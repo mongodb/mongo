@@ -1,5 +1,6 @@
 build_variant_large_distro_exceptions:
   - amazon
+  - amazon-linux2-arm64-dynamic-compile
   - amazon2023
   - amazon2023-arm64
   - debian12
@@ -31,6 +32,7 @@ build_variant_large_distro_exceptions:
   - enterprise-ubuntu2004-arm64
   - enterprise-ubuntu2204-arm64
   - hot_backups-rhel-79-64-bit
+  - linux-x86-dynamic-debug-compile-required
   - macos
   - macos-arm64
   - macos-debug-suggested
@@ -52,3 +54,4 @@ build_variant_large_distro_exceptions:
   - ubi8
   - ubuntu1604-container
   - ubuntu1804-container
+  - windows-compile-required

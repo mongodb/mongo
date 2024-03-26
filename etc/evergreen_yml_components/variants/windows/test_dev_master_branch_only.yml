@@ -182,7 +182,6 @@ buildvariants:
     # run too long and hit execution timeouts.
     # burn_in_task_name: jsCore
   tasks:
-  - name: query_golden_classic
   # - name: burn_in_tasks_gen
   #   depends_on:
   #   - name: version_burn_in_gen
@@ -190,38 +189,8 @@ buildvariants:
   #     omit_generated_tasks: true
   #   - name: archive_dist_test_debug
   #     variant: *windows_compile_variant_name
-  - name: audit
-  - name: auth_audit_gen
-  - name: buildscripts_test
-  - name: .bulk_write
-  - name: causally_consistent_jscore_txns_passthrough
-    distros:
-    - windows-vsCurrent-large
-  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
-  - name: external_auth
-  - name: external_auth_aws
-  - name: .jscore .common !.sharding
-  - name: jsCore_auth
-  - name: jsCore_column_store_indexes
-  - name: jsCore_ese
-  - name: jsCore_txns_large_txns_format
-  - name: jsCore_wildcard_indexes
-  - name: .jstestfuzz .common
-  - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
-  - name: .recordids_replicated
-  - name: .replica_sets .common
-  - name: .replica_sets .multi_oplog !.gcm
-  - name: sasl
-  - name: .sharding .txns
-  - name: sharding_auth_audit_gen
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
-  - name: query_stats_aggregation_passthrough
-  - name: query_stats_mongos_aggregation_passthrough
-  - name: query_stats_mongos_passthrough
-  - name: query_stats_passthrough
-  - name: .timeseries_crud
-  - name: unittest_shell_hang_analyzer_gen
+  - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
+  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
 
 - name: &enterprise-windows-benchmarks enterprise-windows-benchmarks
   display_name: "* Enterprise Windows (Benchmarks)"

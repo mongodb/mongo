@@ -203,7 +203,7 @@ tasks:
       - src/build_metrics_task_gen.json
 
 - name: check_feature_flag_tags
-  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_critical_single_variant"]
   patch_only: true
   commands:
   - command: manifest.load
@@ -220,7 +220,7 @@ tasks:
       - "./src/evergreen/feature_flag_tags_check.sh"
 
 - name: check_for_todos
-  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_critical_single_variant"]
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
   - command: manifest.load
@@ -269,7 +269,7 @@ tasks:
       - "src/evergreen/gen_patch_test_tags.sh"
 
 - name: generate_buildid_to_debug_symbols_mapping
-  tags: ["assigned_to_jira_team_devprod_correctness", "release_critical", "incompatible_mac", "incompatible_windows", "symbolizer"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "release_critical", "incompatible_mac", "incompatible_windows", "requires_compile_variant", "symbolizer"]
   stepback: false
   patchable: true
   depends_on:
@@ -611,7 +611,7 @@ tasks:
 
 # Check that the mutational fuzzer can parse JS files modified in a patch build.
 - name: lint_fuzzer_sanity_patch
-  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_critical_single_variant"]
   patch_only: true
   commands:
   - command: manifest.load
@@ -785,7 +785,7 @@ tasks:
   - func: "monitor mongo fork 10gen"
 
 - name: powercycle
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "experimental", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -815,7 +815,7 @@ tasks:
       num_tasks: 1
 
 - name: powercycle_kill_mongod
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "experimental", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -833,7 +833,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_last_lts_fcv
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "experimental", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -851,7 +851,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "experimental", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -869,7 +869,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication_smalloplog
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "experimental", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -895,7 +895,7 @@ tasks:
       gen_task: powercycle_smoke_skip_compile_gen
 
 - name: powercycle_smoke
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "incompatible_windows"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -926,7 +926,7 @@ tasks:
       run_powercycle_args: --sshAccessRetryCount=1800
 
 - name: powercycle_syncdelay
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "experimental", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -944,7 +944,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_write_concern_majority
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "experimental", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug

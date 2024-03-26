@@ -852,7 +852,7 @@ tasks:
 
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
-  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "requires_large_host"]
   exec_timeout_secs: 7200 # 1 hour timeout for the task overall
   depends_on:
   - name: version_expansions_gen
@@ -1158,7 +1158,7 @@ tasks:
       display_name: Binaries
 
 - name: stitch_support_create_lib
-  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "incompatible_mac", "stitch", "bazel_check"]
+  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "incompatible_mac", "requires_compile_variant", "stitch", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
@@ -1192,7 +1192,7 @@ tasks:
       display_name: "Stitch Support Library"
 
 - name: stitch_support_install_and_run_tests
-  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "incompatible_mac", "stitch", "bazel_check"]
+  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "incompatible_mac", "requires_compile_variant", "stitch", "bazel_check"]
   depends_on:
   - name: stitch_support_create_lib
   commands:
@@ -1217,7 +1217,7 @@ tasks:
       - "src/evergreen/stitch_support_run_tests.sh"
 
 - name: crypt_create_lib
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "crypt", "bazel_check"]
+  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "requires_compile_variant", "crypt", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
@@ -1478,7 +1478,7 @@ tasks:
 
 - name: publish_packages
   run_on: rhel8.7-small
-  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "publish"]
+  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "incompatible_development_variant", "requires_compile_variant", "publish"]
   # This should prevent this task from running in patch builds, where we
   # don't want to publish packages.
   patchable: false
@@ -1530,7 +1530,7 @@ tasks:
 
 - name: push
   run_on: rhel8.7-small
-  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "publish"]
+  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "incompatible_development_variant", "requires_compile_variant", "publish"]
   patchable: false
   depends_on:
   - name: package
@@ -2083,7 +2083,7 @@ tasks:
 
 - name: crypt_push
   run_on: rhel8.7-small
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "publish_crypt"]
+  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_development_variant", "incompatible_community", "requires_compile_variant", "publish_crypt"]
   patchable: false
   stepback: false
   depends_on:

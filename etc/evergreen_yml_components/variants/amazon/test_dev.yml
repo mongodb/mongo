@@ -93,21 +93,17 @@ buildvariants:
     clang_tidy_toolchain: v4
     compile_variant: *amazon-linux2-arm64-dynamic-compile
   tasks:
-    - name: clang_tidy
-      distros:
-        - amazon2-arm64-xlarge
     - name: compile_ninja_quick_TG
     - name: compile_test_parallel_unittest_stream_TG
     - name: compile_test_parallel_core_stream_TG
     - name: compile_test_parallel_dbtest_stream_TG
     - name: compile_integration_and_test_parallel_stream_TG
-    - name: generate_buildid_to_debug_symbols_mapping
-    - name: iwyu_self_test
-    - name: .lint
-    - name: resmoke_validation_tests
-    - name: server_discovery_and_monitoring_json_test
-    - name: server_selection_json_test
-    - name: run_pretty_printer_tests
+    - name: .development_critical_single_variant !.requires_large_host
+    - name: .development_critical_single_variant .requires_large_host
+      distros:
+      - amazon2-arm64-xlarge
+    - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
+    - name: .default .requires_compile_variant !.incompatible_development_variant
 
 - name: &commit-queue commit-queue
   display_name: "~ Commit Queue"
