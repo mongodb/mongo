@@ -47,6 +47,9 @@ struct RepresentativeQueryInfo {
     const stdx::unordered_set<NamespaceString> involvedNamespaces;
     const boost::optional<mongo::EncryptionInformation> encryptionInformation;
     const bool isIdHackQuery;
+    // Name of the leading stage if it is "system"/"administrative" and is not eligible for
+    // rejection by query settings.
+    const boost::optional<std::string> systemStage;
 };
 
 /**
@@ -87,6 +90,8 @@ bool isDefault(const QuerySettings& settings);
 
 void validateRepresentativeQuery(const RepresentativeQueryInfo& representativeQueryInfo);
 void validateQuerySettings(const QuerySettings& settings);
+void verifyQueryCompatibleWithSettings(const RepresentativeQueryInfo& representativeQueryInfo,
+                                       const QuerySettings& settings);
 void simplifyQuerySettings(QuerySettings& settings);
 
 }  // namespace utils

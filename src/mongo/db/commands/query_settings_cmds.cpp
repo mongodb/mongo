@@ -276,6 +276,8 @@ public:
 
                 auto mergedQuerySettings =
                     mergeQuerySettings(lookupResult->first, request().getSettings());
+                utils::verifyQueryCompatibleWithSettings(representativeQueryInfo,
+                                                         mergedQuerySettings);
                 QueryShapeConfiguration newQueryShapeConfiguration(std::move(queryShapeHash),
                                                                    std::move(mergedQuerySettings));
 
@@ -292,6 +294,8 @@ public:
 
                 // Assert that query settings will be set on a valid query.
                 utils::validateRepresentativeQuery(representativeQueryInfo);
+                utils::verifyQueryCompatibleWithSettings(representativeQueryInfo,
+                                                         newQueryShapeConfiguration.getSettings());
                 return insertQuerySettings(opCtx, std::move(newQueryShapeConfiguration));
             }
         }

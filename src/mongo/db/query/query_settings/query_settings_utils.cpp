@@ -29,6 +29,9 @@
 
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 
+#include <boost/optional/optional.hpp>
+#include <string_view>
+
 #include "mongo/db/curop.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -37,6 +40,7 @@
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_utils.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
 
@@ -54,6 +58,8 @@ auto const kSerializationContext =
     SerializationContext{SerializationContext::Source::Command,
                          SerializationContext::CallerType::Request,
                          SerializationContext::Prefix::ExcludePrefix};
+
+MONGO_FAIL_POINT_DEFINE(allowAllSetQuerySettings);
 
 void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const QuerySettings& settings) {
@@ -81,6 +87,67 @@ void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& exp
         uasserted(ErrorCodes::QueryRejectedBySettings, "Query rejected by admin query settings");
     }
 }
+
+/**
+ * System or administrative queries should not be rejected, even if a user
+ * chooses to set reject=true.
+ */
+bool pipelineCanBeRejected(const Pipeline& pipeline) {
+    using namespace std::string_view_literals;
+    static const stdx::unordered_set<std::string_view> exemptedStages = {
+        "$querySettings"sv,
+        "$planCacheStats"sv,
+        "$collStats"sv,
+        "$indexStats"sv,
+        "$listSessions"sv,
+        "$listSampledQueries"sv,
+        "$queryStats"sv,
+        "$currentOp"sv,
+        "$listCatalog"sv,
+        "$listLocalSessions"sv,
+        "$listSearchIndexes"sv,
+        "$operationMetrics"sv,
+    };
+    return !pipeline.peekFront() || !exemptedStages.contains(pipeline.peekFront()->getSourceName());
+}
+
+/**
+ * Aggregate commands require additional introspection to decide if the pipeline is suitable for
+ * rejection to apply.
+ *
+ * "System" requests (used internally or for administration) are permitted to ignore reject, to
+ * avoid accidentally reaching a hard to resolve state, or breaking internal mechanisms.
+ */
+void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              const Pipeline& pipeline,
+                              const QuerySettings& settings) {
+    // Agg requests with "system" stages like $querySettings should not be failed,
+    // even if reject has been set by query hash.
+    if (!pipelineCanBeRejected(pipeline)) {
+        return;
+    }
+    // Continue on to the common checks, and maybe fail the request.
+    failIfRejectedBySettings(expCtx, settings);
+}
+
+/**
+ * If the pipeline starts with a "system"/administrative document source to which query settings
+ * should not be applied, return the relevant stage name.
+ */
+boost::optional<std::string> getStageExemptedFromRejection(const Pipeline& pipeline) {
+    if (pipelineCanBeRejected(pipeline)) {
+        // No pipeline stages are incompatible with rejection.
+        return boost::none;
+    }
+
+    const auto* firstStage = pipeline.peekFront();
+    // An empty pipeline should have lead to the above early exit being taken.
+    tassert(8705201, "Empty pipeline should be eligible for rejection, but was not", firstStage);
+
+    // Currently, all "system" queries are always the first stage in a pipeline.
+    return {std::string(firstStage->getSourceName())};
+}
+
 }  // namespace
 
 /*
@@ -135,7 +202,8 @@ RepresentativeQueryInfo createRepresentativeInfoFind(
         nssOrUuid.nss(),
         std::move(involvedNamespaces),
         std::move(encryptionInformation),
-        isIdHackEligibleQuery};
+        isIdHackEligibleQuery,
+        {/* no unsupported agg stages */}};
 }
 
 /*
@@ -180,7 +248,8 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(
         nssOrUuid.nss(),
         std::move(involvedNamespaces),
         boost::none /* encryptionInformation */,
-        false /* isIdHackEligibleQuery */};
+        false /* isIdHackEligibleQuery */,
+        {/* no unsupported agg stages */}};
 }
 
 /*
@@ -236,7 +305,8 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(
         std::move(expCtx->ns),
         std::move(involvedNamespaces),
         std::move(encryptionInformation),
-        false /* isIdHackEligibleQuery */};
+        false /* isIdHackEligibleQuery */,
+        getStageExemptedFromRejection(*pipeline)};
 }
 
 RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
@@ -378,7 +448,7 @@ QuerySettings lookupQuerySettingsForAgg(
                         .first;
 
     // Fail the current command, if 'reject: true' flag is present.
-    failIfRejectedBySettings(expCtx, settings);
+    failIfRejectedBySettings(expCtx, pipeline, settings);
 
     return settings;
 }
@@ -514,6 +584,9 @@ void validateQuerySettingsEncryptionInformation(
 }
 
 void validateRepresentativeQuery(const RepresentativeQueryInfo& representativeQueryInfo) {
+    if (MONGO_unlikely(allowAllSetQuerySettings.shouldFail())) {
+        return;
+    }
     uassert(8584900,
             "setQuerySettings command cannot be used on internal databases",
             !representativeQueryInfo.namespaceString.isOnInternalDb());
@@ -537,6 +610,17 @@ void validateQuerySettings(const QuerySettings& querySettings) {
             !isDefault(querySettings));
 
     validateQuerySettingsIndexHints(querySettings.getIndexHints());
+}
+
+void verifyQueryCompatibleWithSettings(const RepresentativeQueryInfo& representativeQueryInfo,
+                                       const QuerySettings& settings) {
+    if (MONGO_unlikely(allowAllSetQuerySettings.shouldFail())) {
+        return;
+    }
+    uassert(8705200,
+            str::stream() << "Setting {reject:true} is forbidden for query containing stage: "
+                          << *representativeQueryInfo.systemStage,
+            !(settings.getReject() && representativeQueryInfo.systemStage.has_value()));
 }
 
 void simplifyQuerySettings(QuerySettings& settings) {
