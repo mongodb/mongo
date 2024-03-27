@@ -143,7 +143,6 @@ buildvariants:
       --allocator=system
       --sanitize=undefined,address
       --ssl
-      --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
       --use-diagnostic-latches=on
@@ -179,7 +178,7 @@ buildvariants:
   - rhel80-build
   expansions:
     <<: *aubsan-lite-required-expansions
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
   tasks:
   - name: jsCore
   - name: jsCore_txns
@@ -199,7 +198,6 @@ buildvariants:
       --allocator=system
       --sanitize=address
       --ssl
-      --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
       --use-diagnostic-latches=on
@@ -210,7 +208,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     test_flags: >-
-      --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,corrupts_data
+      --excludeWithAnyTags=requires_fast_memory,corrupts_data
       --enableEnterpriseTests=off
     separate_debug: off
     compile_variant: rhel80-asan
@@ -240,12 +238,11 @@ buildvariants:
       --allocator=system
       --sanitize=address
       --ssl
-      --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
       --use-diagnostic-latches=on
     test_flags: >-
-      --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
+      --excludeWithAnyTags=requires_fast_memory,requires_increased_memlock_limits,corrupts_data
       --benchmarkRepetitions=1
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -332,13 +329,12 @@ buildvariants:
       --opt=on
       --sanitize=undefined
       --ssl
-      --ocsp-stapling=off
       --allocator=tcmalloc-gperf
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
       --use-diagnostic-latches=on
     test_flags: >-
-      --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
+      --excludeWithAnyTags=requires_increased_memlock_limits,corrupts_data
       --benchmarkRepetitions=1
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -423,10 +419,9 @@ buildvariants:
       --allocator=system
       --sanitize=undefined,address,fuzzer
       --ssl
-      --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --use-diagnostic-latches=on
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,corrupts_data
+    test_flags: --excludeWithAnyTags=corrupts_data
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared

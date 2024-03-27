@@ -65,7 +65,7 @@ buildvariants:
     compile_variant: *enterprise-ubuntu2204-64-libvoidstar
     compile_flags: >-
       --ssl
-      --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204
+      MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       CCFLAGS="-fsanitize-coverage=trace-pc-guard"
@@ -86,7 +86,7 @@ buildvariants:
       --ssl
       --opt=on
       --dbg=on
-      --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204
+      MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       --shared-libsan
@@ -117,7 +117,7 @@ buildvariants:
       --opt=on
       --dbg=on
       --ssl
-      --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204
+      MONGO_DISTMOD=ubuntu2204
       --link-model=dynamic
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars

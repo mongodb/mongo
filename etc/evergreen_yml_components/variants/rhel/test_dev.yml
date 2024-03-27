@@ -379,7 +379,7 @@ buildvariants:
     <<: *aubsan-lite-required-expansions
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-      --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,featureFlagSbeFull
+      --excludeWithAnyTags=requires_increased_memlock_limits,featureFlagSbeFull
   tasks:
   - name: .aggregation !.sbe_only
   - name: .auth
