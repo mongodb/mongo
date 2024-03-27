@@ -549,7 +549,9 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
             d64.scaleIndex = scaleIndexForControlByte(control);
             uassert(8288100,
                     "Invalid control byte in BSON Column",
-                    d64.scaleIndex != kInvalidScaleIndex);
+                    d64.scaleIndex == Simple8bTypeUtil::kMemoryAsInteger ||
+                        (lastUncompressed.type() == NumberDouble &&
+                         d64.scaleIndex != kInvalidScaleIndex));
 
             // For doubles we need to remember the last value from the previous block (as
             // the scaling can change between blocks).
@@ -584,11 +586,10 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
             }
 
             current.scaleIndex = d64.scaleIndex;
-            uassert(8827801,
-                    "Unexpected control for type in BSONColumn",
-                    current.scaleIndex == Simple8bTypeUtil::kMemoryAsInteger ||
-                        lastUncompressed.type() == NumberDouble);
         } else {
+            uassert(8827801,
+                    "Invalid control byte in BSON Column",
+                    scaleIndexForControlByte(control) == Simple8bTypeUtil::kMemoryAsInteger);
             // Helper to determine if we may only encode zero deltas
             auto zeroDeltaOnly = [&]() {
                 if (lastUncompressed.type() == BinData) {
