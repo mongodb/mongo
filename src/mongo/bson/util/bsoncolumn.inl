@@ -30,208 +30,6 @@
 namespace mongo {
 namespace bsoncolumn {
 
-// TODO:  Materialize is used in some places to refer converting int encodings to
-// concrete types, and in other places to refer to converting concrete types to
-// a desired output type.  Here we use it to refer to a composite of these two
-// actions; we should take the time to make our terminology consistent.
-template <typename T, typename Encoding, class Buffer, typename Materialize>
-requires Appendable<Buffer>
-const char* BSONColumnBlockBased::decompressAllDelta(const char* ptr,
-                                                     const char* end,
-                                                     Buffer& buffer,
-                                                     Encoding last,
-                                                     const BSONElement& reference,
-                                                     const Materialize& materialize) {
-    // iterate until we stop seeing simple8b block sequences
-    uint64_t prev = simple8b::kSingleZero;
-    while (ptr < end) {
-        uint8_t control = *ptr;
-        if (control == EOO || isUncompressedLiteralControlByte(control) ||
-            isInterleavedStartControlByte(control))
-            return ptr;
-
-        uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-        uassert(8838601,
-                "Invalid control byte in BSON Column",
-                bsoncolumn::scaleIndexForControlByte(control) ==
-                    Simple8bTypeUtil::kMemoryAsInteger);
-
-        simple8b::visitAll<Encoding>(
-            ptr + 1,
-            size,
-            prev,
-            [&materialize, &buffer, &reference, &last](const Encoding v) {
-                if (v == 0)
-                    buffer.appendLast();
-                else {
-                    last = expandDelta(last, v);
-                    materialize(last, reference, buffer);
-                }
-            },
-            [&buffer]() { buffer.appendLast(); },
-            [&buffer]() { buffer.appendMissing(); });
-
-        ptr += 1 + size;
-    }
-
-    return ptr;
-}
-
-template <typename T, typename Encoding, class Buffer, typename Materialize>
-requires Appendable<Buffer>
-const char* BSONColumnBlockBased::decompressAllDeltaPrimitive(const char* ptr,
-                                                              const char* end,
-                                                              Buffer& buffer,
-                                                              Encoding last,
-                                                              const BSONElement& reference,
-                                                              const Materialize& materialize) {
-    // iterate until we stop seeing simple8b block sequences
-    uint64_t prev = simple8b::kSingleZero;
-    while (ptr < end) {
-        uint8_t control = *ptr;
-        if (control == EOO || isUncompressedLiteralControlByte(control) ||
-            isInterleavedStartControlByte(control))
-            return ptr;
-
-        uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-        uassert(8762800,
-                "Invalid control byte in BSON Column",
-                bsoncolumn::scaleIndexForControlByte(control) ==
-                    Simple8bTypeUtil::kMemoryAsInteger);
-
-        simple8b::visitAll<Encoding>(
-            ptr + 1,
-            size,
-            prev,
-            [&materialize, &buffer, &reference, &last](const Encoding v) {
-                last = expandDelta(last, v);
-                materialize(last, reference, buffer);
-            },
-            [&buffer]() { buffer.appendMissing(); });
-
-        ptr += 1 + size;
-    }
-
-    return ptr;
-}
-
-template <typename T, class Buffer, typename Materialize, typename Decode>
-requires Appendable<Buffer>
-const char* BSONColumnBlockBased::decompressAllDeltaOfDelta(const char* ptr,
-                                                            const char* end,
-                                                            Buffer& buffer,
-                                                            int64_t last,
-                                                            const BSONElement& reference,
-                                                            const Materialize& materialize,
-                                                            const Decode& decode) {
-    // iterate until we stop seeing simple8b block sequences
-    int64_t lastlast = 0;
-    uint64_t prev = simple8b::kSingleZero;
-    while (ptr < end) {
-        uint8_t control = *ptr;
-        if (control == EOO || isUncompressedLiteralControlByte(control) ||
-            isInterleavedStartControlByte(control))
-            return ptr;
-
-        uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-        uassert(8762801,
-                "Invalid control byte in BSON Column",
-                bsoncolumn::scaleIndexForControlByte(control) ==
-                    Simple8bTypeUtil::kMemoryAsInteger);
-
-        simple8b::visitAll<int64_t>(
-            ptr + 1,
-            size,
-            prev,
-            [&materialize, &lastlast, &buffer, &reference, &last](int64_t v) {
-                lastlast = expandDelta(lastlast, v);
-                last = expandDelta(last, lastlast);
-                materialize(last, reference, buffer);
-            },
-            [&buffer]() { buffer.appendMissing(); });
-
-        ptr += 1 + size;
-    }
-
-    return ptr;
-}
-
-template <class Buffer>
-requires Appendable<Buffer>
-const char* BSONColumnBlockBased::decompressAllDouble(const char* ptr,
-                                                      const char* end,
-                                                      Buffer& buffer,
-                                                      double last) {
-    // iterate until we stop seeing simple8b block sequences
-    int64_t lastValue = 0;
-    uint64_t prev = simple8b::kSingleZero;
-    while (ptr < end) {
-        uint8_t control = *ptr;
-        if (control == EOO || isUncompressedLiteralControlByte(control) ||
-            isInterleavedStartControlByte(control))
-            return ptr;
-
-        uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-        uint8_t scaleIndex = bsoncolumn::scaleIndexForControlByte(control);
-        uassert(8762802,
-                "Invalid control byte in BSON Column",
-                scaleIndex != bsoncolumn::kInvalidScaleIndex);
-        auto encodedDouble = Simple8bTypeUtil::encodeDouble(last, scaleIndex);
-        uassert(8295701, "Invalid double encoding in BSON Column", encodedDouble);
-        lastValue = *encodedDouble;
-
-        simple8b::visitAll<int64_t>(
-            ptr + 1,
-            size,
-            prev,
-            [&last, &buffer, &scaleIndex, &lastValue](int64_t v) {
-                lastValue = expandDelta(lastValue, v);
-                last = Simple8bTypeUtil::decodeDouble(lastValue, scaleIndex);
-                buffer.append(last);
-            },
-            [&buffer]() { buffer.appendMissing(); });
-
-        ptr += 1 + size;
-    }
-
-    return ptr;
-}
-
-template <class Buffer>
-requires Appendable<Buffer>
-const char* BSONColumnBlockBased::decompressAllLiteral(const char* ptr,
-                                                       const char* end,
-                                                       Buffer& buffer) {
-    uint64_t prev = simple8b::kSingleZero;
-    while (ptr < end) {
-        const uint8_t control = *ptr;
-        if (control == EOO || isUncompressedLiteralControlByte(control) ||
-            isInterleavedStartControlByte(control))
-            break;
-
-        uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-        uassert(8762803,
-                "Invalid control byte in BSON Column",
-                bsoncolumn::scaleIndexForControlByte(control) ==
-                    Simple8bTypeUtil::kMemoryAsInteger);
-
-        simple8b::visitAll<int64_t>(
-            ptr + 1,
-            size,
-            prev,
-            [&buffer](int64_t v) {
-                uassert(8609800, "Post literal delta blocks should only contain skip or 0", v == 0);
-                buffer.appendLast();
-            },
-            [&buffer]() { buffer.appendLast(); },
-            [&buffer]() { buffer.appendMissing(); });
-
-        ptr += 1 + size;
-    }
-
-    return ptr;
-}
-
 template <class Buffer>
 requires Appendable<Buffer>
 void BSONColumnBlockBased::decompress(Buffer& buffer) const {
@@ -272,7 +70,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
             switch (type) {
                 case Bool:
                     buffer.template append<bool>(literal);
-                    ptr = decompressAllDeltaPrimitive<bool, int64_t, Buffer>(
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDeltaPrimitive<bool, int64_t, Buffer>(
                         ptr,
                         end,
                         buffer,
@@ -284,7 +82,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                     break;
                 case NumberInt:
                     buffer.template append<int32_t>(literal);
-                    ptr = decompressAllDeltaPrimitive<int32_t, int64_t, Buffer>(
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDeltaPrimitive<int32_t, int64_t, Buffer>(
                         ptr,
                         end,
                         buffer,
@@ -296,7 +94,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                     break;
                 case NumberLong:
                     buffer.template append<int64_t>(literal);
-                    ptr = decompressAllDeltaPrimitive<int64_t, int64_t, Buffer>(
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDeltaPrimitive<int64_t, int64_t, Buffer>(
                         ptr,
                         end,
                         buffer,
@@ -308,7 +106,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                     break;
                 case NumberDecimal:
                     buffer.template append<Decimal128>(literal);
-                    ptr = decompressAllDelta<Decimal128, int128_t, Buffer>(
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDelta<Decimal128, int128_t, Buffer>(
                         ptr,
                         end,
                         buffer,
@@ -320,11 +118,11 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                     break;
                 case NumberDouble:
                     buffer.template append<double>(literal);
-                    ptr = decompressAllDouble(ptr, end, buffer, literal._numberDouble());
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDouble(ptr, end, buffer, literal._numberDouble());
                     break;
                 case bsonTimestamp:
                     buffer.template append<Timestamp>(literal);
-                    ptr = decompressAllDeltaOfDelta<Timestamp, Buffer>(
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDeltaOfDelta<Timestamp, Buffer>(
                         ptr,
                         end,
                         buffer,
@@ -337,7 +135,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                     break;
                 case Date:
                     buffer.template append<Date_t>(literal);
-                    ptr = decompressAllDeltaOfDelta<Date_t, Buffer>(
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDeltaOfDelta<Date_t, Buffer>(
                         ptr,
                         end,
                         buffer,
@@ -350,7 +148,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                     break;
                 case jstOID:
                     buffer.template append<OID>(literal);
-                    ptr = decompressAllDeltaOfDelta<OID, Buffer>(
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDeltaOfDelta<OID, Buffer>(
                         ptr,
                         end,
                         buffer,
@@ -364,7 +162,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                     break;
                 case String:
                     buffer.template append<StringData>(literal);
-                    ptr = decompressAllDelta<StringData, int128_t, Buffer>(
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDelta<StringData, int128_t, Buffer>(
                         ptr,
                         end,
                         buffer,
@@ -380,7 +178,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                     int size;
                     const char* binary = literal.binData(size);
                     if (size <= 16) {
-                        ptr = decompressAllDelta<BSONBinData, int128_t, Buffer>(
+                        ptr = BSONColumnBlockDecompressHelpers::decompressAllDelta<BSONBinData, int128_t, Buffer>(
                             ptr,
                             end,
                             buffer,
@@ -392,13 +190,13 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                                 buffer.append(BSONBinData(data, size, ref.binDataType()));
                             });
                     } else {
-                        ptr = decompressAllLiteral(ptr, end, buffer);
+                        ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(ptr, end, buffer);
                     }
                     break;
                 }
                 case Code:
                     buffer.template append<BSONCode>(literal);
-                    ptr = decompressAllDelta<BSONCode, int128_t, Buffer>(
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDelta<BSONCode, int128_t, Buffer>(
                         ptr,
                         end,
                         buffer,
@@ -422,7 +220,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                 case MaxKey:
                     // Non-delta types, deltas should only contain skip or 0
                     buffer.template append<BSONElement>(literal);
-                    ptr = decompressAllLiteral(ptr, end, buffer);
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(ptr, end, buffer);
                     break;
                 default:
                     uasserted(8295704, "Type not implemented");
@@ -433,7 +231,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
             using PathBufferPair = std::pair<RootPath, Buffer&>;
             std::array<PathBufferPair, 1> path{{{RootPath{}, buffer}}};
             ptr = decompressor.decompress(std::span<PathBufferPair, 1>{path});
-            ptr = decompressAllLiteral(ptr, end, buffer);
+            ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(ptr, end, buffer);
         } else {
             uasserted(8295706, "Unexpected control");
         }

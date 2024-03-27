@@ -354,6 +354,402 @@ private:
 };
 
 /**
+ * Interface for a buffer to receive decoded elements from block-based
+ * BSONColumn decompression.
+ */
+template <class T>
+concept Appendable = requires(
+    T& t, StringData strVal, BSONBinData binVal, BSONCode codeVal, BSONElement bsonVal, int32_t n) {
+    t.append(true);
+    t.append((int32_t)1);
+    t.append((int64_t)1);
+    t.append(Decimal128());
+    t.append((double)1.0);
+    t.append((Timestamp)1);
+    t.append(Date_t::now());
+    t.append(OID::gen());
+    t.append(strVal);
+    t.append(binVal);
+    t.append(codeVal);
+
+    // Strings can arrive either in 128-bit encoded format, or as
+    // literals (BSONElement)
+
+    // Takes pre-allocated BSONElement
+    t.template append<bool>(bsonVal);
+    t.template append<int32_t>(bsonVal);
+    t.template append<int64_t>(bsonVal);
+    t.template append<Decimal128>(bsonVal);
+    t.template append<double>(bsonVal);
+    t.template append<Timestamp>(bsonVal);
+    t.template append<Date_t>(bsonVal);
+    t.template append<OID>(bsonVal);
+    t.template append<StringData>(bsonVal);
+    t.template append<BSONBinData>(bsonVal);
+    t.template append<BSONCode>(bsonVal);
+    t.template append<BSONElement>(bsonVal);
+
+    t.appendPreallocated(bsonVal);
+
+    t.appendPositionInfo(n);
+
+    t.appendMissing();
+
+    // Repeat the last appended value
+    t.appendLast();
+};
+
+/**
+ * Interface to accept elements decoded from BSONColumn and materialize them
+ * as Elements of user-defined type.
+ *
+ * This class will be used with decompress() and other methods of BSONColumn to efficiently produce
+ * values of the desired type (e.g., SBE values or BSONElements). The methods provided by
+ * implementors of this concept will be called from the main decompression loop, so they should be
+ * inlineable, and avoid branching and memory allocations when possible.
+ *
+ * The data types passed to the materialize() methods could be referencing memory on the stack
+ * (e.g., the pointer in a StringData instance) and so implementors should assume this data is
+ * ephemeral. The provided ElementStorage can be used to allocate memory with the lifetime of the
+ * BSONColumn instance.
+ *
+ * The exception to this rule is that BSONElements passed to the materialize() methods may appear in
+ * decompressed form as-is in the BSONColumn binary data. If they are as such, they will have the
+ * same lifetime as the BSONColumn, and may go away if a yield of query execution occurs.
+ * Implementers may wish to explicitly copy the value with the allocator in this case. It may also
+ * occur that decompression allocates its own BSONElements as part of its execution (e.g., when
+ * materializing whole objects from compressed scalars). In this case, decompression will invoke
+ * materializePreallocated() instead of materialize().
+ */
+template <class T>
+concept Materializer = requires(T& t,
+                                ElementStorage& alloc,
+                                StringData strVal,
+                                BSONBinData binVal,
+                                BSONCode codeVal,
+                                BSONElement bsonVal) {
+    { T::materialize(alloc, true) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (int32_t)1) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (int64_t)1) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, Decimal128()) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (double)1.0) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (Timestamp)1) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, Date_t::now()) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, OID::gen()) } -> std::same_as<typename T::Element>;
+
+    { T::materialize(alloc, strVal) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, binVal) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, codeVal) } -> std::same_as<typename T::Element>;
+
+    { T::template materialize<bool>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<int32_t>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<int64_t>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<Decimal128>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<double>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<Timestamp>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<Date_t>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<OID>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+
+    { T::template materialize<StringData>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<BSONBinData>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<BSONCode>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+
+    { T::materializePreallocated(bsonVal) } -> std::same_as<typename T::Element>;
+
+    { T::materializeMissing(alloc) } -> std::same_as<typename T::Element>;
+};
+
+/**
+ * Interface to indicate to the 'Collector' at compile time if the user requested the decompressor
+ * to collect the position information of values within documents.
+ */
+template <typename T>
+concept PositionInfoAppender = requires(T& t, int32_t n) {
+    { t.appendPositionInfo(n) } -> std::same_as<void>;
+};
+
+/**
+ * Helpers for block decompress-all functions
+ * T - the type we are decompressing to
+ * Encoding - the underlying encoding (int128_t or int64_t) for Simple8b deltas
+ * Buffer - the buffer being filled by decompress()
+ * Materialize - function to convert delta decoding into T and append to Buffer
+ * Decode - the Simple8b decoder to use
+ * Finish - after completion, receives the count of elements and the final element
+ */
+
+// TODO:  Materialize is used in some places to refer converting int encodings to
+// concrete types, and in other places to refer to converting concrete types to
+// a desired output type.  Here we use it to refer to a composite of these two
+// actions; we should take the time to make our terminology consistent.
+
+class BSONColumnBlockDecompressHelpers {
+public:
+    template <typename T, typename Encoding, class Buffer, typename Materialize, typename Finish>
+    requires Appendable<Buffer>
+    static const char* decompressAllDelta(const char* ptr,
+                                          const char* end,
+                                          Buffer& buffer,
+                                          Encoding last,
+                                          const BSONElement& reference,
+                                          const Materialize& materialize,
+                                          const Finish& finish) {
+        // iterate until we stop seeing simple8b block sequences
+        uint64_t prev = simple8b::kSingleZero;
+        size_t elemCount = 0;
+        while (ptr < end) {
+            uint8_t control = *ptr;
+            if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                isInterleavedStartControlByte(control))
+                return ptr;
+
+            uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+
+            elemCount += simple8b::visitAll<Encoding>(
+                ptr + 1,
+                size,
+                prev,
+                [&materialize, &buffer, &reference, &last](const Encoding v) {
+                    if (v == 0)
+                        buffer.appendLast();
+                    else {
+                        last = expandDelta(last, v);
+                        materialize(last, reference, buffer);
+                    }
+                },
+                [&buffer]() { buffer.appendLast(); },
+                [&buffer]() { buffer.appendMissing(); });
+
+            ptr += 1 + size;
+        }
+
+        finish(elemCount, last);
+        return ptr;
+    }
+
+    template <typename T, typename Encoding, class Buffer, typename Materialize>
+    requires Appendable<Buffer>
+    static const char* decompressAllDelta(const char* ptr,
+                                          const char* end,
+                                          Buffer& buffer,
+                                          Encoding last,
+                                          const BSONElement& reference,
+                                          const Materialize& materialize) {
+        return decompressAllDelta<T>(
+            ptr, end, buffer, last, reference, materialize, [](size_t count, Encoding last) {});
+    }
+
+    /* Like decompressAllDelta, but does not have branching to avoid re-materialization
+       of repeated values, intended to be used on primitive types where this does not
+       result in additional allocation */
+    template <typename T, typename Encoding, class Buffer, typename Materialize, typename Finish>
+    requires Appendable<Buffer>
+    static const char* decompressAllDeltaPrimitive(const char* ptr,
+                                                   const char* end,
+                                                   Buffer& buffer,
+                                                   Encoding last,
+                                                   const BSONElement& reference,
+                                                   const Materialize& materialize,
+                                                   const Finish& finish) {
+        // iterate until we stop seeing simple8b block sequences
+        uint64_t prev = simple8b::kSingleZero;
+        size_t elemCount = 0;
+        while (ptr < end) {
+            uint8_t control = *ptr;
+            if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                isInterleavedStartControlByte(control))
+                return ptr;
+
+            uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+            uassert(8762800,
+                    "Invalid control byte in BSON Column",
+                    bsoncolumn::scaleIndexForControlByte(control) ==
+                        Simple8bTypeUtil::kMemoryAsInteger);
+
+            elemCount += simple8b::visitAll<Encoding>(
+                ptr + 1,
+                size,
+                prev,
+                [&materialize, &buffer, &reference, &last](const Encoding v) {
+                    last = expandDelta(last, v);
+                    materialize(last, reference, buffer);
+                },
+                [&buffer]() { buffer.appendMissing(); });
+
+            ptr += 1 + size;
+        }
+
+        finish(elemCount, last);
+        return ptr;
+    }
+
+    template <typename T, typename Encoding, class Buffer, typename Materialize>
+    requires Appendable<Buffer>
+    static const char* decompressAllDeltaPrimitive(const char* ptr,
+                                                   const char* end,
+                                                   Buffer& buffer,
+                                                   Encoding last,
+                                                   const BSONElement& reference,
+                                                   const Materialize& materialize) {
+        return decompressAllDeltaPrimitive<T>(
+            ptr, end, buffer, last, reference, materialize, [](size_t count, Encoding last) {});
+    }
+
+    template <typename T, class Buffer, typename Materialize, typename Decode, typename Finish>
+    requires Appendable<Buffer>
+    static const char* decompressAllDeltaOfDelta(const char* ptr,
+                                                 const char* end,
+                                                 Buffer& buffer,
+                                                 int64_t last,
+                                                 const BSONElement& reference,
+                                                 const Materialize& materialize,
+                                                 const Decode& decode,
+                                                 const Finish& finish) {
+        // iterate until we stop seeing simple8b block sequences
+        int64_t lastlast = 0;
+        uint64_t prev = simple8b::kSingleZero;
+        size_t elemCount = 0;
+        while (ptr < end) {
+            uint8_t control = *ptr;
+            if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                isInterleavedStartControlByte(control))
+                return ptr;
+
+            uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+            uassert(8762801,
+                    "Invalid control byte in BSON Column",
+                    bsoncolumn::scaleIndexForControlByte(control) ==
+                        Simple8bTypeUtil::kMemoryAsInteger);
+
+            elemCount += simple8b::visitAll<int64_t>(
+                ptr + 1,
+                size,
+                prev,
+                [&materialize, &lastlast, &buffer, &reference, &last](int64_t v) {
+                    lastlast = expandDelta(lastlast, v);
+                    last = expandDelta(last, lastlast);
+                    materialize(last, reference, buffer);
+                },
+                [&buffer]() { buffer.appendMissing(); });
+
+            ptr += 1 + size;
+        }
+
+        finish(elemCount, last);
+        return ptr;
+    }
+
+    template <typename T, class Buffer, typename Materialize, typename Decode>
+    requires Appendable<Buffer>
+    static const char* decompressAllDeltaOfDelta(const char* ptr,
+                                                 const char* end,
+                                                 Buffer& buffer,
+                                                 int64_t last,
+                                                 const BSONElement& reference,
+                                                 const Materialize& materialize,
+                                                 const Decode& decode) {
+        return decompressAllDeltaOfDelta<T>(
+            ptr, end, buffer, last, reference, materialize, decode, [](size_t count, int64_t last) {
+            });
+    }
+
+    template <class Buffer, typename Finish>
+    requires Appendable<Buffer>
+    static const char* decompressAllDouble(
+        const char* ptr, const char* end, Buffer& buffer, double last, const Finish& finish) {
+        // iterate until we stop seeing simple8b block sequences
+        int64_t lastValue = 0;
+        uint64_t prev = simple8b::kSingleZero;
+        size_t elemCount = 0;
+        while (ptr < end) {
+            uint8_t control = *ptr;
+            if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                isInterleavedStartControlByte(control))
+                return ptr;
+
+            uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+            uint8_t scaleIndex = bsoncolumn::scaleIndexForControlByte(control);
+            uassert(8762802,
+                    "Invalid control byte in BSON Column",
+                    scaleIndex != bsoncolumn::kInvalidScaleIndex);
+            auto encodedDouble = Simple8bTypeUtil::encodeDouble(last, scaleIndex);
+            uassert(8295701, "Invalid double encoding in BSON Column", encodedDouble);
+            lastValue = *encodedDouble;
+
+            elemCount += simple8b::visitAll<int64_t>(
+                ptr + 1,
+                size,
+                prev,
+                [&last, &buffer, &scaleIndex, &lastValue](int64_t v) {
+                    lastValue = expandDelta(lastValue, v);
+                    last = Simple8bTypeUtil::decodeDouble(lastValue, scaleIndex);
+                    buffer.append(last);
+                },
+                [&buffer]() { buffer.appendMissing(); });
+
+            ptr += 1 + size;
+        }
+
+        finish(elemCount, lastValue);
+        return ptr;
+    }
+
+    template <class Buffer>
+    requires Appendable<Buffer>
+    static const char* decompressAllDouble(const char* ptr,
+                                           const char* end,
+                                           Buffer& buffer,
+                                           double last) {
+        return decompressAllDouble(ptr, end, buffer, last, [](size_t count, int64_t last) {});
+    }
+
+    template <class Buffer, typename Finish>
+    requires Appendable<Buffer>
+    static const char* decompressAllLiteral(const char* ptr,
+                                            const char* end,
+                                            Buffer& buffer,
+                                            const Finish& finish) {
+        uint64_t prev = simple8b::kSingleZero;
+        size_t elemCount = 0;
+        while (ptr < end) {
+            const uint8_t control = *ptr;
+            if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                isInterleavedStartControlByte(control))
+                break;
+
+            uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+            uassert(8762803,
+                    "Invalid control byte in BSON Column",
+                    bsoncolumn::scaleIndexForControlByte(control) ==
+                        Simple8bTypeUtil::kMemoryAsInteger);
+
+            elemCount += simple8b::visitAll<int64_t>(
+                ptr + 1,
+                size,
+                prev,
+                [&buffer](int64_t v) {
+                    uassert(
+                        8609800, "Post literal delta blocks should only contain skip or 0", v == 0);
+                    buffer.appendLast();
+                },
+                [&buffer]() { buffer.appendLast(); },
+                [&buffer]() { buffer.appendMissing(); });
+
+            ptr += 1 + size;
+        }
+
+        finish(elemCount, 0);
+        return ptr;
+    }
+
+    template <class Buffer>
+    requires Appendable<Buffer>
+    static const char* decompressAllLiteral(const char* ptr, const char* end, Buffer& buffer) {
+        return decompressAllLiteral(ptr, end, buffer, [](size_t count, int64_t last) {});
+    }
+};
+
+/**
  * Implements the "materializer" concept such that the output elements are BSONElements.
  */
 class BSONElementMaterializer {
