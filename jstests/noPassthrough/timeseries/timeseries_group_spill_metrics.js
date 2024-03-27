@@ -12,9 +12,11 @@ import {getAggPlanStage, getEngine} from "jstests/libs/analyze_plan.js";
 const conn = MongoRunner.runMongod(
     {setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true}});
 const db = conn.getDB('test');
-// Debug mode changes how often we spill.
-if (db.adminCommand('buildInfo').debug) {
-    jsTestLog("Returning early because debug is on.");
+// Debug mode changes how often we spill. This test assumes SBE is being used.
+if (db.adminCommand('buildInfo').debug ||
+    assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
+            .internalQueryFrameworkControl == "forceClassicEngine") {
+    jsTestLog("Returning early because debug or forceClassic is on.");
     MongoRunner.stopMongod(conn);
     quit();
 }

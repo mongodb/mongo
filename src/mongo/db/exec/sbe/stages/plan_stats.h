@@ -315,8 +315,35 @@ struct TraverseStats : public SpecificStats {
 };
 
 struct HashAggStats : public SpecificStats {
-    std::unique_ptr<SpecificStats> clone() const final {
+    std::unique_ptr<SpecificStats> clone() const override {
         return std::make_unique<HashAggStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const override {
+        return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const override {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) override {
+        visitor->visit(this);
+    }
+
+    bool usedDisk{false};
+    // The number of times that the entire hash table was spilled.
+    long long spills{0};
+    // The number of individual records spilled to disk.
+    long long spilledRecords{0};
+    // An estimate, in bytes, of the size of the final spill table after all spill events have taken
+    // place.
+    long long spilledDataStorageSize{0};
+};
+
+struct BlockHashAggStats : public HashAggStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<BlockHashAggStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const final {
@@ -331,14 +358,20 @@ struct HashAggStats : public SpecificStats {
         visitor->visit(this);
     }
 
-    bool usedDisk{false};
-    // The number of times that the entire hash table was spilled.
-    long long spills{0};
-    // The number of individual records spilled to disk.
-    long long spilledRecords{0};
-    // An estimate, in bytes, of the size of the final spill table after all spill events have taken
-    // place.
-    long long spilledDataStorageSize{0};
+    /*
+     * We use block accumulators (which do bulk operations) when the groupby keys for BlockHashAgg
+     * don't have many unique values. If there are lots of unique values (ie highly partitioned), we
+     * prefer an element-wise approach, applying the accumulator to each data point one at a time.
+     *
+     * These metrics keep track of how many times each type of accumulator is used.
+     * `blockAccumulations` and `elementWiseAccumulations` indicate how many times we chose the
+     * corresponding accumulation method per block. `blockAccumulatorTotalCalls` indicates how many
+     * times the block accumulators were invoked, which may be more than once per block depending
+     * on how many partitions there are.
+     */
+    long long blockAccumulations{0};
+    long long blockAccumulatorTotalCalls{0};
+    long long elementWiseAccumulations{0};
 };
 
 struct HashLookupStats : public SpecificStats {

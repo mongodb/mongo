@@ -200,7 +200,7 @@ private:
 
     SlotExprPairVector _mergingExprs;
 
-    HashAggStats _specificStats;
+    BlockHashAggStats _specificStats;
 
     value::SlotAccessorMap _outAccessorsMap;
 

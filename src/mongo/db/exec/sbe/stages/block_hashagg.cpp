@@ -351,6 +351,9 @@ value::SlotAccessor* BlockHashAggStage::getAccessor(CompileCtx& ctx, value::Slot
 }
 
 void BlockHashAggStage::executeBlockLevelAccumulatorCode(const value::MaterializedRow& key) {
+    // Track how many times we invoke the block accumulators.
+    _specificStats.blockAccumulatorTotalCalls++;
+
     // If all bits are false, there's no work to do. We don't want to make an erroneous
     // entry in our hash map.
     if (allFalse(_accumulatorBitsetAccessor.getViewOfValue())) {
@@ -445,6 +448,9 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
 }
 
 void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedKeys) {
+    // We're using the block-based accumulator, so increment the corresponding metric.
+    _specificStats.blockAccumulations++;
+
     invariant(_blockBitsetInAccessor);
     auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
     invariant(bitmapInTag == value::TypeTags::valueBlock);
@@ -485,6 +491,9 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
 }
 
 void BlockHashAggStage::runAccumulatorsElementWise() {
+    // We're using the element-wise accumulator, so increment the corresponding metric.
+    _specificStats.elementWiseAccumulations++;
+
     // Extract the bitmap.
     value::DeblockedTagVals extractedBitmap = _bitmapBlock->extract();
 
@@ -964,6 +973,11 @@ std::unique_ptr<PlanStageStats> BlockHashAggStage::getStats(bool includeDebugInf
         bob.appendNumber("spills", _specificStats.spills);
         bob.appendNumber("spilledRecords", _specificStats.spilledRecords);
         bob.appendNumber("spilledDataStorageSize", _specificStats.spilledDataStorageSize);
+
+        // Block-specific stats.
+        bob.appendNumber("blockAccumulations", _specificStats.blockAccumulations);
+        bob.appendNumber("blockAccumulatorTotalCalls", _specificStats.blockAccumulatorTotalCalls);
+        bob.appendNumber("elementWiseAccumulations", _specificStats.elementWiseAccumulations);
 
         ret->debugInfo = bob.obj();
     }
