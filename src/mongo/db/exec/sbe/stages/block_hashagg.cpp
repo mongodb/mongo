@@ -88,41 +88,6 @@ std::unique_ptr<value::ValueBlock> bitAnd(value::ValueBlock* bitset1, value::Val
     return std::make_unique<value::BoolBlock>(std::move(vecResult));
 }
 
-/*
- * Block that holds a view of a single value. It does not take ownership of the given value. This is
- * used because the block accumulators expect block inputs, but in some cases we may need to provide
- * is scalars that we do not own.
- * Used only for BlockHashAgg.
- */
-class SingletonViewBlock final : public value::ValueBlock {
-public:
-    SingletonViewBlock() {}
-
-    SingletonViewBlock(value::TypeTags tag, value::Value val) : _tag(tag), _val(val) {}
-
-    void setTagVal(std::pair<value::TypeTags, value::Value> tagVal) {
-        _tag = tagVal.first;
-        _val = tagVal.second;
-    }
-
-    std::unique_ptr<ValueBlock> clone() const override {
-        return std::make_unique<SingletonViewBlock>(_tag, _val);
-    }
-
-    boost::optional<size_t> tryCount() const override {
-        return 1;
-    }
-
-    value::DeblockedTagVals deblock(
-        boost::optional<value::DeblockedTagValStorage>& storage) override {
-        return {1, &_tag, &_val};
-    }
-
-private:
-    value::TypeTags _tag;
-    value::Value _val;
-};
-
 struct SpanHasher {
     SpanHasher() {}
 
@@ -146,6 +111,9 @@ struct SpanEq {
         return true;
     }
 };
+
+// Map from <row of tokens> ---> finalToken
+using TokenizeTableType = stdx::unordered_map<std::span<size_t>, size_t, SpanHasher, SpanEq>;
 
 using KeyTableType = stdx::
     unordered_map<std::span<size_t>, std::pair<size_t, value::MaterializedRow>, SpanHasher, SpanEq>;
@@ -540,74 +508,153 @@ void BlockHashAggStage::runAccumulatorsElementWise() {
     _accumulatorBitsetAccessor.reset(false, value::TypeTags::Nothing, 0);
 }
 
-boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tokenizeTokenInfos(
-    const std::vector<value::TokenizedBlock>& tokenInfos,
-    const std::vector<value::DeblockedTagVals>& deblockedTokens) {
+boost::optional<std::vector<size_t>> BlockHashAggStage::tokenizeTokenInfos(
+    const std::vector<value::TokenizedBlock>& tokenInfos) {
     invariant(!tokenInfos.empty());
 
-    // compoundKeys is an N x M vector, where N is the number of elements in the input blocks,
-    // and M is the number of input blocks.
-    std::vector<size_t> compoundKeys(tokenInfos[0].idxs.size() * tokenInfos.size());
+    // TODO SERVER-85739: Note that we could have a special path here for the case where
+    // 'tokenInfos' is size 1. We would not need to do the hashing in that case.  We can also have
+    // a path that quickly bails out and returns boost::none if _any_ of the inputs have more than
+    // kMaxNumPartitionsForTokenizedPath tokens.
+
+    // compoundKeys is a blockSize x numBlocks (row x column) vector.
+    const size_t blockSize = tokenInfos[0].idxs.size();
+    const size_t numBlocks = tokenInfos.size();
+    _compoundKeys.resize(blockSize * numBlocks, 0);
 
     // All input blocks must be the same size, enforced by an invariant in open().
     size_t ckIdx = 0;
-    for (size_t blockIdx = 0; blockIdx < tokenInfos[0].idxs.size(); ++blockIdx) {
-        for (size_t keyIdx = 0; keyIdx < tokenInfos.size(); ++keyIdx) {
-            compoundKeys[ckIdx++] = tokenInfos[keyIdx].idxs[blockIdx];
+    for (size_t blockIdx = 0; blockIdx < blockSize; ++blockIdx) {
+        for (size_t keyIdx = 0; keyIdx < numBlocks; ++keyIdx) {
+            _compoundKeys[ckIdx++] = tokenInfos[keyIdx].idxs[blockIdx];
         }
     }
 
-    auto keyMap = KeyTableType();
+    auto keyMap = TokenizeTableType();
     size_t uniqueCount = 0;
-    std::vector<value::MaterializedRow> keys;
-    std::vector<size_t> idxs(tokenInfos[0].idxs.size(), 0);
-    for (size_t blockIdx = 0; blockIdx < tokenInfos[0].idxs.size(); ++blockIdx) {
-        // Create an empty key that we will populate with the corresponding tokens for each element
-        // in the key.
-        value::MaterializedRow key{tokenInfos.size()};
-        std::span<size_t> htKey{&compoundKeys[blockIdx * tokenInfos.size()], tokenInfos.size()};
-        auto [it, inserted] = keyMap.emplace(htKey, std::pair(uniqueCount, key));
+    std::vector<size_t> idxs(blockSize, 0);
+    for (size_t blockIdx = 0; blockIdx < blockSize; ++blockIdx) {
+        std::span<size_t> htKey{&_compoundKeys[blockIdx * numBlocks], numBlocks};
+        auto [it, inserted] = keyMap.emplace(htKey, uniqueCount);
         if (inserted) {
             uniqueCount++;
+
             if (uniqueCount > kMaxNumPartitionsForTokenizedPath) {
                 // We've seen more "partitions" for this block than we are willing to process in
                 // the Tokenized path, so we will exit early and run the accumulators element
                 // wise.
                 return boost::none;
             }
-
-            for (size_t keyIdx = 0; keyIdx < tokenInfos.size(); ++keyIdx) {
-                size_t idx = (blockIdx * tokenInfos.size()) /* rowIdx */ + keyIdx /* colIdx */;
-                auto [tag, val] = deblockedTokens[keyIdx][compoundKeys[idx]];
-                // Update the key element at keyIdx with the corresponding token.
-                it->second.second.reset(keyIdx, false, tag, val);
-            }
-            // Now that the full key is materialized, insert it into the vector of keys.
-            keys.push_back(it->second.second);
         }
-        idxs[blockIdx] = it->second.first;
+        idxs[blockIdx] = it->second;
     }
 
-    return BlockHashAggStage::TokenizedKeys{std::move(keys), std::move(idxs)};
+    return idxs;
 }
 
 boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tryTokenizeGbs() {
+    // First separate which gbBlocks are mono blocks and which are not.
+    std::vector<value::ValueBlock*> nonMonoGbBlocks;
+    nonMonoGbBlocks.reserve(_gbBlocks.size());
+    std::vector<value::MonoBlock*> monoGbBlocks;
+    monoGbBlocks.reserve(_gbBlocks.size());
+
+    std::vector<bool> isMonoBlock(_gbBlocks.size());
+    {
+        size_t i = 0;
+        for (auto* gbBlock : _gbBlocks) {
+            if (auto monoBlock = gbBlock->as<value::MonoBlock>()) {
+                isMonoBlock[i] = true;
+                monoGbBlocks.push_back(monoBlock);
+            } else {
+                isMonoBlock[i] = false;
+                nonMonoGbBlocks.push_back(gbBlock);
+            }
+            ++i;
+        }
+    }
+
+    TokenizedKeys out;
+
+    // Special case: we have only mono blocks.
+    if (nonMonoGbBlocks.empty()) {
+        value::MaterializedRow key{monoGbBlocks.size()};
+
+        // Go over each mono block and produce the output manually.
+        size_t idx = 0;
+        for (auto* mb : monoGbBlocks) {
+            key.reset(idx++, false, mb->getTag(), mb->getValue());
+        }
+
+        out.keys.push_back(std::move(key));
+        out.idxs.resize(_currentBlockSize, 0);
+        return out;
+    }
+
     // Populate '_tokenInfos' and '_deblockedTokens'.
     _tokenInfos.clear();
-
-    for (size_t i = 0; i < _gbBlocks.size(); ++i) {
-        _tokenInfos.push_back(_gbBlocks[i]->tokenize());
+    _deblockedTokens.clear();
+    for (size_t i = 0; i < nonMonoGbBlocks.size(); ++i) {
+        _tokenInfos.push_back(nonMonoGbBlocks[i]->tokenize());
 
         tassert(8608600,
                 "All input blocks must be the same size",
                 _tokenInfos[i].idxs.size() == _currentBlockSize);
-
-        _deblockedTokens[i] = _tokenInfos[i].tokens->extract();
     }
 
     // Combine the TokenizedBlocks for each input key, combine them into compound keys, tokenize
     // these compound keys, and then return the result.
-    return tokenizeTokenInfos(_tokenInfos, _deblockedTokens);
+    boost::optional<std::vector<size_t>> optFinalTokens = tokenizeTokenInfos(_tokenInfos);
+    if (!optFinalTokens) {
+        // Too many tokens, use the row path.
+        return boost::none;
+    }
+
+    // Now extract everything.
+    for (size_t i = 0; i < nonMonoGbBlocks.size(); ++i) {
+        _deblockedTokens.push_back(_tokenInfos[i].tokens->extract());
+    }
+
+    const std::vector<size_t>& finalTokens = *optFinalTokens;
+    // Now we convert our list of final tokens [1,2,3, 1, 4, ...] into a list of actual keys that
+    // can be put into the hash table.
+    {
+        size_t nextTokenIdToAdd = 0;
+        for (size_t i = 0; i < finalTokens.size(); ++i) {
+            const size_t tokenId = finalTokens[i];
+
+            // We've found a token that we haven't yet constructed a key for.
+            if (nextTokenIdToAdd == tokenId) {
+                // Construct the GB index for this key.
+                value::MaterializedRow key{_gbBlocks.size()};
+                size_t monoBlockIdx = 0;
+                size_t nonMonoBlockIdx = 0;
+                tassert(8848300,
+                        "Expected deblocked tokens to be correct size",
+                        _deblockedTokens.size() == nonMonoGbBlocks.size());
+
+                for (size_t keyIdx = 0; keyIdx < _gbBlocks.size(); ++keyIdx) {
+                    if (isMonoBlock[keyIdx]) {
+                        auto* monoBlock = monoGbBlocks[monoBlockIdx];
+                        key.reset(keyIdx, false, monoBlock->getTag(), monoBlock->getValue());
+                        ++monoBlockIdx;
+                    } else {
+                        const size_t originalTokenId = _tokenInfos[nonMonoBlockIdx].idxs[i];
+                        dassert(originalTokenId < _deblockedTokens[nonMonoBlockIdx].count());
+                        auto [t, v] = _deblockedTokens[nonMonoBlockIdx][originalTokenId];
+                        key.reset(keyIdx, false, t, v);
+                        ++nonMonoBlockIdx;
+                    }
+                }
+                out.keys.push_back(std::move(key));
+                ++nextTokenIdToAdd;
+            }
+        }
+    }
+
+    // Do not access 'finalTokens' again.
+    out.idxs = std::move(*optFinalTokens);
+    return out;
 }
 
 void BlockHashAggStage::open(bool reOpen) {

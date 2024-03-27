@@ -36,6 +36,42 @@
 #include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe {
+// Helper that's used to make tests easier to write (and read). Not all tests have been changed
+// to use this, but see the block hashagg unit test for an example.
+struct CopyableValueBlock {
+    CopyableValueBlock() = default;
+    CopyableValueBlock(std::unique_ptr<value::ValueBlock> vb) : _block(std::move(vb)) {
+        invariant(_block);
+    }
+    CopyableValueBlock(const CopyableValueBlock& o) : _block(o._block->clone()) {}
+
+    value::ValueBlock* operator->() {
+        return _block.get();
+    }
+
+    value::ValueBlock& operator*() {
+        return *_block;
+    }
+
+    const value::ValueBlock* operator->() const {
+        return _block.get();
+    }
+
+    const value::ValueBlock& operator*() const {
+        return *_block;
+    }
+    CopyableValueBlock& operator=(const CopyableValueBlock& o) {
+        _block = o._block->clone();
+        return *this;
+    }
+    CopyableValueBlock& operator=(CopyableValueBlock&& o) {
+        // Doesn't actually move, as we don't care about optimizing copies in tests.
+        _block = o._block->clone();
+        return *this;
+    }
+
+    std::unique_ptr<value::ValueBlock> _block;
+};
 
 static std::vector<std::pair<value::TypeTags, value::Value>> makeInt32s(
     std::vector<int32_t> values) {
@@ -46,6 +82,18 @@ static std::vector<std::pair<value::TypeTags, value::Value>> makeInt32s(
     return ints;
 }
 
+static CopyableValueBlock makeMonoBlock(std::pair<value::TypeTags, value::Value> tv, size_t ct) {
+    return CopyableValueBlock(std::make_unique<value::MonoBlock>(ct, tv.first, tv.second));
+}
+
+static CopyableValueBlock makeInt32sBlock(const std::vector<int32_t>& vals) {
+    auto block = std::make_unique<value::HeterogeneousBlock>();
+    for (auto v : vals) {
+        block->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(v));
+    }
+    return CopyableValueBlock(std::move(block));
+}
+
 static std::unique_ptr<value::HeterogeneousBlock> makeHeterogeneousBlock(
     std::vector<std::pair<value::TypeTags, value::Value>> vals) {
     auto block = std::make_unique<value::HeterogeneousBlock>();
@@ -53,13 +101,6 @@ static std::unique_ptr<value::HeterogeneousBlock> makeHeterogeneousBlock(
         block->push_back(t, v);
     }
     return block;
-}
-
-static std::pair<value::TypeTags, value::Value> makeHeterogeneousBlockTagVal(
-    std::vector<std::pair<value::TypeTags, value::Value>> vals) {
-    auto block = makeHeterogeneousBlock(vals);
-    auto resultVal = value::bitcastFrom<value::ValueBlock*>(block.release());
-    return {sbe::value::TypeTags::valueBlock, resultVal};
 }
 
 static std::unique_ptr<value::ValueBlock> makeHeterogeneousBoolBlock(std::vector<bool> bools) {

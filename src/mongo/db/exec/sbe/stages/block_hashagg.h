@@ -84,6 +84,11 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+    void doSaveState(bool relinquishCursor) override {
+        // We don't need to store this across yields, as we resize it each time.
+        _compoundKeys.clear();
+    }
+
     /*
      * TODO SERVER-85731 tune this parameter.
      * The partition approach is essentially O(partition_size*block_size).
@@ -114,16 +119,25 @@ private:
     };
 
     /**
-     * Take a vector of TokenizedBlocks and combine them into the actual keys that will be used for
-     * the hash table. These combined keys will then be tokenized again, so that we can identify the
-     * unique compound keys. Returns TokenizedKeys containing the actual materialized keys and a
-     * vector of indices where keys[idxs[i]] represents the materialized key of the ith element in
-     * the input. If the number of unique keys encountered exceeds
-     * kMaxNumPartitionsForTokenizedPath, return boost::none and use the element wise path.
+     * Given a 2d matrix of tokens, assigns a number to each row indicating which 'token', or
+     * unique value it is.
+     *
+     * Returns a 1d-vector of the assigned numbers (one value per row). E.g.
+     *
+     * Input matrix:     Output vector:
+     * ------------
+     * 1    2    3 |      0
+     * 1    2    4 |      1
+     * 2    3    4 |      2
+     * 1    2    4 |      1 // Second occurrence of row '1,2,4' which is assigned token ID 1.
+     * 2    3    5 |      3
+     * 2    3    4 |      2 // Second occurrence of row '2,3,4' which is assigned token ID 2.
+     *
+     * If it's discovered that there are more than kMaxNumPartitionsForTokenizedPath, returns
+     * boost::none, and we fall back to row-by-row processing.
      */
-    boost::optional<TokenizedKeys> tokenizeTokenInfos(
-        const std::vector<value::TokenizedBlock>& tokenInfos,
-        const std::vector<value::DeblockedTagVals>& deblockedTokens);
+    boost::optional<std::vector<size_t>> tokenizeTokenInfos(
+        const std::vector<value::TokenizedBlock>& tokenInfos);
 
     boost::optional<BlockHashAggStage::TokenizedKeys> tryTokenizeGbs();
 
@@ -219,8 +233,6 @@ private:
     value::ValueBlock* _bitmapBlock = nullptr;
     std::vector<value::ValueBlock*> _gbBlocks;
     std::vector<value::ValueBlock*> _dataBlocks;
-    std::vector<value::TokenizedBlock> _tokenInfos;
-    std::vector<value::DeblockedTagVals> _deblockedTokens;
     std::deque<boost::optional<value::MonoBlock>> _monoBlocks;
 
     vm::ByteCode _bytecode;
@@ -241,6 +253,12 @@ private:
     BufBuilder _stashedBuffer;
     BufBuilder _currentBuffer;
     boost::optional<SpilledRow> _stashedNextRow;
+
+    // Table used for computing compound keys. Stored here to avoid repeated
+    // allocation/deallocation.
+    std::vector<value::TokenizedBlock> _tokenInfos;
+    std::vector<value::DeblockedTagVals> _deblockedTokens;
+    std::vector<size_t> _compoundKeys;
 };
 
 }  // namespace sbe

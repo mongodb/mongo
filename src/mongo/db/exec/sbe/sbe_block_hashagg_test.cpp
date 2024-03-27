@@ -45,6 +45,25 @@
 namespace mongo::sbe {
 
 namespace {
+// Represents one "bucket's" worth of data to be fed into the group stage including:
+// - A group by key (either 'scalarId' or 'ids')
+// - A selectivity bitset
+// - A vector of blocks, one for each column
+//
+// For example:
+// group keys        bitset      'a'       'b'
+//  99  101       |    true   |  'foo'  |  'bar'
+//  99  100       |    false  |  'bar'  |  'bar'
+//  99  101       |    true   |  'foo'  |  'foo'
+struct Bucket {
+    // Only one of these may be set.
+    std::pair<value::TypeTags, value::Value> scalarId{value::TypeTags::Nothing, 0};
+    std::vector<CopyableValueBlock> ids;
+
+    std::vector<bool> bitset;
+    std::vector<CopyableValueBlock> dataBlocks;
+};
+
 typedef std::map<std::vector<int32_t>, std::vector<int32_t>> TestResultType;
 using TypedValue = std::pair<value::TypeTags, value::Value>;
 }  // namespace
@@ -101,6 +120,24 @@ public:
     static void assertResultMatchesMap(TypedValue result,
                                        TestResultType expectedMap,
                                        std::vector<size_t> expectedOutputBlockSizes) {
+        constexpr bool kDebugTest = false;
+        if (kDebugTest) {
+            std::cout << "Result data...\n";
+            std::cout << result << std::endl;
+
+            std::cout << "Expected result\n";
+            for (const auto& [keys, vals] : expectedMap) {
+                for (auto k : keys) {
+                    std::cout << k << ", ";
+                }
+                std::cout << "--->";
+                for (auto v : vals) {
+                    std::cout << v << ", ";
+                }
+                std::cout << std::endl;
+            }
+        }
+
         ASSERT_EQ(result.first, value::TypeTags::Array);
         auto resultArr = value::getArrayView(result.second);
 
@@ -140,51 +177,29 @@ public:
         ASSERT(expectedMap.empty());
     }
 
-    template <typename... BlockData>
-    static TypedValue makeInputArray(int32_t id, std::vector<bool> bitset, BlockData... blockData) {
-        auto [arrTag, arrVal] = value::makeNewArray();
-        value::ValueGuard guard(arrTag, arrVal);
-        auto arr = value::getArrayView(arrVal);
-
-        // Append groupBy key.
-        arr->push_back(makeInt32(id));
-        // Append bitset block.
-        auto bitsetBlock = makeBoolBlock(bitset);
-        arr->push_back({sbe::value::TypeTags::valueBlock,
-                        value::bitcastFrom<value::ValueBlock*>(bitsetBlock.release())});
-        // Append data.
-        (arr->push_back(makeHeterogeneousBlockTagVal(blockData)), ...);
-        guard.reset();
-        return {arrTag, arrVal};
-    }
-
-    template <typename... BlockData>
-    static TypedValue makeInputArray(std::vector<std::vector<TypedValue>> ids,
-                                     std::vector<bool> bitset,
-                                     BlockData... blockData) {
-        auto [arrTag, arrVal] = value::makeNewArray();
-        value::Array* arr = value::getArrayView(arrVal);
-
-        // Append groupby keys.
-        for (auto& id : ids) {
-            arr->push_back(makeHeterogeneousBlockTagVal(id));
-        }
-        // Append corresponding bitset.
-        auto bitsetBlock = makeBoolBlock(bitset);
-        arr->push_back({sbe::value::TypeTags::valueBlock,
-                        value::bitcastFrom<value::ValueBlock*>(bitsetBlock.release())});
-        // Append data.
-        (arr->push_back(makeHeterogeneousBlockTagVal(blockData)), ...);
-        return {arrTag, arrVal};
-    }
-
-    void runBlockHashAggTestHelper(TypedValue inputData,
-                                   size_t keySize,
-                                   size_t numScanSlots,
+    void runBlockHashAggTestHelper(const std::vector<Bucket>& inputData,
                                    AccNamesVector accNames,
                                    TestResultType expectedResultsMap,
                                    std::vector<size_t> expectedOutputBlockSizes,
                                    bool spillToDisk) {
+        // The user may specify a list of block IDs or a 'scalarId'.
+        for (auto& bucket : inputData) {
+            invariant(bucket.ids.empty() != /* XOR */
+                      (bucket.scalarId.first == value::TypeTags::Nothing));
+
+            invariant(inputData.empty() ||
+                      (bucket.ids.size() == inputData[0].ids.size() &&
+                       bucket.dataBlocks.size() == inputData[0].dataBlocks.size()));
+        }
+
+        size_t keySize = 0;
+        size_t numScanSlots = 3;  // Default.
+
+        if (!inputData.empty()) {
+            keySize = inputData[0].ids.size() ? inputData[0].ids.size() : 1;
+            numScanSlots = keySize + 1 /* bitset */ + inputData[0].dataBlocks.size();
+        }
+
         auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
             value::SlotVector idSlots;
             value::SlotVector outputSlots;
@@ -255,10 +270,46 @@ public:
             return std::make_pair(outputSlots, std::move(outStage));
         };
 
-        auto result = runTestMulti(numScanSlots, inputData.first, inputData.second, makeFn);
+        // Convert the bucket to an array that will be consumed.
+        std::vector<TypedValue> bucketVals;
+        for (auto& bucket : inputData) {
+            auto [arrTag, arrVal] = value::makeNewArray();
+            value::Array* arr = value::getArrayView(arrVal);
+
+            // Append groupby keys.
+            if (!bucket.ids.empty()) {
+                for (auto& id : bucket.ids) {
+                    auto clone = id->clone();
+                    arr->push_back(value::TypeTags::valueBlock,
+                                   value::bitcastFrom<value::ValueBlock*>(clone.release()));
+                }
+            } else {
+                auto [cpTag, cpVal] =
+                    value::copyValue(bucket.scalarId.first, bucket.scalarId.second);
+                arr->push_back(cpTag, cpVal);
+            }
+
+            // Append corresponding bitset.
+            auto bitsetBlock = makeBoolBlock(bucket.bitset);
+            arr->push_back({sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(bitsetBlock.release())});
+
+            for (const auto& block : bucket.dataBlocks) {
+                auto clone = block->clone();
+                arr->push_back(value::TypeTags::valueBlock,
+                               value::bitcastFrom<value::ValueBlock*>(clone.release()));
+            }
+
+            bucketVals.push_back(std::pair(arrTag, arrVal));
+        }
+
+        TypedValue inputDataArray = makeArray(std::move(bucketVals));
+
+        auto result =
+            runTestMulti(numScanSlots, inputDataArray.first, inputDataArray.second, makeFn);
         value::ValueGuard resultGuard{result};
         assertResultMatchesMap(result, expectedResultsMap, expectedOutputBlockSizes);
-    }  // runBlockHashAggTestHelper
+    }
 
     /**
      * Given the data input, the number of slots the stage requires, accumulators used, and
@@ -284,32 +335,10 @@ public:
      *
      * Inputs
      *
-     *   inputData - A [tag, val] pair representing the inputs to the $group stage, where
-     *     tag - Always TypeTags::Array.
-     *     val - An array of arrays. Each child array represents a subset of docs for one group_id
-     *        and is of the form
-     *          [group_id, [bitset], [optional_field_A_vals], ... [optional_field_N_vals]]
-     *        where
-     *          group_id is the value of this subset's $group key.
-     *          [bitset] is an Array of booleans of the same length as the block indicating which
-     *            entries in the block should be included (true). The others (false) are filtered
-     *            out (by a $match expression).
-     *          [optional_field_X_vals], if present, is an Array of the same length as the block,
-     *            each of whose entries represents one value for field 'X' in a doc in this block.
-     *        In the code, "blocks" are 1D vectors, so each array of optional_field_X_vals is a
-     *        block and the bitset is a pseudo-block, but all of these are parallel with each other
-     *        from the same subset of docs. Note that a single group_id may also have more than one
-     *        child array representing it in 'inputData'.
-     *
-     *   keySize - If the $group key is a scalar, this is 1, else the key is multipart in the form
-     *     of a vector with K entries, in which case 'keySize' is set to K.
-     *
-     *   numScanSlots - The total number of distinct input sources. These are:
-     *       o Each component of the $group key
-     *       o The bitset
-     *       o Each field scanned from the input docs (== each non-$count accumulator)
-     *     $count does not add a slot as it consumes the bitset, whereas every other accumulator
-     *     consumes a scanned input field.
+     *   inputData - A vector of "Buckets," each of which represents a tuple:
+     *         - ids is the vector of groupby-id blocks.
+     *         - bitset is the selectivity bitset, indicating which values to keep/ignore.
+     *         - dataBlocks is a vector of blocks used by the groupby accumulators.
      *
      *   accNames - A vector of vectors. Each child vector represents one accumulator to be applied
      *     to the input data and is of the form
@@ -338,22 +367,16 @@ public:
      *     be of size 'kBlockOutSize', while the last one may be smaller (anywhere in the range 1 to
      *     'kBlockOutSize').
      */
-    void runBlockHashAggTest(TypedValue inputData,
-                             size_t keySize,
-                             size_t numScanSlots,
+    void runBlockHashAggTest(const std::vector<Bucket>& buckets,
                              AccNamesVector accNames,
                              TestResultType expectedResultsMap,
                              std::vector<size_t> expectedOutputBlockSizes) {
-        runBlockHashAggTestHelper(value::copyValue(inputData.first, inputData.second),
-                                  keySize,
-                                  numScanSlots,
+        runBlockHashAggTestHelper(buckets,
                                   accNames,
                                   expectedResultsMap,
                                   expectedOutputBlockSizes,
                                   false /* spillToDisk */);
-        runBlockHashAggTestHelper(inputData,
-                                  keySize,
-                                  numScanSlots,
+        runBlockHashAggTestHelper(buckets,
                                   accNames,
                                   expectedResultsMap,
                                   expectedOutputBlockSizes,
@@ -365,113 +388,113 @@ private:
 };
 
 TEST_F(BlockHashAggStageTest, NoData) {
-    auto [inputTag, inputVal] = makeArray({});
+    std::vector<Bucket> buckets;
     // We should have an empty block with no data.
     TestResultType expected = {};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        0,
-                        3,
-                        {{"valueBlockAggMin", "min", "min"}},
-                        expected,
-                        {});
+    runBlockHashAggTest(buckets, {{"valueBlockAggMin", "min", "min"}}, expected, {});
 }
 
 TEST_F(BlockHashAggStageTest, AllDataFiltered) {
-    // All data has "false" for bitset.
-    auto [inputTag, inputVal] = makeArray(
-        {makeInputArray({makeInt32s({0, 1, 2})}, {false, false, false}, makeInt32s({50, 20, 30}))});
+    std::vector<Bucket> buckets = {Bucket{.ids = {makeInt32sBlock({0, 1, 2})},
+                                          .bitset = {false, false, false},
+                                          .dataBlocks = {makeInt32sBlock({50, 20, 30})}}};
+
     // We should have an empty block with no data.
     TestResultType expected = {};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        1,
-                        3,
-                        {{"valueBlockAggMin", "min", "min"}},
-                        expected,
-                        {});
+    runBlockHashAggTest(buckets, {{"valueBlockAggMin", "min", "min"}}, expected, {});
 }
 
 TEST_F(BlockHashAggStageTest, ScalarKeySingleAccumulatorMin) {
     // Each entry is ID followed by bitset followed by a block of data. For example
     // [groupid, [block bitset values], [block data values]]
-    auto [inputTag, inputVal] =
-        makeArray({makeInputArray(0, {true, true, false}, makeInt32s({50, 20, 30})),
-                   makeInputArray(2, {false, true, true}, makeInt32s({40, 30, 60})),
-                   makeInputArray(1, {true, true, true}, makeInt32s({70, 80, 10})),
-                   makeInputArray(2, {false, false, false}, makeInt32s({10, 20, 30})),
-                   makeInputArray(2, {true, false, true}, makeInt32s({30, 40, 50}))});
+
+    std::vector<Bucket> buckets = {Bucket{.scalarId = makeInt32(0),
+                                          .bitset = {true, true, false},
+                                          .dataBlocks = {makeInt32sBlock({50, 20, 30})}},
+                                   Bucket{.scalarId = makeInt32(2),
+                                          .bitset = {false, true, true},
+                                          .dataBlocks = {makeInt32sBlock({40, 30, 60})}},
+                                   Bucket{.scalarId = makeInt32(1),
+                                          .bitset = {true, true, true},
+                                          .dataBlocks = {makeInt32sBlock({70, 80, 10})}},
+                                   Bucket{.scalarId = makeInt32(2),
+                                          .bitset = {false, false, false},
+                                          .dataBlocks = {makeInt32sBlock({10, 20, 30})}},
+                                   Bucket{.scalarId = makeInt32(2),
+                                          .bitset = {true, false, true},
+                                          .dataBlocks = {makeInt32sBlock({30, 40, 50})}}};
     /*
      * 0 -> min(50, 20) = 20
      * 1 -> min(70, 80, 10) = 10
      * 2 -> min(30, 60, 30, 50) = 30
      */
     TestResultType expected = {{{0}, {20}}, {{1}, {10}}, {{2}, {30}}};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        1,
-                        3,
-                        {{"valueBlockAggMin", "min", "min"}},
-                        expected,
-                        {3});
+    runBlockHashAggTest(buckets, {{"valueBlockAggMin", "min", "min"}}, expected, {3});
 }
 
 TEST_F(BlockHashAggStageTest, ScalarKeyCount) {
     // Each entry is ID followed by a bitset.
-    auto [inputTag, inputVal] = makeArray({makeInputArray(0, {true, true, true}),
-                                           makeInputArray(0, {true, false, true}),
-                                           makeInputArray(1, {true, false, true}),
-                                           makeInputArray(1, {true, true, false})});
+    std::vector<Bucket> buckets = {Bucket{.scalarId = makeInt32(0), .bitset = {true, true, true}},
+                                   Bucket{.scalarId = makeInt32(0), .bitset = {true, false, true}},
+                                   Bucket{.scalarId = makeInt32(1), .bitset = {true, false, true}},
+                                   Bucket{.scalarId = makeInt32(1), .bitset = {true, true, false}}};
     TestResultType expected = {{{0}, {5}}, {{1}, {4}}};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        1,
-                        3,
-                        {{"valueBlockAggCount", "count", "sum"}},
-                        expected,
-                        {2});
+    runBlockHashAggTest(buckets, {{"valueBlockAggCount", "count", "sum"}}, expected, {2});
 }
 
 TEST_F(BlockHashAggStageTest, ScalarKeySum) {
     // Each entry is ID followed by bitset followed by a block of data.
-    auto [inputTag, inputVal] =
-        makeArray({makeInputArray(0, {true, true, false}, makeInt32s({1, 2, 3})),
-                   makeInputArray(2, {false, true, true}, makeInt32s({4, 5, 6})),
-                   makeInputArray(1, {true, true, true}, makeInt32s({7, 8, 9})),
-                   makeInputArray(2, {false, false, false}, makeInt32s({10, 11, 12})),
-                   makeInputArray(2, {true, false, true}, makeInt32s({13, 14, 15}))});
+    std::vector<Bucket> buckets{Bucket{.scalarId = makeInt32(0),
+                                       .bitset = {true, true, false},
+                                       .dataBlocks = {makeInt32sBlock({1, 2, 3})}},
+                                Bucket{.scalarId = makeInt32(2),
+                                       .bitset = {false, true, true},
+                                       .dataBlocks = {makeInt32sBlock({4, 5, 6})}},
+                                Bucket{.scalarId = makeInt32(1),
+                                       .bitset = {true, true, true},
+                                       .dataBlocks = {makeInt32sBlock({7, 8, 9})}},
+                                Bucket{.scalarId = makeInt32(2),
+                                       .bitset = {false, false, false},
+                                       .dataBlocks = {makeInt32sBlock({10, 11, 12})}},
+                                Bucket{.scalarId = makeInt32(2),
+                                       .bitset = {true, false, true},
+                                       .dataBlocks = {makeInt32sBlock({13, 14, 15})}}};
+
+
     /*
      * 0 -> 1+2 = 3
      * 1 -> 7+8+9 = 24
      * 2 -> 5+6+13+15 = 39
      */
     TestResultType expected = {{{0}, {3}}, {{1}, {24}}, {{2}, {39}}};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        1,
-                        3,
-                        {{"valueBlockAggSum", "sum", "sum"}},
-                        expected,
-                        {3});
+    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {3});
 }
 
 TEST_F(BlockHashAggStageTest, ScalarKeyMultipleAccumulators) {
-    // Each entry is ID followed by bitset followed by block A and block B.
-    auto [inputTag, inputVal] = makeArray(
-        {makeInputArray(
-             100, {true, true, false}, makeInt32s({200, 100, 150}), makeInt32s({2, 4, 7})),
-         makeInputArray(
-             100, {false, true, true}, makeInt32s({50, 90, 60}), makeInt32s({-100, 20, 3})),
-         makeInputArray(
-             50, {true, true, true}, makeInt32s({200, 100, 150}), makeInt32s({-150, 150, 20})),
-         makeInputArray(
-             25, {true, false, false}, makeInt32s({20, 75, 10}), makeInt32s({0, 20, -20})),
-         makeInputArray(
-             50, {true, false, true}, makeInt32s({75, 75, 75}), makeInt32s({-2, 5, 8}))});
+    std::vector<Bucket> buckets = {
+        Bucket{.scalarId = makeInt32(100),
+               .bitset = {true, true, false},
+               .dataBlocks = {makeInt32sBlock({200, 100, 150}), makeInt32sBlock({2, 4, 7})}},
+        Bucket{.scalarId = makeInt32(100),
+               .bitset = {false, true, true},
+               .dataBlocks = {makeInt32sBlock({50, 90, 60}), makeInt32sBlock({-100, 20, 3})}},
+        Bucket{.scalarId = makeInt32(50),
+               .bitset = {true, true, true},
+               .dataBlocks = {makeInt32sBlock({200, 100, 150}), makeInt32sBlock({-150, 150, 20})}},
+        Bucket{.scalarId = makeInt32(25),
+               .bitset = {true, false, false},
+               .dataBlocks = {makeInt32sBlock({20, 75, 10}), makeInt32sBlock({0, 20, -20})}},
+        Bucket{.scalarId = makeInt32(50),
+               .bitset = {true, false, true},
+               .dataBlocks = {makeInt32sBlock({75, 75, 75}), makeInt32sBlock({-2, 5, 8})}}};
+
     /*
      * 25  -> min(20) = 20, count=1, min(0) = 0
      * 50  -> min(200, 100, 150, 75, 75) = 75, count = 5, min(-150, 150, 20, -2, 8) = -150
      * 100 -> min(200, 100, 90, 60) = 60, count = 4, min(2, 4, 20, 3) = 2
      */
     TestResultType expected = {{{25}, {20, 1, 0}}, {{50}, {75, 5, -150}}, {{100}, {60, 4, 2}}};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        1,
-                        4,
+    runBlockHashAggTest(buckets,
                         {{"valueBlockAggMin", "min", "min"},
                          {"valueBlockAggCount", "count", "sum"},
                          {"valueBlockAggMin", "min", "min"}},
@@ -480,29 +503,65 @@ TEST_F(BlockHashAggStageTest, ScalarKeyMultipleAccumulators) {
 }
 
 TEST_F(BlockHashAggStageTest, Count) {
-    // Each entry is ID followed by a bitset.
-    auto [inputTag, inputVal] =
-        makeArray({makeInputArray({makeInt32s({0, 1, 0})}, {true, true, true}),
-                   makeInputArray({makeInt32s({0, 0, 1})}, {true, false, true}),
-                   makeInputArray({makeInt32s({0, 1, 1})}, {true, false, true}),
-                   makeInputArray({makeInt32s({1, 1, 0})}, {true, true, false})});
-    TestResultType expected = {{{0}, {4}}, {{1}, {5}}};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        1,
-                        3,
-                        {{"valueBlockAggCount", "count", "sum"}},
-                        expected,
-                        {2});
+    std::vector<Bucket> buckets = {
+        Bucket{.ids = {makeInt32sBlock({99, 101, 99})}, .bitset = {true, true, true}},
+        Bucket{.ids = {makeInt32sBlock({99, 99, 101})}, .bitset = {true, false, true}},
+        Bucket{.ids = {makeInt32sBlock({99, 101, 101})}, .bitset = {true, false, true}},
+        Bucket{.ids = {makeInt32sBlock({101, 101, 99})}, .bitset = {true, true, false}}};
+
+    TestResultType expected = {{{99}, {4}}, {{101}, {5}}};
+    runBlockHashAggTest(buckets, {{"valueBlockAggCount", "count", "sum"}}, expected, {2});
+}
+
+TEST_F(BlockHashAggStageTest, CountWithMonoBlockKeys) {
+    std::vector<Bucket> buckets{
+        Bucket{
+            .ids = {makeMonoBlock(makeInt32(99), 3)},  // groupBys
+            .bitset = {true, true, true}               // bitset
+        },
+        Bucket{.ids = {makeMonoBlock(makeInt32(101), 3)}, .bitset = {true, false, true}},
+        Bucket{.ids = {makeInt32sBlock({99, 101, 101})}, .bitset = {true, false, true}},
+        Bucket{.ids = {makeInt32sBlock({101, 101, 99})}, .bitset = {true, true, false}},
+    };
+
+    TestResultType expected = {{{99}, {4}}, {{101}, {5}}};
+    runBlockHashAggTest(buckets, {{"valueBlockAggCount", "count", "sum"}}, expected, {2});
+}
+
+TEST_F(BlockHashAggStageTest, CountWithMonoBlockKeysCompound) {
+    std::vector<Bucket> buckets = {
+        Bucket{.ids = {makeMonoBlock(makeInt32(99), 3), makeInt32sBlock({1000, 1001, 1000})},
+               .bitset = {true, true, true}},
+        Bucket{.ids = {makeMonoBlock(makeInt32(101), 3), makeMonoBlock(makeInt32(1000), 3)},
+               .bitset = {true, false, true}},
+        Bucket{.ids = {makeInt32sBlock({99, 101, 101}), makeMonoBlock(makeInt32(1001), 3)},
+               .bitset = {true, false, true}},
+        Bucket{.ids = {makeInt32sBlock({101, 101, 99}), makeInt32sBlock({1000, 1000, 1001})},
+               .bitset = {true, true, false}}};
+    TestResultType expected = {
+        {{99, 1000}, {2}}, {{99, 1001}, {2}}, {{101, 1000}, {4}}, {{101, 1001}, {1}}};
+    runBlockHashAggTest(buckets, {{"valueBlockAggCount", "count", "sum"}}, expected, {4}
+                        // Expected output block sizes.
+    );
 }
 
 TEST_F(BlockHashAggStageTest, SumBlockGroupByKey) {
     // Each entry is ID followed by bitset followed by a block of data.
-    auto [inputTag, inputVal] = makeArray(
-        {makeInputArray({makeInt32s({0, 0, 0})}, {true, true, false}, makeInt32s({1, 2, 3})),
-         makeInputArray({makeInt32s({2, 2, 2})}, {false, true, true}, makeInt32s({4, 5, 6})),
-         makeInputArray({makeInt32s({1, 1, 1})}, {true, true, true}, makeInt32s({7, 8, 9})),
-         makeInputArray({makeInt32s({2, 2, 2})}, {false, false, false}, makeInt32s({10, 11, 12})),
-         makeInputArray({makeInt32s({2, 2, 2})}, {true, false, true}, makeInt32s({13, 14, 15}))});
+    std::vector<Bucket> buckets = {Bucket{.ids = {makeInt32sBlock({0, 0, 0})},
+                                          .bitset = {true, true, false},
+                                          .dataBlocks = {makeInt32sBlock({1, 2, 3})}},
+                                   Bucket{.ids = {makeInt32sBlock({2, 2, 2})},
+                                          .bitset = {false, true, true},
+                                          .dataBlocks = {makeInt32sBlock({4, 5, 6})}},
+                                   Bucket{.ids = {makeInt32sBlock({1, 1, 1})},
+                                          .bitset = {true, true, true},
+                                          .dataBlocks = {makeInt32sBlock({7, 8, 9})}},
+                                   Bucket{.ids = {makeInt32sBlock({2, 2, 2})},
+                                          .bitset = {false, false, false},
+                                          .dataBlocks = {makeInt32sBlock({10, 11, 12})}},
+                                   Bucket{.ids = {makeInt32sBlock({2, 2, 2})},
+                                          .bitset = {true, false, true},
+                                          .dataBlocks = {makeInt32sBlock({13, 14, 15})}}};
 
     /*
      * 0 -> 1+2 = 3
@@ -510,25 +569,31 @@ TEST_F(BlockHashAggStageTest, SumBlockGroupByKey) {
      * 2 -> 5+6+13+15 = 39
      */
     TestResultType expected = {{{0}, {3}}, {{1}, {24}}, {{2}, {39}}};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        1,
-                        3,
-                        {{"valueBlockAggSum", "sum", "sum"}},
-                        expected,
-                        {3});
+    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {3});
 }
 
 // Similar to the test above, but we change the groupby keys so they are different within each
 // block.
 TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeys) {
     // Each entry is ID followed by bitset followed by a block of data.
-    auto [inputTag, inputVal] = makeArray(
-        {makeInputArray({makeInt32s({1, 2, 3})}, {true, true, false}, makeInt32s({1, 2, 3})),
-         makeInputArray({makeInt32s({2, 2, 2})}, {false, true, true}, makeInt32s({4, 5, 6})),
-         makeInputArray({makeInt32s({3, 2, 1})}, {true, true, true}, makeInt32s({7, 8, 9})),
-         makeInputArray({makeInt32s({2, 3, 4})}, {false, true, true}, makeInt32s({10, 11, 12})),
-         makeInputArray({makeInt32s({2, 3, 4})}, {false, false, false}, makeInt32s({0, 5, 4})),
-         makeInputArray({makeInt32s({1, 1, 2})}, {true, true, true}, makeInt32s({13, 14, 15}))});
+    std::vector<Bucket> buckets = {Bucket{.ids = {makeInt32sBlock({1, 2, 3})},
+                                          .bitset = {true, true, false},
+                                          .dataBlocks = {makeInt32sBlock({1, 2, 3})}},
+                                   Bucket{.ids = {makeInt32sBlock({2, 2, 2})},
+                                          .bitset = {false, true, true},
+                                          .dataBlocks = {makeInt32sBlock({4, 5, 6})}},
+                                   Bucket{.ids = {makeInt32sBlock({3, 2, 1})},
+                                          .bitset = {true, true, true},
+                                          .dataBlocks = {makeInt32sBlock({7, 8, 9})}},
+                                   Bucket{.ids = {makeInt32sBlock({2, 3, 4})},
+                                          .bitset = {false, true, true},
+                                          .dataBlocks = {makeInt32sBlock({10, 11, 12})}},
+                                   Bucket{.ids = {makeInt32sBlock({2, 3, 4})},
+                                          .bitset = {false, false, false},
+                                          .dataBlocks = {makeInt32sBlock({0, 5, 4})}},
+                                   Bucket{.ids = {makeInt32sBlock({1, 1, 2})},
+                                          .bitset = {true, true, true},
+                                          .dataBlocks = {makeInt32sBlock({13, 14, 15})}}};
 
     /*
      * 1 -> 1+9+13+14  = 37
@@ -537,12 +602,7 @@ TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeys) {
      * 4 -> 12         = 12
      */
     TestResultType expected = {{{1}, {37}}, {{2}, {36}}, {{3}, {18}}, {{4}, {12}}};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        1,
-                        3,
-                        {{"valueBlockAggSum", "sum", "sum"}},
-                        expected,
-                        {4});
+    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {4});
 }
 
 // Similar test as above but the "2" key appears in every block but is always false, so we make
@@ -550,19 +610,25 @@ TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeys) {
 TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeysMissingKey) {
     // Each entry is ID followed by bitset followed by a block of data.
     // Mix high partition rows with low partition.
-    auto [inputTag, inputVal] = makeArray(
-        {makeInputArray({makeInt32s({1, 2, 3, 5, 6, 7})},
-                        {true, false, false, true, true, true},
-                        makeInt32s({1, 2, 3, 4, 5, 6})),
-         makeInputArray({makeInt32s({2, 2, 2})}, {false, false, false}, makeInt32s({4, 5, 6})),
-         makeInputArray({makeInt32s({3, 2, 1, 7, 6, 5})},
-                        {true, false, true, false, true, true},
-                        makeInt32s({7, 8, 9, 1, 2, 3})),
-         makeInputArray({makeInt32s({2, 3, 4, 6, 7, 5})},
-                        {false, true, true, true, true, false},
-                        makeInt32s({10, 11, 12, 15, 15, 15})),
-         makeInputArray({makeInt32s({2, 3, 4})}, {false, false, false}, makeInt32s({0, 5, 4})),
-         makeInputArray({makeInt32s({1, 1, 2})}, {true, true, false}, makeInt32s({13, 14, 15}))});
+    std::vector<Bucket> buckets = {
+        Bucket{.ids = {makeInt32sBlock({1, 2, 3, 5, 6, 7})},
+               .bitset = {true, false, false, true, true, true},
+               .dataBlocks = {makeInt32sBlock({1, 2, 3, 4, 5, 6})}},
+        Bucket{.ids = {makeInt32sBlock({2, 2, 2})},
+               .bitset = {false, false, false},
+               .dataBlocks = {makeInt32sBlock({4, 5, 6})}},
+        Bucket{.ids = {makeInt32sBlock({3, 2, 1, 7, 6, 5})},
+               .bitset = {true, false, true, false, true, true},
+               .dataBlocks = {makeInt32sBlock({7, 8, 9, 1, 2, 3})}},
+        Bucket{.ids = {makeInt32sBlock({2, 3, 4, 6, 7, 5})},
+               .bitset = {false, true, true, true, true, false},
+               .dataBlocks = {makeInt32sBlock({10, 11, 12, 15, 15, 15})}},
+        Bucket{.ids = {makeInt32sBlock({2, 3, 4})},
+               .bitset = {false, false, false},
+               .dataBlocks = {makeInt32sBlock({0, 5, 4})}},
+        Bucket{.ids = {makeInt32sBlock({1, 1, 2})},
+               .bitset = {true, true, false},
+               .dataBlocks = {makeInt32sBlock({13, 14, 15})}}};
 
     /*
      * 1 -> 1+9+13+14  = 37
@@ -575,36 +641,27 @@ TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeysMissingKey) {
      */
     TestResultType expected = {
         {{1}, {37}}, {{3}, {18}}, {{4}, {12}}, {{5}, {7}}, {{6}, {22}}, {{7}, {21}}};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        1,
-                        3,
-                        {{"valueBlockAggSum", "sum", "sum"}},
-                        expected,
-                        {6});
+    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {6});
 }
 
 TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentBlockGroupByKeys) {
     // Each entry is ID followed by bitset followed by block A and block B.
-    auto [inputTag, inputVal] = makeArray({makeInputArray({makeInt32s({25, 50, 100})},
-                                                          {true, true, false},
-                                                          makeInt32s({200, 100, 150}),
-                                                          makeInt32s({2, 4, 7})),
-                                           makeInputArray({makeInt32s({50, 50, 50})},
-                                                          {false, true, true},
-                                                          makeInt32s({50, 90, 60}),
-                                                          makeInt32s({-100, 20, 3})),
-                                           makeInputArray({makeInt32s({25, 25, 100})},
-                                                          {true, true, true},
-                                                          makeInt32s({200, 100, 150}),
-                                                          makeInt32s({-150, 150, 2})),
-                                           makeInputArray({makeInt32s({100, 50, 25})},
-                                                          {true, false, false},
-                                                          makeInt32s({20, 75, 10}),
-                                                          makeInt32s({0, 20, -20})),
-                                           makeInputArray({makeInt32s({100, 25, 50})},
-                                                          {true, false, true},
-                                                          makeInt32s({75, 75, 75}),
-                                                          makeInt32s({-2, 5, 8}))});
+    std::vector<Bucket> buckets = {
+        Bucket{.ids = {makeInt32sBlock({25, 50, 100})},
+               .bitset = {true, true, false},
+               .dataBlocks = {makeInt32sBlock({200, 100, 150}), makeInt32sBlock({2, 4, 7})}},
+        Bucket{.ids = {makeInt32sBlock({50, 50, 50})},
+               .bitset = {false, true, true},
+               .dataBlocks = {makeInt32sBlock({50, 90, 60}), makeInt32sBlock({-100, 20, 3})}},
+        Bucket{.ids = {makeInt32sBlock({25, 25, 100})},
+               .bitset = {true, true, true},
+               .dataBlocks = {makeInt32sBlock({200, 100, 150}), makeInt32sBlock({-150, 150, 2})}},
+        Bucket{.ids = {makeInt32sBlock({100, 50, 25})},
+               .bitset = {true, false, false},
+               .dataBlocks = {makeInt32sBlock({20, 75, 10}), makeInt32sBlock({0, 20, -20})}},
+        Bucket{.ids = {makeInt32sBlock({100, 25, 50})},
+               .bitset = {true, false, true},
+               .dataBlocks = {makeInt32sBlock({75, 75, 75}), makeInt32sBlock({-2, 5, 8})}}};
 
     /*
      * 25  -> min(200, 200, 100) = 100, count = 3, min(2, -150, 150) = -150
@@ -612,9 +669,7 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentBlockGroupByKeys) {
      * 100 -> min(150, 20, 75) = 20, count = 3, min(20, 0, -2) = -2
      */
     TestResultType expected = {{{25}, {100, 3, -150}}, {{50}, {60, 4, 3}}, {{100}, {20, 3, -2}}};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        1,
-                        4,
+    runBlockHashAggTest(buckets,
                         {{"valueBlockAggMin", "min", "min"},
                          {"valueBlockAggCount", "count", "sum"},
                          {"valueBlockAggMin", "min", "min"}},
@@ -624,43 +679,42 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentBlockGroupByKeys) {
 
 TEST_F(BlockHashAggStageTest, CountCompoundKey) {
     // Each entry is ID followed by a bitset.
-    auto [inputTag, inputVal] = makeArray(
-        {makeInputArray({makeInt32s({0, 1, 0}), makeInt32s({0, 0, 1})}, {true, true, true}),
-         makeInputArray({makeInt32s({0, 0, 1}), makeInt32s({0, 1, 0})}, {true, false, true}),
-         makeInputArray({makeInt32s({0, 1, 1}), makeInt32s({1, 0, 1})}, {true, false, true}),
-         makeInputArray({makeInt32s({1, 1, 0}), makeInt32s({1, 1, 1})}, {true, true, false})});
+    std::vector<Bucket> buckets = {
+        Bucket{.ids = {makeInt32sBlock({0, 1, 0}), makeInt32sBlock({0, 0, 1})},
+               .bitset = {true, true, true}},
+        Bucket{.ids = {makeInt32sBlock({0, 0, 1}), makeInt32sBlock({0, 1, 0})},
+               .bitset = {true, false, true}},
+        Bucket{.ids = {makeInt32sBlock({0, 1, 1}), makeInt32sBlock({1, 0, 1})},
+               .bitset = {true, false, true}},
+        Bucket{.ids = {makeInt32sBlock({1, 1, 0}), makeInt32sBlock({1, 1, 1})},
+               .bitset = {true, true, false}}};
     TestResultType expected = {{{0, 0}, {2}}, {{0, 1}, {2}}, {{1, 0}, {2}}, {{1, 1}, {3}}};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        2,
-                        3,
-                        {{"valueBlockAggCount", "count", "sum"}},
-                        expected,
-                        {4});
+    runBlockHashAggTest(buckets, {{"valueBlockAggCount", "count", "sum"}}, expected, {4});
 }
 
 // TODO SERVER-85731 Revisit input sizes if kMaxNumPartitionsForTokenizedPath changes.
 TEST_F(BlockHashAggStageTest, SumCompoundKeysMissingKey) {
     // Each entry is ID followed by bitset followed by a block of data.
     // Mix high partition rows with low partition.
-    auto [inputTag, inputVal] =
-        makeArray({makeInputArray({makeInt32s({1, 2, 3, 5, 6, 7}), makeInt32s({2, 3, 4, 6, 7, 8})},
-                                  {true, false, false, true, true, true},
-                                  makeInt32s({1, 2, 3, 4, 5, 6})),
-                   makeInputArray({makeInt32s({2, 2, 2}), makeInt32s({3, 3, 3})},
-                                  {false, false, false},
-                                  makeInt32s({4, 5, 6})),
-                   makeInputArray({makeInt32s({3, 2, 1, 7, 6, 5}), makeInt32s({4, 3, 2, 8, 7, 6})},
-                                  {true, false, true, false, true, true},
-                                  makeInt32s({7, 8, 9, 1, 2, 3})),
-                   makeInputArray({makeInt32s({2, 3, 4, 6, 7, 5}), makeInt32s({3, 4, 5, 7, 8, 6})},
-                                  {false, true, true, true, true, false},
-                                  makeInt32s({10, 11, 12, 15, 15, 15})),
-                   makeInputArray({makeInt32s({2, 3, 4}), makeInt32s({3, 4, 5})},
-                                  {false, false, false},
-                                  makeInt32s({0, 5, 4})),
-                   makeInputArray({makeInt32s({1, 1, 2}), makeInt32s({2, 2, 3})},
-                                  {true, true, false},
-                                  makeInt32s({13, 14, 15}))});
+    std::vector<Bucket> buckets = {
+        Bucket{.ids = {makeInt32sBlock({1, 2, 3, 5, 6, 7}), makeInt32sBlock({2, 3, 4, 6, 7, 8})},
+               .bitset = {true, false, false, true, true, true},
+               .dataBlocks = {makeInt32sBlock({1, 2, 3, 4, 5, 6})}},
+        Bucket{.ids = {makeInt32sBlock({2, 2, 2}), makeInt32sBlock({3, 3, 3})},
+               .bitset = {false, false, false},
+               .dataBlocks = {makeInt32sBlock({4, 5, 6})}},
+        Bucket{.ids = {makeInt32sBlock({3, 2, 1, 7, 6, 5}), makeInt32sBlock({4, 3, 2, 8, 7, 6})},
+               .bitset = {true, false, true, false, true, true},
+               .dataBlocks = {makeInt32sBlock({7, 8, 9, 1, 2, 3})}},
+        Bucket{.ids = {makeInt32sBlock({2, 3, 4, 6, 7, 5}), makeInt32sBlock({3, 4, 5, 7, 8, 6})},
+               .bitset = {false, true, true, true, true, false},
+               .dataBlocks = {makeInt32sBlock({10, 11, 12, 15, 15, 15})}},
+        Bucket{.ids = {makeInt32sBlock({2, 3, 4}), makeInt32sBlock({3, 4, 5})},
+               .bitset = {false, false, false},
+               .dataBlocks = {makeInt32sBlock({0, 5, 4})}},
+        Bucket{.ids = {makeInt32sBlock({1, 1, 2}), makeInt32sBlock({2, 2, 3})},
+               .bitset = {true, true, false},
+               .dataBlocks = {makeInt32sBlock({13, 14, 15})}}};
 
     /*
      * {1, 2} -> 1+9+13+14  = 37
@@ -677,12 +731,7 @@ TEST_F(BlockHashAggStageTest, SumCompoundKeysMissingKey) {
                                {{5, 6}, {7}},
                                {{6, 7}, {22}},
                                {{7, 8}, {21}}};
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        2,
-                        4,
-                        {{"valueBlockAggSum", "sum", "sum"}},
-                        expected,
-                        {6});
+    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {6});
 }
 
 TEST_F(BlockHashAggStageTest, BlockOutSizeTest) {
@@ -694,7 +743,8 @@ TEST_F(BlockHashAggStageTest, BlockOutSizeTest) {
         }
     };
 
-    std::vector<TypedValue> vals;
+    std::vector<Bucket> buckets;
+
     // Create kBlockOutSize * 3 + 1 group ids, so that the output is 3 blocks of size
     // kBlockOutSize, and 1 block of size 1.
     for (size_t id = 0; id < BlockHashAggStage::kBlockOutSize * 3 + 1; ++id) {
@@ -713,15 +763,12 @@ TEST_F(BlockHashAggStageTest, BlockOutSizeTest) {
             bitmap.push_back(exists);
             data.push_back(dataPoint);
         }
-
-        auto input = makeInputArray({makeInt32s(ids)}, bitmap, makeInt32s(data));
-        vals.push_back(input);
+        buckets.push_back(Bucket{.ids = {makeInt32sBlock(ids)},
+                                 .bitset = bitmap,
+                                 .dataBlocks = {makeInt32sBlock(data)}});
     }
 
-    auto [inputTag, inputVal] = makeArray(vals);
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        1,
-                        3,
+    runBlockHashAggTest(buckets,
                         {{"valueBlockAggSum", "sum", "sum"}},
                         expected,
                         {BlockHashAggStage::kBlockOutSize,
@@ -759,7 +806,7 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentPartitionSizes) {
             }
         };
 
-    std::vector<std::pair<value::TypeTags, value::Value>> vals;
+    std::vector<Bucket> buckets;
     size_t keySize = 4;
     size_t i = 0;
     for (size_t partitionSize = lowPartitionSize; partitionSize <= highPartitionSize;
@@ -791,18 +838,16 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentPartitionSizes) {
                 i++;
             }
         }
-        std::vector<std::vector<TypedValue>> expectedKeys(keySize);
+        std::vector<CopyableValueBlock> expectedKeys(keySize);
         for (size_t idIdx = 0; idIdx < keySize; ++idIdx) {
-            expectedKeys[idIdx] = makeInt32s(ids[idIdx]);
+            expectedKeys[idIdx] = makeInt32sBlock(ids[idIdx]);
         }
-        auto input = makeInputArray(expectedKeys, bitmap, makeInt32s(data1), makeInt32s(data2));
-        vals.push_back(input);
+        buckets.push_back(Bucket{.ids = expectedKeys,
+                                 .bitset = bitmap,
+                                 .dataBlocks = {makeInt32sBlock(data1), makeInt32sBlock(data2)}});
     }
 
-    auto [inputTag, inputVal] = makeArray(vals);
-    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
-                        keySize,
-                        keySize + 1 /* bitset */ + 2 /* numDataBlocks */,
+    runBlockHashAggTest(buckets,
                         {{"valueBlockAggSum", "sum", "sum"},
                          {"valueBlockAggCount", "count", "sum"},
                          {"valueBlockAggMin", "min", "min"}},
