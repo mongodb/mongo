@@ -8,3 +8,13 @@ filegroup(
         "exit_code.h",
     ],
 )
+
+mongo_cc_library(
+    name = "boost_assert_shim",
+    srcs = [
+        "boost_assert_shim.cpp",
+    ],
+    hdrs = [
+        "boost_assert_shim.h",
+    ],
+)

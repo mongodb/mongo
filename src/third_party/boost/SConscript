@@ -16,7 +16,7 @@ env.AppendUnique(
     CPPDEFINES=['BOOST_BIND_GLOBAL_PLACEHOLDERS'],
 )
 
-env.Library(
+env.BazelLibrary(
     target='boost_system',
     source=[
         'libs/system/src/error_code.cpp',
@@ -26,7 +26,7 @@ env.Library(
     ],
 )
 
-env.Library(
+env.BazelLibrary(
     target='boost_filesystem',
     source=[
         'libs/filesystem/src/codecvt_error_category.cpp',
@@ -46,7 +46,7 @@ env.Library(
     ],
 )
 
-env.Library(
+env.BazelLibrary(
     target='boost_program_options',
     source=[
         'libs/program_options/src/cmdline.cpp',
@@ -71,7 +71,7 @@ env.Library(
     ],
 )
 
-env.Library(
+env.BazelLibrary(
     target='boost_iostreams',
     source=[
         'libs/iostreams/src/file_descriptor.cpp',
@@ -106,7 +106,7 @@ boost_thread_defines = dict(
 
 threadlib_env = env.Clone()
 threadlib_env.Append(CPPDEFINES=['BOOST_THREAD_BUILD_LIB'] + boost_thread_defines)
-threadlib_env.Library(
+threadlib_env.BazelLibrary(
     target='boost_thread',
     source=[
         'libs/thread/src/future.cpp',
@@ -134,7 +134,7 @@ if env.ToolchainIs('msvc'):
         'BOOST_USE_WINDOWS_H',
     ])
 
-loglib_env.Library(
+loglib_env.BazelLibrary(
     target='boost_log',
     source=[
         'libs/log/src/attribute_name.cpp',

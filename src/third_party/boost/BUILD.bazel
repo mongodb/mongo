@@ -1,0 +1,217 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+BOOST_COPTS = select({
+    "//bazel/config:compiler_type_gcc": [
+        "-Wno-overloaded-virtual",
+    ],
+    "//conditions:default": [],
+})
+
+BOOST_HEADERS = glob([
+    "boost/**/*.ipp",
+    "boost/**/*.hpp",
+    "boost/**/*.h",
+])
+
+BOOST_LIB_HEADERS = glob([
+    "libs/**/*.ipp",
+    "libs/**/*.hpp",
+    "libs/**/*.h",
+])
+
+BOOST_DEFINES = [
+    "BOOST_BIND_GLOBAL_PLACEHOLDERS",
+]
+
+filegroup(
+    name = "headers",
+    srcs = BOOST_HEADERS,
+)
+
+mongo_cc_library(
+    name = "boost_system",
+    srcs = [
+        "libs/system/src/error_code.cpp",
+    ],
+    hdrs = BOOST_LIB_HEADERS,
+    copts = BOOST_COPTS,
+    local_defines = BOOST_DEFINES,
+    deps = [
+        "//src/mongo/util:boost_assert_shim",
+    ],
+)
+
+mongo_cc_library(
+    name = "boost_filesystem",
+    srcs = [
+        "libs/filesystem/src/codecvt_error_category.cpp",
+        "libs/filesystem/src/directory.cpp",
+        "libs/filesystem/src/exception.cpp",
+        "libs/filesystem/src/operations.cpp",
+        "libs/filesystem/src/path.cpp",
+        "libs/filesystem/src/path_traits.cpp",
+        "libs/filesystem/src/portability.cpp",
+        "libs/filesystem/src/unique_path.cpp",
+        "libs/filesystem/src/utf8_codecvt_facet.cpp",
+        "libs/filesystem/src/windows_file_codecvt.cpp",
+    ],
+    hdrs = BOOST_LIB_HEADERS,
+    copts = BOOST_COPTS,
+    local_defines = BOOST_DEFINES,
+    deps = [
+        ":boost_system",
+        "//src/mongo/util:boost_assert_shim",
+    ],
+)
+
+mongo_cc_library(
+    name = "boost_program_options",
+    srcs = [
+        "libs/program_options/src/cmdline.cpp",
+        "libs/program_options/src/config_file.cpp",
+        "libs/program_options/src/convert.cpp",
+        "libs/program_options/src/options_description.cpp",
+        "libs/program_options/src/parsers.cpp",
+        "libs/program_options/src/positional_options.cpp",
+        "libs/program_options/src/split.cpp",
+        "libs/program_options/src/utf8_codecvt_facet.cpp",
+        "libs/program_options/src/value_semantic.cpp",
+        "libs/program_options/src/variables_map.cpp",
+        "libs/program_options/src/winmain.cpp",
+    ],
+    hdrs = BOOST_LIB_HEADERS,
+    copts = BOOST_COPTS,
+    local_defines = BOOST_DEFINES,
+    deps = [
+        "//src/mongo/util:boost_assert_shim",
+    ],
+)
+
+mongo_cc_library(
+    name = "boost_iostreams",
+    srcs = [
+        "libs/iostreams/src/file_descriptor.cpp",
+        "libs/iostreams/src/mapped_file.cpp",
+    ],
+    hdrs = BOOST_LIB_HEADERS,
+    copts = BOOST_COPTS,
+    local_defines = BOOST_DEFINES,
+    deps = [
+        ":boost_system",
+        "//src/mongo/util:boost_assert_shim",
+    ],
+)
+
+mongo_cc_library(
+    name = "boost_thread",
+    srcs = [
+        "libs/thread/src/future.cpp",
+    ] + select({
+        "@platforms//os:linux": [
+            "libs/thread/src/pthread/once.cpp",
+            "libs/thread/src/pthread/thread.cpp",
+        ],
+        "@platforms//os:macos": [
+            "libs/thread/src/pthread/once.cpp",
+            "libs/thread/src/pthread/thread.cpp",
+        ],
+        "@platforms//os:windows": [
+            "libs/thread/src/win32/thread.cpp",
+            "libs/thread/src/win32/thread_primitives.cpp",
+            "libs/thread/src/win32/tss_dll.cpp",
+            "libs/thread/src/win32/tss_pe.cpp",
+        ],
+    }),
+    hdrs = BOOST_LIB_HEADERS + select({
+        "@platforms//os:linux": [
+            "libs/thread/src/pthread/once_atomic.cpp",
+        ],
+        "@platforms//os:macos": [
+            "libs/thread/src/pthread/once_atomic.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    copts = BOOST_COPTS,
+    local_defines = BOOST_DEFINES + ["BOOST_THREAD_BUILD_LIB"] + select({
+        "@platforms//os:linux": [
+            "BOOST_THREAD_PTHREAD",
+        ],
+        "@platforms//os:macos": [
+            "BOOST_THREAD_PTHREAD",
+        ],
+        "@platforms//os:windows": [
+            "BOOST_THREAD_WIN32",
+        ],
+    }),
+    deps = [
+        "//src/mongo/util:boost_assert_shim",
+    ],
+)
+
+mongo_cc_library(
+    name = "boost_log",
+    srcs = [
+        "libs/log/src/attribute_name.cpp",
+        "libs/log/src/attribute_set.cpp",
+        "libs/log/src/attribute_value_set.cpp",
+        "libs/log/src/code_conversion.cpp",
+        "libs/log/src/core.cpp",
+        "libs/log/src/date_time_format_parser.cpp",
+        "libs/log/src/default_attribute_names.cpp",
+        "libs/log/src/default_sink.cpp",
+        "libs/log/src/dump.cpp",
+        "libs/log/src/event.cpp",
+        "libs/log/src/exceptions.cpp",
+        "libs/log/src/format_parser.cpp",
+        "libs/log/src/global_logger_storage.cpp",
+        "libs/log/src/named_scope.cpp",
+        "libs/log/src/named_scope_format_parser.cpp",
+        "libs/log/src/once_block.cpp",
+        "libs/log/src/permissions.cpp",
+        "libs/log/src/process_id.cpp",
+        "libs/log/src/process_name.cpp",
+        "libs/log/src/record_ostream.cpp",
+        "libs/log/src/severity_level.cpp",
+        "libs/log/src/spirit_encoding.cpp",
+        "libs/log/src/text_file_backend.cpp",
+        "libs/log/src/text_multifile_backend.cpp",
+        "libs/log/src/text_ostream_backend.cpp",
+        "libs/log/src/thread_id.cpp",
+        "libs/log/src/thread_specific.cpp",
+        "libs/log/src/threadsafe_queue.cpp",
+        "libs/log/src/timer.cpp",
+        "libs/log/src/timestamp.cpp",
+        "libs/log/src/trivial.cpp",
+    ] + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": [
+            "libs/log/src/syslog_backend.cpp",
+        ],
+    }),
+    hdrs = BOOST_LIB_HEADERS,
+    copts = BOOST_COPTS + select({
+        "@platforms//os:windows": [
+            "/wd4828",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = BOOST_DEFINES + [
+        "BOOST_LOG_USE_COMPILER_TLS",
+        "BOOST_LOG_USE_STD_REGEX",
+        "BOOST_LOG_WITHOUT_DEFAULT_FACTORIES",
+        "BOOST_LOG_WITHOUT_IPC",
+        "BOOST_LOG_WITHOUT_SETTINGS_PARSERS",
+    ] + select({
+        "@platforms//os:windows": [
+            "BOOST_USE_WINDOWS_H",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "boost_filesystem",
+        "boost_thread",
+        "//src/mongo/util:boost_assert_shim",
+    ],
+)

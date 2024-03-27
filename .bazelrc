@@ -29,6 +29,12 @@ build:windows --//bazel/config:compiler_type=msvc
 build:macos --cxxopt=-std=c++20
 build:windows --cxxopt=/std:c++20
 
+# Set the windows version to win10 by default
+# TODO(SERVER-87654): We may want to add support for other Windows versions in the future.
+build:windows --cxxopt=-D_WIN32_WINNT=0x0A00
+build:windows --cxxopt=-DBOOST_USE_WINAPI_VERSION=0x0A00
+build:windows --cxxopt=-DNTDDI_VERSION=0x0A000000
+
 # remote execution is the default, but only mongodb employees will be able to access
 # the engflow cluster. External builders should use the local option below
 # remote execution configs

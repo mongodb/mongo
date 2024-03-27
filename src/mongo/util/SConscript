@@ -77,7 +77,7 @@ if env.TargetOSIs('windows'):
     env.Alias('generated-sources', generatedResourceConstantFile)
 
 # Shim library for boost to depend on
-env.Library(
+env.BazelLibrary(
     target='boost_assert_shim',
     source=[
         'boost_assert_shim.cpp',

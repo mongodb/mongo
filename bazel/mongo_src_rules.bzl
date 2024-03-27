@@ -943,7 +943,7 @@ MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINE
                        WINDOWS_DEFINES + TCMALLOC_DEFINES + LINUX_DEFINES + GCC_OPT_DEFINES + BOOST_DEFINES + \
                        ABSEIL_DEFINES + PCRE2_DEFINES + SAFEINT_DEFINES
 
-MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS + \
+MONGO_GLOBAL_COPTS = ["-Isrc", "-Isrc/third_party/boost"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS + \
                      MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + UNDEFINED_SANITIZER_COPTS + \
                      THREAD_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS + LINUX_OPT_COPTS + \
                      GCC_OR_CLANG_WARNINGS_COPTS + GCC_OR_CLANG_GENERAL_COPTS + \
@@ -958,6 +958,8 @@ MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAG
                          EXTRA_GLOBAL_LIBS_LINKFLAGS + ANY_SANITIZER_AVAILABLE_LINKFLAGS + ANY_SANITIZER_GCC_LINKFLAGS + \
                          GCC_OR_CLANG_LINKFLAGS + COMPRESS_DEBUG_LINKFLAGS + DEDUPE_SYMBOL_LINKFLAGS + \
                          DEBUG_TYPES_SECTION_FLAGS
+
+MONGO_GLOBAL_ACCESSIBLE_HEADERS = ["//src/third_party/boost:headers"]
 
 MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES
 
@@ -1111,7 +1113,7 @@ def mongo_cc_library(
     native.cc_library(
         name = name + SHARED_ARCHIVE_SUFFIX,
         srcs = srcs,
-        hdrs = hdrs + fincludes_hdr,
+        hdrs = hdrs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS,
         deps = deps,
         visibility = visibility,
         testonly = testonly,
@@ -1132,7 +1134,7 @@ def mongo_cc_library(
     native.cc_library(
         name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs,
-        hdrs = hdrs + fincludes_hdr,
+        hdrs = hdrs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS,
         deps = deps,
         visibility = visibility,
         testonly = testonly,
@@ -1241,7 +1243,7 @@ def mongo_cc_binary(
 
     native.cc_binary(
         name = name + WITH_DEBUG_SUFFIX,
-        srcs = srcs + fincludes_hdr,
+        srcs = srcs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS,
         deps = all_deps,
         visibility = visibility,
         testonly = testonly,
