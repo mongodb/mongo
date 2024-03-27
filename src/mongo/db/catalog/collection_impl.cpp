@@ -270,29 +270,14 @@ bool collUsesCappedSnapshots(const CollectionOptions& options) {
     // increasing order.
     return options.capped && !options.clusteredIndex;
 }
-
-bool collUsesCappedSnapshots(const NamespaceString& nss) {
-    // The oplog tracks its visibility through support from the storage engine.
-    if (nss.isOplog()) {
-        return false;
-    }
-
-    // Only use the behavior for non-replicated capped collections (which can accept concurrent
-    // writes).
-    if (nss.isReplicated()) {
-        return false;
-    }
-
-    return true;
-}
 }  // namespace internal
 
 bool collUsesCappedSnapshots(const NamespaceString& nss, const CollectionOptions& options) {
-    return internal::collUsesCappedSnapshots(nss) && internal::collUsesCappedSnapshots(options);
+    return Collection::everUsesCappedSnapshots(nss) && internal::collUsesCappedSnapshots(options);
 }
 
 bool collUsesCappedSnapshots(const CollectionImpl& coll) {
-    return internal::collUsesCappedSnapshots(coll.ns()) &&
+    return Collection::everUsesCappedSnapshots(coll.ns()) &&
         internal::collUsesCappedSnapshots(coll.getCollectionOptions());
 }
 }  // namespace

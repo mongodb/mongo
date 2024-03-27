@@ -100,7 +100,7 @@ void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
                                          MODE_IX,
                                          AutoGetCollection::Options{}.secondaryNssOrUUIDs(
                                              toNssVec.cbegin(), toNssVec.cend()));
-            auto acquisitions = acquireCollections(
+            auto acquisitions = makeAcquisitionMap(acquireCollections(
                 opCtx,
                 {CollectionAcquisitionRequest(
                      NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),
@@ -112,7 +112,7 @@ void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                      repl::ReadConcernArgs::get(opCtx),
                      AcquisitionPrerequisites::kWrite)},
-                MODE_IX);
+                MODE_IX));
 
             const auto& collsColl =
                 acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
@@ -202,7 +202,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
         opCtx, "AddIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace, [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, userCollectionNss, MODE_IX);
-            auto acquisitions = acquireCollections(
+            auto acquisitions = makeAcquisitionMap(acquireCollections(
                 opCtx,
                 {CollectionAcquisitionRequest(
                      NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),
@@ -214,7 +214,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                      repl::ReadConcernArgs::get(opCtx),
                      AcquisitionPrerequisites::kWrite)},
-                MODE_IX);
+                MODE_IX));
 
             auto& collsColl = acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
             const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
@@ -287,7 +287,7 @@ void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
         [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);
-            auto acquisitions = acquireCollections(
+            auto acquisitions = makeAcquisitionMap(acquireCollections(
                 opCtx,
                 {CollectionAcquisitionRequest(
                      NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),
@@ -299,7 +299,7 @@ void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                      repl::ReadConcernArgs::get(opCtx),
                      AcquisitionPrerequisites::kWrite)},
-                MODE_IX);
+                MODE_IX));
 
             auto& collsColl = acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
             const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
@@ -371,7 +371,7 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
         [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);
-            auto acquisitions = acquireCollections(
+            auto acquisitions = makeAcquisitionMap(acquireCollections(
                 opCtx,
                 {CollectionAcquisitionRequest(
                      NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),
@@ -383,7 +383,7 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                      repl::ReadConcernArgs::get(opCtx),
                      AcquisitionPrerequisites::kWrite)},
-                MODE_IX);
+                MODE_IX));
 
             auto& collsColl = acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
             const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
@@ -463,7 +463,7 @@ void dropCollectionShardingIndexCatalog(OperationContext* opCtx, const Namespace
             WriteUnitOfWork wunit(opCtx);
             Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
             Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-            auto acquisitions = acquireCollections(
+            auto acquisitions = makeAcquisitionMap(acquireCollections(
                 opCtx,
                 {CollectionAcquisitionRequest(
                      NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),
@@ -475,7 +475,7 @@ void dropCollectionShardingIndexCatalog(OperationContext* opCtx, const Namespace
                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                      repl::ReadConcernArgs::get(opCtx),
                      AcquisitionPrerequisites::kWrite)},
-                MODE_IX);
+                MODE_IX));
 
             const auto& collsColl =
                 acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
@@ -525,7 +525,7 @@ void clearCollectionShardingIndexCatalog(OperationContext* opCtx,
         [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);
-            auto acquisitions = acquireCollections(
+            auto acquisitions = makeAcquisitionMap(acquireCollections(
                 opCtx,
                 {CollectionAcquisitionRequest(
                      NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),
@@ -537,7 +537,7 @@ void clearCollectionShardingIndexCatalog(OperationContext* opCtx,
                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                      repl::ReadConcernArgs::get(opCtx),
                      AcquisitionPrerequisites::kWrite)},
-                MODE_IX);
+                MODE_IX));
 
             const auto& collsColl =
                 acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);

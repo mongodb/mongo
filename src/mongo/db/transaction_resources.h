@@ -384,9 +384,12 @@ struct TransactionResources {
     ////////////////////////////////////////////////////////////////////////////////////////
     // Per-collection resources
 
+    using AcquiredCollections = std::list<AcquiredCollection>;
+    using AcquiredViews = std::list<AcquiredView>;
+
     // Set of all collections which are currently acquired
-    std::list<AcquiredCollection> acquiredCollections;
-    std::list<AcquiredView> acquiredViews;
+    AcquiredCollections acquiredCollections;
+    AcquiredViews acquiredViews;
 
     // Reference counters used for controlling how many references there are to the
     // TransactionResources object.

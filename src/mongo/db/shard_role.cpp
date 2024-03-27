@@ -37,10 +37,7 @@
 #include <boost/utility/in_place_factory.hpp>  // IWYU pragma: keep
 #include <fmt/format.h>
 #include <iterator>
-#include <list>
-#include <map>
 
-#include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 
 #include "mongo/base/error_codes.h"
@@ -96,6 +93,8 @@ namespace {
 enum class ResolutionType { kUUID, kNamespace };
 
 struct ResolvedNamespaceOrViewAcquisitionRequest {
+    ResourceId resourceId;
+
     // Populated in the first phase of collection(s) acquisition.
     AcquisitionPrerequisites prerequisites;
     ResolutionType resolvedBy;
@@ -113,8 +112,9 @@ struct ResolvedNamespaceOrViewAcquisitionRequest {
     shard_role_details::AcquisitionLocks acquisitionLocks;
 };
 
-using ResolvedNamespaceOrViewAcquisitionRequestsMap =
-    std::map<ResourceId, ResolvedNamespaceOrViewAcquisitionRequest>;
+using ResolvedNamespaceOrViewAcquisitionRequests =
+    absl::InlinedVector<ResolvedNamespaceOrViewAcquisitionRequest,
+                        kDefaultAcquisitionContainerSize>;
 
 void validateResolvedCollectionByUUID(OperationContext* opCtx,
                                       CollectionOrViewAcquisitionRequest ar,
@@ -140,15 +140,15 @@ void validateResolvedCollectionByUUID(OperationContext* opCtx,
 }
 
 /**
- * Takes the input acquisitions, populates the NSS and returns a map sorted by NSS, suitable for
+ * Takes the input acquisitions, populates the NSS and returns a vector sorted by NSS, suitable for
  * locking them in NSS order.
  */
-ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionRequests(
+ResolvedNamespaceOrViewAcquisitionRequests resolveNamespaceOrViewAcquisitionRequests(
     OperationContext* opCtx,
     const CollectionCatalog& catalog,
-    const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
+    const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
 
-    ResolvedNamespaceOrViewAcquisitionRequestsMap sortedAcquisitionRequests;
+    ResolvedNamespaceOrViewAcquisitionRequests resolvedAcquisitionRequests;
 
     for (const auto& ar : acquisitionRequests) {
         if (ar.nssOrUUID.isNamespaceString()) {
@@ -161,10 +161,13 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                                                    ar.lockAcquisitionDeadline);
 
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-                prerequisites, ResolutionType::kNamespace, nullptr, boost::none};
+                ResourceId(RESOURCE_COLLECTION, ar.nssOrUUID.nss()),
+                prerequisites,
+                ResolutionType::kNamespace,
+                nullptr,
+                boost::none};
 
-            sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, ar.nssOrUUID.nss()),
-                                              std::move(resolvedAcquisitionRequest));
+            resolvedAcquisitionRequests.emplace_back(std::move(resolvedAcquisitionRequest));
         } else if (ar.nssOrUUID.isUUID()) {
             auto coll = catalog.lookupCollectionByUUID(opCtx, ar.nssOrUUID.uuid());
 
@@ -178,16 +181,28 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                                                    ar.viewMode);
 
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-                prerequisites, ResolutionType::kUUID, nullptr, boost::none};
+                ResourceId(RESOURCE_COLLECTION, coll->ns()),
+                prerequisites,
+                ResolutionType::kUUID,
+                nullptr,
+                boost::none};
 
-            sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, coll->ns()),
-                                              std::move(resolvedAcquisitionRequest));
+            resolvedAcquisitionRequests.emplace_back(std::move(resolvedAcquisitionRequest));
         } else {
             MONGO_UNREACHABLE;
         }
     }
 
-    return sortedAcquisitionRequests;
+    // Empirically, this early-return results in better performance than trying to sort a vector of
+    // size 1.
+    if (resolvedAcquisitionRequests.size() == 1) {
+        return resolvedAcquisitionRequests;
+    }
+
+    std::sort(resolvedAcquisitionRequests.begin(),
+              resolvedAcquisitionRequests.end(),
+              [](auto& lhs, auto& rhs) { return lhs.resourceId > rhs.resourceId; });
+    return resolvedAcquisitionRequests;
 }
 
 void verifyDbAndCollection(OperationContext* opCtx,
@@ -341,7 +356,7 @@ const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
 CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks(
     OperationContext* opCtx,
     const CollectionCatalog& catalog,
-    ResolvedNamespaceOrViewAcquisitionRequestsMap sortedAcquisitionRequests) {
+    ResolvedNamespaceOrViewAcquisitionRequests sortedAcquisitionRequests) {
     CollectionOrViewAcquisitions acquisitions;
 
     auto& txnResources = TransactionResources::get(opCtx);
@@ -353,7 +368,7 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
     auto currentAcquireCallNum = txnResources.increaseAcquireCollectionCallCount();
 
     for (auto& acquisitionRequest : sortedAcquisitionRequests) {
-        auto& prerequisites = acquisitionRequest.second.prerequisites;
+        auto& prerequisites = acquisitionRequest.prerequisites;
 
         auto snapshotedServices = acquireServicesSnapshot(opCtx, catalog, prerequisites);
         const bool isCollection =
@@ -393,13 +408,13 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
                 prerequisites.uuid = collectionPtr->uuid();
             }
 
-            acquisitionRequest.second.acquisitionLocks.hasLockFreeReadsBlock =
-                bool(acquisitionRequest.second.lockFreeReadsResources.lockFreeReadsBlock);
+            acquisitionRequest.acquisitionLocks.hasLockFreeReadsBlock =
+                bool(acquisitionRequest.lockFreeReadsResources.lockFreeReadsBlock);
 
-            if (const auto& ptr = acquisitionRequest.second.lockFreeReadsResources.globalLock) {
-                acquisitionRequest.second.acquisitionLocks.globalLock =
+            if (const auto& ptr = acquisitionRequest.lockFreeReadsResources.globalLock) {
+                acquisitionRequest.acquisitionLocks.globalLock =
                     ptr->isLocked() ? MODE_IS : MODE_NONE;
-                acquisitionRequest.second.acquisitionLocks.globalLockOptions =
+                acquisitionRequest.acquisitionLocks.globalLockOptions =
                     kLockFreeReadsGlobalLockOptions;
             }
 
@@ -407,28 +422,28 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
                 txnResources.addAcquiredCollection(
                     {currentAcquireCallNum,
                      prerequisites,
-                     std::move(acquisitionRequest.second.dbLock),
-                     std::move(acquisitionRequest.second.collLock),
-                     std::move(acquisitionRequest.second.lockFreeReadsResources.lockFreeReadsBlock),
-                     std::move(acquisitionRequest.second.lockFreeReadsResources.globalLock),
-                     std::move(acquisitionRequest.second.acquisitionLocks),
+                     std::move(acquisitionRequest.dbLock),
+                     std::move(acquisitionRequest.collLock),
+                     std::move(acquisitionRequest.lockFreeReadsResources.lockFreeReadsBlock),
+                     std::move(acquisitionRequest.lockFreeReadsResources.globalLock),
+                     std::move(acquisitionRequest.acquisitionLocks),
                      std::move(snapshotedServices.collectionDescription),
                      std::move(snapshotedServices.ownershipFilter),
                      std::move(get<CollectionPtr>(snapshotedServices.collectionPtrOrView))});
 
             CollectionAcquisition acquisition(txnResources, acquiredCollection);
-            acquisitions.emplace(prerequisites.nss, std::move(acquisition));
+            acquisitions.emplace_back(std::move(acquisition));
         } else {
             // It's a view.
             auto& acquiredView =
                 txnResources.addAcquiredView({prerequisites,
-                                              std::move(acquisitionRequest.second.dbLock),
-                                              std::move(acquisitionRequest.second.collLock),
+                                              std::move(acquisitionRequest.dbLock),
+                                              std::move(acquisitionRequest.collLock),
                                               std::move(get<std::shared_ptr<const ViewDefinition>>(
                                                   snapshotedServices.collectionPtrOrView))});
 
             ViewAcquisition acquisition(txnResources, acquiredView);
-            acquisitions.emplace(prerequisites.nss, std::move(acquisition));
+            acquisitions.emplace_back(std::move(acquisition));
         }
     }
 
@@ -441,6 +456,12 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
 void establishCappedSnapshotIfNeeded(OperationContext* opCtx,
                                      const std::shared_ptr<const CollectionCatalog>& catalog,
                                      const NamespaceStringOrUUID& nsOrUUID) {
+    // Avoid the costly lookup if we can determine ahead of time that this collection would never
+    // use capped snapshots.
+    if (nsOrUUID.isNamespaceString() && !Collection::everUsesCappedSnapshots(nsOrUUID.nss())) {
+        return;
+    }
+
     auto coll = catalog->lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID);
     if (coll && coll->usesCappedSnapshots()) {
         CappedSnapshots::get(opCtx).establish(opCtx, coll);
@@ -456,7 +477,7 @@ bool haveAcquiredConsistentCatalogAndSnapshot(const CollectionCatalog* catalogBe
 }
 
 std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(
-    OperationContext* opCtx, const std::vector<NamespaceStringOrUUID>& acquisitionRequests) {
+    OperationContext* opCtx, const NamespaceStringOrUUIDRequests& acquisitionRequests) {
     while (true) {
         shard_role_details::SnapshotAttempt snapshotAttempt(opCtx, acquisitionRequests);
         snapshotAttempt.snapshotInitialState();
@@ -468,9 +489,9 @@ std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(
     }
 }
 
-std::vector<NamespaceStringOrUUID> toNamespaceStringOrUUIDs(
-    const std::list<shard_role_details::AcquiredCollection>& acquiredCollections) {
-    std::vector<NamespaceStringOrUUID> requests;
+NamespaceStringOrUUIDRequests toNamespaceStringOrUUIDs(
+    const TransactionResources::AcquiredCollections& acquiredCollections) {
+    NamespaceStringOrUUIDRequests requests;
     for (const auto& acquiredCollection : acquiredCollections) {
         const auto& prerequisites = acquiredCollection.prerequisites;
         requests.emplace_back(prerequisites.nss);
@@ -478,16 +499,16 @@ std::vector<NamespaceStringOrUUID> toNamespaceStringOrUUIDs(
     return requests;
 }
 
-std::vector<NamespaceStringOrUUID> toNamespaceStringOrUUIDs(
-    const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
-    std::vector<NamespaceStringOrUUID> requests;
+NamespaceStringOrUUIDRequests toNamespaceStringOrUUIDs(
+    const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
+    NamespaceStringOrUUIDRequests requests;
     for (const auto& ar : acquisitionRequests) {
         requests.emplace_back(ar.nssOrUUID);
     }
     return requests;
 }
 
-void validateRequests(const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
+void validateRequests(const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
     for (const auto& ar : acquisitionRequests) {
         if (ar.nssOrUUID.isNamespaceString()) {
             uassert(ErrorCodes::InvalidNamespace,
@@ -506,9 +527,8 @@ void validateRequests(const std::vector<CollectionOrViewAcquisitionRequest>& acq
     }
 }
 
-void checkShardingPlacement(
-    OperationContext* opCtx,
-    const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
+void checkShardingPlacement(OperationContext* opCtx,
+                            const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
     for (const auto& ar : acquisitionRequests) {
         // We only have to check placement for collections that come from a router, which
         // will have the namespace set.
@@ -519,8 +539,7 @@ void checkShardingPlacement(
 }
 
 ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources takeGlobalLock(
-    OperationContext* opCtx,
-    const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
+    OperationContext* opCtx, const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
     auto lockFreeReadsBlock = std::make_shared<LockFreeReadsBlock>(opCtx);
     auto globalLock = std::make_shared<Lock::GlobalLock>(opCtx,
                                                          MODE_IS,
@@ -531,8 +550,7 @@ ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources takeGlobalLock
 }
 
 std::shared_ptr<const CollectionCatalog> stashConsistentCatalog(
-    OperationContext* opCtx,
-    const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
+    OperationContext* opCtx, const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
     auto requests = toNamespaceStringOrUUIDs(acquisitionRequests);
     auto catalog = getConsistentCatalogAndSnapshot(opCtx, requests);
     // Stash the catalog, it will be automatically unstashed when the snapshot is released.
@@ -666,11 +684,12 @@ CollectionAcquisition::~CollectionAcquisition() {
     // acquisitions.
     if (transactionResources.state == shard_role_details::TransactionResources::State::ACTIVE) {
         auto currentRefCount = --_acquiredCollection->refCount;
-        if (currentRefCount == 0)
+        if (currentRefCount == 0) {
             transactionResources.acquiredCollections.remove_if(
                 [&](const shard_role_details::AcquiredCollection& txnResourceAcquiredColl) {
                     return &txnResourceAcquiredColl == _acquiredCollection;
                 });
+        }
     }
 
     transactionResources.collectionAcquisitionReferences--;
@@ -797,62 +816,80 @@ const ViewDefinition& ViewAcquisition::getViewDefinition() const {
 CollectionAcquisition acquireCollection(OperationContext* opCtx,
                                         CollectionAcquisitionRequest acquisitionRequest,
                                         LockMode mode) {
-    return CollectionAcquisition(acquireCollectionOrView(opCtx, acquisitionRequest, mode));
+    return CollectionAcquisition(
+        acquireCollectionOrView(opCtx, std::move(acquisitionRequest), mode));
 }
 
-CollectionAcquisitions acquireCollections(
-    OperationContext* opCtx,
-    std::vector<CollectionAcquisitionRequest> acquisitionRequests,
-    LockMode mode) {
+CollectionAcquisitions acquireCollections(OperationContext* opCtx,
+                                          CollectionAcquisitionRequests acquisitionRequests,
+                                          LockMode mode) {
     // Transform the CollectionAcquisitionRequests to NamespaceOrViewAcquisitionRequests.
-    std::vector<CollectionOrViewAcquisitionRequest> namespaceOrViewAcquisitionRequests;
-    std::move(acquisitionRequests.begin(),
-              acquisitionRequests.end(),
-              std::back_inserter(namespaceOrViewAcquisitionRequests));
-
-    // Acquire the collections
-    auto acquisitions = acquireCollectionsOrViews(opCtx, namespaceOrViewAcquisitionRequests, mode);
-
-    // Transform the acquisitions to CollectionAcquisitions
-    CollectionAcquisitions collectionAcquisitions;
-    for (auto& acquisition : acquisitions) {
-        // It must be a collection, because that's what the acquisition request stated.
-        invariant(acquisition.second.isCollection());
-        collectionAcquisitions.emplace(std::move(acquisition));
-    }
-    return collectionAcquisitions;
-}
-
-CollectionOrViewAcquisition acquireCollectionOrView(
-    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode) {
-    auto acquisition = acquireCollectionsOrViews(opCtx, {std::move(acquisitionRequest)}, mode);
-    invariant(acquisition.size() == 1);
-    return std::move(acquisition.begin()->second);
-}
-
-CollectionAcquisition acquireCollectionMaybeLockFree(
-    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionRequest) {
-    return CollectionAcquisition(acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest));
-}
-
-CollectionAcquisitions acquireCollectionsMaybeLockFree(
-    OperationContext* opCtx, std::vector<CollectionAcquisitionRequest> acquisitionRequests) {
-    // Transform the CollectionAcquisitionRequests to NamespaceOrViewAcquisitionRequests.
-    std::vector<CollectionOrViewAcquisitionRequest> namespaceOrViewAcquisitionRequests;
+    CollectionOrViewAcquisitionRequests namespaceOrViewAcquisitionRequests;
     std::move(acquisitionRequests.begin(),
               acquisitionRequests.end(),
               std::back_inserter(namespaceOrViewAcquisitionRequests));
 
     // Acquire the collections
     auto acquisitions =
-        acquireCollectionsOrViewsMaybeLockFree(opCtx, namespaceOrViewAcquisitionRequests);
+        acquireCollectionsOrViews(opCtx, std::move(namespaceOrViewAcquisitionRequests), mode);
 
     // Transform the acquisitions to CollectionAcquisitions
     CollectionAcquisitions collectionAcquisitions;
     for (auto& acquisition : acquisitions) {
         // It must be a collection, because that's what the acquisition request stated.
-        invariant(acquisition.second.isCollection());
-        collectionAcquisitions.emplace(std::move(acquisition));
+        invariant(acquisition.isCollection());
+        collectionAcquisitions.emplace_back(std::move(acquisition));
+    }
+    return collectionAcquisitions;
+}
+
+CollectionAcquisitionMap makeAcquisitionMap(CollectionAcquisitions acquisitions) {
+    CollectionAcquisitionMap map;
+    for (auto&& a : acquisitions) {
+        map.emplace(a.nss(), std::move(a));
+    }
+    return map;
+}
+
+CollectionOrViewAcquisitionMap makeAcquisitionMap(CollectionOrViewAcquisitions acquisitions) {
+    CollectionOrViewAcquisitionMap map;
+    for (auto&& a : acquisitions) {
+        map.emplace(a.nss(), std::move(a));
+    }
+    return map;
+}
+
+CollectionOrViewAcquisition acquireCollectionOrView(
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode) {
+    auto acquisition = acquireCollectionsOrViews(opCtx, {std::move(acquisitionRequest)}, mode);
+    invariant(acquisition.size() == 1);
+    return std::move(*acquisition.begin());
+}
+
+CollectionAcquisition acquireCollectionMaybeLockFree(
+    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionRequest) {
+    return CollectionAcquisition(
+        acquireCollectionOrViewMaybeLockFree(opCtx, std::move(acquisitionRequest)));
+}
+
+CollectionAcquisitions acquireCollectionsMaybeLockFree(
+    OperationContext* opCtx, CollectionAcquisitionRequests acquisitionRequests) {
+    // Transform the CollectionAcquisitionRequests to NamespaceOrViewAcquisitionRequests.
+    CollectionOrViewAcquisitionRequests namespaceOrViewAcquisitionRequests;
+    std::move(acquisitionRequests.begin(),
+              acquisitionRequests.end(),
+              std::back_inserter(namespaceOrViewAcquisitionRequests));
+
+    // Acquire the collections
+    auto acquisitions = acquireCollectionsOrViewsMaybeLockFree(
+        opCtx, std::move(namespaceOrViewAcquisitionRequests));
+
+    // Transform the acquisitions to CollectionAcquisitions
+    CollectionAcquisitions collectionAcquisitions;
+    for (auto& acquisition : acquisitions) {
+        // It must be a collection, because that's what the acquisition request stated.
+        invariant(acquisition.isCollection());
+        collectionAcquisitions.emplace_back(std::move(acquisition));
     }
     return collectionAcquisitions;
 }
@@ -862,7 +899,7 @@ CollectionOrViewAcquisition acquireCollectionOrViewMaybeLockFree(
     auto acquisition =
         acquireCollectionsOrViewsMaybeLockFree(opCtx, {std::move(acquisitionRequest)});
     invariant(acquisition.size() == 1);
-    return std::move(acquisition.begin()->second);
+    return std::move(*acquisition.begin());
 }
 
 namespace shard_role_details {
@@ -962,13 +999,13 @@ SnapshotAttempt::~SnapshotAttempt() {
     CurOp::get(_opCtx)->yielded();
 }
 
-ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
+ResolvedNamespaceOrViewAcquisitionRequests generateSortedAcquisitionRequests(
     OperationContext* opCtx,
     const CollectionCatalog& catalog,
-    const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests,
+    const CollectionOrViewAcquisitionRequests& acquisitionRequests,
     const ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources&
         lockFreeReadsResources) {
-    ResolvedNamespaceOrViewAcquisitionRequestsMap sortedAcquisitionRequests;
+    ResolvedNamespaceOrViewAcquisitionRequests resolvedAcquisitionRequests;
 
     auto readTimestamp =
         shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
@@ -994,16 +1031,30 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
                                                ar.viewMode);
 
         ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-            prerequisites, resolvedBy, nullptr, boost::none, lockFreeReadsResources};
+            ResourceId(RESOURCE_COLLECTION, counter++),
+            prerequisites,
+            resolvedBy,
+            nullptr,
+            boost::none,
+            lockFreeReadsResources};
         // We don't care about ordering in this case, use a mock ResourceId as the key.
-        sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, counter++),
-                                          std::move(resolvedAcquisitionRequest));
+        resolvedAcquisitionRequests.emplace_back(std::move(resolvedAcquisitionRequest));
     }
-    return sortedAcquisitionRequests;
+
+    // Empirically, this early-return results in better performance than trying to sort a vector of
+    // size 1.
+    if (resolvedAcquisitionRequests.size() == 1) {
+        return resolvedAcquisitionRequests;
+    }
+
+    std::sort(resolvedAcquisitionRequests.begin(),
+              resolvedAcquisitionRequests.end(),
+              [](auto& lhs, auto& rhs) { return lhs.resourceId > rhs.resourceId; });
+    return resolvedAcquisitionRequests;
 }
 
 CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
-    OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests) {
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequests acquisitionRequests) {
     if (acquisitionRequests.size() == 0) {
         return {};
     }
@@ -1050,7 +1101,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
 
 CollectionOrViewAcquisitions acquireCollectionsOrViews(
     OperationContext* opCtx,
-    std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests,
+    CollectionOrViewAcquisitionRequests acquisitionRequests,
     LockMode mode) {
     if (acquisitionRequests.size() == 0) {
         return {};
@@ -1070,45 +1121,43 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
         //
         // Lock the collection locks in the sorted order and recheck the UUIDS. If it fails, we need
         // to start over.
-        const auto& dbName = sortedAcquisitionRequests.begin()->second.prerequisites.nss.dbName();
+        const auto& dbName = sortedAcquisitionRequests.begin()->prerequisites.nss.dbName();
         Lock::DBLockSkipOptions dbLockOptions = [&]() {
             Lock::DBLockSkipOptions dbLockOptions;
-            dbLockOptions.skipRSTLLock =
+            dbLockOptions.skipRSTLLock = std::all_of(
+                sortedAcquisitionRequests.begin(),
+                sortedAcquisitionRequests.end(),
+                [](const auto& ar) { return AutoGetDb::canSkipRSTLLock(ar.prerequisites.nss); });
+            dbLockOptions.skipFlowControlTicket =
                 std::all_of(sortedAcquisitionRequests.begin(),
                             sortedAcquisitionRequests.end(),
                             [](const auto& ar) {
-                                return AutoGetDb::canSkipRSTLLock(ar.second.prerequisites.nss);
+                                return AutoGetDb::canSkipFlowControlTicket(ar.prerequisites.nss);
                             });
-            dbLockOptions.skipFlowControlTicket = std::all_of(
-                sortedAcquisitionRequests.begin(),
-                sortedAcquisitionRequests.end(),
-                [](const auto& ar) {
-                    return AutoGetDb::canSkipFlowControlTicket(ar.second.prerequisites.nss);
-                });
             return dbLockOptions;
         }();
 
         const auto lockAcquisitionDeadline =
-            sortedAcquisitionRequests.begin()->second.prerequisites.lockAcquisitionDeadline;
+            sortedAcquisitionRequests.begin()->prerequisites.lockAcquisitionDeadline;
         const auto dbLockMode = isSharedLockMode(mode) ? MODE_IS : MODE_IX;
         const auto dbLock = std::make_shared<Lock::DBLock>(
             opCtx, dbName, dbLockMode, lockAcquisitionDeadline, dbLockOptions);
 
         for (auto& ar : sortedAcquisitionRequests) {
-            const auto& nss = ar.second.prerequisites.nss;
+            const auto& nss = ar.prerequisites.nss;
             tassert(7300400,
                     str::stream()
                         << "Cannot acquire locks for collections across different databases ('"
                         << dbName.toStringForErrorMsg() << "' vs '"
                         << nss.dbName().toStringForErrorMsg() << "'",
                     dbName == nss.dbName());
-            const auto& lockAcquisitionDeadline = ar.second.prerequisites.lockAcquisitionDeadline;
+            const auto& lockAcquisitionDeadline = ar.prerequisites.lockAcquisitionDeadline;
 
-            ar.second.dbLock = dbLock;
-            ar.second.acquisitionLocks.dbLock = dbLockMode;
-            ar.second.acquisitionLocks.dbLockOptions = dbLockOptions;
-            ar.second.collLock.emplace(opCtx, nss, mode, lockAcquisitionDeadline);
-            ar.second.acquisitionLocks.collLock = mode;
+            ar.dbLock = dbLock;
+            ar.acquisitionLocks.dbLock = dbLockMode;
+            ar.acquisitionLocks.dbLockOptions = dbLockOptions;
+            ar.collLock.emplace(opCtx, nss, mode, lockAcquisitionDeadline);
+            ar.acquisitionLocks.collLock = mode;
         }
 
         // Wait for a configured amount of time after acquiring locks if the failpoint is
@@ -1126,8 +1175,8 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
         // changed.
         bool hasOptimisticResolutionFailed = false;
         for (auto& ar : sortedAcquisitionRequests) {
-            const auto& prerequisites = ar.second.prerequisites;
-            if (ar.second.resolvedBy != ResolutionType::kUUID) {
+            const auto& prerequisites = ar.prerequisites;
+            if (ar.resolvedBy != ResolutionType::kUUID) {
                 continue;
             }
             const auto& currentCatalog = CollectionCatalog::get(opCtx);
@@ -1160,7 +1209,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
 }
 
 CollectionOrViewAcquisitions acquireCollectionsOrViewsMaybeLockFree(
-    OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests) {
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequests acquisitionRequests) {
     const bool allAcquisitionsForRead =
         std::all_of(acquisitionRequests.begin(), acquisitionRequests.end(), [](const auto& ar) {
             return ar.operationType == AcquisitionPrerequisites::kRead;

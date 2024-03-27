@@ -378,6 +378,7 @@ public:
                        Date_t deadline = Date_t::max());
 
         CollectionLock(CollectionLock&&);
+        CollectionLock& operator=(CollectionLock&& other);
         ~CollectionLock();
 
     private:

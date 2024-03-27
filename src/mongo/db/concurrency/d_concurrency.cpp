@@ -299,6 +299,13 @@ Lock::CollectionLock::CollectionLock(CollectionLock&& otherLock)
     otherLock._opCtx = nullptr;
 }
 
+Lock::CollectionLock& Lock::CollectionLock::operator=(CollectionLock&& other) {
+    _id = other._id;
+    _opCtx = other._opCtx;
+    other._opCtx = nullptr;
+    return *this;
+}
+
 Lock::CollectionLock::~CollectionLock() {
     if (_opCtx)
         shard_role_details::getLocker(_opCtx)->unlock(_id);

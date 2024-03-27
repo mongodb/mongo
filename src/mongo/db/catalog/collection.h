@@ -455,6 +455,20 @@ public:
     virtual void updateClusteredIndexTTLSetting(OperationContext* opCtx,
                                                 boost::optional<int64_t> expireAfterSeconds) = 0;
 
+    static bool everUsesCappedSnapshots(const NamespaceString& nss) {
+        // The oplog tracks its visibility through support from the storage engine.
+        if (nss.isOplog()) {
+            return false;
+        }
+
+        // Only use the behavior for non-replicated capped collections (which can accept concurrent
+        // writes).
+        if (nss.isReplicated()) {
+            return false;
+        }
+        return true;
+    }
+
     virtual Status updateCappedSize(OperationContext* opCtx,
                                     boost::optional<long long> newCappedSize,
                                     boost::optional<long long> newCappedMax) = 0;

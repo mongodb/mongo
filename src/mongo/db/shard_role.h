@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -52,7 +54,6 @@
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/views/view.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/uuid.h"
 
@@ -335,10 +336,28 @@ private:
         _collectionOrViewAcquisition;
 };
 
-using CollectionAcquisitions = stdx::unordered_map<NamespaceString, CollectionAcquisition>;
+// Most acquisitions are on a single collection and are only of size 1.
+static constexpr auto kDefaultAcquisitionContainerSize = 1;
 
+using NamespaceStringOrUUIDRequests =
+    absl::InlinedVector<NamespaceStringOrUUID, kDefaultAcquisitionContainerSize>;
+using CollectionOrViewAcquisitionRequests =
+    absl::InlinedVector<CollectionOrViewAcquisitionRequest, kDefaultAcquisitionContainerSize>;
+using CollectionAcquisitionRequests =
+    absl::InlinedVector<CollectionAcquisitionRequest, kDefaultAcquisitionContainerSize>;
+using CollectionAcquisitions =
+    absl::InlinedVector<CollectionAcquisition, kDefaultAcquisitionContainerSize>;
 using CollectionOrViewAcquisitions =
-    stdx::unordered_map<NamespaceString, CollectionOrViewAcquisition>;
+    absl::InlinedVector<CollectionOrViewAcquisition, kDefaultAcquisitionContainerSize>;
+using CollectionAcquisitionMap = absl::flat_hash_map<NamespaceString, CollectionAcquisition>;
+using CollectionOrViewAcquisitionMap =
+    absl::flat_hash_map<NamespaceString, CollectionOrViewAcquisition>;
+
+/**
+ * Helpers functions that convert a vector of acquisitions into a map.
+ */
+CollectionAcquisitionMap makeAcquisitionMap(CollectionAcquisitions acquisitions);
+CollectionOrViewAcquisitionMap makeAcquisitionMap(CollectionOrViewAcquisitions acquisitions);
 
 /**
  * Takes into account the specified namespace acquisition requests and if they can be satisfied,
@@ -351,18 +370,18 @@ CollectionAcquisition acquireCollection(OperationContext* opCtx,
                                         CollectionAcquisitionRequest acquisitionRequest,
                                         LockMode mode);
 
-CollectionAcquisitions acquireCollections(
-    OperationContext* opCtx,
-    std::vector<CollectionAcquisitionRequest> acquisitionRequests,
-    LockMode mode);
+CollectionAcquisitions acquireCollections(OperationContext* opCtx,
+                                          CollectionAcquisitionRequests acquisitionRequests,
+                                          LockMode mode);
 
 CollectionOrViewAcquisition acquireCollectionOrView(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode);
 
 CollectionOrViewAcquisitions acquireCollectionsOrViews(
     OperationContext* opCtx,
-    std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests,
+    CollectionOrViewAcquisitionRequests acquisitionRequests,
     LockMode mode);
+
 
 /**
  * Same semantics as `acquireCollectionsOrViews` above, but will not acquire or hold any of the
@@ -376,13 +395,13 @@ CollectionAcquisition acquireCollectionMaybeLockFree(
     OperationContext* opCtx, CollectionAcquisitionRequest acquisitionRequest);
 
 CollectionAcquisitions acquireCollectionsMaybeLockFree(
-    OperationContext* opCtx, std::vector<CollectionAcquisitionRequest> acquisitionRequests);
+    OperationContext* opCtx, CollectionAcquisitionRequests acquisitionRequests);
 
 CollectionOrViewAcquisition acquireCollectionOrViewMaybeLockFree(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest);
 
 CollectionOrViewAcquisitions acquireCollectionsOrViewsMaybeLockFree(
-    OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests);
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequests acquisitionRequests);
 
 /**
  * Please read the comments on AcquisitionPrerequisites::kLocalCatalogOnlyWithPotentialDataLoss for
@@ -575,7 +594,7 @@ namespace shard_role_details {
 class SnapshotAttempt {
 public:
     SnapshotAttempt(OperationContext* opCtx,
-                    const std::vector<NamespaceStringOrUUID>& acquisitionRequests)
+                    const NamespaceStringOrUUIDRequests& acquisitionRequests)
         : _opCtx{opCtx}, _acquisitionRequests(acquisitionRequests) {}
 
     ~SnapshotAttempt();
@@ -590,7 +609,7 @@ public:
 
 private:
     OperationContext* _opCtx;
-    const std::vector<NamespaceStringOrUUID>& _acquisitionRequests;
+    const NamespaceStringOrUUIDRequests& _acquisitionRequests;
     bool _openedSnapshot = false;
     bool _successful = false;
     boost::optional<long long> _replTermBeforeSnapshot;
