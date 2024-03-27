@@ -169,7 +169,7 @@
 /*
  * Atomic versions of the flag set/clear macros.
  */
-#define FLD_ISSET_ATOMIC_16(field, mask) ((field) & (uint16_t)(mask))
+#define FLD_ISSET_ATOMIC_16(field, mask) (__wt_atomic_load16(&(field)) & (uint16_t)(mask))
 
 #define FLD_SET_ATOMIC_16(field, mask)                                             \
     do {                                                                           \
@@ -177,7 +177,7 @@
         if (FLD_ISSET_ATOMIC_16((field), (mask)))                                  \
             break;                                                                 \
         do {                                                                       \
-            __orig = (field);                                                      \
+            __orig = __wt_atomic_load16(&(field));                                 \
         } while (!__wt_atomic_cas16(&(field), __orig, __orig | (uint16_t)(mask))); \
     } while (0)
 
@@ -187,7 +187,7 @@
         if (!FLD_ISSET_ATOMIC_16((field), (mask)))                                    \
             break;                                                                    \
         do {                                                                          \
-            __orig = (field);                                                         \
+            __orig = __wt_atomic_load16(&(field));                                    \
         } while (!__wt_atomic_cas16(&(field), __orig, __orig & (uint16_t)(~(mask)))); \
     } while (0)
 
