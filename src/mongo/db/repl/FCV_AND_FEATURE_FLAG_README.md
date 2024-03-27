@@ -773,6 +773,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "Toaster")) {
     parallel suite, please add them to the exclusion list [here](https://github.com/mongodb/mongo/blob/eb75b6ccc62f7c8ea26a57c1b5eb96a41809396a/jstests/libs/parallelTester.js#L149).
     _ Additionally, the featureFlagXX tags aren't considered by the jstests/core/selinux.js test.
     If you want to skip a test, please use the `no_selinux` tag.
+-   If you have a JS test that is incompatible with a feature flag being enabled, tag with a tag of
+    the same name as the feature flag appended with `_incompatible`in the format
+    `featureFlagXX_incompatible` (for example, `featureFlagToaster_incompatible`). This ensures that
+    the test will only be run when the selected feature flag is disabled.
 -   Alternatively, it is fine to check the state of the feature flag in a test and skip the test
     if the feature flag is not enabled (through `FeatureFlagUtil.isEnabled` or using the command
     `getParameter` to query the setting for a feature flag)

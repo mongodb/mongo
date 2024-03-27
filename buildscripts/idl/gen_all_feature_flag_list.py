@@ -45,14 +45,14 @@ from buildscripts.idl import lib
 from buildscripts.idl.idl import parser
 
 
-def gen_all_feature_flags(idl_dirs: List[str] = None):
-    """Generate a list of all feature flags."""
+def get_all_feature_flags(idl_dirs: List[str] = None):
+    """Generate a dict of all feature flags with their default value."""
     default_idl_dirs = ["src", "buildscripts"]
 
     if not idl_dirs:
         idl_dirs = default_idl_dirs
 
-    all_flags = []
+    all_flags = {}
     for idl_dir in idl_dirs:
         for idl_path in sorted(lib.list_idls(idl_dir)):
             if lib.is_third_party_idl(idl_path):
@@ -65,17 +65,31 @@ def gen_all_feature_flags(idl_dirs: List[str] = None):
             with open(idl_path) as idl_file:
                 doc = parser.parse_file(idl_file, idl_path)
             for feature_flag in doc.spec.feature_flags:
-                if feature_flag.default.literal != "true":
-                    all_flags.append(feature_flag.name)
+                all_flags[feature_flag.name] = feature_flag.default.literal
+
+    return all_flags
+
+
+def get_all_feature_flags_turned_on_by_default(idl_dirs: List[str] = None):
+    """Generate a list of all feature flags that default to true."""
+    all_flags = get_all_feature_flags(idl_dirs)
+
+    return [flag for flag in all_flags if all_flags[flag] == "true"]
+
+
+def get_all_feature_flags_turned_off_by_default(idl_dirs: List[str] = None):
+    """Generate a list of all feature flags that default to false."""
+    all_flags = get_all_feature_flags(idl_dirs)
+    all_default_false_flags = [flag for flag in all_flags if all_flags[flag] != "true"]
 
     with open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml") as fully_disabled_ffs:
         force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
 
-    return list(set(all_flags) - set(force_disabled_flags))
+    return list(set(all_default_false_flags) - set(force_disabled_flags))
 
 
 def gen_all_feature_flags_file(filename: str = "all_feature_flags.txt"):
-    flags = gen_all_feature_flags()
+    flags = get_all_feature_flags_turned_off_by_default()
     with open(filename, "w") as output_file:
         output_file.write("\n".join(flags))
         print("Generated: ", os.path.realpath(output_file.name))

@@ -279,7 +279,7 @@ be invoked as either:
             # These logging messages start with # becuase the output of this file must produce
             # valid yaml. This comments out these print statements when the output is parsed.
             print("# Fetching feature flags...")
-            all_ff = gen_all_feature_flag_list.gen_all_feature_flags()
+            all_ff = gen_all_feature_flag_list.get_all_feature_flags_turned_off_by_default()
             print("# Fetched feature flags...")
         else:
             all_ff = []
@@ -327,6 +327,8 @@ be invoked as either:
     else:
         # Don't run tests with feature flags that are not enabled.
         _config.EXCLUDE_WITH_ANY_TAGS.extend(not_enabled_feature_flags)
+        _config.EXCLUDE_WITH_ANY_TAGS.extend(
+            [f"{feature_flag}_incompatible" for feature_flag in _config.ENABLED_FEATURE_FLAGS])
 
     _config.FAIL_FAST = not config.pop("continue_on_failure")
     _config.FLOW_CONTROL = config.pop("flow_control")
