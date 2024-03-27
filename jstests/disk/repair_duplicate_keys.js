@@ -3,8 +3,6 @@
  * local lost and found collection.
  *
  * @tags: [
- *   # TODO SERVER-88225: Investigate failure
- *   assumes_no_old_format_indexes,
  *   requires_wiredtiger,
  * ]
  */

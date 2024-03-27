@@ -350,9 +350,9 @@ protected:
                   bool dupsAllowed) override;
 
     /**
-     * This function continues to exist in order to support v4.0 unique partial index format: the
-     * format changed in v4.2 and onward. _unindex will call this if an index entry in the new
-     * format cannot be found, and this function will check for the old format.
+     * This function continues to exist in order to support v4.0 unique index format: the format
+     * changed in v4.2 and onward. _unindex will call this if an index entry in the new format
+     * cannot be found, and this function will check for the old format.
      */
     void _unindexTimestampUnsafe(OperationContext* opCtx,
                                  WT_CURSOR* c,
@@ -363,8 +363,6 @@ private:
     Status _insertOldFormatKey(OperationContext* opCtx,
                                WT_CURSOR* c,
                                const key_string::Value& keyString);
-
-    bool _partial;
 };
 
 class WiredTigerIdIndex : public WiredTigerIndex {

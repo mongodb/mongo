@@ -225,6 +225,24 @@ TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
         ASSERT_EQ(ErrorCodes::DuplicateKey, res.code());
     }
 
+    // Ensure that it is not possible to remove a key with a mismatched RecordId.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
+        WriteUnitOfWork uow(opCtx.get());
+        // The key "1" exists, but with RecordId 1, so this should not remove anything.
+        auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(2));
+        sdi->unindex(opCtx.get(), ks, dupsAllowed);
+        uow.commit();
+
+        auto cur = sdi->newCursor(opCtx.get());
+        auto seekKs = makeKeyStringForSeek(sdi.get(), BSON("" << 1), true, true);
+        auto result = cur->seek(seekKs);
+        ASSERT(result);
+        ASSERT_EQ(result->loc, RecordId(1));
+    }
+
     // Ensure we can remove an old format key and replace it with a new one.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

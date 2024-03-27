@@ -1555,8 +1555,7 @@ WiredTigerIndexUnique::WiredTigerIndexUnique(OperationContext* ctx,
                                              KeyFormat rsKeyFormat,
                                              const IndexDescriptor* desc,
                                              bool isLogged)
-    : WiredTigerIndex(ctx, uri, collectionUUID, ident, rsKeyFormat, desc, isLogged),
-      _partial(desc->isPartial()) {
+    : WiredTigerIndex(ctx, uri, collectionUUID, ident, rsKeyFormat, desc, isLogged) {
     // _id indexes must use WiredTigerIdIndex
     invariant(!isIdIndex());
     // All unique indexes should be in the timestamp-safe format version as of version 4.2.
@@ -1914,8 +1913,10 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
                                                     bool dupsAllowed) {
     // The old unique index format had a key-value of indexKey-RecordId. This means that the
     // RecordId in an index entry might not match the indexKey+RecordId keyString passed into this
-    // function: an index on a field where multiple collection documents have the same field value
-    // but only one passes the partial index filter.
+    // function. There is at least one case where this is required: an index on a field where
+    // multiple collection documents have the same field value but only one passes the partial index
+    // filter. However, we can't make assumptions about why callers would try to remove a key with a
+    // mismatched RecordId. If they try, we must ensure we always delete the correct key.
     //
     // The dupsAllowed flag is no longer relevant for the old unique index format. No new index
     // entries are written in the old format, let alone during temporary phases of the server when
@@ -1930,46 +1931,39 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
     setKey(c, keyItem.Get());
 
-    if (_partial) {
-        int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
-        if (ret == WT_NOTFOUND) {
-            return;
-        }
-        invariantWTOK(ret, c->session);
+    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
+    if (ret == WT_NOTFOUND) {
+        return;
+    }
+    invariantWTOK(ret, c->session);
 
-        WT_ITEM value;
-        invariantWTOK(c->get_value(c, &value), c->session);
-        BufReader br(value.data, value.size);
-        fassert(40416, br.remaining());
+    WT_ITEM value;
+    invariantWTOK(c->get_value(c, &value), c->session);
+    BufReader br(value.data, value.size);
+    fassert(40416, br.remaining());
 
-        // Check that the record id matches. We may be called to unindex records that are not
-        // present in the index due to the partial filter expression.
-        bool foundRecord = [&]() {
-            if (key_string::decodeRecordIdLong(&br) != id) {
-                return false;
-            }
-            return true;
-        }();
+    // Check that the record id matches. We may be called to unindex records that are not present in
+    // the index. We must always ensure we do not delete a key with a different RecordId.
+    bool foundRecord = key_string::decodeRecordIdLong(&br) == id;
 
-        // Ensure the index entry value is not a list of RecordIds, which should only be possible
-        // temporarily in v4.0 when dupsAllowed is true, not ever across upgrades or in upgraded
-        // versions.
-        key_string::TypeBits::fromBuffer(getKeyStringVersion(), &br);
-        if (br.remaining()) {
-            LOGV2_FATAL_NOTRACE(
-                7592201,
-                "An index entry was found that contains an unexpected old format that should no "
-                "longer exist. The index should be dropped and rebuilt.",
-                "indexName"_attr = _indexName,
-                "collectionUUID"_attr = _collectionUUID);
-        }
-
-        if (!foundRecord) {
-            return;
-        }
+    // Ensure the index entry value is not a list of RecordIds, which should only be possible
+    // temporarily in v4.0 when dupsAllowed is true, not ever across upgrades or in upgraded
+    // versions.
+    key_string::TypeBits::fromBuffer(getKeyStringVersion(), &br);
+    if (br.remaining()) {
+        LOGV2_FATAL_NOTRACE(
+            7592201,
+            "An index entry was found that contains an unexpected old format that should no "
+            "longer exist. The index should be dropped and rebuilt.",
+            "indexName"_attr = _indexName,
+            "collectionUUID"_attr = _collectionUUID);
     }
 
-    int ret = WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(opCtx), c));
+    if (!foundRecord) {
+        return;
+    }
+
+    ret = WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(opCtx), c));
     if (ret == WT_NOTFOUND) {
         return;
     }
