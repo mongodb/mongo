@@ -51,6 +51,61 @@
 namespace mongo::sbe::value {
 
 namespace {
+// Internally used by TsBlock, and not exposed as part of the rest of the native block types. This
+// block owns its data in an intrusive_ptr<ElementStorage>, and provides a view of SBE tags/vals
+// which point into it.
+class ElementStorageValueBlock final : public ValueBlock {
+public:
+    ElementStorageValueBlock() = default;
+    ElementStorageValueBlock(const ElementStorageValueBlock& o) = delete;
+    ElementStorageValueBlock(ElementStorageValueBlock&& o) = delete;
+
+    /**
+     * Constructor which takes a storage buffer along with 'tags' and 'vals' which point into the
+     * storage buffer. The storage buffer is responsible for freeing the values. That is,
+     * releaseValue() will not be called.
+     */
+    ElementStorageValueBlock(boost::intrusive_ptr<mongo::bsoncolumn::ElementStorage> storage,
+                             std::vector<TypeTags> tags,
+                             std::vector<Value> vals)
+        : _storage(std::move(storage)), _vals(std::move(vals)), _tags(std::move(tags)) {}
+
+    size_t size() const {
+        return _tags.size();
+    }
+
+    boost::optional<size_t> tryCount() const override {
+        return _vals.size();
+    }
+
+    DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) override {
+        return {_vals.size(), _tags.data(), _vals.data()};
+    }
+
+    std::unique_ptr<ValueBlock> clone() const override {
+        // Just like TsBlock, any attempts to copy/clone this block result in a fully owned
+        // version. The "viewness" does not propagate.
+        std::vector<TypeTags> cpyTags(_tags.size(), value::TypeTags::Nothing);
+        std::vector<Value> cpyVals(_tags.size());
+        ValueVectorGuard guard(cpyTags, cpyVals);
+        for (size_t i = 0; i < _tags.size(); ++i) {
+            std::tie(cpyTags[i], cpyVals[i]) = value::copyValue(_tags[i], _vals[i]);
+        }
+
+        guard.reset();
+        return std::make_unique<HeterogeneousBlock>(std::move(cpyTags), std::move(cpyVals));
+    }
+
+private:
+    // Storage for the values.
+    boost::intrusive_ptr<mongo::bsoncolumn::ElementStorage> _storage;
+
+    // The values stored in these vectors are pointers into '_storage', which is responsible for
+    // freeing them.
+    std::vector<Value> _vals;
+    std::vector<TypeTags> _tags;
+};
+
 /**
  * Used by the block-based decompressing API to decompress directly into vectors that are needed
  * by other functions to construct blocks. The API requires all 'Containers' to implement
@@ -303,8 +358,14 @@ TsBlock::~TsBlock() {
     releaseValue(_controlMax.first, _controlMax.second);
 }
 
-void TsBlock::deblockFromBsonObj(std::vector<TypeTags>& deblockedTags,
-                                 std::vector<Value>& deblockedVals) const {
+void TsBlock::deblockFromBsonObj() {
+    std::vector<TypeTags> tags;
+    std::vector<Value> vals;
+    tags.reserve(_count);
+    vals.reserve(_count);
+
+    ValueVectorGuard vectorGuard(tags, vals);
+
     ObjectEnumerator enumerator(TypeTags::bsonObject, _blockVal);
     for (size_t i = 0; i < _count; ++i) {
         auto [tag, val] = [&] {
@@ -326,29 +387,21 @@ void TsBlock::deblockFromBsonObj(std::vector<TypeTags>& deblockedTags,
             }
         }();
 
-        ValueGuard guard(tag, val);
-        deblockedTags.push_back(tag);
-        deblockedVals.push_back(val);
-        guard.reset();
+        tags.push_back(tag);
+        vals.push_back(val);
     }
+
+    vectorGuard.reset();
+    _decompressedBlock = buildBlockFromStorage(std::move(tags), std::move(vals));
 }
 
-void TsBlock::deblockFromBsonColumn(std::vector<TypeTags>& deblockedTags,
-                                    std::vector<Value>& deblockedVals) {
-    tassert(7796401,
-            "Invalid BinDataType for BSONColumn",
-            getBSONBinDataSubtype(TypeTags::bsonBinData, _blockVal) == BinDataType::Column);
+void TsBlock::deblockFromBsonColumn() {
+    const auto binData = getBinData();
 
-    const auto binData =
-        BSONBinData{value::getBSONBinData(TypeTags::bsonBinData, _blockVal),
-                    static_cast<int>(value::getBSONBinDataSize(TypeTags::bsonBinData, _blockVal)),
-                    BinDataType::Column};
-
-    boost::optional<size_t> count = tryCount();
-    if (count) {
-        deblockedTags.reserve(*count);
-        deblockedVals.reserve(*count);
-    }
+    std::vector<TypeTags> tags;
+    std::vector<Value> vals;
+    tags.reserve(_count);
+    vals.reserve(_count);
 
     // If we can guarantee there are no arrays nor objects in this column, and the feature flag is
     // enabled, use the faster block-based decoding API.
@@ -357,27 +410,38 @@ void TsBlock::deblockFromBsonColumn(std::vector<TypeTags>& deblockedTags,
         mongo::bsoncolumn::BSONColumnBlockBased col(binData);
         boost::intrusive_ptr allocator{new mongo::bsoncolumn::ElementStorage()};
 
-        // The decoding API will put the decompressed elements directly into 'deblockedTags' and
-        // 'deblockedVals'.
-        BlockBasedDecompressAdaptor container(deblockedTags, deblockedVals);
+        // The decoding API will put the decompressed elements directly into 'tags' and
+        // 'vals'.
+        BlockBasedDecompressAdaptor container(tags, vals);
         col.decompress<SBEMaterializer, BlockBasedDecompressAdaptor>(container, allocator);
         tassert(8751600,
                 "Must have same the number of decompressed tags and values",
-                deblockedTags.size() == deblockedVals.size());
+                tags.size() == vals.size());
+
+        _decompressedBlock = buildBlockFromStorage(std::move(tags), std::move(vals));
     } else {
         // Use the old, less efficient decoder, if there may be objects or arrays.
         BSONColumn blockColumn(binData);
         auto it = blockColumn.begin();
-        for (size_t i = 0; i < _count; ++i) {
-            // BSONColumn::Iterator decompresses values into its own buffer which is invalidated
-            // whenever the iterator advances, so we need to copy them out.
-            auto [tag, val] = bson::convertFrom</*View*/ true>(*it);
-            auto [cpyTag, cpyVal] = value::copyValue(tag, val);
-            ++it;
 
-            deblockedTags.push_back(cpyTag);
-            deblockedVals.push_back(cpyVal);
+        // Generally when we're in this path, we expect to be decompressing deep types. Instead of
+        // copying the values into an owned value block, we insert them into an
+        // ElementStorageValueBlock which will keep the BSONColumn's ElementStorage around. This
+        // prevents us from using HomogeneousBlock, but lets us avoid the copy.
+
+        for (size_t i = 0; i < _count; ++i) {
+            auto [tag, val] = bson::convertFrom</*View*/ true>(*it);
+
+            // No copy.
+
+            ++it;
+            tags.push_back(tag);
+            vals.push_back(val);
         }
+
+        // Preserve the storage for this BSONColumn so it lives as long as this TsBlock is alive.
+        _decompressedBlock = std::make_unique<ElementStorageValueBlock>(
+            blockColumn.release(), std::move(tags), std::move(vals));
     }
 }
 
@@ -421,6 +485,17 @@ DeblockedTagVals TsBlock::deblock(boost::optional<DeblockedTagValStorage>& stora
     return _decompressedBlock->extract();
 }
 
+BSONBinData TsBlock::getBinData() const {
+    tassert(7796401,
+            "Invalid BinDataType for BSONColumn",
+            getBSONBinDataSubtype(TypeTags::bsonBinData, _blockVal) == BinDataType::Column);
+
+    return BSONBinData{
+        value::getBSONBinData(TypeTags::bsonBinData, _blockVal),
+        static_cast<int>(value::getBSONBinDataSize(TypeTags::bsonBinData, _blockVal)),
+        BinDataType::Column};
+}
+
 std::pair<TypeTags, Value> TsBlock::tryMin() const {
     // V1 and v3 buckets store the time field unsorted. In all versions, the control.min of the time
     // field is rounded down. If computing the true minimum requires traversing the whole column, we
@@ -429,7 +504,7 @@ std::pair<TypeTags, Value> TsBlock::tryMin() const {
         if (isTimeFieldSorted()) {
             // control.min is only a lower bound for the time field but v2 buckets are sorted by
             // time, so we can easily get the true min by reading the first element in the block.
-            auto blockColumn = getBSONColumn();
+            auto blockColumn = BSONColumn(getBinData());
             auto it = blockColumn.begin();
             auto [trueMinTag, trueMinVal] = bson::convertFrom</*View*/ true>(*it);
             return value::copyValue(trueMinTag, trueMinVal);
@@ -443,16 +518,13 @@ std::pair<TypeTags, Value> TsBlock::tryMin() const {
 
 void TsBlock::ensureDeblocked() {
     if (!_decompressedBlock) {
-        std::vector<TypeTags> tags;
-        std::vector<Value> vals;
-
         if (_blockTag == TypeTags::bsonObject) {
-            deblockFromBsonObj(tags, vals);
+            deblockFromBsonObj();
         } else {
-            deblockFromBsonColumn(tags, vals);
+            deblockFromBsonColumn();
         }
-
-        _decompressedBlock = buildBlockFromStorage(std::move(tags), std::move(vals));
+        tassert(
+            8867300, "Decompressed block must be set after ensureDeblocked()", _decompressedBlock);
     }
 }
 

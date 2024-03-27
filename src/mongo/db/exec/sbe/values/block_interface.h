@@ -495,14 +495,6 @@ public:
         return _vals.size();
     }
 
-    std::pair<TypeTags, Value> tryMin() const override {
-        return {TypeTags::Nothing, Value{0u}};
-    }
-
-    std::pair<TypeTags, Value> tryMax() const override {
-        return {TypeTags::Nothing, Value{0u}};
-    }
-
     boost::optional<bool> tryDense() const override {
         return _isDense;
     }

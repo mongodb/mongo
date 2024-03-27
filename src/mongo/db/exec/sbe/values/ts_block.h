@@ -35,7 +35,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
@@ -145,13 +144,6 @@ public:
         return _count;
     }
 
-    BSONColumn getBSONColumn() const {
-        return BSONColumn(BSONBinData{
-            value::getBSONBinData(TypeTags::bsonBinData, _blockVal),
-            static_cast<int>(value::getBSONBinDataSize(TypeTags::bsonBinData, _blockVal)),
-            BinDataType::Column});
-    }
-
     std::pair<TypeTags, Value> tryLowerBound() const override {
         // The time field's control value is rounded down, so we can use it as a lower bound,
         // but cannot necessarily use it as the min().
@@ -179,19 +171,23 @@ public:
     }
 
 private:
+    /**
+     * Returns the BinData for this TsBlock, if present. It's illegal to call this for TsBlocks
+     * backed by a bucket which does not use BinData/BSONColumn.
+     */
+    BSONBinData getBinData() const;
+
     void ensureDeblocked();
 
     /**
      * Deblocks the values from a BSON object block.
      */
-    void deblockFromBsonObj(std::vector<TypeTags>& deblockedTags,
-                            std::vector<Value>& deblockedVals) const;
+    void deblockFromBsonObj();
 
     /**
      * Deblocks the values from a BSON column block.
      */
-    void deblockFromBsonColumn(std::vector<TypeTags>& deblockedTags,
-                               std::vector<Value>& deblockedVals);
+    void deblockFromBsonColumn();
 
     bool isTimeFieldSorted() const;
 
