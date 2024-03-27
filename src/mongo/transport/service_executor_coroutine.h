@@ -99,16 +99,16 @@ private:
 
     std::atomic<bool> _stillRunning{false};
 
-    mutable stdx::mutex _mutex;
-    stdx::condition_variable _threadWakeup;
-    stdx::condition_variable _shutdownCondition;
+    // mutable stdx::mutex _mutex;
+    // stdx::condition_variable _threadWakeup;
+    // stdx::condition_variable _shutdownCondition;
 
-    AtomicUInt32 _numRunningWorkerThreads{0};
+    // AtomicUInt32 _numRunningWorkerThreads{0};
 
     const size_t _reservedThreads;
 
     std::vector<ThreadGroup> _threadGroups;
-    std::thread _backgroundTimeService;
+    // std::thread _backgroundTimeService;
 
     constexpr static std::string_view _name{"coroutine"};
     constexpr static size_t kTaskBatchSize{100};

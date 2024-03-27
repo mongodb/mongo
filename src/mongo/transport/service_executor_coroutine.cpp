@@ -25,18 +25,18 @@ extern std::function<std::pair<std::function<void()>, std::function<void(int16_t
     getTxServiceFunctors;
 
 namespace transport {
-namespace {
+// namespace {
 
-// Tasks scheduled with MayRecurse may be called recursively if the recursion depth is below this
-// value.
-MONGO_EXPORT_SERVER_PARAMETER(reservedServiceExecutorRecursionLimit, int, 8);
+// // Tasks scheduled with MayRecurse may be called recursively if the recursion depth is below this
+// // value.
+// MONGO_EXPORT_SERVER_PARAMETER(reservedServiceExecutorRecursionLimit, int, 8);
 
-constexpr auto kThreadsRunning = "threadsRunning"_sd;
-constexpr auto kExecutorLabel = "executor"_sd;
-constexpr auto kExecutorName = "reserved"_sd;
-constexpr auto kReadyThreads = "readyThreads"_sd;
-constexpr auto kStartingThreads = "startingThreads"_sd;
-}  // namespace
+// constexpr auto kThreadsRunning = "threadsRunning"_sd;
+// constexpr auto kExecutorLabel = "executor"_sd;
+// constexpr auto kExecutorName = "reserved"_sd;
+// constexpr auto kReadyThreads = "readyThreads"_sd;
+// constexpr auto kStartingThreads = "startingThreads"_sd;
+// }  // namespace
 
 
 void ThreadGroup::enqueueTask(Task task) {
@@ -128,8 +128,8 @@ ServiceExecutorCoroutine::ServiceExecutorCoroutine(ServiceContext* ctx, size_t r
 Status ServiceExecutorCoroutine::start() {
     MONGO_LOG(0) << "ServiceExecutorCoroutine::start";
     {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        _stillRunning.store(true, std::memory_order_relaxed);
+        // stdx::unique_lock<stdx::mutex> lk(_mutex);
+        _stillRunning.store(true, std::memory_order_release);
     }
 
     for (size_t i = 0; i < _reservedThreads; i++) {
@@ -147,6 +147,8 @@ Status ServiceExecutorCoroutine::_startWorker(int16_t groupId) {
                  << " group id: " << groupId;
 
     return launchServiceWorkerThread([this, threadGroupId = groupId] {
+        while (!_stillRunning.load(std::memory_order_acquire)) {
+        }
         localThreadId = threadGroupId;
 
         // std::string threadName("thread_group_" + std::to_string(threadGroupId));
@@ -154,13 +156,13 @@ Status ServiceExecutorCoroutine::_startWorker(int16_t groupId) {
         StringData threadNameSD(threadName);
         setThreadName(threadNameSD);
 
-        std::unique_lock<stdx::mutex> lk(_mutex);
-        _numRunningWorkerThreads.addAndFetch(1);
-        auto numRunningGuard = MakeGuard([&] {
-            _numRunningWorkerThreads.subtractAndFetch(1);
-            _shutdownCondition.notify_one();
-        });
-        lk.unlock();
+        // std::unique_lock<stdx::mutex> lk(_mutex);
+        // _numRunningWorkerThreads.addAndFetch(1);
+        // auto numRunningGuard = MakeGuard([&] {
+        //     _numRunningWorkerThreads.subtractAndFetch(1);
+        //     _shutdownCondition.notify_one();
+        // });
+        // lk.unlock();
 
         ThreadGroup& threadGroup = _threadGroups[threadGroupId];
 
@@ -228,25 +230,26 @@ Status ServiceExecutorCoroutine::_startWorker(int16_t groupId) {
 Status ServiceExecutorCoroutine::shutdown(Milliseconds timeout) {
     LOG(0) << "Shutting down coroutine executor";
 
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    // stdx::unique_lock<stdx::mutex> lock(_mutex);
     _stillRunning.store(false, std::memory_order_relaxed);
-    _threadWakeup.notify_all();
-    if (_backgroundTimeService.joinable()) {
-        _backgroundTimeService.join();
-    }
+    // _threadWakeup.notify_all();
+    // if (_backgroundTimeService.joinable()) {
+    //     _backgroundTimeService.join();
+    // }
 
     for (ThreadGroup& thd_group : _threadGroups) {
         thd_group.terminate();
     }
 
-    bool result = _shutdownCondition.wait_for(lock, timeout.toSystemDuration(), [this]() {
-        return _numRunningWorkerThreads.load() == 0;
-    });
+    // bool result = _shutdownCondition.wait_for(lock, timeout.toSystemDuration(), [this]() {
+    //     return _numRunningWorkerThreads.load() == 0;
+    // });
 
-    return result
-        ? Status::OK()
-        : Status(ErrorCodes::Error::ExceededTimeLimit,
-                 "coroutine executor couldn't shutdown all worker threads within time limit.");
+    return Status::OK();
+    // return result
+    //     ? Status::OK()
+    //     : Status(ErrorCodes::Error::ExceededTimeLimit,
+    //              "coroutine executor couldn't shutdown all worker threads within time limit.");
 }
 
 Status ServiceExecutorCoroutine::schedule(Task task,
@@ -309,9 +312,9 @@ void ServiceExecutorCoroutine::ongoingCoroutineCountUpdate(uint16_t threadGroupI
 }
 
 void ServiceExecutorCoroutine::appendStats(BSONObjBuilder* bob) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    *bob << kExecutorLabel << kExecutorName << kThreadsRunning
-         << static_cast<int>(_numRunningWorkerThreads.loadRelaxed()) << kReadyThreads;
+    // stdx::lock_guard<stdx::mutex> lk(_mutex);
+    // *bob << kExecutorLabel << kExecutorName << kThreadsRunning
+    //      << static_cast<int>(_numRunningWorkerThreads.loadRelaxed()) << kReadyThreads;
     //  << static_cast<int>(_numReadyThreads) << kStartingThreads
     //  << static_cast<int>(_numStartingThreads);
 }
