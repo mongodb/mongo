@@ -159,7 +159,7 @@ class test_compact11(backup_base):
         self.turn_on_bg_compact('free_space_target=1MB,run_once=true')
 
         bytes_recovered = 0
-        # Each pass on a file should be a success. Note that it does not mean the file is compacted.
+        # Wait for background compaction to process all the tables.
         while self.get_bg_compaction_success() < self.num_tables:
             new_bytes_recovered = self.get_bytes_recovered()
             if new_bytes_recovered != bytes_recovered:
@@ -175,7 +175,7 @@ class test_compact11(backup_base):
 
                 bytes_recovered = new_bytes_recovered
 
-        self.pr(f'Compaction has compacted {self.get_bg_compaction_success()} tables.')
+        self.pr(f'Compaction has processed {self.get_bg_compaction_success()} tables.')
         self.assertTrue(bytes_recovered > 0)
 
         # Compare all the incremental backups against the starting full backup. The idea is that
