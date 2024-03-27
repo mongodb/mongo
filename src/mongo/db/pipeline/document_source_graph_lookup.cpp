@@ -530,6 +530,11 @@ void DocumentSourceGraphLookUp::performSearch() {
         _frontierUsageBytes += startingValue.getApproximateSize();
     }
 
+    // Query settings are looked up after parsing and therefore are not populated in the
+    // '_fromExpCtx' as part of DocumentSourceGraphLookUp constructor. Assign query settings to the
+    // '_fromExpCtx' by copying them from the parent query ExpressionContext.
+    _fromExpCtx->setQuerySettings(pExpCtx->getQuerySettings());
+
     try {
         doBreadthFirstSearch();
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {

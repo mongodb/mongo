@@ -24,7 +24,9 @@ export class QuerySettingsIndexHintsTests {
      * Asserts that after executing 'command' the most recent query plan from cache would have
      * 'querySettings' set.
      */
-    assertQuerySettingsInCacheForCommand(command, querySettings) {
+    assertQuerySettingsInCacheForCommand(command,
+                                         querySettings,
+                                         collOrViewName = this.qsutils.collName) {
         // Single solution plans are not cached in classic, therefore do not perform plan cache
         // checks for classic.
         const db = this.qsutils.db;
@@ -39,8 +41,8 @@ export class QuerySettingsIndexHintsTests {
         }
 
         // If the collection used is a view, determine the underlying collection being used.
-        const collInfo = db.getCollectionInfos({name: this.qsutils.collName})[0];
-        const collName = collInfo.options.viewOn ? collInfo.options.viewOn : this.qsutils.collName;
+        const collInfo = db.getCollectionInfos({name: collOrViewName})[0];
+        const collName = collInfo.options.viewOn || collOrViewName;
 
         // Clear the plan cache before running any queries.
         db[collName].getPlanCache().clear();
@@ -48,8 +50,7 @@ export class QuerySettingsIndexHintsTests {
         // Take the newest plan cache entry (based on 'timeOfCreation' sorting) and ensure that it
         // contains the 'settings'.
         assert.commandWorked(db.runCommand(command));
-        const planCacheStatsAfterRunningCmd =
-            db[this.qsutils.collName].aggregate([{$planCacheStats: {}}]).toArray();
+        const planCacheStatsAfterRunningCmd = db[collName].getPlanCache().list();
         assert.gte(planCacheStatsAfterRunningCmd.length,
                    1,
                    "Expecting at least 1 entry in query plan cache");
@@ -139,6 +140,21 @@ export class QuerySettingsIndexHintsTests {
             this.qsutils.withQuerySettings(querySettingsQuery, settings, () => {
                 this.assertIndexScanStage(query, index);
                 this.assertQuerySettingsInCacheForCommand(query, settings);
+            });
+        }
+    }
+
+    /**
+     * Ensure query plan cache contains query settings for the namespace 'ns'.
+     */
+    assertGraphLookupQuerySettingsInCache(querySettingsQuery, ns) {
+        const query = this.qsutils.withoutDollarDB(querySettingsQuery);
+        for (const allowedIndexes of [[this.indexA, this.indexB],
+                                      [this.indexA, this.indexAB],
+                                      [this.indexAB, this.indexB]]) {
+            const settings = {indexHints: {ns, allowedIndexes}};
+            this.qsutils.withQuerySettings(querySettingsQuery, settings, () => {
+                this.assertQuerySettingsInCacheForCommand(query, settings, ns.coll);
             });
         }
     }
