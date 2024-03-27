@@ -240,19 +240,6 @@ export var RoutingTableConsistencyChecker = (function() {
         try {
             jsTest.log('Checking routing table consistency');
 
-            // Although the balancer has already stopped its activity, there might still be some
-            // outstanding moveCollection (backed by _shardsvrReshardCollection) running on shards.
-            // TODO SERVER-76646 remove/adapt the assert.soon logic below.
-            assert.soon(function() {
-                const adminDB = mongos.getDB('admin');
-                const inflightReshardCollections =
-                    assert
-                        .commandWorked(
-                            adminDB.currentOp({type: 'op', desc: 'ReshardCollectionCoordinator'}))
-                        .inprog;
-                return inflightReshardCollections.length === 0;
-            }, 'Unable to drain inflight reshardCollection operations within the expected timeout');
-
             // Group docs in config.chunks by coll UUID (sorting by minKey), then join with docs in
             // config.collections.
             const testCollectionsWithRoutingTable = fetchRoutingTableData(mongos);
@@ -271,20 +258,11 @@ export var RoutingTableConsistencyChecker = (function() {
             });
             jsTest.log('Routing table consistency check completed');
         } catch (e) {
-            if (e.code === ErrorCodes.Unauthorized) {
-                jsTest.log(
-                    'Skipping check of routing table consistency - access to admin collections is not authorized');
-            } else if (e.code === ErrorCodes.FailedToSatisfyReadPreference ||
-                       // Needed to avoid failures in auto_bootstrap suite;
-                       // TODO SERVER-88620 remove this extra condition
-                       e.code === ErrorCodes.HostUnreachable) {
-                // $currentOp may fail when a test stops a replica set outside the standard cluster
-                // fixture teardown procedure.
-                jsTest.log(
-                    'Skipping check of routing table consistency - unable to access all the shards of the cluster');
-            } else {
+            if (e.code !== ErrorCodes.Unauthorized) {
                 throw e;
             }
+            jsTest.log(
+                'Skipping check of routing table consistency - access to admin collections is not authorized');
         }
 
         try {
