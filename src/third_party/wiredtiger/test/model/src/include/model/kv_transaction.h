@@ -104,6 +104,7 @@ public:
     inline timestamp_t
     commit_timestamp() const noexcept
     {
+        std::lock_guard lock_guard(_lock); /* So that Coverity does not complain. */
         return _commit_timestamp;
     }
 
@@ -114,6 +115,7 @@ public:
     inline timestamp_t
     durable_timestamp() const noexcept
     {
+        std::lock_guard lock_guard(_lock); /* So that Coverity does not complain. */
         return _durable_timestamp;
     }
 
@@ -124,6 +126,7 @@ public:
     inline timestamp_t
     prepare_timestamp() const noexcept
     {
+        std::lock_guard lock_guard(_lock); /* So that Coverity does not complain. */
         return _prepare_timestamp;
     }
 

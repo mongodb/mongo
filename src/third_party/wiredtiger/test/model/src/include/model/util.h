@@ -63,6 +63,12 @@ public:
         : _connection(connection), _close_config(close_config == nullptr ? "" : close_config){};
 
     /*
+     * wiredtiger_connection_guard::wiredtiger_connection_guard --
+     *     Delete the copy constructor.
+     */
+    wiredtiger_connection_guard(const wiredtiger_connection_guard &) = delete;
+
+    /*
      * wiredtiger_connection_guard::~wiredtiger_connection_guard --
      *     Destroy the guard.
      */
@@ -71,6 +77,12 @@ public:
         if (_connection != nullptr)
             (void)_connection->close(_connection, _close_config.c_str());
     }
+
+    /*
+     * wiredtiger_connection_guard::operator= --
+     *     Delete the assignment operator.
+     */
+    wiredtiger_connection_guard &operator=(const wiredtiger_connection_guard &) = delete;
 
 private:
     WT_CONNECTION *_connection;
@@ -91,6 +103,12 @@ public:
     inline wiredtiger_cursor_guard(WT_CURSOR *cursor) noexcept : _cursor(cursor){};
 
     /*
+     * wiredtiger_cursor_guard::wiredtiger_cursor_guard --
+     *     Delete the copy constructor.
+     */
+    wiredtiger_cursor_guard(const wiredtiger_cursor_guard &) = delete;
+
+    /*
      * wiredtiger_cursor_guard::~wiredtiger_cursor_guard --
      *     Destroy the guard.
      */
@@ -99,6 +117,12 @@ public:
         if (_cursor != nullptr)
             (void)_cursor->close(_cursor);
     }
+
+    /*
+     * wiredtiger_cursor_guard::operator= --
+     *     Delete the assignment operator.
+     */
+    wiredtiger_cursor_guard &operator=(const wiredtiger_cursor_guard &) = delete;
 
 private:
     WT_CURSOR *_cursor;
@@ -118,6 +142,12 @@ public:
     inline wiredtiger_session_guard(WT_SESSION *session) noexcept : _session(session){};
 
     /*
+     * wiredtiger_session_guard::wiredtiger_session_guard --
+     *     Delete the copy constructor.
+     */
+    wiredtiger_session_guard(const wiredtiger_session_guard &) = delete;
+
+    /*
      * wiredtiger_session_guard::~wiredtiger_session_guard --
      *     Destroy the guard.
      */
@@ -126,6 +156,12 @@ public:
         if (_session != nullptr)
             (void)_session->close(_session, nullptr);
     }
+
+    /*
+     * wiredtiger_session_guard::operator= --
+     *     Delete the assignment operator.
+     */
+    wiredtiger_session_guard &operator=(const wiredtiger_session_guard &) = delete;
 
 private:
     WT_SESSION *_session;
@@ -150,6 +186,12 @@ public:
           _durable_timestamp(durable_timestamp){};
 
     /*
+     * kv_transaction_guard::kv_transaction_guard --
+     *     Delete the copy constructor.
+     */
+    kv_transaction_guard(const kv_transaction_guard &) = delete;
+
+    /*
      * kv_transaction_guard::~kv_transaction_guard --
      *     Destroy the guard.
      */
@@ -170,6 +212,12 @@ public:
             std::cerr << "Error while finishing a transaction: " << e.what() << std::endl;
         }
     }
+
+    /*
+     * kv_transaction_guard::operator= --
+     *     Delete the assignment operator.
+     */
+    kv_transaction_guard &operator=(const kv_transaction_guard &) = delete;
 
 private:
     kv_transaction_ptr _txn;
