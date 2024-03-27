@@ -41,6 +41,8 @@ function runTests(collName, commandName, writeConcern) {
 
     // Existing collection with the expected UUID (command succeeds but no drop)
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+    // Read from the mongoS to ensure the shard has refreshed its filtering information.
+    assert.eq(0, st.s.getDB(dbName).getCollection(collName).countDocuments({}));
     const collUUID = st.config.collections.findOne({_id: ns}).uuid;
     assert.commandWorked(db.getCollection(collName).insert({_id: 0}));
     assert.commandWorked(db.runCommand(appenWriteConcern(
