@@ -1028,16 +1028,26 @@ public:
 
     void save() override {
         // Make a copy of the key buffer to be used by restore()
-        copyKey();
+        if (!_eof) {
+            copyKey();
+        }
         WiredTigerIndexCursorGeneric::resetCursor();
+        // Forget the key buffer when resetting the cursor.
+        _kvView.reset();
 
         // Our saved position is wherever we were when we last called updatePosition().
         // Any partially completed repositions should not effect our saved position.
     }
 
     void saveUnpositioned() override {
+        // No need to copy the key in save()
+        _kvView.reset();
         save();
         _eof = true;
+        // Should not call seek() in restore()
+        if (!_key.isEmpty()) {
+            _key.resetToEmpty();
+        }
     }
 
     void restore() override {
@@ -1136,6 +1146,8 @@ protected:
         // We must unposition our cursor by resetting so that we can set new bounds.
         if (_cursor) {
             WiredTigerIndexCursorGeneric::resetCursor();
+            // Forget the key buffer when resetting the cursor.
+            _kvView.reset();
         }
 
         const WiredTigerItem searchKey(query.getBuffer(), query.getSize());
@@ -1188,7 +1200,7 @@ protected:
             _opCtx, [&] { return _forward ? cur->next(cur) : cur->prev(cur); });
 
         // Forget the key buffer when repositioning the cursor.
-        _kvView = {};
+        _kvView.reset();
 
         if (ret == WT_NOTFOUND) {
             return false;
@@ -1321,6 +1333,7 @@ protected:
     SortedDataKeyValueView getKeyValueView() {
         if (_eof)
             return {};
+        LOGV2_TRACE_CURSOR(8615100, "returning {kvView}", "kvView"_attr = _kvView);
         return _kvView;
     }
 

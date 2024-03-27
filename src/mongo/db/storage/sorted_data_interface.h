@@ -531,8 +531,21 @@ public:
         return {_version, _ksSize + _ridSize, SharedBufferFragment(buf.release(), bufSize)};
     }
 
-    bool isEmpty() {
+    bool isEmpty() const {
         return _ksSize == 0;
+    }
+
+    void reset() {
+        _ksSize = 0;
+    }
+
+    std::string toString() const {
+        if (isEmpty())
+            return "";
+        std::stringstream ss;
+        ss << hexblob::encode(_ksData, _ksSize) << "_" << hexblob::encode(_ridData, _ridSize) << "_"
+           << (_tbSize > 0 ? hexblob::encode(_tbData, _tbSize) : "");
+        return ss.str();
     }
 
 private:
