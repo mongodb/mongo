@@ -57,9 +57,11 @@ server_parameters:
         description: "Cluster server parameter OpObserver test param"
         cpp_vartype: ClusterServerParameterTest
         cpp_varname: cspTestStorage
+        redact: false
 
     cspTest2:
         set_at: cluster
         description: "Cluster server parameter OpObserver test param #2"
         cpp_vartype: ClusterServerParameterTest
         cpp_varname: cspTest2Storage
+        redact: false

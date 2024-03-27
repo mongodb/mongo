@@ -1588,6 +1588,7 @@ class TestParser(testcase.IDLTestcase):
                 set_at: startup
                 description: bar
                 cpp_varname: baz
+                redact: false
                 default:
                 - one
                 - two

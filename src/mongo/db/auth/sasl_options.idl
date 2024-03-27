@@ -45,21 +45,29 @@ server_parameters:
         is_constexpr: false
     on_update: "SASLGlobalParams::onSetAuthenticationMechanism"
     cpp_varname: "saslGlobalParams.authenticationMechanisms"
+    redact: false
+
   saslHostName:
     description: "Overrides the automatically detected hostname used in SASL authentication"
     set_at: startup
     on_update: "SASLGlobalParams::onSetHostName"
     cpp_varname: "saslGlobalParams.hostName"
+    redact: false
+
   saslServiceName:
     description: "Override the default service name used in Kerberos authentication"
     set_at: startup
     on_update: "SASLGlobalParams::onSetServiceName"
     cpp_varname: "saslGlobalParams.serviceName"
+    redact: false
+
   saslauthdPath:
     description: "The path to a saslauthd Unix domain socket"
     set_at: startup
     on_update: "SASLGlobalParams::onSetAuthdPath"
     cpp_varname: "saslGlobalParams.authdPath"
+    redact: false
+
   scramIterationCount:
     description: "The number of times passwords are iteratively hashed for SCRAM-SHA-1"
     set_at: [startup, runtime]
@@ -67,6 +75,8 @@ server_parameters:
     cpp_varname: "saslGlobalParams.scramSHA1IterationCount"
     default: 10000
     validator: {gte: 5000}
+    redact: false
+
   scramSHA256IterationCount:
     description: "The number of times passwords are iteratively hashed for SCRAM-SHA-256"
     set_at: [startup, runtime]
@@ -74,6 +84,7 @@ server_parameters:
     cpp_varname: "saslGlobalParams.scramSHA256IterationCount"
     default: 15000
     validator: {gte: 5000}
+    redact: false
 
 configs:
   "security.authenticationMechanisms":

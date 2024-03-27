@@ -42,6 +42,8 @@ server_parameters:
         validator:
             gte: 0
             lte: 255
+        redact: false
+
     multiUpdateCoordinatorServiceMaxThreadCount:
         description: The max number of threads in the multi update coordinator's thread pool.
         set_at: startup
@@ -51,3 +53,4 @@ server_parameters:
         validator:
             gte: 1
             lte: 255
+        redact: false

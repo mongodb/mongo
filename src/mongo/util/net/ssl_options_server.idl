@@ -46,6 +46,7 @@ server_parameters:
     set_at: startup
     cpp_varname: "sslGlobalParams.sslUseSystemCA"
     default: false
+    redact: false
 
 configs:
   "net.tls.tlsOnNormalPorts":

@@ -39,4 +39,4 @@ server_parameters:
       name: ChangeStreamOptionsParameter
       override_set: true
       override_validate: true
-      
+    redact: false

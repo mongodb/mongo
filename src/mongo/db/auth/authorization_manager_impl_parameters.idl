@@ -41,3 +41,4 @@ server_parameters:
       - startup
     cpp_varname: authorizationManagerCacheSize
     default: 100
+    redact: false

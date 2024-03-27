@@ -37,12 +37,16 @@ server_parameters:
         description: "Specialized server parameter with dummy value."
         set_at: [ startup, runtime ]
         cpp_class: SpecializedDummyServerParameter
+        redact: false
+
     specializedWithCtor:
         description: "Provide a custom constructor implementation."
         set_at: startup
         cpp_class:
             name: SpecializedConstructorServerParameter
             override_ctor: true
+        redact: false
+
     specializedWithValue:
         description: "Attach a simple value."
         set_at: startup
@@ -50,6 +54,8 @@ server_parameters:
             name: SpecializedWithValueServerParameter
             data: std::int32_t
         default: 43
+        redact: false
+
     specializedWithStringValue:
         description: "Attach a string."
         set_at: startup
@@ -57,6 +63,8 @@ server_parameters:
             name: SpecializedWithStringValueServerParameter
             data: std::string
         default: 'Hello World'
+        redact: false
+
     specializedWithAtomicValue:
         description: "Attach a thread safe value."
         set_at: [ startup, runtime ]
@@ -64,6 +72,8 @@ server_parameters:
             name: SpecializedWithAtomicValueServerParameter
             data: AtomicWord<std::int32_t>
         default: 42
+        redact: false
+
     specializedWithMultiValue:
         description: "Attach a struct."
         set_at: startup
@@ -71,6 +81,8 @@ server_parameters:
             name: SpecializedMultiValueServerParameter
             data: ExtraDataForServerParameter
             override_set: true
+        redact: false
+
     specializedWithCtorAndValue:
         description: "Attach a simple value and a constum constructor."
         set_at: startup
@@ -79,6 +91,8 @@ server_parameters:
             data: std::int32_t
             override_ctor: true
         default: 44
+        redact: false
+
     specializedWithOptions:
         description: "Use optional attributes."
         set_at: startup
@@ -87,10 +101,13 @@ server_parameters:
         test_only: false
         condition: { expr: true }
         deprecated_name: deprecatedWithOptions
+
     specializedRuntimeOnly:
         description: "Only settable at runtime."
         set_at: runtime
         cpp_class: SpecializedRuntimeOnly
+        redact: false
+
     specializedRedactedSettable:
         description: "Redacted and runtime-settable."
         set_at: runtime
@@ -99,6 +116,7 @@ server_parameters:
             data: std::string
         redact: true
         test_only: false
+
     specializedWithValidate:
         description: "Has custom validation method"
         set_at: runtime
@@ -106,6 +124,8 @@ server_parameters:
             name: SpecializedWithValidateServerParameter
             override_validate: true
             data: std::int32_t
+        redact: false
+
     specializedCluster:
         description: "Specialized cluster server parameter"
         set_at: cluster
@@ -114,3 +134,4 @@ server_parameters:
             override_set: true
             override_validate: true
             data: SpecializedClusterServerParameterData
+        redact: false

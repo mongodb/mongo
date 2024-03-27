@@ -40,3 +40,4 @@ server_parameters:
     default: 1
     condition: 
       preprocessor: '!defined(__linux__)'
+    redact: false

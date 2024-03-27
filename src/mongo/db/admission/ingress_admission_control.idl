@@ -41,3 +41,4 @@ server_parameters:
     cpp_vartype: AtomicWord<int32_t>
     on_update: IngressAdmissionController::onUpdateTicketPoolSize
     default: 1000000
+    redact: false

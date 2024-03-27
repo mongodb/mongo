@@ -43,6 +43,7 @@ server_parameters:
         cpp_class:
             name: AllowListedClusterNetworkSetting
             override_set: true
+        redact: false
 
 configs:
     auth:

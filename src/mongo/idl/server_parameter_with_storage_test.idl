@@ -45,6 +45,7 @@ server_parameters:
       callback: "validateOddSP"
       gt: 0
     on_update: "onUpdateStdIntPreallocated"
+    redact: false
 
   stdIntDeclared:
     set_at: [ startup, runtime ]
@@ -55,18 +56,21 @@ server_parameters:
     validator:
       gte: 0
       lt: 1000
+    redact: false
 
   startupString:
     set_at: startup
     description: "Create a startup-only string, and declare storage"
     cpp_vartype: "std::string"
     cpp_varname: gStartupString
+    redact: false
 
   runtimeBoostDouble:
     set_at: runtime
     description: "Create a runtime-only string, using boost::synchronized_value"
     cpp_vartype: "synchronized_value<double>"
     cpp_varname: gRuntimeBoostDouble
+    redact: false
 
   startupStringRedacted:
     set_at: startup
@@ -84,6 +88,7 @@ server_parameters:
     validator:
         gte: { expr: kStartupIntWithExpressionsMinimum, is_constexpr: false }
         lte: { expr: kStartupIntWithExpressionsMaximum, is_constexpr: true }
+    redact: false
 
   'ugly complicated-name.sp':
     set_at: startup
@@ -91,6 +96,7 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: gUglyComplicatedNameSp
     default: true
+    redact: false
 
   changeStreamOptions:
     set_at: cluster
@@ -100,4 +106,4 @@ server_parameters:
     validator:
       callback: "validateNonNegativeExpireAfterSeconds"
     on_update: "onUpdateChangeStreamOptions"
-
+    redact: false

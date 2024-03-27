@@ -40,3 +40,4 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: mrSingleReduceOptimizationEnabled
         default: false
+        redact: false

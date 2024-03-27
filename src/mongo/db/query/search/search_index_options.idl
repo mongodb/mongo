@@ -39,6 +39,8 @@ server_parameters:
         cpp_varname: 'globalSearchIndexParams.host'
         validator:
             callback: 'SearchIndexParams::onValidateHost'
+        redact: false
+
     skipAuthenticationToSearchIndexManagementServer:
         description: 'Skip authentication for mongod->search-index-server connections, even if auth is enabled on mongod'
         set_at: [ startup ]
@@ -46,3 +48,4 @@ server_parameters:
         # The search index server doesn't support our authentication protocol at this time,
         # so this is `true` by default.
         default: true
+        redact: false

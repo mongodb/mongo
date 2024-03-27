@@ -2045,6 +2045,7 @@ class TestBinder(testcase.IDLTestcase):
                 foo:
                     set_at: %s
                     description: bar
+                    redact: false
                     cpp_varname: baz
                 """ % (set_at)))
 
@@ -2055,6 +2056,7 @@ class TestBinder(testcase.IDLTestcase):
             foo:
                 set_at: startup
                 description: bar
+                redact: false
                 cpp_varname: baz
                 default: 42
                 on_update: buzz
@@ -2073,6 +2075,7 @@ class TestBinder(testcase.IDLTestcase):
             foo:
                 set_at: cluster
                 description: bar
+                redact: false
                 cpp_varname: baz
                 cpp_vartype: bazStorage
                 on_update: buzz
@@ -2091,6 +2094,7 @@ class TestBinder(testcase.IDLTestcase):
             foo:
                 set_at: startup
                 description: bar
+                redact: false
                 cpp_varname: baz
                 default:
                     expr: 'kDefaultValue'
@@ -2112,6 +2116,7 @@ class TestBinder(testcase.IDLTestcase):
             foo:
                 set_at: startup
                 description: bar
+                redact: false
                 cpp_class: baz
         """))
 
@@ -2121,6 +2126,7 @@ class TestBinder(testcase.IDLTestcase):
             foo:
                 set_at: startup
                 description: bar
+                redact: false
                 cpp_class:
                     name: baz
         """))
@@ -2131,6 +2137,7 @@ class TestBinder(testcase.IDLTestcase):
             foo:
                 set_at: startup
                 description: bar
+                redact: false
                 cpp_class:
                     name: baz
                     data: bling
@@ -2174,6 +2181,7 @@ class TestBinder(testcase.IDLTestcase):
             foo:
                 set_at: startup
                 description: bar
+                redact: false
                 cpp_class: baz
                 default: blong
             """))
@@ -2189,6 +2197,7 @@ class TestBinder(testcase.IDLTestcase):
                 foo:
                     set_at: shutdown
                     description: bar
+                    redact: false
                     cpp_varname: baz
             """), idl.errors.ERROR_ID_BAD_SETAT_SPECIFIER)
 
@@ -2199,6 +2208,7 @@ class TestBinder(testcase.IDLTestcase):
                 foo:
                     set_at: startup
                     description: bar
+                    redact: false
                     cpp_class: baz
                     cpp_varname: bling
             """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)

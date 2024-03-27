@@ -90,3 +90,4 @@ server_parameters:
             expr: (365 * 24 * 60 * 60) # one year
         validator: 
             gt: 0
+        redact: false

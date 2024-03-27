@@ -266,3 +266,4 @@ server_parameters:
     cpp_vartype: int
     cpp_varname: localLogicalSessionTimeoutMinutes
     default: 30
+    redact: false

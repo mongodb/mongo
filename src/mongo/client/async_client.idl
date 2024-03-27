@@ -40,3 +40,4 @@ server_parameters:
     cpp_varname: gConnectionAcquisitionToWireLoggingRate
     default: 0.05
     validator: { gte: 0.0, lte: 1.0 }
+    redact: false

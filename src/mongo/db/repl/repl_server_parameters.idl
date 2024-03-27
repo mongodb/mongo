@@ -47,6 +47,7 @@ server_parameters:
         cpp_vartype: std::string
         cpp_varname: initialSyncOplogBuffer
         default: "collection"
+        redact: false
 
     initialSyncOplogBufferPeekCacheSize:
         description: Set this to specify size of read ahead buffer in the OplogBufferCollection.
@@ -54,6 +55,7 @@ server_parameters:
         cpp_vartype: int
         cpp_varname: initialSyncOplogBufferPeekCacheSize
         default: 10000
+        redact: false
 
     # From initial_syncer.cpp
     numInitialSyncConnectAttempts:
@@ -62,6 +64,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: numInitialSyncConnectAttempts
         default: 10
+        redact: false
 
     numInitialSyncOplogFindAttempts:
         description: The number of attempts to call find on the remote oplog
@@ -69,6 +72,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: numInitialSyncOplogFindAttempts
         default: 3
+        redact: false
 
     initialSyncOplogFetcherBatchSize:
         description: The batchSize to use for the find/getMore queries called by the OplogFetcher
@@ -79,6 +83,7 @@ server_parameters:
         #     defaultBatchSize to use.
         default:
             expr: (16 * 1024 * 1024) / 12 * 10
+        redact: false
 
     # From oplog_fetcher.cpp
     oplogInitialFindMaxSeconds:
@@ -91,6 +96,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: oplogInitialFindMaxSeconds
         default: 60
+        redact: false
 
     oplogRetriedFindMaxSeconds:
         description: Number of seconds for the `maxTimeMS` on any retried `find` commands
@@ -98,6 +104,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: oplogRetriedFindMaxSeconds
         default: 2
+        redact: false
 
     oplogFetcherUsesExhaust:
         description: >-
@@ -107,6 +114,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: oplogFetcherUsesExhaust
         default: true
+        redact: false
 
     oplogBatchDelayMillis:
         description: >-
@@ -118,6 +126,7 @@ server_parameters:
         default: 0
         validator:
             gte: 0
+        redact: false
 
     # From bgsync.cpp
     bgSyncOplogFetcherBatchSize:
@@ -129,6 +138,7 @@ server_parameters:
         #     defaultBatchSize to use.
         default:
             expr: (16 * 1024 * 1024) / 12 * 10
+        redact: false
 
     rollbackRemoteOplogQueryBatchSize:
         description: >-
@@ -143,6 +153,7 @@ server_parameters:
         # We choose 2000 for (10 minute timeout) * (60 sec / min) * (50 MB / second) /
         #     (16 MB / document).
         default: 2000
+        redact: false
 
     forceRollbackViaRefetch:
         description: >-
@@ -153,6 +164,7 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: forceRollbackViaRefetch
         default: false
+        redact: false
 
     # From noop_writer.cpp
     writePeriodicNoops:
@@ -161,6 +173,7 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: writePeriodicNoops
         default: true
+        redact: false
 
     collectionClonerUsesExhaust:
         description: Whether to use the "exhaust cursor" feature when retrieving collection data.
@@ -168,6 +181,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: collectionClonerUsesExhaust
         default: true
+        redact: false
 
     # From collection_bulk_loader_impl.cpp
     collectionBulkLoaderBatchSizeInBytes:
@@ -179,6 +193,7 @@ server_parameters:
         cpp_varname: collectionBulkLoaderBatchSizeInBytes
         default:
             expr: 256 * 1024
+        redact: false
 
     # From database_cloner.cpp
     collectionClonerBatchSize:
@@ -192,6 +207,7 @@ server_parameters:
         default: 0
         validator:
             gte: 0
+        redact: false
 
     # From replication_coordinator_external_state_impl.cpp
     oplogFetcherSteadyStateMaxFetcherRestarts:
@@ -205,6 +221,7 @@ server_parameters:
         default: 1
         validator:
             gte: 0
+        redact: false
 
     oplogFetcherInitialSyncMaxFetcherRestarts:
         description: >-
@@ -218,6 +235,7 @@ server_parameters:
         default: 10
         validator:
             gte: 0
+        redact: false
 
     # From oplog_applier.cpp
     replWriterThreadCount:
@@ -229,6 +247,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
     replWriterMinThreadCount:
         description: The minimum number of threads in the thread pool used to apply the oplog
@@ -239,6 +258,7 @@ server_parameters:
         validator:
             gte: 0
             lte: 256
+        redact: false
 
     replBatchLimitOperations:
         description: The maximum number of operations to apply in a single batch
@@ -251,6 +271,7 @@ server_parameters:
             gte: 1
             lte:
                 expr: 1000 * 1000
+        redact: false
 
     replBatchLimitBytes:
         description: The maximum oplog application batch size in bytes
@@ -264,6 +285,7 @@ server_parameters:
                 expr: 16 * 1024 * 1024
             lte:
                 expr: 100 * 1024 * 1024
+        redact: false
 
     # From tenant_oplog_applier.cpp
     tenantApplierBatchSizeBytes:
@@ -278,6 +300,7 @@ server_parameters:
                 expr: 16 * 1024 * 1024
             lte:
                 expr: 100 * 1024 * 1024
+        redact: false
 
     tenantApplierBatchSizeOps:
         description: The maximum number of operations in a tenant oplog applier batch.
@@ -289,6 +312,7 @@ server_parameters:
             gte: 1
             lte:
                 expr: 100 * 1000
+        redact: false
 
     minOplogEntriesPerThread:
         description: >-
@@ -300,6 +324,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 32
+        redact: false
 
     tenantApplierThreadCount:
         description: >-
@@ -311,6 +336,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
     recoverFromOplogAsStandalone:
         description: Tells the server to perform replication recovery as a standalone.
@@ -318,6 +344,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: recoverFromOplogAsStandalone
         default: false
+        redact: false
 
     maxSyncSourceLagSecs:
         description: ''
@@ -327,6 +354,7 @@ server_parameters:
         default: 30
         validator:
             gt: 0
+        redact: false
 
     replElectionTimeoutOffsetLimitFraction:
         description: ''
@@ -336,6 +364,7 @@ server_parameters:
         default: 0.15
         validator:
             gt: 0.01
+        redact: false
 
     # New parameters since this file was created, not taken from elsewhere.
     initialSyncTransientErrorRetryPeriodSeconds:
@@ -349,6 +378,7 @@ server_parameters:
             expr: 24 * 60 * 60
         validator:
             gte: 0
+        redact: false
 
     oplogNetworkTimeoutBufferSeconds:
         description: >-
@@ -360,6 +390,7 @@ server_parameters:
         default: 5
         validator:
             gte: 0
+        redact: false
 
     oplogApplicationEnforcesSteadyStateConstraints:
         description: >-
@@ -369,6 +400,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: oplogApplicationEnforcesSteadyStateConstraints
         default: false
+        redact: false
 
     initialSyncSourceReadPreference:
         description: >-
@@ -383,6 +415,7 @@ server_parameters:
         # and if it is not, readPreference is 'nearest'.
         default: ""
         validator: { callback: 'validateReadPreferenceMode' }
+        redact: false
 
     changeSyncSourceThresholdMillis:
         description: >-
@@ -396,6 +429,7 @@ server_parameters:
         default: 5
         validator:
             gte: 0
+        redact: false
 
     maxNumSyncSourceChangesPerHour:
         description: >-
@@ -408,6 +442,7 @@ server_parameters:
         default: 3
         validator:
             gt: 0
+        redact: false
 
     enableOverrideClusterChainingSetting:
         description: >-
@@ -418,6 +453,7 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: enableOverrideClusterChainingSetting
         default: false
+        redact: false
 
     disableSplitHorizonIPCheck:
         description: >-
@@ -427,6 +463,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: disableSplitHorizonIPCheck
         default: false
+        redact: false
 
     tenantMigrationGarbageCollectionDelayMS:
         description: >-
@@ -438,6 +475,7 @@ server_parameters:
         cpp_varname: tenantMigrationGarbageCollectionDelayMS
         default:
             expr: 15 * 60 * 1000
+        redact: false
 
     tenantMigrationExternalKeysRemovalBufferSecs:
         description: >-
@@ -449,6 +487,7 @@ server_parameters:
         cpp_varname: tenantMigrationExternalKeysRemovalBufferSecs
         default:
             expr: 60 * 60 * 24   # 24 hours
+        redact: false
 
     tenantMigrationOplogBufferPeekCacheSize:
         description: >-
@@ -458,6 +497,7 @@ server_parameters:
         cpp_vartype: int
         cpp_varname: tenantMigrationOplogBufferPeekCacheSize
         default: 10000
+        redact: false
 
     tenantMigrationOplogFetcherBatchSize:
         description: >-
@@ -470,6 +510,7 @@ server_parameters:
         #     defaultBatchSize to use.
         default:
             expr: (16 * 1024 * 1024) / 12 * 10
+        redact: false
 
     maxTenantMigrationRecipientThreadPoolSize:
         description: >-
@@ -483,6 +524,7 @@ server_parameters:
         default: 128
         validator:
             gte: 1
+        redact: false
 
     minTenantMigrationRecipientThreadPoolSize:
         description: >-
@@ -493,6 +535,7 @@ server_parameters:
         default: 0
         validator:
             gte: 1
+        redact: false
 
     maxTenantMigrationDonorServiceThreadPoolSize:
         description: >-
@@ -503,6 +546,7 @@ server_parameters:
         default: 8
         validator:
             gte: 1
+        redact: false
     
     minTenantMigrationDonorServiceThreadPoolSize:
         description: >-
@@ -513,6 +557,7 @@ server_parameters:
         default: 0
         validator:
             gte: 1
+        redact: false
 
     importQuorumTimeoutSeconds:
         description: >-
@@ -524,6 +569,7 @@ server_parameters:
             expr: 24 * 60 * 60   # 24 hours
         validator:
             gte: 0
+        redact: false
 
     maxShardSplitDonorServiceThreadPoolSize:
         description: >-
@@ -534,6 +580,7 @@ server_parameters:
         default: 8
         validator:
             gte: 1
+        redact: false
     
     minShardSplitDonorServiceThreadPoolSize:
         description: >-
@@ -544,6 +591,7 @@ server_parameters:
         default: 0
         validator:
             gte: 1
+        redact: false
 
     shardSplitTimeoutMS:
         description: >-
@@ -554,6 +602,7 @@ server_parameters:
         default: 10000
         validator:
             gte: 1
+        redact: false
 
     tenantMigrationBlockingStateTimeoutMS:
         description: >-
@@ -564,6 +613,7 @@ server_parameters:
         default: 3600000
         validator:
             gte: 1
+        redact: false
 
     tenantMigrationDisableX509Auth:
         description: >-
@@ -572,6 +622,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: tenantMigrationDisableX509Auth
         default: true
+        redact: false
 
     tenantMigrationExcludeDonorHostTimeoutMS:
         description: >-
@@ -582,6 +633,7 @@ server_parameters:
         default: 60000
         validator:
             gte: 1
+        redact: false
 
     enableDefaultWriteConcernUpdatesForInitiate:
         description: >-
@@ -592,6 +644,7 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: enableDefaultWriteConcernUpdatesForInitiate
         default: false
+        redact: false
 
     startupRecoveryForRestore:
         description: >-
@@ -603,6 +656,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: startupRecoveryForRestore
         default: false
+        redact: false
 
     enableReconfigRollbackCommittedWritesCheck:
         description: >-
@@ -613,6 +667,7 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: enableReconfigRollbackCommittedWritesCheck
         default: true
+        redact: false
 
     initialSyncMethod:
         description: >-
@@ -622,6 +677,7 @@ server_parameters:
         cpp_vartype: std::string
         cpp_varname: initialSyncMethod
         default: "logical"
+        redact: false
 
     fileBasedInitialSyncMaxLagSec:
         description: >-
@@ -634,6 +690,7 @@ server_parameters:
                 expr: 5 * 60
         validator:
             gte: 0
+        redact: false
     
     fileBasedInitialSyncMaxCyclesWithoutProgress:
         description: >-
@@ -646,6 +703,7 @@ server_parameters:
         default: 3
         validator:
             gte: 1
+        redact: false
     
     fileBasedInitialSyncExtendCursorTimeoutMS:
         description: >-
@@ -658,6 +716,7 @@ server_parameters:
             expr: 180 * 1000
         validator:
             gte: 1
+        redact: false
 
     fassertOnLockTimeoutForStepUpDown:
         description: >-
@@ -670,6 +729,7 @@ server_parameters:
         default: 30
         validator:
             gte: 0
+        redact: false
 
     allowMultipleArbiters:
         description: >-
@@ -685,6 +745,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: allowMultipleArbiters
         default: false
+        redact: false
 
     shardSplitGarbageCollectionDelayMS:
         description: >-
@@ -695,6 +756,7 @@ server_parameters:
         cpp_varname: shardSplitGarbageCollectionDelayMS
         default:
             expr: 15 * 60 * 1000
+        redact: false
 
     slowServiceOnStepUpBeginThresholdMS:
         description: >-
@@ -706,6 +768,7 @@ server_parameters:
         default: 200
         validator:
             gte: 0
+        redact: false
 
     slowTotalOnStepUpBeginThresholdMS:
         description: >-
@@ -717,6 +780,7 @@ server_parameters:
         default: 500
         validator:
             gte: 0
+        redact: false
 
     slowServiceOnStepUpCompleteThresholdMS:
         description: >-
@@ -729,6 +793,7 @@ server_parameters:
         default: 200
         validator:
             gte: 0
+        redact: false
 
     slowTotalOnStepUpCompleteThresholdMS:
         description: >-
@@ -741,6 +806,7 @@ server_parameters:
         default: 500
         validator:
             gte: 0
+        redact: false
 
     disableTransitionFromLatestToLastContinuous:
         description: >-
@@ -751,6 +817,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: disableTransitionFromLatestToLastContinuous
         default: true
+        redact: false
     
     unsupportedSyncSource:
         description: >-
@@ -762,6 +829,7 @@ server_parameters:
         cpp_varname: unsupportedSyncSource
         default: ""
         validator: { callback: 'validateHostAndPort' }
+        redact: false
     
     dbCheckMaxTotalIndexKeysPerSnapshot:
         description: >-
@@ -773,6 +841,7 @@ server_parameters:
         default: 1000
         validator:
             gt: 0 
+        redact: false
     
     dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot:
         description: >-
@@ -784,6 +853,7 @@ server_parameters:
         default: 1000
         validator:
             gt: 0 
+        redact: false
 
     dbCheckMaxInternalRetries:
         description: >-
@@ -794,6 +864,7 @@ server_parameters:
         default: 5
         validator:
             gte: 0
+        redact: false
 
     writeConflictRetryLimit:
         description: >-
@@ -805,6 +876,7 @@ server_parameters:
         default: 10000
         validator:
             gte: 0
+        redact: false
 
 feature_flags:
     featureFlagShardMerge:

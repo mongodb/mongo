@@ -44,6 +44,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
     reshardingDonorServiceMaxThreadCount:
         description: The max number of threads in the resharding donor's thread pool.
@@ -54,6 +55,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
     reshardingRecipientServiceMaxThreadCount:
         description: The max number of threads in the resharding recipient's thread pool.
@@ -64,6 +66,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
     reshardingCollectionClonerBatchSizeInBytes:
         description: >-
@@ -76,6 +79,7 @@ server_parameters:
             expr: 100 * 1024
         validator:
             gte: 1
+        redact: false
 
     reshardingCollectionClonerWriteThreadCount:
         description: >-
@@ -87,6 +91,7 @@ server_parameters:
             expr: 2
         validator:
             gte: 1
+        redact: false
 
     reshardingTxnClonerProgressBatchSize:
         description: >-
@@ -98,6 +103,7 @@ server_parameters:
         default: 1000
         validator:
             gte: 1
+        redact: false
 
     reshardingOplogBatchTaskCount:
         description: >-
@@ -112,6 +118,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
     reshardingOplogBatchLimitOperations:
         description: >-
@@ -125,6 +132,7 @@ server_parameters:
             gte: 1
             lte:
                 expr: 1000 * 1000
+        redact: false
 
     reshardingOplogBatchLimitBytes:
         description: >-
@@ -139,6 +147,7 @@ server_parameters:
                 expr: 16 * 1024 * 1024
             lte:
                 expr: 100 * 1024 * 1024
+        redact: false
 
     reshardingOplogApplierMaxLockRequestTimeoutMillis:
         description: >-
@@ -148,6 +157,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gReshardingOplogApplierMaxLockRequestTimeoutMillis
         default: 5
+        redact: false
 
     reshardingMinimumOperationDurationMillis:
         description: >-
@@ -161,6 +171,7 @@ server_parameters:
             expr: 5 * 60 * 1000
         validator:
             gte: 0
+        redact: false
     
     reshardingCriticalSectionTimeoutMillis:
         description: >-
@@ -173,6 +184,7 @@ server_parameters:
             expr: 5 * 1000
         validator:
             gte: 0
+        redact: false
 
     remainingReshardingOperationTimeThresholdMillis:
         description: >-
@@ -186,6 +198,7 @@ server_parameters:
             expr: 2 * 1000
         validator:
             gte: 0
+        redact: false
 
     reshardingCoordinatorQuiescePeriodMillis:
         description: >-
@@ -200,3 +213,4 @@ server_parameters:
             expr: 15 * 60 * 1000
         validator:
             gte: 0
+        redact: false

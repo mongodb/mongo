@@ -46,3 +46,4 @@ server_parameters:
     validator:
       gte: 1
       lte: 86400
+    redact: false

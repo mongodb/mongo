@@ -8,3 +8,4 @@ server_parameters:
     cpp_varname: "enableLocalhostAuthBypass"
     cpp_vartype: bool
     default: true
+    redact: false

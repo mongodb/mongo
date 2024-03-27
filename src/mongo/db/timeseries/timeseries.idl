@@ -42,6 +42,8 @@ server_parameters:
         cpp_vartype: "AtomicWord<bool>"
         cpp_varname: "gPerformTimeseriesCompressionIntermediateDataIntegrityCheck"
         default: true
+        redact: false
+
     "timeseriesBucketMaxCount":
         description: "Maximum number of measurements to store in a single bucket"
         set_at: [ startup ]
@@ -49,6 +51,8 @@ server_parameters:
         cpp_varname: "gTimeseriesBucketMaxCount"
         default: 1000
         validator: { gte: 1 }
+        redact: false
+
     "timeseriesBucketMaxSize":
         description: "Maximum size in bytes of measurements to store together in a single bucket"
         set_at: [ startup ]
@@ -56,6 +60,8 @@ server_parameters:
         cpp_varname: "gTimeseriesBucketMaxSize"
         default: 128000 # 125KB
         validator: { gte: 1 }
+        redact: false
+
     "timeseriesIdleBucketExpiryMemoryUsageThreshold":
         description: "The threshold in bytes for bucket catalog memory usage above which idle
                       buckets will be expired. If set to a non-positive number, the threshold will
@@ -63,12 +69,16 @@ server_parameters:
         set_at: [ startup, runtime ]
         cpp_varname: "gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes"
         default: 0
+        redact: false
+
     "timeseriesSideBucketCatalogMemoryUsageThreshold":
         description: "The threshold in bytes for side bucket catalog memory usage above which idle
                       buckets will be expired."
         set_at: [ startup, runtime ]
         cpp_varname: "gTimeseriesSideBucketCatalogMemoryUsageThresholdBytes"
         default: 104857600 # 100 MB
+        redact: false
+
     "timeseriesIdleBucketExpiryMaxCountPerAttempt":
         description: "The maximum number of buckets that may be closed due to expiry at each attempt"
         set_at: [ startup ]
@@ -76,6 +86,8 @@ server_parameters:
         cpp_varname: "gTimeseriesIdleBucketExpiryMaxCountPerAttempt"
         default:  3
         validator: { gte: 2 }
+        redact: false
+
     "timeseriesBucketMinCount":
         description: "Time-series buckets that need to be closed due to size
                       (timeseriesBucketMaxSize) but haven't crossed this threshold are considered to
@@ -88,6 +100,8 @@ server_parameters:
         cpp_varname: "gTimeseriesBucketMinCount"
         default:  10
         validator: { gte: 1 }
+        redact: false
+
     "timeseriesBucketMinSize":
         description: "If there is high memory pressure on the system, we will lower the maximum 
                       size (in bytes) of measurements we pack into buckets. This value represents
@@ -97,6 +111,8 @@ server_parameters:
         cpp_varname: "gTimeseriesBucketMinSize"
         default: 5120 # 5KB
         validator: { gte: 1 }
+        redact: false
+
     "timeseriesInsertMaxRetriesOnDuplicates":
         description: "In rare cases due to collision from OID generation, we will retry inserting
                       those bucket documents automatically for a limited number of times. This value
@@ -106,6 +122,8 @@ server_parameters:
         cpp_varname: "gTimeseriesInsertMaxRetriesOnDuplicates"
         default: 32
         validator: {gte: 1}
+        redact: false
+
     "timeseriesLargeMeasurementThreshold":
         description: "When a measurement larger than the threshold (in bytes) is being inserted into
                       a bucket, we use the measurements uncompressed size towards the bucket size
@@ -117,6 +135,7 @@ server_parameters:
         cpp_varname: "gTimeseriesLargeMeasurementThreshold"
         default: 0
         validator: {gte: 0}
+        redact: false
 
 enums:
     BucketGranularity:

@@ -42,6 +42,7 @@ server_parameters:
         cpp_varname: gPreImageRemoverDisabled
         default: false
         test_only: true
+        redact: false
 
     expiredChangeStreamPreImageRemovalJobSleepSecs:
         description: >-
@@ -52,6 +53,7 @@ server_parameters:
         validator:
             gte: 1
         default: 10
+        redact: false
 
     preImagesCollectionTruncateMarkersMinBytes:
         description: >-
@@ -64,6 +66,7 @@ server_parameters:
         default: 33_554_432  # 32 MiB
         validator:
             gt: 0
+        redact: false
 
 structs:
     ChangeStreamPreImageId:

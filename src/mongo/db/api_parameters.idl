@@ -65,6 +65,7 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     cpp_varname: gRequireApiVersion
     default: false
+    redact: false
 
   acceptApiVersion2:
     description: "Allow users to issue commands that include apiVersion: \"2\". Test only."
@@ -73,3 +74,4 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: acceptApiVersion2
     default: false
+    redact: false

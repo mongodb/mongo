@@ -41,6 +41,8 @@ server_parameters:
         cpp_varname: internalQueryAlwaysMergeOnPrimaryShard
         set_at: [ startup, runtime ]
         default: false
+        redact: false
+
     internalQueryProhibitMergingOnMongoS:
         description: >-
             If set to true on mongos, all aggregations which could otherwise merge on the mongos will be
@@ -51,6 +53,8 @@ server_parameters:
         cpp_varname: internalQueryProhibitMergingOnMongoS
         set_at: [ startup, runtime ]
         default: false
+        redact: false
+
     internalQueryDisableExchange:
         description: >-
             If set to true on mongos then the cluster query planner will not produce plans with the exchange.
@@ -59,3 +63,4 @@ server_parameters:
         cpp_varname: internalQueryDisableExchange
         set_at: [ startup, runtime ]
         default: false
+        redact: false

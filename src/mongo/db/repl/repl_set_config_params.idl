@@ -38,4 +38,4 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: skipShardingConfigurationChecks
         default: false
-
+        redact: false

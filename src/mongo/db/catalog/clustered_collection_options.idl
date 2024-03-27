@@ -42,6 +42,7 @@ server_parameters:
         cpp_vartype: bool
         test_only: true
         default: false
+        redact: false
 
 structs:
     ClusteredIndexSpec:

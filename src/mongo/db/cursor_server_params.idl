@@ -36,6 +36,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gClientCursorMonitorFrequencySecs
         default: 4
+        redact: false
 
     cursorTimeoutMillis:
         description: 'Period of time, in milliseconds, after which mortal cursors are killed for inactivity'
@@ -43,6 +44,7 @@ server_parameters:
         cpp_vartype: AtomicWord<long long>
         cpp_varname: gCursorTimeoutMillis
         default: 600000
+        redact: false
 
     bulkWriteMaxRepliesSize:
         description: >-
@@ -52,3 +54,4 @@ server_parameters:
         cpp_varname: gBulkWriteMaxRepliesSize
         default:
             expr: 30 * 1024 * 1024
+        redact: false

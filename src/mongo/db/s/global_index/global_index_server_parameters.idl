@@ -44,6 +44,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
     globalIndexClonerServiceFetchBatchMaxSizeBytes:
         description: The max number of threads in the global index cloner's thread pool.
@@ -53,3 +54,4 @@ server_parameters:
         default: 102400
         validator:
             gte: 1
+        redact: false

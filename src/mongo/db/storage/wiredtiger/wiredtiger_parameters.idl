@@ -46,6 +46,7 @@ server_parameters:
         # Defer the initialization with condition: false
         # and allow those places to manually set themselves up.
         condition: { expr: false }
+        redact: false
 
     wiredTigerSessionCloseIdleTimeSecs:
         description: 'Close idle wiredtiger sessions in the session cache after this many seconds'
@@ -57,6 +58,7 @@ server_parameters:
             expr: 'kDebugBuild ? 5 : 300'
         validator:
             gte: 0
+        redact: false
 
     # The "wiredTigerCursorCacheSize" parameter has the following meaning.
     #
@@ -89,6 +91,7 @@ server_parameters:
         cpp_vartype: 'AtomicWord<std::int32_t>'
         cpp_varname: gWiredTigerCursorCacheSize
         default: -100
+        redact: false
 
     wiredTigerMaxCacheOverflowSizeGB:
       description: >-
@@ -99,6 +102,7 @@ server_parameters:
       cpp_vartype: 'AtomicWord<double>'
       cpp_varname: gWiredTigerMaxCacheOverflowSizeGBDeprecated
       default: 0
+      redact: false
 
     wiredTigerEvictionDirtyTargetGB:
       description: >-
@@ -113,6 +117,7 @@ server_parameters:
       validator:
         gte: 0.01
         lte: 10000
+      redact: false
 
     wiredTigerEvictionDirtyMaxGB:
       description: >-
@@ -126,6 +131,7 @@ server_parameters:
       validator:
         gte: 0.01
         lte: 10000
+      redact: false
 
     wiredTigerEvictionDebugMode:
       description: >-
@@ -138,6 +144,7 @@ server_parameters:
       # This parameter is only allowed in debug builds.
       condition:
         constexpr: 'kDebugBuild'
+      redact: false
 
     wiredTigerFileHandleCloseIdleTime:
       description: >-
@@ -149,6 +156,7 @@ server_parameters:
       default: 600
       validator:
         gte: 1
+      redact: false
 
     wiredTigerExtraDiagnostics:
       description: >-
@@ -161,6 +169,7 @@ server_parameters:
       cpp_varname: "gWiredTigerExtraDiagnostics"
       validator:
           callback: validateExtraDiagnostics
+      redact: false
 
     wiredTigerFileHandleCloseMinimum:
       description: >-
@@ -171,6 +180,7 @@ server_parameters:
       default: 2000
       validator:
         gte: 1
+      redact: false
 
     wiredTigerFileHandleCloseScanInterval:
       description: >-
@@ -181,12 +191,14 @@ server_parameters:
       default: 10
       validator:
         gte: 1
+      redact: false
 
     wiredTigerDirectoryForIndexes:
        description: 'Read-only view of DirectoryForIndexes config parameter'
        set_at: 'readonly'
        cpp_class:
            name: WiredTigerDirectoryForIndexesParameter
+       redact: false
 
     wiredTigerSkipTableLoggingChecksOnStartup:
       description: >-
@@ -195,6 +207,7 @@ server_parameters:
       cpp_vartype: 'bool'
       cpp_varname: gWiredTigerSkipTableLoggingChecksOnStartup
       default: false
+      redact: false
 
     wiredTigerStressConfig:
       description: >-
@@ -203,6 +216,7 @@ server_parameters:
       cpp_vartype: bool
       cpp_varname: gWiredTigerStressConfig
       default: false
+      redact: false
 
     wiredTigerSizeStorerPeriodicSyncHits:
       description: >-
@@ -213,6 +227,7 @@ server_parameters:
       default: 100000
       validator:
         gte: 1
+      redact: false
 
     wiredTigerSizeStorerPeriodicSyncPeriodMillis:
       description: >-
@@ -223,3 +238,4 @@ server_parameters:
       default: 60000
       validator:
         gte: 1
+      redact: false

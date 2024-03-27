@@ -38,6 +38,7 @@ server_parameters:
     cpp_vartype: int
     cpp_varname: logicalSessionRefreshMillis
     default: 300000
+    redact: false
 
   maxSessions:
     description: The maximum number of sessions that can be cached.
@@ -45,6 +46,7 @@ server_parameters:
     cpp_vartype: int
     cpp_varname: maxSessions
     default: 1000000
+    redact: false
 
   disableLogicalSessionCacheRefresh:
     description: Disable the logical session cache refresh (for testing only).
@@ -52,6 +54,7 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: disableLogicalSessionCacheRefresh
     default: false
+    redact: false
 
   TransactionRecordMinimumLifetimeMinutes:
     # The minimum lifetime for a transaction record is how long it has to have lived on the server
@@ -73,3 +76,4 @@ server_parameters:
     cpp_vartype: int
     cpp_varname: gTransactionRecordMinimumLifetimeMinutes
     default: 30
+    redact: false

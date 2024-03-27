@@ -39,16 +39,19 @@ server_parameters:
     description: "Sets quiet logging mode"
     set_at: ["startup", "runtime"]
     cpp_varname: "serverGlobalParams.quiet"
+    redact: false
 
   traceExceptions:
     description: "Configures mongod to log full code stack traces for every database and socket C++ exception"
     set_at: runtime
     cpp_varname: "DBException::traceExceptions"
+    redact: false
 
   traceWriteConflictExceptions:
     description: "Call printStackTrace on every WriteConflictException created"
     set_at: ["startup", "runtime"]
     cpp_varname: "DBException::traceWriteConflictExceptions"
+    redact: false
 
   logLevel:
     description: "Specifies the verbosity of logging"
@@ -56,6 +59,7 @@ server_parameters:
     cpp_class:
       name: LogLevelServerParameter
       override_set: true
+    redact: false
 
   logComponentVerbosity:
     description: "Sets the verbosity levels of various components for log messages"
@@ -63,6 +67,7 @@ server_parameters:
     cpp_class:
       name: LogComponentVerbosityServerParameter
       override_set: true
+    redact: false
 
   automationServiceDescriptor:
     description: "automationServiceDescriptor"
@@ -70,3 +75,4 @@ server_parameters:
     cpp_class:
       name: AutomationServiceDescriptorServerParameter
       override_set: true
+    redact: false

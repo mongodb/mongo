@@ -954,7 +954,7 @@ def _parse_server_parameter(ctxt, spec, name, node):
             "cpp_vartype": _RuleDesc('scalar'),
             "cpp_varname": _RuleDesc('scalar'),
             "condition": _RuleDesc('mapping', mapping_parser_func=_parse_condition),
-            "redact": _RuleDesc('bool_scalar'),
+            "redact": _RuleDesc('required_bool_scalar', _RuleDesc.REQUIRED),
             "default": _RuleDesc('scalar_or_mapping', mapping_parser_func=_parse_expression),
             "test_only": _RuleDesc('bool_scalar'),
             "deprecated_name": _RuleDesc('scalar_or_sequence'),
@@ -1061,12 +1061,12 @@ def _propagate_globals(spec):
         idltype.cpp_type = _prefix_with_namespace(cpp_namespace, idltype.cpp_type)
 
 
-def parse_file(stream, error_file_name, parse_feature_flags=True):
+def parse_file(stream, error_file_name, parse_non_forward_compatible_section=True):
     # type: (Any, str, bool) -> syntax.IDLParsedSpec
     """
     Parse a YAML document into an idl.syntax tree.
 
-    If parse_feature_flags is False, don't attempt to parse the feature flag type.
+    If parse_non_forward_compatible_section is False, don't attempt to parse the feature flag type.
 
     stream: is a io.Stream.
     error_file_name: just a file name for error messages to use.
@@ -1117,13 +1117,15 @@ def parse_file(stream, error_file_name, parse_feature_flags=True):
             _parse_mapping(ctxt, spec, second_node, 'generic_reply_field_lists',
                            _parse_generic_reply_field_list)
         elif first_name == "server_parameters":
-            _parse_mapping(ctxt, spec, second_node, "server_parameters", _parse_server_parameter)
+            # TODO (SERVER-86977): Remove bypass after 8.0 branches
+            if parse_non_forward_compatible_section:
+                _parse_mapping(ctxt, spec, second_node, "server_parameters",
+                               _parse_server_parameter)
         elif first_name == "configs":
             _parse_mapping(ctxt, spec, second_node, "configs", _parse_config_option)
-        elif parse_feature_flags and first_name == "feature_flags":
-            _parse_mapping(ctxt, spec, second_node, "feature_flags", _parse_feature_flag)
-        elif not parse_feature_flags and first_name == "feature_flags":
-            continue
+        elif first_name == "feature_flags":
+            if parse_non_forward_compatible_section:
+                _parse_mapping(ctxt, spec, second_node, "feature_flags", _parse_feature_flag)
         else:
             ctxt.add_unknown_root_node_error(first_node)
 
@@ -1158,18 +1160,18 @@ class ImportResolverBase(object, metaclass=ABCMeta):
         pass
 
 
-def parse(stream, input_file_name, resolver, parse_feature_flags=True):
+def parse(stream, input_file_name, resolver, parse_non_forward_compatible_section=True):
     # type: (Any, str, ImportResolverBase, bool) -> syntax.IDLParsedSpec
     """
     Parse a YAML document into an idl.syntax tree.
 
-    If parse_feature_flags is False, don't attempt to parse the feature flag type.
+    If parse_non_forward_compatible_section is False, don't attempt to parse the feature flag type.
 
     stream: is a io.Stream.
     input_file_name: a file name for error messages to use, and to help resolve imported files.
     """
 
-    root_doc = parse_file(stream, input_file_name, parse_feature_flags)
+    root_doc = parse_file(stream, input_file_name, parse_non_forward_compatible_section)
 
     if root_doc.errors:
         return root_doc
@@ -1206,7 +1208,8 @@ def parse(stream, input_file_name, resolver, parse_feature_flags=True):
 
         # Parse imported file
         with resolver.open(resolved_file_name) as file_stream:
-            parsed_doc = parse_file(file_stream, resolved_file_name, parse_feature_flags)
+            parsed_doc = parse_file(file_stream, resolved_file_name,
+                                    parse_non_forward_compatible_section)
 
         # Check for errors
         if parsed_doc.errors:

@@ -40,3 +40,4 @@ server_parameters:
     cpp_varname: KeysRotationIntervalSec
     default:
       expr: 3 * 30 * 24 * 60 * 60   # ~3 months
+    redact: false

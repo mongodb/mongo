@@ -39,3 +39,4 @@ server_parameters:
         cpp_vartype: std::string
         cpp_varname: gTestOnlyValidatedTenancyScopeKey
         test_only: true
+        redact: false

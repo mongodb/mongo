@@ -62,3 +62,4 @@ server_parameters:
         name: "MirroredReadsServerParameter"
         data: "synchronized_value<MirroredReadsParameters>"
         override_set: true
+    redact: false

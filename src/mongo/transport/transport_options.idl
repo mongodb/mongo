@@ -37,6 +37,8 @@ server_parameters:
     cpp_varname: gTCPFastOpenServer
     cpp_vartype: bool
     default: true
+    redact: false
+
   tcpFastOpenQueueSize:
     description: TCP Fast Open queue length
     set_at: startup
@@ -45,6 +47,7 @@ server_parameters:
     default: 1024
     validator:
       gt: 0
+    redact: false
 
   # Options to configure outbound TFO connections.
   tcpFastOpenClient:
@@ -53,3 +56,4 @@ server_parameters:
     cpp_varname: gTCPFastOpenClient
     cpp_vartype: bool
     default: true
+    redact: false

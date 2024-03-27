@@ -39,6 +39,7 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: gInitialServiceExecutorUseDedicatedThread
     default: true
+    redact: false
 
   fixedServiceExecutorThreadLimit:
     description: >-
@@ -50,3 +51,4 @@ server_parameters:
     default: 1000
     validator:
         gte: 10
+    redact: false

@@ -56,3 +56,4 @@ server_parameters:
         cpp_varname: pauseMigrationsDuringMultiUpdates
         condition:
           min_fcv: 7.2
+        redact: false

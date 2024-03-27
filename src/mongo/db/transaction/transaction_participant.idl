@@ -44,6 +44,7 @@ server_parameters:
         # 5 milliseconds will help avoid deadlocks, but will still allow fast-running metadata operations
         # to run without aborting transactions.
         default: 5
+        redact: false
 
     transactionLifetimeLimitSeconds:
         description: >-
@@ -56,6 +57,7 @@ server_parameters:
             gte: 1
         on_update: std::ref(TransactionParticipant::observeTransactionLifetimeLimitSeconds)
         default: 60
+        redact: false
 
     maxNumberOfTransactionOperationsInSingleOplogEntry:
         description: >-
@@ -66,6 +68,7 @@ server_parameters:
         cpp_varname: gMaxNumberOfTransactionOperationsInSingleOplogEntry
         default: 2147483647  # INT_MAX
         validator: { gte: 1 }
+        redact: false
 
     transactionSizeLimitBytes:
         description: >-
@@ -75,3 +78,4 @@ server_parameters:
         cpp_varname: gTransactionSizeLimitBytes
         default:
           expr: std::numeric_limits<long long>::max()
+        redact: false

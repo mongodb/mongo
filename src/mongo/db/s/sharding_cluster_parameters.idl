@@ -55,3 +55,4 @@ server_parameters:
         set_at: cluster
         cpp_vartype: ShardedClusterCardinalityParam
         cpp_varname: shardedClusterCardinalityForDirectConns
+        redact: false

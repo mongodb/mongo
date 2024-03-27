@@ -34,3 +34,4 @@ server_parameters:
     description: "Transition from sendKeyFile to sendX509, or sendX509 to x509 clusterAuthModes"
     set_at: runtime
     cpp_class: ClusterAuthModeServerParameter
+    redact: false

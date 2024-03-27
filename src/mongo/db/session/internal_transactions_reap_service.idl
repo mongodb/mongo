@@ -43,3 +43,4 @@ server_parameters:
     default: 1000
     validator:
         gte: 0
+    redact: false

@@ -47,6 +47,8 @@ server_parameters:
         set_at: [ startup ]
         cpp_vartype: std::string
         cpp_varname: recoverToOplogTimestamp
+        redact: false
+
     notablescan:
         # NOT recommended for production use.
         description: >-
@@ -54,6 +56,8 @@ server_parameters:
             If true, MongoDB will not execute queries that require a table scan and will return an error.
         set_at: [ startup, runtime ]
         cpp_varname: 'storageGlobalParams.noTableScan'
+        redact: false
+
     allowDocumentsGreaterThanMaxUserSize:
         description: >-
             Internal, allows users to insert documents greater than the 16mb maximum user BSON
@@ -68,6 +72,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: gAllowDocumentsGreaterThanMaxUserSize
         default: false
+        redact: false
 
 configs:
     'storage.engine':

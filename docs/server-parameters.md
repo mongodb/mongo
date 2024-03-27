@@ -23,6 +23,7 @@ server_parameters:
     cpp_class:
       name: LogLevelServerParameter
       override_set: true
+    redact: false
   ...
 ```
 
@@ -203,12 +204,14 @@ as a dictionary, then `cpp_class.name`. A `cpp_class` directive may also contain
 ```yaml
 server_parameters:
     someParameter:
+        ...
         cpp_class:
             name: string # Name to assign to the class (e.g., SomeParameterImpl)
             data: string # cpp data type to add to the class as a property named "_data"
             override_ctor: bool # True to allow defining a custom constructor, default: false
             override_set: bool # True to allow defining a custom set() method, default: false
             override_validate: bool # True to allow defining a custom validate() method, default: false
+        ...
 ```
 
 `override_ctor`: If `false`, the inherited constructor from the `ServerParameter` base class will be

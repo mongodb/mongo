@@ -40,11 +40,15 @@ server_parameters:
         cpp_varname: 'globalMongotParams.host'
         validator:
             callback: 'MongotParams::onValidateHost'
+        redact: false
+
     skipAuthenticationToMongot:
         description: 'Skip authentication for mongod->mongot connections, even if auth is enabled on mongod'
         set_at: [ startup ]
         cpp_varname: 'globalMongotParams.skipAuthToMongot'
         default: false
+        redact: false
+
     mongotConnectionPoolMinSize:
       description: <-
           The minimum number of connections for the TaskExecutor ConnectionPool used for outgoing
@@ -54,6 +58,8 @@ server_parameters:
       validator:
           gte: 0
       default: 1
+      redact: false
+
     mongotConnectionPoolMaxSize:
       description: <-
           The maximum number of connections for the TaskExecutor ConnectionPool used for outgoing
@@ -63,3 +69,4 @@ server_parameters:
       validator:
           gte: 1
       default: 32767
+      redact: false

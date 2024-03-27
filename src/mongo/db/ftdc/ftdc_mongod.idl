@@ -35,7 +35,6 @@ imports:
   - "mongo/db/basic_types.idl"
 
 server_parameters:
-
   diagnosticDataCollectionStatsNamespaces:
     description: "Specifies a comma-separated list of collections to collect metrics on"
     set_at: [startup, runtime]
@@ -43,3 +42,4 @@ server_parameters:
     cpp_varname: "gDiagnosticDataCollectionStatsNamespaces"
     validator:
         callback: validateCollectionStatsNamespaces
+    redact: false

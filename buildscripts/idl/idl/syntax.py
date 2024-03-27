@@ -867,7 +867,7 @@ class ServerParameter(common.SourceLocation):
         self.cpp_class = None  # type: ServerParameterClass
         self.condition = None  # type: Condition
         self.deprecated_name = []  # type: List[str]
-        self.redact = False  # type: bool
+        self.redact = None  # type: bool
         self.test_only = False  # type: bool
         self.default = None  # type: Expression
 

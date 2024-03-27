@@ -36,3 +36,4 @@ server_parameters:
     cpp_varname: gJoinIngressSessionsOnShutdown
     cpp_vartype: bool
     default: false
+    redact: false

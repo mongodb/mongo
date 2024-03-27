@@ -41,6 +41,7 @@ server_parameters:
         validator:
             gte: 500
         default: 10000
+        redact: false
     localThresholdMs:
         description: Determines the width of the latency window used in server selection.
         set_at: startup
@@ -48,6 +49,7 @@ server_parameters:
         validator:
             gte: 0
         default: 15
+        redact: false
     connectTimeoutMs:
         description: Determines the connection timeout used in the replica set monitor.
         set_at: startup
@@ -56,5 +58,6 @@ server_parameters:
         validator:
             gte: 500
         default: 10000
+        redact: false
 
 

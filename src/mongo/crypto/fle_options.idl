@@ -78,9 +78,12 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: gUnsupportedDangerousTestingFLEDiagnosticsEnabledAtStartup
     default: false
+    redact: false
+    
   fleCompactionOptions:
     description: "Options related to compaction or cleanup operations in Queryable Encryption
         protocol version 2"
     set_at: cluster
     cpp_varname: "fleCompactionOptions"
     cpp_vartype: FLECompactionOptions
+    redact: false

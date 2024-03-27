@@ -37,3 +37,4 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: coordinateCommitReturnImmediatelyAfterPersistingDecision
         default: false
+        redact: false

@@ -45,6 +45,7 @@ server_parameters:
     default: 1000
     validator:
       gte: 1
+    redact: false
 
   maxIndexBuildDrainMemoryUsageMegabytes:
     description: "Limits the amount of memory that a hybrid index build on one collection may
@@ -59,4 +60,4 @@ server_parameters:
     validator:
       gte: 16
       lt: 2048
-
+    redact: false

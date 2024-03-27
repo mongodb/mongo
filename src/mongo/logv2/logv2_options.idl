@@ -39,3 +39,4 @@ server_parameters:
         cpp_class:
             name: RedactEncryptedFields
             override_set: true
+        redact: false

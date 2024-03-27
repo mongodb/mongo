@@ -49,6 +49,7 @@ server_parameters:
         validator:
           gte: 1
           lte: 10000
+        redact: false
 
     maxDbCheckMBperSec:
         description: "Max MB per second that a single dbCheck process running in the background will
@@ -59,6 +60,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         validator: { gte: 0 }
         default: 1
+        redact: false
 
 # TODO SERVER-78399: Remove once secondaryIndexChecksInDbCheck feature flag is removed.
 types:

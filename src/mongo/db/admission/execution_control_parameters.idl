@@ -62,6 +62,7 @@ server_parameters:
     default: 0
     validator:
       callback: "admission::TicketHolderManager::validateConcurrentWriteTransactions"
+    redact: false
 
   storageEngineConcurrentReadTransactions:
     description: "Storage Engine Concurrent Read Transactions"
@@ -78,6 +79,7 @@ server_parameters:
     default: 0
     validator:
       callback: "admission::TicketHolderManager::validateConcurrentReadTransactions"
+    redact: false
 
   lowPriorityAdmissionBypassThreshold:
     description: >-
@@ -94,6 +96,7 @@ server_parameters:
     default: 5000
     validator:
       gte: 0
+    redact: false
 
   storageEngineConcurrencyAdjustmentAlgorithm:
     description: >-
@@ -104,6 +107,7 @@ server_parameters:
     default: "throughputProbing"
     validator:
       callback: validateConcurrencyAdjustmentAlgorithm
+    redact: false
 
   storageEngineConcurrencyAdjustmentIntervalMillis:
     description: >-
@@ -115,3 +119,4 @@ server_parameters:
     default: 100
     validator:
       gte: 10
+    redact: false

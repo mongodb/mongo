@@ -39,4 +39,4 @@ server_parameters:
         validator:
             gte: { expr: 'BSONDepth::kBSONDepthParameterFloor' }
             lte: { expr: 'BSONDepth::kBSONDepthParameterCeiling' }
-
+        redact: false

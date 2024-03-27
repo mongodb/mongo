@@ -36,15 +36,20 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gDisableJavaScriptJIT
         default: true
+        redact: false
+
     javascriptProtection:
         description: "disable automatic JavaScript function marshalling"
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gJavascriptProtection
         default: false
+        redact: false
+
     jsHeapLimitMB:
         description: "set the js scope's heap size limit"
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gJSHeapLimitMB
         default: 1100
+        redact: false

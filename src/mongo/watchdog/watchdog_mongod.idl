@@ -41,3 +41,4 @@ server_parameters:
         validator:
             callback: validateWatchdogPeriodSeconds
         on_update: onUpdateWatchdogPeriodSeconds
+        redact: false

@@ -36,3 +36,4 @@ server_parameters:
         cpp_vartype: 'AtomicWord<int>'
         cpp_varname: gScriptingEngineInterruptIntervalMS
         default: 1000
+        redact: false

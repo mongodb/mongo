@@ -40,6 +40,8 @@ server_parameters:
     validator:
         gte: 0
     default: 1
+    redact: false
+
   ShardingTaskExecutorPoolMaxSize:
     description: <-
         The maximum number of connections for each executor in the pool for the sharding grid.
@@ -48,6 +50,8 @@ server_parameters:
     validator:
         gte: 1
     default: 32767
+    redact: false
+
   ShardingTaskExecutorPoolMaxConnecting:
     description: <-
         The maximum number of in-flight connections for each executor
@@ -57,6 +61,8 @@ server_parameters:
     validator:
         gte: 1
     default: 2
+    redact: false
+
   ShardingTaskExecutorPoolHostTimeoutMS:
     description: <-
         The timeout for dropping a host for each executor in the pool for the sharding grid.
@@ -66,6 +72,8 @@ server_parameters:
         callback: "ShardingTaskExecutorPoolController::validateHostTimeout"
         gte: 1
     default: 300000 # 5mins
+    redact: false
+
   ShardingTaskExecutorPoolRefreshRequirementMS:
     description: <-
         The timeout before a connection needs to be refreshed for each executor
@@ -75,6 +83,8 @@ server_parameters:
     validator:
         gte: 1
     default: 60000 # 1min
+    redact: false
+
   ShardingTaskExecutorPoolRefreshTimeoutMS:
     description: <-
         The timeout for refreshing a connection for each executor in the pool for the sharding grid.
@@ -84,6 +94,8 @@ server_parameters:
         callback: "ShardingTaskExecutorPoolController::validatePendingTimeout"
         gte: 1
     default: 20000 # 20secs
+    redact: false
+
   ShardingTaskExecutorPoolReplicaSetMatching:
     description: <-
         Enables ReplicaSet member connection matching.
@@ -91,6 +103,7 @@ server_parameters:
     cpp_varname: "ShardingTaskExecutorPoolController::gParameters.matchingStrategyString"
     on_update: "ShardingTaskExecutorPoolController::onUpdateMatchingStrategy"
     default: "automatic" # matchPrimaryNode on mongos; disabled on mongod
+    redact: false
 
   ShardingTaskExecutorPoolMinSizeForConfigServers:
     description: <-
@@ -101,6 +114,8 @@ server_parameters:
     validator:
         gte: -1
     default: -1
+    redact: false
+
   ShardingTaskExecutorPoolMaxSizeForConfigServers:
     description: <-
         Overrides ShardingTaskExecutorPoolMaxSize for pools targeting config servers.
@@ -110,3 +125,4 @@ server_parameters:
     validator:
         gte: -1
     default: -1
+    redact: false

@@ -51,3 +51,4 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: 'skipShellCursorFinalize'
     default: false
+    redact: false

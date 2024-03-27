@@ -36,6 +36,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: numInitialSyncAttempts
         default: 10
+        redact: false
 
     enableElectionHandoff:
         description: <-
@@ -45,6 +46,7 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: enableElectionHandoff
         default: true
+        redact: false
 
     shutdownTimeoutMillisForSignaledShutdown:
         description: <-
@@ -55,6 +57,7 @@ server_parameters:
         default: 15000
         validator:
             gte: 0
+        redact: false
 
     periodicNoopIntervalSecs:
         description: <-
@@ -66,6 +69,7 @@ server_parameters:
         validator:
             gt: 0
             lte: 10
+        redact: false
 
     testingSnapshotBehaviorInIsolation:
         # SERVER-31304 rename this parameter to something more appropriate.
@@ -75,3 +79,4 @@ server_parameters:
         set_at: startup
         cpp_vartype: bool
         cpp_varname: gTestingSnapshotBehaviorInIsolation
+        redact: false

@@ -36,3 +36,4 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: gTestingDiagnosticsEnabledAtStartup
     default: false
+    redact: false

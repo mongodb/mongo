@@ -38,3 +38,4 @@ server_parameters:
         cpp_vartype: int
         cpp_varname: gPriorityTakeoverFreshnessWindowSeconds
         default: 2
+        redact: false

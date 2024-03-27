@@ -84,6 +84,7 @@ server_parameters:
       default: false
       condition:
         feature_flag: gFeatureFlagToaster
+      redact: false
 
     spTestNeedsLatestFCV:
       description: "Server parameter gated on FCV >= latestFCV"
@@ -94,6 +95,7 @@ server_parameters:
       default: 0
       condition:
         min_fcv: $ver_str(latest)
+      redact: false
 
     cwspTestNeedsLatestFCV:
       description: "Cluster server parameter gated on latest FCV"
@@ -103,6 +105,7 @@ server_parameters:
       test_only: true
       condition:
         min_fcv: $ver_str(latest)
+      redact: false
 
     spTestNeedsFeatureFlagBlender:
       description: "Server Parameter gated on featureFlagBlender"
@@ -113,6 +116,7 @@ server_parameters:
       default: 0
       condition:
         feature_flag: gFeatureFlagBlender
+      redact: false
 
     cwspTestNeedsFeatureFlagBlender:
       description: "Cluster server Parameter gated on featureFlagBlender"
@@ -122,3 +126,4 @@ server_parameters:
       test_only: true
       condition:
         feature_flag: gFeatureFlagBlender
+      redact: false

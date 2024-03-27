@@ -41,6 +41,7 @@ server_parameters:
     cpp_varname: useReadOnceCursorsForIndexBuilds
     cpp_vartype: AtomicWord<bool>
     default: true
+    redact: false
 
   maxIndexBuildMemoryUsageMegabytes:
     description: "Limits the amount of memory that simultaneous index builds on one collection may consume for the duration of the builds"
@@ -52,6 +53,7 @@ server_parameters:
     default: 200
     validator:
       gte: 50
+    redact: false
 
   internalIndexBuildBulkLoadYieldIterations:
     description: "The number of keys bulk-loaded before yielding."
@@ -63,3 +65,4 @@ server_parameters:
     default: 1000
     validator:
       gte: 1
+    redact: false

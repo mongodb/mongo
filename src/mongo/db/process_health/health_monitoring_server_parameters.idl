@@ -117,6 +117,7 @@ server_parameters:
             name: "HealthMonitoringIntensitiesServerParameter"
             data: "synchronized_value<HealthObserverIntensities>"
             override_set: true
+        redact: false
 
     progressMonitor:
         set_at: ["startup", "runtime"]
@@ -125,6 +126,7 @@ server_parameters:
             name: "HealthMonitoringProgressMonitorServerParameter"
             data: "synchronized_value<HealthObserverProgressMonitorConfig>"
             override_set: true
+        redact: false
 
     healthMonitoringIntervals:
         set_at: [startup, runtime]
@@ -133,6 +135,7 @@ server_parameters:
             name: "PeriodicHealthCheckIntervalsServerParameter"
             data: "synchronized_value<HealthObserverIntervals>"
             override_set: true
+        redact: false
 
     activeFaultDurationSecs:
         description: "A server parameter for specifying the duration after which we transition to active fault."
@@ -143,6 +146,7 @@ server_parameters:
             expr: 120
         validator:
             gte: 0
+        redact: false
 
     reachableConfigReplicasRequiredByHealthMonitoring:
         description: "Minimal count of reachable Config server replicas required to pass the health check"
@@ -153,6 +157,7 @@ server_parameters:
             expr: 1
         validator:
             gt: 0
+        redact: false
 
     configReplicasProbedByHealthMonitoring:
         description: "Count of Config server replicas probed by the health check"
@@ -163,3 +168,4 @@ server_parameters:
             expr: 2
         validator:
             gt: 0
+        redact: false

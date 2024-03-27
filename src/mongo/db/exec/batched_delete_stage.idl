@@ -42,6 +42,8 @@ server_parameters:
     validator:
       gte: 0
       lte: 2147483647
+    redact: false
+
   batchedDeletesTargetBatchDocs:
     description: "Threshold of documents at which a batch of document deletions is committed. A value of zero means unlimited"
     set_at: [startup, runtime]
@@ -50,6 +52,8 @@ server_parameters:
     default: 10
     validator:
       gte: 0
+    redact: false
+
   batchedDeletesTargetBatchTimeMS:
     description: "Threshold in milliseconds of batch processing time at which a batch of document deletions is committed. A value of zero means unlimited"
     set_at: [startup, runtime]
@@ -58,3 +62,4 @@ server_parameters:
     default: 5
     validator:
       gte: 0
+    redact: false

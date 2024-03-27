@@ -36,3 +36,4 @@ server_parameters:
         set_at: [ startup, runtime ]
         default: false
         cpp_varname: "httpClientOptions.verboseLogging"
+        redact: false

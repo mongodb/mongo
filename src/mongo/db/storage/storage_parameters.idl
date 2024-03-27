@@ -45,6 +45,8 @@ server_parameters:
         validator:
             gte: 0.0
             lte: { expr: 'StorageGlobalParams::kMaxSyncdelaySecs' }
+        redact: false
+
     # This is an alias for the 'storage.journal.commitIntervalMs' config, and the default is defined in the
     # StorageGlobalParams struct to resolve a conflict between config parameter and set parameter evaluation.
     journalCommitInterval:
@@ -54,12 +56,16 @@ server_parameters:
         validator:
             gte: 1
             lte: { expr: 'StorageGlobalParams::kMaxJournalCommitIntervalMs' }
+        redact: false
+
     takeUnstableCheckpointOnShutdown:
         description: 'Take unstable checkpoint on shutdown'
         cpp_vartype: bool
         cpp_varname: gTakeUnstableCheckpointOnShutdown
         set_at: startup
         default: false
+        redact: false
+
     operationMemoryPoolBlockInitialSizeKB:
         description: 'Initial block size in KB for the per operation temporary object memory pool'
         set_at: [ startup, runtime ]
@@ -68,6 +74,8 @@ server_parameters:
         default: 1
         validator:
             gte: 1
+        redact: false
+
     operationMemoryPoolBlockMaxSizeKB:
         description: 'Maximum block size in KB for the per operation temporary object memory pool'
         set_at: [ startup, runtime ]
@@ -76,6 +84,7 @@ server_parameters:
         default: 2048
         validator:
             gte: 1
+        redact: false
 
     indexMaxNumGeneratedKeysPerDocument:
         description: 'Maximum number of index keys a single document is allowed to generate'
@@ -85,12 +94,14 @@ server_parameters:
         default: 100000
         validator:
             gte: 200
+        redact: false
 
     storageGlobalParams.directoryperdb:
         description: 'Read-only view of directory per db config parameter'
         set_at: 'readonly'
         cpp_class:
             name: StorageDirectoryPerDbParameter
+        redact: false
 
     timeseriesValidateCompressedBuckets:
         description: 'Validate that there is no data loss before committing compressed timeseries buckets'
@@ -98,6 +109,7 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gValidateTimeseriesCompression
         default: true
+        redact: false
 
     maintainValidCursorsAcrossSBEReadCommands:
         description: "Enable maintaining valid cursors across SBE read commands (find, agg, getMore)"
@@ -105,6 +117,7 @@ server_parameters:
         cpp_varname: gMaintainValidCursorsAcrossReadCommands
         cpp_vartype: bool
         default: false
+        redact: false
 
     maintainValidCursorsAcrossSBEYield:
         description: "Enable retaining valid cursors across SBE query yield"
@@ -112,6 +125,7 @@ server_parameters:
         cpp_varname: gYieldingSupportForSBE
         cpp_vartype: bool
         default: false
+        redact: false
 
     internalInsertMaxBatchSize:
         description: "Maximum number of documents that we will insert in a single batch."
@@ -123,6 +137,7 @@ server_parameters:
             is_constexpr: false
         validator:
             gt: 0
+        redact: false
 
     maxNumberOfBatchedOperationsInSingleOplogEntry:
         description: >-
@@ -134,6 +149,7 @@ server_parameters:
         cpp_varname: gMaxNumberOfBatchedOperationsInSingleOplogEntry
         default: 2147483647  # INT_MAX
         validator: { gte: 1 }
+        redact: false
 
     maxSizeOfBatchedOperationsInSingleOplogEntryBytes:
         description: >-
@@ -145,6 +161,7 @@ server_parameters:
         cpp_varname: gMaxSizeOfBatchedOperationsInSingleOplogEntryBytes
         default: 16777216  # 16 MB
         validator: { gte: 1 }
+        redact: false
 
     maxNumberOfInsertsBatchInsertsForRenameAcrossDatabases:
         description: >-
@@ -155,6 +172,7 @@ server_parameters:
         cpp_varname: gMaxNumberOfInsertsBatchInsertsForRenameAcrossDatabases
         default: 500
         validator: { gte: 1, lte: 16777216 }
+        redact: false
 
     maxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes:
         description: >-
@@ -166,6 +184,7 @@ server_parameters:
         default: 4194304 # 4 MB, an arbitrary but conservative fraction of the 16 MB BSON limit. Similar
                          # in spirit to batchedDeletesTargetStagedDocBytes.
         validator: { gte: 1, lte: 16777216 }
+        redact: false
 
     collectionSamplingLogIntervalSeconds:
         description: 'The approximate interval between log messages indicating collection sampling progress. Once interval seconds have elapsed since the last log message, a progress message will be logged after the current sample is completed. A value of zero will disable this logging.'
@@ -176,6 +195,7 @@ server_parameters:
         - oplogSamplingLogIntervalSeconds
         default: 10
         validator: { gte: 0 }
+        redact: false
 
     allowUnsafeUntimestampedWrites:
         description: >- 
@@ -184,6 +204,7 @@ server_parameters:
         cpp_varname: gAllowUnsafeUntimestampedWrites
         cpp_vartype: bool
         default: false
+        redact: false
 
     skipDroppingHashedShardKeyIndex:
         description: >-
@@ -192,6 +213,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: skipDroppingHashedShardKeyIndex
         default: false
+        redact: false
 
     enableAutoCompaction:
         description: 'Enable auto compact at startup. Used for testing purposes.'
@@ -199,7 +221,7 @@ server_parameters:
         cpp_varname: gEnableAutoCompaction
         set_at: startup
         default: false
-
+        redact: false
 
 feature_flags:
     featureFlagLargeBatchedOperations:

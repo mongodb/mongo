@@ -58,3 +58,4 @@ server_parameters:
     cpp_varname: defaultMaxTimeMS
     condition:
       feature_flag: gFeatureFlagDefaultReadMaxTimeMS
+    redact: false

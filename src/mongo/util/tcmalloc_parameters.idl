@@ -39,6 +39,7 @@ server_parameters:
     cpp_class:
       name: TCMallocMaxPerCPUCacheSizeServerParameter
       override_set: true
+    redact: false
 
   tcmallocMaxTotalThreadCacheBytes:
     description: "Configure tcmalloc's max_total_thread_cache_bytes"
@@ -46,6 +47,7 @@ server_parameters:
     cpp_class:
       name: TCMallocMaxTotalThreadCacheBytesServerParameter
       override_set: true
+    redact: false
 
   tcmallocAggressiveMemoryDecommit:
     description: "Configure tcmalloc's aggressive_memory_decommit"
@@ -53,6 +55,7 @@ server_parameters:
     cpp_class:
       name: TCMallocAggressiveMemoryDecommitServerParameter
       override_set: true
+    redact: false
 
   heapProfilingEnabled:
     description: "Enable Heap Profiling"
@@ -62,6 +65,7 @@ server_parameters:
     default: false
     condition:
       preprocessor: defined(_POSIX_VERSION) && (defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE) || defined(MONGO_CONFIG_USE_LIBUNWIND))
+    redact: false
 
   heapProfilingSampleIntervalBytes:
     description: "Configure heap profiling sample interval bytes"
@@ -72,6 +76,7 @@ server_parameters:
     default: 262144
     condition:
       preprocessor: defined(_POSIX_VERSION) && (defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE) || defined(MONGO_CONFIG_USE_LIBUNWIND))
+    redact: false
 
   tcmallocReleaseRate:
     description: "Configure tcmalloc_release_rate"
@@ -79,3 +84,4 @@ server_parameters:
     cpp_class:
       name: TCMallocReleaseRateServerParameter
       override_set: false
+    redact: false

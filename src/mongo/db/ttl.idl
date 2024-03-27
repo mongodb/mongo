@@ -36,6 +36,7 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: ttlMonitorEnabled
         default: true
+        redact: false
 
     ttlMonitorSleepSecs:
         description: "Period of TTL monitor thread (used for testing)."
@@ -46,6 +47,7 @@ server_parameters:
         default: 60
         validator:
             gt: 0
+        redact: false
 
     ttlMonitorBatchDeletes:
         description:
@@ -56,6 +58,7 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: ttlMonitorBatchDeletes
         default: true
+        redact: false
 
     ttlMonitorSubPassTargetSecs:
         description:
@@ -70,6 +73,7 @@ server_parameters:
         default: 60
         validator:
             gte: 0
+        redact: false
 
     ttlIndexDeleteTargetTimeMS:
         description:
@@ -82,6 +86,7 @@ server_parameters:
         default: 1000
         validator:
             gte: 0
+        redact: false
 
     ttlIndexDeleteTargetDocs:
         description:
@@ -94,6 +99,7 @@ server_parameters:
         default: 50000
         validator:
             gte: 0
+        redact: false
 
     ttlCollLowPrioritySubpassLimit:
         description:
@@ -106,4 +112,4 @@ server_parameters:
         default: 10
         validator:
             gt: 0
-
+        redact: false

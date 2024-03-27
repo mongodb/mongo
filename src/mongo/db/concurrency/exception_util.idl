@@ -37,6 +37,7 @@ server_parameters:
         cpp_varname: 'gEnableTemporarilyUnavailableExceptions'
         cpp_vartype: AtomicWord<bool>
         default: true
+        redact: false
 
     temporarilyUnavailableMaxRetries:
         description: 'The number of times to retry a TemporarilyUnavailable error internally'
@@ -46,6 +47,7 @@ server_parameters:
         default: 10
         validator:
           gte: 0
+        redact: false
 
     temporarilyUnavailableBackoffBaseMs:
         description: 'The base period of time to wait between each TemporarilyUnavailable retry
@@ -57,6 +59,7 @@ server_parameters:
         default: 1000
         validator:
           gte: 0
+        redact: false
 
     transactionTooLargeForCacheThreshold:
         description: "Threshold on the proportion of total dirty cache bytes that the running
@@ -72,3 +75,4 @@ server_parameters:
         validator:
           gte: 0.0
           lte: 1.0
+        redact: false

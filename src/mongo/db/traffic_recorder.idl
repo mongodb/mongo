@@ -89,6 +89,7 @@ server_parameters:
         cpp_varname: gTrafficRecordingDirectory
         validator:
             callback: 'validateTrafficRecordDestination'
+        redact: false
 
     AlwaysRecordTraffic:
         description: 'Start server with traffic recording enabled, and ensure all records are flushed. Test only.'
@@ -96,3 +97,4 @@ server_parameters:
         set_at: startup
         cpp_vartype: std::string
         cpp_varname: gAlwaysRecordTraffic
+        redact: false

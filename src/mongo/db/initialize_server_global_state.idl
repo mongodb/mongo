@@ -40,6 +40,7 @@ server_parameters:
       gte: 0
     description: 'Max log attribute size in kilobytes'
     set_at: [ startup, runtime ]
+    redact: false
 
   honorSystemUmask:
     description: 'Use the system provided umask, rather than overriding with processUmask config value'
@@ -47,6 +48,7 @@ server_parameters:
     cpp_class: HonorSystemUMaskServerParameter
     condition:
       preprocessor: '!defined(_WIN32)'
+    redact: false
 
   processUmask:
     description: >
@@ -56,6 +58,7 @@ server_parameters:
     cpp_class: ProcessUMaskServerParameter
     condition:
       preprocessor: '!defined(_WIN32)'
+    redact: false
 
   backtraceLogFile:
     description: >
@@ -63,3 +66,4 @@ server_parameters:
     set_at: startup
     cpp_varname: gBacktraceLogFile
     cpp_vartype: std::string
+    redact: false

@@ -35,3 +35,4 @@ server_parameters:
         description: 'Disable use of secure allocator domains'
         set_at: startup
         cpp_varname: 'serverGlobalParams.disabledSecureAllocatorDomains'
+        redact: false
