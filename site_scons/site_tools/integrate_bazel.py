@@ -625,8 +625,17 @@ def generate(env: SCons.Environment.Environment) -> None:
         if normalized_os == "macos" and evergreen_tmp_dir:
             bazel_internal_flags.append(f"--sandbox_writable_path={evergreen_tmp_dir}")
 
+        # Any flags that need to appear before the actual bazel command (ex. "bazel {--flags} build")
+        bazel_pre_command_internal_flags = []
+        if evergreen_tmp_dir:
+            bazel_pre_command_internal_flags += [
+                "--output_user_root=" + os.path.join(
+                    os.path.abspath(evergreen_tmp_dir), "bazel-output-root")
+            ]
+
         Globals.bazel_base_build_command = [
             os.path.abspath(bazel_executable),
+            *bazel_pre_command_internal_flags,
             'build',
         ] + bazel_internal_flags + shlex.split(env.get("BAZEL_FLAGS", ""))
 
