@@ -111,20 +111,6 @@
 /* Define to 1 if you have the `snappy' library (-lsnappy). */
 #cmakedefine HAVE_LIBSNAPPY 1
 
-/* Define to 1 if the user has explictly enabled TCMalloc builds. */
-#cmakedefine ENABLE_TCMALLOC 1
-
-/*
- * To remain compatible with autoconf & scons builds, we
- * define HAVE_LIBTCMALLOC for configuring our sources to actually
- * include the tcmalloc headers, as opposed to the sources
- * using ENABLE_TCMALLOC.
- */
-#if defined ENABLE_TCMALLOC
-  /* Define to 1 if you have the `tcmalloc' library (-ltcmalloc). */
-  #cmakedefine HAVE_LIBTCMALLOC 1
-#endif
-
 /* Define to 1 if the user has set enable antithesis. */
 #cmakedefine ENABLE_ANTITHESIS 1
 
