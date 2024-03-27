@@ -256,6 +256,19 @@ functions:
       - "--change-dir=${extraction_change_dir}"
       - "${move_outputs}"
 
+  "extract benchmarks": &extract_benchmarks
+    command: subprocess.exec
+    display_name: "extract benchmarks"
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "evergreen/functions/binaries_extract.py"
+      - "--tarball=mongo_benchmarks.tgz"
+      - "--extraction-command=${decompress}"
+      - "--change-dir=build/install"
+      - "--move-output=build/install/benchmarks.txt:build/"
+
   "get version expansions": &get_version_expansions
     command: s3.get
     display_name: "get version expansions"
@@ -282,9 +295,9 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/benchmarks/${build_id}.tgz
+      remote_file: ${mongo_benchmarks}
       bucket: mciuploads
-      extract_to: src
+      local_file: src/mongo_benchmarks.tgz
 
   "fetch corpus": &fetch_corpus
     command: s3.get
@@ -531,6 +544,10 @@ functions:
         value: ${project}/${compile_variant}/${version_id}/binaries/mongo-jstestshell-debugsymbols-${revision_order_id}.tgz
       - key: mongo_artifacts
         value: ${project}/${compile_variant}/${version_id}/artifacts/${revision_order_id}.tgz
+      - key: mongo_benchmarks
+        value: ${project}/${compile_variant}/${version_id}/binaries/benchmarks-${revision_order_id}.${ext|tgz}
+      - key: mongo_benchmarks_debugsymbols
+        value: ${project}/${compile_variant}/${version_id}/binaries/benchmarksdebugsymbols-${revision_order_id}.${ext|tgz}
       - key: mongo_venv
         value: ${project}/${compile_variant}/${version_id}/venv/${revision_order_id}.tgz
       - key: mongo_fuzzer_corpus_mciuploads
@@ -691,6 +708,7 @@ functions:
   - *f_expansions_write
   - *set_up_credentials
   - *fetch_benchmarks
+  - *extract_benchmarks
 
   "f_multiversion_setup_exec": &do_multiversion_setup
     command: subprocess.exec

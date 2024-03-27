@@ -163,15 +163,10 @@ wiredtiger_ext_h = env.Install(
 
 env.Alias('generated-sources', [wiredtiger_h, wiredtiger_ext_h])
 
-env.AutoInstall(
-    '$PREFIX_INCLUDEDIR',
-    source=[
-        wiredtiger_h,
-        wiredtiger_ext_h,
-    ],
-    AIB_COMPONENT='wiredtiger',
-    AIB_ROLE='dev',
-)
+env.AutoInstall('$PREFIX_INCLUDEDIR', source=[
+    wiredtiger_h,
+    wiredtiger_ext_h,
+], AIB_COMPONENT='wiredtiger_libs', AIB_ROLE='dev', AIB_COMPONENTS_EXTRA=['wiredtiger'])
 
 #
 # WiredTiger library
@@ -225,26 +220,18 @@ if useZstd:
 if (get_option("use-hardware-crc32") == "off"):
     env.Append(CPPDEFINES=["HAVE_NO_CRC32_HARDWARE"])
 
-cslib = env.Library(
-    target="wiredtiger_checksum",
-    source=cssources,
-    AIB_COMPONENT='wiredtiger',
-)
+cslib = env.Library(target="wiredtiger_checksum", source=cssources, AIB_COMPONENT='wiredtiger_libs',
+                    AIB_COMPONENTS_EXTRA=['wiredtiger'])
 
 wtlib = env.Library(
-    target="wiredtiger",
-    source=wtsources,
-    LIBDEPS_PRIVATE=[
+    target="wiredtiger", source=wtsources, LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_snappy',
         '$BUILD_DIR/third_party/shim_zlib',
         '$BUILD_DIR/third_party/shim_zstd',
         'wiredtiger_checksum',
-    ],
-    LIBDEPS_TAGS=[
+    ], LIBDEPS_TAGS=[
         'init-no-global-side-effects',
-    ],
-    AIB_COMPONENT='wiredtiger',
-)
+    ], AIB_COMPONENT='wiredtiger_libs', AIB_COMPONENTS_EXTRA=['wiredtiger'])
 
 env.Depends([cslib, wtlib], [filelistfile, version_file])
 

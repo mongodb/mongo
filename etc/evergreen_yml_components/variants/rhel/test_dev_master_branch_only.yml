@@ -494,9 +494,12 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --use-diagnostic-latches=on
     scons_cache_scope: shared
+    num_scons_link_jobs_available: 0.5
     compile_variant: *enterprise-rhel-80-benchmarks
   tasks:
   - name: compile_upload_benchmarks_TG
+    distros:
+      - rhel80-xlarge
   - name: .benchmarks
 
 - <<: *linux_x86_dynamic_compile_variant_dependency

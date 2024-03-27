@@ -6153,6 +6153,18 @@ env.AddPackageNameAlias(
 )
 
 env.AddPackageNameAlias(
+    component="benchmarks",
+    role="runtime",
+    name="benchmarks",
+)
+
+env.AddPackageNameAlias(
+    component="benchmarks",
+    role="debug",
+    name="benchmarks-debugsymbols",
+)
+
+env.AddPackageNameAlias(
     component="mh",
     role="runtime",
     # TODO: we should be able to move this to where the mqlrun binary is
@@ -6176,6 +6188,13 @@ env.AutoInstall(
     AIB_ROLE='runtime',
     AIB_COMPONENT='pretty-printer-tests',
     AIB_COMPONENTS_EXTRA=['dist-test'],
+)
+
+env.AutoInstall(
+    ".",
+    "$BENCHMARK_LIST",
+    AIB_COMPONENT="benchmarks",
+    AIB_ROLE='runtime',
 )
 
 if 'SANITIZER_RUNTIME_LIBS' in env:

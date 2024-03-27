@@ -181,9 +181,10 @@ fi' >> .bash_profile
         archive_fail "unittest"
     fi
 
-    BENCHMARK_ARCHIVE=$(ls /data/mci/artifacts-*compile_upload_benchmarks/mongodb_mongo_*.tgz 2>/dev/null)
+    BENCHMARK_ARCHIVE=$(ls /data/mci/artifacts-*compile_upload_benchmarks/benchmarks-*.tgz 2>/dev/null)
     if [[ -n $BENCHMARK_ARCHIVE ]]; then
-        tar --wildcards --strip-components=2 -xzf $BENCHMARK_ARCHIVE '*/bin/*' &
+        tar --wildcards --strip-components=0 -xzf $BENCHMARK_ARCHIVE 'bin/*' &
+        tar --wildcards -xzf $BENCHMARK_ARCHIVE 'lib/*' &
     else
         archive_fail "benchmark"
     fi
