@@ -96,6 +96,18 @@ private:
         struct Decoder64 {
             Decoder64();
 
+            void writeToElementStorage(ElementStorage& allocator,
+                                       BSONType type,
+                                       int64_t value,
+                                       BSONElement lastLiteral,
+                                       StringData fieldName) const;
+
+            template <class Buffer>
+            void appendToBuffers(BufferVector<Buffer*>& buffers,
+                                 BSONType type,
+                                 int64_t value,
+                                 BSONElement lastLiteral);
+
             boost::optional<int64_t> lastEncodedValue;
             Simple8b<uint64_t>::Iterator pos;
             int64_t lastEncodedValueForDeltaOfDelta = 0;
@@ -107,6 +119,18 @@ private:
          * State when decoding deltas for 128-bit values.
          */
         struct Decoder128 {
+            void writeToElementStorage(ElementStorage& allocator,
+                                       BSONType type,
+                                       int128_t value,
+                                       BSONElement lastLiteral,
+                                       StringData fieldName) const;
+
+            template <class Buffer>
+            void appendToBuffers(BufferVector<Buffer*>& buffers,
+                                 BSONType type,
+                                 int128_t value,
+                                 BSONElement lastLiteral);
+
             boost::optional<int128_t> lastEncodedValue;
             Simple8b<uint128_t>::Iterator pos;
         };
@@ -177,14 +201,10 @@ private:
     const char* decompressFast(
         absl::flat_hash_map<const void*, BufferVector<Buffer*>>&& elemToBuffer);
 
-    void writeToElementStorage(DecodingState::Elem elem,
-                               BSONElement lastLiteral,
-                               StringData fieldName);
+    void writeToElementStorage(BSONElement bsonElem, StringData fieldName);
 
     template <class Buffer>
-    static void appendToBuffers(BufferVector<Buffer*>& buffers,
-                                DecodingState::Elem elem,
-                                BSONElement lastLiteral);
+    static void appendToBuffers(BufferVector<Buffer*>& buffers, BSONElement bsonElem);
 
     template <typename Buffer, typename T>
     static void appendEncodedToBuffers(BufferVector<Buffer*>& buffers, T v) {
@@ -463,10 +483,32 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
                 invariant(buffers.empty(),
                           "decompressing paths with a nested relationship is not yet supported");
 
-                // We must write a BSONElement to ElementStorage since this scalar is part
-                // of an object being materialized.
-                writeToElementStorage(
-                    decodingStateElem, state._lastLiteral, referenceField.fieldNameStringData());
+                // We must write a BSONElement to ElementStorage since this scalar is part of an
+                // object being materialized.
+                visit(OverloadedVisitor{
+                          [&](BSONElement& bsonElem) {
+                              writeToElementStorage(bsonElem, referenceField.fieldNameStringData());
+                          },
+                          [&](std::pair<BSONType, int64_t> elem) {
+                              auto d64 = get_if<DecodingState::Decoder64>(&state.decoder);
+                              invariant(d64, "expected Decoder64");
+                              d64->writeToElementStorage(_allocator,
+                                                         elem.first,
+                                                         elem.second,
+                                                         state._lastLiteral,
+                                                         referenceField.fieldNameStringData());
+                          },
+                          [&](std::pair<BSONType, int128_t> elem) {
+                              auto d128 = get_if<DecodingState::Decoder128>(&state.decoder);
+                              invariant(d128, "expected Decoder128");
+                              d128->writeToElementStorage(_allocator,
+                                                          elem.first,
+                                                          elem.second,
+                                                          state._lastLiteral,
+                                                          referenceField.fieldNameStringData());
+                          }},
+                      decodingStateElem);
+
             } else if (buffers.size() > 0) {
                 // This scalar is not part of an object being materialized. Increment the position
                 // counter if the 'Container' is requesting position information.
@@ -475,7 +517,26 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
                         bufferToPositions[buffer]++;
                     }
                 }
-                appendToBuffers(buffers, decodingStateElem, state._lastLiteral);
+
+                visit(OverloadedVisitor{
+                          [&](BSONElement& bsonElem) {
+                              // We must write a BSONElement to ElementStorage since this scalar is
+                              // part of an object being materialized.
+                              appendToBuffers(buffers, bsonElem);
+                          },
+                          [&](std::pair<BSONType, int64_t> elem) {
+                              auto d64 = get_if<DecodingState::Decoder64>(&state.decoder);
+                              invariant(d64, "expected Decoder64");
+                              d64->appendToBuffers(
+                                  buffers, elem.first, elem.second, state._lastLiteral);
+                          },
+                          [&](std::pair<BSONType, int128_t> elem) {
+                              auto d128 = get_if<DecodingState::Decoder128>(&state.decoder);
+                              invariant(d128, "expected Decoder128");
+                              d128->appendToBuffers(
+                                  buffers, elem.first, elem.second, state._lastLiteral);
+                          }},
+                      decodingStateElem);
             }
 
             return true;
@@ -784,86 +845,80 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
 }
 
 template <class Buffer>
+void BlockBasedInterleavedDecompressor::DecodingState::Decoder64::appendToBuffers(
+    BufferVector<Buffer*>& buffers, BSONType type, int64_t value, BSONElement lastLiteral) {
+    switch (type) {
+        case Date:
+            appendEncodedToBuffers<Buffer, Date_t>(buffers, Date_t::fromMillisSinceEpoch(value));
+            break;
+        case NumberDouble:
+            appendEncodedToBuffers<Buffer, double>(
+                buffers, Simple8bTypeUtil::decodeDouble(value, scaleIndex));
+            break;
+        case NumberLong:
+            appendEncodedToBuffers<Buffer, int64_t>(buffers, value);
+            break;
+        case NumberInt:
+            appendEncodedToBuffers<Buffer, int32_t>(buffers, value);
+            break;
+        case Bool:
+            appendEncodedToBuffers<Buffer, bool>(buffers, value);
+            break;
+        case jstOID:
+            appendEncodedToBuffers<Buffer, OID>(
+                buffers,
+                Simple8bTypeUtil::decodeObjectId(value, lastLiteral.__oid().getInstanceUnique()));
+            break;
+        case bsonTimestamp:
+            appendEncodedToBuffers<Buffer, Timestamp>(buffers, static_cast<Timestamp>(value));
+            break;
+        default:
+            invariant(false, "unsupported encoded data type");
+    }
+}
+
+template <class Buffer>
+void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::appendToBuffers(
+    BufferVector<Buffer*>& buffers, BSONType type, int128_t value, BSONElement lastLiteral) {
+    switch (type) {
+        case String: {
+            auto string = Simple8bTypeUtil::decodeString(value);
+            appendEncodedToBuffers<Buffer, StringData>(
+                buffers, StringData((const char*)string.str.data(), string.size));
+        } break;
+        case Code: {
+            auto string = Simple8bTypeUtil::decodeString(value);
+            appendEncodedToBuffers<Buffer, BSONCode>(
+                buffers, BSONCode(StringData((const char*)string.str.data(), string.size)));
+        } break;
+        case BinData: {
+            char data[16];
+            size_t size = lastLiteral.valuestrsize();
+            Simple8bTypeUtil::decodeBinary(value, data, size);
+            appendEncodedToBuffers<Buffer, BSONBinData>(
+                buffers, BSONBinData(data, size, lastLiteral.binDataType()));
+        } break;
+        case NumberDecimal:
+            appendEncodedToBuffers<Buffer, Decimal128>(buffers,
+                                                       Simple8bTypeUtil::decodeDecimal128(value));
+            break;
+        default:
+            invariant(false, "unsupported encoded data type");
+    }
+}
+
+template <class Buffer>
 void BlockBasedInterleavedDecompressor::appendToBuffers(BufferVector<Buffer*>& buffers,
-                                                        DecodingState::Elem elem,
-                                                        BSONElement lastLiteral) {
-    visit(OverloadedVisitor{
-              [&](BSONElement& bsonElem) {
-                  if (bsonElem.eoo()) {
-                      for (auto&& b : buffers) {
-                          b->appendMissing();
-                      }
-                  } else {
-                      for (auto&& b : buffers) {
-                          b->template append<BSONElement>(bsonElem);
-                      }
-                  }
-              },
-              [&](std::pair<BSONType, int64_t>& encoded) {
-                  switch (encoded.first) {
-                      case Date:
-                          appendEncodedToBuffers<Buffer, Date_t>(
-                              buffers, Date_t::fromMillisSinceEpoch(encoded.second));
-                          break;
-                      case NumberDouble:
-                          appendEncodedToBuffers<Buffer, double>(
-                              buffers,
-                              Simple8bTypeUtil::decodeDouble(encoded.second,
-                                                             Simple8bTypeUtil::kMemoryAsInteger));
-                          break;
-                      case NumberLong:
-                          appendEncodedToBuffers<Buffer, int64_t>(buffers, encoded.second);
-                          break;
-                      case NumberInt:
-                          appendEncodedToBuffers<Buffer, int32_t>(buffers, encoded.second);
-                          break;
-                      case Bool:
-                          appendEncodedToBuffers<Buffer, bool>(buffers, encoded.second);
-                          break;
-                      case jstOID:
-                          appendEncodedToBuffers<Buffer, OID>(
-                              buffers,
-                              Simple8bTypeUtil::decodeObjectId(
-                                  encoded.second, lastLiteral.__oid().getInstanceUnique()));
-                          break;
-                      case bsonTimestamp:
-                          appendEncodedToBuffers<Buffer, Timestamp>(
-                              buffers, static_cast<Timestamp>(encoded.second));
-                          break;
-                      default:
-                          invariant(false, "unsupported encoded data type");
-                  }
-              },
-              [&](std::pair<BSONType, int128_t>& encoded) {
-                  switch (encoded.first) {
-                      case String: {
-                          auto string = Simple8bTypeUtil::decodeString(encoded.second);
-                          appendEncodedToBuffers<Buffer, StringData>(
-                              buffers, StringData((const char*)string.str.data(), string.size));
-                      } break;
-                      case Code: {
-                          auto string = Simple8bTypeUtil::decodeString(encoded.second);
-                          appendEncodedToBuffers<Buffer, BSONCode>(
-                              buffers,
-                              BSONCode(StringData((const char*)string.str.data(), string.size)));
-                      } break;
-                      case BinData: {
-                          char data[16];
-                          size_t size = lastLiteral.valuestrsize();
-                          Simple8bTypeUtil::decodeBinary(encoded.second, data, size);
-                          appendEncodedToBuffers<Buffer, BSONBinData>(
-                              buffers, BSONBinData(data, size, lastLiteral.binDataType()));
-                      } break;
-                      case NumberDecimal:
-                          appendEncodedToBuffers<Buffer, Decimal128>(
-                              buffers, Simple8bTypeUtil::decodeDecimal128(encoded.second));
-                          break;
-                      default:
-                          invariant(false, "unsupported encoded data type");
-                  }
-              },
-          },
-          elem);
+                                                        BSONElement bsonElem) {
+    if (bsonElem.eoo()) {
+        for (auto&& b : buffers) {
+            b->appendMissing();
+        }
+    } else {
+        for (auto&& b : buffers) {
+            b->template append<BSONElement>(bsonElem);
+        }
+    }
 }
 
 template <class Buffer>

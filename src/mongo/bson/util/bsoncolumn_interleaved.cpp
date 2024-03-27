@@ -44,109 +44,101 @@ BlockBasedInterleavedDecompressor::BlockBasedInterleavedDecompressor(ElementStor
               "request to do interleaved decompression on non-interleaved data");
 }
 
+void BlockBasedInterleavedDecompressor::DecodingState::Decoder64::writeToElementStorage(
+    ElementStorage& allocator,
+    BSONType type,
+    int64_t value,
+    BSONElement lastLiteral,
+    StringData fieldName) const {
+    switch (type) {
+        case NumberInt: {
+            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 4);
+            DataView(esElem.value()).write<LittleEndian<int32_t>>(value);
+        } break;
+        case bsonTimestamp:
+        case Date:
+        case NumberLong: {
+            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 8);
+            DataView(esElem.value()).write<LittleEndian<int64_t>>(value);
+        } break;
+        case Bool: {
+            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 1);
+            DataView(esElem.value()).write<LittleEndian<bool>>(value);
+        } break;
+        case jstOID: {
+            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 12);
+            Simple8bTypeUtil::decodeObjectIdInto(
+                esElem.value(), value, lastLiteral.__oid().getInstanceUnique());
+        } break;
+        case NumberDouble: {
+            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 8);
+            DataView(esElem.value())
+                .write<LittleEndian<double>>(Simple8bTypeUtil::decodeDouble(value, scaleIndex));
+        } break;
+        default:
+            uassert(8784700, "attempt to materialize unsupported type", false);
+    }
+}
+
+void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::writeToElementStorage(
+    ElementStorage& allocator,
+    BSONType type,
+    int128_t value,
+    BSONElement lastLiteral,
+    StringData fieldName) const {
+    switch (type) {
+        case String:
+        case Code: {
+            Simple8bTypeUtil::SmallString ss = Simple8bTypeUtil::decodeString(value);
+            // Add 5 bytes to size, strings begin with a 4 byte count and ends with a
+            // null terminator
+            ElementStorage::Element esElem = allocator.allocate(type, fieldName, ss.size + 5);
+            // Write count, size includes null terminator
+            DataView(esElem.value()).write<LittleEndian<int32_t>>(ss.size + 1);
+            // Write string value
+            memcpy(esElem.value() + sizeof(int32_t), ss.str.data(), ss.size);
+            // Write null terminator
+            DataView(esElem.value()).write<char>('\0', ss.size + sizeof(int32_t));
+        } break;
+        case NumberDecimal: {
+            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 16);
+            Decimal128 dec128 = Simple8bTypeUtil::decodeDecimal128(value);
+            Decimal128::Value dec128Val = dec128.getValue();
+            DataView(esElem.value()).write<LittleEndian<long long>>(dec128Val.low64);
+            DataView(esElem.value() + sizeof(long long))
+                .write<LittleEndian<long long>>(dec128Val.high64);
+        } break;
+        case BinData: {
+            // Layout of a binary element:
+            // - 4-byte length of binary data
+            // - 1-byte binary subtype
+            // - The binary data
+            ElementStorage::Element esElem =
+                allocator.allocate(type, fieldName, lastLiteral.valuesize());
+            // The first 5 bytes in binData is a count and subType, copy them from
+            // previous
+            memcpy(esElem.value(), lastLiteral.value(), 5);
+            uassert(8690003,
+                    "BinData length should not exceed 16 in a delta encoding",
+                    lastLiteral.valuestrsize() <= 16);
+            Simple8bTypeUtil::decodeBinary(value, esElem.value() + 5, lastLiteral.valuestrsize());
+        } break;
+        default:
+            uassert(8784701, "attempt to materialize unsupported type", false);
+    }
+}
+
 /**
  * Given an element that is being materialized as part of a sub-object, write it to the allocator as
  * a BSONElement with the appropriate field name.
  */
-void BlockBasedInterleavedDecompressor::writeToElementStorage(DecodingState::Elem elem,
-                                                              BSONElement lastLiteral,
+void BlockBasedInterleavedDecompressor::writeToElementStorage(BSONElement bsonElem,
                                                               StringData fieldName) {
-    visit(OverloadedVisitor{
-              [&](BSONElement& bsonElem) {
-                  if (!bsonElem.eoo()) {
-                      ElementStorage::Element esElem =
-                          _allocator.allocate(bsonElem.type(), fieldName, bsonElem.valuesize());
-                      memcpy(esElem.value(), bsonElem.value(), bsonElem.valuesize());
-                  }
-              },
-              [&](std::pair<BSONType, int64_t> elem) {
-                  switch (elem.first) {
-                      case NumberInt: {
-                          ElementStorage::Element esElem =
-                              _allocator.allocate(elem.first, fieldName, 4);
-                          DataView(esElem.value()).write<LittleEndian<int32_t>>(elem.second);
-                      } break;
-                      case Date:
-                      case NumberLong: {
-                          ElementStorage::Element esElem =
-                              _allocator.allocate(elem.first, fieldName, 8);
-                          DataView(esElem.value()).write<LittleEndian<int64_t>>(elem.second);
-                      } break;
-                      case Bool: {
-                          ElementStorage::Element esElem =
-                              _allocator.allocate(elem.first, fieldName, 1);
-                          DataView(esElem.value()).write<LittleEndian<bool>>(elem.second);
-                      } break;
-                      case jstOID: {
-                          ElementStorage::Element esElem =
-                              _allocator.allocate(elem.first, fieldName, 12);
-                          Simple8bTypeUtil::decodeObjectIdInto(
-                              esElem.value(), elem.second, lastLiteral.__oid().getInstanceUnique());
-                      } break;
-                      case bsonTimestamp: {
-                          ElementStorage::Element esElem =
-                              _allocator.allocate(elem.first, fieldName, 8);
-                          DataView(esElem.value()).write<LittleEndian<long long>>(elem.second);
-                      } break;
-                      case NumberDouble: {
-                          ElementStorage::Element esElem =
-                              _allocator.allocate(elem.first, fieldName, 8);
-                          DataView(esElem.value())
-                              .write<LittleEndian<double>>(Simple8bTypeUtil::decodeDouble(
-                                  elem.second, Simple8bTypeUtil::kMemoryAsInteger));
-                      } break;
-                      default:
-                          invariant(false, "attempt to materialize unsupported type");
-                  }
-              },
-              [&](std::pair<BSONType, int128_t> elem) {
-                  switch (elem.first) {
-                      case String:
-                      case Code: {
-                          Simple8bTypeUtil::SmallString ss =
-                              Simple8bTypeUtil::decodeString(elem.second);
-                          // Add 5 bytes to size, strings begin with a 4 byte count and ends with a
-                          // null terminator
-                          ElementStorage::Element esElem =
-                              _allocator.allocate(elem.first, fieldName, ss.size + 5);
-                          // Write count, size includes null terminator
-                          DataView(esElem.value()).write<LittleEndian<int32_t>>(ss.size + 1);
-                          // Write string value
-                          memcpy(esElem.value() + sizeof(int32_t), ss.str.data(), ss.size);
-                          // Write null terminator
-                          DataView(esElem.value()).write<char>('\0', ss.size + sizeof(int32_t));
-                      } break;
-                      case NumberDecimal: {
-                          ElementStorage::Element esElem =
-                              _allocator.allocate(elem.first, fieldName, 16);
-                          Decimal128 dec128 = Simple8bTypeUtil::decodeDecimal128(elem.second);
-                          Decimal128::Value dec128Val = dec128.getValue();
-                          DataView(esElem.value()).write<LittleEndian<long long>>(dec128Val.low64);
-                          DataView(esElem.value() + sizeof(long long))
-                              .write<LittleEndian<long long>>(dec128Val.high64);
-                      } break;
-                      case BinData: {
-                          // Layout of a binary element:
-                          // - 4-byte length of binary data
-                          // - 1-byte binary subtype
-                          // - The binary data
-                          ElementStorage::Element esElem =
-                              _allocator.allocate(elem.first, fieldName, lastLiteral.valuesize());
-                          // The first 5 bytes in binData is a count and subType, copy them from
-                          // previous
-                          memcpy(esElem.value(), lastLiteral.value(), 5);
-                          uassert(8690003,
-                                  "BinData length should not exceed 16 in a delta encoding",
-                                  lastLiteral.valuestrsize() <= 16);
-                          Simple8bTypeUtil::decodeBinary(
-                              elem.second, esElem.value() + 5, lastLiteral.valuestrsize());
-                      } break;
-                      default:
-                          invariant(false, "attempted to materialize unsupported type");
-                  }
-              },
-          },
-          elem);
+    if (!bsonElem.eoo()) {
+        ElementStorage::Element esElem =
+            _allocator.allocate(bsonElem.type(), fieldName, bsonElem.valuesize());
+        memcpy(esElem.value(), bsonElem.value(), bsonElem.valuesize());
+    }
 }
 
 
@@ -297,13 +289,6 @@ BlockBasedInterleavedDecompressor::DecodingState::loadDelta(ElementStorage& allo
     if (!d64.deltaOfDelta && *delta == 0) {
         // If we have an encoded representation of the last value, return it.
         if (d64.lastEncodedValue) {
-            if (_lastLiteral.type() == NumberDouble) {
-                auto scaledDouble =
-                    Simple8bTypeUtil::decodeDouble(*d64.lastEncodedValue, d64.scaleIndex);
-                boost::optional<int64_t> encodedScaled = Simple8bTypeUtil::encodeDouble(
-                    scaledDouble, Simple8bTypeUtil::kMemoryAsInteger);
-                return std::pair{_lastLiteral.type(), *encodedScaled};
-            }
             return std::pair{_lastLiteral.type(), *d64.lastEncodedValue};
         }
         // Otherwise return the last uncompressed value we found.
@@ -323,15 +308,7 @@ BlockBasedInterleavedDecompressor::DecodingState::loadDelta(ElementStorage& allo
         return std::pair{_lastLiteral.type(), d64.lastEncodedValueForDeltaOfDelta};
     }
 
-    auto type = _lastLiteral.type();
-    if (type == NumberDouble) {
-        auto scaledDouble = Simple8bTypeUtil::decodeDouble(*d64.lastEncodedValue, d64.scaleIndex);
-        boost::optional<int64_t> encodedScaled =
-            Simple8bTypeUtil::encodeDouble(scaledDouble, Simple8bTypeUtil::kMemoryAsInteger);
-        return std::pair{type, *encodedScaled};
-    }
-
-    return std::pair{type, *d64.lastEncodedValue};
+    return std::pair{_lastLiteral.type(), *d64.lastEncodedValue};
 }
 
 BlockBasedInterleavedDecompressor::DecodingState::Elem
