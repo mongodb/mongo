@@ -354,8 +354,12 @@ public:
     static std::vector<boost::optional<uint128_t>> deltaString(It begin, It end, BSONElement prev) {
         std::vector<boost::optional<uint128_t>> deltas;
         for (; begin != end; ++begin) {
-            deltas.push_back(deltaString(*begin, prev));
-            prev = *begin;
+            if (!begin->eoo()) {
+                deltas.push_back(deltaString(*begin, prev));
+                prev = *begin;
+            } else {
+                deltas.push_back(boost::none);
+            }
         }
         return deltas;
     }
@@ -4348,7 +4352,31 @@ TEST_F(BSONColumnTest, RLELargeValueExtendedSelector) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyColumnReopenFromBinary(reinterpret_cast<const char*>(binData.data), binData.length);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, DefaultSelectorAfterExtended) {
+    BSONColumnBuilder cb;
+
+    // This test is having a large delta that must be stored in the extended selectors, after comes
+    // a small value. We need to properly adjust selector state when reopening.
+    std::vector<BSONElement> elems = {
+        createElementString("core"_sd), createElementString("Singapore"_sd), BSONElement()};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0001);
+    appendSimple8bBlocks128(
+        expected, deltaString(elems.begin() + 1, elems.end(), elems.front()), 2);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, Interleaved) {
