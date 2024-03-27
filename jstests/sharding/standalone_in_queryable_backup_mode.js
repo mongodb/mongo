@@ -32,6 +32,10 @@ var kDbName = 'testDb';
 var kShardedCollName = 'testShardedColl';
 var kUnshardedCollName = 'testUnshardedColl';
 
+const shard0Identity = st.rs0.getPrimary().getDB("admin").getCollection("system.version").findOne({
+    _id: "shardIdentity"
+});
+
 assert.commandWorked(
     st.s.adminCommand({shardCollection: kDbName + '.' + kShardedCollName, key: {_id: 1}}));
 
@@ -69,11 +73,8 @@ MongoRunner.stopMongod(st.rs0.getSecondary());
 
 jsTest.log(
     "Going to start a mongod process with --shardsvr, --queryableBackupMode and recoverToOplogTimestamp");
-const shardIdentity = st.rs0.getPrimary().getDB("admin").getCollection("system.version").findOne({
-    _id: "shardIdentity"
-});
 let configFileStr =
-    "sharding:\n _overrideShardIdentity: '" + tojson(shardIdentity).replace(/\s+/g, ' ') + "'";
+    "sharding:\n _overrideShardIdentity: '" + tojson(shard0Identity).replace(/\s+/g, ' ') + "'";
 let delim = _isWindows() ? '\\' : '/';
 let configFilePath = secondaryDbPath + delim + "config-for-read-only-mongod.yml";
 writeFile(configFilePath, configFileStr);
