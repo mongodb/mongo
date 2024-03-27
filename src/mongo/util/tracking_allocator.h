@@ -150,6 +150,10 @@ public:
         }
     }
 
+    ~TrackingSharedBufferAllocator() {
+        _stats.get().bytesDeallocated(_buf.capacity());
+    }
+
     TrackingSharedBufferAllocator(TrackingSharedBufferAllocator&&) = default;
     TrackingSharedBufferAllocator& operator=(TrackingSharedBufferAllocator&&) = default;
 

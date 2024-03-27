@@ -56,6 +56,7 @@ public:
             return *this;
         }
 
+        _stats.get().bytesDeallocated(_obj.allocated());
         _stats = other._stats;
         _obj = std::move(other._obj);
         invariant(other._obj.allocated() == 0);
