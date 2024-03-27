@@ -11,7 +11,8 @@
  * ]
  */
 
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+// This test intentionally corrupts a bucket, so disable testing diagnostics.
+TestData.testingDiagnosticsEnabled = false;
 
 const conn = MongoRunner.runMongod();
 
