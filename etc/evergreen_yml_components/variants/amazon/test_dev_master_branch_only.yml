@@ -173,7 +173,7 @@ buildvariants:
 # This task is responsible for creating a AL2023 x86 server binary candidate for 10gen/mongot.
 # A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
 # binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests.
-- name: AL2023-x86-mongot-integration-cron-only
+- name: amazon-linux-2023-x86-mongot-integration-cron-only
   display_name: "AL2023 x86 mongot integration tasks cron only"
   cron: "0 */4 * * *" # Run these tasks every 4 hours
   patchable: false
