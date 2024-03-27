@@ -866,6 +866,7 @@ icuEnv.CppUnitTest(
         'hierarchical_acquisition_test.cpp',
         'icu_test.cpp',
         "inlined_storage_test.cpp",
+        'inline_memory_test.cpp',
         'interruptible_test.cpp',
         'invalidating_lru_cache_test.cpp',
         'itoa_test.cpp',
@@ -1018,6 +1019,11 @@ env.Benchmark(
 env.Benchmark(
     target='cancellation_bm',
     source='cancellation_bm.cpp',
+)
+
+env.Benchmark(
+    target='inline_memory_bm',
+    source='inline_memory_bm.cpp',
 )
 
 env.Benchmark(
