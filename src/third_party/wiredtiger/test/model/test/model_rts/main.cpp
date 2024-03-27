@@ -219,9 +219,10 @@ test_restart_wt1(void)
     testutil_check(table->insert(txn1, key2, value2));
     txn1->commit(20);
 
-    /* Create an unnamed checkpoint, crash, and verify. */
+    /* Set the stable timestamp, restart, and verify. */
     database.set_stable_timestamp(15);
     database.restart();
+    testutil_assert(database.stable_timestamp() == 15);
     testutil_assert(table->get(key1) == value1);
     testutil_assert(table->get(key2) == model::NONE);
 
@@ -263,6 +264,7 @@ test_restart_wt1(void)
 
     /* Reopen and verify. */
     testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     wt_model_assert(table, uri, key1);
@@ -303,10 +305,11 @@ test_restart_wt2(void)
     testutil_check(table->insert(txn1, key2, value2));
     txn1->commit(20);
 
-    /* Create an unnamed checkpoint, crash, and verify. */
+    /* Create an unnamed checkpoint, restart, and verify. */
     database.set_stable_timestamp(15);
     database.create_checkpoint();
-    database.crash();
+    database.restart();
+    testutil_assert(database.stable_timestamp() == 15);
     testutil_assert(table->get(key1) == value1);
     testutil_assert(table->get(key2) == model::NONE);
 
@@ -349,6 +352,7 @@ test_restart_wt2(void)
 
     /* Reopen and verify. */
     testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     wt_model_assert(table, uri, key1);
@@ -399,10 +403,11 @@ test_restart_wt3(void)
     testutil_check(table->insert(txn2, key5, value5));
     txn2->prepare(14);
 
-    /* Create an unnamed checkpoint, crash, and verify. */
+    /* Create an unnamed checkpoint, restart, and verify. */
     database.set_stable_timestamp(15);
     database.create_checkpoint();
-    database.crash();
+    database.restart();
+    testutil_assert(database.stable_timestamp() == 15);
     testutil_assert(table->get(key1) == value1);
     testutil_assert(table->get(key2) == model::NONE);
     testutil_assert(table->get(key3) == model::NONE);
@@ -461,6 +466,7 @@ test_restart_wt3(void)
 
     /* Reopen and verify. */
     testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     wt_model_assert(table, uri, key1);
@@ -504,9 +510,10 @@ test_crash_wt1(void)
     testutil_check(table->insert(txn1, key2, value2));
     txn1->commit(20);
 
-    /* Create an unnamed checkpoint, crash, and verify. */
+    /* Set the stable timestamp, crash, and verify. */
     database.set_stable_timestamp(15);
     database.crash();
+    testutil_assert(database.stable_timestamp() == model::k_timestamp_none);
     testutil_assert(table->get(key1) == model::NONE);
     testutil_assert(table->get(key2) == model::NONE);
 
@@ -539,6 +546,7 @@ test_crash_wt1(void)
 
     /* Reopen and verify. */
     testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     wt_model_assert(table, uri, key1);
     wt_model_assert(table, uri, key2);
@@ -574,7 +582,9 @@ test_crash_wt2(void)
     /* Create an unnamed checkpoint, crash, and verify. */
     database.set_stable_timestamp(15);
     database.create_checkpoint();
+    database.set_stable_timestamp(25);
     database.crash();
+    testutil_assert(database.stable_timestamp() == 15);
     testutil_assert(table->get(key1) == value1);
     testutil_assert(table->get(key2) == model::NONE);
 
@@ -612,6 +622,7 @@ test_crash_wt2(void)
 
     /* Reopen and verify. */
     testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     wt_model_assert(table, uri, key1);
@@ -666,6 +677,7 @@ test_crash_wt3(void)
     database.set_stable_timestamp(15);
     database.create_checkpoint();
     database.crash();
+    testutil_assert(database.stable_timestamp() == 15);
     testutil_assert(table->get(key1) == value1);
     testutil_assert(table->get(key2) == model::NONE);
     testutil_assert(table->get(key3) == model::NONE);
@@ -718,6 +730,7 @@ test_crash_wt3(void)
 
     /* Reopen and verify. */
     testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     wt_model_assert(table, uri, key1);
