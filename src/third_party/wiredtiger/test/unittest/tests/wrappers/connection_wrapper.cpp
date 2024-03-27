@@ -15,7 +15,7 @@
 #include "../utils.h"
 
 ConnectionWrapper::ConnectionWrapper(const std::string &db_home, const char *cfg_str)
-    : _conn_impl(nullptr), _conn(nullptr), _db_home(db_home), _cfg_str(cfg_str)
+    : _conn_impl(nullptr), _conn(nullptr), _db_home(db_home), _cfg_str(cfg_str), _do_cleanup(true)
 {
     struct stat sb;
     /*
@@ -38,7 +38,8 @@ ConnectionWrapper::~ConnectionWrapper()
 {
     utils::throwIfNonZero(_conn->close(_conn, ""));
 
-    utils::wiredtigerCleanup(_db_home);
+    if (_do_cleanup)
+        utils::wiredtigerCleanup(_db_home);
 }
 
 WT_SESSION_IMPL *

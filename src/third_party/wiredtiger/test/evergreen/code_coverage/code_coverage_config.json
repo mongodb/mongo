@@ -147,6 +147,8 @@
     "test/csuite/wt3363_checkpoint_op_races/test_wt3363_checkpoint_op_races",
     "test/csuite/wt3120_filesys/test_wt3120_filesys -b $(pwd)",
     "test/csuite/wt8659_reconstruct_database_from_logs/test_wt8659_reconstruct_database_from_logs",
+    "test/csuite/incr_backup/test_incr_backup -S 123456789",
+    "test/csuite/incr_backup/test_incr_backup -S 0x9b1bde3f111fe316",
 
     "python3 ../test/suite/run.py cursor_bound -s 1",
     "python3 ../test/suite/run.py cursor_bound_fuzz",

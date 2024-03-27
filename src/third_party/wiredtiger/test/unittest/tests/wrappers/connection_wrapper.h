@@ -37,11 +37,18 @@ public:
     WT_CONNECTION_IMPL *getWtConnectionImpl() const;
     WT_CONNECTION *getWtConnection() const;
 
+    void
+    clearDoCleanup()
+    {
+        _do_cleanup = false;
+    };
+
 private:
     WT_CONNECTION_IMPL *_conn_impl;
     WT_CONNECTION *_conn;
     std::string _db_home;
     const char *_cfg_str;
+    bool _do_cleanup;
 };
 
 #endif // WT_CONNECTION_WRAPPER_H

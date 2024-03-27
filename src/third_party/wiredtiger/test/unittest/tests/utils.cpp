@@ -39,6 +39,8 @@ wiredtigerCleanup(std::string const &home)
     remove_wrapper(home + "/WiredTiger.turtle");
     remove_wrapper(home + "/WiredTiger.wt");
     remove_wrapper(home + "/WiredTigerHS.wt");
+    remove_wrapper(home + "/backup_test1.wt");
+    remove_wrapper(home + "/backup_test2.wt");
     remove_wrapper(home + "/cursor_test.wt");
 
     remove_wrapper(home);
