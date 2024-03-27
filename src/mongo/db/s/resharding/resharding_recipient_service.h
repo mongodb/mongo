@@ -262,10 +262,7 @@ private:
     void _cleanupReshardingCollections(bool aborted,
                                        const CancelableOperationContextFactory& factory);
 
-    // Transitions the on-disk and in-memory state to 'newState'.
-    void _transitionState(RecipientStateEnum newState,
-                          const CancelableOperationContextFactory& factory);
-
+    // Transitions the on-disk and in-memory state to the state defined in 'newRecipientCtx'.
     void _transitionState(RecipientShardContext&& newRecipientCtx,
                           boost::optional<CloneDetails>&& cloneDetails,
                           boost::optional<mongo::Date_t> configStartTime,
@@ -285,6 +282,8 @@ private:
     void _transitionToStrictConsistency(const CancelableOperationContextFactory& factory);
 
     void _transitionToError(Status abortReason, const CancelableOperationContextFactory& factory);
+
+    void _transitionToDone(bool aborted, const CancelableOperationContextFactory& factory);
 
     BSONObj _makeQueryForCoordinatorUpdate(const ShardId& shardId, RecipientStateEnum newState);
 

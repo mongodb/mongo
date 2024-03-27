@@ -482,7 +482,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                     if (_recipientCtx.getState() != RecipientStateEnum::kDone) {
                         // If a failover occured before removing the recipient document, the
                         // recipient could already be in state done.
-                        _transitionState(RecipientStateEnum::kDone, factory);
+                        _transitionToDone(aborted, factory);
                     }
 
                     if (!_isAlsoDonor) {
@@ -671,7 +671,10 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken,
         const CancelableOperationContextFactory& factory) {
-    if (_recipientCtx.getState() > RecipientStateEnum::kAwaitingFetchTimestamp) {
+    if (_recipientCtx.getState() > RecipientStateEnum::kAwaitingFetchTimestamp &&
+        _recipientCtx.getState() != RecipientStateEnum::kError) {
+        // This invariant won't hold if an unrecoverable error is encountered before the recipient
+        // makes enough progress to record _cloneTimestamp and then a failover occurs.
         invariant(_cloneTimestamp);
         return ExecutorFuture(**executor);
     }
@@ -1136,16 +1139,6 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionState(
-    RecipientStateEnum newState, const CancelableOperationContextFactory& factory) {
-    invariant(newState != RecipientStateEnum::kCreatingCollection &&
-              newState != RecipientStateEnum::kError);
-
-    auto newRecipientCtx = _recipientCtx;
-    newRecipientCtx.setState(newState);
-    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
-}
-
-void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     RecipientShardContext&& newRecipientCtx,
     boost::optional<ReshardingRecipientService::RecipientStateMachine::CloneDetails>&& cloneDetails,
     boost::optional<mongo::Date_t> configStartTime,
@@ -1213,6 +1206,17 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToError(
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kError);
     resharding::emplaceTruncatedAbortReasonIfExists(newRecipientCtx, abortReason);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_transitionToDone(
+    bool aborted, const CancelableOperationContextFactory& factory) {
+    auto newRecipientCtx = _recipientCtx;
+    newRecipientCtx.setState(RecipientStateEnum::kDone);
+    if (aborted) {
+        resharding::emplaceTruncatedAbortReasonIfExists(newRecipientCtx,
+                                                        resharding::coordinatorAbortedError());
+    }
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
 }
 
@@ -1548,6 +1552,13 @@ CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortS
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _abortSource = CancellationSource(stepdownToken);
+    }
+
+    if (_recipientCtx.getState() == RecipientStateEnum::kDone && _recipientCtx.getAbortReason()) {
+        // A recipient in state kDone with an abortReason is indication that the coordinator
+        // has persisted the decision and called abort on all participants. Canceling the
+        // _abortSource to avoid repeating the future chain.
+        _abortSource->cancel();
     }
 
     if (auto future = _coordinatorHasDecisionPersisted.getFuture(); future.isReady()) {

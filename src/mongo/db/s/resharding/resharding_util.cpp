@@ -520,5 +520,10 @@ std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::strin
     }());
 }
 
+boost::optional<Status> coordinatorAbortedError() {
+    return Status{ErrorCodes::ReshardCollectionAborted,
+                  "Recieved abort from the resharding coordinator"};
+}
+
 }  // namespace resharding
 }  // namespace mongo

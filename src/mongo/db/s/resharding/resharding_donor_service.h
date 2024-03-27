@@ -227,6 +227,9 @@ private:
     // Transitions the on-disk and in-memory state to DonorStateEnum::kError.
     void _transitionToError(Status abortReason);
 
+    // Transitions the on-disk and in-memory state to DonorStateEnum::kDone.
+    void _transitionToDone(bool aborted);
+
     BSONObj _makeQueryForCoordinatorUpdate(const ShardId& shardId, DonorStateEnum newState);
 
     ExecutorFuture<void> _updateCoordinator(

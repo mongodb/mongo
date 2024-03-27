@@ -378,5 +378,7 @@ bool isMoveCollection(boost::optional<ProvenanceEnum> provenance);
  */
 std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::string& poolName);
 
+boost::optional<Status> coordinatorAbortedError();
+
 }  // namespace resharding
 }  // namespace mongo

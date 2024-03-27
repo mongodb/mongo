@@ -237,6 +237,22 @@ public:
         ASSERT_TRUE(bool(donorColl->isEmpty(opCtx)));
     }
 
+    ReshardingDonorDocument getPersistedDonorDocument(OperationContext* opCtx,
+                                                      UUID reshardingUUID) {
+        boost::optional<ReshardingDonorDocument> persistedDonorDocument;
+        PersistentTaskStore<ReshardingDonorDocument> store(
+            NamespaceString::kDonorReshardingOperationsNamespace);
+        store.forEach(opCtx,
+                      BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << reshardingUUID),
+                      [&](const auto& donorDocument) {
+                          persistedDonorDocument.emplace(donorDocument);
+                          return false;
+                      });
+
+        ASSERT(persistedDonorDocument);
+        return persistedDonorDocument.get();
+    }
+
 private:
     void _onReshardingFieldsChanges(OperationContext* opCtx,
                                     DonorStateMachine& donor,
@@ -727,20 +743,10 @@ TEST_F(ReshardingDonorServiceTest, TruncatesXLErrorOnDonorDocument) {
         // errored locally. It is therefore safe to check its local state document until
         // DonorStateMachine::abort() is called.
         {
-            boost::optional<ReshardingDonorDocument> persistedDonorDocument;
-            PersistentTaskStore<ReshardingDonorDocument> store(
-                NamespaceString::kDonorReshardingOperationsNamespace);
-            store.forEach(
-                opCtx.get(),
-                BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID()),
-                [&](const auto& donorDocument) {
-                    persistedDonorDocument.emplace(donorDocument);
-                    return false;
-                });
-
-            ASSERT(persistedDonorDocument);
+            auto persistedDonorDocument =
+                getPersistedDonorDocument(opCtx.get(), doc.getReshardingUUID());
             auto persistedAbortReasonBSON =
-                persistedDonorDocument->getMutableState().getAbortReason();
+                persistedDonorDocument.getMutableState().getAbortReason();
             ASSERT(persistedAbortReasonBSON);
             // The actual abortReason will be slightly larger than kReshardErrorMaxBytes bytes due
             // to the primitive truncation algorithm - Check that the total size is less than
@@ -808,6 +814,118 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
 
     stateTransitionsGuard.unset(kDoneState);
     ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(ReshardingDonorServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinator) {
+    const auto abortErrMsg = "Recieved abort from the resharding coordinator";
+
+    for (bool isAlsoRecipient : {false, true}) {
+        LOGV2(8743302,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "isAlsoRecipient"_attr = isAlsoRecipient);
+
+        auto removeDonorDocFailpoint = globalFailPointRegistry().find("removeDonorDocFailpoint");
+        auto timesEnteredFailPoint = removeDonorDocFailpoint->setMode(FailPoint::alwaysOn);
+
+        auto doc = makeStateDocument(isAlsoRecipient);
+        auto instanceId =
+            BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+        createSourceCollection(opCtx.get(), doc);
+        if (isAlsoRecipient) {
+            createTemporaryReshardingCollection(opCtx.get(), doc);
+        }
+
+        DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        donor->abort(false);
+        removeDonorDocFailpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+
+        // Ensure the node is aborting with abortReason from coordinator.
+        {
+            auto persistedDonorDocument =
+                getPersistedDonorDocument(opCtx.get(), doc.getReshardingUUID());
+            auto state = persistedDonorDocument.getMutableState().getState();
+            ASSERT_EQ(state, DonorStateEnum::kDone);
+
+            auto abortReason = persistedDonorDocument.getMutableState().getAbortReason();
+            ASSERT(abortReason);
+            ASSERT_EQ(abortReason->getIntField("code"), ErrorCodes::ReshardCollectionAborted);
+            ASSERT_EQ(abortReason->getStringField("errmsg").toString(), abortErrMsg);
+        }
+
+        stepDown();
+        ASSERT_EQ(donor->getCompletionFuture().getNoThrow(),
+                  ErrorCodes::InterruptedDueToReplStateChange);
+        donor.reset();
+
+        removeDonorDocFailpoint->setMode(FailPoint::off);
+        stepUp(opCtx.get());
+
+        auto [maybeDonor, isPausedOrShutdown] =
+            DonorStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(maybeDonor);
+        ASSERT_FALSE(isPausedOrShutdown);
+        donor = *maybeDonor;
+
+        ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+        checkStateDocumentRemoved(opCtx.get());
+    }
+}
+
+TEST_F(ReshardingDonorServiceTest, FailoverAfterDonorErrorsPriorToObtainingTimestamp) {
+    for (bool isAlsoRecipient : {false, true}) {
+        LOGV2(8743303,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "isAlsoRecipient"_attr = isAlsoRecipient);
+
+        std::string errMsg("Simulating an unrecoverable error for testing");
+        FailPointEnableBlock failpoint("reshardingDonorFailsBeforeObtainingTimestamp",
+                                       BSON("errmsg" << errMsg));
+
+        auto doc = makeStateDocument(isAlsoRecipient);
+        auto instanceId =
+            BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+        DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        auto localTransitionToErrorFuture = donor->awaitInBlockingWritesOrError();
+        ASSERT_OK(localTransitionToErrorFuture.getNoThrow());
+
+        stepDown();
+        ASSERT_EQ(donor->getCompletionFuture().getNoThrow(),
+                  ErrorCodes::InterruptedDueToReplStateChange);
+        donor.reset();
+
+        stepUp(opCtx.get());
+        auto [maybeDonor, isPausedOrShutdown] =
+            DonorStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(maybeDonor);
+        ASSERT_FALSE(isPausedOrShutdown);
+        donor = *maybeDonor;
+
+        {
+            auto persistedDonorDocument =
+                getPersistedDonorDocument(opCtx.get(), doc.getReshardingUUID());
+            auto state = persistedDonorDocument.getMutableState().getState();
+            ASSERT_EQ(state, DonorStateEnum::kError);
+
+            auto abortReason = persistedDonorDocument.getMutableState().getAbortReason();
+            ASSERT(abortReason);
+            ASSERT_EQ(abortReason->getIntField("code"), ErrorCodes::InternalError);
+            ASSERT_EQ(abortReason->getStringField("errmsg").toString(),
+                      "Simulating an unrecoverable error for testing");
+        }
+
+        donor->abort(false);
+        ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+    }
 }
 
 }  // namespace
