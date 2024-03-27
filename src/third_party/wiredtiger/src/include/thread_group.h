@@ -49,10 +49,10 @@ struct __wt_thread {
  *	Encapsulation of a group of utility threads.
  */
 struct __wt_thread_group {
-    uint32_t alloc;           /* Size of allocated group */
-    uint32_t max;             /* Max threads in group */
-    uint32_t min;             /* Min threads in group */
-    uint32_t current_threads; /* Number of active threads */
+    uint32_t alloc;                     /* Size of allocated group */
+    uint32_t max;                       /* Max threads in group */
+    uint32_t min;                       /* Min threads in group */
+    wt_shared uint32_t current_threads; /* Number of active threads */
 
     const char *name; /* Name */
 

@@ -227,6 +227,8 @@ __wt_atomic_storevbool(volatile bool *vp, bool v)
  * Generic atomic functions that accept any type. The typed macros above should be preferred since
  * they provide better type checking.
  */
+#define __wt_atomic_load_enum(vp) __atomic_load_n(vp, __ATOMIC_RELAXED)
+#define __wt_atomic_store_enum(vp, v) __atomic_store_n(vp, v, __ATOMIC_RELAXED)
 #define __wt_atomic_and_generic(vp, v) __atomic_and_fetch(vp, v, __ATOMIC_RELAXED)
 #define __wt_atomic_or_generic(vp, v) __atomic_or_fetch(vp, v, __ATOMIC_RELAXED)
 #define __wt_atomic_load_generic(vp) __atomic_load_n(vp, __ATOMIC_RELAXED)

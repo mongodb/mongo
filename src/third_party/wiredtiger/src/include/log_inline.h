@@ -21,10 +21,20 @@ __wt_log_cmp(WT_LSN *lsn1, WT_LSN *lsn2)
      * Read LSNs into local variables so that we only read each field once and all comparisons are
      * on the same values.
      */
-    l1 = ((volatile WT_LSN *)lsn1)->file_offset;
-    l2 = ((volatile WT_LSN *)lsn2)->file_offset;
+    WT_READ_ONCE(l1, lsn1->file_offset);
+    WT_READ_ONCE(l2, lsn2->file_offset);
 
     return (l1 < l2 ? -1 : (l1 > l2 ? 1 : 0));
+}
+
+/*
+ * __wt_lsn_offset --
+ *     Return a log sequence number's offset.
+ */
+static WT_INLINE uint32_t
+__wt_lsn_offset(WT_LSN *lsn)
+{
+    return (__wt_atomic_load32(&lsn->l.offset));
 }
 
 /*

@@ -639,7 +639,8 @@ __log_file_server(void *arg)
                  */
                 if (conn->hot_backup_start == 0 && conn->log_cursors == 0) {
                     WT_WITH_HOTBACKUP_READ_LOCK(session,
-                      ret = __wt_ftruncate(session, close_fh, close_end_lsn.l.offset), NULL);
+                      ret = __wt_ftruncate(session, close_fh, __wt_lsn_offset(&close_end_lsn)),
+                      NULL);
                     WT_ERR_ERROR_OK(ret, ENOTSUP, false);
                 }
                 WT_SET_LSN(&close_end_lsn, close_end_lsn.l.file + 1, 0);
@@ -679,7 +680,7 @@ typedef struct {
 #define WT_WRLSN_ENTRY_CMP_LT(entry1, entry2)        \
     ((entry1).lsn.l.file < (entry2).lsn.l.file ||    \
       ((entry1).lsn.l.file == (entry2).lsn.l.file && \
-        (entry1).lsn.l.offset < (entry2).lsn.l.offset))
+        __wt_lsn_offset(&(entry1).lsn) < __wt_lsn_offset(&(entry2).lsn)))
 
 /*
  * __wt_log_wrlsn --
@@ -785,8 +786,8 @@ restart:
                  * so that the checkpoint LSN is close to the end of the record.
                  */
                 slot_last_offset = (uint32_t)__wt_atomic_loadiv64(&slot->slot_last_offset);
-                if (slot->slot_start_lsn.l.offset != slot_last_offset)
-                    slot->slot_start_lsn.l.offset = slot_last_offset;
+                if (__wt_lsn_offset(&slot->slot_start_lsn) != slot_last_offset)
+                    __wt_atomic_store32(&slot->slot_start_lsn.l.offset, slot_last_offset);
                 WT_ASSIGN_LSN(&log->write_start_lsn, &slot->slot_start_lsn);
                 WT_ASSIGN_LSN(&log->write_lsn, &slot->slot_end_lsn);
                 __wt_cond_signal(session, log->log_write_cond);

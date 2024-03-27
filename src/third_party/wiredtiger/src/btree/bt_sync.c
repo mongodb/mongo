@@ -308,12 +308,14 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          * consistent view of that namespace. Set the checkpointing flag to block such actions and
          * wait for any problematic eviction or page splits to complete.
          */
-        WT_ASSERT(session, btree->syncing == WT_BTREE_SYNC_OFF && btree->sync_session == NULL);
+        WT_ASSERT(session,
+          __wt_atomic_load_enum(&btree->syncing) == WT_BTREE_SYNC_OFF &&
+            btree->sync_session == NULL);
 
         btree->sync_session = session;
-        btree->syncing = WT_BTREE_SYNC_WAIT;
+        __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_WAIT);
         __wt_gen_next_drain(session, WT_GEN_EVICT);
-        btree->syncing = WT_BTREE_SYNC_RUNNING;
+        __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_RUNNING);
         is_hs = WT_IS_HS(btree->dhandle);
 
         /* Add in history store reconciliation for standard files. */
@@ -499,7 +501,7 @@ err:
         __wt_txn_release_snapshot(session);
 
     /* Clear the checkpoint flag. */
-    btree->syncing = WT_BTREE_SYNC_OFF;
+    __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_OFF);
     btree->sync_session = NULL;
 
     __wt_spin_unlock(session, &btree->flush_lock);

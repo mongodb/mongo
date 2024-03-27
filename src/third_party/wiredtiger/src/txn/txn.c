@@ -2835,7 +2835,7 @@ __wt_verbose_dump_txn_one(
         __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[3]),
         __wt_timestamp_to_string(txn_shared->pinned_durable_timestamp, ts_string[4]),
         __wt_timestamp_to_string(txn_shared->read_timestamp, ts_string[5]), txn->ckpt_lsn.l.file,
-        txn->ckpt_lsn.l.offset, txn->full_ckpt ? "true" : "false",
+        __wt_lsn_offset(&txn->ckpt_lsn), txn->full_ckpt ? "true" : "false",
         txn->rollback_reason == NULL ? "" : txn->rollback_reason, txn->flags, iso_tag));
 
     /*

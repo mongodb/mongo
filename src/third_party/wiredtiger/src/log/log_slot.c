@@ -34,11 +34,11 @@ __log_slot_dump(WT_SESSION_IMPL *session)
         __wt_errx(session, "    State: %" PRIx64 " Flags: %" PRIx16, (uint64_t)slot->slot_state,
           slot->flags_atomic);
         __wt_errx(session, "    Start LSN: %" PRIu32 "/%" PRIu32, slot->slot_start_lsn.l.file,
-          slot->slot_start_lsn.l.offset);
+          __wt_lsn_offset(&slot->slot_start_lsn));
         __wt_errx(session, "    End  LSN: %" PRIu32 "/%" PRIu32, slot->slot_end_lsn.l.file,
-          slot->slot_end_lsn.l.offset);
+          __wt_lsn_offset(&slot->slot_end_lsn));
         __wt_errx(session, "    Release LSN: %" PRIu32 "/%" PRIu32, slot->slot_release_lsn.l.file,
-          slot->slot_release_lsn.l.offset);
+          __wt_lsn_offset(&slot->slot_release_lsn));
         __wt_errx(session, "    Offset: start: %" PRIuMAX " last:%" PRIuMAX,
           (uintmax_t)slot->slot_start_offset,
           (uintmax_t)__wt_atomic_loadiv64(&slot->slot_last_offset));
@@ -72,8 +72,8 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
     slot->slot_unbuffered = 0;
     WT_ASSIGN_LSN(&slot->slot_start_lsn, &log->alloc_lsn);
     WT_ASSIGN_LSN(&slot->slot_end_lsn, &slot->slot_start_lsn);
-    slot->slot_start_offset = log->alloc_lsn.l.offset;
-    __wt_atomic_storeiv64(&slot->slot_last_offset, log->alloc_lsn.l.offset);
+    slot->slot_start_offset = __wt_lsn_offset(&log->alloc_lsn);
+    __wt_atomic_storeiv64(&slot->slot_last_offset, __wt_lsn_offset(&log->alloc_lsn));
     slot->slot_fh = log->log_fh;
     slot->slot_error = 0;
     WT_DIAGNOSTIC_YIELD;
@@ -175,7 +175,7 @@ retry:
     }
 
     end_offset = WT_LOG_SLOT_JOINED_BUFFERED(old_state) + slot->slot_unbuffered;
-    slot->slot_end_lsn.l.offset += (uint32_t)end_offset;
+    __wt_atomic_add32(&slot->slot_end_lsn.l.offset, (uint32_t)end_offset);
     WT_STAT_CONN_INCRV(session, log_slot_consolidated, end_offset);
     /*
      * XXX Would like to change so one piece of code advances the LSN.
@@ -196,6 +196,7 @@ __log_slot_dirty_max_check(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
     WT_CONNECTION_IMPL *conn;
     WT_LOG *log;
     WT_LSN *current, *last_sync;
+    uint32_t current_offset, last_sync_offset;
 
     if (S2C(session)->log_dirty_max == 0)
         return;
@@ -208,8 +209,10 @@ __log_slot_dirty_max_check(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
         last_sync = &log->sync_lsn;
     else
         last_sync = &log->dirty_lsn;
-    if (current->l.file == last_sync->l.file && current->l.offset > last_sync->l.offset &&
-      current->l.offset - last_sync->l.offset > conn->log_dirty_max) {
+    current_offset = __wt_lsn_offset(current);
+    last_sync_offset = __wt_lsn_offset(last_sync);
+    if (current->l.file == last_sync->l.file && current_offset > last_sync_offset &&
+      current_offset - last_sync_offset > conn->log_dirty_max) {
         /* Schedule the asynchronous sync */
         F_SET_ATOMIC_16(slot, WT_SLOT_SYNC_DIRTY);
         WT_ASSIGN_LSN(&log->dirty_lsn, &slot->slot_release_lsn);

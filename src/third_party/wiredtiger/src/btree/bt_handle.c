@@ -532,7 +532,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
 
     btree->modified = false; /* Clean */
 
-    btree->syncing = WT_BTREE_SYNC_OFF;                           /* Not syncing */
+    __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_OFF);   /* Not syncing */
     btree->checkpoint_gen = __wt_gen(session, WT_GEN_CHECKPOINT); /* Checkpoint generation */
 
     /*

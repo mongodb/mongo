@@ -84,7 +84,7 @@ __thread_group_shrink(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, uint32_t
         __wt_verbose(session, WT_VERB_THREAD_GROUP, "Stopping utility thread: %s:%" PRIu32,
           group->name, thread->id);
         if (F_ISSET(thread, WT_THREAD_ACTIVE))
-            --group->current_threads;
+            __wt_atomic_sub32(&group->current_threads, 1);
         F_CLR(thread, WT_THREAD_ACTIVE | WT_THREAD_RUN);
         /*
          * Signal the thread in case it is in a long timeout.
@@ -147,7 +147,8 @@ __thread_group_resize(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, uint32_t
       group->name, group->min, new_min, group->max, new_max);
 
     WT_ASSERT(session,
-      group->current_threads <= group->alloc && __wt_rwlock_islocked(session, &group->lock));
+      __wt_atomic_load32(&group->current_threads) <= group->alloc &&
+        __wt_rwlock_islocked(session, &group->lock));
 
     if (new_min == group->min && new_max == group->max)
         return (0);
@@ -207,7 +208,7 @@ __thread_group_resize(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, uint32_t
 
     group->max = new_max;
     group->min = new_min;
-    while (group->current_threads < new_min)
+    while (__wt_atomic_load32(&group->current_threads) < new_min)
         __wt_thread_group_start_one(session, group, true);
     return (0);
 
@@ -338,15 +339,15 @@ __wt_thread_group_start_one(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, bo
 {
     WT_THREAD *thread;
 
-    if (group->current_threads >= group->max)
+    if (__wt_atomic_load32(&group->current_threads) >= group->max)
         return;
 
     if (!is_locked)
         __wt_writelock(session, &group->lock);
 
     /* Recheck the bounds now that we hold the lock */
-    if (group->current_threads < group->max) {
-        thread = group->threads[group->current_threads++];
+    if (__wt_atomic_load32(&group->current_threads) < group->max) {
+        thread = group->threads[__wt_atomic_fetch_add32(&group->current_threads, 1)];
         WT_ASSERT(session, thread != NULL);
         __wt_verbose(session, WT_VERB_THREAD_GROUP, "Activating utility thread: %s:%" PRIu32,
           group->name, thread->id);
@@ -367,13 +368,13 @@ __wt_thread_group_stop_one(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group)
 {
     WT_THREAD *thread;
 
-    if (group->current_threads <= group->min)
+    if (__wt_atomic_load32(&group->current_threads) <= group->min)
         return;
 
     __wt_writelock(session, &group->lock);
     /* Recheck the bounds now that we hold the lock */
-    if (group->current_threads > group->min) {
-        thread = group->threads[--group->current_threads];
+    if (__wt_atomic_load32(&group->current_threads) > group->min) {
+        thread = group->threads[__wt_atomic_sub32(&group->current_threads, 1)];
         __wt_verbose(session, WT_VERB_THREAD_GROUP, "Pausing utility thread: %s:%" PRIu32,
           group->name, thread->id);
         WT_ASSERT(session, F_ISSET(thread, WT_THREAD_ACTIVE));
