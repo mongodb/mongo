@@ -305,6 +305,19 @@ Status _createView(OperationContext* opCtx,
                 Top::get(serviceContext).collectionDropped(nss);
             });
 
+        if (MONGO_unlikely(failTimeseriesViewCreation.shouldFail([&nss](const BSONObj& data) {
+                const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
+                return fpNss == nss;
+            }))) {
+            LOGV2(5490200,
+                  "failTimeseriesViewCreation fail point enabled. Failing creation of view "
+                  "definition.");
+            return Status{ErrorCodes::OperationFailed,
+                          str::stream() << "View definition " << nss.toStringForErrorMsg()
+                                        << " creation failed due to 'failTimeseriesViewCreation' "
+                                           "fail point enabled."};
+        }
+
         // Even though 'collectionOptions' is passed by rvalue reference, it is not safe to move
         // because 'userCreateNS' may throw a WriteConflictException.
         Status status = db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
@@ -610,85 +623,22 @@ Status _createTimeseries(OperationContext* opCtx,
         return bucketCreationStatus;
     }
 
-    ret = writeConflictRetry(opCtx, "create", ns, [&]() -> Status {
-        AutoGetCollection autoColl(
-            opCtx,
-            ns,
-            MODE_IX,
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-        Lock::CollectionLock systemDotViewsLock(
-            opCtx, NamespaceString::makeSystemDotViewsNamespace(ns.dbName()), MODE_X);
-        auto db = autoColl.ensureDbExists(opCtx);
 
-        // This is a top-level handler for time-series creation name conflicts. New commands coming
-        // in, or commands that generated a WriteConflict must return a NamespaceExists error here
-        // on conflict.
-        Status status = catalog::checkIfNamespaceExists(opCtx, ns);
-        if (!status.isOK()) {
-            return status;
-        }
+    CollectionOptions viewOptions;
+    viewOptions.viewOn = bucketsNs.coll().toString();
+    viewOptions.collation = options.collation;
+    constexpr bool asArray = true;
+    viewOptions.pipeline = timeseries::generateViewPipeline(*options.timeseries, asArray);
 
-        if (opCtx->writesAreReplicated() &&
-            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
-            return {ErrorCodes::NotWritablePrimary,
-                    str::stream() << "Not primary while creating collection "
-                                  << ns.toStringForErrorMsg()};
-        }
+    const auto viewCreationStatus = _createView(opCtx, ns, viewOptions);
+    if (!viewCreationStatus.isOK()) {
+        return viewCreationStatus.withContext(
+            str::stream() << "Failed to create view on " << bucketsNs.toStringForErrorMsg()
+                          << " for time-series collection " << ns.toStringForErrorMsg()
+                          << " with options " << viewOptions.toBSON());
+    }
 
-        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, ns)
-            ->checkShardVersionOrThrow(opCtx);
-
-        _createSystemDotViewsIfNecessary(opCtx, db);
-
-        auto catalog = CollectionCatalog::get(opCtx);
-        WriteUnitOfWork wuow(opCtx);
-
-        AutoStatsTracker statsTracker(opCtx,
-                                      ns,
-                                      Top::LockType::NotLocked,
-                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                      catalog->getDatabaseProfileLevel(ns.dbName()));
-
-        // If the buckets collection and time-series view creation roll back, ensure that their
-        // Top entries are deleted.
-        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-            [serviceContext = opCtx->getServiceContext(), ns](OperationContext*) {
-                Top::get(serviceContext).collectionDropped(ns);
-            });
-
-        if (MONGO_unlikely(failTimeseriesViewCreation.shouldFail([&ns](const BSONObj& data) {
-                const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
-                return fpNss == ns;
-            }))) {
-            LOGV2(5490200,
-                  "failTimeseriesViewCreation fail point enabled. Failing creation of view "
-                  "definition after bucket collection was created successfully.");
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "Timeseries view definition " << ns.toStringForErrorMsg()
-                                  << " creation failed due to 'failTimeseriesViewCreation' "
-                                     "fail point enabled."};
-        }
-
-        CollectionOptions viewOptions;
-        viewOptions.viewOn = bucketsNs.coll().toString();
-        viewOptions.collation = options.collation;
-        constexpr bool asArray = true;
-        viewOptions.pipeline = timeseries::generateViewPipeline(*options.timeseries, asArray);
-
-        // Create the time-series view.
-        status = db->userCreateNS(opCtx, ns, viewOptions);
-        if (!status.isOK()) {
-            return status.withContext(
-                str::stream() << "Failed to create view on " << bucketsNs.toStringForErrorMsg()
-                              << " for time-series collection " << ns.toStringForErrorMsg()
-                              << " with options " << viewOptions.toBSON());
-        }
-
-        wuow.commit();
-        return Status::OK();
-    });
-
-    return ret;
+    return Status::OK();
 }
 
 Status _createCollection(
