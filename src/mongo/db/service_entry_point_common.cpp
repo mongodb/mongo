@@ -460,7 +460,8 @@ void appendAdditionalParticipants(OperationContext* opCtx,
         }
     }
 
-    commandBodyFieldsBob->appendElements(BSON("additionalParticipants" << participantArray));
+    commandBodyFieldsBob->appendElements(
+        BSON(TxnResponseMetadata::kAdditionalParticipantsFieldName << participantArray));
 }
 
 class RunCommandOpTimes {
@@ -1060,7 +1061,21 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
 
 void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
     const OperationSessionInfoFromClient& sessionOptions = _ecd->getSessionOptions();
-    auto opCtx = _ecd->getExecutionContext().getOpCtx();
+    auto& execContext = _ecd->getExecutionContext();
+    auto opCtx = execContext.getOpCtx();
+
+    // We still append any participants that this shard might have added to the transaction on an
+    // error response because:
+    // 1. There are some errors that mongos will retry on when there is only one participant. It's
+    // important that mongos does not retry on these errors if the participant that it contacted
+    // added additional participants.
+    // 2. If the error is not retryable, mongos can then abort the transaction on the added
+    // participants rather than waiting for the added shards to abort either due to a transaction
+    // timeout or a new transaction being started, releasing their resources sooner.
+    appendAdditionalParticipants(opCtx,
+                                 _ecd->getExtraFieldsBuilder(),
+                                 execContext.getCommand()->getName(),
+                                 _ecd->getInvocation()->ns());
 
     if (status.code() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
         // Exceptions are used to resolve views in a sharded cluster, so they should be handled
