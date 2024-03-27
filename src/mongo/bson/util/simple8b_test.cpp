@@ -161,13 +161,12 @@ void testSimple8b(const std::vector<boost::optional<T>>& expectedValues,
     std::vector<boost::optional<make_signed_t<T>>> decodedValues;
 
     prev = 0xE;
-    size_t visitCount = simple8b::visitAll<make_signed_t<T>>(
+    simple8b::visitAll<make_signed_t<T>>(
         reinterpret_cast<const char*>(expectedBinary.data()),
         expectedBinary.size(),
         prev,
         [&decodedValues](const make_signed_t<T> v) { decodedValues.push_back(v); },
         [&decodedValues]() { decodedValues.push_back(boost::none); });
-    ASSERT_EQ(expectedValues.size(), visitCount);
     ASSERT_EQ(expectedValues.size(), decodedValues.size());
     for (size_t i = 0; i < expectedValues.size(); ++i) {
         if (expectedValues[i])

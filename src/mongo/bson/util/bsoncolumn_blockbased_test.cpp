@@ -245,7 +245,6 @@ struct TestPath {
     const std::vector<std::string> _fields;
 };
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressScalars) {
     auto col = bsonColumnFromObjs({
         BSON("a" << 10 << "b" << BSON("c" << int64_t(20))),
@@ -277,9 +276,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressScalars) {
     ASSERT_EQ(paths[1].second[2].Long(), 22);
     ASSERT_EQ(paths[1].second[3].Long(), 23);
 }
-*/
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressSomeScalars) {
     // Create a BSONColumn that has different deltas in the object fields. This ensures that the
     // number of deltas per simple8b block will be different for each field to encourage
@@ -312,7 +309,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressSomeScalars) {
         ASSERT_EQ(paths[1].second[i].Int(), i * 100000);
     }
 }
-*/
 
 TEST_F(BSONColumnBlockBasedTest, DecompressObjects) {
     auto col = bsonColumnFromObjs({
@@ -338,7 +334,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressObjects) {
     ASSERT_BSONOBJ_EQ(paths[0].second[3].Obj(), fromjson("{a: 13}"));
 }
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
     auto col = bsonColumnFromObjs({
         fromjson("{a: 10, b: {c: 30}}"),
@@ -401,7 +396,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
         ASSERT_BSONOBJ_EQ(paths[1].second[3].Obj(), fromjson("{c: 33}"));
     }
 }
-*/
 
 TEST_F(BSONColumnBlockBasedTest, DecompressSiblingObjects) {
     auto col = bsonColumnFromObjs({
@@ -737,7 +731,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingArrays) {
     }
 }
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingScalar) {
     // Create a BSONColumn where even elements have a "b" field, and odd elements have "c." This
     // will use a single section of interleaved mode, with three scalar fields. "b" and "c" will
@@ -798,9 +791,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingScalar) {
         }
     }
 }
-*/
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingObject) {
     const int nObjs = 10;
     std::vector<BSONObj> objs;
@@ -860,9 +851,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingObject) {
         }
     }
 }
-*/
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingNestedObject) {
     const int nObjs = 10;
     std::vector<BSONObj> objs;
@@ -904,7 +893,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingNestedObject) {
         }
     }
 }
-*/
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithEmptyInReference) {
     const int nObjs = 10;
@@ -938,7 +926,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithEmptyInReference) {
     }
 }
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingPath) {
     auto col = bsonColumnFromObjs({
         fromjson("{a: {b:  0}}"),
@@ -988,7 +975,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingPath) {
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
     }
 }
-*/
 
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingPathWithMinKey) {
     auto col = bsonColumnFromObjs({

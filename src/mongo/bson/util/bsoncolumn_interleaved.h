@@ -188,6 +188,15 @@ private:
 
     static bool moreData(DecodingState& ds, const char* control);
 
+    template <typename T, typename Encoding, class Buffer, typename Materialize, typename Finish>
+    static void decompressAllDelta(const char* ptr,
+                                   const char* end,
+                                   Buffer& buffer,
+                                   Encoding last,
+                                   const BSONElement& reference,
+                                   const Materialize& materialize,
+                                   const Finish& finish);
+
     template <typename Buffer>
     const char* decompressFast(
         absl::flat_hash_map<const void*, BufferVector<Buffer*>>&& elemToBuffer);
@@ -574,6 +583,55 @@ inline bool BlockBasedInterleavedDecompressor::moreData(DecodingState& ds, const
 }
 
 /**
+ * TODO: This code cloned and modified from bsoncolumn.inl. We should be sharing this code.
+ */
+template <typename T, typename Encoding, class Buffer, typename Materialize, typename Finish>
+void BlockBasedInterleavedDecompressor::decompressAllDelta(const char* ptr,
+                                                           const char* end,
+                                                           Buffer& buffer,
+                                                           Encoding last,
+                                                           const BSONElement& reference,
+                                                           const Materialize& materialize,
+                                                           const Finish& finish) {
+    size_t elemCount = 0;
+    uint8_t size = numSimple8bBlocksForControlByte(*ptr) * sizeof(uint64_t);
+    Simple8b<make_unsigned_t<Encoding>> s8b(ptr + 1, size);
+
+    auto it = s8b.begin();
+    // process all copies of the reference object efficiently
+    // this can otherwise get more complicated on string/binary types
+    for (; it != s8b.end(); ++it) {
+        const auto& delta = *it;
+        if (delta) {
+            if (*delta == 0) {
+                buffer.template append<T>(reference);
+                ++elemCount;
+            } else {
+                break;
+            }
+        } else {
+            buffer.appendMissing();
+            ++elemCount;
+        }
+    }
+
+    for (; it != s8b.end(); ++it) {
+        const auto& delta = *it;
+        if (delta) {
+            last =
+                expandDelta(last, Simple8bTypeUtil::decodeInt<make_unsigned_t<Encoding>>(*delta));
+            materialize(last, reference, buffer);
+            ++elemCount;
+        } else {
+            buffer.appendMissing();
+            ++elemCount;
+        }
+    }
+
+    finish(elemCount, last);
+}
+
+/**
  * A data structure that tracks the state of a stream of scalars that appears in interleaved
  * BSONColumn data. This structure is used with a min heap to understand which bits of compressed
  * data belong to which stream.
@@ -705,47 +763,44 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
                 switch (state._refElem.type()) {
                     case Bool:
                         for (auto&& buffer : state._buffers) {
-                            BSONColumnBlockDecompressHelpers::
-                                decompressAllDelta<bool, int64_t, Buffer>(
-                                    control,
-                                    control + size + 1,
-                                    *buffer,
-                                    std::get<int64_t>(state._lastValue),
-                                    state._refElem,
-                                    [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
-                                        buffer.append(static_cast<bool>(v));
-                                    },
-                                    finish64);
+                            decompressAllDelta<bool, int64_t, Buffer>(
+                                control,
+                                control + size + 1,
+                                *buffer,
+                                std::get<int64_t>(state._lastValue),
+                                state._refElem,
+                                [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
+                                    buffer.append(static_cast<bool>(v));
+                                },
+                                finish64);
                         }
                         break;
                     case NumberInt:
                         for (auto&& buffer : state._buffers) {
-                            BSONColumnBlockDecompressHelpers::
-                                decompressAllDelta<int32_t, int64_t, Buffer>(
-                                    control,
-                                    control + size + 1,
-                                    *buffer,
-                                    std::get<int64_t>(state._lastValue),
-                                    state._refElem,
-                                    [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
-                                        buffer.append(static_cast<int32_t>(v));
-                                    },
-                                    finish64);
+                            decompressAllDelta<int32_t, int64_t, Buffer>(
+                                control,
+                                control + size + 1,
+                                *buffer,
+                                std::get<int64_t>(state._lastValue),
+                                state._refElem,
+                                [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
+                                    buffer.append(static_cast<int32_t>(v));
+                                },
+                                finish64);
                         }
                         break;
                     case NumberLong:
                         for (auto&& buffer : state._buffers) {
-                            BSONColumnBlockDecompressHelpers::
-                                decompressAllDelta<int64_t, int64_t, Buffer>(
-                                    control,
-                                    control + size + 1,
-                                    *buffer,
-                                    std::get<int64_t>(state._lastValue),
-                                    state._refElem,
-                                    [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
-                                        buffer.append(v);
-                                    },
-                                    finish64);
+                            decompressAllDelta<int64_t, int64_t, Buffer>(
+                                control,
+                                control + size + 1,
+                                *buffer,
+                                std::get<int64_t>(state._lastValue),
+                                state._refElem,
+                                [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
+                                    buffer.append(v);
+                                },
+                                finish64);
                         }
                         break;
                     default:

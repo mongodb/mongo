@@ -357,6 +357,121 @@ namespace bsoncolumn {
  */
 
 /**
+ * Interface for a buffer to receive decoded elements from block-based
+ * BSONColumn decompression.
+ */
+template <class T>
+concept Appendable = requires(
+    T& t, StringData strVal, BSONBinData binVal, BSONCode codeVal, BSONElement bsonVal, int32_t n) {
+    t.append(true);
+    t.append((int32_t)1);
+    t.append((int64_t)1);
+    t.append(Decimal128());
+    t.append((double)1.0);
+    t.append((Timestamp)1);
+    t.append(Date_t::now());
+    t.append(OID::gen());
+    t.append(strVal);
+    t.append(binVal);
+    t.append(codeVal);
+
+    // Strings can arrive either in 128-bit encoded format, or as
+    // literals (BSONElement)
+
+    // Takes pre-allocated BSONElement
+    t.template append<bool>(bsonVal);
+    t.template append<int32_t>(bsonVal);
+    t.template append<int64_t>(bsonVal);
+    t.template append<Decimal128>(bsonVal);
+    t.template append<double>(bsonVal);
+    t.template append<Timestamp>(bsonVal);
+    t.template append<Date_t>(bsonVal);
+    t.template append<OID>(bsonVal);
+    t.template append<StringData>(bsonVal);
+    t.template append<BSONBinData>(bsonVal);
+    t.template append<BSONCode>(bsonVal);
+    t.template append<BSONElement>(bsonVal);
+
+    t.appendPreallocated(bsonVal);
+
+    t.appendPositionInfo(n);
+
+    t.appendMissing();
+
+    // Repeat the last appended value
+    t.appendLast();
+};
+
+/**
+ * Interface to accept elements decoded from BSONColumn and materialize them
+ * as Elements of user-defined type.
+ *
+ * This class will be used with decompress() and other methods of BSONColumn to efficiently produce
+ * values of the desired type (e.g., SBE values or BSONElements). The methods provided by
+ * implementors of this concept will be called from the main decompression loop, so they should be
+ * inlineable, and avoid branching and memory allocations when possible.
+ *
+ * The data types passed to the materialize() methods could be referencing memory on the stack
+ * (e.g., the pointer in a StringData instance) and so implementors should assume this data is
+ * ephemeral. The provided ElementStorage can be used to allocate memory with the lifetime of the
+ * BSONColumn instance.
+ *
+ * The exception to this rule is that BSONElements passed to the materialize() methods may appear in
+ * decompressed form as-is in the BSONColumn binary data. If they are as such, they will have the
+ * same lifetime as the BSONColumn, and may go away if a yield of query execution occurs.
+ * Implementers may wish to explicitly copy the value with the allocator in this case. It may also
+ * occur that decompression allocates its own BSONElements as part of its execution (e.g., when
+ * materializing whole objects from compressed scalars). In this case, decompression will invoke
+ * materializePreallocated() instead of materialize().
+ */
+template <class T>
+concept Materializer = requires(T& t,
+                                ElementStorage& alloc,
+                                StringData strVal,
+                                BSONBinData binVal,
+                                BSONCode codeVal,
+                                BSONElement bsonVal) {
+    { T::materialize(alloc, true) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (int32_t)1) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (int64_t)1) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, Decimal128()) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (double)1.0) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (Timestamp)1) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, Date_t::now()) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, OID::gen()) } -> std::same_as<typename T::Element>;
+
+    { T::materialize(alloc, strVal) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, binVal) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, codeVal) } -> std::same_as<typename T::Element>;
+
+    { T::template materialize<bool>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<int32_t>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<int64_t>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<Decimal128>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<double>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<Timestamp>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<Date_t>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<OID>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+
+    { T::template materialize<StringData>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<BSONBinData>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<BSONCode>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+
+    { T::materializePreallocated(bsonVal) } -> std::same_as<typename T::Element>;
+
+    { T::materializeMissing(alloc) } -> std::same_as<typename T::Element>;
+};
+
+/**
+ * Interface to indicate to the 'Collector' at compile time if the user requested the decompressor
+ * to collect the position information of values within documents.
+ */
+template <typename T>
+concept PositionInfoAppender = requires(T& t, int32_t n) {
+    { t.appendPositionInfo(n) } -> std::same_as<void>;
+};
+
+/**
  * Implements Appendable and utilizes a user-defined Materializer to receive output of
  * BSONColumn decoding and fill a container of user-defined elements.  Container can
  * be user-defined or any STL container can be used.
@@ -578,6 +693,57 @@ public:
 private:
     const char* _binary;
     size_t _size;
+
+    /**
+     * Helpers for block decompress-all functions
+     * T - the type we are decompressing to
+     * Encoding - the underlying encoding (int128_t or int64_t) for Simple8b deltas
+     * Buffer - the buffer being filled by decompress()
+     * Materialize - function to convert delta decoding into T and append to Buffer
+     * Decode - the Simple8b decoder to use
+     */
+
+    template <typename T, typename Encoding, class Buffer, typename Materialize>
+    requires Appendable<Buffer>
+    static const char* decompressAllDelta(const char* ptr,
+                                          const char* end,
+                                          Buffer& buffer,
+                                          Encoding last,
+                                          const BSONElement& reference,
+                                          const Materialize& materialize);
+
+    /* Like decompressAllDelta, but does not have branching to avoid re-materialization
+       of repeated values, intended to be used on primitive types where this does not
+       result in additional allocation */
+    template <typename T, typename Encoding, class Buffer, typename Materialize>
+    requires Appendable<Buffer>
+    static const char* decompressAllDeltaPrimitive(const char* ptr,
+                                                   const char* end,
+                                                   Buffer& buffer,
+                                                   Encoding last,
+                                                   const BSONElement& reference,
+                                                   const Materialize& materialize);
+
+    template <typename T, class Buffer, typename Materialize, typename Decode>
+    requires Appendable<Buffer>
+    static const char* decompressAllDeltaOfDelta(const char* ptr,
+                                                 const char* end,
+                                                 Buffer& buffer,
+                                                 int64_t last,
+                                                 const BSONElement& reference,
+                                                 const Materialize& materialize,
+                                                 const Decode& decode);
+
+    template <class Buffer>
+    requires Appendable<Buffer>
+    static const char* decompressAllDouble(const char* ptr,
+                                           const char* end,
+                                           Buffer& buffer,
+                                           double reference);
+
+    template <class Buffer>
+    requires Appendable<Buffer>
+    static const char* decompressAllLiteral(const char* ptr, const char* end, Buffer& buffer);
 };
 
 /**

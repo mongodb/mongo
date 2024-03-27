@@ -358,23 +358,22 @@ static constexpr uint64_t kSingleZero = 0xE;
  * visitMissing - a callback for receiving missing
  * visitZero - should have identical behavior to visit(0), may be used
  *             to provide a more efficient implementation of this case
- * Returns number of elements visited
  */
 template <typename T, typename Visit, typename VisitZero, typename VisitMissing>
-inline size_t visitAll(const char* buffer,
-                       size_t size,
-                       uint64_t& prevNonRLE,
-                       const Visit& visit,
-                       const VisitZero& visitZero,
-                       const VisitMissing& visitMissing);
+inline void visitAll(const char* buffer,
+                     size_t size,
+                     uint64_t& prevNonRLE,
+                     const Visit& visit,
+                     const VisitZero& visitZero,
+                     const VisitMissing& visitMissing);
 
 template <typename T, typename Visit, typename VisitMissing>
-inline size_t visitAll(const char* buffer,
-                       size_t size,
-                       uint64_t& prevNonRLE,
-                       const Visit& visit,
-                       const VisitMissing& visitMissing) {
-    return visitAll<T>(
+inline void visitAll(const char* buffer,
+                     size_t size,
+                     uint64_t& prevNonRLE,
+                     const Visit& visit,
+                     const VisitMissing& visitMissing) {
+    visitAll<T>(
         buffer, size, prevNonRLE, visit, [&visit]() { visit(0); }, visitMissing);
 }
 
