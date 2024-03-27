@@ -1030,35 +1030,6 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
         throwIfReasonDiffers);
 }
 
-void validateTimeseriesShardKey(StringData timeFieldName,
-                                boost::optional<StringData> metaFieldName,
-                                const BSONObj& shardKeyPattern) {
-    BSONObjIterator shardKeyElems{shardKeyPattern};
-    while (auto elem = shardKeyElems.next()) {
-        if (elem.fieldNameStringData() == timeFieldName) {
-            uassert(5914000,
-                    str::stream() << "the time field '" << timeFieldName
-                                  << "' can be only at the end of the shard key pattern",
-                    !shardKeyElems.more());
-
-            uassert(880031,
-                    str::stream() << "Invalid shard key"
-                                  << " for time-series collection: " << redact(shardKeyPattern)
-                                  << ". Shard keys"
-                                  << " on the time field must be ascending or descending "
-                                     "(numbers only).",
-                    elem.isNumber());
-        } else {
-            uassert(5914001,
-                    str::stream() << "only the time field or meta field can be "
-                                     "part of shard key pattern",
-                    metaFieldName &&
-                        (elem.fieldNameStringData() == *metaFieldName ||
-                         elem.fieldNameStringData().startsWith(*metaFieldName + ".")));
-        }
-    }
-}
-
 /*
  * Check the requested shardKey is a timefield, then convert it to a shardKey compatible for the
  * bucket collection.
@@ -1066,7 +1037,7 @@ void validateTimeseriesShardKey(StringData timeFieldName,
 BSONObj validateAndTranslateShardKey(OperationContext* opCtx,
                                      const boost::optional<TimeseriesOptions>& timeseriesOpts,
                                      const BSONObj& shardKey) {
-    validateTimeseriesShardKey(
+    shardkeyutil::validateTimeseriesShardKey(
         timeseriesOpts->getTimeField(), timeseriesOpts->getMetaField(), shardKey);
 
     return uassertStatusOK(
@@ -1558,7 +1529,7 @@ TranslatedRequestParams CreateCollectionCoordinatorLegacy::_translateRequestPara
     // object.
     auto timeFieldName = timeseriesOptions->getTimeField();
     auto metaFieldName = timeseriesOptions->getMetaField();
-    validateTimeseriesShardKey(timeFieldName, metaFieldName, *_request.getShardKey());
+    shardkeyutil::validateTimeseriesShardKey(timeFieldName, metaFieldName, *_request.getShardKey());
 
     KeyPattern keyPattern(
         uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(

@@ -457,7 +457,7 @@ export var ReshardingTest = class {
             this._pauseCoordinatorBeforeCompletionFailpoints.push(
                 configureFailPoint(configServer,
                                    "reshardingPauseCoordinatorBeforeCompletion",
-                                   {"sourceNamespace": this._ns}));
+                                   {"sourceNamespace": this._underlyingSourceNs}));
         });
 
         this._commandDoneSignal = new CountDownLatch(1);
@@ -1003,7 +1003,8 @@ export var ReshardingTest = class {
     _checkCoordinatorPostState(expectedErrorCode) {
         assert.eq(
             [],
-            this._st.config.reshardingOperations.find({ns: this._ns, state: {$ne: "quiesced"}})
+            this._st.config.reshardingOperations
+                .find({ns: this._underlyingSourceNs, state: {$ne: "quiesced"}})
                 .toArray(),
             "expected config.reshardingOperations to be empty (except quiesced operations), but found it wasn't");
 
@@ -1250,7 +1251,8 @@ export var ReshardingTest = class {
         let cloneTimestamp;
 
         assert.soon(() => {
-            const coordinatorDoc = this._st.config.reshardingOperations.findOne({ns: this._ns});
+            const coordinatorDoc =
+                this._st.config.reshardingOperations.findOne({ns: this._underlyingSourceNs});
             cloneTimestamp = coordinatorDoc !== null ? coordinatorDoc.cloneTimestamp : undefined;
             return cloneTimestamp !== undefined;
         });

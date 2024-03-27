@@ -44,13 +44,19 @@ assert.commandWorked(timeseriesCollection.insert([
     {data: 1, ts: new Date(), meta: {x: 5, y: -4}}
 ]));
 
-reshardingTest.withReshardingInBackground({
-    newShardKeyPattern: {'meta.y': 1},
-    newChunks: [
-        {min: {'meta.y': MinKey}, max: {'meta.y': 0}, shard: recipientShardNames[0]},
-        {min: {'meta.y': 0}, max: {'meta.y': MaxKey}, shard: recipientShardNames[1]},
-    ],
-});
+reshardingTest.withReshardingInBackground(
+    {
+        newShardKeyPattern: {'meta.y': 1},
+        newChunks: [
+            {min: {'meta.y': MinKey}, max: {'meta.y': 0}, shard: recipientShardNames[0]},
+            {min: {'meta.y': 0}, max: {'meta.y': MaxKey}, shard: recipientShardNames[1]},
+        ],
+    },
+    () => {
+        reshardingTest.awaitCloneTimestampChosen();
+        assert.commandWorked(timeseriesCollection.insert(
+            {data: 300, ts: ISODate("2021-05-18T04:00:00.000Z"), meta: {x: 3, y: -4}}));
+    });
 
 const st = reshardingTest._st;
 
@@ -61,8 +67,8 @@ assert.eq(timeseriesCollDocPostResharding.timeseriesFields.metaField, timeseries
 // Resharding has updated shard key.
 assert.eq(timeseriesCollDocPostResharding.key, {"meta.y": 1})
 
-assert.eq(4, st.rs2.getPrimary().getCollection(bucketNss).countDocuments({}));
+assert.eq(5, st.rs2.getPrimary().getCollection(bucketNss).countDocuments({}));
 assert.eq(0, st.rs0.getPrimary().getCollection(bucketNss).countDocuments({}));
-assert.eq(4, st.s0.getCollection(ns).countDocuments({}));
+assert.eq(5, st.s0.getCollection(ns).countDocuments({}));
 
 reshardingTest.teardown();
