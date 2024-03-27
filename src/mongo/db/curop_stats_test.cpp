@@ -69,7 +69,7 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
     auto opCtx = makeOperationContext();
     auto curop = CurOp::get(*opCtx);
 
-    Milliseconds executionTime = Milliseconds(16);
+    Milliseconds executionTime = Milliseconds(512);
     Milliseconds waitForTickets = Milliseconds(2);
     Milliseconds waitForFlowControlTicket = Milliseconds(4);
 
@@ -124,7 +124,7 @@ TEST_F(CurOpStatsTest, UnstashingAndStashingTransactionResource) {
     curop2->setTickSource_forTest(tickSourceMock.get());
 
     // Advance execution time.
-    Milliseconds executionTime = Milliseconds(128);
+    Milliseconds executionTime = Milliseconds(1024);
     curop1->ensureStarted();
     curop2->ensureStarted();
     tickSourceMock->advance(executionTime);
