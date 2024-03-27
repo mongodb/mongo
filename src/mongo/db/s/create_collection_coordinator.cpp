@@ -757,7 +757,21 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
     const auto& targetNss = *optTargetNss;
     invariant(optTargetCollUUID);
 
-    // 2. Check if the collection already registered in the sharding catalog with same options
+    // 2. Make sure we're not trying to track a temporary collection upon moveCollection
+    if (request.getRegisterExistingCollectionInGlobalCatalog()) {
+        DBDirectClient client(opCtx);
+        const auto isTemporaryCollection =
+            client.count(NamespaceString::kAggTempCollections,
+                         BSON("_id" << NamespaceStringUtil::serialize(
+                                  *optTargetNss, SerializationContext::stateDefault())));
+        if (isTemporaryCollection) {
+            // Return UNSHARDED version for the coordinator to gracefully terminate without
+            // registering the collection
+            return CreateCollectionResponse{ShardVersion::UNSHARDED()};
+        }
+    }
+
+    // 3. Check if the collection already registered in the sharding catalog with same options
     const auto cri = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, targetNss));
 
