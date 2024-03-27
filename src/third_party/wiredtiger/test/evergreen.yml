@@ -3730,6 +3730,21 @@ tasks:
             ${PREPARE_TEST_ENV}
             ./test_model.sh
 
+  - name: model-test-failure-workloads
+    tags: ["model_checking"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/evergreen"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            ./run_model_workloads.sh
+
   - name: model-test-long
     tags: ["model_checking"]
     commands:
@@ -5308,6 +5323,8 @@ buildvariants:
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-unit-test
+    - name: model-test-failure-workloads
+      batchtime: 1440 # 24 hours
     # FIXME-WT-12637
     #- name: model-test-long
     #  batchtime: 1440 # once a day
@@ -5675,6 +5692,8 @@ buildvariants:
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-unit-test
+    - name: model-test-failure-workloads
+      batchtime: 1440 # 24 hours
     # FIXME-WT-12637
     #- name: model-test-long
     #  batchtime: 1440 # once a day
