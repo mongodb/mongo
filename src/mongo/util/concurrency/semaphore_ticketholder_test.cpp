@@ -74,6 +74,7 @@ TEST_F(SemaphoreTicketHolderTest, PriorityBookkeeping) {
     priorityBookkeepingTest(
         _opCtx.get(),
         std::make_unique<SemaphoreTicketHolder>(&serviceContext, 1, false /* trackPeakUsed */),
+        AdmissionContext::Priority::kNormal,
         AdmissionContext::Priority::kExempt,
         [](auto statsWhileProcessing, auto statsWhenFinished) {
             ASSERT_EQ(statsWhileProcessing.getObjectField("normalPriority")

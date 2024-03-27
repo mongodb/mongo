@@ -36,6 +36,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/control/journal_flusher.h"
@@ -104,7 +105,7 @@ void JournalFlusher::run() {
                                 [&] { return _flushJournalNow || _needToPause || _shuttingDown; });
     }
 
-    boost::optional<ScopedAdmissionPriority> admissionPriority;
+    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
     auto setUpOpCtx = [&](WithLock lk) {
         // Initialize the thread's opCtx.
         _uniqueCtx.emplace(tc->makeOperationContext());

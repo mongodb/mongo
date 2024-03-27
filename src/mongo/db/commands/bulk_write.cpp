@@ -54,6 +54,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types.h"
@@ -767,7 +768,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
         }
     }
 
-    boost::optional<ScopedAdmissionPriority> priority;
+    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> priority;
     if (nsString == NamespaceString::kConfigSampledQueriesNamespace ||
         nsString == NamespaceString::kConfigSampledQueriesDiffNamespace) {
         priority.emplace(opCtx, AdmissionContext::Priority::kLow);

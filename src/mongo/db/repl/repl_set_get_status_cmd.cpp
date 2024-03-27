@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/database_name.h"
@@ -63,7 +64,8 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         // Critical to monitoring and observability, categorize the command as immediate priority.
-        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+            opCtx, AdmissionContext::Priority::kExempt);
 
         if (cmdObj["forShell"].trueValue())
             NotPrimaryErrorTracker::get(opCtx->getClient()).disable();

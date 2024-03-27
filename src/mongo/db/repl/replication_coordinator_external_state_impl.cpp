@@ -46,6 +46,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -589,7 +590,8 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
 
 void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* opCtx) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-    invariant(AdmissionContext::get(opCtx).getPriority() == AdmissionContext::Priority::kExempt,
+    invariant(ExecutionAdmissionContext::get(opCtx).getPriority() ==
+                  AdmissionContext::Priority::kExempt,
               "Replica Set state changes are critical to the cluster and should not be throttled");
 
     if (_oplogWriteBuffer) {
@@ -601,7 +603,8 @@ void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* 
 
 OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
-    invariant(AdmissionContext::get(opCtx).getPriority() == AdmissionContext::Priority::kExempt,
+    invariant(ExecutionAdmissionContext::get(opCtx).getPriority() ==
+                  AdmissionContext::Priority::kExempt,
               "Replica Set state changes are critical to the cluster and should not be throttled");
 
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -843,7 +846,8 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     OperationContext* opCtx, const LastVote& lastVote) {
     BSONObj lastVoteObj = lastVote.toBSON();
 
-    invariant(AdmissionContext::get(opCtx).getPriority() == AdmissionContext::Priority::kExempt,
+    invariant(ExecutionAdmissionContext::get(opCtx).getPriority() ==
+                  AdmissionContext::Priority::kExempt,
               "Writes that are part of elections should not be throttled");
 
     try {
@@ -1011,7 +1015,8 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
     // As opCtx does not expose a method to allow skipping flow control on purpose we mark the
     // operation as having Immediate priority. This will skip flow control and ticket acquisition.
     // It is fine to do this since the system is essentially shutting down at this point.
-    ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx, AdmissionContext::Priority::kExempt);
 
     // Tell the system to stop updating the oplogTruncateAfterPoint asynchronously and to go
     // back to using last applied to update repl's durable timestamp instead of the truncate

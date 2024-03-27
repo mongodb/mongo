@@ -48,9 +48,9 @@ namespace mongo {
 namespace {
 void updateQueueStatsOnRelease(ServiceContext* serviceContext,
                                TicketHolder::QueueStats& queueStats,
-                               AdmissionContext* admCtx) {
+                               AdmissionContext* admCtx,
+                               TickSource::Tick startTime) {
     queueStats.totalFinishedProcessing.fetchAndAddRelaxed(1);
-    auto startTime = admCtx->getStartProcessingTime();
     auto tickSource = serviceContext->getTickSource();
     auto delta = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTime);
     queueStats.totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
@@ -62,7 +62,7 @@ void updateQueueStatsOnTicketAcquisition(ServiceContext* serviceContext,
     if (admCtx->getAdmissions() == 0) {
         queueStats.totalNewAdmissions.fetchAndAddRelaxed(1);
     }
-    admCtx->start(serviceContext->getTickSource());
+    admCtx->recordAdmission();
     queueStats.totalStartedProcessing.fetchAndAddRelaxed(1);
 }
 }  // namespace
@@ -74,7 +74,7 @@ bool TicketHolder::resize(int32_t newSize, Date_t deadline) noexcept {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
     auto difference = newSize - _outof.load();
-    AdmissionContext admCtx;
+    MockAdmissionContext admCtx;
     if (difference > 0) {
         // Hand out tickets one-by-one until we've given them all out.
         for (auto remaining = difference; remaining > 0; remaining--) {
@@ -112,16 +112,17 @@ void TicketHolder::appendStats(BSONObjBuilder& b) const {
     _appendImplStats(b);
 }
 
-void TicketHolder::_releaseToTicketPool(AdmissionContext* admCtx,
-                                        AdmissionContext::Priority ticketPriority) noexcept {
-    if (ticketPriority == AdmissionContext::Priority::kExempt) {
-        updateQueueStatsOnRelease(_serviceContext, _exemptQueueStats, admCtx);
+void TicketHolder::_releaseToTicketPool(Ticket& ticket) noexcept {
+    if (ticket._priority == AdmissionContext::Priority::kExempt) {
+        updateQueueStatsOnRelease(
+            _serviceContext, _exemptQueueStats, ticket._admissionContext, ticket._acquisitionTime);
         return;
     }
 
-    auto& queueStats = _getQueueStatsToUse(ticketPriority);
-    updateQueueStatsOnRelease(_serviceContext, queueStats, admCtx);
-    _releaseToTicketPoolImpl(admCtx);
+    auto& queueStats = _getQueueStatsToUse(ticket._priority);
+    updateQueueStatsOnRelease(
+        _serviceContext, queueStats, ticket._admissionContext, ticket._acquisitionTime);
+    _releaseToTicketPoolImpl(ticket._admissionContext);
 }
 
 Ticket TicketHolder::waitForTicket(Interruptible& interruptible,

@@ -51,6 +51,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/database_name.h"
@@ -247,7 +248,7 @@ Future<repl::OpTime> persistParticipantsList(
                 [lsid, txnNumberAndRetryCounter, participants](OperationContext* opCtx) {
                     // Skip ticket acquisition in order to prevent possible deadlock when
                     // participants are in the prepared state. See SERVER-82883 and SERVER-60682.
-                    ScopedAdmissionPriority skipTicketAcquisition(
+                    ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
                         opCtx, AdmissionContext::Priority::kExempt);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx,
@@ -492,7 +493,7 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
                     // Do not acquire a storage ticket in order to avoid unnecessary serialization
                     // with other prepared transactions that are holding a storage ticket
                     // themselves; see SERVER-60682.
-                    ScopedAdmissionPriority setTicketAquisition(
+                    ScopedAdmissionPriority<ExecutionAdmissionContext> setTicketAquisition(
                         opCtx, AdmissionContext::Priority::kExempt);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kWritingDecision);

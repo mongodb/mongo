@@ -32,9 +32,9 @@ ftdcEnv.Library(
         '$BUILD_DIR/third_party/shim_zlib',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/admission/execution_admission_context',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/shard_role_api',
-        '$BUILD_DIR/mongo/util/concurrency/admission_context',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )

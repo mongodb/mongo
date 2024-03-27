@@ -45,6 +45,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -491,8 +492,8 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) final {
             // Critical to monitoring and observability, categorize the command as immediate
             // priority.
-            ScopedAdmissionPriority skipAdmissionControl(opCtx,
-                                                         AdmissionContext::Priority::kExempt);
+            ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+                opCtx, AdmissionContext::Priority::kExempt);
 
             if (_collStatsSampler.tick())
                 LOGV2_WARNING(7024600,
@@ -673,8 +674,8 @@ public:
         Reply typedRun(OperationContext* opCtx) {
             // Critical to monitoring and observability, categorize the command as immediate
             // priority.
-            ScopedAdmissionPriority skipAdmissionControl(opCtx,
-                                                         AdmissionContext::Priority::kExempt);
+            ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+                opCtx, AdmissionContext::Priority::kExempt);
 
             const auto& cmd = request();
             const auto& dbname = cmd.getDbName();
@@ -761,8 +762,8 @@ public:
 
     Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) override {
         // Critical to observability and diagnosability, categorize as immediate priority.
-        ScopedAdmissionPriority skipAdmissionControl(rec->getOpCtx(),
-                                                     AdmissionContext::Priority::kExempt);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+            rec->getOpCtx(), AdmissionContext::Priority::kExempt);
 
         auto result = rec->getReplyBuilder()->getBodyBuilder();
         VersionInfoInterface::instance().appendBuildInfo(&result);
@@ -826,7 +827,8 @@ public:
              BSONObjBuilder& result) final {
         // Critical to monitoring and observability, categorize the command as immediate
         // priority.
-        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+            opCtx, AdmissionContext::Priority::kExempt);
         VersionInfoInterface::instance().appendBuildInfo(&result);
         appendStorageEngineList(opCtx->getServiceContext(), &result);
         return true;

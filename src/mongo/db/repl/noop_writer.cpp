@@ -37,6 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -167,7 +168,8 @@ Status NoopWriter::startWritingPeriodicNoops(OpTime lastKnownOpTime) {
             // Noop writes are critical for the cluster stability, so we mark it as having Immediate
             // priority. As a result it will skip both flow control and waiting for ticket
             // acquisition.
-            ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kExempt);
+            ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+                opCtx, AdmissionContext::Priority::kExempt);
             _writeNoop(opCtx);
         });
     return Status::OK();

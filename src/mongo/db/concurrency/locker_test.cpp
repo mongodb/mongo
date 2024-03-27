@@ -41,6 +41,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -1244,19 +1245,20 @@ TEST_F(LockerTest, SetTicketAcquisitionForLockRAIIType) {
     ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
 
     {
-        ScopedAdmissionPriority setTicketAquisition(opCtx.get(),
-                                                    AdmissionContext::Priority::kExempt);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> setTicketAquisition(
+            opCtx.get(), AdmissionContext::Priority::kExempt);
         ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
     }
 
     ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
 
-    ScopedAdmissionPriority admissionPriority(opCtx.get(), AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
+        opCtx.get(), AdmissionContext::Priority::kExempt);
     ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
 
     {
-        ScopedAdmissionPriority setTicketAquisition(opCtx.get(),
-                                                    AdmissionContext::Priority::kExempt);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> setTicketAquisition(
+            opCtx.get(), AdmissionContext::Priority::kExempt);
         ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
     }
 

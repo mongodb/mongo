@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/constants.h"
@@ -89,7 +90,8 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
     auto opCtx = client->makeOperationContext();
     opCtx->setEnforceConstraints(false);
 
-    ScopedAdmissionPriority admissionPriority(opCtx.get(), AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
+        opCtx.get(), AdmissionContext::Priority::kExempt);
 
     for (auto&& role : roles) {
         auto& collectorVector = _collectors[role.first];

@@ -50,6 +50,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -591,8 +592,8 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
             auto newOpCtx = cc().makeOperationContext();
 
             // Avoid ticket acquisition during step up.
-            ScopedAdmissionPriority admissionPriority(newOpCtx.get(),
-                                                      AdmissionContext::Priority::kExempt);
+            ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
+                newOpCtx.get(), AdmissionContext::Priority::kExempt);
 
             // Synchronize with killOps to make this unkillable.
             {

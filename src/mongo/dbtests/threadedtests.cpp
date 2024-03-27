@@ -300,18 +300,18 @@ private:
         std::string threadName = (str::stream() << "ticketHolder" << x);
         Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
+        MockAdmissionContext admCtx;
         Microseconds timeInQueue;
 
         for (int i = 0; i < checkIns; i++) {
-            boost::optional<ScopedAdmissionPriority> admissionPriority;
+            boost::optional<ScopedAdmissionPriorityBase> admissionPriority;
             if ((i % 3) == 0) {
                 // One of every three admissions is low priority.
-                admissionPriority.emplace(opCtx.get(), AdmissionContext::Priority::kLow);
+                admissionPriority.emplace(opCtx.get(), admCtx, AdmissionContext::Priority::kLow);
             }
 
-            auto ticket = _tickets->waitForTicket(*Interruptible::notInterruptible(),
-                                                  &AdmissionContext::get(opCtx.get()),
-                                                  timeInQueue);
+            auto ticket =
+                _tickets->waitForTicket(*Interruptible::notInterruptible(), &admCtx, timeInQueue);
 
             _hotel.checkIn();
 

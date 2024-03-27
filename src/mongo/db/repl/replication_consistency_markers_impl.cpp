@@ -40,6 +40,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -485,7 +486,8 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // waiting for durability. SERVER-60682 is an example with more pending prepared transactions
     // than storage tickets; the transaction coordinator could not persist the decision and had to
     // unnecessarily wait for prepared transactions to expire to make forward progress.
-    ScopedAdmissionPriority setTicketAquisition(opCtx, AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> setTicketAquisition(
+        opCtx, AdmissionContext::Priority::kExempt);
 
     // The locks necessary to write to the oplog truncate after point's collection and read from the
     // oplog collection must be taken up front so that the mutex can also be taken around both

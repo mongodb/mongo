@@ -50,6 +50,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/execution_control_feature_flags_gen.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
@@ -78,7 +79,6 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/diagnostic_info.h"
@@ -647,8 +647,8 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
                 // acquisition. Slow queries can happen for various reasons; however, if queries
                 // are slower due to ticket exhaustion, queueing in order to log can compound
                 // the issue.
-                ScopedAdmissionPriority skipAdmissionControl(opCtx,
-                                                             AdmissionContext::Priority::kExempt);
+                ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+                    opCtx, AdmissionContext::Priority::kExempt);
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(500),
@@ -962,7 +962,7 @@ void CurOp::reportState(BSONObjBuilder* builder,
     // FCV to keep consistent behavior.
     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
             .isEnabledAndIgnoreFCVUnsafe()) {
-        auto admissionPriority = AdmissionContext::get(opCtx).getPriority();
+        auto admissionPriority = ExecutionAdmissionContext::get(opCtx).getPriority();
         if (admissionPriority < AdmissionContext::Priority::kNormal) {
             builder->append("admissionPriority", toString(admissionPriority));
         }
@@ -1209,7 +1209,7 @@ void OpDebug::report(OperationContext* opCtx,
     // FCV to keep consistent behavior.
     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
             .isEnabledAndIgnoreFCVUnsafe()) {
-        auto admissionPriority = AdmissionContext::get(opCtx).getPriority();
+        auto admissionPriority = ExecutionAdmissionContext::get(opCtx).getPriority();
         if (admissionPriority < AdmissionContext::Priority::kNormal) {
             pAttrs->add("admissionPriority", admissionPriority);
         }

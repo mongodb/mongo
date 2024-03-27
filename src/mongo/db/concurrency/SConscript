@@ -51,12 +51,12 @@ env.Library(
         'resource_catalog.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/admission/execution_admission_context',
         '$BUILD_DIR/mongo/db/admission/ticketholder_manager',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/background_job',
-        '$BUILD_DIR/mongo/util/concurrency/admission_context',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',

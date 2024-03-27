@@ -50,6 +50,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_operation_source.h"
@@ -323,7 +324,7 @@ public:
                 }
             }
 
-            boost::optional<ScopedAdmissionPriority> priority;
+            boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> priority;
             if (request().getNamespace() == NamespaceString::kConfigSampledQueriesNamespace ||
                 request().getNamespace() == NamespaceString::kConfigSampledQueriesDiffNamespace) {
                 priority.emplace(opCtx, AdmissionContext::Priority::kLow);

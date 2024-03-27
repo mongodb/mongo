@@ -45,6 +45,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -126,7 +127,8 @@ public:
         const auto runStart = clock->now();
         BSONObjBuilder timeBuilder(256);
 
-        ScopedAdmissionPriority admissionPriority(opCtx, AdmissionContext::Priority::kExempt);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
+            opCtx, AdmissionContext::Priority::kExempt);
 
         // --- basic fields that are global
 

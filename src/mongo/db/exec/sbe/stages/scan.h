@@ -40,6 +40,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/field_name_bloom_filter.h"
@@ -351,7 +352,7 @@ private:
 
     // Whether the scan should have low storage admission priority.
     bool _lowPriority;
-    boost::optional<ScopedAdmissionPriority> _priority;
+    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> _priority;
 
     ScanStats _specificStats;
 

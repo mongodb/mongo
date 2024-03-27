@@ -50,6 +50,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_checks.h"
@@ -547,7 +548,7 @@ public:
 
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.
-            boost::optional<ScopedAdmissionPriority> admissionPriority;
+            boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
             if (term && isOplogNss) {
                 // We do not want to wait to take tickets for internal (replication) oplog reads.
                 // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may

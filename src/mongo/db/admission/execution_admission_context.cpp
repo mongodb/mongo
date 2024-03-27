@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,47 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/db/admission/execution_admission_context.h"
 
 #include "mongo/db/operation_context.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 namespace {
-static constexpr StringData kLowString = "low"_sd;
-static constexpr StringData kNormalString = "normal"_sd;
-static constexpr StringData kExemptString = "exempt"_sd;
+const auto contextDecoration = OperationContext::declareDecoration<ExecutionAdmissionContext>();
 }  // namespace
 
-ScopedAdmissionPriorityBase::ScopedAdmissionPriorityBase(OperationContext* opCtx,
-                                                         AdmissionContext& admCtx,
-                                                         AdmissionContext::Priority priority)
-    : _opCtx(opCtx), _admCtx(&admCtx), _originalPriority(admCtx.getPriority()) {
-    uassert(ErrorCodes::IllegalOperation,
-            "It is illegal for an operation to demote a high priority to a lower priority "
-            "operation",
-            _originalPriority != AdmissionContext::Priority::kExempt ||
-                priority == AdmissionContext::Priority::kExempt);
-
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    _admCtx->_priority = priority;
+ExecutionAdmissionContext& ExecutionAdmissionContext::get(OperationContext* opCtx) {
+    return contextDecoration(opCtx);
 }
 
-ScopedAdmissionPriorityBase::~ScopedAdmissionPriorityBase() {
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    _admCtx->_priority = _originalPriority;
-}
-
-StringData toString(AdmissionContext::Priority priority) {
-    switch (priority) {
-        case AdmissionContext::Priority::kLow:
-            return kLowString;
-        case AdmissionContext::Priority::kNormal:
-            return kNormalString;
-        case AdmissionContext::Priority::kExempt:
-            return kExemptString;
+void ExecutionAdmissionContext::copyTo(
+    OperationContext* opCtx, boost::optional<AdmissionContext::Priority> newPriority) const {
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    if (newPriority) {
+        ExecutionAdmissionContext newContext(*this);
+        newContext._priority = *newPriority;
+        contextDecoration(opCtx) = newContext;
+        return;
     }
-    MONGO_UNREACHABLE;
+
+    contextDecoration(opCtx) = *this;
 }
 }  // namespace mongo

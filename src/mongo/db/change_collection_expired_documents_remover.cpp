@@ -44,6 +44,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
@@ -118,8 +119,8 @@ void removeExpiredDocuments(Client* client) {
             // Change stream collections can multiply the amount of user data inserted and deleted
             // on each node. It is imperative that removal is prioritized so it can keep up with
             // inserts and prevent users from running out of disk space.
-            ScopedAdmissionPriority skipAdmissionControl(opCtx.get(),
-                                                         AdmissionContext::Priority::kExempt);
+            ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+                opCtx.get(), AdmissionContext::Priority::kExempt);
 
             auto expiredAfterSeconds =
                 change_stream_serverless_helpers::getExpireAfterSeconds(tenantId);

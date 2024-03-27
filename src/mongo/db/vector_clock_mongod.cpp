@@ -50,6 +50,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/dbdirectclient.h"
@@ -307,8 +308,8 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError() {
             // This code is used by the TransactionCoordinator. As a result, we need to skip ticket
             // acquisition in order to prevent possible deadlock when participants are in the
             // prepared state. See SERVER-82883 and SERVER-60682.
-            ScopedAdmissionPriority skipTicketAcquisition(opCtx,
-                                                          AdmissionContext::Priority::kExempt);
+            ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
+                opCtx, AdmissionContext::Priority::kExempt);
 
             if (mustRecoverDurableTime) {
                 return recoverDirect(opCtx);

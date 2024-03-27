@@ -38,6 +38,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -155,8 +156,7 @@ private:
     /**
      * Releases a ticket back into the ticketing pool.
      */
-    virtual void _releaseToTicketPool(AdmissionContext* admCtx,
-                                      AdmissionContext::Priority ticketPriority) noexcept;
+    virtual void _releaseToTicketPool(Ticket& ticket) noexcept;
 
     virtual void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept = 0;
 
@@ -268,7 +268,8 @@ public:
     Ticket(Ticket&& t)
         : _ticketholder(t._ticketholder),
           _admissionContext(t._admissionContext),
-          _priority(t._priority) {
+          _priority(t._priority),
+          _acquisitionTime(t._acquisitionTime) {
         t._ticketholder = nullptr;
         t._admissionContext = nullptr;
     }
@@ -281,6 +282,7 @@ public:
         _ticketholder = t._ticketholder;
         _admissionContext = t._admissionContext;
         _priority = t._priority;
+        _acquisitionTime = t._acquisitionTime;
         t._ticketholder = nullptr;
         t._admissionContext = nullptr;
         return *this;
@@ -288,7 +290,7 @@ public:
 
     ~Ticket() {
         if (_ticketholder) {
-            _ticketholder->_releaseToTicketPool(_admissionContext, _priority);
+            _ticketholder->_releaseToTicketPool(*this);
         }
     }
 
@@ -310,6 +312,7 @@ private:
     Ticket(TicketHolder* ticketHolder, AdmissionContext* admissionContext)
         : _ticketholder(ticketHolder), _admissionContext(admissionContext) {
         _priority = admissionContext->getPriority();
+        _acquisitionTime = ticketHolder->_serviceContext->getTickSource()->getTicks();
     }
 
     /**
@@ -327,5 +330,6 @@ private:
     TicketHolder* _ticketholder;
     AdmissionContext* _admissionContext;
     AdmissionContext::Priority _priority;
+    TickSource::Tick _acquisitionTime;
 };
 }  // namespace mongo

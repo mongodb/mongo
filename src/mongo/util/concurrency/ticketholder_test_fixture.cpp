@@ -54,7 +54,7 @@ void TicketHolderTestFixture::basicTimeout(OperationContext* opCtx,
     ASSERT_EQ(holder->available(), 1);
     ASSERT_EQ(holder->outof(), 1);
 
-    AdmissionContext& admCtx = AdmissionContext::get(opCtx);
+    MockAdmissionContext admCtx{};
     Microseconds timeInQueue(0);
     {
         // Ignores deadline if there is a ticket instantly available.
@@ -81,7 +81,7 @@ void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
                                          TickSourceMock<Microseconds>* tickSource) {
     Stats stats(holder.get());
 
-    AdmissionContext& admCtx = AdmissionContext::get(opCtx);
+    MockAdmissionContext admCtx{};
     Microseconds timeInQueue(0);
     auto ticket =
         holder->waitForTicketUntil(*opCtx, &admCtx, Date_t::now() + Milliseconds{500}, timeInQueue);
@@ -151,7 +151,7 @@ void TicketHolderTestFixture::interruptTest(OperationContext* opCtx,
     Microseconds timeInQueue(0);
 
     auto waiter = stdx::thread([&]() {
-        AdmissionContext& admCtx = AdmissionContext::get(opCtx);
+        MockAdmissionContext admCtx{};
         ASSERT_THROWS_CODE(holder->waitForTicketUntil(*opCtx, &admCtx, Date_t::max(), timeInQueue),
                            DBException,
                            ErrorCodes::Interrupted);
@@ -170,13 +170,17 @@ void TicketHolderTestFixture::interruptTest(OperationContext* opCtx,
 void TicketHolderTestFixture::priorityBookkeepingTest(
     OperationContext* opCtx,
     std::unique_ptr<TicketHolder> holder,
+    AdmissionContext::Priority oldPriority,
     AdmissionContext::Priority newPriority,
     std::function<void(BSONObj&, BSONObj&)> checks) {
-    auto& admCtx = AdmissionContext::get(opCtx);
+
+    MockAdmissionContext admCtx{};
+    ScopedAdmissionPriorityBase initialPriority{opCtx, admCtx, oldPriority};
+
     Stats stats(holder.get());
 
-    boost::optional<ScopedAdmissionPriority> priorityOverride;
-    priorityOverride.emplace(opCtx, newPriority);
+    boost::optional<ScopedAdmissionPriorityBase> priorityOverride;
+    priorityOverride.emplace(opCtx, admCtx, newPriority);
 
     Microseconds unused;
     boost::optional<Ticket> ticket = holder->waitForTicket(*opCtx, &admCtx, unused);

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
@@ -78,7 +79,8 @@ void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* res
     //
     // Fields are omitted if it cannot be immediately acquired to prevent stalling 'serverStatus'
     // observability.
-    ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+        opCtx, AdmissionContext::Priority::kExempt);
     Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked, [] {
         Lock::GlobalLockSkipOptions options;
         options.skipRSTLLock = true;

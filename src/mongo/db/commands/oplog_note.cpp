@@ -42,6 +42,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -77,7 +78,8 @@ MONGO_FAIL_POINT_DEFINE(hangInAppendOplogNote);
 
 namespace {
 Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData note) {
-    ScopedAdmissionPriority priority{opCtx, AdmissionContext::Priority::kExempt};
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority{
+        opCtx, AdmissionContext::Priority::kExempt};
 
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     // Use GlobalLock instead of DBLock to allow return when the lock is not available. It may

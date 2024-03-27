@@ -41,6 +41,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/last_vote.h"
@@ -370,7 +371,8 @@ void ReplicationCoordinatorImpl::ElectionState::_writeLastVoteForMyElection(
         // Any operation that occurs as part of an election process is critical to the operation of
         // the cluster. We mark the operation as having Immediate priority to skip ticket
         // acquisition and flow control.
-        ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kExempt);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+            opCtx.get(), AdmissionContext::Priority::kExempt);
 
         LOGV2(6015300,
               "Storing last vote document in local storage for my election",

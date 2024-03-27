@@ -43,6 +43,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -375,7 +376,8 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollSc
     // Change stream collections can multiply the amount of user data inserted and deleted on each
     // node. It is imperative that removal is prioritized so it can keep up with inserts and prevent
     // users from running out of disk space.
-    ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+        opCtx, AdmissionContext::Priority::kExempt);
 
     // Acquire intent-exclusive lock on the change collection.
     const auto preImageColl = acquireCollection(
@@ -429,7 +431,8 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollSc
     // Change stream collections can multiply the amount of user data inserted and deleted on each
     // node. It is imperative that removal is prioritized so it can keep up with inserts and prevent
     // users from running out of disk space.
-    ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+        opCtx, AdmissionContext::Priority::kExempt);
 
     // Acquire intent-exclusive lock on the change collection.
     const auto preImageColl =

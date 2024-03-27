@@ -48,6 +48,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
 #include "mongo/db/client.h"
@@ -240,8 +241,8 @@ public:
             return _recoveryUnit.get();
         }
 
-        AdmissionContext admissionContext() const {
-            return _admCtx;
+        const ExecutionAdmissionContext& executionControlContext() const {
+            return _execCtrlCtx;
         }
 
         /**
@@ -274,7 +275,7 @@ public:
         APIParameters _apiParameters;
         repl::ReadConcernArgs _readConcernArgs;
         WriteUnitOfWork::RecoveryUnitState _ruState;
-        AdmissionContext _admCtx;
+        ExecutionAdmissionContext _execCtrlCtx;
     };  // class TxnResources
 
     /**

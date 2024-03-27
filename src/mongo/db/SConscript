@@ -904,8 +904,8 @@ env.Library(
         'list_indexes.idl',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/admission/execution_admission_context',
         '$BUILD_DIR/mongo/db/query/cursor_response_idl',
-        '$BUILD_DIR/mongo/util/concurrency/admission_context',
         'api_parameters',
     ],
     LIBDEPS_PRIVATE=[
@@ -999,8 +999,8 @@ env.Library(
         'transaction_resources.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/admission/execution_admission_context',
         '$BUILD_DIR/mongo/s/grid',
-        '$BUILD_DIR/mongo/util/concurrency/admission_context',
         'concurrency/lock_manager',
         'shard_role_api_stor_ex',
         'storage/write_unit_of_work',

@@ -39,6 +39,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor_manager.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -89,7 +90,8 @@ public:
              const mongo::BSONObj& cmdObj,
              mongo::BSONObjBuilder& result) override {
         // Critical to observability and diagnosability, categorize as immediate priority.
-        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+            opCtx, AdmissionContext::Priority::kExempt);
 
         executor::ConnectionPoolStats stats{};
 

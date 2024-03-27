@@ -29,6 +29,7 @@
 
 #include "mongo/db/repl/oplog_writer_impl.h"
 
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
@@ -147,7 +148,8 @@ void OplogWriterImpl::_run() {
 
     // Oplog writes are crucial to the stability of the replica set. We give the operations
     // Immediate priority so that it skips waiting for ticket acquisition and flow control.
-    ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx, AdmissionContext::Priority::kExempt);
 
     while (true) {
         // For pausing replication in tests.
@@ -260,7 +262,8 @@ void OplogWriterImpl::_writeOplogBatchImpl(OperationContext* opCtx,
                                            bool writeChangeColl) {
     // Oplog writes are crucial to the stability of the replica set. We give the operations
     // Immediate priority so that it skips waiting for ticket acquisition and flow control.
-    ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx, AdmissionContext::Priority::kExempt);
     UnreplicatedWritesBlock uwb(opCtx);
 
     // The 'nsOrUUID' is used only to log the debug message when retrying inserts on the

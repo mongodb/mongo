@@ -55,6 +55,7 @@
 #include "mongo/client/fetcher.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/read_preference_gen.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -3470,7 +3471,8 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
 
     boost::optional<Timestamp> lastStableRecoveryTimestamp = boost::none;
     try {
-        ScopedAdmissionPriority admissionPriority(opCtx, AdmissionContext::Priority::kExempt);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
+            opCtx, AdmissionContext::Priority::kExempt);
         // We need to hold the lock so that we don't run when storage is being shutdown.
         Lock::GlobalLock lk(opCtx,
                             MODE_IS,

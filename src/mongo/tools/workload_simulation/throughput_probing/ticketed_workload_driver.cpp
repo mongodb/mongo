@@ -30,6 +30,7 @@
 #include "mongo/tools/workload_simulation/throughput_probing/ticketed_workload_driver.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 
@@ -159,7 +160,7 @@ void TicketedWorkloadDriver::_read(int32_t i) {
     Microseconds timeInQueue;
 
     while (_readRunning.load() >= i) {
-        auto admCtx = AdmissionContext::get(opCtx.get());
+        auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
         Ticket ticket = _readTicketHolder->waitForTicket(*opCtx, &admCtx, timeInQueue);
         _doRead(opCtx.get(), &admCtx);
     }
@@ -171,7 +172,7 @@ void TicketedWorkloadDriver::_write(int32_t i) {
     Microseconds timeInQueue;
 
     while (_writeRunning.load() >= i) {
-        auto admCtx = AdmissionContext::get(opCtx.get());
+        auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
         Ticket ticket = _writeTicketHolder->waitForTicket(*opCtx, &admCtx, timeInQueue);
         _doWrite(opCtx.get(), &admCtx);
     }

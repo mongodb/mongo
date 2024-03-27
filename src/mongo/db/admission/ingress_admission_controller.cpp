@@ -41,6 +41,8 @@ namespace mongo {
 namespace {
 const auto getIngressAdmissionController =
     ServiceContext::declareDecoration<IngressAdmissionController>();
+const auto getIngressAdmissionContext =
+    OperationContext::declareDecoration<IngressAdmissionContext>();
 
 const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
     "InitIngressAdmissionController", [](ServiceContext* ctx) {
@@ -78,7 +80,7 @@ IngressAdmissionController& IngressAdmissionController::get(OperationContext* op
 }
 
 Ticket IngressAdmissionController::admitOperation(OperationContext* opCtx) {
-    auto& admCtx = AdmissionContext::get(opCtx);
+    auto& admCtx = IngressAdmissionContext::get(opCtx);
     auto* curOp = CurOp::get(opCtx);
 
     // Try to get the ticket without waiting
@@ -108,6 +110,10 @@ Status IngressAdmissionController::onUpdateTicketPoolSize(int32_t newValue) try 
     return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus();
+}
+
+IngressAdmissionContext& IngressAdmissionContext::get(OperationContext* opCtx) {
+    return getIngressAdmissionContext(opCtx);
 }
 
 }  // namespace mongo

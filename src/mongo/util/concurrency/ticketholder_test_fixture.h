@@ -87,6 +87,7 @@ protected:
      */
     void priorityBookkeepingTest(OperationContext* opCtx,
                                  std::unique_ptr<TicketHolder> holder,
+                                 AdmissionContext::Priority oldPriority,
                                  AdmissionContext::Priority newPriority,
                                  std::function<void(BSONObj& /*statsWhileProcessing*/,
                                                     BSONObj& /*statsWhenFinished*/)> checks);
@@ -130,12 +131,13 @@ struct TicketHolderTestFixture::MockAdmission {
     MockAdmission(ServiceContext* serviceContext, AdmissionContext::Priority priority) {
         client = serviceContext->getService()->makeClient("");
         opCtx = client->makeOperationContext();
-        admissionPriority.emplace(opCtx.get(), priority);
+        admissionPriority.emplace(opCtx.get(), admCtx, priority);
     }
 
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
-    boost::optional<ScopedAdmissionPriority> admissionPriority;
+    MockAdmissionContext admCtx;
+    boost::optional<ScopedAdmissionPriorityBase> admissionPriority;
     boost::optional<Ticket> ticket;
 };
 

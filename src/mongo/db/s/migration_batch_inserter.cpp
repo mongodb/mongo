@@ -39,6 +39,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -63,7 +64,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/str.h"
@@ -208,7 +208,8 @@ void MigrationBatchInserter::run(Status status) const try {
         _migrationProgress->incNumBytes(batchClonedBytes);
 
         if (_writeConcern.needToWaitForOtherNodes() && _threadCount == 1) {
-            if (auto ticket = _secondaryThrottleTicket->tryAcquire(&AdmissionContext::get(opCtx))) {
+            if (auto ticket =
+                    _secondaryThrottleTicket->tryAcquire(&ExecutionAdmissionContext::get(opCtx))) {
                 runWithoutSession(_outerOpCtx, [&] {
                     repl::ReplicationCoordinator::StatusAndDuration replStatus =
                         repl::ReplicationCoordinator::get(opCtx)->awaitReplication(

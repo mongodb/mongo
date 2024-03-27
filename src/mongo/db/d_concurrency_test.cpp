@@ -45,6 +45,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/ticketholder_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -1760,7 +1761,8 @@ TEST_F(DConcurrencyTestFixture, NoThrottlingWhenNotAcquiringTickets) {
         auto opctx2 = clientOpctxPairs[1].second.get();
 
         // Prevent the enforcement of ticket throttling.
-        ScopedAdmissionPriority priority(opctx1, AdmissionContext::Priority::kExempt);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+            opctx1, AdmissionContext::Priority::kExempt);
 
         // Both locks should be acquired immediately because there is no throttling.
         Lock::GlobalRead R1(opctx1, Date_t::now(), Lock::InterruptBehavior::kThrow);

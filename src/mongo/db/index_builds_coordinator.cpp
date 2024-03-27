@@ -46,6 +46,7 @@
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
@@ -3188,7 +3189,8 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     // impact on user operations. Other steps of the index builds such as the draining phase have
     // normal priority because index builds are required to eventually catch-up with concurrent
     // writers. Otherwise we risk never finishing the index build.
-    ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kLow);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(opCtx,
+                                                                AdmissionContext::Priority::kLow);
     {
         indexBuildsSSS.scanCollection.addAndFetch(1);
 
@@ -3229,7 +3231,8 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     // impact on user operations. Other steps of the index builds such as the draining phase have
     // normal priority because index builds are required to eventually catch-up with concurrent
     // writers. Otherwise we risk never finishing the index build.
-    ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kLow);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(opCtx,
+                                                                AdmissionContext::Priority::kLow);
     {
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         AutoGetCollection collLock(opCtx, dbAndUUID, MODE_IX);

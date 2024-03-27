@@ -43,6 +43,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
@@ -1303,8 +1304,8 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
 
                 // The TimestampMonitor is an important background cleanup task for the storage
                 // engine and needs to be able to make progress to free up resources.
-                ScopedAdmissionPriority immediatePriority(opCtx,
-                                                          AdmissionContext::Priority::kExempt);
+                ScopedAdmissionPriority<ExecutionAdmissionContext> immediatePriority(
+                    opCtx, AdmissionContext::Priority::kExempt);
 
                 Timestamp checkpoint;
                 Timestamp oldest;

@@ -37,6 +37,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -83,7 +84,8 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
     // Maintaining the Oplog cap is crucial to the stability of the server so that we don't let the
     // oplog grow unbounded. We mark the operation as having immediate priority to skip ticket
     // acquisition and flow control.
-    ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx.get(), AdmissionContext::Priority::kExempt);
 
     try {
         // A Global IX lock should be good enough to protect the oplog truncation from

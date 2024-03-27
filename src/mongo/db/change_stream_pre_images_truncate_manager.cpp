@@ -29,6 +29,7 @@
 
 #include "mongo/db/change_stream_pre_images_truncate_manager.h"
 
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_tenant_truncate_markers.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -49,7 +50,8 @@ PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(
     // on each node. It is imperative that truncate marker generation and pre-image removal are
     // prioritized so they can keep up with inserts and prevent users from running out of disk
     // space.
-    ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+        opCtx, AdmissionContext::Priority::kExempt);
 
     auto tenantTruncateMarkers = _getInitializedMarkersForPreImagesCollection(opCtx, tenantId);
     if (!tenantTruncateMarkers) {

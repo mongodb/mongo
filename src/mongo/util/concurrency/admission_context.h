@@ -46,8 +46,6 @@ class OperationContext;
  */
 class AdmissionContext {
 public:
-    AdmissionContext() {}
-
     /**
      * Classifies the priority that an operation acquires a ticket when the system is under high
      * load (operations are throttled waiting for a ticket). Only applicable when there are no
@@ -72,27 +70,8 @@ public:
      */
     enum class Priority { kExempt = 0, kLow, kNormal };
 
-    /**
-     * Retrieve the AdmissionContext decoration the provided OperationContext
-     */
-    static AdmissionContext& get(OperationContext* opCtx);
-
-    /**
-     * Copy this AdmissionContext to another OperationContext. Optionally, provide a new priority
-     * to upgrade the copied context's priority.
-     */
-    void copyTo(OperationContext* opCtx,
-                boost::optional<AdmissionContext::Priority> newPriority = boost::none);
-
-    void start(TickSource* tickSource) {
+    void recordAdmission() {
         _admissions += 1;
-        if (tickSource) {
-            _startProcessingTime = tickSource->getTicks();
-        }
-    }
-
-    TickSource::Tick getStartProcessingTime() const {
-        return _startProcessingTime;
     }
 
     /**
@@ -106,28 +85,48 @@ public:
         return _priority;
     }
 
-private:
-    friend class ScopedAdmissionPriority;
+protected:
+    friend class ScopedAdmissionPriorityBase;
 
-    TickSource::Tick _startProcessingTime{0};
+    AdmissionContext() = default;
+
     int32_t _admissions{0};
     Priority _priority{Priority::kNormal};
+};
+
+/**
+ * Default-constructible admission context to use for testing purposes.
+ */
+class MockAdmissionContext : public AdmissionContext {
+public:
+    MockAdmissionContext() = default;
 };
 
 /**
  * RAII-style class to set the priority for the ticket admission mechanism when acquiring a global
  * lock.
  */
-class ScopedAdmissionPriority {
+class ScopedAdmissionPriorityBase {
 public:
-    explicit ScopedAdmissionPriority(OperationContext* opCtx, AdmissionContext::Priority priority);
-    ScopedAdmissionPriority(const ScopedAdmissionPriority&) = delete;
-    ScopedAdmissionPriority& operator=(const ScopedAdmissionPriority&) = delete;
-    ~ScopedAdmissionPriority();
+    explicit ScopedAdmissionPriorityBase(OperationContext* opCtx,
+                                         AdmissionContext& admCtx,
+                                         AdmissionContext::Priority priority);
+    ScopedAdmissionPriorityBase(const ScopedAdmissionPriorityBase&) = delete;
+    ScopedAdmissionPriorityBase& operator=(const ScopedAdmissionPriorityBase&) = delete;
+    ~ScopedAdmissionPriorityBase();
 
 private:
     OperationContext* const _opCtx;
+    AdmissionContext* const _admCtx;
     AdmissionContext::Priority _originalPriority;
+};
+
+template <typename AdmissionContextType>
+class ScopedAdmissionPriority : public ScopedAdmissionPriorityBase {
+public:
+    explicit ScopedAdmissionPriority(OperationContext* opCtx, AdmissionContext::Priority priority)
+        : ScopedAdmissionPriorityBase(opCtx, AdmissionContextType::get(opCtx), priority) {}
+    ~ScopedAdmissionPriority() = default;
 };
 
 StringData toString(AdmissionContext::Priority priority);

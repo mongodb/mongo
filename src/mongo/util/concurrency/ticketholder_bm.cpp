@@ -32,6 +32,7 @@
 #include <map>
 #include <memory>
 
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
@@ -117,7 +118,7 @@ void BM_acquireAndRelease(benchmark::State& state) {
         str::stream() << "test client for thread " << state.thread_index);
     ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
 
-    boost::optional<ScopedAdmissionPriority> admissionPriority;
+    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
     admissionPriority.emplace(opCtx.get(), [&] {
         switch (admissionsPriority) {
             case AdmissionsPriority::kNormal:
@@ -143,7 +144,7 @@ void BM_acquireAndRelease(benchmark::State& state) {
         Microseconds timeForAcquire;
         Microseconds timeInQueue(0);
         {
-            auto admCtx = AdmissionContext::get(opCtx.get());
+            auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
             auto ticket = fixture->ticketHolder->waitForTicketUntil(
                 *Interruptible::notInterruptible(), &admCtx, Date_t::max(), timeInQueue);
             timeForAcquire = timer.elapsed();

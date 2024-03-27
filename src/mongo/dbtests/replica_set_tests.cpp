@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
@@ -108,7 +109,8 @@ private:
 TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx.get(), AdmissionContext::Priority::kExempt);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})
@@ -131,7 +133,8 @@ TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
 TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithOldTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx.get(), AdmissionContext::Priority::kExempt);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})
@@ -154,7 +157,8 @@ TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithOldTerm) {
 TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithEqualTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx.get(), AdmissionContext::Priority::kExempt);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})

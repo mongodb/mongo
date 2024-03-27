@@ -46,6 +46,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -177,7 +178,8 @@ void HostInfoCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) cons
 template <>
 HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext* opCtx) {
     // Critical to observability and diagnosability, categorize as immediate priority.
-    ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+        opCtx, AdmissionContext::Priority::kExempt);
 
     ProcessInfo p;
 
@@ -232,7 +234,8 @@ void GetCmdLineOptsCmd::Invocation::doCheckAuthorization(OperationContext* opCtx
 template <>
 GetCmdLineOptsReply GetCmdLineOptsCmd::Invocation::typedRun(OperationContext* opCtx) {
     // Critical to observability and diagnosability, categorize as immediate priority.
-    ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
+    ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+        opCtx, AdmissionContext::Priority::kExempt);
 
     GetCmdLineOptsReply reply;
     reply.setArgv(serverGlobalParams.argvArray);
@@ -322,7 +325,8 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         // Critical to observability and diagnosability, categorize as immediate priority.
-        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+            opCtx, AdmissionContext::Priority::kExempt);
 
         if (MONGO_unlikely(hangInGetLog.shouldFail())) {
             LOGV2(5113600, "Hanging in getLog");

@@ -1788,7 +1788,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
     // (Ignore FCV check): This feature flag is not FCV gated (shouldBeFCVGated is false)
     if (gFeatureFlagIngressAdmissionControl.isEnabledAndIgnoreFCVUnsafe()) {
-        boost::optional<ScopedAdmissionPriority> admissionPriority;
+        boost::optional<ScopedAdmissionPriority<IngressAdmissionContext>> admissionPriority;
         if (!_invocation->isSubjectToIngressAdmissionControl()) {
             admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
         }

@@ -82,12 +82,12 @@ TEST(TicketPoolTest, BasicTimeout) {
     TicketPool<FifoTicketQueue> pool(0);
 
     {
-        AdmissionContext ctx;
+        MockAdmissionContext ctx;
         ASSERT_FALSE(pool.acquire(&ctx, Date_t::now() + Milliseconds{10}));
     }
 
     {
-        AdmissionContext admCtx;
+        MockAdmissionContext admCtx;
         ASSERT_FALSE(pool.acquire(&admCtx, Date_t::min()));
     }
 }
@@ -99,7 +99,7 @@ TEST(TicketPoolTest, HandOverWorks) {
         ASSERT_FALSE(pool.tryAcquire());
 
         stdx::thread waitingThread([&] {
-            AdmissionContext ctx;
+            MockAdmissionContext ctx;
             ASSERT_TRUE(pool.acquire(&ctx, Date_t::now() + Seconds{10}));
         });
 
@@ -120,7 +120,7 @@ TEST(TicketPoolTest, HandOverWorks) {
 
         for (int i = 0; i < threadsToTest; i++) {
             threads.emplace_back([&] {
-                AdmissionContext ctx;
+                MockAdmissionContext ctx;
                 ASSERT_TRUE(pool.acquire(&ctx, Date_t::now() + Seconds{10}));
                 pendingThreads.subtractAndFetch(1);
             });
