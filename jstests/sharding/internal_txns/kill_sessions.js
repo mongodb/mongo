@@ -5,12 +5,19 @@
  */
 TestData.disableImplicitSessions = true;
 
+let mongosOptions = {
+    setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}
+};
+
+// Don't add a maxSessions parameter in case of embeddedRouter, otherwise it will be passed to the
+// config server and the cluster won't boot.
+if (!TestData.embeddedRouter) {
+    mongosOptions.setParameter.maxSessions = 1;
+}
+
 const st = new ShardingTest({
     shards: 1,
-    mongosOptions: {
-        setParameter:
-            {maxSessions: 1, 'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}
-    },
+    mongosOptions: mongosOptions,
     // The config server uses a session for internal operations, so raise the limit by 1 for a
     // config shard.
     shardOptions: {setParameter: {maxSessions: TestData.configShard ? 2 : 1}}

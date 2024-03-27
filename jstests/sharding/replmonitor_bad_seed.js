@@ -18,7 +18,6 @@
  *
  * @tags: [
  *   requires_persistence,
- *   temp_disabled_embedded_router_test_issue,
  * ]
  */
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
@@ -42,7 +41,7 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 
 // Don't clear the data directory so that the shardIdentity is not deleted.
 replTest.stopSet(undefined /* send default signal */, true /* don't clear data directory */);
 
-st.restartMongos(0);
+st.restartRouterNode(0);
 
 replTest.startSet({restart: true, noCleanData: true});
 replTest.awaitSecondaryNodes();

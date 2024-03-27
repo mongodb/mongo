@@ -11,7 +11,6 @@
 //   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
 //   requires_fcv_80,
 //   requires_fsync,
-//   temp_disabled_embedded_router_test_issue,
 // ]
 
 // The mongod secondaries are set to priority 0 to prevent the primaries from stepping down during

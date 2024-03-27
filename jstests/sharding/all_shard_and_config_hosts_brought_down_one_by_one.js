@@ -4,8 +4,10 @@
  * Restarts the config server, which requires persistence so restarted nodes can rejoin their
  * original replica set and run shutdown hooks.
  * @tags: [
- *    requires_persistence,
- *    temp_disabled_embedded_router_test_issue,
+ *   requires_persistence,
+ *   # This test shuts down the cluster bit by bit. Shutting down mongos would imply shutting down
+ *   # random nodes, breaking the test.
+ *   embedded_router_incompatible,
  * ]
  */
 

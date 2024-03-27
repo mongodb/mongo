@@ -2,7 +2,6 @@
  * Confirms that the limit on number of aggregragation pipeline stages is respected.
  * @tags: [
  *   requires_fcv_71,
- *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

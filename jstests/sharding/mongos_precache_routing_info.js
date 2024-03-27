@@ -1,6 +1,6 @@
 // create
 // @tags: [
-//   temp_disabled_embedded_router_test_issue,
+//   temp_disabled_embedded_router_metrics,
 // ]
 var s = new ShardingTest({
     shards: 2,
@@ -29,8 +29,8 @@ for (i = 0; i < numSplits; i++) {
     assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: midKey}));
 }
 
-// restart mongos
-s.restartMongos(0);
+// restart the router
+s.restartRouterNode(0);
 db = s.getDB("test");
 
 // check for # refreshes started
@@ -38,7 +38,7 @@ ss = db.serverStatus();
 assert.eq(1, ss.shardingStatistics.catalogCache.countFullRefreshesStarted);
 
 // does not pre cache when set parameter is disabled
-s.restartMongos(0, {
+s.restartRouterNode(0, {
     restart: true,
     setParameter: {
         loadRoutingTableOnStartup: false,

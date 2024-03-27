@@ -3,7 +3,7 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [
  *   resource_intensive,
- *   temp_disabled_embedded_router_test_issue,
+ *   temp_disabled_embedded_router_metrics,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

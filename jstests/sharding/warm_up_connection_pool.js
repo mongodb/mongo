@@ -1,13 +1,16 @@
 /**
  * @tags: [
  *   multiversion_incompatible,
- *   temp_disabled_embedded_router_test_issue,
+ *   # This test requires restarting mongos alone to test the warm-up of the connection pool. The
+ *   # embedded router seems to have a different behavior, breaking the test.
+ *   # TODO (SERVER-88486): investigate a way to adapt this tests for embedded router, if needed.
+ *   embedded_router_incompatible,
  * ]
  */
 
 // Checking UUID and index consistency involves talking to a shard node, which in this
 // test is shutdown.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;

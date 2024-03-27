@@ -7,7 +7,6 @@
  * Manual key rotation requires restarting a shard, so a persistent storage engine is necessary.
  * @tags: [
  *   requires_persistence,
- *   temp_disabled_embedded_router_test_issue,
  * ]
  */
 
@@ -75,11 +74,10 @@ assert.eq(res.$clusterTime.signature.keyId, NumberLong(0));
 
 // Resume key generation.
 for (let i = 0; i < st.configRS.nodes.length; i++) {
-    st.configRS.getPrimary().adminCommand(
-        {configureFailPoint: "disableKeyGeneration", mode: "off"});
+    st.configRS.nodes[i].adminCommand({configureFailPoint: "disableKeyGeneration", mode: "off"});
 }
 
-st.restartMongos(0);
+st.restartRouterNode(0);
 
 // Wait for config server primary to create new keys.
 assert.soonNoExcept(function() {

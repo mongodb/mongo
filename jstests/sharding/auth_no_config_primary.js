@@ -5,7 +5,6 @@
  * across a restart.
  * @tags: [
  *   requires_persistence,
- *   temp_disabled_embedded_router_test_issue,
  * ]
  */
 
@@ -44,7 +43,7 @@ assert.eq('world', res.hello);
 
 // Test authenticate through new mongos.
 var otherMongos =
-    MongoRunner.runMongos({keyFile: "jstests/libs/key1", configdb: st.s.savedOptions.configdb});
+    MongoRunner.runMongos({keyFile: "jstests/libs/key1", configdb: st.configRS.getURL()});
 
 assert.commandFailedWithCode(otherMongos.getDB('test').runCommand({find: 'user'}),
                              ErrorCodes.Unauthorized);

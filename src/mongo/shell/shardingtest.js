@@ -92,7 +92,7 @@
  *       alwaysUseTestNameForShardName {boolean}: Always use the testname as the name of the shard.
  *       embeddedRouter {boolean}: Use mongod's embedding routing functionality instead of mongos.
  *          Each st.s, s0, s1,.... points to the router port of a mongod instead of a dedicated
- * mongos. Ignores mongosOptions. Chooses `numMongos` mongod nodes from the shards to act as
+ * mongos. Chooses `numMongos` mongod nodes from the shards to act as
  * routers, at random. Incompatible with useBridge.
  *     }
  *   }
@@ -964,7 +964,8 @@ var ShardingTest = function ShardingTest(params) {
     };
 
     /**
-     * Stops and restarts a mongos process.
+     * Stops and restarts a mongos process. The operation fails if this connection is not against a
+     * mongos process (i.e. an embedded router).
      *
      * If 'opts' is not specified, starts the mongos with its previous parameters.  If 'opts' is
      * specified and 'opts.restart' is false or missing, starts mongos with the parameters specified
@@ -981,6 +982,9 @@ var ShardingTest = function ShardingTest(params) {
         } else {
             mongos = this["s" + n];
         }
+
+        assert(!mongos.isEmbeddedRouter,
+               "This mongos is an embedded router, it can't be restarted separately");
 
         opts = opts || mongos;
         opts.port = opts.port || mongos.port;
@@ -1024,6 +1028,67 @@ var ShardingTest = function ShardingTest(params) {
             this.admin = this._mongos[n].getDB('admin');
             this.config = this._mongos[n].getDB('config');
         }
+    };
+
+    /**
+     * Restarts a router node. The node can be either a standalone mongoS, or a mongoD with an
+     * embedded router. If the node is a mongoD with embedded router, this command will wait until
+     * the triggered election finishes. As a consequence, the primary of the affected RS could
+     * change.
+     *
+     * If 'opts' is not specified, starts the node with its previous parameters.  If 'opts' is
+     * specified and 'opts.restart' is false or missing, starts the node with the parameters
+     * specified in 'opts'.  If opts is specified and 'opts.restart' is true, merges the previous
+     * options with the options specified in 'opts', with the options in 'opts' taking precedence.
+     *
+     * Warning: Overwrites the old s (if n = 0) admin, config, and sn member variables.
+     */
+    ShardingTest.prototype.restartRouterNode = function(n, opts) {
+        const routerConn = (() => {
+            if (this._useBridge) {
+                return this._unbridgedMongos[n];
+            } else {
+                return this["s" + n];
+            }
+        })();
+
+        if (!routerConn.isEmbeddedRouter) {
+            this.restartMongos(n, opts);
+            return;
+        }
+
+        assert(!this._useBridge, "BUG: mongobridge and embedded router are not compatible");
+
+        const nodeInfo = routerConn.nodeInfo;
+
+        if (nodeInfo.isConfig) {
+            this.restartConfigServer(nodeInfo.index, opts);
+        } else {
+            nodeInfo.rs.restart(nodeInfo.index, opts);
+        }
+
+        const mongodConn = nodeInfo.rs.nodes[nodeInfo.index];
+        const newConn =
+            MongoRunner.awaitConnection({pid: mongodConn.pid, port: mongodConn.routerPort});
+        newConn.isEmbeddedRouter = true;
+        newConn.port = mongodConn.routerPort;
+        newConn.nodeInfo = nodeInfo;
+        newConn.fullOptions = mongodConn.fullOptions;
+        newConn.commandLine = mongodConn.commandLine;
+        newConn.name = routerConn.name;
+        newConn.host = routerConn.host;
+
+        this._mongos[n] = newConn;
+        this["s" + n] = newConn;
+
+        if (n == 0) {
+            this.s = this._mongos[n];
+            this.admin = this._mongos[n].getDB('admin');
+            this.config = this._mongos[n].getDB('config');
+        }
+
+        // Wait for any election to succeed.
+        nodeInfo.rs.awaitNodesAgreeOnPrimary();
     };
 
     /**
@@ -1423,6 +1488,13 @@ var ShardingTest = function ShardingTest(params) {
             var nodeOptions = [];
             for (var i = 0; i < numConfigs; ++i) {
                 nodeOptions.push(otherParams["c" + i] || {});
+                if (isEmbeddedRouterMode && otherParams.mongosOptions) {
+                    nodeOptions[i] = Object.merge(otherParams.mongosOptions, nodeOptions[i]);
+                    if (otherParams.mongosOptions.setParameter) {
+                        nodeOptions[i].setParameter = Object.merge(
+                            otherParams.mongosOptions.setParameter, nodeOptions[i].setParameter);
+                    }
+                }
             }
 
             rstOptions.nodes = nodeOptions;
@@ -1535,7 +1607,7 @@ var ShardingTest = function ShardingTest(params) {
             var protocolVersion = rsDefaults.protocolVersion;
             delete rsDefaults.protocolVersion;
 
-            const rs = new ReplSetTest({
+            let replSetTestOpts = {
                 name: setName,
                 nodes: numReplicas,
                 host: hostName,
@@ -1550,7 +1622,17 @@ var ShardingTest = function ShardingTest(params) {
                 isConfigServer: setIsConfigSvr,
                 isRouterServer: isEmbeddedRouterMode,
                 useAutoBootstrapProcedure: useAutoBootstrapProcedure,
-            });
+            };
+
+            if (isEmbeddedRouterMode && otherParams.mongosOptions) {
+                replSetTestOpts = Object.merge(otherParams.mongosOptions, replSetTestOpts);
+                if (otherParams.mongosOptions.setParameter) {
+                    replSetTestOpts.setParameter = Object.merge(
+                        otherParams.mongosOptions.setParameter, replSetTestOpts.setParameter);
+                }
+            }
+
+            const rs = new ReplSetTest(replSetTestOpts);
 
             print("ShardingTest starting replica set for shard: " + setName);
 
@@ -1844,16 +1926,19 @@ var ShardingTest = function ShardingTest(params) {
         if (isEmbeddedRouterMode) {
             print("Connecting to embedded routers...");
 
-            // TODO (SERVER-87462): Randomize the list of routers to choose after adding shards from
-            // the router port.
-
-            // Make sure to push one configsvr router port as the first one so it will be the one
-            // responsible to run the addShard commands, extend all sh methods and stop the
-            // balancer.
-
-            let allShardNodes = this._rs.map(r => r.test.nodes).flat();
+            let allShardNodes = this._rs
+                                    .map(r => r.test.nodes.map((_, index) => ({
+                                                                   rs: r.test,
+                                                                   index: index,
+                                                                   isConfig: false,
+                                                               })))
+                                    .flat();
             if (!isConfigShardMode) {
-                allShardNodes = allShardNodes.concat(this.configRS.nodes);
+                allShardNodes = allShardNodes.concat(this.configRS.nodes.map((_, index) => ({
+                                                                                 rs: this.configRS,
+                                                                                 index: index,
+                                                                                 isConfig: true,
+                                                                             })));
             }
 
             assert(allShardNodes.length >= numMongos,
@@ -1863,8 +1948,16 @@ var ShardingTest = function ShardingTest(params) {
                 Random.setRandomFixtureSeed();
             }
 
+            // TODO (SERVER-87462): Randomize the list of routers to choose after adding shards from
+            // the router port.
+
+            // Make sure to push one configsvr router port as the first one so it will be the one
+            // responsible to run the addShard commands, extend all sh methods and stop the
+            // balancer.
             const shuffledNodes = Array.shuffle(allShardNodes);
-            const index = shuffledNodes.findIndex(node => node === this.configRS.nodes[0]);
+            const index =
+                shuffledNodes.findIndex(node => (node.rs === this.configRS && node.index == 0));
+            assert(index != -1, "Can't find first node of the config server");
             const configNode = shuffledNodes.splice(index, 1)[0];
             shuffledNodes.unshift(configNode);
 
@@ -1872,10 +1965,16 @@ var ShardingTest = function ShardingTest(params) {
             let i = 0;
 
             print("Chose the following nodes to act as embedded routers: " + routerNodes);
-            for (const node of routerNodes) {
+            for (const nodeInfo of routerNodes) {
+                const node = nodeInfo.rs.nodes[nodeInfo.index];
                 const conn = MongoRunner.awaitConnection({pid: node.pid, port: node.routerPort});
                 conn.isEmbeddedRouter = true;
                 conn.port = node.routerPort;
+                conn.nodeInfo = nodeInfo;
+                conn.fullOptions = node.fullOptions;
+                conn.name = MongoRunner.getMongosName(node.routerPort, otherParams.useHostname);
+                conn.host = conn.name;
+                conn.commandLine = node.commandLine;
                 this._mongos.push(conn);
                 this["s" + i++] = conn;
                 print("Connected to embedded router - this.s" + i + " == mongod with pid " +

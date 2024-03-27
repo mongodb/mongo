@@ -1,8 +1,5 @@
 // Performs an aggregation that will execute JavaScript on mongos. This is a sanity check to confirm
 // that JavaScript is available on mongos.
-// @tags: [
-//      temp_disabled_embedded_router_test_issue,
-// ]
 
 const st = new ShardingTest({shards: 2});
 const mongos = st.s;
@@ -41,8 +38,8 @@ const pipeline = [
 // mongos succeeds.
 assert.commandWorked(testDB.runCommand({aggregate: 'coll', pipeline: pipeline, cursor: {}}));
 
-// Confirm that the same pipeline fails when Javascript has been disabled on mongos.
-st.restartMongos(0, {"noscripting": '', "restart": true});
+// Confirm that the same pipeline fails when Javascript has been disabled on the router.
+st.restartRouterNode(0, {"noscripting": '', "restart": true});
 // 'testDB' and 'coll' are no longer valid after mongos restart and must be reassigned.
 testDB = st.s.getDB("test");
 coll = testDB.coll;

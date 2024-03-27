@@ -331,12 +331,11 @@ buildvariants:
     # TODO (SERVER-88125): Re-enable `uncategorized` tests.
     # TODO (SERVER-88126): Re-enable `health_monitor` tests.
     # TODO (SERVER-88127): Re-enable `metrics` tests.
-    # TODO (SERVER-88128): Re-enable `test_issue` tests.
     # TODO (SERVER-88129): Re-enable `mongo_bridge` tests.
     test_flags: >-
       --embeddedRouter=true
       --runAllFeatureFlagTests
-      --excludeWithAnyTags=temp_disabled_embedded_router_num_routers,temp_disabled_embedded_router_uncategorized,temp_disabled_embedded_router_health_monitor,temp_disabled_embedded_router_metrics,temp_disabled_embedded_router_test_issue,temp_disabled_embedded_router_known_issues,temp_disabled_embedded_router_mongo_bridge
+      --excludeWithAnyTags=embedded_router_incompatible,temp_disabled_embedded_router_num_routers,temp_disabled_embedded_router_uncategorized,temp_disabled_embedded_router_health_monitor,temp_disabled_embedded_router_metrics,temp_disabled_embedded_router_known_issues,temp_disabled_embedded_router_mongo_bridge
   tasks:
   - name: sharding_gen
 

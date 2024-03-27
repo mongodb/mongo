@@ -1097,6 +1097,10 @@ MongoRunner.runMongod = function(opts, isMixedVersionCluster = false) {
     return mongod;
 };
 
+MongoRunner.getMongosName = function(port, useHostName) {
+    return (useHostName ? getHostName() : "localhost") + ":" + port;
+};
+
 MongoRunner.runMongos = function(opts, isMixedVersionCluster = false) {
     opts = opts || {};
 
@@ -1127,7 +1131,7 @@ MongoRunner.runMongos = function(opts, isMixedVersionCluster = false) {
     }
 
     mongos.commandLine = MongoRunner.arrToOpts(opts);
-    mongos.name = (useHostName ? getHostName() : "localhost") + ":" + mongos.commandLine.port;
+    mongos.name = MongoRunner.getMongosName(mongos.commandLine.port, useHostName);
     mongos.host = mongos.name;
     mongos.port = parseInt(mongos.commandLine.port);
     mongos.runId = runId || ObjectId();

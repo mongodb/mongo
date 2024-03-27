@@ -6,7 +6,7 @@
  * This test restarts shard replica sets, so it requires a persistent storage engine.
  * @tags: [
  *   requires_persistence,
- *   temp_disabled_embedded_router_test_issue,
+ *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 // This test uses authentication and runs commands without authenticating, which is not

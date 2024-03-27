@@ -1,7 +1,9 @@
 /**
  * Test of complex sharding initialization
  * @tags: [
- *   temp_disabled_embedded_router_test_issue,
+ *   # This test is testing CMD parameters passed specifically to mongoS, which expects to be
+ *   # different from other nodes. That's not possible with an embedded router.
+ *   embedded_router_incompatible,
  * ]
  */
 
