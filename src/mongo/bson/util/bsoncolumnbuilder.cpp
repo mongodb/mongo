@@ -2560,14 +2560,22 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_flushSubObjMode
 template <class BufBuilderType, class BSONObjType, class Allocator>
 bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::isInternalStateIdentical(
     const BSONColumnBuilder& other) const {
-    // Verify that buffers are identical
-    if (_bufBuilder.len() != other._bufBuilder.len()) {
-        return false;
-    }
-    if (_bufBuilder.len() > 0) {
-        if (memcmp(_bufBuilder.buf(), other._bufBuilder.buf(), _bufBuilder.len()) != 0) {
+    auto areBufBuildersIdentical = [](const BufBuilderType& bufBuilder,
+                                      const BufBuilderType& otherBufBuilder) {
+        if (bufBuilder.len() != otherBufBuilder.len()) {
             return false;
         }
+
+        if (bufBuilder.len() > 0 &&
+            std::memcmp(bufBuilder.buf(), otherBufBuilder.buf(), bufBuilder.len()) != 0) {
+            return false;
+        }
+
+        return true;
+    };
+
+    if (!areBufBuildersIdentical(_bufBuilder, other._bufBuilder)) {
+        return false;
     }
 
     // Validate intermediate data
@@ -2581,76 +2589,130 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::isInternalStateI
         return false;
     }
 
-    // Validate internal state of regular mode
-    auto* regular = std::get_if<typename InternalState::Regular>(&_is.state);
-    auto* otherRegular = std::get_if<typename InternalState::Regular>(&other._is.state);
-    if (static_cast<bool>(regular) != static_cast<bool>(otherRegular)) {
+    if (_is.state.index() != other._is.state.index()) {
         return false;
     }
-    if (!regular) {
-        // Currently we don't check the interleaved state.
-        return true;
-    }
-    if (regular->_controlByteOffset != otherRegular->_controlByteOffset) {
-        return false;
-    }
-    if (auto encoder = std::get_if<Encoder64>(&regular->_encoder)) {
-        auto encoderOther = std::get_if<Encoder64>(&otherRegular->_encoder);
-        if (!encoderOther) {
-            return false;
-        }
 
-        if (encoder->scaleIndex != encoderOther->scaleIndex) {
-            return false;
-        }
+    auto areEncodingStatesIdentical =
+        [](const bsoncolumn::EncodingState<BufBuilderType, Allocator>& encodingState,
+           const bsoncolumn::EncodingState<BufBuilderType, Allocator>& otherEncodingState) {
+            if (encodingState._controlByteOffset != otherEncodingState._controlByteOffset) {
+                return false;
+            }
 
-        // Our mac toolchain does not have std::bit_cast yet.
-        auto bit_cast = [](double from) {
-            uint64_t to;
-            memcpy(&to, &from, sizeof(uint64_t));
-            return to;
+            if (encodingState._prev != otherEncodingState._prev) {
+                return false;
+            }
+
+            if (encodingState._encoder.index() != otherEncodingState._encoder.index()) {
+                return false;
+            }
+
+            return visit(OverloadedVisitor{
+                             [&](const Encoder64& encoder) {
+                                 auto& otherEncoder =
+                                     std::get<Encoder64>(otherEncodingState._encoder);
+
+                                 if (encoder.scaleIndex != otherEncoder.scaleIndex) {
+                                     return false;
+                                 }
+
+                                 // NaN does not compare equal to itself, so we bit cast and perform
+                                 // this comparison as interger
+                                 if (absl::bit_cast<uint64_t>(encoder.lastValueInPrevBlock) !=
+                                     absl::bit_cast<uint64_t>(otherEncoder.lastValueInPrevBlock)) {
+                                     return false;
+                                 }
+
+                                 if (encoder.prevDelta != otherEncoder.prevDelta) {
+                                     return false;
+                                 }
+
+                                 if (encoder.prevEncoded64 != otherEncoder.prevEncoded64) {
+                                     return false;
+                                 }
+
+                                 return encoder.simple8bBuilder.isInternalStateIdentical(
+                                     otherEncoder.simple8bBuilder);
+                             },
+                             [&](const Encoder128& encoder) {
+                                 auto& otherEncoder =
+                                     std::get<Encoder128>(otherEncodingState._encoder);
+
+                                 if (encoder.prevEncoded128 != otherEncoder.prevEncoded128) {
+                                     return false;
+                                 }
+
+                                 return encoder.simple8bBuilder.isInternalStateIdentical(
+                                     otherEncoder.simple8bBuilder);
+                             },
+                         },
+                         encodingState._encoder);
         };
-        // NaN does not compare equal to itself, so we bit cast and perform this comparison as
-        // interger
-        if (bit_cast(encoder->lastValueInPrevBlock) !=
-            bit_cast(encoderOther->lastValueInPrevBlock)) {
-            return false;
-        }
 
-        if (encoder->prevDelta != encoderOther->prevDelta) {
-            return false;
-        }
-        if (encoder->prevEncoded64 != encoderOther->prevEncoded64) {
-            return false;
-        }
+    return visit(
+        OverloadedVisitor{
+            [&](const typename InternalState::Regular& regular) {
+                return areEncodingStatesIdentical(
+                    regular, std::get<typename InternalState::Regular>(other._is.state));
+            },
+            [&](const typename InternalState::Interleaved& interleaved) {
+                auto& otherInterleaved =
+                    std::get<typename InternalState::Interleaved>(other._is.state);
 
-        if (!encoder->simple8bBuilder.isInternalStateIdentical(encoderOther->simple8bBuilder)) {
-            return false;
-        }
+                if (interleaved.mode != otherInterleaved.mode) {
+                    return false;
+                }
 
+                if (interleaved.subobjStates.size() != otherInterleaved.subobjStates.size()) {
+                    return false;
+                }
 
-    } else if (auto encoder = std::get_if<Encoder128>(&regular->_encoder)) {
-        auto encoderOther = std::get_if<Encoder128>(&otherRegular->_encoder);
-        if (!encoderOther) {
-            return false;
-        }
+                for (size_t i = 0; i < interleaved.subobjStates.size(); ++i) {
+                    auto& subObjState = interleaved.subobjStates[i];
+                    auto& otherSubObjState = otherInterleaved.subobjStates[i];
 
-        if (encoder->prevEncoded128 != encoderOther->prevEncoded128) {
-            return false;
-        }
+                    if (!areEncodingStatesIdentical(subObjState.state, otherSubObjState.state)) {
+                        return false;
+                    }
 
-        if (!encoder->simple8bBuilder.isInternalStateIdentical(encoderOther->simple8bBuilder)) {
-            return false;
-        }
-    } else {
-        return false;
-    }
+                    if (!areBufBuildersIdentical(subObjState.buffer, otherSubObjState.buffer)) {
+                        return false;
+                    }
 
-    if (regular->_prev != otherRegular->_prev) {
-        return false;
-    }
+                    if (subObjState.controlBlocks != otherSubObjState.controlBlocks) {
+                        return false;
+                    }
+                }
 
-    return true;
+                if (!interleaved.referenceSubObj.get().get().binaryEqual(
+                        otherInterleaved.referenceSubObj.get().get())) {
+                    return false;
+                }
+
+                if (interleaved.referenceSubObjType != otherInterleaved.referenceSubObjType) {
+                    return false;
+                }
+
+                if (interleaved.bufferedObjElements.size() !=
+                    otherInterleaved.bufferedObjElements.size()) {
+                    return false;
+                }
+
+                for (size_t i = 0; i < interleaved.bufferedObjElements.size(); ++i) {
+                    auto& bufferedObjElement = interleaved.bufferedObjElements[i];
+                    auto& otherBufferedObjElement = otherInterleaved.bufferedObjElements[i];
+
+                    if (!bufferedObjElement.get().get().binaryEqual(
+                            otherBufferedObjElement.get().get())) {
+                        return false;
+                    }
+                }
+
+                return true;
+            },
+        },
+        _is.state);
 }
 
 template class BSONColumnBuilder<UntrackedBufBuilder, UntrackedBSONObj, std::allocator<void>>;
