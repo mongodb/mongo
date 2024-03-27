@@ -126,9 +126,7 @@ public:
         : _commonStats(typeName), _opCtx(expCtx->opCtx), _expCtx(expCtx) {
         invariant(expCtx);
         if (expCtx->explain || expCtx->mayDbProfile) {
-            // Populating the field for execution time indicates that this stage should time each
-            // call to work().
-            _commonStats.executionTime.emplace(0);
+            markShouldCollectTimingInfo();
         }
     }
 
@@ -358,9 +356,14 @@ public:
      * execution has started.
      */
     void markShouldCollectTimingInfo() {
-        invariant(!_commonStats.executionTime ||
-                  durationCount<Microseconds>(*_commonStats.executionTime) == 0);
-        _commonStats.executionTime.emplace(0);
+        invariant(durationCount<Microseconds>(_commonStats.executionTime.executionTimeEstimate) ==
+                  0);
+
+        if (internalMeasureQueryExecutionTimeInNanoseconds.load()) {
+            _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;
+        } else {
+            _commonStats.executionTime.precision = QueryExecTimerPrecision::kMillis;
+        }
     }
 
 protected:
@@ -413,10 +416,19 @@ protected:
      * stage. May return boost::none if it is not necessary to collect timing info.
      */
     boost::optional<ScopedTimer> getOptTimer() {
-        if (_opCtx && _commonStats.executionTime) {
-            return boost::optional<ScopedTimer>(boost::in_place_init,
-                                                _commonStats.executionTime.get_ptr(),
-                                                _opCtx->getServiceContext()->getFastClockSource());
+        if (_opCtx && _commonStats.executionTime.precision != QueryExecTimerPrecision::kNoTiming) {
+            if (MONGO_likely(_commonStats.executionTime.precision ==
+                             QueryExecTimerPrecision::kMillis)) {
+                return boost::optional<ScopedTimer>(
+                    boost::in_place_init,
+                    &_commonStats.executionTime.executionTimeEstimate,
+                    _opCtx->getServiceContext()->getFastClockSource());
+            } else {
+                return boost::optional<ScopedTimer>(
+                    boost::in_place_init,
+                    &_commonStats.executionTime.executionTimeEstimate,
+                    _opCtx->getServiceContext()->getTickSource());
+            }
         }
 
         return boost::none;

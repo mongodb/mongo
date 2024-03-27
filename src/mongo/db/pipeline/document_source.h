@@ -392,7 +392,7 @@ public:
         auto serviceCtx = pExpCtx->opCtx->getServiceContext();
         dassert(serviceCtx);
 
-        ScopedTimer timer(_commonStats.executionTime.get_ptr(), serviceCtx->getFastClockSource());
+        auto timer = getOptTimer(serviceCtx);
 
         ++_commonStats.works;
 
@@ -597,6 +597,29 @@ private:
 
         return pushMatchBefore(itr, container) || pushSampleBefore(itr, container) ||
             pushSingleDocumentTransformOrRedactBefore(itr, container);
+    }
+
+    /**
+     * Returns an optional timer which is used to collect the execution time.
+     * May return boost::none if it is not necessary to collect timing info.
+     */
+    boost::optional<ScopedTimer> getOptTimer(ServiceContext* serviceCtx) {
+        if (serviceCtx &&
+            _commonStats.executionTime.precision != QueryExecTimerPrecision::kNoTiming) {
+            if (MONGO_likely(_commonStats.executionTime.precision ==
+                             QueryExecTimerPrecision::kMillis)) {
+                return boost::optional<ScopedTimer>(
+                    boost::in_place_init,
+                    &_commonStats.executionTime.executionTimeEstimate,
+                    serviceCtx->getFastClockSource());
+            } else {
+                return boost::optional<ScopedTimer>(
+                    boost::in_place_init,
+                    &_commonStats.executionTime.executionTimeEstimate,
+                    serviceCtx->getTickSource());
+            }
+        }
+        return boost::none;
     }
 
 public:

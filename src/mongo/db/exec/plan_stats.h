@@ -104,8 +104,8 @@ struct CommonStats {
     //
     // The field must be populated when running explain or when running with the profiler on. It
     // must also be populated when multi planning, in order to gather stats stored in the plan
-    // cache.
-    boost::optional<Nanoseconds> executionTime;
+    // cache. This struct includes the execution time and its precision/unit.
+    QueryExecTime executionTime;
 
     bool failed;
     bool isEOF;

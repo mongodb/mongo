@@ -238,10 +238,21 @@ void statsToBSON(const PlanStageStats& stats,
     // Some top-level exec stats get pulled out of the root stage.
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         bob->appendNumber("nReturned", static_cast<long long>(stats.common.advanced));
-        // Include executionTimeMillis if it was recorded.
-        if (stats.common.executionTime) {
-            bob->appendNumber("executionTimeMillisEstimate",
-                              durationCount<Milliseconds>(*stats.common.executionTime));
+        // Include the execution time if it was recorded.
+        if (stats.common.executionTime.precision == QueryExecTimerPrecision::kMillis) {
+            bob->appendNumber(
+                "executionTimeMillisEstimate",
+                durationCount<Milliseconds>(stats.common.executionTime.executionTimeEstimate));
+        } else if (stats.common.executionTime.precision == QueryExecTimerPrecision::kNanos) {
+            bob->appendNumber(
+                "executionTimeMillisEstimate",
+                durationCount<Milliseconds>(stats.common.executionTime.executionTimeEstimate));
+            bob->appendNumber(
+                "executionTimeMicros",
+                durationCount<Microseconds>(stats.common.executionTime.executionTimeEstimate));
+            bob->appendNumber(
+                "executionTimeNanos",
+                durationCount<Nanoseconds>(stats.common.executionTime.executionTimeEstimate));
         }
 
         bob->appendNumber("works", static_cast<long long>(stats.common.works));
@@ -595,11 +606,7 @@ PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* stats,
 
     PlanSummaryStats summary;
     summary.nReturned = stats->common.advanced;
-
-    if (stats->common.executionTime) {
-        summary.executionTime.executionTimeEstimate = *stats->common.executionTime;
-        summary.executionTime.precision = QueryExecTimerPrecision::kMillis;
-    }
+    summary.executionTime = stats->common.executionTime;
 
     // Flatten the stats tree into a list.
     std::vector<const PlanStageStats*> statsNodes;

@@ -1207,7 +1207,7 @@ server_parameters:
 
   internalMeasureQueryExecutionTimeInNanoseconds:
     description: "If true, the explain results include 'executionTimeMicros' and
-    'executionTimeNanos' fields to represent the execution time of each SBE plan stage in
+    'executionTimeNanos' fields to represent the execution time of each execution stage in
     microseconds and in nanoseconds"
     set_at: [ startup ]
     cpp_varname: "internalMeasureQueryExecutionTimeInNanoseconds"

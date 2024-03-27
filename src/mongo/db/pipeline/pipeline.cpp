@@ -91,9 +91,17 @@ Value appendCommonExecStats(Value docSource, const CommonStats& stats) {
     auto nReturned = static_cast<long long>(stats.advanced);
     doc.addField("nReturned", Value(nReturned));
 
-    invariant(stats.executionTime);
-    auto executionTimeMillisEstimate = durationCount<Milliseconds>(*stats.executionTime);
-    doc.addField("executionTimeMillisEstimate", Value(executionTimeMillisEstimate));
+    if (stats.executionTime.precision == QueryExecTimerPrecision::kMillis) {
+        doc.addField("executionTimeMillisEstimate",
+                     Value(durationCount<Milliseconds>(stats.executionTime.executionTimeEstimate)));
+    } else if (stats.executionTime.precision == QueryExecTimerPrecision::kNanos) {
+        doc.addField("executionTimeMillisEstimate",
+                     Value(durationCount<Milliseconds>(stats.executionTime.executionTimeEstimate)));
+        doc.addField("executionTimeMicros",
+                     Value(durationCount<Microseconds>(stats.executionTime.executionTimeEstimate)));
+        doc.addField("executionTimeNanos",
+                     Value(durationCount<Nanoseconds>(stats.executionTime.executionTimeEstimate)));
+    }
     return Value(doc.freeze());
 }
 
