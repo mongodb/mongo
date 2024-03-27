@@ -2196,7 +2196,7 @@ public:
     std::unique_ptr<sbe::vm::CodeFragment> compileSingleInputNoCollator(
         const AccumulationStatement& accStatement) {
         auto exprs =
-            stage_builder::Accum::Op{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
+            stage_builder::AccumOp{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
         ASSERT_EQ(exprs.size(), 1u);
         _expr = exprs[0].extractExpr(_state);
 
@@ -2581,8 +2581,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinWithCollation) 
 
     registerCollator(_state, &collator);
 
-    auto exprs =
-        stage_builder::Accum::Op{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
+    auto exprs = stage_builder::AccumOp{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
     ASSERT_EQ(exprs.size(), 1u);
     auto expr = exprs[0].extractExpr(_state);
 
@@ -2619,8 +2618,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxWithCollation) 
 
     registerCollator(_state, &collator);
 
-    auto exprs =
-        stage_builder::Accum::Op{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
+    auto exprs = stage_builder::AccumOp{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
     ASSERT_EQ(exprs.size(), 1u);
     auto expr = exprs[0].extractExpr(_state);
 
@@ -2726,8 +2724,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAddToSetWithCollat
 
     registerCollator(_state, &collator);
 
-    auto exprs =
-        stage_builder::Accum::Op{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
+    auto exprs = stage_builder::AccumOp{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
     ASSERT_EQ(exprs.size(), 1u);
     auto expr = exprs[0].extractExpr(_state);
 
@@ -2896,7 +2893,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAvg) {
 
     // We expect $avg to result in two separate agg expressions: one for computing the sum and the
     // other for computing the count. Both agg expressions read from the same input slot.
-    auto exprs = stage_builder::Accum::Op{accStatement}.buildCombineAggs(
+    auto exprs = stage_builder::AccumOp{accStatement}.buildCombineAggs(
         _state, {}, {_inputSlotId, _inputSlotId});
     ASSERT_EQ(exprs.size(), 2u);
 

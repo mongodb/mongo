@@ -32,93 +32,82 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/window_function/window_function_statement.h"
+#include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
-namespace Accum {
-class Op;
-}
+struct WindowOpInfo;
 
-/**
- * Build a list of window function init functions.
- */
-SbExpr::Vector buildWindowInit(StageBuilderState& state, const WindowFunctionStatement& stmt);
+class WindowOp {
+public:
+    WindowOp(std::string opName);
 
-SbExpr::Vector buildWindowInit(StageBuilderState& state,
-                               const WindowFunctionStatement& stmt,
-                               StringDataMap<SbExpr> args);
+    WindowOp(StringData opName) : WindowOp(opName.toString()) {}
 
-/**
- * Build a list of window function add functions.
- */
-SbExpr::Vector buildWindowAdd(StageBuilderState& state,
-                              const WindowFunctionStatement& stmt,
-                              SbExpr arg);
+    WindowOp(const WindowFunctionStatement& wf);
 
-/**
- * Similar to above but takes multiple arguments.
- */
-SbExpr::Vector buildWindowAdd(StageBuilderState& state,
-                              const WindowFunctionStatement& stmt,
-                              StringDataMap<SbExpr> args);
+    StringData getOpName() const {
+        return _opName;
+    }
 
-/**
- * Build a list of window function remove functions.
- */
-SbExpr::Vector buildWindowRemove(StageBuilderState& state,
-                                 const WindowFunctionStatement& stmt,
-                                 SbExpr arg);
+    /**
+     * This method returns the number of agg expressions that need to be generated for this
+     * WindowOp.
+     */
+    size_t getNumAggs() const;
 
-/**
- * Similar to above but takes multiple arguments.
- */
-SbExpr::Vector buildWindowRemove(StageBuilderState& state,
-                                 const WindowFunctionStatement& stmt,
-                                 StringDataMap<SbExpr> args);
+    /**
+     * Given one or more input expressions ('input' / 'inputs'), these methods generate the
+     * arg expressions needed for this WindowOp.
+     */
+    AccumInputsPtr buildAddRemoveExprs(StageBuilderState& state, AccumInputsPtr inputs) const;
 
-/**
- * Build a window function finalize functions from the list of intermediate values.
- */
-SbExpr buildWindowFinalize(StageBuilderState& state,
-                           const WindowFunctionStatement& stmt,
-                           SbSlotVector values);
+    /**
+     * Given a vector of named arg expressions ('args' / 'argNames'), this method generates the
+     * accumulate expressions for this WindowOp.
+     */
+    SbExpr::Vector buildAddAggs(StageBuilderState& state, AccumInputsPtr inputs) const;
 
-/**
- * Similar to above but takes multiple arguments.
- */
-SbExpr buildWindowFinalize(StageBuilderState& state,
-                           const WindowFunctionStatement& stmt,
-                           SbSlotVector values,
-                           StringDataMap<SbExpr> args);
+    /**
+     * Given a vector of named arg expressions ('args' / 'argNames'), this method generates the
+     * accumulate expressions for this WindowOp.
+     */
+    SbExpr::Vector buildRemoveAggs(StageBuilderState& state, AccumInputsPtr inputs) const;
 
-/**
- * Given an Accum::Op 'acc' and a single input expression ('input'), these functions
- * generate the accumulate expressions for 'acc'.
- */
-SbExpr::Vector buildAccumulatorForWindowFunc(const Accum::Op& acc,
-                                             SbExpr input,
-                                             StageBuilderState& state);
+    /**
+     * Given a map of input expressions ('argExprs'), these methods generate the initialize
+     * expressions for this WindowOp.
+     */
+    SbExpr::Vector buildInitialize(StageBuilderState& state, AccumInputsPtr inputs) const;
 
-/**
- * Given an Accum::Op 'acc' and a set of input expressions ('inputs'), these functions
- * generate the accumulate expressions for 'acc'.
- */
-SbExpr::Vector buildAccumulatorForWindowFunc(const Accum::Op& acc,
-                                             StringDataMap<SbExpr> inputs,
-                                             StageBuilderState& state);
+    /**
+     * Given a map of input expressions ('argExprs'), this method generates the finalize
+     * expression for this WindowOp.
+     */
+    SbExpr buildFinalize(StageBuilderState& state,
+                         AccumInputsPtr inputs,
+                         const SbSlotVector& aggSlots) const;
 
-SbExpr::Vector buildInitializeForWindowFunc(const Accum::Op& acc, StageBuilderState&);
+private:
+    // Static helper method for looking up the info for this WindowOp in the global map.
+    // This method should only be used by WindowOp's constructors.
+    static const WindowOpInfo* lookupOpInfo(const std::string& opName);
 
-SbExpr::Vector buildInitializeForWindowFunc(const Accum::Op& acc,
-                                            StringDataMap<SbExpr> argExprs,
-                                            StageBuilderState&);
+    // Non-static checked helper method for retrieving the value of '_opInfo'. This method will
+    // raise a tassert if '_opInfo' is null.
+    const WindowOpInfo* getOpInfo() const {
+        uassert(8859901,
+                str::stream() << "Unrecognized WindowOp name: " << _opName,
+                _opInfo != nullptr);
 
-SbExpr buildFinalizeForWindowFunc(const Accum::Op& acc,
-                                  StageBuilderState& state,
-                                  const SbSlotVector& aggSlots);
+        return _opInfo;
+    }
 
-SbExpr buildFinalizeForWindowFunc(const Accum::Op& acc,
-                                  StringDataMap<SbExpr> argExprs,
-                                  StageBuilderState& state,
-                                  const SbSlotVector& aggSlots);
+    // Name of the specific accumulation op. This name is used to retrieve info about the op
+    // from the global map.
+    std::string _opName;
+
+    // Info about the specific accumulation op named by '_opName'.
+    const WindowOpInfo* _opInfo = nullptr;
+};
 }  // namespace mongo::stage_builder

@@ -62,136 +62,126 @@
 #include "mongo/util/str.h"
 
 namespace mongo::stage_builder {
-namespace Accum {
-const StringData kCount = "count"_sd;
-const StringData kCovarianceX = "covarianceX"_sd;
-const StringData kCovarianceY = "covarianceY"_sd;
-const StringData kDefaultVal = "defaultVal"_sd;
-const StringData kInput = "input"_sd;
-const StringData kInputFirst = "inputFirst"_sd;
-const StringData kInputLast = "inputLast"_sd;
-const StringData kIsAscending = "isAscending"_sd;
-const StringData kIsGroupAccum = "isGroupAccum"_sd;
-const StringData kMaxSize = "maxSize"_sd;
-const StringData kSortBy = "sortBy"_sd;
-const StringData kSortByFirst = "sortByFirst"_sd;
-const StringData kSortByLast = "sortByLast"_sd;
-const StringData kSortSpec = "sortSpec"_sd;
-const StringData kUnit = "unit"_sd;
-const StringData kValue = "value"_sd;
-
 const StringData kAccumulatorCountName = "$count"_sd;
 
-Inputs::~Inputs() {}
+AccumInputs::~AccumInputs() = default;
 
-template <typename... Ts>
-auto decodeNamedExprsMap(StringDataMap<SbExpr> args, Ts&&... expectedParamNames) {
-    auto extractArg = [&](const auto& expectedParamName) {
-        auto it = args.find(expectedParamName);
-        uassert(8679700,
-                str::stream() << "Expected parameter not found: " << expectedParamName,
-                it != args.end());
-
-        return std::move(it->second);
-    };
-
-    return std::tuple(extractArg(expectedParamNames)...);
+AccumInputsPtr AddSingleInput::clone() const {
+    return std::make_unique<AddSingleInput>(inputExpr.clone());
 }
 
-AccumSingleInput::AccumSingleInput(StringDataMap<SbExpr> args) {
-    std::tie(inputExpr) = decodeNamedExprsMap(std::move(args), kInput);
+AccumInputsPtr AddAggsAvgInputs::clone() const {
+    return std::make_unique<AddAggsAvgInputs>(inputExpr.clone(), count.clone());
 }
 
-AccumAggsAvgInputs::AccumAggsAvgInputs(StringDataMap<SbExpr> args) {
-    std::tie(inputExpr, count) = decodeNamedExprsMap(std::move(args), kInput, kCount);
+AccumInputsPtr AddCovarianceInputs::clone() const {
+    return std::make_unique<AddCovarianceInputs>(covarianceX.clone(), covarianceY.clone());
 }
 
-AccumCovarianceInputs::AccumCovarianceInputs(StringDataMap<SbExpr> args) {
-    std::tie(covarianceX, covarianceY) =
-        decodeNamedExprsMap(std::move(args), kCovarianceX, kCovarianceY);
+AccumInputsPtr AddRankInputs::clone() const {
+    return std::make_unique<AddRankInputs>(inputExpr.clone(), isAscending.clone());
 }
 
-AccumRankInputs::AccumRankInputs(StringDataMap<SbExpr> args) {
-    std::tie(inputExpr, isAscending) = decodeNamedExprsMap(std::move(args), kInput, kIsAscending);
+AccumInputsPtr AddIntegralInputs::clone() const {
+    return std::make_unique<AddIntegralInputs>(inputExpr.clone(), sortBy.clone());
 }
 
-AccumIntegralInputs::AccumIntegralInputs(StringDataMap<SbExpr> args) {
-    std::tie(inputExpr, sortBy) = decodeNamedExprsMap(std::move(args), kInput, kSortBy);
+AccumInputsPtr AddLinearFillInputs::clone() const {
+    return std::make_unique<AddLinearFillInputs>(inputExpr.clone(), sortBy.clone());
 }
 
-AccumLinearFillInputs::AccumLinearFillInputs(StringDataMap<SbExpr> args) {
-    std::tie(inputExpr, sortBy) = decodeNamedExprsMap(std::move(args), kInput, kSortBy);
+AccumInputsPtr AddTopBottomNInputs::clone() const {
+    return std::make_unique<AddTopBottomNInputs>(value.clone(), sortBy.clone(), sortSpec.clone());
 }
 
-AccumTopBottomNInputs::AccumTopBottomNInputs(StringDataMap<SbExpr> args) {
-    std::tie(value, sortBy, sortSpec) =
-        decodeNamedExprsMap(std::move(args), kValue, kSortBy, kSortSpec);
+AccumInputsPtr AddBlockTopBottomNInputs::clone() const {
+    SbExpr::Vector clonedValues;
+    SbExpr::Vector clonedSortBy;
+
+    for (const auto& e : values) {
+        clonedValues.emplace_back(e.clone());
+    }
+    for (const auto& e : sortBy) {
+        clonedSortBy.emplace_back(e.clone());
+    }
+
+    return std::make_unique<AddBlockTopBottomNInputs>(
+        std::pair{std::move(clonedValues), valueIsArray},
+        std::pair{std::move(clonedSortBy), useMK},
+        sortSpec.clone());
 }
 
-InitAccumNInputs::InitAccumNInputs(StringDataMap<SbExpr> args) {
-    std::tie(maxSize, isGroupAccum) = decodeNamedExprsMap(std::move(args), kMaxSize, kIsGroupAccum);
+AccumInputsPtr InitAccumNInputs::clone() const {
+    return std::make_unique<InitAccumNInputs>(maxSize.clone(), isGroupAccum.clone());
 }
 
-InitExpMovingAvgInputs::InitExpMovingAvgInputs(StringDataMap<SbExpr> args) {
-    std::tie(inputExpr) = decodeNamedExprsMap(std::move(args), kInput);
+AccumInputsPtr InitExpMovingAvgInputs::clone() const {
+    return std::make_unique<InitExpMovingAvgInputs>(inputExpr.clone());
 }
 
-InitIntegralInputs::InitIntegralInputs(StringDataMap<SbExpr> args) {
-    std::tie(inputExpr) = decodeNamedExprsMap(std::move(args), kInput);
+AccumInputsPtr InitIntegralInputs::clone() const {
+    return std::make_unique<InitIntegralInputs>(inputExpr.clone());
 }
 
-FinalizeTopBottomNInputs::FinalizeTopBottomNInputs(StringDataMap<SbExpr> args) {
-    std::tie(sortSpec) = decodeNamedExprsMap(std::move(args), kSortSpec);
+AccumInputsPtr FinalizeTopBottomNInputs::clone() const {
+    return std::make_unique<FinalizeTopBottomNInputs>(sortSpec.clone());
 }
 
-FinalizeDerivativeInputs::FinalizeDerivativeInputs(StringDataMap<SbExpr> args) {
-    std::tie(unit, inputFirst, sortByFirst, inputLast, sortByLast) = decodeNamedExprsMap(
-        std::move(args), kUnit, kInputFirst, kSortByFirst, kInputLast, kSortByLast);
+AccumInputsPtr FinalizeDerivativeInputs::clone() const {
+    return std::make_unique<FinalizeDerivativeInputs>(unit.clone(),
+                                                      inputFirst.clone(),
+                                                      sortByFirst.clone(),
+                                                      inputLast.clone(),
+                                                      sortByLast.clone());
 }
 
-FinalizeLinearFillInputs::FinalizeLinearFillInputs(StringDataMap<SbExpr> args) {
-    std::tie(sortBy) = decodeNamedExprsMap(std::move(args), kSortBy);
+AccumInputsPtr FinalizeLinearFillInputs::clone() const {
+    return std::make_unique<FinalizeLinearFillInputs>(sortBy.clone());
 }
 
-CombineAggsTopBottomNInputs::CombineAggsTopBottomNInputs(StringDataMap<SbExpr> args) {
-    std::tie(sortSpec) = decodeNamedExprsMap(std::move(args), kSortSpec);
+AccumInputsPtr FinalizeWindowFirstLastInputs::clone() const {
+    return std::make_unique<FinalizeWindowFirstLastInputs>(inputExpr.clone(), defaultVal.clone());
+}
+
+AccumInputsPtr CombineAggsTopBottomNInputs::clone() const {
+    return std::make_unique<CombineAggsTopBottomNInputs>(sortSpec.clone());
 }
 
 namespace {
 template <typename ReturnT, typename InputsT, typename... Args>
 using BuildFnType =
-    std::function<ReturnT(const Op&, std::unique_ptr<InputsT>, StageBuilderState&, Args...)>;
+    std::function<ReturnT(const AccumOp&, std::unique_ptr<InputsT>, StageBuilderState&, Args...)>;
 
 template <typename ReturnT, typename... Args>
-using BuildNoInputsFnType = std::function<ReturnT(const Op&, StageBuilderState&, Args...)>;
+using BuildNoInputsFnType = std::function<ReturnT(const AccumOp&, StageBuilderState&, Args...)>;
 
-// std::function type for buildAccumExprs() with inputs and without inputs.
-using BuildAccumExprsNoInputsFn = BuildNoInputsFnType<InputsPtr>;
+// std::function type for buildAddExprs() with inputs and without inputs.
+using BuildAccumExprsNoInputsFn = BuildNoInputsFnType<AccumInputsPtr>;
 
 template <typename T>
-using BuildAccumExprsFnType = BuildFnType<InputsPtr, T>;
+using BuildAccumExprsFnType = BuildFnType<AccumInputsPtr, T>;
 
-using BuildAccumExprsFn = BuildAccumExprsFnType<Inputs>;
+using BuildAccumExprsFn = BuildAccumExprsFnType<AccumInputs>;
 
-// std::function type for buildAccumBlockExprs() with inputs and without inputs.
+// std::function type for buildAddBlockExprs() with inputs and without inputs.
 using BuildAccumBlockExprsNoInputsFn =
-    BuildNoInputsFnType<boost::optional<Accum::AccumBlockExprs>, const PlanStageSlots&>;
+    BuildNoInputsFnType<boost::optional<AddBlockExprs>, const PlanStageSlots&>;
 
 template <typename T>
 using BuildAccumBlockExprsFnType =
-    BuildFnType<boost::optional<Accum::AccumBlockExprs>, T, const PlanStageSlots&>;
+    BuildFnType<boost::optional<AddBlockExprs>, T, const PlanStageSlots&>;
 
-using BuildAccumBlockExprsFn = BuildAccumBlockExprsFnType<Inputs>;
+using BuildAccumBlockExprsFn = BuildAccumBlockExprsFnType<AccumInputs>;
 
-// std::function type for buildAccumAggs() with inputs and without inputs.
+// std::function type for buildAddAggs() with inputs and without inputs.
 using BuildAccumAggsNoInputsFn = BuildNoInputsFnType<SbExpr::Vector>;
 
 template <typename T>
 using BuildAccumAggsFnType = BuildFnType<SbExpr::Vector, T>;
 
-using BuildAccumAggsFn = BuildAccumAggsFnType<Inputs>;
+using BuildAccumAggsFn = BuildAccumAggsFnType<AccumInputs>;
 
-// std::function type for buildAccumBlockAggs() with inputs and without inputs.
+// std::function type for buildAddBlockAggs() with inputs and without inputs.
 using BuildAccumBlockAggsNoInputsFn =
     BuildNoInputsFnType<boost::optional<std::vector<BlockAggAndRowAgg>>, SbSlot>;
 
@@ -199,7 +189,7 @@ template <typename T>
 using BuildAccumBlockAggsFnType =
     BuildFnType<boost::optional<std::vector<BlockAggAndRowAgg>>, T, SbSlot>;
 
-using BuildAccumBlockAggsFn = BuildAccumBlockAggsFnType<Inputs>;
+using BuildAccumBlockAggsFn = BuildAccumBlockAggsFnType<AccumInputs>;
 
 // std::function type for buildInit() with inputs and without inputs.
 using BuildInitNoInputsFn = BuildNoInputsFnType<SbExpr::Vector>;
@@ -207,7 +197,7 @@ using BuildInitNoInputsFn = BuildNoInputsFnType<SbExpr::Vector>;
 template <typename T>
 using BuildInitFnType = BuildFnType<SbExpr::Vector, T>;
 
-using BuildInitFn = BuildInitFnType<Inputs>;
+using BuildInitFn = BuildInitFnType<AccumInputs>;
 
 // std::function type for buildFinalize() with inputs and without inputs.
 using BuildFinalizeNoInputsFn = BuildNoInputsFnType<SbExpr, const SbSlotVector&>;
@@ -215,7 +205,7 @@ using BuildFinalizeNoInputsFn = BuildNoInputsFnType<SbExpr, const SbSlotVector&>
 template <typename T>
 using BuildFinalizeFnType = BuildFnType<SbExpr, T, const SbSlotVector&>;
 
-using BuildFinalizeFn = BuildFinalizeFnType<Inputs>;
+using BuildFinalizeFn = BuildFinalizeFnType<AccumInputs>;
 
 // std::function type for buildCombineAggs() with inputs and without inputs.
 using BuildCombineAggsNoInputsFn = BuildNoInputsFnType<SbExpr::Vector, const SbSlotVector&>;
@@ -223,30 +213,15 @@ using BuildCombineAggsNoInputsFn = BuildNoInputsFnType<SbExpr::Vector, const SbS
 template <typename T>
 using BuildCombineAggsFnType = BuildFnType<SbExpr::Vector, T, const SbSlotVector&>;
 
-using BuildCombineAggsFn = BuildCombineAggsFnType<Inputs>;
+using BuildCombineAggsFn = BuildCombineAggsFnType<AccumInputs>;
 
-// Helper function for casting InputsPtr to a derived class type.
+// Helper function for casting AccumInputsPtr to a derived class type.
 template <typename T>
-std::unique_ptr<T> castInputsTo(InputsPtr inputs) {
+std::unique_ptr<T> castInputsTo(AccumInputsPtr inputs) {
     // Try casting 'inputs.get()' to T* and check if the cast was succeesful.
     const bool castSuccessful = inputs && dynamic_cast<T*>(inputs.get()) != nullptr;
 
-    constexpr bool isConstructibleFromNamedExprsMap =
-        std::is_constructible_v<T, StringDataMap<SbExpr>>;
-
-    // If the cast failed and the expected type is constructible from a named expr map,
-    // check if 'inputs' is a NamedExprsMapWrapper.
-    if constexpr (isConstructibleFromNamedExprsMap) {
-        if (!castSuccessful && inputs) {
-            if (auto wrapper = dynamic_cast<NamedExprsMapWrapper*>(inputs.get())) {
-                // If 'inputs' is a NamedExprsMapWrapper and its possible to convert it
-                // to the expected type, perform the conversion and return the result.
-                return std::make_unique<T>(std::move(wrapper->args));
-            }
-        }
-    }
-
-    // If we reach this point, assert that the cast was castSuccessfulful.
+    // Assert that the cast was successful.
     uassert(8679708, "Casting accumulator input to expected type failed", castSuccessful);
 
     // Extract the pointer from 'inputs', wrap it in a 'std::unique_ptr<T>' and return it.
@@ -258,9 +233,9 @@ std::unique_ptr<T> castInputsTo(InputsPtr inputs) {
  * callback.
  *
  * Given an original build callback with an "inputs" parameter of type 'std::unique_ptr<T>'
- * (where T is a subclass of Inputs), the "wrapped" build callback returned will have the same
+ * (where T is a subclass of AccumInputs), the "wrapped" build callback returned will have the same
  * parameters and return type as the original, except that the type of its "inputs" parameter
- * will be 'std::unique_ptr<Inputs>' instead.
+ * will be 'std::unique_ptr<AccumInputs>' instead.
  *
  * When invoked, the wrapped callback will check if the "inputs" arg provided by the caller can
  * be cast to the type of the original callback's "inputs" parameter. If the cast is possible,
@@ -268,19 +243,22 @@ std::unique_ptr<T> castInputsTo(InputsPtr inputs) {
  * the original callback returns. If the cast is not possible, the wrapped callback will uassert.
  */
 template <typename ReturnT, typename T, typename... Args>
-BuildFnType<ReturnT, Inputs, Args...> makeBuildFnImpl(BuildFnType<ReturnT, T, Args...> fn) {
-    return [fn = std::move(fn)](
-               const Op& acc, InputsPtr inputs, StageBuilderState& state, Args&&... args) {
-        return fn(acc, castInputsTo<T>(std::move(inputs)), state, std::forward<Args>(args)...);
-    };
+BuildFnType<ReturnT, AccumInputs, Args...> makeBuildFnImpl(BuildFnType<ReturnT, T, Args...> fn) {
+    return
+        [fn = std::move(fn)](
+            const AccumOp& acc, AccumInputsPtr inputs, StageBuilderState& state, Args&&... args) {
+            return fn(acc, castInputsTo<T>(std::move(inputs)), state, std::forward<Args>(args)...);
+        };
 }
 
 template <typename ReturnT, typename... Args>
-BuildFnType<ReturnT, Inputs, Args...> makeBuildFnImpl(BuildNoInputsFnType<ReturnT, Args...> fn) {
-    return [fn = std::move(fn)](
-               const Op& acc, InputsPtr inputs, StageBuilderState& state, Args&&... args) {
-        return fn(acc, state, std::forward<Args>(args)...);
-    };
+BuildFnType<ReturnT, AccumInputs, Args...> makeBuildFnImpl(
+    BuildNoInputsFnType<ReturnT, Args...> fn) {
+    return
+        [fn = std::move(fn)](
+            const AccumOp& acc, AccumInputsPtr inputs, StageBuilderState& state, Args&&... args) {
+            return fn(acc, state, std::forward<Args>(args)...);
+        };
 }
 
 template <typename FuncT>
@@ -290,16 +268,16 @@ auto makeBuildFn(FuncT fn) {
 }  // namespace
 
 /**
- * The OpInfo struct contains function pointers and other useful information about an Accum::Op.
- * The 'accumOpInfoMap' map (defined below) maps the name of each op to the corresponding OpInfo
- * for that op.
+ * The AccumOpInfo struct contains function pointers and other useful information about an AccumOp.
+ * The 'accumOpInfoMap' map (defined below) maps the name of each op to the corresponding
+ * AccumOpInfo for that op.
  */
-struct OpInfo {
+struct AccumOpInfo {
     size_t numAggs = 1;
-    BuildAccumExprsFn buildAccumExprs = nullptr;
-    BuildAccumBlockExprsFn buildAccumBlockExprs = nullptr;
-    BuildAccumAggsFn buildAccumAggs = nullptr;
-    BuildAccumBlockAggsFn buildAccumBlockAggs = nullptr;
+    BuildAccumExprsFn buildAddExprs = nullptr;
+    BuildAccumBlockExprsFn buildAddBlockExprs = nullptr;
+    BuildAccumAggsFn buildAddAggs = nullptr;
+    BuildAccumBlockAggsFn buildAddBlockAggs = nullptr;
     BuildInitFn buildInit = nullptr;
     BuildFinalizeFn buildFinalize = nullptr;
     BuildCombineAggsFn buildCombineAggs = nullptr;
@@ -323,18 +301,18 @@ SbExpr nullMissingUndefinedToNothing(SbExpr arg, StageBuilderState& state) {
 }
 
 /**
- * Used to create buildAccumExprs values for $min and $max, as these otherwise won't handle all the
+ * Used to create buildAddExprs values for $min and $max, as these otherwise won't handle all the
  * null, missing, undefined cases correctly.
  */
-InputsPtr buildAccumExprsMinMax(const Op& acc,
-                                std::unique_ptr<AccumSingleInput> inputs,
-                                StageBuilderState& state) {
+AccumInputsPtr buildAccumExprsMinMax(const AccumOp& acc,
+                                     std::unique_ptr<AddSingleInput> inputs,
+                                     StageBuilderState& state) {
     inputs->inputExpr = nullMissingUndefinedToNothing(std::move(inputs->inputExpr), state);
     return inputs;
 }
 
-SbExpr::Vector buildAccumAggsMin(const Op& acc,
-                                 std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsMin(const AccumOp& acc,
+                                 std::unique_ptr<AddSingleInput> inputs,
                                  StageBuilderState& state) {
     SbExprBuilder b(state);
 
@@ -348,7 +326,7 @@ SbExpr::Vector buildAccumAggsMin(const Op& acc,
     }
 }
 
-SbExpr::Vector buildCombineAggsMin(const Op& acc,
+SbExpr::Vector buildCombineAggsMin(const AccumOp& acc,
                                    StageBuilderState& state,
                                    const SbSlotVector& inputSlots) {
     tassert(7039501,
@@ -368,7 +346,9 @@ SbExpr::Vector buildCombineAggsMin(const Op& acc,
     }
 }
 
-SbExpr buildFinalizeMin(const Op& acc, StageBuilderState& state, const SbSlotVector& minSlots) {
+SbExpr buildFinalizeMin(const AccumOp& acc,
+                        StageBuilderState& state,
+                        const SbSlotVector& minSlots) {
     SbExprBuilder b(state);
 
     // We can get away with not building a project stage since there's no finalize step but we
@@ -381,8 +361,8 @@ SbExpr buildFinalizeMin(const Op& acc, StageBuilderState& state, const SbSlotVec
     return b.makeFillEmptyNull(minSlots[0]);
 }
 
-SbExpr::Vector buildAccumAggsMax(const Op& acc,
-                                 std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsMax(const AccumOp& acc,
+                                 std::unique_ptr<AddSingleInput> inputs,
                                  StageBuilderState& state) {
     SbExprBuilder b(state);
 
@@ -396,7 +376,7 @@ SbExpr::Vector buildAccumAggsMax(const Op& acc,
     }
 }
 
-SbExpr::Vector buildCombineAggsMax(const Op& acc,
+SbExpr::Vector buildCombineAggsMax(const AccumOp& acc,
                                    StageBuilderState& state,
                                    const SbSlotVector& inputSlots) {
     tassert(7039502,
@@ -416,7 +396,9 @@ SbExpr::Vector buildCombineAggsMax(const Op& acc,
     }
 }
 
-SbExpr buildFinalizeMax(const Op& acc, StageBuilderState& state, const SbSlotVector& maxSlots) {
+SbExpr buildFinalizeMax(const AccumOp& acc,
+                        StageBuilderState& state,
+                        const SbSlotVector& maxSlots) {
     SbExprBuilder b(state);
 
     tassert(5755100,
@@ -426,23 +408,23 @@ SbExpr buildFinalizeMax(const Op& acc, StageBuilderState& state, const SbSlotVec
     return b.makeFillEmptyNull(maxSlots[0]);
 }
 
-InputsPtr buildAccumExprsFirstLast(const Op& acc,
-                                   std::unique_ptr<AccumSingleInput> inputs,
-                                   StageBuilderState& state) {
+AccumInputsPtr buildAccumExprsFirstLast(const AccumOp& acc,
+                                        std::unique_ptr<AddSingleInput> inputs,
+                                        StageBuilderState& state) {
     SbExprBuilder b(state);
 
     inputs->inputExpr = b.makeFillEmptyNull(std::move(inputs->inputExpr));
     return inputs;
 }
 
-SbExpr::Vector buildAccumAggsFirst(const Op& acc,
-                                   std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsFirst(const AccumOp& acc,
+                                   std::unique_ptr<AddSingleInput> inputs,
                                    StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(b.makeFunction("first", std::move(inputs->inputExpr)));
 }
 
-SbExpr::Vector buildCombineAggsFirst(const Op& acc,
+SbExpr::Vector buildCombineAggsFirst(const AccumOp& acc,
                                      StageBuilderState& state,
                                      const SbSlotVector& inputSlots) {
     tassert(7039503,
@@ -455,14 +437,14 @@ SbExpr::Vector buildCombineAggsFirst(const Op& acc,
     return SbExpr::makeSeq(b.makeFunction("first", std::move(arg)));
 }
 
-SbExpr::Vector buildAccumAggsLast(const Op& acc,
-                                  std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsLast(const AccumOp& acc,
+                                  std::unique_ptr<AddSingleInput> inputs,
                                   StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(b.makeFunction("last", std::move(inputs->inputExpr)));
 }
 
-SbExpr::Vector buildCombineAggsLast(const Op& acc,
+SbExpr::Vector buildCombineAggsLast(const AccumOp& acc,
                                     StageBuilderState& state,
                                     const SbSlotVector& inputSlots) {
     tassert(7039504,
@@ -475,9 +457,9 @@ SbExpr::Vector buildCombineAggsLast(const Op& acc,
     return SbExpr::makeSeq(b.makeFunction("last", std::move(arg)));
 }
 
-InputsPtr buildAccumExprsAvg(const Op& acc,
-                             std::unique_ptr<AccumSingleInput> inputs,
-                             StageBuilderState& state) {
+AccumInputsPtr buildAccumExprsAvg(const AccumOp& acc,
+                                  std::unique_ptr<AddSingleInput> inputs,
+                                  StageBuilderState& state) {
     SbExprBuilder b(state);
 
     // Generate the addend expression.
@@ -496,18 +478,16 @@ InputsPtr buildAccumExprsAvg(const Op& acc,
 
     // Use 'inputs->inputExpr' as the input for the "aggDoubleDoubleSum()" agg and use 'addend'
     // as the input for the "sum()" agg.
-    return std::make_unique<AccumAggsAvgInputs>(std::move(inputs->inputExpr), std::move(addend));
-}  // buildAccumExprsAvg
+    return std::make_unique<AddAggsAvgInputs>(std::move(inputs->inputExpr), std::move(addend));
+}
 
-boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsAvg(
-    const Op& acc,
-    std::unique_ptr<AccumSingleInput> inputsIn,
-    StageBuilderState& state,
-    const PlanStageSlots& outputs) {
-    // Call buildAccumExprs() and cast the result to AccumAggsAvgInputs. This will uassert if the
-    // result type of buildAccumExprs() is not AccumAggsAvgInputs.
-    std::unique_ptr<AccumAggsAvgInputs> inputs =
-        castInputsTo<AccumAggsAvgInputs>(acc.buildAccumExprs(state, std::move(inputsIn)));
+boost::optional<AddBlockExprs> buildAccumBlockExprsAvg(const AccumOp& acc,
+                                                       std::unique_ptr<AddSingleInput> inputsIn,
+                                                       StageBuilderState& state,
+                                                       const PlanStageSlots& outputs) {
+    // Call buildAddExprs() and cast the result to AddAggsAvgInputs. This will uassert if the
+    // result type of buildAddExprs() is not AddAggsAvgInputs.
+    auto inputs = castInputsTo<AddAggsAvgInputs>(acc.buildAddExprs(state, std::move(inputsIn)));
 
     // Try to vectorize 'inputs->inputExpr' and 'inputs->count'.
     SbExpr inputExpr = buildVectorizedExpr(state, std::move(inputs->inputExpr), outputs, false);
@@ -517,8 +497,8 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsAvg(
         // If vectorization succeeded, allocate a slot and update 'inputs->inputExpr' to refer to
         // the slot. Then put 'inputs', the vectorized expression, and the internal slot into an
         // AccumBlockExprs struct and return it.
-        boost::optional<Accum::AccumBlockExprs> accumBlockExprs;
-        accumBlockExprs.emplace();
+        boost::optional<AddBlockExprs> addBlockExprs;
+        addBlockExprs.emplace();
 
         SbSlot inputInternalSlot = SbSlot{state.slotId()};
         SbSlot countInternalSlot = SbSlot{state.slotId()};
@@ -526,23 +506,23 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsAvg(
         inputs->inputExpr = SbExpr{inputInternalSlot};
         inputs->count = SbExpr{countInternalSlot};
 
-        accumBlockExprs->exprs.emplace_back(std::move(inputExpr));
-        accumBlockExprs->exprs.emplace_back(std::move(countExpr));
+        addBlockExprs->exprs.emplace_back(std::move(inputExpr));
+        addBlockExprs->exprs.emplace_back(std::move(countExpr));
 
-        accumBlockExprs->slots.emplace_back(inputInternalSlot);
-        accumBlockExprs->slots.emplace_back(countInternalSlot);
+        addBlockExprs->slots.emplace_back(inputInternalSlot);
+        addBlockExprs->slots.emplace_back(countInternalSlot);
 
-        accumBlockExprs->inputs = std::move(inputs);
+        addBlockExprs->inputs = std::move(inputs);
 
-        return accumBlockExprs;
+        return addBlockExprs;
     }
 
     // If vectorization failed, return boost::none.
     return boost::none;
 }  // buildAccumBlockExprsAvg
 
-SbExpr::Vector buildAccumAggsAvg(const Op& acc,
-                                 std::unique_ptr<AccumAggsAvgInputs> inputs,
+SbExpr::Vector buildAccumAggsAvg(const AccumOp& acc,
+                                 std::unique_ptr<AddAggsAvgInputs> inputs,
                                  StageBuilderState& state) {
     SbExprBuilder b(state);
 
@@ -554,8 +534,8 @@ SbExpr::Vector buildAccumAggsAvg(const Op& acc,
 }  // buildAccumAggsAvg
 
 boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsAvg(
-    const Op& acc,
-    std::unique_ptr<AccumAggsAvgInputs> inputs,
+    const AccumOp& acc,
+    std::unique_ptr<AddAggsAvgInputs> inputs,
     StageBuilderState& state,
     SbSlot bitmapInternalSlot) {
     SbExprBuilder b(state);
@@ -576,7 +556,7 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsAvg(
     return pairs;
 }  // buildAccumBlockAggsAvg
 
-SbExpr::Vector buildCombineAggsAvg(const Op& acc,
+SbExpr::Vector buildCombineAggsAvg(const AccumOp& acc,
                                    StageBuilderState& state,
                                    const SbSlotVector& inputSlots) {
     SbExprBuilder b(state);
@@ -589,7 +569,9 @@ SbExpr::Vector buildCombineAggsAvg(const Op& acc,
                            b.makeFunction("sum", inputSlots[1]));
 }
 
-SbExpr buildFinalizeAvg(const Op& acc, StageBuilderState& state, const SbSlotVector& aggSlots) {
+SbExpr buildFinalizeAvg(const AccumOp& acc,
+                        StageBuilderState& state,
+                        const SbSlotVector& aggSlots) {
     SbExprBuilder b(state);
 
     // Slot 0 contains the accumulated sum, and slot 1 contains the count of summed items.
@@ -628,16 +610,16 @@ SbExpr buildFinalizeAvg(const Op& acc, StageBuilderState& state, const SbSlotVec
     }
 }
 
-SbExpr::Vector buildAccumAggsSum(const Op& acc,
-                                 std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsSum(const AccumOp& acc,
+                                 std::unique_ptr<AddSingleInput> inputs,
                                  StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(b.makeFunction("aggDoubleDoubleSum", std::move(inputs->inputExpr)));
 }
 
 boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsSum(
-    const Op& acc,
-    std::unique_ptr<AccumSingleInput> inputs,
+    const AccumOp& acc,
+    std::unique_ptr<AddSingleInput> inputs,
     StageBuilderState& state,
     SbSlot bitmapInternalSlot) {
     SbExprBuilder b(state);
@@ -653,7 +635,7 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsSum(
     return pairs;
 }
 
-SbExpr::Vector buildCombineAggsSum(const Op& acc,
+SbExpr::Vector buildCombineAggsSum(const AccumOp& acc,
                                    StageBuilderState& state,
                                    const SbSlotVector& inputSlots) {
     SbExprBuilder b(state);
@@ -666,7 +648,9 @@ SbExpr::Vector buildCombineAggsSum(const Op& acc,
     return SbExpr::makeSeq(b.makeFunction("aggMergeDoubleDoubleSums", std::move(arg)));
 }
 
-SbExpr buildFinalizeSum(const Op& acc, StageBuilderState& state, const SbSlotVector& sumSlots) {
+SbExpr buildFinalizeSum(const AccumOp& acc,
+                        StageBuilderState& state,
+                        const SbSlotVector& sumSlots) {
     SbExprBuilder b(state);
 
     tassert(5755300,
@@ -688,12 +672,12 @@ SbExpr buildFinalizeSum(const Op& acc, StageBuilderState& state, const SbSlotVec
     }
 }
 
-SbExpr::Vector buildAccumAggsCount(const Op& acc, StageBuilderState& state) {
+SbExpr::Vector buildAccumAggsCount(const AccumOp& acc, StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(b.makeFunction("count"));
 }
 
-SbExpr::Vector buildCombineAggsCount(const Op& acc,
+SbExpr::Vector buildCombineAggsCount(const AccumOp& acc,
                                      StageBuilderState& state,
                                      const SbSlotVector& inputSlots) {
     SbExprBuilder b(state);
@@ -707,7 +691,9 @@ SbExpr::Vector buildCombineAggsCount(const Op& acc,
     return SbExpr::makeSeq(b.makeFunction("sum", std::move(arg)));
 }
 
-SbExpr buildFinalizeCount(const Op& acc, StageBuilderState& state, const SbSlotVector& sumSlots) {
+SbExpr buildFinalizeCount(const AccumOp& acc,
+                          StageBuilderState& state,
+                          const SbSlotVector& sumSlots) {
     SbExprBuilder b(state);
 
     tassert(8448801,
@@ -755,14 +741,14 @@ SbExpr::Vector buildAccumAggsAddToSetHelper(SbExpr arg,
     }
 }
 
-SbExpr::Vector buildAccumAggsAddToSet(const Op& acc,
-                                      std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsAddToSet(const AccumOp& acc,
+                                      std::unique_ptr<AddSingleInput> inputs,
                                       StageBuilderState& state) {
     return buildAccumAggsAddToSetHelper(
         std::move(inputs->inputExpr), "addToSetCapped"_sd, "collAddToSetCapped"_sd, state);
 }
 
-SbExpr::Vector buildCombineAggsAddToSet(const Op& acc,
+SbExpr::Vector buildCombineAggsAddToSet(const AccumOp& acc,
                                         StageBuilderState& state,
                                         const SbSlotVector& inputSlots) {
     tassert(7039506,
@@ -773,7 +759,7 @@ SbExpr::Vector buildCombineAggsAddToSet(const Op& acc,
         std::move(arg), "aggSetUnionCapped"_sd, "aggCollSetUnionCapped"_sd, state);
 }
 
-SbExpr buildFinalizeCappedAccumulator(const Op& acc,
+SbExpr buildFinalizeCappedAccumulator(const AccumOp& acc,
                                       StageBuilderState& state,
                                       const SbSlotVector& accSlots) {
     SbExprBuilder b(state);
@@ -803,13 +789,13 @@ SbExpr::Vector buildAccumAggsPushHelper(SbExpr arg,
     return SbExpr::makeSeq(b.makeFunction(aggFuncName, std::move(arg), b.makeInt32Constant(cap)));
 }
 
-SbExpr::Vector buildAccumAggsPush(const Op& acc,
-                                  std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsPush(const AccumOp& acc,
+                                  std::unique_ptr<AddSingleInput> inputs,
                                   StageBuilderState& state) {
     return buildAccumAggsPushHelper(std::move(inputs->inputExpr), "addToArrayCapped"_sd, state);
 }
 
-SbExpr::Vector buildCombineAggsPush(const Op& acc,
+SbExpr::Vector buildCombineAggsPush(const AccumOp& acc,
                                     StageBuilderState& state,
                                     const SbSlotVector& inputSlots) {
     tassert(7039505,
@@ -820,14 +806,14 @@ SbExpr::Vector buildCombineAggsPush(const Op& acc,
     return buildAccumAggsPushHelper(std::move(arg), "aggConcatArraysCapped"_sd, state);
 }
 
-SbExpr::Vector buildAccumAggsStdDev(const Op& acc,
-                                    std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsStdDev(const AccumOp& acc,
+                                    std::unique_ptr<AddSingleInput> inputs,
                                     StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(b.makeFunction("aggStdDev", std::move(inputs->inputExpr)));
 }
 
-SbExpr::Vector buildCombineAggsStdDev(const Op& acc,
+SbExpr::Vector buildCombineAggsStdDev(const AccumOp& acc,
                                       StageBuilderState& state,
                                       const SbSlotVector& inputSlots) {
     SbExprBuilder b(state);
@@ -872,7 +858,7 @@ SbExpr buildFinalizePartialStdDevHelper(SbSlot stdDevSlot, StageBuilderState& st
                           std::move(countField));
 }
 
-SbExpr buildFinalizeStdDevPop(const Op& acc,
+SbExpr buildFinalizeStdDevPop(const AccumOp& acc,
                               StageBuilderState& state,
                               const SbSlotVector& stdDevSlots) {
     SbExprBuilder b(state);
@@ -890,7 +876,7 @@ SbExpr buildFinalizeStdDevPop(const Op& acc,
     }
 }
 
-SbExpr buildFinalizeStdDevSamp(const Op& acc,
+SbExpr buildFinalizeStdDevSamp(const AccumOp& acc,
                                StageBuilderState& state,
                                const SbSlotVector& stdDevSlots) {
     SbExprBuilder b(state);
@@ -924,22 +910,22 @@ SbExpr wrapMergeObjectsArg(SbExpr arg, StageBuilderState& state) {
     return b.makeLet(frameId, std::move(binds), std::move(expr));
 }
 
-InputsPtr buildAccumExprsMergeObjects(const Op& acc,
-                                      std::unique_ptr<AccumSingleInput> inputs,
-                                      StageBuilderState& state) {
+AccumInputsPtr buildAccumExprsMergeObjects(const AccumOp& acc,
+                                           std::unique_ptr<AddSingleInput> inputs,
+                                           StageBuilderState& state) {
     inputs->inputExpr = wrapMergeObjectsArg(std::move(inputs->inputExpr), state);
     return inputs;
 }
 
-SbExpr::Vector buildAccumAggsMergeObjects(const Op& acc,
-                                          std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsMergeObjects(const AccumOp& acc,
+                                          std::unique_ptr<AddSingleInput> inputs,
                                           StageBuilderState& state) {
     SbExprBuilder b(state);
 
     return SbExpr::makeSeq(b.makeFunction("mergeObjects", std::move(inputs->inputExpr)));
 }
 
-SbExpr::Vector buildCombineAggsMergeObjects(const Op& acc,
+SbExpr::Vector buildCombineAggsMergeObjects(const AccumOp& acc,
                                             StageBuilderState& state,
                                             const SbSlotVector& inputSlots) {
     tassert(7039507,
@@ -952,7 +938,7 @@ SbExpr::Vector buildCombineAggsMergeObjects(const Op& acc,
         b.makeFunction("mergeObjects", wrapMergeObjectsArg(SbExpr{inputSlots[0]}, state)));
 }
 
-SbExpr::Vector buildInitializeAccumN(const Op& acc,
+SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
                                      std::unique_ptr<InitAccumNInputs> inputs,
                                      StageBuilderState& state) {
     SbExprBuilder b(state);
@@ -1004,8 +990,8 @@ SbExpr::Vector buildInitializeAccumN(const Op& acc,
     }
 }
 
-SbExpr::Vector buildAccumAggsFirstN(const Op& acc,
-                                    std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsFirstN(const AccumOp& acc,
+                                    std::unique_ptr<AddSingleInput> inputs,
                                     StageBuilderState& state) {
     SbExprBuilder b(state);
 
@@ -1024,7 +1010,7 @@ SbExpr::Vector buildAccumAggsFirstN(const Op& acc,
     return SbExpr::makeSeq(b.makeLet(frameId, std::move(binds), std::move(e)));
 }
 
-SbExpr::Vector buildCombineAggsFirstN(const Op& acc,
+SbExpr::Vector buildCombineAggsFirstN(const AccumOp& acc,
                                       StageBuilderState& state,
                                       const SbSlotVector& inputSlots) {
     SbExprBuilder b(state);
@@ -1037,7 +1023,7 @@ SbExpr::Vector buildCombineAggsFirstN(const Op& acc,
     return SbExpr::makeSeq(b.makeFunction("aggFirstNMerge", inputSlots[0]));
 }
 
-SbExpr buildFinalizeFirstN(const Op& acc,
+SbExpr buildFinalizeFirstN(const AccumOp& acc,
                            StageBuilderState& state,
                            const SbSlotVector& inputSlots) {
     SbExprBuilder b(state);
@@ -1049,23 +1035,23 @@ SbExpr buildFinalizeFirstN(const Op& acc,
     return b.makeFunction("aggFirstNFinalize", inputSlots[0]);
 }
 
-InputsPtr buildAccumExprsLastN(const Op& acc,
-                               std::unique_ptr<AccumSingleInput> inputs,
-                               StageBuilderState& state) {
+AccumInputsPtr buildAccumExprsLastN(const AccumOp& acc,
+                                    std::unique_ptr<AddSingleInput> inputs,
+                                    StageBuilderState& state) {
     SbExprBuilder b(state);
 
     inputs->inputExpr = b.makeFillEmptyNull(std::move(inputs->inputExpr));
     return inputs;
 }
 
-SbExpr::Vector buildAccumAggsLastN(const Op& acc,
-                                   std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsLastN(const AccumOp& acc,
+                                   std::unique_ptr<AddSingleInput> inputs,
                                    StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(b.makeFunction("aggLastN", std::move(inputs->inputExpr)));
 }
 
-SbExpr::Vector buildCombineAggsLastN(const Op& acc,
+SbExpr::Vector buildCombineAggsLastN(const AccumOp& acc,
                                      StageBuilderState& state,
                                      const SbSlotVector& inputSlots) {
     SbExprBuilder b(state);
@@ -1078,7 +1064,9 @@ SbExpr::Vector buildCombineAggsLastN(const Op& acc,
     return SbExpr::makeSeq(b.makeFunction("aggLastNMerge", inputSlots[0]));
 }
 
-SbExpr buildFinalizeLastN(const Op& acc, StageBuilderState& state, const SbSlotVector& inputSlots) {
+SbExpr buildFinalizeLastN(const AccumOp& acc,
+                          StageBuilderState& state,
+                          const SbSlotVector& inputSlots) {
     SbExprBuilder b(state);
 
     uassert(7548702,
@@ -1088,13 +1076,13 @@ SbExpr buildFinalizeLastN(const Op& acc, StageBuilderState& state, const SbSlotV
     return b.makeFunction("aggLastNFinalize", inputSlots[0]);
 }
 
-bool isAccumulatorTopN(const Op& acc) {
+bool isAccumulatorTopN(const AccumOp& acc) {
     const auto& name = acc.getOpName();
     return name == AccumulatorTopN::getName() || name == AccumulatorTop::getName();
 }
 
-SbExpr::Vector buildAccumAggsTopBottomN(const Op& acc,
-                                        std::unique_ptr<AccumTopBottomNInputs> inputs,
+SbExpr::Vector buildAccumAggsTopBottomN(const AccumOp& acc,
+                                        std::unique_ptr<AddTopBottomNInputs> inputs,
                                         StageBuilderState& state) {
     SbExprBuilder b(state);
 
@@ -1109,7 +1097,7 @@ SbExpr::Vector buildAccumAggsTopBottomN(const Op& acc,
                                           std::move(value)));
 }
 
-SbExpr::Vector buildCombineAggsTopBottomN(const Op& acc,
+SbExpr::Vector buildCombineAggsTopBottomN(const AccumOp& acc,
                                           std::unique_ptr<CombineAggsTopBottomNInputs> inputs,
                                           StageBuilderState& state,
                                           const SbSlotVector& inputSlots) {
@@ -1128,7 +1116,7 @@ SbExpr::Vector buildCombineAggsTopBottomN(const Op& acc,
                        std::move(sortSpec)));
 }
 
-SbExpr buildFinalizeTopBottomNImpl(const Op& acc,
+SbExpr buildFinalizeTopBottomNImpl(const AccumOp& acc,
                                    std::unique_ptr<FinalizeTopBottomNInputs> inputs,
                                    StageBuilderState& state,
                                    const SbSlotVector& inputSlots,
@@ -1175,31 +1163,31 @@ SbExpr buildFinalizeTopBottomNImpl(const Op& acc,
     }
 }
 
-SbExpr buildFinalizeTopBottomN(const Op& acc,
+SbExpr buildFinalizeTopBottomN(const AccumOp& acc,
                                std::unique_ptr<FinalizeTopBottomNInputs> inputs,
                                StageBuilderState& state,
                                const SbSlotVector& inputSlots) {
     return buildFinalizeTopBottomNImpl(acc, std::move(inputs), state, inputSlots, false);
 }
 
-SbExpr buildFinalizeTopBottom(const Op& acc,
+SbExpr buildFinalizeTopBottom(const AccumOp& acc,
                               std::unique_ptr<FinalizeTopBottomNInputs> inputs,
                               StageBuilderState& state,
                               const SbSlotVector& inputSlots) {
     return buildFinalizeTopBottomNImpl(acc, std::move(inputs), state, inputSlots, true);
 }
 
-InputsPtr buildAccumExprsMinMaxN(const Op& acc,
-                                 std::unique_ptr<AccumSingleInput> inputs,
-                                 StageBuilderState& state) {
+AccumInputsPtr buildAccumExprsMinMaxN(const AccumOp& acc,
+                                      std::unique_ptr<AddSingleInput> inputs,
+                                      StageBuilderState& state) {
     SbExprBuilder b(state);
 
     inputs->inputExpr = b.makeFunction("setToArray", std::move(inputs->inputExpr));
     return inputs;
 }
 
-SbExpr::Vector buildAccumAggsMinMaxN(const Op& acc,
-                                     std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsMinMaxN(const AccumOp& acc,
+                                     std::unique_ptr<AddSingleInput> inputs,
                                      StageBuilderState& state) {
     SbExprBuilder b(state);
 
@@ -1216,7 +1204,7 @@ SbExpr::Vector buildAccumAggsMinMaxN(const Op& acc,
     }
 }
 
-SbExpr::Vector buildCombineAggsMinMaxN(const Op& acc,
+SbExpr::Vector buildCombineAggsMinMaxN(const AccumOp& acc,
                                        StageBuilderState& state,
                                        const SbSlotVector& inputSlots) {
     SbExprBuilder b(state);
@@ -1237,7 +1225,7 @@ SbExpr::Vector buildCombineAggsMinMaxN(const Op& acc,
     }
 }
 
-SbExpr buildFinalizeMinMaxN(const Op& acc,
+SbExpr buildFinalizeMinMaxN(const AccumOp& acc,
                             StageBuilderState& state,
                             const SbSlotVector& inputSlots) {
     SbExprBuilder b(state);
@@ -1257,8 +1245,8 @@ SbExpr buildFinalizeMinMaxN(const Op& acc,
     }
 }
 
-SbExpr::Vector buildAccumAggsCovariance(const Op& acc,
-                                        std::unique_ptr<AccumCovarianceInputs> inputs,
+SbExpr::Vector buildAccumAggsCovariance(const AccumOp& acc,
+                                        std::unique_ptr<AddCovarianceInputs> inputs,
                                         StageBuilderState& state) {
     auto argX = std::move(inputs->covarianceX);
     auto argY = std::move(inputs->covarianceY);
@@ -1268,7 +1256,7 @@ SbExpr::Vector buildAccumAggsCovariance(const Op& acc,
     return SbExpr::makeSeq(b.makeFunction("aggCovarianceAdd", std::move(argX), std::move(argY)));
 }
 
-SbExpr buildFinalizeCovarianceSamp(const Op& acc,
+SbExpr buildFinalizeCovarianceSamp(const AccumOp& acc,
                                    StageBuilderState& state,
                                    const SbSlotVector& slots) {
     SbExprBuilder b(state);
@@ -1281,7 +1269,7 @@ SbExpr buildFinalizeCovarianceSamp(const Op& acc,
     return b.makeFunction("aggCovarianceSampFinalize", std::move(exprs));
 }
 
-SbExpr buildFinalizeCovariancePop(const Op& acc,
+SbExpr buildFinalizeCovariancePop(const AccumOp& acc,
                                   StageBuilderState& state,
                                   const SbSlotVector& slots) {
     SbExprBuilder b(state);
@@ -1294,7 +1282,7 @@ SbExpr buildFinalizeCovariancePop(const Op& acc,
     return b.makeFunction("aggCovariancePopFinalize", std::move(exprs));
 }
 
-SbExpr::Vector buildInitializeExpMovingAvg(const Op& acc,
+SbExpr::Vector buildInitializeExpMovingAvg(const AccumOp& acc,
                                            std::unique_ptr<InitExpMovingAvgInputs> inputs,
                                            StageBuilderState& state) {
     SbExprBuilder b(state);
@@ -1305,14 +1293,14 @@ SbExpr::Vector buildInitializeExpMovingAvg(const Op& acc,
         "newArray", b.makeNullConstant(), std::move(alphaExpr), b.makeBoolConstant(false)));
 }
 
-SbExpr::Vector buildAccumAggsExpMovingAvg(const Op& acc,
-                                          std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsExpMovingAvg(const AccumOp& acc,
+                                          std::unique_ptr<AddSingleInput> inputs,
                                           StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(b.makeFunction("aggExpMovingAvg", std::move(inputs->inputExpr)));
 }
 
-SbExpr buildFinalizeExpMovingAvg(const Op& acc,
+SbExpr buildFinalizeExpMovingAvg(const AccumOp& acc,
                                  StageBuilderState& state,
                                  const SbSlotVector& slots) {
     SbExprBuilder b(state);
@@ -1320,8 +1308,8 @@ SbExpr buildFinalizeExpMovingAvg(const Op& acc,
     return b.makeFunction("aggExpMovingAvgFinalize", slots[0]);
 }
 
-SbExpr::Vector buildAccumAggsLocf(const Op& acc,
-                                  std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsLocf(const AccumOp& acc,
+                                  std::unique_ptr<AddSingleInput> inputs,
                                   StageBuilderState& state) {
     SbExprBuilder b(state);
 
@@ -1336,8 +1324,8 @@ SbExpr::Vector buildAccumAggsLocf(const Op& acc,
     return SbExpr::makeSeq(std::move(localBind));
 }
 
-SbExpr::Vector buildAccumAggsDocumentNumber(const Op& acc,
-                                            std::unique_ptr<AccumSingleInput> inputs,
+SbExpr::Vector buildAccumAggsDocumentNumber(const AccumOp& acc,
+                                            std::unique_ptr<AddSingleInput> inputs,
                                             StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(b.makeFunction("sum", b.makeInt64Constant(1)));
@@ -1345,7 +1333,7 @@ SbExpr::Vector buildAccumAggsDocumentNumber(const Op& acc,
 
 SbExpr::Vector buildAccumAggsRankImpl(const StringData rankFuncName,
                                       const StringData collRankFuncName,
-                                      const Op& acc,
+                                      const AccumOp& acc,
                                       SbExpr input,
                                       SbExpr sortOrder,
                                       StageBuilderState& state) {
@@ -1362,8 +1350,8 @@ SbExpr::Vector buildAccumAggsRankImpl(const StringData rankFuncName,
     }
 }
 
-SbExpr::Vector buildAccumAggsRank(const Op& acc,
-                                  std::unique_ptr<AccumRankInputs> inputs,
+SbExpr::Vector buildAccumAggsRank(const AccumOp& acc,
+                                  std::unique_ptr<AddRankInputs> inputs,
                                   StageBuilderState& state) {
     auto input = std::move(inputs->inputExpr);
     auto sortOrder = std::move(inputs->isAscending);
@@ -1372,15 +1360,15 @@ SbExpr::Vector buildAccumAggsRank(const Op& acc,
         "aggRank", "aggRankColl", acc, std::move(input), std::move(sortOrder), state);
 }
 
-SbExpr buildFinalizeRank(const Op& acc, StageBuilderState& state, const SbSlotVector& slots) {
+SbExpr buildFinalizeRank(const AccumOp& acc, StageBuilderState& state, const SbSlotVector& slots) {
     SbExprBuilder b(state);
 
     tassert(7996805, "Incorrect number of arguments", slots.size() == 1);
     return b.makeFunction("aggRankFinalize", slots[0]);
 }
 
-SbExpr::Vector buildAccumAggsDenseRank(const Op& acc,
-                                       std::unique_ptr<AccumRankInputs> inputs,
+SbExpr::Vector buildAccumAggsDenseRank(const AccumOp& acc,
+                                       std::unique_ptr<AddRankInputs> inputs,
                                        StageBuilderState& state) {
     auto input = std::move(inputs->inputExpr);
     auto sortOrder = std::move(inputs->isAscending);
@@ -1389,7 +1377,7 @@ SbExpr::Vector buildAccumAggsDenseRank(const Op& acc,
         "aggDenseRank", "aggDenseRankColl", acc, std::move(input), std::move(sortOrder), state);
 }
 
-SbExpr::Vector buildInitializeIntegral(const Op& acc,
+SbExpr::Vector buildInitializeIntegral(const AccumOp& acc,
                                        std::unique_ptr<InitIntegralInputs> inputs,
                                        StageBuilderState& state) {
     SbExprBuilder b(state);
@@ -1400,8 +1388,8 @@ SbExpr::Vector buildInitializeIntegral(const Op& acc,
         b.makeFunction("aggIntegralInit", std::move(unitExpr), b.makeBoolConstant(true)));
 }
 
-SbExpr::Vector buildAccumAggsIntegral(const Op& acc,
-                                      std::unique_ptr<AccumIntegralInputs> inputs,
+SbExpr::Vector buildAccumAggsIntegral(const AccumOp& acc,
+                                      std::unique_ptr<AddIntegralInputs> inputs,
                                       StageBuilderState& state) {
     auto input = std::move(inputs->inputExpr);
     auto sortBy = std::move(inputs->sortBy);
@@ -1411,19 +1399,21 @@ SbExpr::Vector buildAccumAggsIntegral(const Op& acc,
     return SbExpr::makeSeq(b.makeFunction("aggIntegralAdd", std::move(input), std::move(sortBy)));
 }
 
-SbExpr buildFinalizeIntegral(const Op& acc, StageBuilderState& state, const SbSlotVector& slots) {
+SbExpr buildFinalizeIntegral(const AccumOp& acc,
+                             StageBuilderState& state,
+                             const SbSlotVector& slots) {
     SbExprBuilder b(state);
 
     tassert(7996809, "Incorrect number of arguments", slots.size() == 1);
     return b.makeFunction("aggIntegralFinalize", slots[0]);
 }
 
-SbExpr::Vector buildAccumAggsDerivative(const Op& acc, StageBuilderState& state) {
+SbExpr::Vector buildAccumAggsDerivative(const AccumOp& acc, StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(b.makeFunction("sum", b.makeInt64Constant(1)));
 }
 
-SbExpr buildFinalizeDerivative(const Op& acc,
+SbExpr buildFinalizeDerivative(const AccumOp& acc,
                                std::unique_ptr<FinalizeDerivativeInputs> inputs,
                                StageBuilderState& state,
                                const SbSlotVector& slots) {
@@ -1450,7 +1440,7 @@ SbExpr buildFinalizeDerivative(const Op& acc,
         b.makeNullConstant());
 }
 
-SbExpr::Vector buildInitializeLinearFill(const Op& acc, StageBuilderState& state) {
+SbExpr::Vector buildInitializeLinearFill(const AccumOp& acc, StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(b.makeFunction("newArray",
                                           b.makeNullConstant(),
@@ -1461,17 +1451,17 @@ SbExpr::Vector buildInitializeLinearFill(const Op& acc, StageBuilderState& state
                                           b.makeInt64Constant(0)));
 }
 
-InputsPtr buildAccumExprsLinearFill(const Op& acc,
-                                    std::unique_ptr<AccumLinearFillInputs> inputs,
-                                    StageBuilderState& state) {
+AccumInputsPtr buildAccumExprsLinearFill(const AccumOp& acc,
+                                         std::unique_ptr<AddLinearFillInputs> inputs,
+                                         StageBuilderState& state) {
     SbExprBuilder b(state);
 
     inputs->inputExpr = b.makeFillEmptyNull(std::move(inputs->inputExpr));
     return inputs;
 }
 
-SbExpr::Vector buildAccumAggsLinearFill(const Op& acc,
-                                        std::unique_ptr<AccumLinearFillInputs> inputs,
+SbExpr::Vector buildAccumAggsLinearFill(const AccumOp& acc,
+                                        std::unique_ptr<AddLinearFillInputs> inputs,
                                         StageBuilderState& state) {
     auto input = std::move(inputs->inputExpr);
     auto sortBy = std::move(inputs->sortBy);
@@ -1481,7 +1471,7 @@ SbExpr::Vector buildAccumAggsLinearFill(const Op& acc,
     return SbExpr::makeSeq(b.makeFunction("aggLinearFillAdd", std::move(input), std::move(sortBy)));
 }
 
-SbExpr buildFinalizeLinearFill(const Op& acc,
+SbExpr buildFinalizeLinearFill(const AccumOp& acc,
                                std::unique_ptr<FinalizeLinearFillInputs> inputs,
                                StageBuilderState& state,
                                const SbSlotVector& inputSlots) {
@@ -1498,15 +1488,14 @@ SbExpr buildFinalizeLinearFill(const Op& acc,
     return b.makeFunction("aggLinearFillFinalize", std::move(inputVar), std::move(sortBy));
 }
 
-boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsSingleInput(
-    const Op& acc,
-    std::unique_ptr<AccumSingleInput> inputsIn,
+boost::optional<AddBlockExprs> buildAccumBlockExprsSingleInput(
+    const AccumOp& acc,
+    std::unique_ptr<AddSingleInput> inputsIn,
     StageBuilderState& state,
     const PlanStageSlots& outputs) {
-    // Call buildAccumExprs() and cast the result to AccumSingleInput. This will uassert if the
-    // result type of buildAccumExprs() is not AccumSingleInput.
-    std::unique_ptr<AccumSingleInput> inputs =
-        castInputsTo<AccumSingleInput>(acc.buildAccumExprs(state, std::move(inputsIn)));
+    // Call buildAddExprs() and cast the result to AddSingleInput. This will uassert if the
+    // result type of buildAddExprs() is not AddSingleInput.
+    auto inputs = castInputsTo<AddSingleInput>(acc.buildAddExprs(state, std::move(inputsIn)));
 
     // Try to vectorize 'inputs->inputExpr'.
     SbExpr expr = buildVectorizedExpr(state, std::move(inputs->inputExpr), outputs, false);
@@ -1514,36 +1503,35 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsSingleInput(
     if (expr) {
         // If vectorization succeeded, allocate a slot and update 'inputs->inputExpr' to refer to
         // the slot. Then put 'inputs', the vectorized expression, and the internal slot into an
-        // AccumBlockExprs struct and return it.
-        boost::optional<Accum::AccumBlockExprs> accumBlockExprs;
-        accumBlockExprs.emplace();
+        // AddBlockExprs struct and return it.
+        boost::optional<AddBlockExprs> addBlockExprs;
+        addBlockExprs.emplace();
 
         SbSlot internalSlot = SbSlot{state.slotId()};
         inputs->inputExpr = SbExpr{internalSlot};
 
-        accumBlockExprs->exprs.emplace_back(std::move(expr));
-        accumBlockExprs->slots.emplace_back(internalSlot);
+        addBlockExprs->exprs.emplace_back(std::move(expr));
+        addBlockExprs->slots.emplace_back(internalSlot);
 
-        accumBlockExprs->inputs = std::move(inputs);
+        addBlockExprs->inputs = std::move(inputs);
 
-        return accumBlockExprs;
+        return addBlockExprs;
     }
 
     // If vectorization failed, return boost::none.
     return boost::none;
 }
 
-boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsNoInputs(
-    const Op& acc, StageBuilderState& state, const PlanStageSlots& outputs) {
-    // Default construct a 'AccumBlockExprs' and return it.
-    boost::optional<Accum::AccumBlockExprs> accumBlockExprs;
-    accumBlockExprs.emplace();
-    return accumBlockExprs;
+boost::optional<AddBlockExprs> buildAccumBlockExprsNoInputs(const AccumOp& acc,
+                                                            StageBuilderState& state,
+                                                            const PlanStageSlots& outputs) {
+    // Default construct a 'AddBlockExprs' and return it.
+    return boost::optional<AddBlockExprs>{boost::in_place_init};
 }
 
 boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMin(
-    const Op& acc,
-    std::unique_ptr<AccumSingleInput> inputs,
+    const AccumOp& acc,
+    std::unique_ptr<AddSingleInput> inputs,
     StageBuilderState& state,
     SbSlot bitmapInternalSlot) {
     SbExprBuilder b(state);
@@ -1561,8 +1549,8 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMin(
 }
 
 boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMax(
-    const Op& acc,
-    std::unique_ptr<AccumSingleInput> inputs,
+    const AccumOp& acc,
+    std::unique_ptr<AddSingleInput> inputs,
     StageBuilderState& state,
     SbSlot bitmapInternalSlot) {
     SbExprBuilder b(state);
@@ -1580,7 +1568,7 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMax(
 }
 
 boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsCount(
-    const Op& acc, StageBuilderState& state, SbSlot bitmapInternalSlot) {
+    const AccumOp& acc, StageBuilderState& state, SbSlot bitmapInternalSlot) {
     SbExprBuilder b(state);
 
     auto blockAgg = b.makeFunction("valueBlockAggCount", bitmapInternalSlot);
@@ -1593,9 +1581,9 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsCount(
     return pairs;
 }
 
-boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsTopBottomN(
-    const Op& acc,
-    std::unique_ptr<AccumBlockTopBottomNInputs> inputs,
+boost::optional<AddBlockExprs> buildAccumBlockExprsTopBottomN(
+    const AccumOp& acc,
+    std::unique_ptr<AddBlockTopBottomNInputs> inputs,
     StageBuilderState& state,
     const PlanStageSlots& outputs) {
     // Try to vectorize each element of 'inputs->values'.
@@ -1624,34 +1612,34 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsTopBottomN(
 
     // If vectorization succeeded, allocate K+1 slots and update 'inputs->values' and
     // 'inputs->sortBy' to refer to these slots. Then put 'inputs', the vectorized
-    // expressions, and the K+1 internal slots into an AccumBlockExprs struct and return it.
-    boost::optional<Accum::AccumBlockExprs> accumBlockExprs;
-    accumBlockExprs.emplace();
+    // expressions, and the K+1 internal slots into an AddBlockExprs struct and return it.
+    boost::optional<AddBlockExprs> addBlockExprs;
+    addBlockExprs.emplace();
 
     inputs->values = SbExpr::Vector{};
     for (size_t i = 0; i < valueExprs.size(); ++i) {
         SbSlot valueInternalSlot = SbSlot{state.slotId()};
         inputs->values.emplace_back(SbExpr{valueInternalSlot});
-        accumBlockExprs->exprs.emplace_back(std::move(valueExprs[i]));
-        accumBlockExprs->slots.emplace_back(valueInternalSlot);
+        addBlockExprs->exprs.emplace_back(std::move(valueExprs[i]));
+        addBlockExprs->slots.emplace_back(valueInternalSlot);
     }
 
     inputs->sortBy = SbExpr::Vector{};
     for (size_t i = 0; i < keyExprs.size(); ++i) {
         SbSlot keyInternalSlot = SbSlot{state.slotId()};
         inputs->sortBy.emplace_back(SbExpr{keyInternalSlot});
-        accumBlockExprs->exprs.emplace_back(std::move(keyExprs[i]));
-        accumBlockExprs->slots.emplace_back(keyInternalSlot);
+        addBlockExprs->exprs.emplace_back(std::move(keyExprs[i]));
+        addBlockExprs->slots.emplace_back(keyInternalSlot);
     }
 
-    accumBlockExprs->inputs = std::move(inputs);
+    addBlockExprs->inputs = std::move(inputs);
 
-    return accumBlockExprs;
+    return addBlockExprs;
 }
 
 boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsTopBottomN(
-    const Op& acc,
-    std::unique_ptr<AccumBlockTopBottomNInputs> inputs,
+    const AccumOp& acc,
+    std::unique_ptr<AddBlockTopBottomNInputs> inputs,
     StageBuilderState& state,
     SbSlot bitmapInternalSlot) {
     SbExprBuilder b(state);
@@ -1706,211 +1694,212 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsTopBottomN(
 
     return pairs;
 }
+}  // namespace
 
-static const StringDataMap<OpInfo> accumOpInfoMap = {
+static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
     // AddToSet
     {AccumulatorAddToSet::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsAddToSet),
-            .buildFinalize = makeBuildFn(&buildFinalizeCappedAccumulator),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsAddToSet)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsAddToSet),
+                 .buildFinalize = makeBuildFn(&buildFinalizeCappedAccumulator),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsAddToSet)}},
 
     // Avg
     {AccumulatorAvg::kName,
-     OpInfo{.numAggs = 2,
-            .buildAccumExprs = makeBuildFn(&buildAccumExprsAvg),
-            .buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsAvg),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsAvg),
-            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsAvg),
-            .buildFinalize = makeBuildFn(&buildFinalizeAvg),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsAvg)}},
+     AccumOpInfo{.numAggs = 2,
+                 .buildAddExprs = makeBuildFn(&buildAccumExprsAvg),
+                 .buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsAvg),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsAvg),
+                 .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsAvg),
+                 .buildFinalize = makeBuildFn(&buildFinalizeAvg),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsAvg)}},
 
     // Bottom
     {AccumulatorBottom::getName(),
-     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
-            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
-            .buildInit = makeBuildFn(&buildInitializeAccumN),
-            .buildFinalize = makeBuildFn(&buildFinalizeTopBottom),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
+     AccumOpInfo{.buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+                 .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
+                 .buildInit = makeBuildFn(&buildInitializeAccumN),
+                 .buildFinalize = makeBuildFn(&buildFinalizeTopBottom),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
 
     // BottomN
     {AccumulatorBottomN::getName(),
-     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
-            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
-            .buildInit = makeBuildFn(&buildInitializeAccumN),
-            .buildFinalize = makeBuildFn(&buildFinalizeTopBottomN),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
+     AccumOpInfo{.buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+                 .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
+                 .buildInit = makeBuildFn(&buildInitializeAccumN),
+                 .buildFinalize = makeBuildFn(&buildFinalizeTopBottomN),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
 
     // Count
     {kAccumulatorCountName,
-     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsNoInputs),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsCount),
-            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsCount),
-            .buildFinalize = makeBuildFn(&buildFinalizeCount),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsCount)}},
+     AccumOpInfo{.buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsNoInputs),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsCount),
+                 .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsCount),
+                 .buildFinalize = makeBuildFn(&buildFinalizeCount),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsCount)}},
 
     // CovariancePop
     {AccumulatorCovariancePop::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsCovariance),
-            .buildFinalize = makeBuildFn(&buildFinalizeCovariancePop)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsCovariance),
+                 .buildFinalize = makeBuildFn(&buildFinalizeCovariancePop)}},
 
     // CovarianceSamp
     {AccumulatorCovarianceSamp::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsCovariance),
-            .buildFinalize = makeBuildFn(&buildFinalizeCovarianceSamp)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsCovariance),
+                 .buildFinalize = makeBuildFn(&buildFinalizeCovarianceSamp)}},
 
     // DenseRank
     {AccumulatorDenseRank::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsDenseRank),
-            .buildFinalize = makeBuildFn(&buildFinalizeRank)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsDenseRank),
+                 .buildFinalize = makeBuildFn(&buildFinalizeRank)}},
 
     // Derivative
     {window_function::ExpressionDerivative::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsDerivative),
-            .buildFinalize = makeBuildFn(&buildFinalizeDerivative)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsDerivative),
+                 .buildFinalize = makeBuildFn(&buildFinalizeDerivative)}},
 
     // DocumentNumber
     {AccumulatorDocumentNumber::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsDocumentNumber)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsDocumentNumber)}},
 
     // ExpMovingAvg
     {AccumulatorExpMovingAvg::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsExpMovingAvg),
-            .buildInit = makeBuildFn(&buildInitializeExpMovingAvg),
-            .buildFinalize = makeBuildFn(buildFinalizeExpMovingAvg)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsExpMovingAvg),
+                 .buildInit = makeBuildFn(&buildInitializeExpMovingAvg),
+                 .buildFinalize = makeBuildFn(buildFinalizeExpMovingAvg)}},
 
     // First
     {AccumulatorFirst::kName,
-     OpInfo{.buildAccumExprs = makeBuildFn(&buildAccumExprsFirstLast),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsFirst),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsFirst)}},
+     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsFirstLast),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsFirst),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsFirst)}},
 
     // FirstN
     {AccumulatorFirstN::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsFirstN),
-            .buildInit = makeBuildFn(&buildInitializeAccumN),
-            .buildFinalize = makeBuildFn(&buildFinalizeFirstN),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsFirstN)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsFirstN),
+                 .buildInit = makeBuildFn(&buildInitializeAccumN),
+                 .buildFinalize = makeBuildFn(&buildFinalizeFirstN),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsFirstN)}},
 
     // Integral
     {AccumulatorIntegral::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsIntegral),
-            .buildInit = makeBuildFn(&buildInitializeIntegral),
-            .buildFinalize = makeBuildFn(&buildFinalizeIntegral)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsIntegral),
+                 .buildInit = makeBuildFn(&buildInitializeIntegral),
+                 .buildFinalize = makeBuildFn(&buildFinalizeIntegral)}},
 
     // Last
     {AccumulatorLast::kName,
-     OpInfo{.buildAccumExprs = makeBuildFn(&buildAccumExprsFirstLast),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsLast),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsLast)}},
+     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsFirstLast),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsLast),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsLast)}},
 
     // LastN
     {AccumulatorLastN::kName,
-     OpInfo{.buildAccumExprs = makeBuildFn(&buildAccumExprsLastN),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsLastN),
-            .buildInit = makeBuildFn(&buildInitializeAccumN),
-            .buildFinalize = makeBuildFn(&buildFinalizeLastN),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsLastN)}},
+     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsLastN),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsLastN),
+                 .buildInit = makeBuildFn(&buildInitializeAccumN),
+                 .buildFinalize = makeBuildFn(&buildFinalizeLastN),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsLastN)}},
 
     // LinearFill
     {window_function::ExpressionLinearFill::kName,
-     OpInfo{.buildAccumExprs = makeBuildFn(&buildAccumExprsLinearFill),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsLinearFill),
-            .buildInit = makeBuildFn(&buildInitializeLinearFill),
-            .buildFinalize = makeBuildFn(&buildFinalizeLinearFill)}},
+     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsLinearFill),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsLinearFill),
+                 .buildInit = makeBuildFn(&buildInitializeLinearFill),
+                 .buildFinalize = makeBuildFn(&buildFinalizeLinearFill)}},
 
     // Locf
-    {AccumulatorLocf::kName, OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsLocf)}},
+    {AccumulatorLocf::kName, AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsLocf)}},
 
     // Max
     {AccumulatorMax::kName,
-     OpInfo{.buildAccumExprs = makeBuildFn(&buildAccumExprsMinMax),
-            .buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsSingleInput),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsMax),
-            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsMax),
-            .buildFinalize = makeBuildFn(&buildFinalizeMax),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsMax)}},
+     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsMinMax),
+                 .buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsSingleInput),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsMax),
+                 .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsMax),
+                 .buildFinalize = makeBuildFn(&buildFinalizeMax),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsMax)}},
 
     // MaxN
     {AccumulatorMaxN::kName,
-     OpInfo{.buildAccumExprs = makeBuildFn(&buildAccumExprsMinMaxN),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsMinMaxN),
-            .buildInit = makeBuildFn(&buildInitializeAccumN),
-            .buildFinalize = makeBuildFn(&buildFinalizeMinMaxN),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsMinMaxN)}},
+     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsMinMaxN),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsMinMaxN),
+                 .buildInit = makeBuildFn(&buildInitializeAccumN),
+                 .buildFinalize = makeBuildFn(&buildFinalizeMinMaxN),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsMinMaxN)}},
 
     // MergeObjects
     {AccumulatorMergeObjects::kName,
-     OpInfo{.buildAccumExprs = makeBuildFn(&buildAccumExprsMergeObjects),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsMergeObjects),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsMergeObjects)}},
+     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsMergeObjects),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsMergeObjects),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsMergeObjects)}},
 
     // Min
     {AccumulatorMin::kName,
-     OpInfo{.buildAccumExprs = makeBuildFn(&buildAccumExprsMinMax),
-            .buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsSingleInput),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsMin),
-            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsMin),
-            .buildFinalize = makeBuildFn(&buildFinalizeMin),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsMin)}},
+     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsMinMax),
+                 .buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsSingleInput),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsMin),
+                 .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsMin),
+                 .buildFinalize = makeBuildFn(&buildFinalizeMin),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsMin)}},
 
     // MinN
     {AccumulatorMinN::kName,
-     OpInfo{.buildAccumExprs = makeBuildFn(&buildAccumExprsMinMaxN),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsMinMaxN),
-            .buildInit = makeBuildFn(&buildInitializeAccumN),
-            .buildFinalize = makeBuildFn(&buildFinalizeMinMaxN),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsMinMaxN)}},
+     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsMinMaxN),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsMinMaxN),
+                 .buildInit = makeBuildFn(&buildInitializeAccumN),
+                 .buildFinalize = makeBuildFn(&buildFinalizeMinMaxN),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsMinMaxN)}},
 
     // Push
     {AccumulatorPush::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsPush),
-            .buildFinalize = makeBuildFn(&buildFinalizeCappedAccumulator),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsPush)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsPush),
+                 .buildFinalize = makeBuildFn(&buildFinalizeCappedAccumulator),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsPush)}},
 
     // Rank
     {AccumulatorRank::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsRank),
-            .buildFinalize = makeBuildFn(&buildFinalizeRank)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsRank),
+                 .buildFinalize = makeBuildFn(&buildFinalizeRank)}},
 
     // StdDevPop
     {AccumulatorStdDevPop::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsStdDev),
-            .buildFinalize = makeBuildFn(&buildFinalizeStdDevPop),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsStdDev)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsStdDev),
+                 .buildFinalize = makeBuildFn(&buildFinalizeStdDevPop),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsStdDev)}},
 
     // StdDevSamp
     {AccumulatorStdDevSamp::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsStdDev),
-            .buildFinalize = makeBuildFn(&buildFinalizeStdDevSamp),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsStdDev)}},
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsStdDev),
+                 .buildFinalize = makeBuildFn(&buildFinalizeStdDevSamp),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsStdDev)}},
 
     // Sum
     {AccumulatorSum::kName,
-     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsSingleInput),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsSum),
-            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsSum),
-            .buildFinalize = makeBuildFn(&buildFinalizeSum),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsSum)}},
+     AccumOpInfo{.buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsSingleInput),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsSum),
+                 .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsSum),
+                 .buildFinalize = makeBuildFn(&buildFinalizeSum),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsSum)}},
 
     // Top
     {AccumulatorTop::getName(),
-     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
-            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
-            .buildInit = makeBuildFn(&buildInitializeAccumN),
-            .buildFinalize = makeBuildFn(&buildFinalizeTopBottom),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
+     AccumOpInfo{.buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+                 .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
+                 .buildInit = makeBuildFn(&buildInitializeAccumN),
+                 .buildFinalize = makeBuildFn(&buildFinalizeTopBottom),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
 
     // TopN
     {AccumulatorTopN::getName(),
-     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
-            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
-            .buildInit = makeBuildFn(&buildInitializeAccumN),
-            .buildFinalize = makeBuildFn(&buildFinalizeTopBottomN),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
+     AccumOpInfo{.buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+                 .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
+                 .buildInit = makeBuildFn(&buildInitializeAccumN),
+                 .buildFinalize = makeBuildFn(&buildFinalizeTopBottomN),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
 };
 
 std::string getOpNameForAccStmt(const AccumulationStatement& accStmt) {
@@ -1928,81 +1917,81 @@ std::string getOpNameForAccStmt(const AccumulationStatement& accStmt) {
 
     return opName;
 }
-}  // namespace
 
-Op::Op(std::string opName) : _opName(std::move(opName)), _opInfo(lookupOpInfo(_opName)) {}
+AccumOp::AccumOp(std::string opName) : _opName(std::move(opName)), _opInfo(lookupOpInfo(_opName)) {}
 
-Op::Op(const AccumulationStatement& accStmt)
+AccumOp::AccumOp(const AccumulationStatement& accStmt)
     : _opName(getOpNameForAccStmt(accStmt)), _opInfo(lookupOpInfo(_opName)) {}
 
-const OpInfo* Op::lookupOpInfo(const std::string& opName) {
+const AccumOpInfo* AccumOp::lookupOpInfo(const std::string& opName) {
     auto it = accumOpInfoMap.find(opName);
     return it != accumOpInfoMap.end() ? &it->second : nullptr;
 }
 
-size_t Op::getNumAggs() const {
+size_t AccumOp::getNumAggs() const {
     return getOpInfo()->numAggs;
 }
 
-bool Op::hasBuildAccumBlockExprs() const {
-    return getOpInfo()->buildAccumBlockExprs != nullptr;
+bool AccumOp::hasBuildAddBlockExprs() const {
+    return getOpInfo()->buildAddBlockExprs != nullptr;
 }
 
-bool Op::hasBuildAccumBlockAggs() const {
-    return getOpInfo()->buildAccumBlockAggs != nullptr;
+bool AccumOp::hasBuildAddBlockAggs() const {
+    return getOpInfo()->buildAddBlockAggs != nullptr;
 }
 
-InputsPtr Op::buildAccumExprs(StageBuilderState& state, InputsPtr inputs) const {
+AccumInputsPtr AccumOp::buildAddExprs(StageBuilderState& state, AccumInputsPtr inputs) const {
     uassert(8679702,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << _opName,
             _opInfo != nullptr);
 
-    if (!_opInfo->buildAccumExprs) {
-        // If the "buildAccumExprs" callback wasn't defined for this op, then we will use the
+    if (!_opInfo->buildAddExprs) {
+        // If the "buildAddExprs" callback wasn't defined for this op, then we will use the
         // inputs as-is for the accumulator args.
         return inputs;
     }
 
-    return _opInfo->buildAccumExprs(*this, std::move(inputs), state);
+    return _opInfo->buildAddExprs(*this, std::move(inputs), state);
 }
 
-boost::optional<Accum::AccumBlockExprs> Op::buildAccumBlockExprs(
-    StageBuilderState& state, InputsPtr inputs, const PlanStageSlots& outputs) const {
+boost::optional<AddBlockExprs> AccumOp::buildAddBlockExprs(StageBuilderState& state,
+                                                           AccumInputsPtr inputs,
+                                                           const PlanStageSlots& outputs) const {
     uassert(8751303,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << _opName,
             _opInfo != nullptr);
 
-    if (!_opInfo->buildAccumBlockAggs) {
+    if (!_opInfo->buildAddBlockAggs) {
         // If this accumulator doesn't support generated block aggs, then return boost::none.
         return boost::none;
     }
 
-    return _opInfo->buildAccumBlockExprs(*this, std::move(inputs), state, outputs);
+    return _opInfo->buildAddBlockExprs(*this, std::move(inputs), state, outputs);
 }
 
-SbExpr::Vector Op::buildAccumAggs(StageBuilderState& state, InputsPtr inputs) const {
+SbExpr::Vector AccumOp::buildAddAggs(StageBuilderState& state, AccumInputsPtr inputs) const {
     uassert(5754701,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << _opName,
-            _opInfo && _opInfo->buildAccumAggs);
+            _opInfo && _opInfo->buildAddAggs);
 
-    return _opInfo->buildAccumAggs(*this, std::move(inputs), state);
+    return _opInfo->buildAddAggs(*this, std::move(inputs), state);
 }
 
-boost::optional<std::vector<BlockAggAndRowAgg>> Op::buildAccumBlockAggs(
-    StageBuilderState& state, InputsPtr inputs, SbSlot bitmapInternalSlot) const {
+boost::optional<std::vector<BlockAggAndRowAgg>> AccumOp::buildAddBlockAggs(
+    StageBuilderState& state, AccumInputsPtr inputs, SbSlot bitmapInternalSlot) const {
     uassert(8751304,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << _opName,
             _opInfo != nullptr);
 
     // If this accumulator doesn't support generated block aggs, then return boost::none.
-    if (!_opInfo->buildAccumBlockAggs) {
+    if (!_opInfo->buildAddBlockAggs) {
         return boost::none;
     }
 
-    return _opInfo->buildAccumBlockAggs(*this, std::move(inputs), state, bitmapInternalSlot);
+    return _opInfo->buildAddBlockAggs(*this, std::move(inputs), state, bitmapInternalSlot);
 }
 
-SbExpr::Vector Op::buildInitialize(StageBuilderState& state, InputsPtr inputs) const {
+SbExpr::Vector AccumOp::buildInitialize(StageBuilderState& state, AccumInputsPtr inputs) const {
     uassert(8070614,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << _opName,
             _opInfo);
@@ -2017,9 +2006,9 @@ SbExpr::Vector Op::buildInitialize(StageBuilderState& state, InputsPtr inputs) c
     return _opInfo->buildInit(*this, std::move(inputs), state);
 }
 
-SbExpr Op::buildFinalize(StageBuilderState& state,
-                         InputsPtr inputs,
-                         const SbSlotVector& aggSlots) const {
+SbExpr AccumOp::buildFinalize(StageBuilderState& state,
+                              AccumInputsPtr inputs,
+                              const SbSlotVector& aggSlots) const {
     uassert(5807020,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << _opName,
             _opInfo);
@@ -2032,14 +2021,13 @@ SbExpr Op::buildFinalize(StageBuilderState& state,
     return _opInfo->buildFinalize(*this, std::move(inputs), state, aggSlots);
 }
 
-SbExpr::Vector Op::buildCombineAggs(StageBuilderState& state,
-                                    InputsPtr inputs,
-                                    const SbSlotVector& inputSlots) const {
+SbExpr::Vector AccumOp::buildCombineAggs(StageBuilderState& state,
+                                         AccumInputsPtr inputs,
+                                         const SbSlotVector& inputSlots) const {
     uassert(7039500,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << _opName,
             _opInfo && _opInfo->buildCombineAggs);
 
     return _opInfo->buildCombineAggs(*this, std::move(inputs), state, inputSlots);
 }
-}  // namespace Accum
 }  // namespace mongo::stage_builder
