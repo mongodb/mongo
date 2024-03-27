@@ -63,7 +63,7 @@ struct SimpleDecoder {
               typename Visit,
               typename VisitZero,
               typename VisitMissing>
-    inline void visitAll(uint64_t encoded,
+    inline size_t visitAll(uint64_t encoded,
                   const Visit& visit,
                   const VisitZero& visitZero,
                   const VisitMissing& visitMissing) const {
@@ -75,6 +75,7 @@ struct SimpleDecoder {
                 visitMissing();
             encoded >>= bits;
         };
+        return iters;
     }
 
     // Calculate the sum of all slots.
@@ -181,7 +182,7 @@ struct TableDecoder {
               typename Visit,
               typename VisitZero,
               typename VisitMissing>
-    inline void visitAll(uint64_t encoded,
+    inline size_t visitAll(uint64_t encoded,
                   const Visit& visit,
                   const VisitZero& visitZero,
                   const VisitMissing& visitMissing) const {
@@ -193,6 +194,7 @@ struct TableDecoder {
                 visitMissing();
             encoded >>= shift;
         };
+        return iters;
     }
 
     // Calculate the sum of all slots
@@ -387,7 +389,7 @@ struct OneDecoder {
               typename Visit,
               typename VisitZero,
               typename VisitMissing>
-    inline void visitAll(uint64_t encoded,
+    inline size_t visitAll(uint64_t encoded,
                   const Visit& visit,
                   const VisitZero& visitZero,
                   const VisitMissing& visitMissing) const {
@@ -398,6 +400,7 @@ struct OneDecoder {
                 visitZero();
             encoded >>= 1;
         }
+        return values;
     }
 
     // Calculate the prefix sum of all slots.
@@ -440,7 +443,7 @@ struct ExtendedDecoder {
               typename Visit,
               typename VisitZero,
               typename VisitMissing>
-    inline void visitAll(uint64_t encoded,
+    inline size_t visitAll(uint64_t encoded,
                   const Visit& visit,
                   const VisitZero& visitZero,
                   const VisitMissing& visitMissing) const {
@@ -461,6 +464,7 @@ struct ExtendedDecoder {
 
             encoded >>= bits;
         };
+        return iters;
     }
 
     // Calculate the sum of all slots
@@ -803,7 +807,7 @@ T decodeLastSlot(uint64_t encoded) {
 
 // Decodes and visits all slots in simple8b block.
 template <typename T, typename Visit, typename VisitZero, typename VisitMissing>
-inline void decodeAndVisit(uint64_t encoded,
+inline size_t decodeAndVisit(uint64_t encoded,
                     uint64_t* prevNonRLE,
                     const Visit& visit,
                     const VisitZero& visitZero,
@@ -815,64 +819,64 @@ inline void decodeAndVisit(uint64_t encoded,
     encoded >>= 4;
     switch (selector) {
         case 1:  // Only 0 or missing deltas
-            decoder1.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder1.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case 2:
-            decoder2.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder2.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case 3:
-            decoder3.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder3.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case 4:
-            decoder4.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder4.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case 5:
-            decoder5.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder5.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case 6:
-            decoder6.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder6.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case 7: {
             auto extended = encoded & simple8b_internal::kBaseSelectorMask;
             encoded >>= 4;
             switch (extended) {
                 case 0:
-                    decoder7.visitAll<T>(encoded, visit, visitZero, visitMissing);
+                    return decoder7.visitAll<T>(encoded, visit, visitZero, visitMissing);
                     break;
                 case 1:
-                    decoderExtended7_1.visitAll<T>(
+                    return decoderExtended7_1.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 2:
-                    decoderExtended7_2.visitAll<T>(
+                    return decoderExtended7_2.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 3:
-                    decoderExtended7_3.visitAll<T>(
+                    return decoderExtended7_3.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 4:
-                    decoderExtended7_4.visitAll<T>(
+                    return decoderExtended7_4.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 5:
-                    decoderExtended7_5.visitAll<T>(
+                    return decoderExtended7_5.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 6:
-                    decoderExtended7_6.visitAll<T>(
+                    return decoderExtended7_6.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 7:
-                    decoderExtended7_7.visitAll<T>(
+                    return decoderExtended7_7.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 8:
-                    decoderExtended7_8.visitAll<T>(
+                    return decoderExtended7_8.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 9:
-                    decoderExtended7_9.visitAll<T>(
+                    return decoderExtended7_9.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 default:
@@ -886,58 +890,58 @@ inline void decodeAndVisit(uint64_t encoded,
             encoded >>= 4;
             switch (extended) {
                 case 0:
-                    decoder8.visitAll<T>(encoded, visit, visitZero, visitMissing);
+                    return decoder8.visitAll<T>(encoded, visit, visitZero, visitMissing);
                     break;
                 case 1:
-                    decoderExtended8_1.visitAll<T>(
+                    return decoderExtended8_1.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 2:
-                    decoderExtended8_2.visitAll<T>(
+                    return decoderExtended8_2.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 3:
-                    decoderExtended8_3.visitAll<T>(
+                    return decoderExtended8_3.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 4:
-                    decoderExtended8_4.visitAll<T>(
+                    return decoderExtended8_4.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 5:
-                    decoderExtended8_5.visitAll<T>(
+                    return decoderExtended8_5.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 6:
-                    decoderExtended8_6.visitAll<T>(
+                    return decoderExtended8_6.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 7:
-                    decoderExtended8_7.visitAll<T>(
+                    return decoderExtended8_7.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 8:
-                    decoderExtended8_8.visitAll<T>(
+                    return decoderExtended8_8.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 9:
-                    decoderExtended8_9.visitAll<T>(
+                    return decoderExtended8_9.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 10:
-                    decoderExtended8_10.visitAll<T>(
+                    return decoderExtended8_10.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 11:
-                    decoderExtended8_11.visitAll<T>(
+                    return decoderExtended8_11.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 12:
-                    decoderExtended8_12.visitAll<T>(
+                    return decoderExtended8_12.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 case 13:
-                    decoderExtended8_13.visitAll<T>(
+                    return decoderExtended8_13.visitAll<T>(
                         encoded, visit, visitZero, visitMissing);
                     break;
                 default:
@@ -947,22 +951,22 @@ inline void decodeAndVisit(uint64_t encoded,
             break;
         }
         case 9:
-            decoder10.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder10.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case 10:
-            decoder12.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder12.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case 11:
-            decoder15.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder15.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case 12:
-            decoder20.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder20.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case 13:
-            decoder30.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder30.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case 14:
-            decoder60.visitAll<T>(encoded, visit, visitZero, visitMissing);
+            return decoder60.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case simple8b_internal::kRleSelector: {
             const T lastValue = decodeLastSlot<T>(*prevNonRLE);
@@ -980,6 +984,7 @@ inline void decodeAndVisit(uint64_t encoded,
                     visit(lastValue);
                 }
             }
+            return count;
             break;
         }
         default:
@@ -1221,19 +1226,21 @@ T decodeAndPrefixSum(uint64_t encoded, T& prefix, uint64_t* prevNonRLE) {
 }  // namespace
 
 template <typename T, typename Visit, typename VisitZero, typename VisitMissing>
-inline void visitAll(const char* buffer,
+inline size_t visitAll(const char* buffer,
               size_t size,
               uint64_t& prevNonRLE,
               const Visit& visit,
               const VisitZero& visitZero,
               const VisitMissing& visitMissing) {
+    size_t numVisited = 0;
     invariant(size % 8 == 0);
     const char* end = buffer + size;
     while (buffer != end) {
         uint64_t encoded = ConstDataView(buffer).read<LittleEndian<uint64_t>>();
-        decodeAndVisit<T>(encoded, &prevNonRLE, visit, visitZero, visitMissing);
+        numVisited += decodeAndVisit<T>(encoded, &prevNonRLE, visit, visitZero, visitMissing);
         buffer += sizeof(uint64_t);
     }
+    return numVisited;
 }
 
 template <typename T>
