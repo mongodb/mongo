@@ -43,7 +43,8 @@ AuthorizationSession::~AuthorizationSession() = default;
 void AuthorizationSession::ScopedImpersonate::swap() {
     using std::swap;
     auto impersonations = _authSession._getImpersonations();
-    swap(*std::get<0>(impersonations), _user);
+    auto originalUser = std::atomic_exchange(std::get<0>(impersonations), std::move(_user));
+    _user = std::move(originalUser);
     swap(*std::get<1>(impersonations), _roles);
 }
 

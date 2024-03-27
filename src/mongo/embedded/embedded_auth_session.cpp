@@ -269,7 +269,7 @@ public:
     }
 
 protected:
-    std::tuple<boost::optional<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
+    std::tuple<std::shared_ptr<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

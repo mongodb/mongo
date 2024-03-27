@@ -97,7 +97,7 @@ public:
     class ScopedImpersonate {
     public:
         ScopedImpersonate(AuthorizationSession* authSession,
-                          boost::optional<UserName>* user,
+                          std::shared_ptr<UserName>* user,
                           std::vector<RoleName>* roles)
             : _authSession(*authSession), _user(*user), _roles(*roles) {
             swap();
@@ -111,7 +111,7 @@ public:
         void swap();
 
         AuthorizationSession& _authSession;
-        boost::optional<UserName>& _user;
+        std::shared_ptr<UserName>& _user;
         std::vector<RoleName>& _roles;
     };
 
@@ -340,7 +340,7 @@ public:
     virtual const boost::optional<Date_t>& getExpiration() const = 0;
 
 protected:
-    virtual std::tuple<boost::optional<UserName>*, std::vector<RoleName>*> _getImpersonations() = 0;
+    virtual std::tuple<std::shared_ptr<UserName>*, std::vector<RoleName>*> _getImpersonations() = 0;
 };
 
 // Returns a status encoding whether the current session in the specified `opCtx` has privilege to

@@ -173,7 +173,6 @@ MONGO_FAIL_POINT_DEFINE(allowMultipleUsersWithApiStrict);
 AuthorizationSessionImpl::AuthorizationSessionImpl(
     std::unique_ptr<AuthzSessionExternalState> externalState, InstallMockForTestingOrAuthImpl)
     : _externalState(std::move(externalState)),
-      _impersonationFlag(false),
       _contract(TestingProctor::instance().isEnabled()),
       _mayBypassWriteBlockingMode(false),
       _mayUseTenant(false) {}
@@ -881,16 +880,15 @@ bool AuthorizationSessionImpl::_isAuthorizedForPrivilege(const Privilege& privil
 
 void AuthorizationSessionImpl::setImpersonatedUserData(const UserName& username,
                                                        const std::vector<RoleName>& roles) {
-    _impersonatedUserName = username;
+    _impersonatedUserName = std::make_shared<UserName>(username);
     _impersonatedRoleNames = roles;
-    _impersonationFlag = true;
 }
 
 bool AuthorizationSessionImpl::isCoauthorizedWithClient(Client* opClient, WithLock opClientLock) {
     _contract.addAccessCheck(AccessCheckEnum::kIsCoauthorizedWithClient);
     auto getUserName = [](AuthorizationSession* authSession) {
-        if (authSession->isImpersonating()) {
-            return authSession->getImpersonatedUserName();
+        if (auto impersonatedUsername = authSession->getImpersonatedUserName()) {
+            return impersonatedUsername;
         } else {
             return authSession->getAuthenticatedUserName();
         }
@@ -915,7 +913,10 @@ bool AuthorizationSessionImpl::isCoauthorizedWith(const boost::optional<UserName
 boost::optional<UserName> AuthorizationSessionImpl::getImpersonatedUserName() {
     _contract.addAccessCheck(AccessCheckEnum::kGetImpersonatedUserName);
 
-    return _impersonatedUserName;
+    if (auto impersonatedUserName = std::atomic_load(&_impersonatedUserName)) {
+        return *impersonatedUserName;
+    }
+    return boost::none;
 }
 
 RoleNameIterator AuthorizationSessionImpl::getImpersonatedRoleNames() {
@@ -932,14 +933,13 @@ bool AuthorizationSessionImpl::isUsingLocalhostBypass() {
 
 // Clear the vectors of impersonated usernames and roles.
 void AuthorizationSessionImpl::clearImpersonatedUserData() {
-    _impersonatedUserName = boost::none;
+    _impersonatedUserName.reset();
     _impersonatedRoleNames.clear();
-    _impersonationFlag = false;
 }
 
 
 bool AuthorizationSessionImpl::isImpersonating() const {
-    return _impersonationFlag;
+    return _impersonatedUserName != nullptr;
 }
 
 auto AuthorizationSessionImpl::checkCursorSessionPrivilege(

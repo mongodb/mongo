@@ -217,7 +217,7 @@ private:
     // lock on the admin database (to update out-of-date user privilege information).
     bool _isAuthorizedForPrivilege(const Privilege& privilege);
 
-    std::tuple<boost::optional<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
+    std::tuple<std::shared_ptr<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
         return std::make_tuple(&_impersonatedUserName, &_impersonatedRoleNames);
     }
 
@@ -231,11 +231,9 @@ private:
 private:
     std::unique_ptr<AuthzSessionExternalState> _externalState;
 
-    // A vector of impersonated UserNames and a vector of those users' RoleNames.
     // These are used in the auditing system. They are not used for authz checks.
-    boost::optional<UserName> _impersonatedUserName;
+    std::shared_ptr<UserName> _impersonatedUserName;
     std::vector<RoleName> _impersonatedRoleNames;
-    bool _impersonationFlag;
 
     // A record of privilege checks and other authorization like function calls made on
     // AuthorizationSession. IDL Typed Commands can optionally define a contract declaring the set

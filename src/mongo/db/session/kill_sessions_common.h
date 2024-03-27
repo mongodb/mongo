@@ -82,13 +82,19 @@ public:
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
 
         if (pattern.getUsers() && pattern.getRoles()) {
-            std::tie(_name, _roles) = getKillAllSessionsByPatternImpersonateData(pattern);
+            boost::optional<UserName> name;
+            std::tie(name, _roles) = getKillAllSessionsByPatternImpersonateData(pattern);
+
+            if (name) {
+                _name = std::make_shared<UserName>(name.get());
+            }
+
             _raii.emplace(authSession, &_name, &_roles);
         }
     }
 
 private:
-    boost::optional<UserName> _name;
+    std::shared_ptr<UserName> _name;
     std::vector<RoleName> _roles;
     boost::optional<AuthorizationSession::ScopedImpersonate> _raii;
 };
