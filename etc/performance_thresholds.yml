@@ -45,6 +45,9 @@
 tests:
   ServiceEntryPointCommonBenchmarkFixture/BM_SEP_PING:
     al2023-arm64-sep-benchmark:
+      # The current suggested method for raising these values is to run the benchmark a few times in patches, get the
+      # means of these metrics in them, and then multiply them by 1.002 (+ .2%). Please make sure the new values
+      # are above the maximum values reported in those patches to prevent any future flakiness.
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
