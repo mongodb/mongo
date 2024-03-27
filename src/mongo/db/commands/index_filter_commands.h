@@ -45,6 +45,8 @@
 
 namespace mongo {
 
+// TODO: SERVER-88503 Remove Index Filters feature.
+
 /**
  * DB commands for index filters.
  * Index filter commands work on a different data structure in the collection

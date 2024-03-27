@@ -313,6 +313,7 @@ struct QueryPlannerParams {
     // Size of available memory in bytes.
     long long availableMemoryBytes{0};
 
+    // TODO: SERVER-88503 Remove Index Filters feature.
     // Were index filters applied to indices?
     bool indexFiltersApplied{false};
 

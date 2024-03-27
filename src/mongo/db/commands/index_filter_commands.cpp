@@ -76,6 +76,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+// TODO: SERVER-88503 Remove Index Filters feature.
 
 namespace mongo {
 
@@ -90,6 +91,13 @@ bool IndexFilterCommand::run(OperationContext* opCtx,
                              const DatabaseName& dbName,
                              const BSONObj& cmdObj,
                              BSONObjBuilder& result) {
+
+    static Rarely sampler;
+    if (sampler.tick()) {
+        LOGV2_WARNING(7923201,
+                      "Index filters are deprecated, consider using query settings instead. See "
+                      "https://www.mongodb.com/docs/manual/reference/command/setQuerySettings");
+    }
     const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
     AutoGetCollectionForReadCommand ctx(opCtx, nss);
     uassertStatusOK(runIndexFilterCommand(opCtx, ctx.getCollection(), cmdObj, &result));

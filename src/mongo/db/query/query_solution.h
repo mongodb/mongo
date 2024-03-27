@@ -521,6 +521,7 @@ public:
     // we would want to fall back on an alternate non-blocking solution.
     bool hasBlockingStage{false};
 
+    // TODO: SERVER-88503 Remove Index Filters feature.
     // Runner executing this solution might be interested in knowing
     // if the planning process for this solution was based on filtered indices.
     bool indexFilterApplied{false};

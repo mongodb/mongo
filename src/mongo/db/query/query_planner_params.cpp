@@ -389,6 +389,7 @@ void QueryPlannerParams::applyQuerySettingsForCollection(
 
 void QueryPlannerParams::applyIndexFilters(const CanonicalQuery& canonicalQuery,
                                            const CollectionPtr& collection) {
+    // TODO: SERVER-88503 Remove Index Filters feature.
     auto filterAllowedIndexEntries = [](const AllowedIndicesFilter& allowedIndicesFilter,
                                         std::vector<IndexEntry>& indexEntries) {
         // Filter index entries
@@ -417,6 +418,14 @@ void QueryPlannerParams::applyIndexFilters(const CanonicalQuery& canonicalQuery,
             querySettings.getAllowedIndicesFilter(canonicalQuery)) {
         filterAllowedIndexEntries(*allowedIndicesFilter, indices);
         indexFiltersApplied = true;
+
+        static Rarely sampler;
+        if (sampler.tick()) {
+            LOGV2_WARNING(
+                7923200,
+                "Index filters are deprecated, consider using query settings instead. See "
+                "https://www.mongodb.com/docs/manual/reference/command/setQuerySettings");
+        }
     }
 }
 
