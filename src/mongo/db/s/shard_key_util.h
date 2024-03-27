@@ -263,5 +263,15 @@ void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const ShardKeyPattern& shardKeyPattern);
 
+/**
+ * Validates a user provided shard key for timeseries collections.
+ * - Key pattern only contains meta field/sub-fields of meta field/time field.
+ * - If meta field is present, it can be ranged or hashed.
+ * - If time field is present, it must be ranged and at the end of the key pattern.
+ */
+void validateTimeseriesShardKey(StringData timeFieldName,
+                                boost::optional<StringData> metaFieldName,
+                                const BSONObj& shardKeyPattern);
+
 }  // namespace shardkeyutil
 }  // namespace mongo

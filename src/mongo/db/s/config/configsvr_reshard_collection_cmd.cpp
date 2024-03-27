@@ -63,8 +63,10 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -264,11 +266,27 @@ public:
                 // Generate the resharding metadata for the ReshardingCoordinatorDocument.
                 auto reshardingUUID = UUID::gen();
                 auto existingUUID = cm.getUUID();
+                auto shardKeySpec = request().getKey();
+
+                const auto collEntry = catalogClient->getCollection(opCtx, nss);
+                // moveCollection/unshardCollection are called with _id as the new shard key since
+                // that's an acceptable value for tracked unsharded collections so we can skip this.
+                if (collEntry.getTimeseriesFields() &&
+                    (!setProvenance ||
+                     (*request().getProvenance() == ProvenanceEnum::kReshardCollection))) {
+                    auto tsOptions = collEntry.getTimeseriesFields().get().getTimeseriesOptions();
+                    shardkeyutil::validateTimeseriesShardKey(
+                        tsOptions.getTimeField(), tsOptions.getMetaField(), request().getKey());
+                    shardKeySpec = uassertStatusOK(
+                        timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
+                            tsOptions, request().getKey()));
+                }
+
                 auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
                                                                ns(),
                                                                std::move(existingUUID),
                                                                std::move(tempReshardingNss),
-                                                               request().getKey());
+                                                               shardKeySpec);
                 commonMetadata.setStartTime(
                     opCtx->getServiceContext()->getFastClockSource()->now());
                 if (request().getReshardingUUID()) {

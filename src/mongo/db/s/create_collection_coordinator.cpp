@@ -1007,22 +1007,8 @@ TranslatedRequestParams translateRequestParameters(OperationContext* opCtx,
     // object.
     auto timeFieldName = timeseriesOptions->getTimeField();
     auto metaFieldName = timeseriesOptions->getMetaField();
-    BSONObjIterator shardKeyElems{*request.getShardKey()};
-    while (auto elem = shardKeyElems.next()) {
-        if (elem.fieldNameStringData() == timeFieldName) {
-            uassert(5914000,
-                    str::stream() << "the time field '" << timeFieldName
-                                  << "' can be only at the end of the shard key pattern",
-                    !shardKeyElems.more());
-        } else {
-            uassert(5914001,
-                    str::stream() << "only the time field or meta field can be "
-                                     "part of shard key pattern",
-                    metaFieldName &&
-                        (elem.fieldNameStringData() == *metaFieldName ||
-                         elem.fieldNameStringData().startsWith(*metaFieldName + ".")));
-        }
-    }
+    shardkeyutil::validateTimeseriesShardKey(timeFieldName, metaFieldName, *request.getShardKey());
+
     KeyPattern keyPattern(
         uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
             *timeseriesOptions, *request.getShardKey())));

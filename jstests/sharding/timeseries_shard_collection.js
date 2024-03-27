@@ -253,7 +253,7 @@ function runShardKeyPatternValidation(collectionExists) {
             key: {time: 'hashed'},
             timeseries: {timeField: 'time', metaField: 'hostId'},
         }),
-                                     ErrorCodes.BadValue);
+                                     [880031, ErrorCodes.BadValue]);
 
         if (!collectionExists) {
             assert.commandWorked(

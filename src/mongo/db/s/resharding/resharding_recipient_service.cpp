@@ -47,6 +47,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
@@ -723,10 +724,17 @@ void ReshardingRecipientService::RecipientStateMachine::
                         shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
                         behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
 
-                        // Do not need to pass in time-series options because we cannot reshard a
-                        // time-series collection.
-                        // TODO SERVER-84741 pass in time-series options and ensure the shard key is
-                        // partially rewritten.
+                        auto [collOptions, _] = _externalState->getCollectionOptions(
+                            opCtx.get(),
+                            _metadata.getSourceNss(),
+                            _metadata.getSourceUUID(),
+                            *_cloneTimestamp,
+                            "loading collection options to validate shard key index for resharding."_sd);
+
+                        CollectionOptions collectionOptions =
+                            uassertStatusOK(CollectionOptions::parse(
+                                collOptions, CollectionOptions::parseForStorage));
+
                         shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                             opCtx.get(),
                             _metadata.getSourceNss(),
@@ -735,8 +743,8 @@ void ReshardingRecipientService::RecipientStateMachine::
                             false /* unique */,
                             true /* enforceUniquenessCheck */,
                             behaviors,
-                            boost::none /* tsOpts */,
-                            false /* updatedToHandleTimeseriesIndex */);
+                            collectionOptions.timeseries /* tsOpts */,
+                            true /* updatedToHandleTimeseriesIndex */);
                     });
             }
         } else {
@@ -913,16 +921,21 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                    // We call validateShardKeyIndexExistsOrCreateIfPossible again here in case if we
                    // restarted after creatingCollection phase, whatever indexSpec we get in that
                    // phase will go away.
-                   //
-                   // Do not need to pass in time-series options because we cannot reshard a
-                   // time-series collection.
-                   // TODO SERVER-84741 pass in time-series options and ensure the shard key is
-                   // partially rewritten.
                    shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
                    behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
 
                    if (!_metadata.getProvenance() ||
                        _metadata.getProvenance() == ProvenanceEnum::kReshardCollection) {
+                       auto [collOptions, _] = _externalState->getCollectionOptions(
+                           opCtx.get(),
+                           _metadata.getSourceNss(),
+                           _metadata.getSourceUUID(),
+                           *_cloneTimestamp,
+                           "loading collection options to build shard key index for resharding."_sd);
+                       CollectionOptions collectionOptions =
+                           uassertStatusOK(CollectionOptions::parse(
+                               collOptions, CollectionOptions::parseForStorage));
+
                        shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                            opCtx.get(),
                            _metadata.getSourceNss(),
@@ -931,8 +944,8 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                            false /* unique */,
                            true /* enforceUniquenessCheck */,
                            behaviors,
-                           boost::none /* tsOpts */,
-                           false /* updatedToHandleTimeseriesIndex */);
+                           collectionOptions.timeseries /* tsOpts */,
+                           true /* updatedToHandleTimeseriesIndex */);
                    }
 
                    // Get all indexSpecs need to build.
