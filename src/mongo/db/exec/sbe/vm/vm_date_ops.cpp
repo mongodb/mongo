@@ -337,7 +337,9 @@ FastTuple<bool, value::TypeTags, value::Value> makeNothingBlock(value::ValueBloc
 
 struct DateTruncFunctor {
     DateTruncFunctor(TimeUnit unit, int64_t binSize, TimeZone timeZone, DayOfWeek startOfWeek)
-        : _unit(unit), _binSize(binSize), _timeZone(timeZone), _startOfWeek(startOfWeek) {}
+        : _unit(unit), _binSize(binSize), _timeZone(timeZone), _startOfWeek(startOfWeek) {
+        _dateReferencePoint = defaultReferencePointForDateTrunc(timeZone, unit, startOfWeek);
+    }
 
     std::pair<value::TypeTags, value::Value> operator()(value::TypeTags tag,
                                                         value::Value val) const {
@@ -346,7 +348,8 @@ struct DateTruncFunctor {
         }
         auto date = getDate(tag, val);
 
-        auto truncatedDate = truncateDate(date, _unit, _binSize, _timeZone, _startOfWeek);
+        auto truncatedDate =
+            truncateDate(date, _unit, _binSize, _dateReferencePoint, _timeZone, _startOfWeek);
 
         return std::pair(value::TypeTags::Date,
                          value::bitcastFrom<int64_t>(truncatedDate.toMillisSinceEpoch()));
@@ -356,10 +359,39 @@ struct DateTruncFunctor {
     int64_t _binSize;
     TimeZone _timeZone;
     DayOfWeek _startOfWeek;
+    DateReferencePoint _dateReferencePoint;
 };
 
 static const auto dateTruncOp =
     value::makeColumnOpWithParams<ColumnOpType::kMonotonic, DateTruncFunctor>();
+
+struct DateTruncMillisFunctor {
+    DateTruncMillisFunctor(TimeUnit unit, int64_t binSize, TimeZone timeZone, DayOfWeek startOfWeek)
+        : _binSize(binSize) {
+        _binSize = getBinSizeInMillis(binSize, unit);
+        _referencePointInMillis =
+            defaultReferencePointForDateTrunc(timeZone, unit, startOfWeek).dateMillis;
+    }
+
+    std::pair<value::TypeTags, value::Value> operator()(value::TypeTags tag,
+                                                        value::Value val) const {
+        if (!coercibleToDate(tag)) {
+            return std::pair(value::TypeTags::Nothing, value::Value{0u});
+        }
+        auto date = getDate(tag, val);
+
+        auto truncatedDate = truncateDateMillis(date, _referencePointInMillis, _binSize);
+
+        return std::pair(value::TypeTags::Date,
+                         value::bitcastFrom<int64_t>(truncatedDate.toMillisSinceEpoch()));
+    }
+
+    int64_t _binSize;
+    Date_t _referencePointInMillis;
+};
+
+static const auto dateTruncMillisOp =
+    value::makeColumnOpWithParams<ColumnOpType::kMonotonic, DateTruncMillisFunctor>();
 
 struct DateDiffFunctor {
     DateDiffFunctor(Date_t endDate, TimeUnit unit, TimeZone timeZone, DayOfWeek startOfWeek)
@@ -467,10 +499,25 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateTr
         return makeNothingBlock(valueBlockIn);
     }
 
-    auto out = valueBlockIn->map(dateTruncOp.bindParams(unit, binSize, timezone, startOfWeek));
-
-    return {
-        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
+    switch (unit) {
+        case TimeUnit::millisecond:
+        case TimeUnit::second:
+        case TimeUnit::minute:
+        case TimeUnit::hour: {
+            auto out = valueBlockIn->map(
+                dateTruncMillisOp.bindParams(unit, binSize, timezone, startOfWeek));
+            return {true,
+                    value::TypeTags::valueBlock,
+                    value::bitcastFrom<value::ValueBlock*>(out.release())};
+        }
+        default: {
+            auto out =
+                valueBlockIn->map(dateTruncOp.bindParams(unit, binSize, timezone, startOfWeek));
+            return {true,
+                    value::TypeTags::valueBlock,
+                    value::bitcastFrom<value::ValueBlock*>(out.release())};
+        }
+    }
 }
 
 /**
