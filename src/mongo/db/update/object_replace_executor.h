@@ -67,10 +67,10 @@ public:
                                               bool allowTopLevelDollarPrefixedFields = false);
 
     /**
-     * Initializes the node with the document to replace with. Any zero-valued timestamps (except
-     * for the _id) are updated to the current time.
+     * Initializes the node with the document to replace with. If 'fromOplogApplication' is false,
+     * any zero-valued timestamps (except for the _id) will be replaced with the current time.
      */
-    explicit ObjectReplaceExecutor(BSONObj replacement);
+    explicit ObjectReplaceExecutor(BSONObj replacement, bool fromOplogApplication = false);
 
     /**
      * Replaces the document that 'applyParams.element' belongs to with 'val'. If 'val' does not
@@ -97,6 +97,8 @@ private:
 
     // True if '_replacementDoc' contains an _id.
     bool _containsId;
+
+    bool _fromOplogApplication = false;
 };
 
 }  // namespace mongo
