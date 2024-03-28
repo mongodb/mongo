@@ -224,7 +224,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_replication_bulk_write_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "bulk_write", "sharding", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "requires_all_feature_flags", "bulk_write", "sharding", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -279,7 +279,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_replication_causal_consistency_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "sharding", "large", "non_live_record", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "requires_all_feature_flags", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "sharding", "large", "non_live_record", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -295,7 +295,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_replication_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "common", "sharding", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "requires_all_feature_flags", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "common", "sharding", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -311,7 +311,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_replication_multi_stmt_txn_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "common", "sharding", "txn", "no_debug_mode", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "requires_all_feature_flags", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "common", "sharding", "txn", "no_debug_mode", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1115,7 +1115,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_replication_metrics_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "concurrency", "sharding", "disabled_on_code_coverage", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "requires_all_feature_flags", "concurrency", "sharding", "disabled_on_code_coverage", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1131,7 +1131,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_replication_wiredtiger_cursor_sweeps_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "concurrency", "sharding", "cursor_sweeps", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "requires_all_feature_flags", "concurrency", "sharding", "cursor_sweeps", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
