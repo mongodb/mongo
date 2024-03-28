@@ -106,6 +106,9 @@ class Globals:
     # Flag to signal that scons is ready to build, but needs to wait on bazel
     waiting_on_bazel_flag: bool = False
 
+    # a IO object to hold the bazel output in place of stdout
+    bazel_thread_terminal_output = StringIO()
+
 
 def bazel_debug(msg: str):
     pass
@@ -226,7 +229,6 @@ def ninja_bazel_builder(env: SCons.Environment.Environment, _dup_env: SCons.Envi
 def bazel_build_thread_func(log_dir: str, verbose: bool) -> None:
     """This thread runs the bazel build up front."""
 
-    temp_stdout = StringIO()
     done_with_temp = False
     os.makedirs(log_dir, exist_ok=True)
 
@@ -262,17 +264,29 @@ def bazel_build_thread_func(log_dir: str, verbose: bool) -> None:
                     if Globals.waiting_on_bazel_flag:
                         if not done_with_temp:
                             done_with_temp = True
-                            temp_stdout.seek(0)
-                            sys.stdout.write(temp_stdout.read())
+                            Globals.bazel_thread_terminal_output.seek(0)
+                            sys.stdout.write(Globals.bazel_thread_terminal_output.read())
+                            Globals.bazel_thread_terminal_output = None
                         sys.stdout.write(data.decode())
                     else:
-
-                        temp_stdout.write(data.decode())
+                        Globals.bazel_thread_terminal_output.write(data.decode())
         finally:
             os.close(parent_fd)
             if bazel_proc.poll() is None:
                 bazel_proc.kill()
             bazel_proc.wait()
+
+            if bazel_proc.returncode != 0:
+                print("ERROR: Bazel build failed:")
+                stdout = ""
+
+                if not done_with_temp:
+                    Globals.bazel_thread_terminal_output.seek(0)
+                    stdout += Globals.bazel_thread_terminal_output.read()
+                    Globals.bazel_thread_terminal_output = None
+                    print(stdout)
+
+                raise subprocess.CalledProcessError(bazel_proc.returncode, bazel_cmd, stdout, "")
 
     except ImportError:
         bazel_proc = subprocess.Popen(bazel_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -284,12 +298,25 @@ def bazel_build_thread_func(log_dir: str, verbose: bool) -> None:
             if Globals.waiting_on_bazel_flag:
                 if not done_with_temp:
                     done_with_temp = True
-                    temp_stdout.seek(0)
-                    sys.stdout.write(temp_stdout.read())
+                    Globals.bazel_thread_terminal_output.seek(0)
+                    sys.stdout.write(Globals.bazel_thread_terminal_output.read())
+                    Globals.bazel_thread_terminal_output = None
                 sys.stdout.write(line.decode())
             else:
+                Globals.bazel_thread_terminal_output.write(line.decode())
 
-                temp_stdout.write(line.decode())
+        stdout, stderr = bazel_proc.communicate()
+
+        if bazel_proc.returncode != 0:
+            print("ERROR: Bazel build failed:")
+
+            if not done_with_temp:
+                Globals.bazel_thread_terminal_output.seek(0)
+                stdout += Globals.bazel_thread_terminal_output.read()
+                Globals.bazel_thread_terminal_output = None
+                print(stdout)
+
+            raise subprocess.CalledProcessError(bazel_proc.returncode, bazel_cmd, stdout, stderr)
 
 
 def create_bazel_builder(builder: SCons.Builder.Builder) -> SCons.Builder.Builder:
@@ -649,7 +676,7 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         # Store the bazel command line flags so scons can check if it should rerun the bazel targets
         # if the bazel command line changes.
-        env['BAZEL_FLAGS_STR'] = str(bazel_internal_flags) + env.get("BAZEL_FLAGS", "")
+        env['BAZEL_FLAGS_STR'] = ' '.join(bazel_internal_flags) + env.get("BAZEL_FLAGS", "")
 
         if "--config=local" not in env['BAZEL_FLAGS_STR']:
             print(
@@ -690,8 +717,10 @@ def generate(env: SCons.Environment.Environment) -> None:
                 nonlocal bazel_build_thread
                 Globals.waiting_on_bazel_flag = True
                 print("SCons done, switching to bazel build thread...")
-
                 bazel_build_thread.join()
+                if Globals.bazel_thread_terminal_output is not None:
+                    Globals.bazel_thread_terminal_output.seek(0)
+                    sys.stdout.write(Globals.bazel_thread_terminal_output.read())
 
             env.AddMethod(wait_for_bazel, "WaitForBazel")
         else:
