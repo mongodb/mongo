@@ -1380,6 +1380,43 @@ the lock is acquired in the same mode as the global lock request.
 Next, it must acquire the RSTL in [intent exclusive](https://docs.mongodb.com/manual/reference/glossary/#term-intent-lock)
 mode. Only then can it acquire the global lock in its desired mode.
 
+# Non-transactional batched operations.
+
+## Vectored inserts
+
+For vectored inserts, where one user command inserts multiple documents, but not within a
+multi-document transaction, we use a special mechanism to reduce replication overhead. The
+documents are broken up into batches with a maximum of `internalInsertMaxBatchSize` documents, or
+`insertVectorMaxBytes` bytes, whichever results in a smaller batch.
+
+When we open the `WriteUnitOfWork` for these batches, we specify a
+`WriteUnitOfWork::OplogEntryGroupType` of `kGroupForPossiblyRetryableOperations`. This will set the
+`writesAreBatched` flag on the `BatchedWriteContext` decoration on the OperationContext. When this
+flag is set, the `OpObserverImpl` will collect writes in a `BatchedOperations` (an alias for
+`TransactionOperations`) structure on the `BatchedWriteContext` rather than write oplog entries for
+them.
+
+When the `WriteUnitOfWork` commits, the OpObserverImpl will write these oplog entries in an
+`applyOps` entry. If this insert is not within a retryable session, this applyOps entry will lack
+the `lsid`, `txnNumber`, and `prevOpTime` fields. If this insert is within a retryable session, it
+will contain all those fields and also a `multiOpType: 1` field which distinguishes vectored inserts
+from transactions. All `applyOps` entries generated from batches within a single retryable vectored
+insert will have the same `lsid` and `txnNumber`, and will be linked to the previous entry using the
+`prevOpTime` field, which will be a null optime for the first `applyOps`.
+
+It is expected that users of the `kGroupForPossiblyRetryableOperations` parameter will ensure that
+no more than `BSONMaxUserSize` bytes of user data are inserted within one `WriteUnitOfWork`. If
+this is exceeded, multiple `applyOps` entries will be generated, with sequential optimes; if they
+are within a retryable write they will be linked together.
+
+When applied on a secondary, each `applyOps` in a batched operation will be applied separately;
+unlike transactions, there is no requirement that all writes within a single vectored insert are
+applied in a single batch.
+
+(n.b. while this mechanism is intended to be able to handle multiple types of operations, only
+vectored inserts are currently implemented and features necessary for other operations, such as
+pre- and post- image recording are not currently implemented)
+
 # Elections
 
 ## Step Up
