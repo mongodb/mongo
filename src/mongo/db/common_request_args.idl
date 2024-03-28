@@ -51,6 +51,9 @@ structs:
       OperationSessionInfoFromClientBase: OperationSessionInfoFromClientBase
       GossipedVectorClockComponents: GossipedVectorClockComponents
     fields:
+      $db:
+        type: database_name
+        cpp_name: "dbName"
       readConcern:
         type: object
         optional: true

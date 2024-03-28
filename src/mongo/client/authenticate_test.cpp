@@ -87,7 +87,7 @@ public:
         // Validate the received request
         ASSERT(!_requests.empty());
         auto& expected = _requests.front();
-        ASSERT_EQ(expected.getDatabase(), request.getDatabase());
+        ASSERT_EQ(expected.parseDbName(), request.parseDbName());
         ASSERT_BSONOBJ_EQ(expected.body, request.body);
         _requests.pop();
 

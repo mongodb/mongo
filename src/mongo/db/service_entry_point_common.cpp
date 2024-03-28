@@ -179,6 +179,7 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
@@ -589,7 +590,12 @@ private:
 
         CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
 
-        _requestArgs = CommonRequestArgs::parse(IDLParserContext("request"), request.body);
+        _requestArgs = CommonRequestArgs::parse(IDLParserContext("request",
+                                                                 false,
+                                                                 request.validatedTenancyScope,
+                                                                 request.getValidatedTenantId(),
+                                                                 request.getSerializationContext()),
+                                                request.body);
 
         validateAPIParameters(request.body, _requestArgs.getAPIParametersFromClient(), command);
 
@@ -597,6 +603,11 @@ private:
 
         {
             stdx::lock_guard<Client> lk(*client);
+            // We construct a legacy $cmd namespace so we can fill in curOp using
+            // the existing logic that existed for OP_QUERY commands
+            NamespaceString nss(NamespaceString::makeCommandNamespace(_requestArgs.getDbName()));
+            CurOp::get(opCtx)->setNS_inlock(std::move(nss));
+
             CurOp::get(opCtx)->setCommand_inlock(command);
             APIParameters::get(opCtx) =
                 APIParameters::fromClient(_requestArgs.getAPIParametersFromClient());
@@ -1214,8 +1225,8 @@ void RunCommandImpl::_epilogue() {
         });
 
     behaviors.waitForLinearizableReadConcern(opCtx);
-    const DatabaseName requestDbName = request.getDbName();
-    tenant_migration_access_blocker::checkIfLinearizableReadWasAllowedOrThrow(opCtx, requestDbName);
+    const DatabaseName& dbName = _ecd->getInvocation()->db();
+    tenant_migration_access_blocker::checkIfLinearizableReadWasAllowedOrThrow(opCtx, dbName);
 
     // Wait for data to satisfy the read concern level, if necessary.
     behaviors.waitForSpeculativeMajorityReadConcern(opCtx);
@@ -2141,7 +2152,7 @@ void ExecCommandDatabase::_handleFailure(Status status) {
                 1,
                 "Assertion while executing command",
                 "command"_attr = request.getCommandName(),
-                "db"_attr = request.getDatabase(),
+                "db"_attr = request.readDatabaseForLogging(),
                 "commandArgs"_attr = redact(
                     ServiceEntryPointCommon::getRedactedCopyForLogging(command, request.body)),
                 "error"_attr = redact(status.toString()));
@@ -2162,12 +2173,7 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
     auto curop = CurOp::get(opCtx);
     curop->debug().iscommand = true;
 
-    // We construct a legacy $cmd namespace so we can fill in curOp using
-    // the existing logic that existed for OP_QUERY commands
-    NamespaceString nss(NamespaceString::makeCommandNamespace(request.getDbName()));
-
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    curop->setNS_inlock(nss);
     curop->setOpDescription_inlock(request.body);
     curop->markCommand_inlock();
 }
@@ -2215,7 +2221,7 @@ void executeCommand(HandleRequest::ExecutionContext& execContext) {
     LOGV2_DEBUG(21965,
                 2,
                 "About to run the command",
-                "db"_attr = request.getDatabase(),
+                "db"_attr = request.readDatabaseForLogging(),
                 "client"_attr = (opCtx->getClient() && opCtx->getClient()->hasRemote()
                                      ? opCtx->getClient()->getRemote().toString()
                                      : ""),
@@ -2239,7 +2245,7 @@ void executeCommand(HandleRequest::ExecutionContext& execContext) {
                     1,
                     "Assertion while executing command",
                     "command"_attr = execContext.getRequest().getCommandName(),
-                    "db"_attr = execContext.getRequest().getDatabase(),
+                    "db"_attr = execContext.getRequest().readDatabaseForLogging(),
                     "error"_attr = ex.toStatus().toString());
         throw;
     }
@@ -2262,7 +2268,7 @@ DbResponse makeCommandResponse(const HandleRequest::ExecutionContext& execContex
                       fmt::format("Not-primary error while processing '{}' operation  on '{}' "
                                   "database via fire-and-forget command execution.",
                                   request.getCommandName(),
-                                  request.getDatabase()));
+                                  request.readDatabaseForLogging()));
         }
         return {};  // Don't reply.
     }

@@ -270,7 +270,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
     // For bulkWrite request, we set the nss when we parse the bulkWrite command.
     if (commandName != BulkWriteCommandRequest::kCommandName) {
         parsedInfo.nss =
-            CommandHelpers::parseNsCollectionRequired(writeReq.getDbName(), writeCmdObj);
+            CommandHelpers::parseNsCollectionRequired(writeReq.parseDbName(), writeCmdObj);
     }
 
     if (commandName == BulkWriteCommandRequest::kCommandName) {

@@ -601,7 +601,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
                                  const OpMsgRequest& request,
                                  ExplainOptions::Verbosity verbosity,
                                  rpc::ReplyBuilderInterface* result) const {
-    const DatabaseName dbName = request.getDbName();
+    const DatabaseName dbName = request.parseDbName();
     auto bodyBuilder = result->getBodyBuilder();
     BSONObj cmdObj = [&]() {
         // Check whether the query portion needs to be rewritten for FLE.

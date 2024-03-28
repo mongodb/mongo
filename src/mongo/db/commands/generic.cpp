@@ -120,10 +120,15 @@ public:
     struct Request {
         static constexpr auto kCommandName = "echo"_sd;
         static Request parse(const IDLParserContext&, const OpMsgRequest& request) {
-            return Request{request};
+            return Request{request, request.parseDbName()};
+        }
+
+        const DatabaseName& getDbName() const {
+            return dbName;
         }
 
         const OpMsgRequest& request;
+        const DatabaseName dbName;
     };
 
     class Invocation final : public MinimalInvocationBase {
@@ -138,7 +143,7 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const override {}
 
         NamespaceString ns() const override {
-            return NamespaceString(request().request.getDbName());
+            return NamespaceString(request().request.parseDbName());
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {

@@ -414,6 +414,10 @@ public:
             return NamespaceStringUtil::deserialize(_cmd.getDbName(), _cmd.getCollection());
         }
 
+        const DatabaseName& db() const override {
+            return _cmd.getDbName();
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassertStatusOK(auth::checkAuthForGetMore(AuthorizationSession::get(opCtx->getClient()),
                                                       ns(),

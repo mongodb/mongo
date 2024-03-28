@@ -102,7 +102,7 @@ public:
         auto builder = result->getBodyBuilder();
         auto explain = boost::make_optional(verbosity);
         try {
-            _explainImpl(opCtx, request.getDbName(), request.body, builder, explain);
+            _explainImpl(opCtx, request.parseDbName(), request.body, builder, explain);
         } catch (...) {
             return exceptionToStatus();
         }

@@ -102,10 +102,6 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
     if (client->isInDirectClient())
         return true;
 
-    uassert(ErrorCodes::Unauthorized,
-            str::stream() << command->getName() << " may only be run against the admin database.",
-            !command->adminOnly() || request.getDatabase() == DatabaseName::kAdmin.db(omitTenant));
-
     auto authzSession = AuthorizationSession::get(client);
     uassert(ErrorCodes::ReauthenticationRequired,
             fmt::format("Command {} requires reauthentication since the current authorization "
@@ -233,7 +229,7 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
                 _nss = _invocation->ns();
                 _name = _invocation->definition()->getName();
             } else {
-                _nss = NamespaceString(request.getDbName());
+                _nss = NamespaceString(request.parseDbName());
                 _name = request.getCommandName().toString();
             }
         }
@@ -887,6 +883,11 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
     // Not using a scope guard because auditLogAuthEvent could conceivably throw.
     try {
         const Command* c = definition();
+
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << c->getName() << " may only be run against the admin database.",
+                !c->adminOnly() || db().isAdminDB());
+
         if (checkAuthorizationImplPreParse(opCtx, c, request)) {
             // Blanket authorization: don't need to check anything else.
         } else {
@@ -896,9 +897,8 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
                 namespace mmb = mutablebson;
                 mmb::Document cmdToLog(request.body, mmb::Document::kInPlaceDisabled);
                 c->snipForLogging(&cmdToLog);
-                auto dbName = request.getDbName();
                 uasserted(ErrorCodes::Unauthorized,
-                          str::stream() << "not authorized on " << dbName.toStringForErrorMsg()
+                          str::stream() << "not authorized on " << db().toStringForErrorMsg()
                                         << " to execute command " << redact(cmdToLog.getObject()));
             }
         }
@@ -924,7 +924,7 @@ public:
         : CommandInvocation(command),
           _command(command),
           _request(request),
-          _dbName(request.getDbName()) {}
+          _dbName(request.parseDbName()) {}
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
@@ -953,6 +953,10 @@ private:
 
     NamespaceString ns() const override {
         return _command->parseNs(_dbName, cmdObj());
+    }
+
+    const DatabaseName& db() const override {
+        return _dbName;
     }
 
     bool supportsWriteConcern() const override {

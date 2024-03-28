@@ -363,14 +363,14 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
         if (cmd != "getMore"_sd)
             return false;
         auto opCtx = client->makeOperationContext();
+        auto dbName = inRequest.parseDbName();
         sep->handleRequest(opCtx.get(),
                            OpMsgRequestBuilder::create(
                                auth::ValidatedTenancyScope::get(opCtx.get()),
-                               inRequest.getDbName(),
-                               KillCursorsCommandRequest(
-                                   NamespaceStringUtil::deserialize(inRequest.getDbName(),
-                                                                    body["collection"].String()),
-                                   {CursorId{firstElement.Long()}})
+                               dbName,
+                               KillCursorsCommandRequest(NamespaceStringUtil::deserialize(
+                                                             dbName, body["collection"].String()),
+                                                         {CursorId{firstElement.Long()}})
                                    .toBSON(BSONObj{}))
                                .serialize())
             .get();

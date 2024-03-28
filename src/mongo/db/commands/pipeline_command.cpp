@@ -115,7 +115,7 @@ public:
 
         const auto aggregationRequest = aggregation_request_helper::parseFromBSON(
             opCtx,
-            opMsgRequest.getDbName(),
+            opMsgRequest.parseDbName(),
             opMsgRequest.body,
             explainVerbosity,
             APIParameters::get(opCtx).getAPIStrict().value_or(false),
@@ -170,7 +170,7 @@ public:
                    PrivilegeVector privileges)
             : CommandInvocation(cmd),
               _request(request),
-              _dbName(request.getDbName()),
+              _dbName(aggregationRequest.getDbName()),
               _aggregationRequest(std::move(aggregationRequest)),
               _liteParsedPipeline(_aggregationRequest),
               _privileges(std::move(privileges)) {
@@ -293,6 +293,10 @@ public:
 
         NamespaceString ns() const override {
             return _aggregationRequest.getNamespace();
+        }
+
+        const DatabaseName& db() const override {
+            return _dbName;
         }
 
         void explain(OperationContext* opCtx,

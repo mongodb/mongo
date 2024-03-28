@@ -250,13 +250,13 @@ void ExecCommandClient::_prologue() {
     const auto& request = _rec->getRequest();
     const Command* c = _invocation->definition();
 
-    const auto dbname = request.getDatabase();
+    const auto& dbname = _invocation->db();
     uassert(ErrorCodes::IllegalOperation,
             "Can't use 'local' database through mongos",
-            dbname != DatabaseName::kLocal.db(omitTenant));
+            !dbname.isLocalDB());
     uassert(ErrorCodes::InvalidNamespace,
-            "Invalid database name: '{}'"_format(dbname),
-            DatabaseName::validDBName(dbname, DatabaseName::DollarInDbNameBehavior::Allow));
+            "Invalid database name: '{}'"_format(dbname.toStringForErrorMsg()),
+            DatabaseName::isValid(dbname, DatabaseName::DollarInDbNameBehavior::Allow));
 
     StringDataSet topLevelFields(8);
     for (auto&& element : request.body) {
@@ -516,7 +516,12 @@ void ParseAndRunCommand::_parseCommand() {
 
     CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
 
-    _requestArgs = CommonRequestArgs::parse(IDLParserContext("request"), request.body);
+    _requestArgs = CommonRequestArgs::parse(IDLParserContext("request",
+                                                             false,
+                                                             request.validatedTenancyScope,
+                                                             request.getValidatedTenantId(),
+                                                             request.getSerializationContext()),
+                                            request.body);
 
     // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
     // the OperationContext. Be sure to do this as soon as possible so that further processing by
@@ -555,7 +560,7 @@ void ParseAndRunCommand::_parseCommand() {
     // the command does not define a fully-qualified namespace, set CurOp to the generic command
     // namespace db.$cmd.
     _ns.emplace(_invocation->ns());
-    const auto nss = (NamespaceString(request.getDbName()) == *_ns
+    const auto nss = (NamespaceString(_invocation->db()) == *_ns
                           ? NamespaceString::makeCommandNamespace(_invocation->ns().dbName())
                           : _invocation->ns());
 
@@ -1203,11 +1208,8 @@ public:
     Future<DbResponse> run();
 
 private:
-    std::string _getDatabaseStringForLogging() const try {
-        // `getDatabase` throws if the request doesn't have a '$db' field.
-        return _rec->getRequest().getDatabase().toString();
-    } catch (const DBException& ex) {
-        return ex.toString();
+    StringData _getDatabaseStringForLogging() const {
+        return _rec->getRequest().readDatabaseForLogging();
     }
 
     void _parseMessage();

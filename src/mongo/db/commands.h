@@ -793,6 +793,14 @@ public:
     virtual NamespaceString ns() const = 0;
 
     /**
+     * The database associated with this command (i.e. the "$db" field in OP_MSG requests).
+     *
+     * This is usually equivalent to ns().dbName(), but some commands are associated with a
+     * different database (usually admin) than the one they modify or operate over.
+     */
+    virtual const DatabaseName& db() const = 0;
+
+    /**
      * All of the namespaces this command operates on. For most commands will just be ns().
      */
     virtual std::vector<NamespaceString> allNamespaces() const {
@@ -1334,6 +1342,10 @@ public:
         : CommandInvocation(command),
           _request{_parseRequest(opCtx, command, opMsgRequest)},
           _opMsgRequest{opMsgRequest} {}
+
+    const DatabaseName& db() const override {
+        return request().getDbName();
+    }
 
 protected:
     const RequestType& request() const {

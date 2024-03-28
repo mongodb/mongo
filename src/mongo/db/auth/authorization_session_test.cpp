@@ -1334,7 +1334,6 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
     BSONObj stringObj = BSON("a"
                              << "string");
     BSONObj uuidObj = BSON("a" << UUID::gen());
-    BSONObj invalidObj = BSON("a" << 12);
 
     // Strings require no privileges
     ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(stringObj.firstElement()));
@@ -1342,20 +1341,12 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
     // UUIDs cannot be parsed with default privileges
     ASSERT_FALSE(authzSession->isAuthorizedToParseNamespaceElement(uuidObj.firstElement()));
 
-    // Element must be either a string, or a UUID
-    ASSERT_THROWS_CODE(authzSession->isAuthorizedToParseNamespaceElement(invalidObj.firstElement()),
-                       AssertionException,
-                       ErrorCodes::InvalidNamespace);
-
     // The useUUID privilege allows UUIDs to be parsed
     authzSession->assumePrivilegesForDB(
         Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useUUID), testDB);
 
     ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(stringObj.firstElement()));
     ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(uuidObj.firstElement()));
-    ASSERT_THROWS_CODE(authzSession->isAuthorizedToParseNamespaceElement(invalidObj.firstElement()),
-                       AssertionException,
-                       ErrorCodes::InvalidNamespace);
 
     // Verify we recorded the all the auth checks correctly
     AuthorizationContract ac(

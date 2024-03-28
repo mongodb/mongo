@@ -178,6 +178,10 @@ private:
         return _batchedRequest.getNS();
     }
 
+    const DatabaseName& db() const override {
+        return _batchedRequest.getNS().dbName();
+    }
+
     bool supportsWriteConcern() const override {
         return true;
     }

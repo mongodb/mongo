@@ -59,7 +59,7 @@ bool isInternalClient(OperationContext* opCtx) {
  * Returns true if this is a request for the local database.
  */
 bool isLocalDatabaseCommandRequest(const OpMsgRequest& opMsgReq) {
-    return opMsgReq.getDbName().isLocalDB();
+    return opMsgReq.parseDbName().isLocalDB();
 }
 
 /**
@@ -162,7 +162,7 @@ bool shouldRouteRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
         uassert(ErrorCodes::NotWritablePrimary,
                 "This command is only allowed on a primary",
                 repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
-                    opCtx, opMsgReq.getDbName()));
+                    opCtx, opMsgReq.parseDbName()));
     }
 
     // There is nothing that will prevent the cluster from becoming multi-shard (i.e. no longer

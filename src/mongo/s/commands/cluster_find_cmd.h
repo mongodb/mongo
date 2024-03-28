@@ -110,7 +110,7 @@ public:
     class Invocation final : public CommandInvocation {
     public:
         Invocation(const ClusterFindCmdBase* definition, const OpMsgRequest& request)
-            : CommandInvocation(definition), _request(request), _dbName(request.getDbName()) {}
+            : CommandInvocation(definition), _request(request), _dbName(request.parseDbName()) {}
 
     private:
         bool supportsWriteConcern() const override {
@@ -126,6 +126,10 @@ public:
             // TODO get the ns from the parsed QueryRequest.
             return NamespaceString(
                 CommandHelpers::parseNsCollectionRequired(_dbName, _request.body));
+        }
+
+        const DatabaseName& db() const override {
+            return _dbName;
         }
 
         /**

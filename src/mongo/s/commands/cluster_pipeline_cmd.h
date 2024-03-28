@@ -102,7 +102,6 @@ public:
                    PrivilegeVector privileges)
             : CommandInvocation(cmd),
               _request(request),
-              _dbName(request.getDatabase().toString()),
               _aggregationRequest(std::move(aggregationRequest)),
               _liteParsedPipeline(LiteParsedPipeline(_aggregationRequest)),
               _privileges(std::move(privileges)) {}
@@ -122,7 +121,6 @@ public:
         }
 
         void _runAggCommand(OperationContext* opCtx,
-                            const std::string& dbname,
                             const BSONObj& cmdObj,
                             BSONObjBuilder* result) {
             const auto& nss = _aggregationRequest.getNamespace();
@@ -154,7 +152,7 @@ public:
             Impl::checkCanRunHere(opCtx);
 
             auto bob = reply->getBodyBuilder();
-            _runAggCommand(opCtx, _dbName, _request.body, &bob);
+            _runAggCommand(opCtx, _request.body, &bob);
         }
 
         void explain(OperationContext* opCtx,
@@ -162,7 +160,7 @@ public:
                      rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanExplainHere(opCtx);
             auto bodyBuilder = result->getBodyBuilder();
-            _runAggCommand(opCtx, _dbName, _request.body, &bodyBuilder);
+            _runAggCommand(opCtx, _request.body, &bodyBuilder);
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -173,8 +171,11 @@ public:
             return _aggregationRequest.getNamespace();
         }
 
+        const DatabaseName& db() const override {
+            return _aggregationRequest.getDbName();
+        }
+
         const OpMsgRequest& _request;
-        const std::string _dbName;
         AggregateCommandRequest _aggregationRequest;
         const LiteParsedPipeline _liteParsedPipeline;
         const PrivilegeVector _privileges;

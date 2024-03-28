@@ -497,10 +497,6 @@ bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(const BSONEle
     const bool isUUID = element.type() == BinData && element.binDataType() == BinDataType::newUUID;
     _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);
 
-    uassert(ErrorCodes::InvalidNamespace,
-            "Failed to parse namespace element",
-            element.type() == String || isUUID);
-
     if (isUUID) {
         return isAuthorizedForActionsOnResource(
             ResourcePattern::forClusterResource(getUserTenantId()), ActionType::useUUID);

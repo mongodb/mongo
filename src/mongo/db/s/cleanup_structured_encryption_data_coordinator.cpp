@@ -283,7 +283,7 @@ bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,
         cmd.setDropTarget(false);
         cmd.setCollectionUUID(state.getEcocUuid().value());
 
-        uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.dbName(), cmd));
+        uassertStatusOK(doRunCommand(opCtx.get(), DatabaseName::kAdmin, cmd));
         *newEcocRenameUuid = state.getEcocUuid();
     }
 

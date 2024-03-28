@@ -1518,7 +1518,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
         DBDirectClient client(opCtx());
         BSONObj info;
         ASSERT_TRUE(client.runCommand(
-            dbNameTestDb,
+            DatabaseName::kAdmin,
             BSON("renameCollection"
                  << nss.ns_forTest() << "to"
                  << NamespaceString::createNamespaceString_forTest(dbNameTestDb, "foo2")

@@ -128,7 +128,7 @@ public:
                 LOGV2_DEBUG(21975,
                             debugLevel,
                             "Command timed out waiting for read concern to be satisfied",
-                            "db"_attr = request.getDatabase(),
+                            "db"_attr = invocation->db(),
                             "command"_attr =
                                 redact(ServiceEntryPointCommon::getRedactedCopyForLogging(
                                     invocation->definition(), request.body)),
@@ -349,7 +349,7 @@ Future<DbResponse> ServiceEntryPointMongod::_replicaSetEndpointHandleRequest(
                 "Using replica set endpoint",
                 "opId"_attr = opCtx->getOpID(),
                 "cmdName"_attr = opMsgReq.getCommandName(),
-                "dbName"_attr = opMsgReq.getDatabaseNoThrow(),
+                "dbName"_attr = opMsgReq.readDatabaseForLogging(),
                 "cmdObj"_attr = redact(opMsgReq.body.toString()),
                 "shouldRoute"_attr = shouldRoute);
     if (shouldRoute) {

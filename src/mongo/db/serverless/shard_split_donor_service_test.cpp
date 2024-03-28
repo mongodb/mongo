@@ -162,6 +162,10 @@ public:
         return NamespaceString::kSystemReplSetNamespace;
     }
 
+    const DatabaseName& db() const final {
+        return NamespaceString::kSystemReplSetNamespace.dbName();
+    }
+
     bool supportsWriteConcern() const final {
         return true;
     }

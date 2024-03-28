@@ -85,7 +85,7 @@ struct ClusterPipelineCommandS {
         boost::optional<ExplainOptions::Verbosity> explainVerbosity,
         bool apiStrict) {
         return aggregation_request_helper::parseFromBSON(
-            opCtx, opMsgRequest.getDbName(), opMsgRequest.body, explainVerbosity, apiStrict);
+            opCtx, opMsgRequest.parseDbName(), opMsgRequest.body, explainVerbosity, apiStrict);
     }
 };
 MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandS>).forRouter();

@@ -257,23 +257,20 @@ public:
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) override {
-        auto dbName = opMsgRequest.getDbName();
-        auto ns = CommandHelpers::parseNsFromCommand(dbName, opMsgRequest.body);
-        auto cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, ns, opMsgRequest);
-        return std::make_unique<Invocation>(
-            this, opMsgRequest, std::move(dbName), std::move(ns), std::move(cmdRequest));
+        auto cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, opMsgRequest);
+        return std::make_unique<Invocation>(this, opMsgRequest, std::move(cmdRequest));
     }
 
     std::unique_ptr<CommandInvocation> parseForExplain(
         OperationContext* opCtx,
         const OpMsgRequest& request,
         boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
-        auto dbName = request.getDbName();
+        auto cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, request);
         // Providing collection UUID for explain is forbidden, see SERVER-38821 and SERVER-38275
-        auto ns = CommandHelpers::parseNsCollectionRequired(dbName, request.body);
-        auto cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, ns, request);
-        return std::make_unique<Invocation>(
-            this, request, std::move(dbName), std::move(ns), std::move(cmdRequest));
+        uassert(ErrorCodes::InvalidNamespace,
+                "Providing collection UUID for explain is forbidden",
+                !cmdRequest->getNamespaceOrUUID().isUUID());
+        return std::make_unique<Invocation>(this, request, std::move(cmdRequest));
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
@@ -335,13 +332,12 @@ public:
     public:
         Invocation(const FindCmd* definition,
                    const OpMsgRequest& request,
-                   DatabaseName dbName,
-                   NamespaceString ns,
                    std::unique_ptr<FindCommandRequest> cmdRequest)
             : CommandInvocation(definition),
               _request(request),
-              _dbName(std::move(dbName)),
-              _ns(std::move(ns)),
+              _ns(cmdRequest->getNamespaceOrUUID().isNamespaceString()
+                      ? cmdRequest->getNamespaceOrUUID().nss()
+                      : NamespaceString(cmdRequest->getNamespaceOrUUID().dbName())),
               _cmdRequest(std::move(cmdRequest)) {
             invariant(_request.body.isOwned());
 
@@ -383,15 +379,15 @@ public:
             return _ns;
         }
 
+        const DatabaseName& db() const override {
+            return _ns.dbName();
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const final {
             AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
 
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    authSession->isAuthorizedToParseNamespaceElement(_request.body.firstElement()));
-
-            const auto hasTerm = _request.body.hasField(kTermField);
-            const auto nsOrUUID = CommandHelpers::parseNsOrUUID(_dbName, _request.body);
+            const auto hasTerm = _cmdRequest->getTerm().has_value();
+            const NamespaceStringOrUUID& nsOrUUID = _cmdRequest->getNamespaceOrUUID();
             if (nsOrUUID.isNamespaceString()) {
                 uassert(ErrorCodes::InvalidNamespace,
                         str::stream() << "Namespace " << nsOrUUID.toStringForErrorMsg()
@@ -506,7 +502,7 @@ public:
 
             if (!_cmdRequest) {
                 // We're rerunning the same invocation, so we have to parse again
-                _cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, _ns, _request);
+                _cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, _request);
             }
             _rewriteFLEPayloads(opCtx);
             auto respSc =
@@ -983,16 +979,28 @@ private:
     // Parses the command object to a FindCommandRequest. If the client request did not specify
     // any runtime constants, make them available to the query here.
     static std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
-        OperationContext* opCtx, const NamespaceString& nss, const OpMsgRequest& request) {
+        OperationContext* opCtx, const OpMsgRequest& request) {
+        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+
+        uassert(ErrorCodes::Unauthorized,
+                "Unauthorized",
+                authSession->isAuthorizedToParseNamespaceElement(request.body.firstElement()));
+
         // check validated tenantId and set the flag on the serialization context object
         auto reqSc = request.getSerializationContext();
+        const boost::optional<auth::ValidatedTenancyScope>& vts =
+            auth::ValidatedTenancyScope::get(opCtx);
 
         auto findCommand = query_request_helper::makeFromFindCommand(
             request.body,
-            auth::ValidatedTenancyScope::get(opCtx),
-            nss.tenantId(),
+            vts,
+            vts.has_value() ? boost::make_optional(vts->tenantId()) : boost::none,
             reqSc,
             APIParameters::get(opCtx).getAPIStrict().value_or(false));
+
+        if (auto& nss = findCommand->getNamespaceOrUUID(); nss.isNamespaceString()) {
+            CommandHelpers::ensureValidCollectionName(nss.nss());
+        }
 
         // TODO: SERVER-73632 Remove Feature Flag for PM-635.
         // Forbid users from passing 'querySettings' explicitly.

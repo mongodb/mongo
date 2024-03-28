@@ -929,28 +929,28 @@ TEST_F(OpMsgWithAuth, ValidatedTenancyScopeShouldNotBeSerialized) {
 TEST(OpMsgRequest, GetDatabaseWorks) {
     OpMsgRequest msg;
     msg.body = fromjson("{$db: 'foo'}");
-    ASSERT_EQ(msg.getDatabase(), "foo");
+    ASSERT_EQ(msg.parseDbName().toString_forTest(), "foo");
 
     msg.body = fromjson("{before: 1, $db: 'foo'}");
-    ASSERT_EQ(msg.getDatabase(), "foo");
+    ASSERT_EQ(msg.parseDbName().toString_forTest(), "foo");
 
     msg.body = fromjson("{before: 1, $db: 'foo', after: 1}");
-    ASSERT_EQ(msg.getDatabase(), "foo");
+    ASSERT_EQ(msg.parseDbName().toString_forTest(), "foo");
 }
 
 TEST(OpMsgRequest, GetDatabaseThrowsWrongType) {
     OpMsgRequest msg;
     msg.body = fromjson("{$db: 1}");
-    ASSERT_THROWS(msg.getDatabase(), DBException);
+    ASSERT_THROWS(msg.parseDbName().toString_forTest(), DBException);
 }
 
 TEST(OpMsgRequest, GetDatabaseThrowsMissing) {
     OpMsgRequest msg;
     msg.body = fromjson("{}");
-    ASSERT_THROWS(msg.getDatabase(), AssertionException);
+    ASSERT_THROWS(msg.parseDbName().toString_forTest(), AssertionException);
 
     msg.body = fromjson("{$notdb: 'foo'}");
-    ASSERT_THROWS(msg.getDatabase(), AssertionException);
+    ASSERT_THROWS(msg.parseDbName().toString_forTest(), AssertionException);
 }
 
 TEST(OpMsgRequestBuilder, WithVTS) {
@@ -973,7 +973,7 @@ TEST(OpMsgRequestBuilder, WithVTS) {
         vts, DatabaseName::createDatabaseName_forTest(tenantId, dbString), body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
-    ASSERT_EQ(msg.getDatabase(), dbString);
+    ASSERT_EQ(msg.parseDbName().toString_forTest(), dbString);
 }
 
 TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
@@ -1002,7 +1002,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
 
     // Missing expectPrefix in the request body.
     ASSERT_EQ(msg.body.getField("expectPrefix").eoo(), true);
-    ASSERT_EQ(msg.getDatabase(), dbString);
+    ASSERT_EQ(msg.parseDbName().toString_forTest(), dbString);
 }
 
 void CheckVtsSetsPrefix(Client* client, bool simulateAtlasProxyTenantProtocol) {
@@ -1127,7 +1127,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
         vts, DatabaseName::createDatabaseName_forTest(tenantId, dbString), body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
-    ASSERT_EQ(msg.getDatabase(), dbString);
+    ASSERT_EQ(msg.parseDbName().toString_forTest(), dbString);
 }
 
 TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
@@ -1158,7 +1158,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
     ASSERT_EQ(msg.body.getField("expectPrefix").eoo(), false);
     ASSERT_TRUE(msg.body.getField("expectPrefix").isBoolean());
     ASSERT_EQ(msg.body.getField("expectPrefix").boolean(), true);
-    ASSERT_EQ(msg.getDatabase(), dbStringWithTid);
+    ASSERT_EQ(msg.parseDbName().toStringWithTenantId_forTest(), dbStringWithTid);
 }
 
 TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
@@ -1254,7 +1254,7 @@ TEST_F(OpMsgWithAuth, GetDbNameWithVTS) {
     ASSERT_EQ(request.getSerializationContext(),
               SerializationContext(
                   SC::Source::Command, SC::CallerType::Request, SC::Prefix::ExcludePrefix));
-    ASSERT_EQ(request.getDbName(), expectedTenantDbName);
+    ASSERT_EQ(request.parseDbName(), expectedTenantDbName);
 }
 
 TEST_F(OpMsgWithAuth, GetDbNameWithVTSIncludePrefix) {
@@ -1300,7 +1300,7 @@ TEST_F(OpMsgWithAuth, GetDbNameWithVTSIncludePrefix) {
     ASSERT_EQ(request.getSerializationContext(),
               SerializationContext(
                   SC::Source::Command, SC::CallerType::Request, SC::Prefix::IncludePrefix));
-    ASSERT_EQ(request.getDbName(), expectedDbName);
+    ASSERT_EQ(request.parseDbName(), expectedDbName);
 }
 
 }  // namespace

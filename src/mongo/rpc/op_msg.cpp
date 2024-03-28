@@ -48,6 +48,7 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -269,7 +270,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     throw;
 }
 
-boost::optional<TenantId> parseDollarTenant(const BSONObj body) {
+boost::optional<TenantId> parseDollarTenant(const BSONObj& body) {
     if (auto tenant = body.getField("$tenant")) {
         return TenantId::parseFromBSON(tenant);
     } else {
@@ -277,13 +278,12 @@ boost::optional<TenantId> parseDollarTenant(const BSONObj body) {
     }
 }
 
-DatabaseName OpMsgRequest::getDbName() const {
-    if (!gMultitenancySupport) {
-        return DatabaseNameUtil::deserialize(boost::none, getDatabase(), getSerializationContext());
-    }
-    auto tenantId = getValidatedTenantId() ? getValidatedTenantId() : parseDollarTenant(body);
+DatabaseName OpMsgRequest::parseDbName() const {
+    auto elem = body["$db"];
+    uassert(40571, "OP_MSG requests require a $db argument", !elem.eoo());
 
-    return DatabaseNameUtil::deserialize(tenantId, getDatabase(), getSerializationContext());
+    auto dbName = elem.checkAndGetStringData();
+    return DatabaseNameUtil::deserialize(getValidatedTenantId(), dbName, getSerializationContext());
 }
 
 SerializationContext OpMsgRequest::getSerializationContext() const {
@@ -291,7 +291,6 @@ SerializationContext OpMsgRequest::getSerializationContext() const {
         return SerializationContext::stateDefault();
     }
     auto serializationCtx = SerializationContext::stateCommandRequest();
-    auto tenantId = getValidatedTenantId() ? getValidatedTenantId() : parseDollarTenant(body);
 
     if (auto const expectPrefix = body.getField("expectPrefix")) {
         serializationCtx.setPrefixState(expectPrefix.boolean());

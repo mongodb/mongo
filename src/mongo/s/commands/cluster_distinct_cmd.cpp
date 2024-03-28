@@ -216,7 +216,7 @@ public:
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
         const BSONObj& cmdObj = opMsgRequest.body;
-        const NamespaceString nss(parseNs(opMsgRequest.getDbName(), cmdObj));
+        const NamespaceString nss(parseNs(opMsgRequest.parseDbName(), cmdObj));
         auto canonicalDistinct = parseDistinctCmd(
             opCtx, nss, cmdObj, ExtensionsCallbackNoop(), nullptr /* defaultCollator */, verbosity);
         auto canonicalQuery = canonicalDistinct.getQuery();

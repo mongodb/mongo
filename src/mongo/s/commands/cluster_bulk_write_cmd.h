@@ -57,6 +57,7 @@
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/namespace_string.h"
@@ -181,6 +182,10 @@ public:
 
         NamespaceString ns() const final {
             return NamespaceString(_request.getDbName());
+        }
+
+        const DatabaseName& db() const final {
+            return _request.getDbName();
         }
 
         bool supportsWriteConcern() const override {

@@ -65,10 +65,10 @@ void runCommand(OperationContext* opCtx,
 
     auto invocation = command->parse(opCtx, request);
 
-    const auto dbname = request.getDatabase().toString();
+    const auto& dbname = invocation->db();
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Invalid database name: '" << dbname << "'",
-            DatabaseName::validDBName(dbname, DatabaseName::DollarInDbNameBehavior::Allow));
+            str::stream() << "Invalid database name: '" << dbname.toStringForErrorMsg() << "'",
+            DatabaseName::isValid(dbname, DatabaseName::DollarInDbNameBehavior::Allow));
 
     const auto apiParamsFromClient = parseAndValidateAPIParameters(request.body, command);
     {
@@ -128,7 +128,7 @@ Future<DbResponse> ServiceEntryPointCryptD::handleRequest(OperationContext* opCt
         LOGV2_DEBUG(24068,
                     2,
                     "Run command",
-                    "db"_attr = request.getDatabase(),
+                    "db"_attr = request.readDatabaseForLogging(),
                     "body"_attr = redact(request.body));
 
         runCommand(opCtx, c, request, replyBuilder.get());
@@ -140,7 +140,7 @@ Future<DbResponse> ServiceEntryPointCryptD::handleRequest(OperationContext* opCt
                     1,
                     "Assertion while executing command",
                     "command"_attr = request.getCommandName(),
-                    "db"_attr = request.getDatabase(),
+                    "db"_attr = request.readDatabaseForLogging(),
                     "body"_attr = redact(request.body),
                     "error"_attr = redact(ex.toString()));
 
