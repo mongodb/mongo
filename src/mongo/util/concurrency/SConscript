@@ -95,3 +95,21 @@ env.Benchmark(
         'ticketholder',
     ],
 )
+
+env.Benchmark(
+    target='lock_free_read_list_bm',
+    source=[
+        'lock_free_read_list_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/processinfo',
+    ],
+)
+
+env.CppUnitTest(
+    target='lock_free_read_list_test',
+    source=[
+        'lock_free_read_list_test.cpp',
+    ],
+    LIBDEPS=[],
+)

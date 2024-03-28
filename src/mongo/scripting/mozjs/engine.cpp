@@ -113,7 +113,7 @@ void MozJSScriptEngine::interrupt(ClientLock&, OperationContext* opCtx) {
 }
 
 void MozJSScriptEngine::interruptAll(ServiceContextLock& svcCtxLock) {
-    ServiceContext::LockedClientsCursor cursor(svcCtxLock);
+    ServiceContext::LockedClientsCursor cursor(&*svcCtxLock);
     while (auto client = cursor.next()) {
         stdx::lock_guard lk(*client);
         if (auto opCtx = client->getOperationContext();
