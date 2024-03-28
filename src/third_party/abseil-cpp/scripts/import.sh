@@ -8,7 +8,7 @@ IFS=$'\n\t'
 set -vx
 
 NAME=abseil-cpp
-REVISION="20230802.1-SERVER-85737"
+REVISION="20230802.1-mongo-SERVER-88161"
 VERSION="20230802.1"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/abseil-cpp

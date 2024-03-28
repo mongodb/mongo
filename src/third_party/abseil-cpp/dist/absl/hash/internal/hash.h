@@ -818,7 +818,7 @@ AbslHashValue(H hash_state, const absl::variant<T...>& v) {
 template <typename H, size_t N>
 H AbslHashValue(H hash_state, const std::bitset<N>& set) {
   typename H::AbslInternalPiecewiseCombiner combiner;
-  for (int i = 0; i < N; i++) {
+  for (size_t i = 0; i < N; i++) {
     unsigned char c = static_cast<unsigned char>(set[i]);
     hash_state = combiner.add_buffer(std::move(hash_state), &c, sizeof(c));
   }
