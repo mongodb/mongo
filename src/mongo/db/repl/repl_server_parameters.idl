@@ -906,3 +906,9 @@ feature_flags:
         default: true
         version: 8.0
         shouldBeFCVGated: true
+
+    featureFlagOplogVisibility:
+        description: When enabled, the Oplog visibility will be tracked at the Replication layer.
+        cpp_varname: feature_flags::gFeatureFlagOplogVisibility
+        default: false
+        shouldBeFCVGated: false
