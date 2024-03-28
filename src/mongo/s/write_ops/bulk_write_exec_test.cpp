@@ -4713,16 +4713,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndRetryableErrorBatched) {
             boost::none},
         boost::none);
 
-    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[0].state, WriteOpState_Deferred);
-    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[1].state, WriteOpState_Deferred);
-    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[2].state, WriteOpState_Error);
-
-    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[0].state, WriteOpState_Deferred);
-    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[1].state, WriteOpState_Deferred);
-    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[2].state, WriteOpState_Error);
-
-    // Despite the retry error, we should consider the write a success since we got an n=1
-    // from the last shard and can ignore the error.
+    // Due to the retry error, we should have reset the write to ready and cleared the child ops.
+    ASSERT_EQ(updateOp1.getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(updateOp2.getWriteState(), WriteOpState_Ready);
     ASSERT_EQ(updateOp1.getChildWriteOps_forTest().size(), 0);
     ASSERT_EQ(updateOp2.getChildWriteOps_forTest().size(), 0);
     ASSERT_FALSE(op.isFinished());
