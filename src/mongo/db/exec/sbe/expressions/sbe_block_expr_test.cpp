@@ -1781,7 +1781,39 @@ void SBEBlockExpressionTest::testFoldF(std::vector<std::pair<value::TypeTags, va
 }
 
 TEST_F(SBEBlockExpressionTest, CellFoldFTest) {
-    // For empty position info, FoldF() should act as an identity function.
+    // For empty position info and a boolean input, FoldF() should act as an identity function,
+    // returning the original input.
+    {
+        value::ViewOfValueAccessor valBlockAccessor;
+        value::ViewOfValueAccessor cellBlockAccessor;
+        auto valBlockSlot = bindAccessor(&valBlockAccessor);
+        auto cellBlockSlot = bindAccessor(&cellBlockAccessor);
+
+        auto materializedCellBlock = std::make_unique<value::MaterializedCellBlock>();
+        materializedCellBlock->_deblocked = nullptr;  // This is never read by the test.
+        materializedCellBlock->_filterPosInfo = std::vector<int32_t>{};
+
+        auto valBlock =
+            std::make_unique<value::BoolBlock>(std::vector<bool>{true, true, false, false, true});
+
+        valBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                               value::bitcastFrom<value::ValueBlock*>(valBlock.get()));
+        cellBlockAccessor.reset(sbe::value::TypeTags::cellBlock,
+                                value::bitcastFrom<value::CellBlock*>(materializedCellBlock.get()));
+
+        {
+            auto expr = makeE<sbe::EFunction>(
+                "cellFoldValues_F",
+                sbe::makeEs(makeE<EVariable>(valBlockSlot), makeE<EVariable>(cellBlockSlot)));
+
+            auto [owned, runTag, runVal] = runExpression(*expr);
+
+            ASSERT_FALSE(owned);
+            ASSERT_EQ(runTag, value::TypeTags::valueBlock);
+            ASSERT_EQ(runVal, value::bitcastFrom<value::ValueBlock*>(valBlock.get()));
+        }
+    }
+
     testFoldF({makeBool(true),
                makeBool(true),
                makeBool(false),

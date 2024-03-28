@@ -44,48 +44,19 @@
 namespace mongo {
 namespace sbe {
 namespace {
-bool allFalse(std::pair<value::TypeTags, value::Value> bitset) {
-    invariant(bitset.first == value::TypeTags::valueBlock);
-    // TODO SERVER-85739 use special cases for different types of blocks.
-    const auto& deblocked = value::bitcastTo<value::ValueBlock*>(bitset.second)->extract();
-    for (size_t i = 0; i < deblocked.count(); i++) {
-        invariant(deblocked[i].first == value::TypeTags::Boolean);
-        if (value::bitcastTo<bool>(deblocked[i].second)) {
+// Verify that the block is made of booleans, and that it's not completely false.
+bool allFalse(const value::DeblockedTagVals& booleanBlock) {
+    for (size_t i = 0; i < booleanBlock.count(); i++) {
+        tassert(8573802,
+                "Bitmap used in aggregator must be of all boolean values",
+                booleanBlock.tags()[i] == value::TypeTags::Boolean);
+    }
+    for (size_t i = 0; i < booleanBlock.count(); i++) {
+        if (value::bitcastTo<bool>(booleanBlock.vals()[i])) {
             return false;
         }
     }
     return true;
-}
-
-// Given a vector of partition IDs, and partition ID, create a bitset indicating whether each
-// element in the vector matches the given partition ID.
-std::unique_ptr<value::ValueBlock> computeBitmapForPartition(
-    const std::vector<size_t>& partitionMap, size_t partition) {
-    std::vector<bool> bitmap;
-    bitmap.resize(partitionMap.size());
-    for (size_t i = 0; i < partitionMap.size(); i++) {
-        bitmap[i] = (partitionMap[i] == partition);
-    }
-    return std::make_unique<value::BoolBlock>(std::move(bitmap));
-}
-
-// Takes two bitsets of equal size, one as a ValueBlock and one as a tag/val, and returns a bitset
-// of the same size with elements pairwise ANDed together.
-std::unique_ptr<value::ValueBlock> bitAnd(value::ValueBlock* bitset1, value::ValueBlock* bitset2) {
-    // TODO SERVER-85738 Implement efficient bitAnd operation on blocks.
-    auto vals1 = bitset1->extract();
-    auto vals2 = bitset2->extract();
-    invariant(vals1.count() == vals2.count());
-
-    std::vector<bool> vecResult;
-    vecResult.resize(vals1.count());
-    for (size_t i = 0; i < vals1.count(); i++) {
-        invariant(vals1[i].first == value::TypeTags::Boolean &&
-                  vals2[i].first == value::TypeTags::Boolean);
-        vecResult[i] =
-            value::bitcastTo<bool>(vals1[i].second) && value::bitcastTo<bool>(vals2[i].second);
-    }
-    return std::make_unique<value::BoolBlock>(std::move(vecResult));
 }
 
 struct SpanHasher {
@@ -115,8 +86,6 @@ struct SpanEq {
 // Map from <row of tokens> ---> finalToken
 using TokenizeTableType = stdx::unordered_map<std::span<size_t>, size_t, SpanHasher, SpanEq>;
 
-using KeyTableType = stdx::
-    unordered_map<std::span<size_t>, std::pair<size_t, value::MaterializedRow>, SpanHasher, SpanEq>;
 }  // namespace
 
 BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
@@ -354,12 +323,6 @@ void BlockHashAggStage::executeBlockLevelAccumulatorCode(const value::Materializ
     // Track how many times we invoke the block accumulators.
     _specificStats.blockAccumulatorTotalCalls++;
 
-    // If all bits are false, there's no work to do. We don't want to make an erroneous
-    // entry in our hash map.
-    if (allFalse(_accumulatorBitsetAccessor.getViewOfValue())) {
-        return;
-    }
-
     _htIt = _ht->find(key);
     if (_htIt == _ht->end()) {
         // New key we haven't seen before.
@@ -455,39 +418,63 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
     auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
     invariant(bitmapInTag == value::TypeTags::valueBlock);
 
+    auto bitmapBlock = value::bitcastTo<value::ValueBlock*>(bitmapInVal);
+    // If the mask can tell us it's completely false without extracting the values, bail out
+    // immediately.
+    if (bitmapBlock->allFalse().get_value_or(false)) {
+        return;
+    }
+    value::DeblockedTagVals inBitmap = bitmapBlock->extract();
+    tassert(8573801,
+            "Bitmap used in aggregator must be of the same size of the tokenized keys",
+            inBitmap.count() == tokenizedKeys.idxs.size());
+    if (!bitmapBlock->allTrue().get_value_or(false) && allFalse(inBitmap)) {
+        return;
+    }
+
     // Set '_accumulatorDataAccessors' to the input value blocks.
     for (size_t i = 0; i < _dataBlocks.size(); ++i) {
         _accumulatorDataAccessors[i].reset(value::TypeTags::valueBlock,
                                            value::bitcastFrom<value::ValueBlock*>(_dataBlocks[i]));
     }
 
+    value::BoolBlock bitmask;
     // Process the accumulators for each partition rather than one element at a time.
     for (size_t partition = 0; partition < tokenizedKeys.keys.size(); ++partition) {
         // The accumulators use `_accumulatorBitsetAccessor` to determine which values to
         // accumulate. If we have multiple partitions, we need some additional logic to
         // indicate which partition we're processing.
-        // TODO SERVER-85739 we can avoid allocating a new bitset for every input. We
-        // can potentially reuse the same bitset. It also might not be worth the
-        // additional code complexity.
         if (tokenizedKeys.keys.size() > 1) {
-            // Combine the partition bitmap and input bitmap using bitAnd().
-            auto partitionBitset = computeBitmapForPartition(tokenizedKeys.idxs, partition);
-            auto accBitset = bitAnd(partitionBitset.get(), _bitmapBlock);
+            // Given a vector of partition IDs, and partition ID, create a bitset indicating whether
+            // each element in the vector matches the given partition ID, and apply on top of it the
+            // mask provided in input.
+            bitmask.clear();
+            bitmask.reserve(tokenizedKeys.idxs.size());
 
-            _accumulatorBitsetAccessor.reset(
-                true,
-                value::TypeTags::valueBlock,
-                value::bitcastFrom<value::ValueBlock*>(accBitset.release()));
-        } else {
-            // The partition bitmap would be all 1s if we computed it, so we can just use
-            // the input bitmap in this case.
+            for (size_t i = 0; i < tokenizedKeys.idxs.size(); i++) {
+                bitmask.push_back(tokenizedKeys.idxs[i] == partition &&
+                                  value::bitcastTo<bool>(inBitmap.vals()[i]));
+            }
+            // If all bits are false, there's no work to do. We don't want to make an erroneous
+            // entry in our hash map.
+            if (bitmask.allFalse().get_value_or(false)) {
+                continue;
+            }
+
             _accumulatorBitsetAccessor.reset(false,
                                              value::TypeTags::valueBlock,
-                                             value::bitcastFrom<value::ValueBlock*>(_bitmapBlock));
+                                             value::bitcastFrom<value::ValueBlock*>(&bitmask));
+        } else {
+            // The partition bitmap would be all 1s if we computed it, so we can just use
+            // the input bitmap in this case, that we already checked for not being made
+            // by all False values.
+            _accumulatorBitsetAccessor.reset(false, bitmapInTag, bitmapInVal);
         }
 
         executeBlockLevelAccumulatorCode(tokenizedKeys.keys[partition]);
     }
+    // Avoid leaving a pointer to inaccessible memory in the accessor.
+    _accumulatorBitsetAccessor.reset(false, value::TypeTags::Nothing, 0);
 }
 
 void BlockHashAggStage::runAccumulatorsElementWise() {

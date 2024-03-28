@@ -30,9 +30,9 @@ assert.commandWorked(db.createCollection(coll.getName(), {
 
 /*
  * We'll have 50 time series buckets (which become blocks in our block processing pipeline). 25 of
- * these buckets will have a small number of partitions, enabling the use of block-based
- * accumulators. The other 25 will have many partitions, meaning we use the element-wise
- * accumulators.
+ * these buckets will have a small number of partitions (2, of which only 1 will be matching the
+ * filter), enabling the use of block-based accumulators. The other 25 will have many partitions
+ * (100), meaning we use the element-wise accumulators.
  */
 const nBuckets = 50;
 const nDocsPerBucket = 200;
@@ -58,7 +58,7 @@ assert.eq(getEngine(explain), "sbe");
 const groupStage = getAggPlanStage(explain, "block_group");
 
 assert.eq(groupStage.blockAccumulations, 25);
-assert.eq(groupStage.blockAccumulatorTotalCalls, 50);
+assert.eq(groupStage.blockAccumulatorTotalCalls, 25);
 assert.eq(groupStage.elementWiseAccumulations, 25);
 
 MongoRunner.stopMongod(conn);
