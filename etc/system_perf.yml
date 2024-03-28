@@ -512,50 +512,77 @@ functions:
 
   ###
   # Compile mongodb
-  compile mongo tools:
-    - command: shell.exec
-      params:
-        working_dir: src/mongo-tools/src/github.com/mongodb/mongo-tools
-        script: |
-          set -o verbose
-          set -o errexit
+  download mongo tools:
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        set -o errexit
 
-          # make sure newlines in the scripts are handled correctly by windows
-          if [ "Windows_NT" = "$OS" ]; then
-            set -o igncr
-          fi;
+        arch=$(uname -m)
+        case $arch in
+          "x86_64")
+            if [ -f /etc/os-release ]; then
+              . /etc/os-release
+              if [ "$ID" == "amzn" ]; then
+                case $VERSION_ID in
+                  "2")
+                    binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2-x86_64-100.9.4.tgz"
+                    ;;
+                  "2023")
+                    binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2023-x86_64-100.9.4.tgz"
+                    ;;
+                  *)
+                    echo "Unsupported Amazon Linux version: $VERSION_ID"
+                    exit 1
+                    ;;
+                esac
+              else
+                echo "Unsupported Linux distribution: $ID"
+                exit 1
+              fi
+            else
+              echo "Unable to determine Linux distribution"
+              exit 1
+            fi
+            ;;
+          "aarch64")
+            if [ -f /etc/os-release ]; then
+              . /etc/os-release
+              if [ "$ID" == "amzn" ]; then
+                case $VERSION_ID in
+                  "2")
+                    binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2-aarch64-100.9.4.tgz"
+                    ;;
+                  "2023")
+                    binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2023-aarch64-100.9.4.tgz"
+                    ;;
+                  *)
+                    echo "Unsupported Amazon Linux version: $VERSION_ID"
+                    exit 1
+                    ;;
+                esac
+              else
+                echo "Unsupported Linux distribution: $ID"
+                exit 1
+              fi
+            else
+              echo "Unable to determine Linux distribution"
+              exit 1
+            fi
+            ;;
+          *)
+            echo "Unsupported architecture: $arch"
+            exit 1
+            ;;
+        esac
 
-          export cleanup=false
-
-          # install go for tools if required (al2023 for now).
-          if [ ! -d "/opt/golang/go1.19" ]; then
-            cleanup=true
-            echo -n "go-lang missing downloading ..."
-            go_file=./go1.19.8.tar.gz
-            wget --quiet https://go.dev/dl/go1.19.8.linux$(echo ${compile_variant} | sed 's/^-al202.//').tar.gz -O "$go_file"
-            echo -n " installing ..."
-            sudo mkdir -p /opt/golang/go1.19
-            sudo tar -C /opt/golang/go1.19 -xzf "$go_file" --strip-components=1
-            [ -e "$go_file" ] && rm -f "$go_file"
-            echo  "done"
-          fi
-
-          # set_goenv provides set_goenv()
-          . ./set_goenv.sh
-          GOROOT="" set_goenv || exit
-          go version
-
-          build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
-          if [ "${build_mongoreplay}" = "true" ]; then
-              build_tools="$build_tools mongoreplay"
-          fi
-          for i in $build_tools; do
-              go build -o "../../../../../mongodb/bin/$i${exe|}" $i/main/$i.go
-              "../../../../../mongodb/bin/$i${exe|}" --version
-          done
-          if "$cleanup"; then
-            sudo rm -rf "/opt/golang/go1.19"
-          fi
+        echo "Downloading and installing MongoDB tools..."
+        sudo mkdir -p mongodb/
+        wget "$binary_url" -O mongo-tools.tar.gz
+        sudo tar -xzvf mongo-tools.tar.gz -C mongodb/ --strip-components=1 "mong*/bin"
+        echo "MongoDB tools installed successfully!"
   compile mongo tools old:
     - command: shell.exec
       params:
@@ -873,7 +900,7 @@ tasks:
             mongo-tools: ${mongo-tools_rev}
       - func: "compile prep"
       - func: "get engflow creds perf"
-      - func: "compile mongo tools"
+      - func: "download mongo tools"
       - func: "generate feature flag list"
       - func: "generate server params list"
       - func: "download mongodb"
