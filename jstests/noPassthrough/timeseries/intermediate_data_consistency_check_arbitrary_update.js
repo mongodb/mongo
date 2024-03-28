@@ -16,6 +16,7 @@ const bucketsColl = testDB.system.buckets.coll;
 const time = ISODate("2024-01-16T20:48:39.448Z");
 
 function runIntermediateDataCheckTest(isOrdered) {
+    jsTestLog("isOrdered: { " + isOrdered + " }");
     coll.drop();
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
@@ -38,7 +39,7 @@ function runIntermediateDataCheckTest(isOrdered) {
     // are performing the first of the two updates below and are trying to update measurements from
     // Bucket 1.
     assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: 'timeseriesDataIntegrityCheckFailure', mode: {times: 1}}));
+        {configureFailPoint: 'timeseriesDataIntegrityCheckFailureUpdate', mode: {times: 1}}));
 
     // This command performs two updates. The first changes the metaField for the measurements
     // of all buckets to m: "A". If the update succeeded entirely, this would cause all measurements
@@ -68,6 +69,7 @@ function runIntermediateDataCheckTest(isOrdered) {
         ordered: isOrdered,
     }),
                                  ErrorCodes.TimeseriesBucketCompressionFailed);
+
     let stats = assert.commandWorked(coll.stats()).timeseries;
     let buckets = bucketsColl.find({}).toArray();
 
@@ -76,10 +78,17 @@ function runIntermediateDataCheckTest(isOrdered) {
         // the next 2 are from writing the measurements from Bucket 0 to Bucket 3 as part of our
         // first update.
         assert.eq(stats.numMeasurementsCommitted, 8);
+        assert.eq(stats.numBucketInserts, 4);
+        assert.eq(stats.numBucketUpdates, 0);
+        assert.eq(stats.numBucketsOpenedDueToMetadata, 4);
+        assert.eq(stats.numBucketFetchesFailed, 0);
+        assert.eq(stats.numBucketQueriesFailed, 3);
+        assert.eq(stats.numBucketReopeningsFailed, 0);
         // One bucket frozen from the triggered failpoint.
         assert.eq(stats.numBucketsFrozen, 1);
         // Check that we have 3 buckets and that two of them are the untouched Bucket 1
         // and Bucket 2, and that one is the newly created Bucket 3.
+        assert.eq(stats.bucketCount, 3);
         assert.eq(buckets.length, 3);
         assert.eq(buckets[0].meta, 1);
         assert.eq(buckets[0].control.count, 2)
@@ -93,14 +102,21 @@ function runIntermediateDataCheckTest(isOrdered) {
         // first update, the next 6 are from writing the measurements from Bucket 1, Bucket 2, and
         // Bucket 3 to Bucket 4 as part of our second update.
         assert.eq(stats.numMeasurementsCommitted, 14);
+        assert.eq(stats.numBucketInserts, 5);
+        assert.eq(stats.numBucketUpdates, 2);
+        assert.eq(stats.numBucketsOpenedDueToMetadata, 5);
+        assert.eq(stats.numBucketFetchesFailed, 0);
+        assert.eq(stats.numBucketQueriesFailed, 3);
+        assert.eq(stats.numBucketReopeningsFailed, 0);
         // One bucket frozen from the triggered failpoint.
         assert.eq(stats.numBucketsFrozen, 1);
+        assert.eq(stats.bucketCount, 1);
         assert.eq(buckets.length, 1);
         assert.eq(buckets[0].meta, "B");
         assert.eq(buckets[0].control.count, 6);
     }
     assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: 'timeseriesDataIntegrityCheckFailure', mode: "off"}));
+        {configureFailPoint: 'timeseriesDataIntegrityCheckFailureUpdate', mode: "off"}));
 }
 
 runIntermediateDataCheckTest(true);

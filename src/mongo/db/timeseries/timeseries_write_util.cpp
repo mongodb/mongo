@@ -81,6 +81,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
+#include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
@@ -107,19 +108,25 @@
 namespace mongo::timeseries {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(timeseriesDataIntegrityCheckFailure);
+MONGO_FAIL_POINT_DEFINE(timeseriesDataIntegrityCheckFailureUpdate);
 
 // Return a verifierFunction that is used to perform a data integrity check on inserts into
 // a compressed column.
 doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> sortedMeasurements,
-                                            std::shared_ptr<bucket_catalog::WriteBatch> batch) {
-    return [sortedMeasurements = std::move(sortedMeasurements), batch](const BSONObj& docToWrite) {
-        if (MONGO_unlikely(timeseriesDataIntegrityCheckFailure.shouldFail())) {
-            uasserted(
-                timeseries::BucketCompressionFailure(batch->bucketHandle.bucketId.collectionUUID,
-                                                     batch->bucketHandle.bucketId.oid),
-                "Failpoint-triggered data integrity check failure");
-        }
+                                            std::shared_ptr<bucket_catalog::WriteBatch> batch,
+                                            OperationSource source) {
+    return [sortedMeasurements = std::move(sortedMeasurements), batch, source](
+               const BSONObj& docToWrite) {
+        timeseriesDataIntegrityCheckFailureUpdate.executeIf(
+            [&](const BSONObj&) {
+                uasserted(  // In testing, we want any failures within this check to invariant.
+                            // In production,
+                    timeseries::BucketCompressionFailure(
+                        batch->bucketHandle.bucketId.collectionUUID,
+                        batch->bucketHandle.bucketId.oid),
+                    "Failpoint-triggered data integrity check failure");
+            },
+            [&source](const BSONObj&) { return source == OperationSource::kTimeseriesUpdate; });
 
         auto data = docToWrite.getObjectField(kBucketDataFieldName);
 
@@ -379,7 +386,8 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     // the measurements we inserted appear correctly in the resulting bucket's BSONColumns.
     doc_diff::VerifierFunc verifierFunction = nullptr;
     if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheck.load()) {
-        verifierFunction = makeVerifierFunction(sortedMeasurements, batch);
+        verifierFunction =
+            makeVerifierFunction(sortedMeasurements, batch, OperationSource::kTimeseriesUpdate);
     }
 
     BSONObjBuilder updateBuilder;
@@ -730,6 +738,41 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
                   "existing uncompressed bucket was compressed, retry insert on compressed bucket"};
 }
 
+BSONObj makeTimeseriesInsertCompressedBucketDocument(
+    std::shared_ptr<bucket_catalog::WriteBatch> batch,
+    const BSONObj& metadata,
+    const std::vector<std::pair<StringData, TrackedBSONColumnBuilder::BinaryDiff>>& intermediates) {
+    BSONObjBuilder insertBuilder;
+    insertBuilder.append(kBucketIdFieldName, batch->bucketHandle.bucketId.oid);
+
+    {
+        BSONObjBuilder bucketControlBuilder(insertBuilder.subobjStart(kBucketControlFieldName));
+        bucketControlBuilder.append(kBucketControlVersionFieldName,
+                                    kTimeseriesControlCompressedSortedVersion);
+        bucketControlBuilder.append(kBucketControlMinFieldName, batch->min);
+        bucketControlBuilder.append(kBucketControlMaxFieldName, batch->max);
+        bucketControlBuilder.append(kBucketControlCountFieldName,
+                                    static_cast<int32_t>(batch->measurements.size()));
+    }
+
+    auto metadataElem = metadata.firstElement();
+    if (metadataElem) {
+        insertBuilder.appendAs(metadataElem, kBucketMetaFieldName);
+    }
+
+    {
+        BSONObjBuilder dataBuilder(insertBuilder.subobjStart(kBucketDataFieldName));
+        for (const auto& [fieldName, binData] : intermediates) {
+            invariant(binData.offset() == 0,
+                      "Intermediate must be called exactly once prior to insert.");
+            auto columnBinary = BSONBinData(binData.data(), binData.size(), BinDataType::Column);
+            dataBuilder.append(fieldName, columnBinary);
+        }
+    }
+
+    return insertBuilder.obj();
+}
+
 }  // namespace
 
 namespace details {
@@ -924,21 +967,30 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
     const NamespaceString& bucketsNs,
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds) {
-    BucketDocument bucketDoc = makeNewDocumentForWrite(bucketsNs, batch, metadata);
-    BSONObj bucketToInsert = bucketDoc.uncompressedBucket;
-
+    BSONObj bucketToInsert;
+    BucketDocument bucketDoc;
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        invariant(bucketDoc.compressedBucket);
+        std::vector<details::Measurement> sortedMeasurements =
+            details::sortMeasurementsOnTimeField(batch);
 
-        // Initialize BSONColumnBuilders which will later get transferred into the Bucket class.
-        BSONObj bucketDataDoc = bucketDoc.compressedBucket->getObjectField(kBucketDataFieldName);
-        batch->measurementMap.initBuilders(
-            bucketDataDoc,
-            batch->measurements.size());  // i.e. number of to-insert measurements in bucketDataDoc
-    }
-    if (bucketDoc.compressedBucket) {
-        bucketToInsert = *bucketDoc.compressedBucket;
+        // Insert measurements, and appropriate skips, into all column builders.
+        for (const auto& measurement : sortedMeasurements) {
+            batch->measurementMap.insertOne(measurement.dataFields);
+        }
+        auto intermediates = batch->measurementMap.intermediate(batch->size);
+        bucketToInsert =
+            makeTimeseriesInsertCompressedBucketDocument(batch, metadata, intermediates);
+
+        // Extra verification that the insert op decompresses to the same values put in.
+        if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheck.load()) {
+            auto verifierFunction =
+                makeVerifierFunction(sortedMeasurements, batch, OperationSource::kTimeseriesInsert);
+            verifierFunction(bucketToInsert);
+        }
+    } else {
+        bucketDoc = makeNewDocumentForWrite(bucketsNs, batch, metadata);
+        bucketToInsert = bucketDoc.uncompressedBucket;
     }
 
     write_ops::InsertCommandRequest op{bucketsNs, {bucketToInsert}};
@@ -986,8 +1038,8 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     }
 
     // Insert new measurements, and appropriate skips, into all column builders.
-    for (const auto& sortedMeasurementDoc : sortedMeasurements) {
-        batch->measurementMap.insertOne(sortedMeasurementDoc.dataFields);
+    for (const auto& measurement : sortedMeasurements) {
+        batch->measurementMap.insertOne(measurement.dataFields);
     }
 
     // Generates a delta update request using the before and after compressed bucket documents' data

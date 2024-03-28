@@ -45,7 +45,7 @@ function testIntegrityCheck(turnFailpointOn) {
     if (turnFailpointOn) {
         // Turn on the failpoint that causes the timeseries data integrity check to fail.
         assert.commandWorked(testDB.adminCommand(
-            {configureFailPoint: 'timeseriesDataIntegrityCheckFailure', mode: 'alwaysOn'}));
+            {configureFailPoint: 'timeseriesDataIntegrityCheckFailureUpdate', mode: {times: 1}}));
 
         // Insert third measurement - this should cause the first bucket A that we closed to be
         // reopened. We should try to insert into this bucket, but then fail when we try to add
@@ -57,9 +57,6 @@ function testIntegrityCheck(turnFailpointOn) {
         assert.eq(stats.timeseries.numBucketsReopened, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketInserts, 3, tojson(stats.timeseries));
-        // Turn off the failpoint.
-        assert.commandWorked(testDB.adminCommand(
-            {configureFailPoint: 'timeseriesDataIntegrityCheckFailure', mode: "off"}));
     } else {
         // Insert third measurement.
         assert.commandWorked(coll.insert(measurements[2]));
