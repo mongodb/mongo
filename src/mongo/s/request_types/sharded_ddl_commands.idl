@@ -829,3 +829,12 @@ commands:
         chained_structs:
             ShardsvrConvertToCappedRequest: ShardsvrConvertToCappedRequest
 
+    _shardsvrUntrackUnsplittableCollection:
+        command_name: _shardsvrUntrackUnsplittableCollection
+        cpp_name: ShardsvrUntrackUnsplittableCollection
+        description: "Internal command to untrack unsplittable collections"
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        reply_type: OkReply

@@ -70,6 +70,7 @@
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/db/s/set_allow_migrations_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/db/s/untrack_unsplittable_collection_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -131,6 +132,9 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
                                                                            std::move(initialState));
         case DDLCoordinatorTypeEnum::kConvertToCapped:
             return std::make_shared<ConvertToCappedCoordinator>(service, std::move(initialState));
+        case DDLCoordinatorTypeEnum::kUntrackUnsplittableCollection:
+            return std::make_shared<UntrackUnsplittableCollectionCoordinator>(
+                service, std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,
                       str::stream()
