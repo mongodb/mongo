@@ -41,11 +41,15 @@ void QueryKnobConfiguration::_tryToSetAllValues() {
     _queryFrameworkControlValue = ServerParameterSet::getNodeParameterSet()
                                       ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
                                       ->_data.get();
-    _sbeDisableGroupPushdownValue = internalQuerySlotBasedExecutionDisableGroupPushdown.load();
-    _sbeDisableLookupPushdownValue = internalQuerySlotBasedExecutionDisableLookupPushdown.load();
-    _sbeDisableTimeSeriesValue = internalQuerySlotBasedExecutionDisableTimeSeriesPushdown.load();
-    _planEvaluationMaxResults = static_cast<size_t>(internalQueryPlanEvaluationMaxResults.load());
-    _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.load());
+    _sbeDisableGroupPushdownValue =
+        internalQuerySlotBasedExecutionDisableGroupPushdown.loadRelaxed();
+    _sbeDisableLookupPushdownValue =
+        internalQuerySlotBasedExecutionDisableLookupPushdown.loadRelaxed();
+    _sbeDisableTimeSeriesValue =
+        internalQuerySlotBasedExecutionDisableTimeSeriesPushdown.loadRelaxed();
+    _planEvaluationMaxResults =
+        static_cast<size_t>(internalQueryPlanEvaluationMaxResults.loadRelaxed());
+    _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
     _isSet = true;
 }
 

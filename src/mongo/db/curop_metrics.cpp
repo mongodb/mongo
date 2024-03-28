@@ -49,7 +49,7 @@ Counter64* makeCounter(std::string name, ClusterRole role) {
 template <typename T>
 void incrCounter(Counter64* stat, const T& in) {
     if (in)
-        stat->increment(in);
+        stat->incrementRelaxed(in);
 }
 
 /** If `in` is an atomic, load it and increment by that value. */

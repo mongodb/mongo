@@ -319,7 +319,7 @@ public:
 
     /** requires `name` be a metric previously added with `addMetric`. */
     void increment(StringData name, long long n = 1) {
-        _stages.find(name)->second->increment(n);
+        _stages.find(name)->second->incrementRelaxed(n);
     }
 
 private:
@@ -338,9 +338,9 @@ public:
 
     void incrementForUpsert(bool didInsert) {
         if (didInsert) {
-            inserts.increment();
+            inserts.incrementRelaxed();
         } else {
-            updates.increment();
+            updates.incrementRelaxed();
         }
     }
 
@@ -364,13 +364,13 @@ public:
         if (cmdName == "find") {
             switch (debug.queryFramework) {
                 case PlanExecutor::QueryFramework::kClassicOnly:
-                    classicFindQueryCounter.increment();
+                    classicFindQueryCounter.incrementRelaxed();
                     break;
                 case PlanExecutor::QueryFramework::kSBEOnly:
-                    sbeFindQueryCounter.increment();
+                    sbeFindQueryCounter.incrementRelaxed();
                     break;
                 case PlanExecutor::QueryFramework::kCQF:
-                    cqfFindQueryCounter.increment();
+                    cqfFindQueryCounter.incrementRelaxed();
                     break;
                 default:
                     break;
@@ -378,19 +378,19 @@ public:
         } else if (cmdName == "aggregate") {
             switch (debug.queryFramework) {
                 case PlanExecutor::QueryFramework::kClassicOnly:
-                    classicOnlyAggregationCounter.increment();
+                    classicOnlyAggregationCounter.incrementRelaxed();
                     break;
                 case PlanExecutor::QueryFramework::kClassicHybrid:
-                    classicHybridAggregationCounter.increment();
+                    classicHybridAggregationCounter.incrementRelaxed();
                     break;
                 case PlanExecutor::QueryFramework::kSBEOnly:
-                    sbeOnlyAggregationCounter.increment();
+                    sbeOnlyAggregationCounter.incrementRelaxed();
                     break;
                 case PlanExecutor::QueryFramework::kSBEHybrid:
-                    sbeHybridAggregationCounter.increment();
+                    sbeHybridAggregationCounter.incrementRelaxed();
                     break;
                 case PlanExecutor::QueryFramework::kCQF:
-                    cqfAggregationQueryCounter.increment();
+                    cqfAggregationQueryCounter.incrementRelaxed();
                     break;
                 case PlanExecutor::QueryFramework::kUnknown:
                     break;
@@ -429,10 +429,10 @@ public:
     LookupPushdownCounters& operator=(const LookupPushdownCounters&) = delete;
 
     void incrementLookupCounters(OpDebug& debug) {
-        nestedLoopJoin.increment(debug.nestedLoopJoin);
-        indexedLoopJoin.increment(debug.indexedLoopJoin);
-        hashLookup.increment(debug.hashLookup);
-        hashLookupSpillToDisk.increment(debug.hashLookupSpillToDisk);
+        nestedLoopJoin.incrementRelaxed(debug.nestedLoopJoin);
+        indexedLoopJoin.incrementRelaxed(debug.indexedLoopJoin);
+        hashLookup.incrementRelaxed(debug.hashLookup);
+        hashLookupSpillToDisk.incrementRelaxed(debug.hashLookupSpillToDisk);
     }
 
     // Counters for lookup join strategies.
@@ -448,9 +448,9 @@ extern LookupPushdownCounters lookupPushdownCounters;
 class SortCounters {
 public:
     void incrementSortCounters(const OpDebug& debug) {
-        sortSpillsCounter.increment(debug.sortSpills);
-        sortTotalBytesCounter.increment(debug.sortTotalDataSizeBytes);
-        sortTotalKeysCounter.increment(debug.keysSorted);
+        sortSpillsCounter.incrementRelaxed(debug.sortSpills);
+        sortTotalBytesCounter.incrementRelaxed(debug.sortTotalDataSizeBytes);
+        sortTotalKeysCounter.incrementRelaxed(debug.keysSorted);
     }
 
     // Counters tracking sort stats across all engines
@@ -473,9 +473,9 @@ public:
     void incrementGroupCounters(uint64_t spills,
                                 uint64_t spilledDataStorageSize,
                                 uint64_t spilledRecords) {
-        groupSpills.increment(spills);
-        groupSpilledDataStorageSize.increment(spilledDataStorageSize);
-        groupSpilledRecords.increment(spilledRecords);
+        groupSpills.incrementRelaxed(spills);
+        groupSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
+        groupSpilledRecords.incrementRelaxed(spilledRecords);
     }
 
     // The total number of spills to disk from group stages.
@@ -498,27 +498,27 @@ public:
     PlanCacheCounters& operator=(const PlanCacheCounters&) = delete;
 
     void incrementClassicHitsCounter() {
-        classicHits.increment();
+        classicHits.incrementRelaxed();
     }
 
     void incrementClassicMissesCounter() {
-        classicMisses.increment();
+        classicMisses.incrementRelaxed();
     }
 
     void incrementClassicSkippedCounter() {
-        classicSkipped.increment();
+        classicSkipped.incrementRelaxed();
     }
 
     void incrementSbeHitsCounter() {
-        sbeHits.increment();
+        sbeHits.incrementRelaxed();
     }
 
     void incrementSbeMissesCounter() {
-        sbeMisses.increment();
+        sbeMisses.incrementRelaxed();
     }
 
     void incrementSbeSkippedCounter() {
-        sbeSkipped.increment();
+        sbeSkipped.incrementRelaxed();
     }
 
 private:
@@ -554,7 +554,7 @@ public:
     void mergeCounters(const StringMap<uint64_t>& toMerge) {
         for (auto&& [name, cnt] : toMerge) {
             if (auto it = _counters.find(name); it != _counters.end()) {
-                it->second->increment(cnt);
+                it->second->incrementRelaxed(cnt);
             }
         }
     }
@@ -581,13 +581,13 @@ public:
                     str::stream() << "The validator counters are not support for the command: "
                                   << cmdName,
                     validatorCounter != _validatorCounterMap.end());
-            validatorCounter->second->totalCounter.increment();
+            validatorCounter->second->totalCounter.incrementRelaxed();
 
             if (!parsingSucceeded) {
-                validatorCounter->second->failedCounter.increment();
+                validatorCounter->second->failedCounter.incrementRelaxed();
             }
             if (validator.hasField("$jsonSchema")) {
-                validatorCounter->second->jsonSchemaCounter.increment();
+                validatorCounter->second->jsonSchemaCounter.incrementRelaxed();
             }
         }
     }
