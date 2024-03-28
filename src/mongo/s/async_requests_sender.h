@@ -100,13 +100,16 @@ public:
      * Defines a request to a remote shard that can be run by the ARS.
      */
     struct Request {
-        Request(ShardId shardId, BSONObj cmdObj);
+        Request(ShardId shardId, BSONObj cmdObj, std::shared_ptr<Shard> shard = nullptr);
 
         // ShardId of the shard to which the command will be sent.
         const ShardId shardId;
 
         // The command object to send to the remote host.
         const BSONObj cmdObj;
+
+        // Optional. The shard registry type to send the request to. Cleared for retries.
+        const std::shared_ptr<Shard> shard;
     };
 
     /**
@@ -200,7 +203,8 @@ private:
         RemoteData(AsyncRequestsSender* ars,
                    ShardId shardId,
                    BSONObj cmdObj,
-                   HostAndPort designatedHost);
+                   HostAndPort designatedHost,
+                   std::shared_ptr<Shard> shard = nullptr);
 
         /**
          * Returns a SemiFuture containing a shard object associated with this remote.
@@ -278,6 +282,9 @@ private:
 
         // The designated host and port to send the command to, if provided.  Otherwise is empty().
         HostAndPort _designatedHostAndPort;
+
+        // Optional shard from shard registry for given shard id.
+        std::shared_ptr<Shard> _shard;
 
         // The exact host on which the remote command was run. Is unset until a request has been
         // sent.

@@ -271,7 +271,8 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
     const CanonicalQuery& query,
     const boost::optional<UUID> sampleId,
     bool appendGeoNearDistanceProjection,
-    bool requestQueryStatsFromRemotes) {
+    bool requestQueryStatsFromRemotes,
+    const auto& opKey) {
     const auto& cm = cri.cm;
 
     // Choose the shard to sample the query on if needed.
@@ -280,13 +281,7 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
         : boost::none;
 
     // Helper methods for appending additional attributes to the shard command.
-    auto appendTxnNumber = [&](auto& cmdBuilder) {
-        if (opCtx->getTxnNumber()) {
-            cmdBuilder.append(OperationSessionInfoFromClient::kTxnNumberFieldName,
-                              *opCtx->getTxnNumber());
-        }
-    };
-    auto appendShardVersion = [&](auto shardId, auto& cmdBuilder) {
+    auto appendShardVersion = [&](const auto& shardId, auto& cmdBuilder) {
         if (cm.hasRoutingTable()) {
             cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, &cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
@@ -294,7 +289,7 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
             cmdBuilder.append("databaseVersion", cm.dbVersion().toBSON());
         }
     };
-    auto appendSampleId = [&](auto shardId, auto& cmdBuilder) {
+    auto appendSampleId = [&](const auto& shardId, auto& cmdBuilder) {
         if (shardId == sampleShardId) {
             analyze_shard_key::appendSampleId(&cmdBuilder, *sampleId);
         }
@@ -315,11 +310,12 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
 
         BSONObjBuilder cmdBuilder;
         findCommandToForward->serialize(BSONObj(), &cmdBuilder);
-        appendTxnNumber(cmdBuilder);
+        logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &cmdBuilder);
+        appendOpKey(opKey, &cmdBuilder);
         appendShardVersion(shardId, cmdBuilder);
         appendSampleId(shardId, cmdBuilder);
 
-        return AsyncRequestsSender::Request(shardId, cmdBuilder.obj());
+        return AsyncRequestsSender::Request(shardId, cmdBuilder.obj(), std::move(shard));
     };
 
     std::vector<AsyncRequestsSender::Request> requests;
@@ -436,26 +432,33 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                 "deadline"_attr = deadline);
         }
 
+        // Construct the requests that we will use to establish cursors on the targeted
+        // shards, attaching the shardVersion and session info, if necessary. Attach our own
+        // OperationKey as well so establishCursors won't copy each request.
+        std::vector<OperationKey> opKeys{UUID::gen()};
+        auto requests = constructRequestsForShards(opCtx,
+                                                   cri,
+                                                   shardIds,
+                                                   query,
+                                                   sampleId,
+                                                   appendGeoNearDistanceProjection,
+                                                   requestQueryStatsFromRemotes,
+                                                   opKeys.front());
+
         // The call to establishCursors has its own timeout mechanism that is controlled by the
         // opCtx, so we don't expect runWithDeadline to throw a timeout at this level. We use
         // runWithDeadline because it has the side effect of pushing a temporary (artificial)
         // deadline onto the opCtx used by establishCursors.
         opCtx->runWithDeadline(deadline, ErrorCodes::MaxTimeMSExpired, [&]() -> void {
-            params.remotes = establishCursors(
-                opCtx,
-                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                query.nss(),
-                readPref,
-                // Construct the requests that we will use to establish cursors on the targeted
-                // shards, attaching the shardVersion and txnNumber, if necessary.
-                constructRequestsForShards(opCtx,
-                                           cri,
-                                           shardIds,
-                                           query,
-                                           sampleId,
-                                           appendGeoNearDistanceProjection,
-                                           requestQueryStatsFromRemotes),
-                findCommand.getAllowPartialResults());
+            params.remotes =
+                establishCursors(opCtx,
+                                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                                 query.nss(),
+                                 readPref,
+                                 std::move(requests),
+                                 findCommand.getAllowPartialResults(),
+                                 Shard::RetryPolicy::kIdempotent,
+                                 std::move(opKeys));
         });
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::CollectionUUIDMismatch &&

@@ -121,6 +121,6 @@ void killRemoteCursor(OperationContext* opCtx,
 /**
  * Appends the given operation key to the given request.
  */
-BSONObj appendOpKey(const OperationKey& opKey, const BSONObj& request);
+void appendOpKey(const OperationKey& opKey, BSONObjBuilder* cmdBuilder);
 
 }  // namespace mongo

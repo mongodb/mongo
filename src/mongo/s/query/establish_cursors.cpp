@@ -181,7 +181,9 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
             dassert(remote.cmdObj.hasField(kOperationKeyField));
             requests.emplace_back(remote);
         } else {
-            requests.emplace_back(remote.shardId, appendOpKey(_defaultOpKey, remote.cmdObj));
+            BSONObjBuilder newCmd(remote.cmdObj);
+            appendOpKey(_defaultOpKey, &newCmd);
+            requests.emplace_back(remote.shardId, newCmd.obj());
         }
     }
 
@@ -420,10 +422,8 @@ BSONObj appendReadPreferenceNearest(BSONObj cmdObj) {
 // the opCtx may have an OperationKey set on it already, do not inherit it here because we may
 // target ourselves which implies the same node receiving multiple operations with the same
 // opKey.
-BSONObj appendOpKey(const OperationKey& opKey, const BSONObj& request) {
-    BSONObjBuilder newCmd(request);
-    opKey.appendToBuilder(&newCmd, kOperationKeyField);
-    return newCmd.obj();
+void appendOpKey(const OperationKey& opKey, BSONObjBuilder* cmdBuilder) {
+    opKey.appendToBuilder(cmdBuilder, kOperationKeyField);
 }
 
 std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
@@ -495,14 +495,18 @@ std::vector<RemoteCursor> establishCursorsOnAllHosts(
     // actual semantics of read preference don't make as much sense when broadcasting to all
     // shards, but we will set read preference to 'nearest' since it does not imply preference for
     // primary or secondary.
-    BSONObj cmd = appendOpKey(opKey, appendReadPreferenceNearest(cmdObj));
+    BSONObjBuilder newCmd(std::move(cmdObj));
+    appendOpKey(opKey, &newCmd);
+    newCmd.append("$readPreference",
+                  BSON("mode"
+                       << "nearest"));
 
     executor::AsyncMulticaster::Options options;
     options.maxConcurrency = internalQueryAggMulticastMaxConcurrency;
     auto results = executor::AsyncMulticaster(executor, options)
                        .multicast(servers,
                                   nss.dbName(),
-                                  cmd,
+                                  newCmd.obj(),
                                   opCtx,
                                   Milliseconds(internalQueryAggMulticastTimeoutMS));
     std::vector<RemoteCursor> remoteCursors;

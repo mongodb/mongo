@@ -149,17 +149,18 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             return newRequest;
         }
 
-        if (request.cmdObj.hasField("lsid")) {
-            auto cmdObjLsid = LogicalSessionFromClient::parse(IDLParserContext{"lsid"},
-                                                              request.cmdObj["lsid"].Obj());
-
-            if (cmdObjLsid.getUid()) {
-                invariant(*cmdObjLsid.getUid() == request.opCtx->getLogicalSessionId()->getUid());
+        if (auto lsidElem =
+                request.cmdObj.getField(OperationSessionInfoFromClient::kSessionIdFieldName)) {
+            if (auto lsidUIDElem =
+                    lsidElem.Obj().getField(LogicalSessionFromClient::kUidFieldName)) {
+                invariant(SHA256Block::fromBinData(lsidUIDElem._binDataVector()) ==
+                          request.opCtx->getLogicalSessionId()->getUid());
                 return newRequest;
             }
 
             newRequest.emplace(request);
-            newRequest->cmdObj = newRequest->cmdObj.removeField("lsid");
+            newRequest->cmdObj =
+                newRequest->cmdObj.removeField(OperationSessionInfoFromClient::kSessionIdFieldName);
         }
 
         if (!newRequest) {
@@ -168,7 +169,8 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
         BSONObjBuilder bob(std::move(newRequest->cmdObj));
         {
-            BSONObjBuilder subbob(bob.subobjStart("lsid"));
+            BSONObjBuilder subbob(
+                bob.subobjStart(OperationSessionInfoFromClient::kSessionIdFieldName));
             request.opCtx->getLogicalSessionId()->serialize(&subbob);
             subbob.done();
         }

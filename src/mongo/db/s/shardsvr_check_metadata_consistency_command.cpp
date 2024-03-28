@@ -272,8 +272,11 @@ public:
             participantRequest.setPrimaryShardId(ShardingState::get(opCtx)->shardId());
             participantRequest.setCursor(request().getCursor());
             const auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-            auto participantRequestWithOpKey =
-                appendOpKey(shardOpKey, participantRequest.toBSON({}));
+
+            BSONObjBuilder participantRequestBob;
+            participantRequest.serialize(BSONObj(), &participantRequestBob);
+            appendOpKey(shardOpKey, &participantRequestBob);
+            auto participantRequestWithOpKey = participantRequestBob.obj();
 
             std::vector<AsyncRequestsSender::Request> requests;
             requests.reserve(participants.size() + 1);
@@ -285,8 +288,11 @@ public:
             const auto configOpKey = UUID::gen();
             ConfigsvrCheckMetadataConsistency configRequest{nss};
             participantRequest.setCursor(request().getCursor());
-            requests.emplace_back(ShardId::kConfigServerId,
-                                  appendOpKey(configOpKey, configRequest.toBSON({})));
+
+            BSONObjBuilder configRequestBob;
+            configRequest.serialize(BSONObj(), &configRequestBob);
+            appendOpKey(configOpKey, &configRequestBob);
+            requests.emplace_back(ShardId::kConfigServerId, configRequestBob.obj());
 
             return establishCursors(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
