@@ -46,9 +46,7 @@ class ClientMetadataPropagationEgressHook : public rpc::EgressMetadataHook {
 public:
     ~ClientMetadataPropagationEgressHook() override = default;
 
-    Status readReplyMetadata(OperationContext* opCtx,
-                             StringData replySource,
-                             const BSONObj& metadataObj) final;
+    Status readReplyMetadata(OperationContext* opCtx, const BSONObj& metadataObj) final;
     Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) final;
 };
 

@@ -55,10 +55,9 @@ Status EgressMetadataHookList::writeRequestMetadata(OperationContext* opCtx,
 }
 
 Status EgressMetadataHookList::readReplyMetadata(OperationContext* opCtx,
-                                                 StringData replySource,
                                                  const BSONObj& metadataObj) {
     for (auto&& hook : _hooks) {
-        auto status = hook->readReplyMetadata(opCtx, replySource, metadataObj);
+        auto status = hook->readReplyMetadata(opCtx, metadataObj);
         if (!status.isOK()) {
             return status;
         }

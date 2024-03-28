@@ -80,29 +80,24 @@ using std::unique_ptr;
 using std::vector;
 
 namespace {
-BSONObj addMetadata(DBClientBase* client, BSONObj command) {
+void addMetadata(DBClientBase* client, BSONObjBuilder* bob) {
     if (client->getRequestMetadataWriter()) {
-        BSONObjBuilder builder(command);
         auto opCtx = (haveClient() ? cc().getOperationContext() : nullptr);
-        uassertStatusOK(client->getRequestMetadataWriter()(opCtx, &builder));
-        return builder.obj();
-    } else {
-        return command;
+        uassertStatusOK(client->getRequestMetadataWriter()(opCtx, bob));
     }
 }
 
+template <typename T>
 Message assembleCommandRequest(DBClientBase* client,
                                const DatabaseName& dbName,
-                               BSONObj commandObj,
+                               const T& command,
                                const ReadPreferenceSetting& readPref) {
-    // Add the $readPreference field to the request.
-    {
-        BSONObjBuilder builder{commandObj};
-        readPref.toContainingBSON(&builder);
-        commandObj = builder.obj();
-    }
+    // Add the $readPreference and other metadata to the request.
+    BSONObjBuilder builder;
+    command.serialize(BSONObj(), &builder);
+    readPref.toContainingBSON(&builder);
+    addMetadata(client, &builder);
 
-    commandObj = addMetadata(client, std::move(commandObj));
     auto vts = [&]() {
         auto tenantId = dbName.tenantId();
         return tenantId
@@ -110,7 +105,7 @@ Message assembleCommandRequest(DBClientBase* client,
                   *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{})
             : auth::ValidatedTenancyScope::kNotRequired;
     }();
-    auto opMsgRequest = OpMsgRequestBuilder::create(vts, dbName, commandObj);
+    auto opMsgRequest = OpMsgRequestBuilder::create(vts, dbName, builder.obj());
     return opMsgRequest.serialize();
 }
 }  // namespace
@@ -122,8 +117,8 @@ Message DBClientCursor::assembleInit() {
 
     // We haven't gotten a cursorId yet so we need to issue the initial find command.
     invariant(_findRequest);
-    BSONObj findCmd = _findRequest->toBSON(BSONObj());
-    return assembleCommandRequest(_client, _ns.dbName(), std::move(findCmd), _readPref);
+    return assembleCommandRequest<FindCommandRequest>(
+        _client, _ns.dbName(), *_findRequest, _readPref);
 }
 
 Message DBClientCursor::assembleGetMore() {
@@ -138,7 +133,8 @@ Message DBClientCursor::assembleGetMore() {
         getMoreRequest.setTerm(static_cast<std::int64_t>(*_term));
     }
     getMoreRequest.setLastKnownCommittedOpTime(_lastKnownCommittedOpTime);
-    auto msg = assembleCommandRequest(_client, _ns.dbName(), getMoreRequest.toBSON({}), _readPref);
+    auto msg = assembleCommandRequest<GetMoreCommandRequest>(
+        _client, _ns.dbName(), getMoreRequest, _readPref);
 
     // Set the exhaust flag if needed.
     if (_isExhaust) {

@@ -52,9 +52,7 @@ public:
 
     Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) final;
 
-    Status readReplyMetadata(OperationContext* opCtx,
-                             StringData replySource,
-                             const BSONObj& metadataObj) final;
+    Status readReplyMetadata(OperationContext* opCtx, const BSONObj& metadataObj) final;
 
 private:
     ServiceContext* _serviceContext;

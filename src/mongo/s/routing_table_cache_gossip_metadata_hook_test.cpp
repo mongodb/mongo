@@ -56,13 +56,12 @@ TEST_F(RoutingTableCacheGossipMetadataHookTest, writeRequestMetadata) {
 
 TEST_F(RoutingTableCacheGossipMetadataHookTest, readReplyMetadata) {
     // Read empty metadata.
-    ASSERT_OK(gossipHook->readReplyMetadata(operationContext(), "", BSONObj()));
+    ASSERT_OK(gossipHook->readReplyMetadata(operationContext(), BSONObj()));
 
     // Read metadata with empty gossip.
-    ASSERT_OK(gossipHook->readReplyMetadata(operationContext(), "", BSON("otherStuff" << 1)));
+    ASSERT_OK(gossipHook->readReplyMetadata(operationContext(), BSON("otherStuff" << 1)));
     ASSERT_OK(gossipHook->readReplyMetadata(
         operationContext(),
-        "",
         BSON("otherStuff" << 1
                           << GenericReplyFieldsWithTypesUnstableV1::kRoutingCacheGossipFieldName
                           << BSONArray())));
@@ -80,7 +79,6 @@ TEST_F(RoutingTableCacheGossipMetadataHookTest, readReplyMetadata) {
     arrBuilder.append(gossip2.toBSON());
     ASSERT_OK(gossipHook->readReplyMetadata(
         operationContext(),
-        "",
         BSON("otherStuff" << 1
                           << GenericReplyFieldsWithTypesUnstableV1::kRoutingCacheGossipFieldName
                           << arrBuilder.arr())));
@@ -93,7 +91,6 @@ TEST_F(RoutingTableCacheGossipMetadataHookTest, readReplyMetadata) {
     // Read ill-formed gossip info. Should return error.
     ASSERT_NOT_OK(gossipHook->readReplyMetadata(
         operationContext(),
-        "",
         BSON("otherStuff" << 1
                           << GenericReplyFieldsWithTypesUnstableV1::kRoutingCacheGossipFieldName
                           << "unexpected")));

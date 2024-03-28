@@ -52,7 +52,6 @@ namespace {
 
 struct ReadReplyArgs {
 public:
-    StringData replySource;
     BSONObj metadataObj;
 };
 
@@ -65,11 +64,8 @@ public:
         return Status::OK();
     }
 
-    Status readReplyMetadata(OperationContext* opCtx,
-                             StringData replySource,
-                             const BSONObj& metadataObj) override {
+    Status readReplyMetadata(OperationContext* opCtx, const BSONObj& metadataObj) override {
         invariant(_arg != nullptr);
-        _arg->replySource = replySource;
         _arg->metadataObj = metadataObj;
         return Status::OK();
     }
@@ -87,9 +83,7 @@ public:
         return _toRet;
     }
 
-    Status readReplyMetadata(OperationContext* opCtx,
-                             StringData replySource,
-                             const BSONObj& metadataObj) override {
+    Status readReplyMetadata(OperationContext* opCtx, const BSONObj& metadataObj) override {
         return _toRet;
     }
 
@@ -102,7 +96,7 @@ TEST(EgressMetadataHookListTest, EmptyHookShouldNotFail) {
     ASSERT_OK(hookList.writeRequestMetadata(nullptr, nullptr));
 
     BSONObj emptyObj;
-    ASSERT_OK(hookList.readReplyMetadata(nullptr, "", emptyObj));
+    ASSERT_OK(hookList.readReplyMetadata(nullptr, emptyObj));
 }
 
 TEST(EgressMetadataHookListTest, SingleHook) {
@@ -117,10 +111,8 @@ TEST(EgressMetadataHookListTest, SingleHook) {
                            << ""),
                       builder.obj());
 
-    string testHost("b:456");
     BSONObj testObj(BSON("x" << 1));
-    ASSERT_OK(hookList.readReplyMetadata(nullptr, testHost, testObj));
-    ASSERT_EQ(testHost, hook1Args.replySource);
+    ASSERT_OK(hookList.readReplyMetadata(nullptr, testObj));
     ASSERT_BSONOBJ_EQ(testObj, hook1Args.metadataObj);
 }
 
@@ -142,14 +134,11 @@ TEST(EgressMetadataHookListTest, MultipleHooks) {
                            << ""),
                       builder.obj());
 
-    string testHost("b:456");
     BSONObj testObj(BSON("x" << 1));
-    ASSERT_OK(hookList.readReplyMetadata(nullptr, testHost, testObj));
+    ASSERT_OK(hookList.readReplyMetadata(nullptr, testObj));
 
-    ASSERT_EQ(testHost, hook1Args.replySource);
     ASSERT_BSONOBJ_EQ(testObj, hook1Args.metadataObj);
 
-    ASSERT_EQ(testHost, hook2Args.replySource);
     ASSERT_BSONOBJ_EQ(testObj, hook2Args.metadataObj);
 }
 
@@ -165,7 +154,7 @@ TEST(EgressMetadataHookListTest, SingleBadHookShouldReturnError) {
 
     BSONObjBuilder builder;
     ASSERT_NOT_OK(hookList.writeRequestMetadata(nullptr, &builder));
-    ASSERT_NOT_OK(hookList.readReplyMetadata(nullptr, "b:456", BSON("x" << 1)));
+    ASSERT_NOT_OK(hookList.readReplyMetadata(nullptr, BSON("x" << 1)));
 }
 
 }  // unnamed namespace

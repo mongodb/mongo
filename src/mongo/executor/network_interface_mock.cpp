@@ -615,10 +615,7 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<s
               "response"_attr = response.response);
 
         if (_metadataHook) {
-            _metadataHook
-                ->readReplyMetadata(noi->getRequest().opCtx,
-                                    noi->getRequest().target.toString(),
-                                    response.response.data)
+            _metadataHook->readReplyMetadata(noi->getRequest().opCtx, response.response.data)
                 .transitional_ignore();
         }
 

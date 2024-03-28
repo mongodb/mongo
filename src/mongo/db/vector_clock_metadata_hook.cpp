@@ -63,7 +63,6 @@ Status VectorClockMetadataHook::writeRequestMetadata(OperationContext* opCtx,
 }
 
 Status VectorClockMetadataHook::readReplyMetadata(OperationContext* opCtx,
-                                                  StringData replySource,
                                                   const BSONObj& metadataObj) {
     if (!VectorClock::get(_service)->isEnabled()) {
         return Status::OK();

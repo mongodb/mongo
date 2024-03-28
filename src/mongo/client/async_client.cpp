@@ -320,21 +320,20 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
         });
 }
 
-Future<rpc::UniqueReply> AsyncDBClient::runCommand(
-    OpMsgRequest request,
-    const BatonHandle& baton,
-    bool fireAndForget,
-    boost::optional<std::shared_ptr<Timer>> fromConnAcquiredTimer) {
+Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
+                                                   const BatonHandle& baton,
+                                                   bool fireAndForget,
+                                                   std::shared_ptr<Timer> fromConnAcquiredTimer) {
     auto requestMsg = request.serialize();
     if (fireAndForget) {
         OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
     }
     auto msgId = nextMessageId();
     auto future = _call(std::move(requestMsg), msgId, baton);
-    auto logMetrics = [this, fromConnAcquiredTimer] {
-        if (fromConnAcquiredTimer) {
+    auto logMetrics = [this, fromConnAcquiredTimerInner = std::move(fromConnAcquiredTimer)] {
+        if (fromConnAcquiredTimerInner) {
             const auto timeElapsedMicros =
-                durationCount<Microseconds>(fromConnAcquiredTimer.get()->elapsed());
+                durationCount<Microseconds>(fromConnAcquiredTimerInner->elapsed());
             totalTimeForEgressConnectionAcquiredToWireMicros.increment(timeElapsedMicros);
 
             if ((!gEnableDetailedConnectionHealthMetricLogLines.load() ||
@@ -380,11 +379,13 @@ Future<rpc::UniqueReply> AsyncDBClient::runCommand(
 Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
     executor::RemoteCommandRequest request,
     const BatonHandle& baton,
-    boost::optional<std::shared_ptr<Timer>> fromConnAcquiredTimer) {
+    std::shared_ptr<Timer> fromConnAcquiredTimer) {
     auto startTimer = Timer();
     auto opMsgRequest = static_cast<OpMsgRequest>(request);
-    return runCommand(
-               std::move(opMsgRequest), baton, request.options.fireAndForget, fromConnAcquiredTimer)
+    return runCommand(std::move(opMsgRequest),
+                      baton,
+                      request.options.fireAndForget,
+                      std::move(fromConnAcquiredTimer))
         .then([this, startTimer = std::move(startTimer)](rpc::UniqueReply response) {
             return executor::RemoteCommandResponse(*response, startTimer.elapsed());
         });

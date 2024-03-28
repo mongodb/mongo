@@ -50,7 +50,6 @@ Status RoutingTableCacheGossipMetadataHook::writeRequestMetadata(OperationContex
 }
 
 Status RoutingTableCacheGossipMetadataHook::readReplyMetadata(OperationContext* opCtx,
-                                                              StringData replySource,
                                                               const BSONObj& metadataObj) {
     try {
         const auto routerCacheVersionsObj =

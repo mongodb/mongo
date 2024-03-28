@@ -60,7 +60,6 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
 }
 
 Status ClientMetadataPropagationEgressHook::readReplyMetadata(OperationContext* opCtx,
-                                                              StringData replySource,
                                                               const BSONObj& metadataObj) {
     return Status::OK();
 }

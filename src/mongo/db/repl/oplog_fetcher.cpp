@@ -576,7 +576,7 @@ void OplogFetcher::_setMetadataWriterAndReader() {
 
             // Run VectorClockMetadataHook on reply metadata so this matches the behavior of the
             // connections in the replication coordinator thread pool.
-            return _vectorClockMetadataHook->readReplyMetadata(opCtx, source, _metadataObj);
+            return _vectorClockMetadataHook->readReplyMetadata(opCtx, _metadataObj);
         });
 }
 

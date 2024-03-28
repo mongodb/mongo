@@ -744,8 +744,7 @@ void NetworkInterfaceTL::CommandStateBase::doMetadataHook(
     if (auto& hook = interface->_metadataHook; hook && !finishLine.isReady()) {
         invariant(response.target);
 
-        uassertStatusOK(
-            hook->readReplyMetadata(nullptr, response.target->toString(), response.data));
+        uassertStatusOK(hook->readReplyMetadata(nullptr, response.data));
     }
 }
 
@@ -1015,15 +1014,17 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
 
             returnConnection(status);
 
-            const auto commandStatus = getStatusFromCommandResult(response.data);
-            if (isHedge && isIgnorableAsHedgeResult(commandStatus)) {
-                LOGV2_DEBUG(4660701,
-                            2,
-                            "Hedged request returned status",
-                            "requestId"_attr = request->id,
-                            "target"_attr = request->target,
-                            "status"_attr = commandStatus);
-                return;
+            if (isHedge) {
+                auto commandStatus = getStatusFromCommandResult(response.data);
+                if (isIgnorableAsHedgeResult(commandStatus)) {
+                    LOGV2_DEBUG(4660701,
+                                2,
+                                "Hedged request returned status",
+                                "requestId"_attr = request->id,
+                                "target"_attr = request->target,
+                                "status"_attr = commandStatus);
+                    return;
+                }
             }
 
             if (!cmdState->finishLine.arriveStrongly()) {
@@ -1032,7 +1033,7 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
                             "Skipping the response because it was already received from other node",
                             "requestId"_attr = request->id,
                             "target"_attr = request->target,
-                            "status"_attr = commandStatus);
+                            "response"_attr = redact(response.data));
 
                 return;
             }

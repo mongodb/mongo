@@ -84,12 +84,11 @@ public:
     Future<executor::RemoteCommandResponse> runCommandRequest(
         executor::RemoteCommandRequest request,
         const BatonHandle& baton = nullptr,
-        boost::optional<std::shared_ptr<Timer>> fromConnAcquiredTimer = boost::none);
-    Future<rpc::UniqueReply> runCommand(
-        OpMsgRequest request,
-        const BatonHandle& baton = nullptr,
-        bool fireAndForget = false,
-        boost::optional<std::shared_ptr<Timer>> fromConnAcquiredTimer = boost::none);
+        std::shared_ptr<Timer> fromConnAcquiredTimer = nullptr);
+    Future<rpc::UniqueReply> runCommand(OpMsgRequest request,
+                                        const BatonHandle& baton = nullptr,
+                                        bool fireAndForget = false,
+                                        std::shared_ptr<Timer> fromConnAcquiredTimer = nullptr);
 
     Future<executor::RemoteCommandResponse> beginExhaustCommandRequest(
         executor::RemoteCommandRequest request, const BatonHandle& baton = nullptr);
