@@ -113,7 +113,6 @@ env.Library(
         'metadata/egress_metadata_hook_list.cpp',
         'metadata/repl_set_metadata.cpp',
         'metadata/oplog_query_metadata.cpp',
-        'metadata/tracking_metadata.cpp',
         'topology_version.idl',
     ],
     LIBDEPS=[
@@ -183,7 +182,6 @@ if wiredtiger:
             'metadata/oplog_query_metadata_test.cpp',
             'metadata/repl_set_metadata_test.cpp',
             'metadata/security_token_metadata_test.cpp',
-            'metadata/tracking_metadata_test.cpp',
             'metadata_test.cpp',
             'object_check_test.cpp',
             'op_msg_test.cpp',

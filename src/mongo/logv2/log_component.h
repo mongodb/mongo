@@ -98,7 +98,6 @@ namespace mongo::logv2 {
     X(kFTDC,                   , "ftdc"                  , "FTDC"    , kDefault) \
     X(kASIO,                   , "asio"                  , "ASIO"    , kNetwork) \
     X(kBridge,                 , "bridge"                , "BRIDGE"  , kNetwork) \
-    X(kTracking,               , "tracking"              , "TRACKING", kDefault) \
     X(kTransaction,            , "transaction"           , "TXN"     , kDefault) \
     X(kTenantMigration,        , "tenantMigration"       , "TENANT_M", kDefault) \
     X(kConnectionPool,         , "connectionPool"        , "CONNPOOL", kNetwork) \

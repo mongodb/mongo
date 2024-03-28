@@ -70,7 +70,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
@@ -85,7 +84,6 @@ namespace mongo {
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using executor::TaskExecutor;
-using rpc::TrackingMetadata;
 using RemoteCommandCallbackArgs = TaskExecutor::RemoteCommandCallbackArgs;
 
 namespace {
@@ -142,24 +140,6 @@ std::string ShardRemote::toString() const {
 BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,
                                                const ReadPreferenceSetting& readPref) {
     BSONObjBuilder builder;
-    if (shouldLog(logv2::LogComponent::kTracking,
-                  logv2::LogSeverity::Debug(1))) {  // avoid performance overhead if not logging
-        if (!TrackingMetadata::get(opCtx).getIsLogged()) {
-            if (!TrackingMetadata::get(opCtx).getOperId()) {
-                TrackingMetadata::get(opCtx).initWithOperName("NotSet");
-            }
-            LOGV2_DEBUG_OPTIONS(20164,
-                                1,
-                                logv2::LogOptions{logv2::LogComponent::kTracking},
-                                "{trackingMetadata}",
-                                "trackingMetadata"_attr = TrackingMetadata::get(opCtx));
-            TrackingMetadata::get(opCtx).setIsLogged(true);
-        }
-
-        TrackingMetadata metadata = TrackingMetadata::get(opCtx).constructChildMetadata();
-        metadata.writeToMetadata(&builder);
-    }
-
     readPref.toContainingBSON(&builder);
 
     if (isConfig())

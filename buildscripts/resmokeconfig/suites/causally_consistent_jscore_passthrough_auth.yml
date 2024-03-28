@@ -178,7 +178,6 @@ executor:
           network:
             verbosity: 1
             asio: 2
-          tracking: 0
     mongod_options:
       enableMajorityReadConcern: ''
       auth: ''
@@ -194,6 +193,5 @@ executor:
             asio: 2
           replication:
             heartbeats: 2
-          tracking: 0
     num_rs_nodes_per_shard: 2
     auth_options: *authOptions

@@ -94,7 +94,6 @@
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -248,7 +247,6 @@ void ExecCommandClient::_prologue() {
     auto opCtx = _rec->getOpCtx();
     auto result = _rec->getReplyBuilder();
     const auto& request = _rec->getRequest();
-    const Command* c = _invocation->definition();
 
     const auto& dbname = _invocation->db();
     uassert(ErrorCodes::IllegalOperation,
@@ -272,12 +270,6 @@ void ExecCommandClient::_prologue() {
         auto body = result->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(body, e.toStatus());
         iassert(Status(ErrorCodes::SkipCommandExecution, "Failed to check authorization"));
-    }
-
-    if (MONGO_unlikely(shouldLog(logv2::LogComponent::kTracking, logv2::LogSeverity::Debug(1)))) {
-        rpc::TrackingMetadata trackingMetadata;
-        trackingMetadata.initWithOperName(c->getName());
-        rpc::TrackingMetadata::get(opCtx) = trackingMetadata;
     }
 }
 

@@ -93,7 +93,6 @@
               network:
                 verbosity: 1
                 asio: 2
-              tracking: 0
         mongod_options:
           set_parameters:
             logComponentVerbosity:

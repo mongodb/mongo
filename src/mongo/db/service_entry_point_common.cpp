@@ -147,7 +147,6 @@
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -1945,17 +1944,6 @@ void ExecCommandDatabase::_initiateCommand() {
     CurOp::get(opCtx)->ensureStarted();
 
     command->incrementCommandsExecuted();
-
-    if (shouldLog(logv2::LogComponent::kTracking, logv2::LogSeverity::Debug(1)) &&
-        rpc::TrackingMetadata::get(opCtx).getParentOperId()) {
-        rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
-        LOGV2_DEBUG_OPTIONS(4615605,
-                            1,
-                            {logv2::LogComponent::kTracking},
-                            "Command metadata",
-                            "trackingMetadata"_attr = rpc::TrackingMetadata::get(opCtx));
-        rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
-    }
 }
 
 void ExecCommandDatabase::_commandExec() {

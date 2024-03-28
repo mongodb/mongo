@@ -74,9 +74,6 @@ structs:
         type: IDLAnyType
         cpp_name: clientMetadata
         optional: true
-      tracking_info:
-        type: IDLAnyType
-        optional: true
       $audit:
         type: IDLAnyType
         cpp_name: impersonation

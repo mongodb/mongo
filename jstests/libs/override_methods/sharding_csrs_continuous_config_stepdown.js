@@ -12,8 +12,7 @@ const {ReplSetTestWithContinuousPrimaryStepdown, ShardingTestWithContinuousPrima
                                      verbositySetting: {
                                          verbosity: 0,
                                          command: {verbosity: 1},
-                                         network: {verbosity: 1, asio: {verbosity: 2}},
-                                         tracking: {verbosity: 0}
+                                         network: {verbosity: 1, asio: {verbosity: 2}}
                                      }
                                  });
 

@@ -52,7 +52,6 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
-#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -124,13 +123,6 @@ void readRequestMetadata(OperationContext* opCtx,
         // its own requests. This may or may not be relevant for SERVER-50804.
         ClientMetadata::setFromMetadataForOperation(opCtx,
                                                     requestArgs.getClientMetadata()->getElement());
-    }
-
-    if (auto ti = requestArgs.getTracking_info()) {
-        TrackingMetadata::get(opCtx) =
-            uassertStatusOK(TrackingMetadata::readFromMetadata(ti->getElement()));
-    } else {
-        TrackingMetadata::get(opCtx) = {};
     }
 
     VectorClock::get(opCtx)->gossipIn(
