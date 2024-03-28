@@ -1032,6 +1032,9 @@ void cleanupESCAnchors(OperationContext* opCtx,
     DBDirectClient client(opCtx);
     std::int64_t deleted = 0;
 
+    std::vector<PrfBlock> deleteBatch;
+    deleteBatch.reserve(std::min(maxTagsPerDelete, pq.size()));
+
     while (!pq.empty()) {
         write_ops::DeleteCommandRequest deleteRequest(escNss,
                                                       std::vector<write_ops::DeleteOpEntry>{});
@@ -1049,6 +1052,7 @@ void cleanupESCAnchors(OperationContext* opCtx,
             for (size_t tagCount = 0; tagCount < maxTagsPerDelete && !pq.empty(); tagCount++) {
                 auto& block = pq.top();
                 array.append(BSONBinData(block.data(), block.size(), BinDataGeneral));
+                deleteBatch.push_back(block);
                 pq.pop();
             }
         }
@@ -1065,9 +1069,13 @@ void cleanupESCAnchors(OperationContext* opCtx,
                           "Queryable Encryption compaction encountered write errors",
                           "namespace"_attr = escNss,
                           "reply"_attr = reply);
+            for (auto& block : deleteBatch) {
+                pq.push(block);
+            }
             checkWriteErrors(reply.getWriteCommandReplyBase());
         }
         deleted += reply.getN();
+        deleteBatch.clear();
     }
 
     if (escStats) {
