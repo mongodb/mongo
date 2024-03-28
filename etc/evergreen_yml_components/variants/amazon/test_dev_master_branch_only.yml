@@ -246,8 +246,8 @@ buildvariants:
   - name: .updatefuzzer
 
 - name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
-  display_name: "AL2023 arm64 Enterprise (SEP Benchmark)"
-  cron: "0 0,8,16 * * *" # Run this task every 8 hours
+  display_name: "! AL2023 arm64 Enterprise (SEP Benchmark)"
+  cron: "0 */4 * * *"
   run_on:
   - amazon2023.0-arm64-large
   expansions:
