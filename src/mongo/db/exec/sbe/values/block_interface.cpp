@@ -126,18 +126,21 @@ std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) {
     return buildBlockFromStorage(std::move(tags), std::move(vals));
 }
 
-std::unique_ptr<ValueBlock> ValueBlock::buildBlockFromStorage(std::vector<value::TypeTags> tags,
-                                                              std::vector<value::Value> vals) {
+std::unique_ptr<ValueBlock> buildBlockFromStorage(std::vector<value::TypeTags> tags,
+                                                  std::vector<value::Value> vals) {
     if (vals.empty()) {
         return std::make_unique<HeterogeneousBlock>();
     }
 
     if ((validHomogeneousType(tags[0]) || tags[0] == TypeTags::Nothing) &&
         std::all_of(tags.begin(), tags.end(), [&](TypeTags tag) { return tag == tags[0]; })) {
+
+        if (std::all_of(
+                vals.begin(), vals.end(), [&](value::Value value) { return value == vals[0]; })) {
+            return std::make_unique<MonoBlock>(vals.size(), tags[0], vals[0]);
+        }
+
         switch (tags[0]) {
-            case value::TypeTags::Nothing: {
-                return std::make_unique<MonoBlock>(vals.size(), value::TypeTags::Nothing, 0);
-            }
             case value::TypeTags::Boolean: {
                 return std::make_unique<value::BoolBlock>(std::move(vals));
             }
