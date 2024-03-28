@@ -66,6 +66,7 @@ struct DbCheckCollectionInfo {
 struct DbCheckCollectionBatchStats {
     boost::optional<UUID> batchId;
     int64_t nDocs;
+    int64_t nCount;
     int64_t nBytes;
     BSONObj lastKey;
     std::string md5;
@@ -78,21 +79,39 @@ struct DbCheckCollectionBatchStats {
  * For organizing the results of batches for extra index keys check.
  */
 struct DbCheckExtraIndexKeysBatchStats {
+    boost::optional<UUID> batchId;
     int64_t nKeys;
     int64_t nBytes;
+
     // These keystrings should have the recordId appended at the end, since WiredTiger will always
     // append the recordId when returning a keystring from the index cursor.
     key_string::Value firstKeyCheckedWithRecordId;
     key_string::Value lastKeyCheckedWithRecordId;
     key_string::Value nextKeyToBeCheckedWithRecordId;
-    bool finishedIndexBatch;
-    bool finishedIndexCheck;
+
     std::string md5;
     repl::OpTime time;
+    bool logToHealthLog;
     boost::optional<Timestamp> readTimestamp;
+
     Date_t deadline;
+
     // Number of consecutive identical keys at the end of the batch.
     int64_t nConsecutiveIdenticalKeysAtEnd = 1;
+
+    // Numer of keys and bytes seen by the hasher. This is used only for reporting and not for
+    // tracking rate limiting.
+    int64_t nHasherKeys;
+    int64_t nHasherBytes;
+
+    BSONObj keyPattern;
+    BSONObj firstBson;
+    BSONObj lastBson;
+    BSONObj indexSpec;
+
+
+    bool finishedIndexBatch;
+    bool finishedIndexCheck;
 };
 
 /**
@@ -178,12 +197,17 @@ private:
     void _extraIndexKeysCheck(OperationContext* opCtx);
 
     /**
-     * Sets up a hasher and hashes one batch for extra index keys check.
-     * Returns a non-OK Status if we encountered an error and should abandon extra index keys
-     * check.
+     * Entry point for hashing portion of extra index key check.
      */
     Status _hashExtraIndexKeysCheck(OperationContext* opCtx,
                                     DbCheckExtraIndexKeysBatchStats* batchStats);
+
+    /**
+     * Sets up a hasher and hashes one batch for extra index keys check.
+     * Returns a non-OK Status if we encountered an error and should abandon extra index keys check.
+     */
+    Status _runHashExtraKeyCheck(OperationContext* opCtx,
+                                 DbCheckExtraIndexKeysBatchStats* batchStats);
 
     /**
      * Gets batch bounds for extra index keys check and stores the info in batchStats. Runs
@@ -264,7 +288,7 @@ private:
     std::unique_ptr<DbCheckAcquisition> _acquireDBCheckLocks(OperationContext* opCtx,
                                                              const NamespaceString& nss);
 
-    bool _shouldLogBatch(DbCheckOplogBatch& batch);
+    std::pair<bool, boost::optional<UUID>> _shouldLogBatch(DbCheckOplogBatch& batch);
 
     DbCheckCollectionInfo _info;
 
