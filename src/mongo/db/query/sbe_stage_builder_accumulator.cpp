@@ -491,7 +491,49 @@ InputsPtr buildAccumExprsAvg(const Op& acc,
     // Use 'inputs->inputExpr' as the input for the "aggDoubleDoubleSum()" agg and use 'addend'
     // as the input for the "sum()" agg.
     return std::make_unique<AccumAggsAvgInputs>(std::move(inputs->inputExpr), std::move(addend));
-}
+}  // buildAccumExprsAvg
+
+boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsAvg(
+    const Op& acc,
+    std::unique_ptr<AccumSingleInput> inputsIn,
+    StageBuilderState& state,
+    const PlanStageSlots& outputs) {
+    // Call buildAccumExprs() and cast the result to AccumAggsAvgInputs. This will uassert if the
+    // result type of buildAccumExprs() is not AccumAggsAvgInputs.
+    std::unique_ptr<AccumAggsAvgInputs> inputs =
+        castInputsTo<AccumAggsAvgInputs>(acc.buildAccumExprs(state, std::move(inputsIn)));
+
+    // Try to vectorize 'inputs->inputExpr' and 'inputs->count'.
+    SbExpr inputExpr = buildVectorizedExpr(state, std::move(inputs->inputExpr), outputs, false);
+    SbExpr countExpr = buildVectorizedExpr(state, std::move(inputs->count), outputs, false);
+
+    if (inputExpr && countExpr) {
+        // If vectorization succeeded, allocate a slot and update 'inputs->inputExpr' to refer to
+        // the slot. Then put 'inputs', the vectorized expression, and the internal slot into an
+        // AccumBlockExprs struct and return it.
+        boost::optional<Accum::AccumBlockExprs> accumBlockExprs;
+        accumBlockExprs.emplace();
+
+        SbSlot inputInternalSlot = SbSlot{state.slotId()};
+        SbSlot countInternalSlot = SbSlot{state.slotId()};
+
+        inputs->inputExpr = SbExpr{inputInternalSlot};
+        inputs->count = SbExpr{countInternalSlot};
+
+        accumBlockExprs->exprs.emplace_back(std::move(inputExpr));
+        accumBlockExprs->exprs.emplace_back(std::move(countExpr));
+
+        accumBlockExprs->slots.emplace_back(inputInternalSlot);
+        accumBlockExprs->slots.emplace_back(countInternalSlot);
+
+        accumBlockExprs->inputs = std::move(inputs);
+
+        return accumBlockExprs;
+    }
+
+    // If vectorization failed, return boost::none.
+    return boost::none;
+}  // buildAccumBlockExprsAvg
 
 SbExpr::Vector buildAccumAggsAvg(const Op& acc,
                                  std::unique_ptr<AccumAggsAvgInputs> inputs,
@@ -503,7 +545,30 @@ SbExpr::Vector buildAccumAggsAvg(const Op& acc,
     aggs.push_back(b.makeFunction("sum", std::move(inputs->count)));
 
     return aggs;
-}
+}  // buildAccumAggsAvg
+
+boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsAvg(
+    const Op& acc,
+    std::unique_ptr<AccumAggsAvgInputs> inputs,
+    StageBuilderState& state,
+    SbSlot bitmapInternalSlot) {
+    SbExprBuilder b(state);
+
+    auto inputBlockAgg = b.makeFunction(
+        "valueBlockAggDoubleDoubleSum"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
+    auto inputRowAgg = b.makeFunction("aggDoubleDoubleSum"_sd, std::move(inputs->inputExpr));
+
+    auto countBlockAgg =
+        b.makeFunction("valueBlockAggSum"_sd, bitmapInternalSlot, inputs->count.clone());
+    auto countRowAgg = b.makeFunction("sum"_sd, std::move(inputs->count));
+
+    boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
+    pairs.emplace();
+    pairs->emplace_back(BlockAggAndRowAgg{std::move(inputBlockAgg), std::move(inputRowAgg)});
+    pairs->emplace_back(BlockAggAndRowAgg{std::move(countBlockAgg), std::move(countRowAgg)});
+
+    return pairs;
+}  // buildAccumBlockAggsAvg
 
 SbExpr::Vector buildCombineAggsAvg(const Op& acc,
                                    StageBuilderState& state,
@@ -1434,10 +1499,11 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsSingleInput(
     const PlanStageSlots& outputs) {
     // Call buildAccumExprs() and cast the result to AccumSingleInput. This will uassert if the
     // result type of buildAccumExprs() is not AccumSingleInput.
-    auto inputs = castInputsTo<AccumSingleInput>(acc.buildAccumExprs(state, std::move(inputsIn)));
+    std::unique_ptr<AccumSingleInput> inputs =
+        castInputsTo<AccumSingleInput>(acc.buildAccumExprs(state, std::move(inputsIn)));
 
     // Try to vectorize 'inputs->inputExpr'.
-    auto expr = buildVectorizedExpr(state, std::move(inputs->inputExpr), outputs, false);
+    SbExpr expr = buildVectorizedExpr(state, std::move(inputs->inputExpr), outputs, false);
 
     if (expr) {
         // If vectorization succeeded, allocate a slot and update 'inputs->inputExpr' to refer to
@@ -1529,7 +1595,7 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsTopBottomN(
     // Try to vectorize each element of 'inputs->values'.
     SbExpr::Vector valueExprs;
     for (size_t i = 0; i < inputs->values.size(); ++i) {
-        auto valueExpr = buildVectorizedExpr(state, std::move(inputs->values[i]), outputs, false);
+        SbExpr valueExpr = buildVectorizedExpr(state, std::move(inputs->values[i]), outputs, false);
         if (!valueExpr) {
             // If vectorization failed, return boost::none.
             return boost::none;
@@ -1541,7 +1607,7 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsTopBottomN(
     // Try to vectorize each element of 'inputs->sortBy'.
     SbExpr::Vector keyExprs;
     for (size_t i = 0; i < inputs->sortBy.size(); ++i) {
-        auto keyExpr = buildVectorizedExpr(state, std::move(inputs->sortBy[i]), outputs, false);
+        SbExpr keyExpr = buildVectorizedExpr(state, std::move(inputs->sortBy[i]), outputs, false);
         if (!keyExpr) {
             // If vectorization failed, return boost::none.
             return boost::none;
@@ -1646,7 +1712,9 @@ static const StringDataMap<OpInfo> accumOpInfoMap = {
     {AccumulatorAvg::kName,
      OpInfo{.numAggs = 2,
             .buildAccumExprs = makeBuildFn(&buildAccumExprsAvg),
+            .buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsAvg),
             .buildAccumAggs = makeBuildFn(&buildAccumAggsAvg),
+            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsAvg),
             .buildFinalize = makeBuildFn(&buildFinalizeAvg),
             .buildCombineAggs = makeBuildFn(&buildCombineAggsAvg)}},
 

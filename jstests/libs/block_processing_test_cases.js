@@ -772,10 +772,76 @@ export function blockProcessingTestCases(timeFieldName,
         // $avg tests //////////////////////////////////////////////////////////////////////////////
         //
         {
+            name: "GroupByNull_Avg",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: null, a: {$avg: '$y'}}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "DateUpper_GroupByNull_Avg_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: null, a: {$avg: '$y'}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "DateLower_GroupByNull_Avg_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$gt: dateLowerBound}}},
+                {$group: {_id: null, a: {$avg: '$y'}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByX_Avg",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: '$x', a: {$avg: '$y'}}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
             name: "GroupByX_Avg_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: '$x', a: {$avg: '$y'}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByX_MultipleAvgs",
+            pipeline: [{$group: {_id: '$x', a: {$avg: '$x'}, b: {$avg: '$y'}, c: {$avg: '$z'}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByXAndY_Avg_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: {x: '$x', y: '$y'}, a: {$avg: '$z'}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByMetaSortKey_Avg_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: {$meta: 'sortKey'}, a: {$avg: '$y'}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: false
+        },
+        {
+            name: "GroupByX_AvgOfMetaSortKey_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: '$x', a: {$avg: {$meta: 'sortKey'}}}},
                 {$project: {_id: 0, a: 1}}
             ],
             usesBlockProcessing: false
@@ -1721,7 +1787,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: "$x", a: {$avg: "$meta"}}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAvgOfMetaSubField",
@@ -1729,7 +1795,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: "$x", a: {$avg: "$meta.series"}}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByComputedField",

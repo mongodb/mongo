@@ -183,7 +183,7 @@ for (const groupKey of [null, 't', 'm', 'm.metaA', 'a']) {
         if (groupKey === accumulatorData) {
             continue;
         }
-        for (const accumulator of ['$min', '$max', '$sum']) {
+        for (const accumulator of ['$min', '$max', '$sum', '$avg']) {
             const uses = [accumulatorData];
             // "null" is not a field we need from previous stages.
             if (groupKey !== null) {
