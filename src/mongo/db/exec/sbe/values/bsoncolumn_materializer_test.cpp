@@ -389,7 +389,6 @@ TEST_F(BSONColumnMaterializerTest, DecompressIterativeSimpleWithSBEMaterializer)
     verifyDecompressionIterative(obj, {value::TypeTags::Nothing, 0});
 }
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnMaterializerTest, DecompressSimpleSBEPath) {
     std::vector<BSONObj> input = {
         BSON("a" << 10 << "b" << 20),
@@ -424,7 +423,6 @@ TEST_F(BSONColumnMaterializerTest, DecompressSimpleSBEPath) {
         verifyDecompressWithPositions(input, path, expectedPositions);
     }
 }
-*/
 
 TEST_F(BSONColumnMaterializerTest, DecompressArrayWithSBEPathNoTraverse) {
     std::vector<BSONObj> input = {BSON("a" << BSON_ARRAY(0 << 10)),
@@ -503,7 +501,6 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectWithSBEPath) {
     verifyDecompressWithPositions(input, path, expectedPositions);
 }
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectGetWithSBEPath) {
     std::vector<BSONObj> input = {BSON("a" << BSON("b" << 0)),
                                   BSON("a" << BSON("b" << 10)),
@@ -524,9 +521,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectGetWithSBEPath) {
     std::vector<int32_t> expectedPositions{1, 1, 1, 1};
     verifyDecompressWithPositions(input, path, expectedPositions);
 }
-*/
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectInArrayWithSBEPath) {
     std::vector<BSONObj> input = {BSON("a" << BSON_ARRAY(BSON("b" << 0))),
                                   BSON("a" << BSON_ARRAY(BSON("b" << 10))),
@@ -548,7 +543,6 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectInArrayWithSBEPath) {
     std::vector<int32_t> expectedPositions{1, 1, 1, 1};
     verifyDecompressWithPositions(input, path, expectedPositions);
 }
-*/
 
 TEST_F(BSONColumnMaterializerTest, DecompressArrayWithScalarsAndObjects) {
     std::vector<BSONObj> input = {
@@ -575,7 +569,6 @@ TEST_F(BSONColumnMaterializerTest, DecompressArrayWithScalarsAndObjects) {
 }
 
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnMaterializerTest, DecompressObjsWithNestedArrays) {
     std::vector<BSONObj> input = {
         fromjson("{a:1, b:1}"),
@@ -618,7 +611,6 @@ TEST_F(BSONColumnMaterializerTest, DecompressObjsWithNestedArrays) {
         verifyDecompressWithPositions(input, path, expectedPositions);
     }
 }
-*/
 
 TEST_F(BSONColumnMaterializerTest, DecompressDoublyNestedArrays) {
     BSONColumnBuilder cb;
@@ -660,7 +652,6 @@ TEST_F(BSONColumnMaterializerTest, DecompressAllUnmatchedPath) {
     verifyDecompressWithPositions(input, path, expectedPositions);
 }
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnMaterializerTest, DecompressSomeUnmatchedPath) {
     std::vector<BSONObj> input = {
         fromjson("{a:1, b: 1}"),
@@ -680,9 +671,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressSomeUnmatchedPath) {
     std::vector<int32_t> expectedPositions{1, 1, 1, 1};
     verifyDecompressWithPositions(input, path, expectedPositions);
 }
-*/
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnMaterializerTest, DecompressUnmatchedPathInObject) {
     std::vector<BSONObj> input = {
         fromjson("{a: {b: 1}}"),                 // matches the path
@@ -713,7 +702,6 @@ TEST_F(BSONColumnMaterializerTest, DecompressUnmatchedPathInObject) {
     std::vector<int32_t> expectedPositions{1, 1, 1, 3, 3};
     verifyDecompressWithPositions(input, path, expectedPositions);
 }
-*/
 
 TEST_F(BSONColumnMaterializerTest, DecompressMultipleBuffers) {
     BSONColumnBuilder cb;

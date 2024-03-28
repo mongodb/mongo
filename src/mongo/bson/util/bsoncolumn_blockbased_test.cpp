@@ -182,6 +182,16 @@ void extractValueTo<BSONCode>(BSONCode& val, BSONElement elem) {
     val = BSONCode{sd};
 }
 
+template <>
+void extractValueTo<MaxKeyLabeler>(MaxKeyLabeler& val, BSONElement elem) {
+    // MaxKeyLabeler is a struct with no members so there is nothing to do here.
+}
+
+template <>
+void extractValueTo<MinKeyLabeler>(MinKeyLabeler& val, BSONElement elem) {
+    // MinKeyLabeler is a struct with no members so there is nothing to do here.
+}
+
 template <typename T>
 void extractValueTo(T& val, BSONElement elem) {
     elem.Val(val);
@@ -206,6 +216,16 @@ void assertEquals<BSONBinData>(const BSONBinData& lhs, const BSONBinData& rhs) {
 template <>
 void assertEquals<BSONCode>(const BSONCode& lhs, const BSONCode& rhs) {
     ASSERT_EQ(lhs.code, rhs.code);
+}
+
+template <>
+void assertEquals<MaxKeyLabeler>(const MaxKeyLabeler& lhs, const MaxKeyLabeler& rhs) {
+    // MaxKeyLabeler is a struct with no members so there is nothing to do here.
+}
+
+template <>
+void assertEquals<MinKeyLabeler>(const MinKeyLabeler& lhs, const MinKeyLabeler& rhs) {
+    // MinKeyLabeler is a struct with no members so there is nothing to do here.
 }
 
 template <typename T>
@@ -245,7 +265,6 @@ struct TestPath {
     const std::vector<std::string> _fields;
 };
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressScalars) {
     auto col = bsonColumnFromObjs({
         BSON("a" << 10 << "b" << BSON("c" << int64_t(20))),
@@ -277,9 +296,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressScalars) {
     ASSERT_EQ(paths[1].second[2].Long(), 22);
     ASSERT_EQ(paths[1].second[3].Long(), 23);
 }
-*/
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressSomeScalars) {
     // Create a BSONColumn that has different deltas in the object fields. This ensures that the
     // number of deltas per simple8b block will be different for each field to encourage
@@ -312,7 +329,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressSomeScalars) {
         ASSERT_EQ(paths[1].second[i].Int(), i * 100000);
     }
 }
-*/
 
 TEST_F(BSONColumnBlockBasedTest, DecompressObjects) {
     auto col = bsonColumnFromObjs({
@@ -338,7 +354,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressObjects) {
     ASSERT_BSONOBJ_EQ(paths[0].second[3].Obj(), fromjson("{a: 13}"));
 }
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
     auto col = bsonColumnFromObjs({
         fromjson("{a: 10, b: {c: 30}}"),
@@ -401,7 +416,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
         ASSERT_BSONOBJ_EQ(paths[1].second[3].Obj(), fromjson("{c: 33}"));
     }
 }
-*/
 
 TEST_F(BSONColumnBlockBasedTest, DecompressSiblingObjects) {
     auto col = bsonColumnFromObjs({
@@ -463,8 +477,9 @@ struct TestArrayPath {
 };
 
 template <typename T>
-auto decompressArraysAndFullColumns(const std::vector<T> values,
-                                    boost::intrusive_ptr<ElementStorage>& allocator) {
+void verifyDecompressPaths(const std::vector<T>& values) {
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+
     std::vector<BSONObj> objs;
     for (std::size_t i = 0; i < values.size(); i += 2) {
         auto bsonObj =
@@ -481,49 +496,105 @@ auto decompressArraysAndFullColumns(const std::vector<T> values,
 
     auto mockRefObj = BSON("a" << BSON_ARRAY(BSON("b" << values[0]) << BSON("b" << values[1])));
 
-    // Test that we can decompress the whole column.
-    std::vector<BSONElement> vec0;
-    TestPath testPath{};
-    ASSERT_EQ(testPath.elementsToMaterialize(mockRefObj).size(), 1);
-    std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths{{testPath, vec0}};
+    {
+        // Test that we can decompress the whole column. This materializes objects, so it tests
+        // decompressGeneral().
+        std::vector<BSONElement> vec0;
+        TestPath testPath{};
+        ASSERT_EQ(testPath.elementsToMaterialize(mockRefObj).size(), 1);
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths{{testPath, vec0}};
 
-    // This is decompressing the whole column, in which there are scalars within objects.
-    col.decompress<BSONElementMaterializer>(allocator, std::span(testPaths));
+        // This is decompressing the whole column, in which there are scalars within objects.
+        col.decompress<BSONElementMaterializer>(allocator, std::span(testPaths));
 
-    ASSERT_EQ(testPaths[0].second.size(), objs.size());
-    ASSERT_EQ(testPaths[0].second[0].type(), Object);
+        ASSERT_EQ(testPaths[0].second.size(), objs.size());
+        ASSERT_EQ(testPaths[0].second[0].type(), Object);
 
-    for (size_t i = 0; i < testPaths[0].second.size(); ++i) {
-        ASSERT_BSONOBJ_EQ(testPaths[0].second[i].Obj(), objs[i]);
+        for (size_t i = 0; i < testPaths[0].second.size(); ++i) {
+            ASSERT_BSONOBJ_EQ(testPaths[0].second[i].Obj(), objs[i]);
+        }
     }
+    {
+        // Test that we can decompress multiple elements within arrays. Create a path that will get
+        // the "b" fields of both array elements. This materializes scalars, but since a single path
+        // must materialize elements from both scalar streams, the output elements must be
+        // interleaved. Hence this will also use decompressGeneral().
+        TestArrayPath arrayPath;
+        ASSERT_EQ(arrayPath.elementsToMaterialize(mockRefObj).size(), 2);
 
-    // Test that we can decompress multiple elements within arrays.
-    // Create a path that will get the "b" fields of both array elements.
-    TestArrayPath arrayPath;
-    ASSERT_EQ(arrayPath.elementsToMaterialize(mockRefObj).size(), 2);
+        std::vector<BSONElement> vec1;
+        std::vector<std::pair<TestArrayPath, std::vector<BSONElement>&>> arrayPaths{
+            {arrayPath, vec1}};
 
-    std::vector<BSONElement> vec1;
-    std::vector<std::pair<TestArrayPath, std::vector<BSONElement>&>> arrayPaths{{arrayPath, vec1}};
+        // This is decompressing scalars, but since a single path is accessing two fields that need
+        // to be interleaved in the output, we still need to use the slow path.
+        col.decompress<BSONElementMaterializer>(allocator, std::span(arrayPaths));
 
-    // This is decompressing scalars, but since a single path is accessing two fields that need to
-    // be interleaved in the output, we still need to use the slow path.
-    col.decompress<BSONElementMaterializer>(allocator, std::span(arrayPaths));
+        ASSERT_EQ(arrayPaths[0].second.size(), values.size());
+        for (size_t i = 0; i < values.size(); ++i) {
+            T got;
+            extractValueTo(got, vec1[i]);
+            assertEquals(values[i], got);
+        }
+    }
+    {
+        // This test creates a BSONColumn with objects of the form
+        //     {a: <v>}
+        // and then decompresses them with a path equivalent to
+        //     Get(a) / Id
+        // This will exercise decompressFast() because we are extracting and materializing scalar
+        // values that do not have to be interleaved in the output.
+        BSONColumnBuilder cb;
+        for (auto&& v : values) {
+            cb.append(BSON("a" << v));
+        }
 
-    ASSERT_EQ(arrayPaths[0].second.size(), values.size());
+        auto col = BSONColumnBlockBased{cb.finalize()};
+        std::vector<BSONElement> vec0;
+        TestPath testPath{{"a"}};
+        ASSERT_EQ(testPath.elementsToMaterialize(BSON("a" << 1)).size(), 1);
 
-    return vec1;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths{{testPath, vec0}};
+        col.decompress<BSONElementMaterializer>(allocator, std::span(testPaths));
+
+        ASSERT_EQ(vec0.size(), values.size());
+        for (size_t i = 0; i < values.size(); ++i) {
+            T got;
+            extractValueTo(got, vec0[i]);
+            assertEquals(values[i], got);
+        }
+    }
+    {
+        // This is similar to the above case but will create enough elements such that the scalar
+        // stream will be broken up into multiple delta control blocks, thus exercising the code
+        // that maintains state across control blocks.
+        const size_t kN = 5000;
+        const size_t nVals = values.size();
+        BSONColumnBuilder cb;
+        for (size_t i = 0; i < kN; ++i) {
+            cb.append(BSON("a" << values[i % nVals]));
+        }
+
+        auto col = BSONColumnBlockBased{cb.finalize()};
+        std::vector<BSONElement> vec0;
+        TestPath testPath{{"a"}};
+        ASSERT_EQ(testPath.elementsToMaterialize(BSON("a" << 1)).size(), 1);
+
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths{{testPath, vec0}};
+        col.decompress<BSONElementMaterializer>(allocator, std::span(testPaths));
+
+        ASSERT_EQ(vec0.size(), kN);
+        for (size_t i = 0; i < kN; ++i) {
+            T got;
+            extractValueTo(got, vec0[i]);
+            assertEquals(values[i % nVals], got);
+        }
+    }
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressArraysWithIntegers) {
     const std::vector<int> integers = {0, 10, 20, 30, 40, 50, 60, 70};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    std::vector<BSONElement> result = decompressArraysAndFullColumns(integers, allocator);
-
-    ASSERT_EQ(result[0].type(), NumberInt);
-    for (size_t i = 0; i < result.size(); ++i) {
-        ASSERT_EQ(result[i].Int(), integers[i]);
-    }
+    verifyDecompressPaths(integers);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithDecimals) {
@@ -533,14 +604,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithDecimals) {
                                               Decimal128(1026.75),
                                               Decimal128(1027.75),
                                               Decimal128(1028.75)};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    const std::vector<BSONElement> result = decompressArraysAndFullColumns(decimals, allocator);
-
-    ASSERT_EQ(result[0].type(), NumberDecimal);
-    for (size_t i = 0; i < result.size(); ++i) {
-        ASSERT_EQ(result[i].Decimal(), decimals[i]);
-    }
+    verifyDecompressPaths(decimals);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithOID) {
@@ -550,14 +614,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithOID) {
                              OID("112233445566778899AABBAB"),
                              OID("112233445566778899AABBAC"),
                              OID("112233445566778899AABBBC")};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    const std::vector<BSONElement> result = decompressArraysAndFullColumns(oids, allocator);
-
-    ASSERT_EQ(result[0].type(), jstOID);
-    for (size_t i = 0; i < result.size(); ++i) {
-        ASSERT_EQ(result[i].OID(), oids[i]);
-    }
+    verifyDecompressPaths(oids);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithStrings) {
@@ -567,14 +624,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithStrings) {
                                     StringData("hello_world3"),
                                     StringData("hello_world4"),
                                     StringData("hello_world5")};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    const std::vector<BSONElement> result = decompressArraysAndFullColumns(strs, allocator);
-
-    ASSERT_EQ(result[0].type(), String);
-    for (size_t i = 0; i < result.size(); ++i) {
-        ASSERT_EQ(result[i].String(), strs[i]);
-    }
+    verifyDecompressPaths(strs);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithDate) {
@@ -584,15 +634,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithDate) {
                                  Date_t::fromMillisSinceEpoch(1702334800773),
                                  Date_t::fromMillisSinceEpoch(1702334800774),
                                  Date_t::fromMillisSinceEpoch(1702334800775)};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    const std::vector<BSONElement> result = decompressArraysAndFullColumns(dates, allocator);
-
-    ASSERT_EQ(result[0].type(), Date);
-
-    for (size_t i = 0; i < result.size(); ++i) {
-        ASSERT_EQ(result[i].Date(), dates[i]);
-    }
+    verifyDecompressPaths(dates);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithTimestamp) {
@@ -603,14 +645,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithTimestamp) {
                                          Timestamp(Date_t::fromMillisSinceEpoch(1702334800773)),
                                          Timestamp(Date_t::fromMillisSinceEpoch(1702334800774)),
                                          Timestamp(Date_t::fromMillisSinceEpoch(1702334800775))};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    const std::vector<BSONElement> result = decompressArraysAndFullColumns(timestamps, allocator);
-
-    ASSERT_EQ(result[0].type(), bsonTimestamp);
-    for (size_t i = 0; i < result.size(); ++i) {
-        ASSERT_EQ(result[i].timestamp(), timestamps[i]);
-    }
+    verifyDecompressPaths(timestamps);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithCode) {
@@ -620,15 +655,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithCode) {
                                    BSONCode(StringData{"x = 3"}),
                                    BSONCode(StringData{"x = 4"}),
                                    BSONCode(StringData{"x = 5"})};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    const std::vector<BSONElement> result = decompressArraysAndFullColumns(codes, allocator);
-
-    for (size_t i = 0; i < result.size(); ++i) {
-        BSONCode res;
-        extractValueTo<BSONCode>(res, result[i]);
-        assertEquals<BSONCode>(res, codes[i]);
-    }
+    verifyDecompressPaths(codes);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithBinData) {
@@ -646,61 +673,28 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithBinData) {
         BSONBinData(binData3, sizeof(binData3), BinDataGeneral),
         BSONBinData(binData4, sizeof(binData4), BinDataGeneral),
         BSONBinData(binData5, sizeof(binData5), BinDataGeneral)};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    const std::vector<BSONElement> result = decompressArraysAndFullColumns(bsonBinDatas, allocator);
-
-    for (size_t i = 0; i < result.size(); ++i) {
-        BSONBinData res;
-        extractValueTo<BSONBinData>(res, result[i]);
-        assertEquals<BSONBinData>(res, bsonBinDatas[i]);
-    }
+    verifyDecompressPaths(bsonBinDatas);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithMaxKey) {
     std::vector<MaxKeyLabeler> maxKeys{MAXKEY, MAXKEY, MAXKEY, MAXKEY, MAXKEY, MAXKEY};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    const std::vector<BSONElement> result = decompressArraysAndFullColumns(maxKeys, allocator);
-
-    for (size_t i = 0; i < result.size(); ++i) {
-        ASSERT_EQ(result[i].type(), MaxKey);
-    }
+    verifyDecompressPaths(maxKeys);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithMinKey) {
     std::vector<MinKeyLabeler> minKeys{MINKEY, MINKEY, MINKEY, MINKEY, MINKEY, MINKEY};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    const std::vector<BSONElement> result = decompressArraysAndFullColumns(minKeys, allocator);
-
-    for (size_t i = 0; i < result.size(); ++i) {
-        ASSERT_EQ(result[i].type(), MinKey);
-    }
+    verifyDecompressPaths(minKeys);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithDoublesSameScale) {
     const std::vector<double> doubles = {1.1, 1.2, 1.3, 1.4, 1.5, 1.6};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    const std::vector<BSONElement> result = decompressArraysAndFullColumns(doubles, allocator);
-
-    ASSERT_EQ(result[0].type(), NumberDouble);
-    for (size_t i = 0; i < result.size(); ++i) {
-        ASSERT_EQ(result[i].Double(), doubles[i]);
-    }
+    verifyDecompressPaths(doubles);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithDoublesDifferentScale) {
-    const std::vector<double> doubles = {1.0, 2.0, 1.1, 3.0, 1.2, 2.0};
-
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    const std::vector<BSONElement> result = decompressArraysAndFullColumns(doubles, allocator);
-
-    ASSERT_EQ(result[0].type(), NumberDouble);
-    for (size_t i = 0; i < result.size(); ++i) {
-        ASSERT_EQ(result[i].Double(), doubles[i]);
-    }
+    // The additional precision for the last element will change the scale.
+    const std::vector<double> doubles = {1.0, 2.0, 1.1, 3.0, 1.2, 2.0123456789};
+    verifyDecompressPaths(doubles);
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingArrays) {
@@ -737,7 +731,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingArrays) {
     }
 }
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingScalar) {
     // Create a BSONColumn where even elements have a "b" field, and odd elements have "c." This
     // will use a single section of interleaved mode, with three scalar fields. "b" and "c" will
@@ -798,9 +791,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingScalar) {
         }
     }
 }
-*/
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingObject) {
     const int nObjs = 10;
     std::vector<BSONObj> objs;
@@ -860,9 +851,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingObject) {
         }
     }
 }
-*/
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingNestedObject) {
     const int nObjs = 10;
     std::vector<BSONObj> objs;
@@ -904,7 +893,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingNestedObject) {
         }
     }
 }
-*/
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithEmptyInReference) {
     const int nObjs = 10;
@@ -938,7 +926,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithEmptyInReference) {
     }
 }
 
-/* TODO:  This test will fail until the setLast changes in SERVER-88302 are in
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingPath) {
     auto col = bsonColumnFromObjs({
         fromjson("{a: {b:  0}}"),
@@ -988,7 +975,6 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingPath) {
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
     }
 }
-*/
 
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingPathWithMinKey) {
     auto col = bsonColumnFromObjs({

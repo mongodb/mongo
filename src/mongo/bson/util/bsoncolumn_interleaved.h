@@ -188,6 +188,15 @@ private:
 
     static bool moreData(DecodingState& ds, const char* control);
 
+    /**
+     * Given the BSON literal stored in the FastDecodingState, dispatch to the appropriate
+     * decompression method to process the succeeding deltas, based on the data type.
+     */
+    template <class Buffer>
+    static void dispatchDecompressionForType(FastDecodingState<Buffer>& state,
+                                             const char* control,
+                                             uint8_t size);
+
     template <typename Buffer>
     const char* decompressFast(
         absl::flat_hash_map<const void*, BufferVector<Buffer*>>&& elemToBuffer);
@@ -373,6 +382,11 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
                 decoderStates.emplace_back();
                 decoderStates.back().loadUncompressed(elem);
                 if (auto it = elemToBuffer.find(elem.value()); it != elemToBuffer.end()) {
+                    for (auto&& b : it->second) {
+                        // Set the "last" element to be whatever is here in the reference object
+                        // without actually appending it.
+                        b->template setLast<BSONElement>(elem);
+                    }
                     posToBuffers.push_back(std::move(it->second));
                 } else {
                     // An empty list to indicate that this element isn't being materialized.
@@ -602,7 +616,13 @@ struct BlockBasedInterleavedDecompressor::FastDecodingState {
 
     // The last uncompressed value for this stream. The delta is applied against this to compute a
     // new uncompressed value.
-    std::variant<int64_t, int128_t> _lastValue;
+    std::variant<std::monostate,              // For types that are not compressed
+                 int64_t,                     // For 64-bit encoded types
+                 int128_t,                    // For 128-bit encoded types
+                 double,                      // For doubles, stored here unencoded
+                 std::pair<int64_t, int64_t>  // Last and last-last for delta-of-delta types
+                 >
+        _lastValue;
 
     // Given the current reference element, set _lastValue.
     void setLastValueFromBSONElem() {
@@ -616,8 +636,54 @@ struct BlockBasedInterleavedDecompressor::FastDecodingState {
             case NumberLong:
                 _lastValue.emplace<int64_t>(_refElem._numberLong());
                 break;
+            case NumberDecimal:
+                _lastValue.emplace<int128_t>(
+                    Simple8bTypeUtil::encodeDecimal128(_refElem._numberDecimal()));
+                break;
+            case NumberDouble:
+                _lastValue.emplace<double>(_refElem._numberDouble());
+                break;
+            case bsonTimestamp:
+                _lastValue.emplace<std::pair<int64_t, int64_t>>(
+                    std::pair{_refElem.timestampValue(), 0});
+                break;
+            case Date:
+                _lastValue.emplace<std::pair<int64_t, int64_t>>(
+                    std::pair{_refElem.date().toMillisSinceEpoch(), 0});
+                break;
+            case jstOID:
+                _lastValue.emplace<std::pair<int64_t, int64_t>>(
+                    std::pair{Simple8bTypeUtil::encodeObjectId(_refElem.__oid()), 0});
+                break;
+            case String:
+                _lastValue.emplace<int128_t>(
+                    Simple8bTypeUtil::encodeString(_refElem.valueStringData()).value_or(0));
+                break;
+            case BinData: {
+                int size;
+                const char* binary = _refElem.binData(size);
+                _lastValue.emplace<int128_t>(
+                    Simple8bTypeUtil::encodeBinary(binary, size).value_or(0));
+            } break;
+            case Code:
+                _lastValue.emplace<int128_t>(
+                    Simple8bTypeUtil::encodeString(_refElem.valueStringData()).value_or(0));
+                break;
+            case Object:
+            case Array:
+            case Undefined:
+            case jstNULL:
+            case RegEx:
+            case DBRef:
+            case CodeWScope:
+            case Symbol:
+            case MinKey:
+            case MaxKey:
+                _lastValue.emplace<std::monostate>(std::monostate{});
+                break;
             default:
-                invariant(false, "unsupported type");
+                uasserted(9999992, "Type not implemented");
+                break;
         }
     }
 
@@ -625,6 +691,230 @@ struct BlockBasedInterleavedDecompressor::FastDecodingState {
         return std::tie(_valueCount, _fieldPos) > std::tie(other._valueCount, other._fieldPos);
     }
 };
+
+/**
+ * Given the BSON literal stored in the FastDecodingState, dispatch to the appropriate decompression
+ * method to process the succeeding deltas, based on the data type.
+ */
+template <class Buffer>
+void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
+    FastDecodingState<Buffer>& state, const char* control, uint8_t size) {
+
+    auto finish64 = [&state](size_t valueCount, int64_t lastValue) {
+        state._valueCount += valueCount;
+        state._lastValue.template emplace<int64_t>(lastValue);
+    };
+    auto finish128 = [&state](size_t valueCount, int128_t lastValue) {
+        state._valueCount += valueCount;
+        state._lastValue.template emplace<int128_t>(lastValue);
+    };
+    auto finishDeltaOfDelta = [&state](
+                                  size_t valueCount, int64_t lastValue, int64_t lastLastValue) {
+        state._valueCount += valueCount;
+        state._lastValue.template emplace<std::pair<int64_t, int64_t>>(lastValue, lastLastValue);
+    };
+    const char* ptr = nullptr;
+    const char* end = control + size + 1;
+    switch (state._refElem.type()) {
+        case Bool:
+            for (auto&& buffer : state._buffers) {
+                ptr = BSONColumnBlockDecompressHelpers::
+                    decompressAllDeltaPrimitive<bool, int64_t, Buffer>(
+                        control,
+                        end,
+                        *buffer,
+                        std::get<int64_t>(state._lastValue),
+                        state._refElem,
+                        [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
+                            buffer.append(static_cast<bool>(v));
+                        },
+                        finish64);
+            }
+            break;
+        case NumberInt:
+            for (auto&& buffer : state._buffers) {
+                ptr = BSONColumnBlockDecompressHelpers::
+                    decompressAllDeltaPrimitive<int32_t, int64_t, Buffer>(
+                        control,
+                        end,
+                        *buffer,
+                        std::get<int64_t>(state._lastValue),
+                        state._refElem,
+                        [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
+                            buffer.append(static_cast<int32_t>(v));
+                        },
+                        finish64);
+            }
+            break;
+        case NumberLong:
+            for (auto&& buffer : state._buffers) {
+                ptr = BSONColumnBlockDecompressHelpers::
+                    decompressAllDeltaPrimitive<int64_t, int64_t, Buffer>(
+                        control,
+                        end,
+                        *buffer,
+                        std::get<int64_t>(state._lastValue),
+                        state._refElem,
+                        [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
+                            buffer.append(v);
+                        },
+                        finish64);
+            }
+            break;
+        case NumberDecimal:
+            for (auto&& buffer : state._buffers) {
+                ptr = BSONColumnBlockDecompressHelpers::
+                    decompressAllDelta<Decimal128, int128_t, Buffer>(
+                        control,
+                        end,
+                        *buffer,
+                        std::get<int128_t>(state._lastValue),
+                        state._refElem,
+                        [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
+                            buffer.append(Simple8bTypeUtil::decodeDecimal128(v));
+                        },
+                        finish128);
+            }
+            break;
+        case NumberDouble:
+            for (auto&& buffer : state._buffers) {
+                ptr = BSONColumnBlockDecompressHelpers::decompressAllDouble<Buffer>(
+                    control,
+                    end,
+                    *buffer,
+                    std::get<double>(state._lastValue),
+                    [&state](size_t valueCount, int64_t lastValue, uint8_t scaleIndex) {
+                        state._valueCount += valueCount;
+                        double v = Simple8bTypeUtil::decodeDouble(lastValue, scaleIndex);
+                        state._lastValue.template emplace<double>(v);
+                    });
+            }
+            break;
+        case bsonTimestamp: {
+            auto [last, lastlast] = std::get<std::pair<int64_t, int64_t>>(state._lastValue);
+            for (auto&& buffer : state._buffers) {
+                ptr =
+                    BSONColumnBlockDecompressHelpers::decompressAllDeltaOfDelta<Timestamp, Buffer>(
+                        control,
+                        end,
+                        *buffer,
+                        last,
+                        lastlast,
+                        state._refElem,
+                        [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
+                            buffer.append(static_cast<Timestamp>(v));
+                        },
+                        finishDeltaOfDelta);
+            }
+        } break;
+        case Date: {
+            auto [last, lastlast] = std::get<std::pair<int64_t, int64_t>>(state._lastValue);
+            for (auto&& buffer : state._buffers) {
+                ptr =
+                    BSONColumnBlockDecompressHelpers::decompressAllDeltaOfDelta<Timestamp, Buffer>(
+                        control,
+                        end,
+                        *buffer,
+                        last,
+                        lastlast,
+                        state._refElem,
+                        [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
+                            buffer.append(Date_t::fromMillisSinceEpoch(v));
+                        },
+                        finishDeltaOfDelta);
+            }
+        } break;
+        case jstOID: {
+            auto [last, lastlast] = std::get<std::pair<int64_t, int64_t>>(state._lastValue);
+            for (auto&& buffer : state._buffers) {
+                ptr = BSONColumnBlockDecompressHelpers::decompressAllDeltaOfDelta<OID, Buffer>(
+                    control,
+                    end,
+                    *buffer,
+                    last,
+                    lastlast,
+                    state._refElem,
+                    [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
+                        buffer.append(
+                            Simple8bTypeUtil::decodeObjectId(v, ref.__oid().getInstanceUnique()));
+                    },
+                    finishDeltaOfDelta);
+            }
+        } break;
+        case String:
+            for (auto&& buffer : state._buffers) {
+                ptr = BSONColumnBlockDecompressHelpers::
+                    decompressAllDelta<StringData, int128_t, Buffer>(
+                        control,
+                        end,
+                        *buffer,
+                        std::get<int128_t>(state._lastValue),
+                        state._refElem,
+                        [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
+                            auto string = Simple8bTypeUtil::decodeString(v);
+                            buffer.append(StringData((const char*)string.str.data(), string.size));
+                        },
+                        finish128);
+            }
+            break;
+        case BinData:
+            for (auto&& buffer : state._buffers) {
+                ptr = BSONColumnBlockDecompressHelpers::
+                    decompressAllDelta<StringData, int128_t, Buffer>(
+                        control,
+                        end,
+                        *buffer,
+                        std::get<int128_t>(state._lastValue),
+                        state._refElem,
+                        [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
+                            char data[16];
+                            size_t size = ref.valuestrsize();
+                            Simple8bTypeUtil::decodeBinary(v, data, size);
+                            buffer.append(BSONBinData(data, size, ref.binDataType()));
+                        },
+                        finish128);
+            }
+            break;
+        case Code:
+            for (auto&& buffer : state._buffers) {
+                ptr = BSONColumnBlockDecompressHelpers::
+                    decompressAllDelta<StringData, int128_t, Buffer>(
+                        control,
+                        end,
+                        *buffer,
+                        std::get<int128_t>(state._lastValue),
+                        state._refElem,
+                        [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
+                            auto string = Simple8bTypeUtil::decodeString(v);
+                            buffer.append(StringData((const char*)string.str.data(), string.size));
+                        },
+                        finish128);
+            }
+            break;
+        case Object:
+        case Array:
+        case Undefined:
+        case jstNULL:
+        case RegEx:
+        case DBRef:
+        case CodeWScope:
+        case Symbol:
+        case MinKey:
+        case MaxKey:
+            for (auto&& buffer : state._buffers) {
+                ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(
+                    control, end, *buffer, [&state](size_t valueCount) {
+                        state._valueCount += valueCount;
+                    });
+            }
+            break;
+        default:
+            uasserted(9999991, "Type not implemented");
+            break;
+    }
+
+    invariant(ptr == end);
+}
 
 /**
  * The fast path for those paths that are only materializing a single scalar field.
@@ -649,9 +939,8 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
      * For streams that are being materialized to a buffer, we materialize uncompressed elements as
      * well as expanded elements produced by simple8b blocks.
      *
-     * For streams that are not being materialized, when we encounter simpl8b blocks, we create a
-     * simple8b iterator and advance it in a tight loop just to count the number of elements in the
-     * stream.
+     * For streams that are not being materialized, when we encounter simple8b blocks, advance past
+     * them, keeping track of the number of elements.
      */
 
     // Initialize a vector of states.
@@ -668,6 +957,11 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
                 heap.emplace_back(scalarIdx, elem);
             }
             heap.back().setLastValueFromBSONElem();
+            for (auto&& b : heap.back()._buffers) {
+                // Set the "last" element to be whatever is here in the reference object without
+                // actually appending it.
+                b->template setLast<BSONElement>(elem);
+            }
             ++scalarIdx;
             return true;
         },
@@ -698,59 +992,7 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
                 state._valueCount += numElemsForControlByte(control);
             } else {
                 // simple8b blocks for a stream that we are materializing.
-                auto finish64 = [&state](size_t valueCount, int64_t lastValue) {
-                    state._valueCount += valueCount;
-                    state._lastValue.template emplace<int64_t>(lastValue);
-                };
-                switch (state._refElem.type()) {
-                    case Bool:
-                        for (auto&& buffer : state._buffers) {
-                            BSONColumnBlockDecompressHelpers::
-                                decompressAllDelta<bool, int64_t, Buffer>(
-                                    control,
-                                    control + size + 1,
-                                    *buffer,
-                                    std::get<int64_t>(state._lastValue),
-                                    state._refElem,
-                                    [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
-                                        buffer.append(static_cast<bool>(v));
-                                    },
-                                    finish64);
-                        }
-                        break;
-                    case NumberInt:
-                        for (auto&& buffer : state._buffers) {
-                            BSONColumnBlockDecompressHelpers::
-                                decompressAllDelta<int32_t, int64_t, Buffer>(
-                                    control,
-                                    control + size + 1,
-                                    *buffer,
-                                    std::get<int64_t>(state._lastValue),
-                                    state._refElem,
-                                    [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
-                                        buffer.append(static_cast<int32_t>(v));
-                                    },
-                                    finish64);
-                        }
-                        break;
-                    case NumberLong:
-                        for (auto&& buffer : state._buffers) {
-                            BSONColumnBlockDecompressHelpers::
-                                decompressAllDelta<int64_t, int64_t, Buffer>(
-                                    control,
-                                    control + size + 1,
-                                    *buffer,
-                                    std::get<int64_t>(state._lastValue),
-                                    state._refElem,
-                                    [](const int64_t v, const BSONElement& ref, Buffer& buffer) {
-                                        buffer.append(v);
-                                    },
-                                    finish64);
-                        }
-                        break;
-                    default:
-                        invariant(false, "unsupported type");
-                }
+                dispatchDecompressionForType(state, control, size);
             }
             control += (1 + size);
         }

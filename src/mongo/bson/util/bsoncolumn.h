@@ -447,6 +447,12 @@ public:
         _collection.push_back(_last);
     }
 
+    // Sets the last value without appending anything.
+    template <typename T>
+    void setLast(const BSONElement& val) {
+        _last = CMaterializer::template materialize<T>(*_allocator, val);
+    }
+
     void appendPositionInfo(int32_t n) {
         // If the 'Container' doesn't request position information, this will be a no-op.
         if constexpr (kCollectsPositionInfo) {

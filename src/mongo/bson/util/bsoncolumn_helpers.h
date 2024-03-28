@@ -475,7 +475,6 @@ concept PositionInfoAppender = requires(T& t, int32_t n) {
  * Encoding - the underlying encoding (int128_t or int64_t) for Simple8b deltas
  * Buffer - the buffer being filled by decompress()
  * Materialize - function to convert delta decoding into T and append to Buffer
- * Decode - the Simple8b decoder to use
  * Finish - after completion, receives the count of elements and the final element
  */
 
@@ -596,18 +595,17 @@ public:
             ptr, end, buffer, last, reference, materialize, [](size_t count, Encoding last) {});
     }
 
-    template <typename T, class Buffer, typename Materialize, typename Decode, typename Finish>
+    template <typename T, class Buffer, typename Materialize, typename Finish>
     requires Appendable<Buffer>
     static const char* decompressAllDeltaOfDelta(const char* ptr,
                                                  const char* end,
                                                  Buffer& buffer,
                                                  int64_t last,
+                                                 int64_t lastlast,
                                                  const BSONElement& reference,
                                                  const Materialize& materialize,
-                                                 const Decode& decode,
                                                  const Finish& finish) {
         // iterate until we stop seeing simple8b block sequences
-        int64_t lastlast = 0;
         uint64_t prev = simple8b::kSingleZero;
         size_t elemCount = 0;
         while (ptr < end) {
@@ -636,22 +634,26 @@ public:
             ptr += 1 + size;
         }
 
-        finish(elemCount, last);
+        finish(elemCount, last, lastlast);
         return ptr;
     }
 
-    template <typename T, class Buffer, typename Materialize, typename Decode>
+    template <typename T, class Buffer, typename Materialize>
     requires Appendable<Buffer>
     static const char* decompressAllDeltaOfDelta(const char* ptr,
                                                  const char* end,
                                                  Buffer& buffer,
                                                  int64_t last,
                                                  const BSONElement& reference,
-                                                 const Materialize& materialize,
-                                                 const Decode& decode) {
-        return decompressAllDeltaOfDelta<T>(
-            ptr, end, buffer, last, reference, materialize, decode, [](size_t count, int64_t last) {
-            });
+                                                 const Materialize& materialize) {
+        return decompressAllDeltaOfDelta<T>(ptr,
+                                            end,
+                                            buffer,
+                                            last,
+                                            0,
+                                            reference,
+                                            materialize,
+                                            [](size_t count, int64_t last, int64_t lastlast) {});
     }
 
     template <class Buffer, typename Finish>
@@ -662,6 +664,7 @@ public:
         int64_t lastValue = 0;
         uint64_t prev = simple8b::kSingleZero;
         size_t elemCount = 0;
+        uint8_t scaleIndex = bsoncolumn::kInvalidScaleIndex;
         while (ptr < end) {
             uint8_t control = *ptr;
             if (control == EOO || isUncompressedLiteralControlByte(control) ||
@@ -669,7 +672,7 @@ public:
                 return ptr;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-            uint8_t scaleIndex = bsoncolumn::scaleIndexForControlByte(control);
+            scaleIndex = bsoncolumn::scaleIndexForControlByte(control);
             uassert(8762802,
                     "Invalid control byte in BSON Column",
                     scaleIndex != bsoncolumn::kInvalidScaleIndex);
@@ -691,7 +694,7 @@ public:
             ptr += 1 + size;
         }
 
-        finish(elemCount, lastValue);
+        finish(elemCount, lastValue, scaleIndex);
         return ptr;
     }
 
@@ -701,7 +704,8 @@ public:
                                            const char* end,
                                            Buffer& buffer,
                                            double last) {
-        return decompressAllDouble(ptr, end, buffer, last, [](size_t count, int64_t last) {});
+        return decompressAllDouble(
+            ptr, end, buffer, last, [](size_t count, int64_t last, uint8_t scaleIndex) {});
     }
 
     template <class Buffer, typename Finish>
@@ -739,14 +743,14 @@ public:
             ptr += 1 + size;
         }
 
-        finish(elemCount, 0);
+        finish(elemCount);
         return ptr;
     }
 
     template <class Buffer>
     requires Appendable<Buffer>
     static const char* decompressAllLiteral(const char* ptr, const char* end, Buffer& buffer) {
-        return decompressAllLiteral(ptr, end, buffer, [](size_t count, int64_t last) {});
+        return decompressAllLiteral(ptr, end, buffer, [](size_t count) {});
     }
 };
 
