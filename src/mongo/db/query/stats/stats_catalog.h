@@ -60,11 +60,11 @@ public:
     static StatsCatalog& get(OperationContext* opCtx);
 
     /**
-     * The constructor provides the Service context under which the cache needs to be instantiated,
-     * and a Thread pool to be used for invoking the blocking 'lookup' calls. The size is the number
-     * of entries the underlying LRU cache will hold.
+     * The constructor provides the Service under which the cache needs to be instantiated, and a
+     * Thread pool to be used for invoking the blocking 'lookup' calls. The size is the number of
+     * entries the underlying LRU cache will hold.
      */
-    StatsCatalog(ServiceContext* service, std::unique_ptr<StatsCacheLoader> cacheLoader);
+    StatsCatalog(Service* service, std::unique_ptr<StatsCacheLoader> cacheLoader);
 
     ~StatsCatalog();
 

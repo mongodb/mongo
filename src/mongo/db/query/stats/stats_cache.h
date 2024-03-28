@@ -64,7 +64,7 @@ public:
      * and a Thread pool to be used for invoking the blocking 'lookup' calls. The size is the number
      * of entries the underlying LRU cache will hold.
      */
-    StatsCache(ServiceContext* service,
+    StatsCache(Service* service,
                std::unique_ptr<StatsCacheLoader> cacheLoader,
                ThreadPoolInterface& threadPool,
                int size);

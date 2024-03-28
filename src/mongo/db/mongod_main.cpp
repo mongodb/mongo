@@ -1149,7 +1149,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     auto cacheLoader = std::make_unique<stats::StatsCacheLoaderImpl>();
-    auto catalog = std::make_unique<stats::StatsCatalog>(serviceContext, std::move(cacheLoader));
+    auto catalog = std::make_unique<stats::StatsCatalog>(
+        serviceContext->getService(ClusterRole::ShardServer), std::move(cacheLoader));
     stats::StatsCatalog::set(serviceContext, std::move(catalog));
 
     // Startup options are written to the audit log at the end of startup so that cluster server

@@ -70,7 +70,10 @@ protected:
         CacheWithThreadPool(ServiceContext* service,
                             std::unique_ptr<StatsCacheLoader> cacheLoaderMock,
                             size_t size)
-            : StatsCache(service, std::move(cacheLoaderMock), _threadPool, size) {
+            : StatsCache(service->getService(ClusterRole::ShardServer),
+                         std::move(cacheLoaderMock),
+                         _threadPool,
+                         size) {
             _threadPool.startup();
         }
 

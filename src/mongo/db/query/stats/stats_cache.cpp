@@ -43,17 +43,14 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::stats {
-namespace {
-const auto statsCacheDecoration = ServiceContext::declareDecoration<std::unique_ptr<StatsCache>>();
-}  // namespace
 
-StatsCache::StatsCache(ServiceContext* service,
+StatsCache::StatsCache(Service* service,
                        std::unique_ptr<StatsCacheLoader> cacheLoader,
                        ThreadPoolInterface& threadPool,
                        int size)
     : ReadThroughCache(
           _mutex,
-          service->getService(),
+          service,
           threadPool,
           [this](OperationContext* opCtx,
                  const StatsPathString& statsPath,

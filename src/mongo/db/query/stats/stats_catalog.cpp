@@ -53,8 +53,7 @@ const auto statsCatalogDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<StatsCatalog>>();
 }  // namespace
 
-StatsCatalog::StatsCatalog(ServiceContext* service,
-                           std::unique_ptr<StatsCacheLoader> statsCacheLoader)
+StatsCatalog::StatsCatalog(Service* service, std::unique_ptr<StatsCacheLoader> statsCacheLoader)
     : _executor(std::make_shared<ThreadPool>([] {
           ThreadPool::Options options;
           options.poolName = "StatsCache";
