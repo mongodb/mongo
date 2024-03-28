@@ -727,6 +727,11 @@ protected:
 
     std::vector<std::string> _saslMechsForAuth;
 
+    // Unless explicitly opted out, a DBClientBase should throw on a StaleConfig error so that the
+    // error can be handled internally if applicable rather than propagated to the external client
+    // right away.
+    bool _shouldThrowOnStaleConfigError = true;
+
 private:
     virtual Message _call(Message& toSend, std::string* actualServer) = 0;
 
@@ -738,11 +743,6 @@ private:
                                       int options);
 
     auth::RunCommandHook _makeAuthRunCommandHook();
-
-    // Unless explicitly opted out, a DBClientBase should throw on a StaleConfig error so that the
-    // error can be handled internally if applicable rather than propagated to the external client
-    // right away.
-    bool _shouldThrowOnStaleConfigError = true;
 
     rpc::RequestMetadataWriter _metadataWriter;
     rpc::ReplyMetadataReader _metadataReader;

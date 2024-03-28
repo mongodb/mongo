@@ -292,6 +292,7 @@ DBClientConnection* DBClientReplicaSet::checkPrimary() {
 
     resetPrimary();
 
+    newConn->setShouldThrowOnStaleConfigError(_shouldThrowOnStaleConfigError);
     _primaryHost = h;
     _primary.reset(newConn);
     _primary->setParentReplSetName(_setName);
@@ -681,6 +682,7 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
             str::stream() << "Failed to connect to " << _lastSecondaryOkHost.toString(),
             newConn != nullptr);
 
+    newConn->setShouldThrowOnStaleConfigError(_shouldThrowOnStaleConfigError);
     _lastSecondaryOkConn = std::shared_ptr<DBClientConnection>(newConn, std::move(dtor));
     _lastSecondaryOkConn->setParentReplSetName(_setName);
     _lastSecondaryOkConn->setRequestMetadataWriter(getRequestMetadataWriter());

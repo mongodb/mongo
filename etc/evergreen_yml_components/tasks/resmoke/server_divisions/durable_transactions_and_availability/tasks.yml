@@ -223,6 +223,14 @@ tasks:
         use_large_distro: "true"
 
 - <<: *gen_task_template
+  name: concurrency_replication_bulk_write_with_replica_set_endpoint_gen
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "bulk_write", "sharding", "feature_flag_guarded"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: concurrency_sharded_replication_bulk_write_gen
   tags: ["assigned_to_jira_team_server_repl", "default", "bulk_write"]
   commands:
@@ -270,6 +278,14 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
+  name: concurrency_replication_causal_consistency_with_replica_set_endpoint_gen
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "sharding", "large", "non_live_record", "feature_flag_guarded"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: concurrency_replication_gen
   tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "concurrency", "common", "repl"]
   commands:
@@ -278,8 +294,24 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
+  name: concurrency_replication_with_replica_set_endpoint_gen
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "common", "sharding", "feature_flag_guarded"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: concurrency_replication_multi_stmt_txn_gen
   tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "concurrency", "common", "repl", "txn", "no_debug_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
+  name: concurrency_replication_multi_stmt_txn_with_replica_set_endpoint_gen
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "common", "sharding", "txn", "no_debug_mode", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1082,8 +1114,24 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
+  name: concurrency_replication_metrics_with_replica_set_endpoint_gen
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "concurrency", "sharding", "disabled_on_code_coverage", "feature_flag_guarded"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: concurrency_replication_wiredtiger_cursor_sweeps_gen
   tags: ["assigned_to_jira_team_server_execution", "default", "concurrency", "repl", "cursor_sweeps"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
+  name: concurrency_replication_wiredtiger_cursor_sweeps_with_replica_set_endpoint_gen
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "concurrency", "sharding", "cursor_sweeps", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:

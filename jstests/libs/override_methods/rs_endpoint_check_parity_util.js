@@ -60,7 +60,7 @@ export function runCommandCompareResponsesBase(
     } catch (err) {
         err0 = err;
     }
-    // TODO (SERVER-87846): Add concurrency_replication suites with replica set endpoint enabled.
+    // TODO (SERVER-86834): Add response comparison to replica set endpoint jstestfuzz suites.
     // let resObj1, err1;
     // try {
     //     resObj1 = func.apply(conn1, makeFuncArgs(commandObj));

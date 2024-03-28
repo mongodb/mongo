@@ -16,6 +16,18 @@ export const $config = (function() {
         }
     }
 
+    function getErrorCode(err) {
+        if (err.code) {
+            return err.code;
+        }
+        if (TestData.testingReplicaSetEndpoint && err.hasOwnProperty("writeErrors")) {
+            // The replica set endpoint uses embedded router, which can return transaction error
+            // as a write error.
+            return err.writeErrors[0].code;
+        }
+        return null;
+    }
+
     function autoRetryTxn(data, func) {
         // joinAndRetry is true either if there is a TransientTransactionError or if
         // startTransaction fails with ConflictingOperationInProgress. The latter occurs when we
@@ -30,9 +42,22 @@ export const $config = (function() {
 
                 func();
             } catch (e) {
-                if (e.code === ErrorCodes.TransactionTooOld ||
-                    e.code === ErrorCodes.NoSuchTransaction ||
-                    e.code === ErrorCodes.TransactionCommitted) {
+                const errorCode = getErrorCode(e);
+                const txnCompletedErrorCodes = [
+                    ErrorCodes.TransactionTooOld,
+                    ErrorCodes.NoSuchTransaction,
+                    ErrorCodes.TransactionCommitted
+                ];
+                if (TestData.testingReplicaSetEndpoint) {
+                    // The replica set endpoint uses embedded router, which yields sessions before
+                    // sending requests to shards. This allows for interleaving such that a
+                    // participant shard can end up claiming to be read-only for a transaction after
+                    // previously claiming to have done a write in that transaction. This causes the
+                    // transaction to be implicitly aborted.
+                    txnCompletedErrorCodes.push(51113);
+                }
+
+                if (txnCompletedErrorCodes.includes(errorCode)) {
                     // We pass `ignoreActiveTxn = true` to startTransaction so that we will not
                     // throw `Transaction already in progress on this session` when trying to start
                     // a new transaction on this client session that already has an active
@@ -48,7 +73,7 @@ export const $config = (function() {
 
                 if ((e.hasOwnProperty('errorLabels') &&
                      e.errorLabels.includes('TransientTransactionError')) ||
-                    e.code === ErrorCodes.ConflictingOperationInProgress) {
+                    errorCode === ErrorCodes.ConflictingOperationInProgress) {
                     joinAndRetry = true;
                     continue;
                 }

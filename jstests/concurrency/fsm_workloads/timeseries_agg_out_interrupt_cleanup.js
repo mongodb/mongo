@@ -45,7 +45,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // The aggregate command could be running different commands internally (renameCollection,
         // insertDocument, etc.) depending on which stage of execution it is in. So, get all the
         // operations that are running against the input, output or temp collections.
-        $super.data.killOpsMatchingFilter(db, {
+        const filter = {
             op: "command",
             active: true,
             $or: [
@@ -58,10 +58,26 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 $exists: false
             }  // Exclude 'drop' command from the filter to make sure that we don't kill the the
             // drop command which is responsible for dropping the temporary collection.
-        });
+        };
+        if (TestData.testingReplicaSetEndpoint) {
+            // The sharding DDL operations do not have opid.
+            filter["$and"] = [
+                {desc: {$ne: "CreateCollectionCoordinator"}},
+                {desc: {$ne: "DropCollectionCoordinator"}},
+                {desc: {$ne: "DropParticipantInstance"}},
+                {desc: {$ne: "RenameCollectionCoordinator"}},
+                {desc: {$ne: "RenameParticipantInstance"}},
+            ];
+        }
+        $super.data.killOpsMatchingFilter(db, filter);
     };
 
     $config.teardown = function teardown(db) {
+        if (TestData.testingReplicaSetEndpoint) {
+            // TODO (SERVER-88154): Interrupting $out on sharded cluster can leave tmp collections.
+            return;
+        }
+
         const collNames = db.getCollectionNames();
         // Ensure that a temporary collection is not left behind.
         assert.eq(collNames.filter(coll => coll.includes('system.buckets.tmp.agg_out')).length, 0);

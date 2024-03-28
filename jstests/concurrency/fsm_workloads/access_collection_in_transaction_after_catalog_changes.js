@@ -23,6 +23,19 @@ export const $config = (function() {
             const startColl = session.getDatabase(db.getName())[startCollName];
             const ddlColl = session.getDatabase(ddlDBName)[ddlCollName];
 
+            const expectedTxnErrorCodes = [
+                ErrorCodes.LockTimeout,
+                ErrorCodes.WriteConflict,
+                ErrorCodes.SnapshotUnavailable,
+                ErrorCodes.OperationNotSupportedInTransaction,
+            ];
+            if (TestData.testingReplicaSetEndpoint) {
+                expectedTxnErrorCodes.push(ErrorCodes.StaleConfig);
+                expectedTxnErrorCodes.push(ErrorCodes.StaleDbVersion);
+                // This error is thrown when there is a placement change during the transaction.
+                expectedTxnErrorCodes.push(ErrorCodes.MigrationConflict);
+            }
+
             // Start the transaction and run an operation on 'startColl'.
             session.startTransaction();
 
@@ -35,14 +48,7 @@ export const $config = (function() {
                 op(ddlColl);
                 success = true;
             } catch (e) {
-                assert.contains(e.code,
-                                [
-                                    ErrorCodes.LockTimeout,
-                                    ErrorCodes.WriteConflict,
-                                    ErrorCodes.SnapshotUnavailable,
-                                    ErrorCodes.OperationNotSupportedInTransaction
-                                ],
-                                () => tojson(e));
+                assert.contains(e.code, expectedTxnErrorCodes, () => tojson(e));
             }
 
             // Commit or abort the transaction.

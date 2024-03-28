@@ -44,7 +44,7 @@ export const $config = (function() {
             assert.commandWorked(res);
             assert(res.queryPlanner, tojson(res));
             assert(res.queryPlanner.winningPlan, tojson(res));
-            if (isMongod(db)) {
+            if (isMongod(db) && !TestData.testingReplicaSetEndpoint) {
                 assert.eq(getWinningPlan(res.queryPlanner).stage, 'EOF', tojson(res));
             } else {
                 // In the sharding case, each shard has a winningPlan

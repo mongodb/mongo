@@ -172,7 +172,7 @@ struct ReadPreferenceSetting {
      * Will not add the $readPreference element if the read preference is PrimaryOnly.
      */
     void toContainingBSON(BSONObjBuilder* builder) const {
-        if (!canRunOnSecondary())
+        if (!canRunOnSecondary() && !isPretargeted)
             return;  // Write nothing since default is fine.
         BSONObjBuilder inner(builder->subobjStart("$readPreference"));
         toInnerBSON(&inner);

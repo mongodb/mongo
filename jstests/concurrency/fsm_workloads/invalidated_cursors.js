@@ -48,20 +48,23 @@ export const $config = (function() {
                 assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending);
             }
 
+            const errorCodesTxn = [
+                ErrorCodes.DatabaseDropPending,
+                ErrorCodes.IndexBuildAborted,
+                ErrorCodes.IndexBuildAlreadyInProgress,
+                ErrorCodes.NoMatchingDocument,
+            ];
+            const errorCodesNonTxn = [
+                ErrorCodes.DatabaseDropPending,
+                ErrorCodes.IndexBuildAborted,
+                ErrorCodes.NoMatchingDocument,
+            ];
+            if (TestData.testingReplicaSetEndpoint) {
+                errorCodesNonTxn.push(ErrorCodes.NamespaceNotFound);
+            }
             this.indexSpecs.forEach(indexSpec => {
                 let res = db[collName].createIndex(indexSpec);
-                assertWorkedOrFailedHandleTxnErrors(res,
-                                                    [
-                                                        ErrorCodes.DatabaseDropPending,
-                                                        ErrorCodes.IndexBuildAborted,
-                                                        ErrorCodes.IndexBuildAlreadyInProgress,
-                                                        ErrorCodes.NoMatchingDocument,
-                                                    ],
-                                                    [
-                                                        ErrorCodes.DatabaseDropPending,
-                                                        ErrorCodes.IndexBuildAborted,
-                                                        ErrorCodes.NoMatchingDocument,
-                                                    ]);
+                assertWorkedOrFailedHandleTxnErrors(res, errorCodesTxn, errorCodesNonTxn);
             });
         },
 
@@ -250,11 +253,16 @@ export const $config = (function() {
             myDB[targetColl].dropIndex(indexSpec);
 
             // Re-create the index that was dropped.
-            assert.commandWorkedOrFailedWithCode(myDB[targetColl].createIndex(indexSpec), [
+            const expectedErrorCodes = [
                 ErrorCodes.DatabaseDropPending,
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
-            ]);
+            ];
+            if (TestData.testingReplicaSetEndpoint) {
+                expectedErrorCodes.push(ErrorCodes.NamespaceNotFound);
+            }
+            assert.commandWorkedOrFailedWithCode(myDB[targetColl].createIndex(indexSpec),
+                                                 expectedErrorCodes);
         }
     };
 

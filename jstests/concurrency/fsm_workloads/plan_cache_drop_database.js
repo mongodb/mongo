@@ -21,16 +21,16 @@ export const $config = (function() {
             // Create two indexes to force plan caching: The {a: 1} index is
             // cached by the query planner because we query on a single value
             // of 'a' and a range of 'b' values.
-            assert.commandWorkedOrFailedWithCode(coll.createIndex({a: 1}), [
+            const expectedErrorCodes = [
                 ErrorCodes.DatabaseDropPending,
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
-            ]);
-            assert.commandWorkedOrFailedWithCode(coll.createIndex({b: 1}), [
-                ErrorCodes.DatabaseDropPending,
-                ErrorCodes.IndexBuildAborted,
-                ErrorCodes.NoMatchingDocument,
-            ]);
+            ];
+            if (TestData.testingReplicaSetEndpoint) {
+                expectedErrorCodes.push(ErrorCodes.NamespaceNotFound);
+            }
+            assert.commandWorkedOrFailedWithCode(coll.createIndex({a: 1}), expectedErrorCodes);
+            assert.commandWorkedOrFailedWithCode(coll.createIndex({b: 1}), expectedErrorCodes);
         } catch (ex) {
             assert.eq(true, ex instanceof BulkWriteError, tojson(ex));
             assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending, tojson(ex));
