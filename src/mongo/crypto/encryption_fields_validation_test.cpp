@@ -121,8 +121,6 @@ Status validateRangeIndexTest(int trimFactor,
 }
 
 TEST(FLEValidationUtils, ValidateTrimFactorRange) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQERangeV2", true);
-
     // 2^1 == 2 values in domain, we can't trim
     ASSERT_OK(validateRangeIndexTest(0, BSONType::NumberInt, Value(0), Value(1)));
     ASSERT_NOT_OK(validateRangeIndexTest(1, BSONType::NumberInt, Value(0), Value(1)));

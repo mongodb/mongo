@@ -1690,7 +1690,6 @@ TEST(FLE_EDC, Disallowed_Types_FLE2InsertUpdatePayload) {
 }
 
 TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQERangeV2", true);
     TestKeyVault keyVault;
 
     auto doc = BSON("sample" << 123456);
@@ -1973,7 +1972,6 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_IsValidZerosBlob) {
 
 
 TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQERangeV2", true);
     TestKeyVault keyVault;
 
     auto doc = BSON("sample" << 3);
@@ -2162,7 +2160,6 @@ TEST(FLE_EDC, DuplicateSafeContent_IncompatibleType) {
 }
 
 TEST(FLE_ECOC, EncryptedTokensRoundTrip) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQERangeV2", true);
     std::vector<uint8_t> value(4);
 
     auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
