@@ -117,6 +117,57 @@ function testBasicSortCase(shard0Conn, shard1Conn) {
 runTestOnPrimaries(testBasicSortCase);
 runTestOnSecondaries(testBasicSortCase);
 
+// Tests that $vectorSearch propagates all fields to shards.
+function testVectorSearchPassesAllFields(shard0Conn, shard1Conn) {
+    const responseOk = 1;
+
+    const mongot0ResponseBatch = [
+        {_id: 3, $vectorSearchScore: 0.99},
+        {_id: 2, $vectorSearchScore: 0.10},
+        {_id: 4, $vectorSearchScore: 0.01},
+        {_id: 1, $vectorSearchScore: 0.0099},
+    ];
+    let localExpectedCommand = expectedMongotCommand;
+    localExpectedCommand["extraField"] = true;
+    const history0 = [{
+        expectedCommand: localExpectedCommand,
+        response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
+    }];
+
+    const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
+    s0Mongot.setMockResponses(history0, cursorId);
+
+    const mongot1ResponseBatch = [
+        {_id: 11, $vectorSearchScore: 1.0},
+        {_id: 13, $vectorSearchScore: 0.30},
+        {_id: 12, $vectorSearchScore: 0.29},
+        {_id: 14, $vectorSearchScore: 0.28},
+    ];
+    const history1 = [{
+        expectedCommand: localExpectedCommand,
+        response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
+    }];
+    const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
+    s1Mongot.setMockResponses(history1, cursorId);
+
+    const expectedDocs = [
+        {_id: 11, x: "brown", y: "ipsum"},
+        {_id: 3, x: "brown", y: "ipsum"},
+        {_id: 13, x: "brown", y: "ipsum"},
+        {_id: 12, x: "cow", y: "lorem ipsum"},
+        {_id: 14, x: "cow", y: "lorem ipsum"},
+        {_id: 2, x: "now", y: "lorem"},
+        {_id: 4, x: "cow", y: "lorem ipsum"},
+        {_id: 1, x: "ow"},
+    ];
+
+    let localVectorSearchQuery = vectorSearchQuery;
+    localVectorSearchQuery["extraField"] = true;
+    const localPipeline = [{$vectorSearch: localVectorSearchQuery}, {$project: {x: 1, y: 1}}];
+    assert.eq(testColl.aggregate(pipeline).toArray(), expectedDocs);
+}
+runTestOnPrimaries(testVectorSearchPassesAllFields);
+runTestOnSecondaries(testVectorSearchPassesAllFields);
 // Tests the case where there's an error from one mongot, which should get propagated to
 // mongod, then to mongos.
 function testErrorCase(shard0Conn, shard1Conn) {

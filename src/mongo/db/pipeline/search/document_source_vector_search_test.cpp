@@ -34,7 +34,6 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/query/search/mongot_options.h"
-#include "mongo/db/query/vector_search/filter_validator.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 
@@ -67,6 +66,7 @@ TEST_F(DocumentSourceVectorSearchTest, NotAllowedInTransaction) {
 }
 
 TEST_F(DocumentSourceVectorSearchTest, NotAllowedInvalidFilter) {
+    // The only invalid filter is invalid MQL.
     auto spec = fromjson(R"({
         $vectorSearch: {
             queryVector: [1.0, 2.0],
@@ -75,7 +75,7 @@ TEST_F(DocumentSourceVectorSearchTest, NotAllowedInvalidFilter) {
             limit: 10,
             filter: {
                 x: {
-                    "$exists": false
+                    "$gibberish": false
                 }
             }
         }
@@ -83,7 +83,81 @@ TEST_F(DocumentSourceVectorSearchTest, NotAllowedInvalidFilter) {
 
     ASSERT_THROWS_CODE(DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       7828300);
+                       ErrorCodes::BadValue);
+}
+
+TEST_F(DocumentSourceVectorSearchTest, NotAllowedLimitIncorrectType) {
+    // Limit argument must be correct type
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            path: "x",
+            numCandidates: 5,
+            limit: "str"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       8575100);
+}
+
+TEST_F(DocumentSourceVectorSearchTest, UnexpectedOrMissingArgumentsAllowed) {
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            numCandidates: 100,
+            path: "x",
+            filter: {
+                x: {
+                    "$gt": 5
+                }
+            }
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx()));
+
+    spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            numCandidates: 100,
+            path: "x",
+            limit: 10,
+            extra: "Here!",
+            filter: {
+                x: {
+                    "$gt": 5
+                }
+            }
+        }
+    })");
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
+TEST_F(DocumentSourceVectorSearchTest, UnexpectedArgumentIsSerialized) {
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            numCandidates: 100,
+            path: "x",
+            limit: 10,
+            extra: "Here!",
+            filter: {
+                x: {
+                    "$gt": 5
+                }
+            }
+        }
+    })");
+    auto dsVectorSearch =
+        DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx());
+    std::vector<Value> vec;
+    dsVectorSearch.front()->serializeToArray(vec);
+    ASSERT(
+        !vec[0].getDocument().getField("$vectorSearch").getDocument().getField("extra").missing());
 }
 
 TEST_F(DocumentSourceVectorSearchTest, EOFWhenCollDoesNotExist) {
@@ -160,99 +234,9 @@ TEST_F(DocumentSourceVectorSearchTest, RedactsCorrectly) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "$vectorSearch": {
-                "queryVector": "?array<?number>",
-                "path": "?string",
-                "index": "HASH<x_index>",
-                "limit": "?number",
-                "numCandidates": "?number",
-                "filter": {
-                    "HASH<x>": {
-                        "$gt": "?number"
-                    }
-                }
-            }
+            "$vectorSearch":"?object"
         })",
         redact(*(vectorStage.front())));
-}
-
-TEST_F(DocumentSourceVectorSearchTest, OptionalArgumentsAreNotSpecified) {
-    auto spec = fromjson(R"({
-        $vectorSearch: {
-            queryVector: [1.0, 2.0],
-            path: "x",
-            limit: 10
-        }
-    })");
-
-    auto vectorStage = DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx());
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$vectorSearch": {
-                "queryVector": "?array<?number>",
-                "path": "?string",
-                "limit": "?number"
-            }
-        })",
-        redact(*(vectorStage.front())));
-}
-
-/**
- * Helper function that parses the $vectorSearch aggregation stage from the input, serializes it
- * to its representative shape, re-parses the representative shape, and compares to the original.
- */
-void assertRepresentativeShapeIsStable(auto expCtx,
-                                       BSONObj inputStage,
-                                       BSONObj expectedRepresentativeStage) {
-    auto parsedStage =
-        *DocumentSourceVectorSearch::createFromBson(inputStage.firstElement(), expCtx).begin();
-    std::vector<Value> serialization;
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    parsedStage->serializeToArray(serialization, opts);
-
-    auto serializedStage = serialization[0].getDocument().toBson();
-    ASSERT_BSONOBJ_EQ(serializedStage, expectedRepresentativeStage);
-
-    auto roundTripped =
-        *DocumentSourceVectorSearch::createFromBson(serializedStage.firstElement(), expCtx).begin();
-
-    std::vector<Value> newSerialization;
-    roundTripped->serializeToArray(newSerialization, opts);
-    ASSERT_EQ(newSerialization.size(), 1UL);
-    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
-}
-
-TEST_F(DocumentSourceVectorSearchTest, RoundTripSerialization) {
-    assertRepresentativeShapeIsStable(getExpCtx(),
-                                      fromjson(R"({
-        $vectorSearch: {
-            queryVector: [1.0, 2.0],
-            path: "x",
-            numCandidates: 100,
-            limit: 10,
-            index: "x_index",
-            filter: {
-                x: {
-                    "$gt": 0
-                }
-            }
-        }
-    })"),
-                                      fromjson(R"({
-            "$vectorSearch": {
-                "queryVector": [1],
-                "path": "?",
-                "index": "x_index",
-                "limit": 1,
-                "numCandidates": 1,
-                "filter": {
-                    "x": {
-                        "$gt": 1
-                    }
-                }
-            }
-        })"));
 }
 
 }  // namespace

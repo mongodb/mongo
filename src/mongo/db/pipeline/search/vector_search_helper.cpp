@@ -33,7 +33,7 @@
 namespace mongo {
 namespace {
 executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const VectorSearchSpec& request) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& request) {
     BSONObjBuilder cmdBob;
     cmdBob.append(mongot_cursor::kVectorSearchCmd, expCtx->ns.coll());
     uassert(7828001,
@@ -42,36 +42,23 @@ executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
                 << expCtx->ns.toStringForErrorMsg(),
             expCtx->uuid);
     expCtx->uuid.value().appendToBuilder(&cmdBob, mongot_cursor::kCollectionUuidField);
-
-    cmdBob.append(VectorSearchSpec::kQueryVectorFieldName, request.getQueryVector());
-    cmdBob.append(VectorSearchSpec::kPathFieldName, request.getPath());
-    cmdBob.append(VectorSearchSpec::kLimitFieldName, request.getLimit().coerceToLong());
-
-    if (request.getIndex()) {
-        cmdBob.append(VectorSearchSpec::kIndexFieldName, *request.getIndex());
-    }
-
-    if (request.getNumCandidates()) {
-        cmdBob.append(VectorSearchSpec::kNumCandidatesFieldName,
-                      request.getNumCandidates()->coerceToLong());
-    }
-
-    if (request.getFilter()) {
-        cmdBob.append(VectorSearchSpec::kFilterFieldName, *request.getFilter());
-    }
     if (expCtx->explain) {
         cmdBob.append("explain",
                       BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->explain)));
     }
 
-    return mongot_cursor::getRemoteCommandRequest(expCtx->opCtx, expCtx->ns, cmdBob.obj());
+    auto commandObj = cmdBob.obj();
+
+    // Copy over all fields from the original object for passthrough.
+    return mongot_cursor::getRemoteCommandRequest(
+        expCtx->opCtx, expCtx->ns, commandObj.addFields(request));
 }
 }  // namespace
 
 namespace search_helpers {
 executor::TaskExecutorCursor establishVectorSearchCursor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const VectorSearchSpec& request,
+    const BSONObj& request,
     std::shared_ptr<executor::TaskExecutor> taskExecutor) {
     // Note that we always pre-fetch the next batch here. This is because we generally expect
     // everything to fit into one batch, since we give mongot the exact upper bound initially - we
@@ -88,7 +75,7 @@ executor::TaskExecutorCursor establishVectorSearchCursor(
 }
 
 BSONObj getVectorSearchExplainResponse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       const VectorSearchSpec& spec,
+                                       const BSONObj& spec,
                                        executor::TaskExecutor* taskExecutor) {
     auto request = getRemoteCommandRequestForVectorSearchQuery(expCtx, spec);
     return mongot_cursor::getExplainResponse(expCtx.get(), request, taskExecutor);

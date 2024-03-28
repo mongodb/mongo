@@ -20,7 +20,6 @@ env.SConscript(
         'query_shape',
         'search',
         'stats',
-        'vector_search',
     ],
     exports=[
         'env',
