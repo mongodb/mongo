@@ -53,6 +53,7 @@ server_parameters:
             Cluster parameter for the number of shards in a sharded cluster. Used to allow or
             disallow direct writes to the cluster.
         set_at: cluster
+        omit_in_ftdc: false
         cpp_vartype: ShardedClusterCardinalityParam
         cpp_varname: shardedClusterCardinalityForDirectConns
         redact: false

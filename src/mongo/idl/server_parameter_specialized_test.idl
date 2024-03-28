@@ -135,3 +135,4 @@ server_parameters:
             override_validate: true
             data: SpecializedClusterServerParameterData
         redact: false
+        omit_in_ftdc: false

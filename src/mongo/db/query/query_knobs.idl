@@ -1393,6 +1393,7 @@ server_parameters:
   internalQueryCutoffForSampleFromRandomCursor:
     description: "The maximum sample ratio for random cursor."
     set_at: cluster
+    omit_in_ftdc: false
     cpp_varname: "internalQueryCutoffForSampleFromRandomCursor"
     cpp_vartype: InternalQueryCutoffForSampleFromRandomCursorStorage
     redact: false

@@ -61,6 +61,7 @@ private:
     std::pair<std::vector<std::string>, std::vector<BSONObj>> retrieveRequestedParameters(
         OperationContext* opCtx,
         const CmdBody& cmdBody,
+        bool shouldOmitInFTDC,
         const boost::optional<TenantId>& tenantId,
         bool excludeClusterParameterTime);
 };

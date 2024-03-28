@@ -54,6 +54,7 @@ server_parameters:
   changeStreams:
     description: "The cluster-wide configuration parameter for the change stream in the serverless."
     set_at: cluster
+    omit_in_ftdc: false
     cpp_vartype: ChangeStreamsClusterParameterStorage
     cpp_varname: gChangeStreamsClusterParameter
     validator:

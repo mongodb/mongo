@@ -58,6 +58,7 @@ std::pair<std::vector<std::string>, std::vector<BSONObj>>
 GetClusterParameterInvocation::retrieveRequestedParameters(
     OperationContext* opCtx,
     const CmdBody& cmdBody,
+    bool shouldOmitInFTDC,
     const boost::optional<TenantId>& tenantId,
     bool excludeClusterParameterTime) {
     ServerParameterSet* clusterParameters = ServerParameterSet::getClusterParameterSet();
@@ -73,6 +74,12 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
                     str::stream() << "Server parameter: '" << requestedParameter->name()
                                   << "' is disabled",
                     skipOnError);
+            return;
+        }
+
+        // If the command is invoked with shouldOmitInFTDC, then any parameter that has that
+        // flag set should be omitted.
+        if (shouldOmitInFTDC && requestedParameter->isOmittedInFTDC()) {
             return;
         }
 
@@ -133,13 +140,14 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
 GetClusterParameterInvocation::Reply GetClusterParameterInvocation::getCachedParameters(
     OperationContext* opCtx, const GetClusterParameter& request) {
     const CmdBody& cmdBody = request.getCommandParameter();
+    bool shouldOmitInFTDC = request.getOmitInFTDC();
 
     auto* repl = repl::ReplicationCoordinator::get(opCtx);
     bool isStandalone = repl && !repl->getSettings().isReplSet() &&
         serverGlobalParams.clusterRole.has(ClusterRole::None);
 
-    auto [parameterNames, parameterValues] =
-        retrieveRequestedParameters(opCtx, cmdBody, request.getDbName().tenantId(), isStandalone);
+    auto [parameterNames, parameterValues] = retrieveRequestedParameters(
+        opCtx, cmdBody, shouldOmitInFTDC, request.getDbName().tenantId(), isStandalone);
 
     LOGV2_DEBUG(6226100,
                 2,

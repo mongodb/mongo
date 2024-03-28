@@ -960,6 +960,7 @@ def _parse_server_parameter(ctxt, spec, name, node):
             "deprecated_name": _RuleDesc('scalar_or_sequence'),
             "validator": _RuleDesc('mapping', mapping_parser_func=_parse_validator),
             "on_update": _RuleDesc("scalar"),
+            "omit_in_ftdc": _RuleDesc('bool_scalar'),
             "cpp_class": _RuleDesc('scalar_or_mapping', mapping_parser_func=map_class),
         })
 

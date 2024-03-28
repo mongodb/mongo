@@ -73,6 +73,7 @@ server_parameters:
             override_set: # bool
             override_validate: # bool
         redact: # bool
+        omit_in_ftdc: # bool - required for cluster parameters, prohibited for all others
         test_only: # bool
         default: # string or expression map
         deprecated_name: # string or list of strings
@@ -121,6 +122,13 @@ must be unique across the server instance. More information on the specific fiel
 -   `default`: String or expression map representation of the initial value.
 
 -   `redact`: Set to `true` to replace values of this setting with placeholders (e.g., for passwords).
+    This is a required field and must be explicitly set to `false` to disable redaction.
+
+-   `omit_in_ftdc`: Only applies to cluster parameters. If set to `true`, then the cluster parameter
+    will be omitted when `getClusterParameter` is invoked with `omitInFTDC: true`.
+    In practice, FTDC runs `getClusterParameter` with this option periodically to
+    collect configuration metadata about the server and setting this flag to true
+    for a cluster parameter ensures that its value(s) will not be exposed in FTDC.
 
 -   `test_only`: Set to `true` to disable this set parameter if `enableTestCommands` is not specified.
 
@@ -314,7 +322,10 @@ server parameter values every `clusterServerParameterRefreshIntervalSecs` using 
 
 `getClusterParameter` returns the cached value of the requested cluster server parameter on the node
 that it is run on. It can accept a single cluster server parameter name, a list of names, or `*` to
-return all cluster server parameter values on the node.
+return all cluster server parameter values on the node. `getClusterParameter` also exposes a single
+option - `omitInFTDC` - which can be set to true to omit all requested cluster parameters that have
+been tagged with the `omit_in_ftdc: true` flag. This option is only intended to be used internally
+by FTDC when it invokes this command for periodic metadata collection.
 
 Specifying `cpp_vartype` for cluster server parameters must result in the usage of an IDL-defined
 type that has `ClusterServerParameter` listed as a chained structure. This chaining adds the

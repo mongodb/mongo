@@ -429,6 +429,7 @@ class ServerParameter(common.SourceLocation):
         self.cpp_varname = None  # type: str
         self.condition = None  # type: Condition
         self.redact = False  # type: bool
+        self.omit_in_ftdc = False  # type: bool
         self.test_only = False  # type: bool
         self.deprecated_name = []  # type: List[str]
         self.default = None  # type: Expression

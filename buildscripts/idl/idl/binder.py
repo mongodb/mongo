@@ -1531,6 +1531,17 @@ def _bind_server_parameter(ctxt, param):
     ast_param.test_only = param.test_only
     ast_param.deprecated_name = param.deprecated_name
 
+    # The omit_in_ftdc flag can only be enabled for cluster parameters.
+    if param.omit_in_ftdc is not None and param.set_at != ['cluster']:
+        ctxt.add_server_parameter_invalid_attr(param, 'omit_in_ftdc=True', ''.join(param.set_at))
+        return None
+
+    # If omit_in_ftdc is None (it has not been set) for a cluster parameter, then emit an error.
+    if param.omit_in_ftdc is None and param.set_at == ['cluster']:
+        ctxt.add_server_parameter_required_attr(param, 'omit_in_ftdc', 'cluster')
+
+    ast_param.omit_in_ftdc = param.omit_in_ftdc
+
     ast_param.set_at = _bind_server_parameter_set_at(ctxt, param)
     if ast_param.set_at is None:
         return None

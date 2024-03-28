@@ -56,6 +56,12 @@ commands:
         api_version: ""
         namespace: type
         type:
-            variant: [string, array<string>] 
+            variant: [string, array<string>]
+        fields:
+            omitInFTDC:
+                description: >- 
+                    Indicates that getClusterParameter should omit any CSPs with omitInFTDC=true
+                type: bool
+                default: false 
         reply_type: GetClusterParameterReply
         strict: false 

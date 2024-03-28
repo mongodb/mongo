@@ -236,6 +236,14 @@ public:
         _redact = true;
     }
 
+    bool isOmittedInFTDC() {
+        return _isOmittedInFTDC;
+    }
+
+    void setOmitInFTDC() {
+        _isOmittedInFTDC = true;
+    }
+
 private:
     enum DisableState { Enabled = 0, TemporarilyDisabled = 1, PermanentlyDisabled = 2 };
 
@@ -292,6 +300,7 @@ private:
     ServerParameterType _type;
     bool _testOnly = false;
     bool _redact = false;
+    bool _isOmittedInFTDC = false;
 
     // Tracks whether a parameter is enabled, temporarily disabled, or permanently disabled. This is
     // used when disabling (permanently) test-only parameters, and when enabling/disabling

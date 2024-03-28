@@ -101,6 +101,7 @@ server_parameters:
         cpp_varname: intStorage
         test_only: true
         redact: false
+        omit_in_ftdc: false
 
     testStrClusterParameter:
         set_at: cluster
@@ -109,12 +110,14 @@ server_parameters:
         cpp_varname: strStorage
         test_only: true
         redact: false
+        omit_in_ftdc: false
 
     testBoolClusterParameter:
         set_at: cluster
         description: "Test cluster parameter that is only usable if enableTestCommands=true"
         cpp_vartype: TestBoolClusterParameterStorage
         cpp_varname: boolStorage
+        omit_in_ftdc: true
         test_only: true
         redact: false
 
@@ -127,3 +130,4 @@ server_parameters:
         condition:
             feature_flag: gFeatureFlagClusterWideToaster
         redact: false
+        omit_in_ftdc: false

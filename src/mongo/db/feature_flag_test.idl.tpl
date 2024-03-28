@@ -100,6 +100,7 @@ server_parameters:
     cwspTestNeedsLatestFCV:
       description: "Cluster server parameter gated on latest FCV"
       set_at: cluster
+      omit_in_ftdc: false
       cpp_varname: gCWSPTestLatestFCV
       cpp_vartype: CWSPIntStorage
       test_only: true
@@ -121,6 +122,7 @@ server_parameters:
     cwspTestNeedsFeatureFlagBlender:
       description: "Cluster server Parameter gated on featureFlagBlender"
       set_at: cluster
+      omit_in_ftdc: false
       cpp_varname: gCWSPTestFeatureFlagBlender
       cpp_vartype: CWSPIntStorage
       test_only: true

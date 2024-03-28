@@ -62,6 +62,8 @@ export const kTestOnlyClusterParameters = {
     },
 };
 
+export const kOmittedInFTDCClusterParameterNames = ['testBoolClusterParameter'];
+
 export const kAllClusterParameters =
     Object.assign({}, kNonTestOnlyClusterParameters, kTestOnlyClusterParameters);
 
@@ -181,8 +183,12 @@ export function runSetClusterParameter(conn, update, tenantId) {
 
 // Runs getClusterParameter on a specific mongod or mongos node and returns true/false depending
 // on whether the expected values were returned.
-export function runGetClusterParameterNode(
-    conn, getClusterParameterArgs, expectedClusterParameters, tenantId) {
+export function runGetClusterParameterNode(conn,
+                                           getClusterParameterArgs,
+                                           allExpectedClusterParameters,
+                                           tenantId = undefined,
+                                           omitInFTDC = false,
+                                           omittedInFTDCClusterParameters = []) {
     const tenantToken =
         tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
     const adminDB = conn.getDB('admin');
@@ -196,11 +202,22 @@ export function runGetClusterParameterNode(
         return true;
     }
 
-    const actualClusterParameters =
-        assert
-            .commandWorked(runCommandWithSecurityToken(
-                tenantToken, adminDB, {getClusterParameter: getClusterParameterArgs}))
-            .clusterParameters;
+    // Update getClusterParameter command and expectedClusterParameters based on whether
+    // omitInFTDC has been set.
+    let getClusterParameterCmd = {getClusterParameter: getClusterParameterArgs};
+    let expectedClusterParameters = allExpectedClusterParameters.slice();
+    if (omitInFTDC) {
+        getClusterParameterCmd['omitInFTDC'] = true;
+        expectedClusterParameters =
+            allExpectedClusterParameters.filter(expectedClusterParameter => {
+                return !omittedInFTDCClusterParameters.find(
+                    (testOnlyParameter) => testOnlyParameter == expectedClusterParameter._id);
+            });
+    }
+    const actualClusterParameters = assert
+                                        .commandWorked(runCommandWithSecurityToken(
+                                            tenantToken, adminDB, getClusterParameterCmd))
+                                        .clusterParameters;
 
     // Reindex actual based on name, and remove irrelevant field.
     let actual = {};
@@ -228,23 +245,52 @@ export function runGetClusterParameterNode(
         }
     }
 
+    // Finally, if omitInFTDC is true, assert that all redacted cluster parameters are not
+    // in the reply.
+    if (omitInFTDC) {
+        for (let i = 0; i < omittedInFTDCClusterParameters.length; i++) {
+            if (!considerParameter(omittedInFTDCClusterParameters[i], conn)) {
+                continue;
+            }
+
+            if (actual[omittedInFTDCClusterParameters[i]] !== undefined) {
+                jsTest.log('getClusterParameter returned parameter ' +
+                           omittedInFTDCClusterParameters[i] +
+                           ', Actual reply: ' + tojson(actual[omittedInFTDCClusterParameters[i]]));
+                return false;
+            }
+        }
+    }
+
     return true;
 }
 
 // Runs getClusterParameter on each replica set node and asserts that the response matches the
 // expected parameter objects on at least a majority of nodes.
-export function runGetClusterParameterReplicaSet(
-    rst, getClusterParameterArgs, expectedClusterParameters, tenantId) {
+export function runGetClusterParameterReplicaSet(rst,
+                                                 getClusterParameterArgs,
+                                                 expectedClusterParameters,
+                                                 tenantId = undefined,
+                                                 omitInFTDC = false,
+                                                 omittedInFTDCClusterParameters = []) {
     let numMatches = 0;
     const numTotalNodes = rst.getSecondaries().length + 1;
-    if (runGetClusterParameterNode(
-            rst.getPrimary(), getClusterParameterArgs, expectedClusterParameters, tenantId)) {
+    if (runGetClusterParameterNode(rst.getPrimary(),
+                                   getClusterParameterArgs,
+                                   expectedClusterParameters,
+                                   tenantId,
+                                   omitInFTDC,
+                                   omittedInFTDCClusterParameters)) {
         numMatches++;
     }
 
     rst.getSecondaries().forEach(function(secondary) {
-        if (runGetClusterParameterNode(
-                secondary, getClusterParameterArgs, expectedClusterParameters, tenantId)) {
+        if (runGetClusterParameterNode(secondary,
+                                       getClusterParameterArgs,
+                                       expectedClusterParameters,
+                                       tenantId,
+                                       omitInFTDC,
+                                       omittedInFTDCClusterParameters)) {
             numMatches++;
         }
     });
@@ -254,23 +300,54 @@ export function runGetClusterParameterReplicaSet(
 
 // Runs getClusterParameter on mongos, each mongod in each shard replica set, and each mongod in
 // the config server replica set.
-export function runGetClusterParameterSharded(
-    st, getClusterParameterArgs, expectedClusterParameters, tenantId) {
-    assert(runGetClusterParameterNode(
-        st.s0, getClusterParameterArgs, expectedClusterParameters, tenantId));
+export function runGetClusterParameterSharded(st,
+                                              getClusterParameterArgs,
+                                              expectedClusterParameters,
+                                              tenantId = undefined,
+                                              omitInFTDC = false,
+                                              omittedInFTDCClusterParameters = []) {
+    assert(runGetClusterParameterNode(st.s0,
+                                      getClusterParameterArgs,
+                                      expectedClusterParameters,
+                                      tenantId,
+                                      omitInFTDC,
+                                      omittedInFTDCClusterParameters));
 
-    runGetClusterParameterReplicaSet(
-        st.configRS, getClusterParameterArgs, expectedClusterParameters, tenantId);
+    runGetClusterParameterReplicaSet(st.configRS,
+                                     getClusterParameterArgs,
+                                     expectedClusterParameters,
+                                     tenantId,
+                                     omitInFTDC,
+                                     omittedInFTDCClusterParameters);
     const shards = [st.rs0, st.rs1, st.rs2];
     shards.forEach(function(shard) {
-        runGetClusterParameterReplicaSet(
-            shard, getClusterParameterArgs, expectedClusterParameters, tenantId);
+        runGetClusterParameterReplicaSet(shard,
+                                         getClusterParameterArgs,
+                                         expectedClusterParameters,
+                                         tenantId,
+                                         omitInFTDC,
+                                         omittedInFTDCClusterParameters);
     });
 }
 
 // Tests valid usages of set/getClusterParameter and verifies that the expected values are returned.
 export function testValidClusterParameterCommands(conn) {
     if (conn instanceof ReplSetTest) {
+        // Run getClusterParameter in list format and '*' with omitInFTDC = true and ensure that
+        // it does not return any parameters that should be omitted for FTDC.
+        runGetClusterParameterReplicaSet(conn,
+                                         kAllClusterParameterNames,
+                                         kAllClusterParameterDefaults,
+                                         undefined,
+                                         true /* omitInFTDC */,
+                                         kOmittedInFTDCClusterParameterNames);
+        runGetClusterParameterReplicaSet(conn,
+                                         '*',
+                                         kAllClusterParameterDefaults,
+                                         undefined,
+                                         true /* omitInFTDC */,
+                                         kOmittedInFTDCClusterParameterNames);
+
         // Run getClusterParameter in list format and '*' and ensure it returns all default values
         // on all nodes in the replica set.
         runGetClusterParameterReplicaSet(
@@ -365,6 +442,21 @@ export function testValidServerlessClusterParameterCommands(conn) {
     runGetClusterParameterReplicaSet(
         conn, kAllClusterParameterNames, kAllClusterParameterDefaults, tenantId1);
     runGetClusterParameterReplicaSet(conn, '*', kAllClusterParameterDefaults, tenantId1);
+
+    // Run getClusterParameter in list format and '*' and ensure that it filters out parameters
+    // that should be omitted in FTDC when omitInFTDC is set for a specific tenant.
+    runGetClusterParameterReplicaSet(conn,
+                                     kAllClusterParameterNames,
+                                     kAllClusterParameterDefaults,
+                                     tenantId1,
+                                     true /* omitInFTDC */,
+                                     kOmittedInFTDCClusterParameterNames);
+    runGetClusterParameterReplicaSet(conn,
+                                     '*',
+                                     kAllClusterParameterDefaults,
+                                     tenantId1,
+                                     true /* omitInFTDC */,
+                                     kOmittedInFTDCClusterParameterNames);
 
     // For each parameter, run setClusterParameter and verify that getClusterParameter
     // returns the updated value on all nodes in the replica set for the tenant it was set on.

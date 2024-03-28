@@ -2039,15 +2039,27 @@ class TestBinder(testcase.IDLTestcase):
         # server parameter with storage.
         # Also try valid set_at values.
         for set_at in ["startup", "runtime", "[ startup, runtime ]", "cluster"]:
-            self.assert_bind(
-                textwrap.dedent("""
-            server_parameters:
-                foo:
-                    set_at: %s
-                    description: bar
-                    redact: false
-                    cpp_varname: baz
-                """ % (set_at)))
+            if set_at != 'cluster':
+                self.assert_bind(
+                    textwrap.dedent("""
+                server_parameters:
+                    foo:
+                        set_at: %s
+                        description: bar
+                        redact: false
+                        cpp_varname: baz
+                    """ % (set_at)))
+            else:
+                self.assert_bind(
+                    textwrap.dedent("""
+                server_parameters:
+                    foo:
+                        set_at: %s
+                        description: bar
+                        redact: false
+                        cpp_varname: baz
+                        omit_in_ftdc: false
+                    """ % (set_at)))
 
         # server parameter with storage and optional fields.
         self.assert_bind(
@@ -2079,6 +2091,7 @@ class TestBinder(testcase.IDLTestcase):
                 cpp_varname: baz
                 cpp_vartype: bazStorage
                 on_update: buzz
+                omit_in_ftdc: false
                 validator:
                     gt: 0
                     gte: 1
@@ -2170,6 +2183,7 @@ class TestBinder(testcase.IDLTestcase):
                     override_validate: true
                 condition: { expr: "true" }
                 redact: true
+                omit_in_ftdc: true
                 test_only: true
                 deprecated_name: bling
         """))
@@ -2212,6 +2226,73 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_class: baz
                     cpp_varname: bling
             """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+
+        # Startup with omit_in_ftdc=true.
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            server_parameters:
+                foo:
+                    set_at: startup
+                    description: bar
+                    cpp_varname: baz
+                    redact: false
+                    omit_in_ftdc: true
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+
+        # Startup with omit_in_ftdc=false.
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            server_parameters:
+                foo:
+                    set_at: startup
+                    description: bar
+                    cpp_varname: baz
+                    redact: false
+                    omit_in_ftdc: false
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+
+        # Runtime with omit_in_ftdc=true.
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            server_parameters:
+                foo:
+                    set_at: runtime
+                    description: bar
+                    cpp_varname: baz
+                    redact: false
+                    omit_in_ftdc: true
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+
+        # Runtime with omit_in_ftdc=false.
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            server_parameters:
+                foo:
+                    set_at: runtime
+                    description: bar
+                    cpp_varname: baz
+                    redact: false
+                    omit_in_ftdc: false
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+
+        # Cluster with omit_in_ftdc unspecified.
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            server_parameters:
+                foo:
+                    set_at: cluster
+                    description: bar
+                    redact: false
+                    cpp_varname: baz
+                    cpp_vartype: bazStorage
+                    on_update: buzz
+                    validator:
+                        gt: 0
+                        gte: 1
+                        lte: 999
+                        lt: 1000
+                        callback: qux
+                """), idl.errors.ERROR_ID_SERVER_PARAMETER_REQUIRED_ATTR)
 
     def test_config_option_positive(self):
         # type: () -> None

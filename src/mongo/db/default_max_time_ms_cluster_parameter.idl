@@ -54,6 +54,7 @@ server_parameters:
                   will not time out. If a query specifies an explicit 'maxTimeMS' value, it will
                   overrides this global default."
     set_at: cluster
+    omit_in_ftdc: false
     cpp_vartype: DefaultMaxTimeMSParam
     cpp_varname: defaultMaxTimeMS
     condition:

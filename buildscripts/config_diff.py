@@ -237,6 +237,7 @@ class TestBuildBasePropertiesForComparisonHandler(unittest.TestCase):
               changeStreamOptions:
                 description: "Cluster server parameter for change stream options"
                 set_at: cluster
+                omit_in_ftdc: false
                 cpp_class:
                   name: ChangeStreamOptionsParameter
                   override_set: true
@@ -296,6 +297,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
               testOptions:
                 description: "Cluster server parameter for change stream options"
                 set_at: cluster
+                omit_in_ftdc: false
                 cpp_class:
                   name: ChangeStreamOptionsParameter
                   override_set: true
@@ -355,6 +357,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
               testOptions:
                 description: "Cluster server parameter for change stream options"
                 set_at: cluster
+                omit_in_ftdc: false
                 cpp_class:
                   name: ChangeStreamOptionsParameter
                   override_set: true
@@ -439,6 +442,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
               testOptions:
                 description: "Cluster server parameter for change stream options"
                 set_at: cluster
+                omit_in_ftdc: false
                 cpp_class:
                   name: ChangeStreamOptionsParameter
                   override_set: true
@@ -447,6 +451,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
               testParameter:
                 description: "Some parameter"
                 set_at: cluster
+                omit_in_ftdc: false
                 cpp_class:
                   name: ChangeStreamOptionsParameter
                   override_set: true
@@ -496,6 +501,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
               testOptions:
                 description: "Cluster server parameter for change stream options"
                 set_at: cluster
+                omit_in_ftdc: false
                 cpp_class:
                   name: ChangeStreamOptionsParameter
                   override_set: true
@@ -504,6 +510,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
               testParameter:
                 description: "Some parameter"
                 set_at: cluster
+                omit_in_ftdc: false
                 cpp_class:
                   name: ChangeStreamOptionsParameter
                   override_set: true
@@ -565,6 +572,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
               testOptions:
                 description: "Cluster server parameter for change stream options"
                 set_at: cluster
+                omit_in_ftdc: false
                 cpp_class:
                   name: ChangeStreamOptionsParameter
                   override_set: true
@@ -573,6 +581,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
               testParameter:
                 description: "Some parameter"
                 set_at: cluster
+                omit_in_ftdc: false
                 cpp_class:
                   name: ChangeStreamOptionsParameter
                   override_set: true
@@ -607,6 +616,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
               testParameter:
                 description: "Some parameter"
                 set_at: cluster
+                omit_in_ftdc: false
                 cpp_class:
                   name: ChangeStreamOptionsParameter
                   override_set: true

@@ -868,6 +868,7 @@ class ServerParameter(common.SourceLocation):
         self.condition = None  # type: Condition
         self.deprecated_name = []  # type: List[str]
         self.redact = None  # type: bool
+        self.omit_in_ftdc = None  # type: bool
         self.test_only = False  # type: bool
         self.default = None  # type: Expression
 

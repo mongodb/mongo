@@ -58,6 +58,7 @@ server_parameters:
         cpp_vartype: ClusterServerParameterTest
         cpp_varname: cspTestStorage
         redact: false
+        omit_in_ftdc: false
 
     cspTest2:
         set_at: cluster
@@ -65,3 +66,4 @@ server_parameters:
         cpp_vartype: ClusterServerParameterTest
         cpp_varname: cspTest2Storage
         redact: false
+        omit_in_ftdc: false

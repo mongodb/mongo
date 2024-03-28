@@ -107,3 +107,4 @@ server_parameters:
       callback: "validateNonNegativeExpireAfterSeconds"
     on_update: "onUpdateChangeStreamOptions"
     redact: false
+    omit_in_ftdc: false
