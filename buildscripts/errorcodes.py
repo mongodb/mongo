@@ -324,7 +324,6 @@ def main():
 
     if options.ticket:
         next_code_gen = get_next_code(seen, coerce_to_number(options.ticket))
-        print("next: %s" % next(next_code_gen))
     else:
         next_code_gen = get_next_code(seen, 0)
 
