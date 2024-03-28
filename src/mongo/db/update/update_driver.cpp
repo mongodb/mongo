@@ -155,7 +155,8 @@ void UpdateDriver::parse(
                 "multi update is not supported for replacement-style update",
                 !multi);
 
-        _updateExecutor = std::make_unique<ObjectReplaceExecutor>(updateMod.getUpdateReplacement());
+        _updateExecutor = std::make_unique<ObjectReplaceExecutor>(updateMod.getUpdateReplacement(),
+                                                                  _fromOplogApplication);
 
         // Register the fact that this driver will only do full object replacements.
         _updateType = UpdateType::kReplacement;
