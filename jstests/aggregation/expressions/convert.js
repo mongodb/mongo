@@ -1,19 +1,19 @@
 /**
  * Tests behavior of $convert aggregation operator.
  */
+
+import {runConvertTests} from "jstests/libs/convert_shared.js";
+
 const coll = db.expression_convert;
-function populateCollection(documentList) {
-    coll.drop();
-    var bulk = coll.initializeOrderedBulkOp();
-    documentList.forEach(doc => bulk.insert(doc));
-    assert.commandWorked(bulk.execute());
-}
+coll.drop();
+
+const requiresFCV80 = false;
 
 //
 // One test document for each possible conversion. Edge cases for these conversions are tested
 // in expression_convert_test.cpp.
 //
-var conversionTestDocs = [
+const conversionTestDocs = [
     {_id: 0, input: 1.9, target: "double", expected: 1.9},
     {_id: 1, input: 1.9, target: "string", expected: "1.9"},
     {_id: 2, input: 1.9, target: "bool", expected: true},
@@ -134,75 +134,18 @@ var conversionTestDocs = [
     {_id: 58, input: new Timestamp(1 / 1000, 1), target: "bool", expected: true},
     {_id: 59, input: MinKey, target: "bool", expected: true},
 
-    {_id: 60, input: Timestamp(1, 1), target: "date", expected: ISODate("1970-01-01T00:00:01.000Z")}
-];
-populateCollection(conversionTestDocs);
-
-// Test $convert on each document.
-var pipeline = [
     {
-        $project: {
-            output: {$convert: {to: "$target", input: "$input"}},
-            target: "$target",
-            expected: "$expected"
-        }
+        _id: 60,
+        input: Timestamp(1, 1),
+        target: "date",
+        expected: ISODate("1970-01-01T00:00:01.000Z")
     },
-    {$addFields: {outputType: {$type: "$output"}}},
-    {$sort: {_id: 1}}
 ];
-var aggResult = coll.aggregate(pipeline).toArray();
-assert.eq(aggResult.length, conversionTestDocs.length);
-
-aggResult.forEach(doc => {
-    assert.eq(doc.output, doc.expected, "Unexpected conversion: _id = " + doc._id);
-    assert.eq(doc.outputType, doc.target, "Conversion to incorrect type: _id = " + doc._id);
-});
-
-// Test each conversion using the shorthand $toBool, $toString, etc. syntax.
-pipeline = [
-    {
-        $project: {
-            output: {
-                $switch: {
-                    branches: [
-                        {case: {$eq: ["$target", "double"]}, then: {$toDouble: "$input"}},
-                        {case: {$eq: ["$target", "string"]}, then: {$toString: "$input"}},
-                        {case: {$eq: ["$target", "objectId"]}, then: {$toObjectId: "$input"}},
-                        {case: {$eq: ["$target", "bool"]}, then: {$toBool: "$input"}},
-                        {case: {$eq: ["$target", "date"]}, then: {$toDate: "$input"}},
-                        {case: {$eq: ["$target", "int"]}, then: {$toInt: "$input"}},
-                        {case: {$eq: ["$target", "long"]}, then: {$toLong: "$input"}},
-                        {case: {$eq: ["$target", "decimal"]}, then: {$toDecimal: "$input"}}
-                    ]
-                }
-            },
-            target: "$target",
-            expected: "$expected"
-        }
-    },
-    {$addFields: {outputType: {$type: "$output"}}},
-    {$sort: {_id: 1}}
-];
-aggResult = coll.aggregate(pipeline).toArray();
-assert.eq(aggResult.length, conversionTestDocs.length);
-
-aggResult.forEach(doc => {
-    assert.eq(doc.output, doc.expected, "Unexpected conversion: _id = " + doc._id);
-    assert.eq(doc.outputType, doc.target, "Conversion to incorrect type: _id = " + doc._id);
-});
-
-// Test a $convert expression with "onError" to make sure that error handling still allows an
-// error in the "input" expression to propagate.
-assert.throws(function() {
-    coll.aggregate([
-        {$project: {output: {$convert: {to: "string", input: {$divide: [1, 0]}, onError: "ERROR"}}}}
-    ]);
-}, [], "Pipeline should have failed");
 
 //
 // Unsupported conversions.
 //
-var illegalConversionTestDocs = [
+const illegalConversionTestDocs = [
     {_id: 0, input: 1.9, target: "objectId"},
 
     {_id: 1, input: ObjectId("0123456789abcdef01234567"), target: "double"},
@@ -238,74 +181,11 @@ var illegalConversionTestDocs = [
     {_id: 25, input: 1.9, target: "timestamp"},
     {_id: 26, input: 1.9, target: "maxKey"},
 ];
-populateCollection(illegalConversionTestDocs);
-
-// Test each document to ensure that the conversion throws an error.
-illegalConversionTestDocs.forEach(doc => {
-    pipeline = [
-        {$match: {_id: doc._id}},
-        {$project: {output: {$convert: {to: "$target", input: "$input"}}}}
-    ];
-
-    assert.throws(function() {
-        coll.aggregate(pipeline);
-    }, [], "Conversion should have failed: _id = " + doc._id);
-});
-
-// Test that each illegal conversion uses the 'onError' value.
-pipeline = [
-    {$project: {output: {$convert: {to: "$target", input: "$input", onError: "ERROR"}}}},
-    {$sort: {_id: 1}}
-];
-aggResult = coll.aggregate(pipeline).toArray();
-assert.eq(aggResult.length, illegalConversionTestDocs.length);
-
-aggResult.forEach(doc => {
-    assert.eq(doc.output, "ERROR", "Unexpected result: _id = " + doc._id);
-});
-
-// Test that, when onError is missing, the missing value propagates to the result.
-pipeline = [
-    {
-        $project:
-            {_id: false, output: {$convert: {to: "$target", input: "$input", onError: "$$REMOVE"}}}
-    },
-    {$sort: {_id: 1}}
-];
-aggResult = coll.aggregate(pipeline).toArray();
-assert.eq(aggResult.length, illegalConversionTestDocs.length);
-
-aggResult.forEach(doc => {
-    assert.eq(doc, {});
-});
 
 //
 // One test document for each "nullish" value.
 //
-var nullTestDocs =
+const nullTestDocs =
     [{_id: 0, input: null}, {_id: 1, input: undefined}, {_id: 2, /* input is missing */}];
-populateCollection(nullTestDocs);
 
-// Test that all nullish inputs result in the 'onNull' output.
-pipeline = [
-    {$project: {output: {$convert: {to: "int", input: "$input", onNull: "NULL"}}}},
-    {$sort: {_id: 1}}
-];
-aggResult = coll.aggregate(pipeline).toArray();
-assert.eq(aggResult.length, nullTestDocs.length);
-
-aggResult.forEach(doc => {
-    assert.eq(doc.output, "NULL", "Unexpected result: _id = " + doc._id);
-});
-
-// Test that all nullish inputs result in the 'onNull' output _even_ if 'to' is nullish.
-pipeline = [
-    {$project: {output: {$convert: {to: null, input: "$input", onNull: "NULL"}}}},
-    {$sort: {_id: 1}}
-];
-aggResult = coll.aggregate(pipeline).toArray();
-assert.eq(aggResult.length, nullTestDocs.length);
-
-aggResult.forEach(doc => {
-    assert.eq(doc.output, "NULL", "Unexpected result: _id = " + doc._id);
-});
+runConvertTests({coll, requiresFCV80, conversionTestDocs, illegalConversionTestDocs, nullTestDocs});

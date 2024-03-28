@@ -93,6 +93,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"
@@ -100,6 +101,7 @@
 #include "mongo/util/pcre_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/text.h"
 
 
 namespace mongo {
@@ -6419,7 +6421,27 @@ namespace {
  */
 class ConversionTable {
 public:
-    using ConversionFunc = std::function<Value(ExpressionContext* const, Value)>;
+    // Some conversion functions require extra arguments like format and subtype. However,
+    // ConversionTable is expected to return a regular 'ConversionFunc'. Functions with extra
+    // arguments are curried in 'makeConversionFunc' to accept just two arguments,
+    // the expression context and an input value. The extra arguments are expected to be movable.
+    template <typename... ExtraArgs>
+    using ConversionFuncWithExtraArgs =
+        std::function<Value(ExpressionContext* const, Value, ExtraArgs...)>;
+
+    using FormatArg = BinDataFormat;
+    using SubtypeArg = Value;
+
+    using ConversionFunc = ConversionFuncWithExtraArgs<>;
+    using ConversionFuncWithFormat = ConversionFuncWithExtraArgs<FormatArg>;
+    using ConversionFuncWithSubtype = ConversionFuncWithExtraArgs<SubtypeArg>;
+    using ConversionFuncWithFormatAndSubtype = ConversionFuncWithExtraArgs<FormatArg, SubtypeArg>;
+
+    using AnyConversionFunc = std::variant<std::monostate,
+                                           ConversionFunc,
+                                           ConversionFuncWithFormat,
+                                           ConversionFuncWithSubtype,
+                                           ConversionFuncWithFormatAndSubtype>;
 
     ConversionTable() {
         //
@@ -6454,6 +6476,13 @@ public:
         table[BSONType::String][BSONType::NumberInt] = &parseStringToNumber<int, 10>;
         table[BSONType::String][BSONType::NumberLong] = &parseStringToNumber<long long, 10>;
         table[BSONType::String][BSONType::NumberDecimal] = &parseStringToNumber<Decimal128, 0>;
+        table[BSONType::String][BSONType::BinData] = &parseStringToBinData;
+
+        //
+        // Conversions from BinData
+        //
+        table[BSONType::BinData][BSONType::BinData] = &performConvertBinDataToBinData;
+        table[BSONType::BinData][BSONType::String] = &performConvertBinDataToString;
 
         //
         // Conversions from jstOID
@@ -6615,8 +6644,11 @@ public:
         table[BSONType::bsonTimestamp][BSONType::Bool] = &performConvertToTrue;
     }
 
-    ConversionFunc findConversionFunc(BSONType inputType, BSONType targetType) const {
-        ConversionFunc foundFunction;
+    ConversionFunc findConversionFunc(BSONType inputType,
+                                      BSONType targetType,
+                                      boost::optional<FormatArg> format,
+                                      SubtypeArg subtype) const {
+        AnyConversionFunc foundFunction;
 
         // Note: We can't use BSONType::MinKey (-1) or BSONType::MaxKey (127) as table indexes,
         // so we have to treat them as special cases.
@@ -6634,15 +6666,61 @@ public:
             // illegal.
         }
 
-        uassert(ErrorCodes::ConversionFailure,
-                str::stream() << "Unsupported conversion from " << typeName(inputType) << " to "
-                              << typeName(targetType) << " in $convert with no onError value",
-                foundFunction);
-        return foundFunction;
+        return makeConversionFunc(
+            foundFunction, inputType, targetType, std::move(format), std::move(subtype));
     }
 
 private:
-    ConversionFunc table[JSTypeMax + 1][JSTypeMax + 1];
+    AnyConversionFunc table[JSTypeMax + 1][JSTypeMax + 1];
+
+    ConversionFunc makeConversionFunc(AnyConversionFunc foundFunction,
+                                      BSONType inputType,
+                                      BSONType targetType,
+                                      boost::optional<FormatArg> format,
+                                      SubtypeArg subtype) const {
+        const auto checkFormat = [&] {
+            uassert(4341115,
+                    str::stream() << "Format must be speficied when converting from '"
+                                  << typeName(inputType) << "' to '" << typeName(targetType) << "'",
+                    format);
+        };
+
+        const auto checkSubtype = [&] {
+            // Subtype has a default value so we should never hit this.
+            tassert(4341103,
+                    str::stream() << "Can't convert to " << typeName(targetType)
+                                  << " without knowing subtype",
+                    !subtype.missing());
+        };
+
+        return visit(OverloadedVisitor{
+                         [](ConversionFunc conversionFunc) {
+                             tassert(4341109, "Conversion function can't be null", conversionFunc);
+                             return conversionFunc;
+                         },
+                         [&](ConversionFuncWithFormat conversionFunc) {
+                             checkFormat();
+                             return makeConvertWithExtraArgs(conversionFunc, std::move(*format));
+                         },
+                         [&](ConversionFuncWithSubtype conversionFunc) {
+                             checkSubtype();
+                             return makeConvertWithExtraArgs(conversionFunc, std::move(subtype));
+                         },
+                         [&](ConversionFuncWithFormatAndSubtype conversionFunc) {
+                             checkFormat();
+                             checkSubtype();
+                             return makeConvertWithExtraArgs(
+                                 conversionFunc, std::move(*format), std::move(subtype));
+                         },
+                         [&](std::monostate) -> ConversionFunc {
+                             uasserted(ErrorCodes::ConversionFailure,
+                                       str::stream()
+                                           << "Unsupported conversion from " << typeName(inputType)
+                                           << " to " << typeName(targetType)
+                                           << " in $convert with no onError value");
+                         }},
+                     foundFunction);
+    }
 
     static void validateDoubleValueIsFinite(double inputDouble) {
         uassert(ErrorCodes::ConversionFailure,
@@ -6821,6 +6899,62 @@ private:
         }
     }
 
+    template <typename Func, typename... ExtraArgs>
+    static ConversionFunc makeConvertWithExtraArgs(Func&& func, ExtraArgs&&... extraArgs) {
+        tassert(4341110, "Conversion function can't be null", func);
+
+        return [=](ExpressionContext* const expCtx, Value inputValue) {
+            return func(expCtx, inputValue, std::move(extraArgs)...);
+        };
+    }
+
+    static Value parseStringToBinData(ExpressionContext* const expCtx,
+                                      Value inputValue,
+                                      FormatArg format,
+                                      SubtypeArg subtypeValue) {
+        auto input = inputValue.getStringData();
+        auto binDataType = computeBinDataType(subtypeValue);
+
+        try {
+            uassert(4341116,
+                    "Only the 'uuid' format is allowed with the UUID subtype",
+                    (format == BinDataFormat::kUuid) == (binDataType == BinDataType::newUUID));
+
+            switch (format) {
+                case BinDataFormat::kBase64: {
+                    auto decoded = base64::decode(input);
+                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
+                }
+                case BinDataFormat::kBase64Url: {
+                    auto decoded = base64url::decode(input);
+                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
+                }
+                case BinDataFormat::kHex: {
+                    auto decoded = hexblob::decode(input);
+                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
+                }
+                case BinDataFormat::kUtf8: {
+                    uassert(
+                        4341119, str::stream() << "Invalid UTF-8: " << input, isValidUTF8(input));
+
+                    auto decoded = input.toString();
+                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
+                }
+                case BinDataFormat::kUuid: {
+                    auto uuid = uassertStatusOK(UUID::parse(input));
+                    return Value(uuid);
+                }
+                default:
+                    uasserted(4341117,
+                              str::stream() << "Invalid format '" << toStringData(format) << "'");
+            }
+        } catch (const DBException& ex) {
+            uasserted(ErrorCodes::ConversionFailure,
+                      str::stream() << "Failed to parse BinData '" << inputValue.getString()
+                                    << "' in $convert with no onError value: " << ex.reason());
+        }
+    }
+
     static Value performConvertToTrue(ExpressionContext* const expCtx, Value inputValue) {
         return Value(true);
     }
@@ -6828,9 +6962,106 @@ private:
     static Value performIdentityConversion(ExpressionContext* const expCtx, Value inputValue) {
         return inputValue;
     }
+
+    static Value performConvertBinDataToString(ExpressionContext* const expCtx,
+                                               Value inputValue,
+                                               FormatArg format) {
+        try {
+            auto binData = inputValue.getBinData();
+            bool isValidUuid =
+                binData.type == BinDataType::newUUID && binData.length == UUID::kNumBytes;
+
+            switch (format) {
+                case BinDataFormat::kAuto: {
+                    if (isValidUuid) {
+                        // If the BinData represents a valid UUID, return the UUID string.
+                        return Value(inputValue.getUuid().toString());
+                    }
+                    // Otherwise, default to base64.
+                    [[fallthrough]];
+                }
+                case BinDataFormat::kBase64: {
+                    auto encoded =
+                        base64::encode(binData.data, static_cast<size_t>(binData.length));
+                    return Value(encoded);
+                }
+                case BinDataFormat::kBase64Url: {
+                    auto encoded =
+                        base64url::encode(binData.data, static_cast<size_t>(binData.length));
+                    return Value(encoded);
+                }
+                case BinDataFormat::kHex: {
+                    auto encoded =
+                        hexblob::encode(binData.data, static_cast<size_t>(binData.length));
+                    return Value(encoded);
+                }
+                case BinDataFormat::kUtf8: {
+                    auto encoded = StringData{static_cast<const char*>(binData.data),
+                                              static_cast<size_t>(binData.length)};
+                    uassert(4341122,
+                            "BinData does not represent a valid UTF-8 string",
+                            isValidUTF8(encoded));
+                    return Value(encoded);
+                }
+                case BinDataFormat::kUuid: {
+                    uassert(4341121, "BinData does not represent a valid UUID", isValidUuid);
+                    return Value(inputValue.getUuid().toString());
+                }
+                default:
+                    uasserted(4341120,
+                              str::stream() << "Invalid format '" << toStringData(format) << "'");
+            }
+        } catch (const DBException& ex) {
+            uasserted(ErrorCodes::ConversionFailure,
+                      str::stream()
+                          << "Failed to convert '" << inputValue.toString()
+                          << "' to string in $convert with no onError value: " << ex.reason());
+        }
+    }
+
+    static Value performConvertBinDataToBinData(ExpressionContext* const expCtx,
+                                                Value inputValue,
+                                                SubtypeArg subtypeValue) {
+        auto binDataType = computeBinDataType(subtypeValue);
+        auto binData = inputValue.getBinData();
+
+        return Value(BSONBinData{binData.data, binData.length, binDataType});
+    }
+
+    static bool isValidUserDefinedBinDataType(int typeCode) {
+        static const auto smallestUserDefinedType = BinDataType::bdtCustom;
+        static const auto largestUserDefinedType = static_cast<BinDataType>(255);
+        return (smallestUserDefinedType <= typeCode) && (typeCode <= largestUserDefinedType);
+    }
+
+    static BinDataType computeBinDataType(Value subtypeValue) {
+        if (subtypeValue.numeric()) {
+            uassert(4341106,
+                    "In $convert, numeric 'subtype' argument is not an integer",
+                    subtypeValue.integral());
+
+            int typeCode = subtypeValue.coerceToInt();
+            uassert(4341107,
+                    str::stream() << "In $convert, numeric value for 'subtype' does not correspond "
+                                     "to a BinData type: "
+                                  << typeCode,
+                    // Allowed ranges are 0-8 (pre-defined types) and 128-255 (user-defined types).
+                    isValidBinDataType(typeCode) || isValidUserDefinedBinDataType(typeCode));
+
+            return static_cast<BinDataType>(typeCode);
+        }
+
+        uasserted(
+            4341108,
+            str::stream() << "For BinData, $convert's 'subtype' argument must be a number, but is "
+                          << typeName(subtypeValue.getType()));
+    }
 };
 
-Expression::Parser makeConversionAlias(const StringData shortcutName, BSONType toType) {
+Expression::Parser makeConversionAlias(const StringData shortcutName,
+                                       BSONType toType,
+                                       boost::optional<BinDataFormat> format = boost::none,
+                                       boost::optional<BinDataType> toSubtype = boost::none) {
     return [=](ExpressionContext* const expCtx,
                BSONElement elem,
                const VariablesParseState& vps) -> intrusive_ptr<Expression> {
@@ -6841,8 +7072,47 @@ Expression::Parser makeConversionAlias(const StringData shortcutName, BSONType t
                 str::stream() << shortcutName << " requires a single argument, got "
                               << operands.size(),
                 operands.size() == 1);
-        return ExpressionConvert::create(expCtx, std::move(operands[0]), toType);
+
+
+        return ExpressionConvert::create(
+            expCtx,
+            std::move(operands[0]),
+            toType,
+            // The 'format' argument to $convert is not allowed in FCVs below 8.0. On a newer
+            // binary, $toString will still specify it.
+            ExpressionConvert::checkBinDataConvertAllowed() ? format : boost::none,
+            toSubtype);
     };
+}
+
+boost::optional<BinDataFormat> parseBinDataFormat(Value formatValue) {
+    if (formatValue.nullish()) {
+        return {};
+    }
+
+    uassert(4341114,
+            str::stream() << "$convert requires that 'format' be a string, found: "
+                          << typeName(formatValue.getType()) << " with value "
+                          << formatValue.toString(),
+            formatValue.getType() == BSONType::String);
+
+    static const StringDataMap<BinDataFormat> stringToBinDataFormat{
+        {toStringData(BinDataFormat::kAuto), BinDataFormat::kAuto},
+        {toStringData(BinDataFormat::kBase64), BinDataFormat::kBase64},
+        {toStringData(BinDataFormat::kBase64Url), BinDataFormat::kBase64Url},
+        {toStringData(BinDataFormat::kHex), BinDataFormat::kHex},
+        {toStringData(BinDataFormat::kUtf8), BinDataFormat::kUtf8},
+        {toStringData(BinDataFormat::kUuid), BinDataFormat::kUuid},
+    };
+
+    auto formatString = formatValue.getStringData();
+    auto formatPair = stringToBinDataFormat.find(formatString);
+
+    uassert(4341125,
+            str::stream() << "Invalid 'format' argument for $convert: " << formatString,
+            formatPair != stringToBinDataFormat.end());
+
+    return formatPair->second;
 }
 
 }  // namespace
@@ -6851,7 +7121,8 @@ REGISTER_STABLE_EXPRESSION(convert, ExpressionConvert::parse);
 
 // Also register shortcut expressions like $toInt, $toString, etc. which can be used as a shortcut
 // for $convert without an 'onNull' or 'onError'.
-REGISTER_STABLE_EXPRESSION(toString, makeConversionAlias("$toString"_sd, BSONType::String));
+REGISTER_STABLE_EXPRESSION(
+    toString, makeConversionAlias("$toString"_sd, BSONType::String, BinDataFormat::kAuto));
 REGISTER_STABLE_EXPRESSION(toObjectId, makeConversionAlias("$toObjectId"_sd, BSONType::jstOID));
 REGISTER_STABLE_EXPRESSION(toDate, makeConversionAlias("$toDate"_sd, BSONType::Date));
 REGISTER_STABLE_EXPRESSION(toDouble, makeConversionAlias("$toDouble"_sd, BSONType::NumberDouble));
@@ -6860,24 +7131,49 @@ REGISTER_STABLE_EXPRESSION(toLong, makeConversionAlias("$toLong"_sd, BSONType::N
 REGISTER_STABLE_EXPRESSION(toDecimal,
                            makeConversionAlias("$toDecimal"_sd, BSONType::NumberDecimal));
 REGISTER_STABLE_EXPRESSION(toBool, makeConversionAlias("$toBool"_sd, BSONType::Bool));
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(toUUID,
+                                      makeConversionAlias("$toUUID"_sd,
+                                                          BSONType::BinData,
+                                                          BinDataFormat::kUuid,
+                                                          BinDataType::newUUID),
+                                      AllowedWithApiStrict::kAlways,
+                                      AllowedWithClientType::kAny,
+                                      feature_flags::gFeatureFlagBinDataConvert);
 
 boost::intrusive_ptr<Expression> ExpressionConvert::create(ExpressionContext* const expCtx,
                                                            boost::intrusive_ptr<Expression> input,
-                                                           BSONType toType) {
+                                                           BSONType toType,
+                                                           boost::optional<BinDataFormat> format,
+                                                           boost::optional<BinDataType> toSubtype) {
+    auto targetType = StringData(typeName(toType));
+    auto toValue = toSubtype
+        ? Value(BSON("type" << targetType << "subtype" << static_cast<int>(*toSubtype)))
+        : Value(targetType);
+
     return new ExpressionConvert(
         expCtx,
         std::move(input),
-        ExpressionConstant::create(expCtx, Value(StringData(typeName(toType)))),
+        ExpressionConstant::create(expCtx, std::move(toValue)),
+        format ? ExpressionConstant::create(expCtx, Value(toStringData(*format))) : nullptr,
         nullptr,
-        nullptr);
+        nullptr,
+        checkBinDataConvertAllowed());
 }
 
 ExpressionConvert::ExpressionConvert(ExpressionContext* const expCtx,
                                      boost::intrusive_ptr<Expression> input,
                                      boost::intrusive_ptr<Expression> to,
+                                     boost::intrusive_ptr<Expression> format,
                                      boost::intrusive_ptr<Expression> onError,
-                                     boost::intrusive_ptr<Expression> onNull)
-    : Expression(expCtx, {std::move(input), std::move(to), std::move(onError), std::move(onNull)}) {
+                                     boost::intrusive_ptr<Expression> onNull,
+                                     const bool allowBinDataConvert)
+    : Expression(expCtx,
+                 {std::move(input),
+                  std::move(to),
+                  std::move(format),
+                  std::move(onError),
+                  std::move(onNull)}),
+      _allowBinDataConvert{allowBinDataConvert} {
     expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
@@ -6889,8 +7185,11 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
                           << typeName(expr.type()),
             expr.type() == BSONType::Object);
 
+    const bool allowBinDataConvert = checkBinDataConvertAllowed();
+
     boost::intrusive_ptr<Expression> input;
     boost::intrusive_ptr<Expression> to;
+    boost::intrusive_ptr<Expression> format;
     boost::intrusive_ptr<Expression> onError;
     boost::intrusive_ptr<Expression> onNull;
     for (auto&& elem : expr.embeddedObject()) {
@@ -6899,6 +7198,16 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
             input = parseOperand(expCtx, elem, vps);
         } else if (field == "to"_sd) {
             to = parseOperand(expCtx, elem, vps);
+        } else if (field == "format"_sd) {
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "The 'format' argument to $convert is not allowed in the "
+                                     "current feature compatibility version. See "
+                                  << feature_compatibility_version_documentation::kCompatibilityLink
+                                  << ".",
+                    // If the command came from mongos, it means mongos must be on an FCV that
+                    // supports the 'format' field.
+                    expCtx->fromMongos || allowBinDataConvert);
+            format = parseOperand(expCtx, elem, vps);
         } else if (field == "onError"_sd) {
             onError = parseOperand(expCtx, elem, vps);
         } else if (field == "onNull"_sd) {
@@ -6913,28 +7222,63 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
     uassert(ErrorCodes::FailedToParse, "Missing 'input' parameter to $convert", input);
     uassert(ErrorCodes::FailedToParse, "Missing 'to' parameter to $convert", to);
 
-    return new ExpressionConvert(
-        expCtx, std::move(input), std::move(to), std::move(onError), std::move(onNull));
+    return new ExpressionConvert(expCtx,
+                                 std::move(input),
+                                 std::move(to),
+                                 std::move(format),
+                                 std::move(onError),
+                                 std::move(onNull),
+                                 allowBinDataConvert);
+}
+
+boost::optional<ExpressionConvert::ConvertTargetTypeInfo>
+ExpressionConvert::ConvertTargetTypeInfo::parse(Value value) {
+    if (value.nullish()) {
+        return {};
+    }
+
+    // We expect 'to' to be either:
+    // - A document describing the target type and subtype.
+    // - A string or a numeric value representing a valid BSON type.
+    Value typeValue;
+    Value subtypeValue;
+    if (value.isObject()) {
+        typeValue = value["type"_sd];
+        subtypeValue = value["subtype"_sd];
+    } else {
+        typeValue = value;
+    }
+
+    if (subtypeValue.missing()) {
+        subtypeValue = Value(static_cast<int>(BinDataType::BinDataGeneral));
+    }
+
+    auto targetType = computeTargetType(typeValue);
+    return ConvertTargetTypeInfo{targetType, subtypeValue};
 }
 
 Value ExpressionConvert::evaluate(const Document& root, Variables* variables) const {
     auto toValue = _children[_kTo]->evaluate(root, variables);
-    Value inputValue = _children[_kInput]->evaluate(root, variables);
-    boost::optional<BSONType> targetType;
-    if (!toValue.nullish()) {
-        targetType = computeTargetType(toValue);
-    }
+    auto inputValue = _children[_kInput]->evaluate(root, variables);
+    auto formatValue =
+        _children[_kFormat] ? _children[_kFormat]->evaluate(root, variables) : Value();
+
+    auto targetTypeInfo = ConvertTargetTypeInfo::parse(toValue);
 
     if (inputValue.nullish()) {
         return _children[_kOnNull] ? _children[_kOnNull]->evaluate(root, variables)
                                    : Value(BSONNULL);
-    } else if (!targetType) {
+    }
+
+    if (!targetTypeInfo) {
         // "to" evaluated to a nullish value.
         return Value(BSONNULL);
     }
 
+    auto format = parseBinDataFormat(formatValue);
+
     try {
-        return performConversion(*targetType, inputValue);
+        return performConversion(*targetTypeInfo, inputValue, format);
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         if (_children[_kOnError]) {
             return _children[_kOnError]->evaluate(root, variables);
@@ -6947,6 +7291,9 @@ Value ExpressionConvert::evaluate(const Document& root, Variables* variables) co
 boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
     _children[_kInput] = _children[_kInput]->optimize();
     _children[_kTo] = _children[_kTo]->optimize();
+    if (_children[_kFormat]) {
+        _children[_kFormat] = _children[_kFormat]->optimize();
+    }
     if (_children[_kOnError]) {
         _children[_kOnError] = _children[_kOnError]->optimize();
     }
@@ -6961,8 +7308,11 @@ boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
     // _children[_kOnError] and _children[_kOnNull] values could still be legally folded if those
     // values are not needed. Support for that case would add more complexity than it's worth,
     // though.
-    if (ExpressionConstant::allNullOrConstant(
-            {_children[_kInput], _children[_kTo], _children[_kOnError], _children[_kOnNull]})) {
+    if (ExpressionConstant::allNullOrConstant({_children[_kInput],
+                                               _children[_kTo],
+                                               _children[_kFormat],
+                                               _children[_kOnError],
+                                               _children[_kOnNull]})) {
         return ExpressionConstant::create(
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
@@ -6991,12 +7341,13 @@ Value ExpressionConvert::serialize(const SerializationOptions& options) const {
          Document{
              {"input", _children[_kInput]->serialize(options)},
              {"to", toField},
+             {"format", _children[_kFormat] ? _children[_kFormat]->serialize(options) : Value()},
              {"onError", _children[_kOnError] ? _children[_kOnError]->serialize(options) : Value()},
              {"onNull",
               _children[_kOnNull] ? _children[_kOnNull]->serialize(options) : Value()}}}});
 }
 
-BSONType ExpressionConvert::computeTargetType(Value targetTypeName) const {
+BSONType ExpressionConvert::computeTargetType(Value targetTypeName) {
     BSONType targetType;
     if (targetTypeName.getType() == BSONType::String) {
         // typeFromName() does not consider "missing" to be a valid type, but we want to accept it,
@@ -7028,12 +7379,28 @@ BSONType ExpressionConvert::computeTargetType(Value targetTypeName) const {
     return targetType;
 }
 
-Value ExpressionConvert::performConversion(BSONType targetType, Value inputValue) const {
+Value ExpressionConvert::performConversion(ConvertTargetTypeInfo targetTypeInfo,
+                                           Value inputValue,
+                                           boost::optional<BinDataFormat> format) const {
     invariant(!inputValue.nullish());
 
     static const ConversionTable table;
     BSONType inputType = inputValue.getType();
-    return table.findConversionFunc(inputType, targetType)(getExpressionContext(), inputValue);
+
+    uassert(ErrorCodes::ConversionFailure,
+            str::stream() << "BinData $convert is not allowed in the current feature "
+                             "compatibility version. See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink << ".",
+            _allowBinDataConvert || targetTypeInfo.type == BSONType::Bool ||
+                (inputType != BSONType::BinData && targetTypeInfo.type != BSONType::BinData));
+
+    return table.findConversionFunc(inputType, targetTypeInfo.type, format, targetTypeInfo.subtype)(
+        getExpressionContext(), inputValue);
+}
+
+bool ExpressionConvert::checkBinDataConvertAllowed() {
+    return feature_flags::gFeatureFlagBinDataConvert.isEnabledUseLatestFCVWhenUninitialized(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 namespace {

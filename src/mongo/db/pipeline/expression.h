@@ -3899,20 +3899,63 @@ private:
     std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> _defaults;
 };
 
+// This enum is not compatible with the QUERY_UTIL_NAMED_ENUM_DEFINE util since the "auto" type
+// conflicts with the C++ keyword "auto". Instead, we manually define the enum and the
+// toStringData function below.
+enum class BinDataFormat {
+    kAuto,
+    kBase64,
+    kBase64Url,
+    kHex,
+    kUtf8,
+    kUuid,
+};
+
+static StringData toStringData(BinDataFormat type) {
+    switch (type) {
+        case BinDataFormat::kAuto:
+            return "auto"_sd;
+        case BinDataFormat::kBase64:
+            return "base64"_sd;
+        case BinDataFormat::kBase64Url:
+            return "base64url"_sd;
+        case BinDataFormat::kHex:
+            return "hex"_sd;
+        case BinDataFormat::kUtf8:
+            return "utf8"_sd;
+        case BinDataFormat::kUuid:
+            return "uuid"_sd;
+        default:
+            MONGO_UNREACHABLE_TASSERT(4341123);
+    }
+}
+
 class ExpressionConvert final : public Expression {
 public:
+    struct ConvertTargetTypeInfo {
+        BSONType type;
+        Value subtype;
+
+        static boost::optional<ConvertTargetTypeInfo> parse(Value value);
+    };
+
     ExpressionConvert(ExpressionContext* expCtx,
                       boost::intrusive_ptr<Expression> input,
                       boost::intrusive_ptr<Expression> to,
+                      boost::intrusive_ptr<Expression> format,
                       boost::intrusive_ptr<Expression> onError,
-                      boost::intrusive_ptr<Expression> onNull);
+                      boost::intrusive_ptr<Expression> onNull,
+                      bool allowBinDataConvert);
     /**
      * Creates a $convert expression converting from 'input' to the type given by 'toType'. Leaves
      * 'onNull' and 'onError' unspecified.
      */
-    static boost::intrusive_ptr<Expression> create(ExpressionContext*,
-                                                   boost::intrusive_ptr<Expression> input,
-                                                   BSONType toType);
+    static boost::intrusive_ptr<Expression> create(
+        ExpressionContext*,
+        boost::intrusive_ptr<Expression> input,
+        BSONType toType,
+        boost::optional<BinDataFormat> format = boost::none,
+        boost::optional<BinDataType> toSubtype = boost::none);
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
@@ -3930,14 +3973,23 @@ public:
         return visitor->visit(this);
     }
 
+    static bool checkBinDataConvertAllowed();
+
 private:
-    BSONType computeTargetType(Value typeName) const;
-    Value performConversion(BSONType targetType, Value inputValue) const;
+    static BSONType computeTargetType(Value typeName);
+    Value performConversion(ConvertTargetTypeInfo targetTypeInfo,
+                            Value inputValue,
+                            boost::optional<BinDataFormat> format) const;
+
+    // Support for BinData $convert is FCV gated. The feature flag is checked once during
+    // parsing to avoid having to acquire FCV snapshot for every document during evaluation.
+    const bool _allowBinDataConvert;
 
     static constexpr size_t _kInput = 0;
     static constexpr size_t _kTo = 1;
-    static constexpr size_t _kOnError = 2;
-    static constexpr size_t _kOnNull = 3;
+    static constexpr size_t _kFormat = 2;
+    static constexpr size_t _kOnError = 3;
+    static constexpr size_t _kOnNull = 4;
 };
 
 class ExpressionRegex : public Expression {

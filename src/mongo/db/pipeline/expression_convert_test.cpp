@@ -99,6 +99,69 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithoutOptionalArguments) {
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 }
 
+TEST_F(ExpressionConvertTest, ParseAndSerializeWithToSubDocument) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << BSON("type"
+                                                << "binData"
+                                                << "subtype" << static_cast<int>(newUUID))
+                                        << "format"
+                                        << "uuid"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    ASSERT_VALUE_EQ(Value(fromjson(  // NOLINT
+                        R"({
+                            $convert: {
+                                input: '$path1', 
+                                to: {
+                                    type: {$const: 'binData'},
+                                    subtype: {$const: 4}
+                                },
+                                format: {$const: 'uuid'}
+                            }
+                        })")),
+                    convertExp->serialize());
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson(  // NOLINT
+            R"({
+                $convert: {
+                    input: '$path1', 
+                    to: {
+                        type: {$const: 'binData'},
+                        subtype: {$const: 4}
+                    },
+                    format: {$const: 'uuid'}
+                }
+            })")),
+        convertExp->serialize(SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson(  // NOLINT
+            R"({
+                $convert: {
+                    input: '$path1', 
+                    to: {"?": "?"},
+                    format: "?"
+                }
+            })")),
+        convertExp->serialize(SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
+
+    ASSERT_VALUE_EQ(Value(fromjson(  // NOLINT
+                        R"({
+                            $convert: {
+                                input: '$path1', 
+                                to: "?object",
+                                format: "?string"
+                            }
+                        })")),
+                    convertExp->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions));
+}
+
 TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnError) {
     auto expCtx = getExpCtx();
 
@@ -167,6 +230,126 @@ TEST_F(ExpressionConvertTest, ConvertWithoutToFailsToParse) {
             ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
             ASSERT_STRING_CONTAINS(exception.reason(), "Missing 'to' parameter to $convert");
         });
+}
+
+TEST_F(ExpressionConvertTest, ConvertToBinDataWithNonNumericSubtypeFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << BSON("type"
+                                                << "binData"
+                                                << "subtype"
+                                                << "newUUID")
+                                        << "format" << toStringData(BinDataFormat::kUuid)));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document input{{"path1", "abc"_sd}};
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(input, &expCtx->variables),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), 4341108);
+            ASSERT_STRING_CONTAINS(exception.reason(),
+                                   "$convert's 'subtype' argument must be a number, but is string");
+        });
+}
+
+TEST_F(ExpressionConvertTest, ConvertToBinDataWithInvalidUtf8Fails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "binData"
+                                        << "format" << toStringData(BinDataFormat::kUtf8)));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document input{{"path1", "\xE2\x82"_sd}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(input, &expCtx->variables),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(), "Invalid UTF-8");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, ConvertToStringWithInvalidUtf8BinDataFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "string"
+                                        << "format" << toStringData(BinDataFormat::kUtf8)));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    auto invalidUtf8 = "\xE2\x82";
+    BSONBinData inputBinData{
+        invalidUtf8, static_cast<int>(std::strlen(invalidUtf8)), BinDataGeneral};
+    Document input{{"path1", inputBinData}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(input, &expCtx->variables),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "BinData does not represent a valid UTF-8 string");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, ConvertToBinDataWithOutOfBoundsSubtypeFails) {
+    auto expCtx = getExpCtx();
+
+    auto assertFailsWithOutOfBoundsSubtype = [&](int subtypeValue) {
+        auto spec = BSON("$convert" << BSON("input"
+                                            << "$path1"
+                                            << "to"
+                                            << BSON("type"
+                                                    << "binData"
+                                                    << "subtype" << subtypeValue)
+                                            << "format" << toStringData(BinDataFormat::kBase64)));
+        auto convertExp =
+            Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+        Document input{{"path1", "abc"_sd}};
+        ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(input, &expCtx->variables),
+                                 AssertionException,
+                                 [](const AssertionException& exception) {
+                                     ASSERT_EQ(exception.code(), 4341107);
+                                     ASSERT_STRING_CONTAINS(
+                                         exception.reason(),
+                                         "In $convert, numeric value for 'subtype' does not "
+                                         "correspond to a BinData type");
+                                 });
+    };
+
+    assertFailsWithOutOfBoundsSubtype(900);
+    assertFailsWithOutOfBoundsSubtype(-1);
+}
+
+TEST_F(ExpressionConvertTest, ConvertToBinDataWithNumericNonIntegerSubtypeFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << BSON("type"
+                                                << "binData"
+                                                << "subtype" << 1.5)
+                                        << "format" << toStringData(BinDataFormat::kBase64)));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document input{{"path1", "abc"_sd}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(input, &expCtx->variables),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), 4341106);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "In $convert, numeric 'subtype' argument is not an integer");
+                             });
 }
 
 TEST_F(ExpressionConvertTest, RoundTripSerialization) {
@@ -298,45 +481,50 @@ TEST_F(ExpressionConvertTest, NegativeNumericTargetTypeFails) {
 TEST_F(ExpressionConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvided) {
     auto expCtx = getExpCtx();
 
-    std::vector<std::pair<Value, std::string>> unsupportedConversions{
+    std::vector<std::pair<Value, Value>> unsupportedConversions{
         // Except for the ones listed below, $convert supports all conversions between the supported
         // types: double, string, int, long, decimal, objectId, bool, int, and date.
-        {Value(OID()), "double"},
-        {Value(OID()), "int"},
-        {Value(OID()), "long"},
-        {Value(OID()), "decimal"},
-        {Value(Date_t{}), "objectId"},
-        {Value(Date_t{}), "int"},
-        {Value(int{1}), "date"},
-        {Value(true), "date"},
+        {Value(OID()), Value("double"_sd)},
+        {Value(OID()), Value("int"_sd)},
+        {Value(OID()), Value("long"_sd)},
+        {Value(OID()), Value("decimal"_sd)},
+        {Value(Date_t{}), Value("objectId"_sd)},
+        {Value(Date_t{}), Value("int"_sd)},
+        {Value(int{1}), Value("date"_sd)},
+        {Value(true), Value("date"_sd)},
 
         // All conversions that involve any other type will fail, unless the target type is bool,
         // in which case the conversion results in a true value. Below is one conversion for each
         // of the unsupported types.
-        {Value(1.0), "minKey"},
-        {Value(1.0), "missing"},
-        {Value(1.0), "object"},
-        {Value(1.0), "array"},
-        {Value(1.0), "binData"},
-        {Value(1.0), "undefined"},
-        {Value(1.0), "null"},
-        {Value(1.0), "regex"},
-        {Value(1.0), "dbPointer"},
-        {Value(1.0), "javascript"},
-        {Value(1.0), "symbol"},
-        {Value(1.0), "javascriptWithScope"},
-        {Value(1.0), "timestamp"},
-        {Value(1.0), "maxKey"},
+        {Value(1.0), Value("minKey"_sd)},
+        {Value(1.0), Value("missing"_sd)},
+        {Value(1.0), Value("object"_sd)},
+        {Value(1.0), Value("array"_sd)},
+        {Value(1.0), Value("undefined"_sd)},
+        {Value(1.0), Value("null"_sd)},
+        {Value(1.0), Value("regex"_sd)},
+        {Value(1.0), Value("dbPointer"_sd)},
+        {Value(1.0), Value("javascript"_sd)},
+        {Value(1.0), Value("symbol"_sd)},
+        {Value(1.0), Value("javascriptWithScope"_sd)},
+        {Value(1.0), Value("timestamp"_sd)},
+        {Value(1.0), Value("maxKey"_sd)},
+        // Conversions to binData will fail with 'ErrorCodes::FailedToParse' unless subtype is
+        // specified.
+        {Value(1.0),
+         Value(BSON("type"
+                    << "binData"
+                    << "subtype" << static_cast<int>(BinDataGeneral)))},
     };
 
     // Attempt all of the unsupported conversions listed above.
     for (const auto& conversion : unsupportedConversions) {
         auto inputValue = conversion.first;
-        auto targetTypeName = conversion.second;
+        auto toValue = conversion.second;
 
         auto spec = BSON("$convert" << BSON("input"
                                             << "$path1"
-                                            << "to" << Value(targetTypeName)));
+                                            << "to" << toValue));
 
         Document input{{"path1", inputValue}};
 
@@ -355,11 +543,11 @@ TEST_F(ExpressionConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvi
     // Attempt them again, this time with an "onError" value.
     for (const auto& conversion : unsupportedConversions) {
         auto inputValue = conversion.first;
-        auto targetTypeName = conversion.second;
+        auto toValue = conversion.second;
 
         auto spec = BSON("$convert" << BSON("input"
                                             << "$path1"
-                                            << "to" << Value(targetTypeName) << "onError"
+                                            << "to" << toValue << "onError"
                                             << "X"));
 
         Document input{{"path1", inputValue}};
@@ -457,6 +645,25 @@ TEST_F(ExpressionConvertTest, ConvertOptimizesToExpressionConstant) {
     auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
     ASSERT(constResult);
     ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), 0.0, BSONType::NumberDouble);
+}
+
+TEST_F(ExpressionConvertTest, ConvertWithFormatOptimizesToExpressionConstant) {
+    auto expCtx = getExpCtx();
+
+    std::string inputStr{"123"};
+
+    auto spec =
+        BSON("$convert" << BSON("input" << base64::encode(inputStr) << "to"
+                                        << "binData"
+                                        << "format" << toStringData(BinDataFormat::kBase64)));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    BSONBinData result{inputStr.data(), static_cast<int>(inputStr.size()), BinDataGeneral};
+
+    auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
+    ASSERT(constResult);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), result, BSONType::BinData);
 }
 
 TEST_F(ExpressionConvertTest, ConvertWithOnErrorOptimizesToExpressionConstant) {
@@ -622,6 +829,206 @@ TEST_F(ExpressionConvertTest, DecimalIdentityConversion) {
         convertExp->evaluate(decimalNegativeInfinity, &expCtx->variables),
         Decimal128::kNegativeInfinity,
         BSONType::NumberDecimal);
+}
+
+TEST_F(ExpressionConvertTest, ConvertToBinDataWithDefaultSubtypeSucceeds) {
+    auto expCtx = getExpCtx();
+
+    auto assertSucceedsWithDefaultSubtype = [&](const BSONObj spec) {
+        auto convertExp =
+            Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+        std::string data = "(^_^)";
+        BSONBinData input{data.data(), static_cast<int>(data.size()), BinDataGeneral};
+        BSONBinData expected{data.data(), static_cast<int>(data.size()), BinDataGeneral};
+
+        Document binDataInput{{"path1", input}};
+        ASSERT_VALUE_CONTENTS_AND_TYPE(
+            convertExp->evaluate(binDataInput, &expCtx->variables), expected, BSONType::BinData);
+    };
+
+    // Test with a type string as the 'to' value.
+    assertSucceedsWithDefaultSubtype(BSON("$convert" << BSON("input"
+                                                             << "$path1"
+                                                             << "to"
+                                                             << "binData")));
+
+    // Test with an object without 'subtype' field as the 'to' value.
+    assertSucceedsWithDefaultSubtype(BSON("$convert" << BSON("input"
+                                                             << "$path1"
+                                                             << "to"
+                                                             << BSON("type"
+                                                                     << "binData"))));
+}
+
+TEST_F(ExpressionConvertTest, BinDataToBinDataConversionSameSubtype) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << BSON("type"
+                                                << "binData"
+                                                << "subtype" << static_cast<int>(BinDataGeneral))));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    std::string data = "(^_^)";
+    BSONBinData input{data.data(), static_cast<int>(data.size()), BinDataGeneral};
+    BSONBinData expected{data.data(), static_cast<int>(data.size()), BinDataGeneral};
+
+    Document binDataInput{{"path1", input}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(binDataInput, &expCtx->variables), expected, BSONType::BinData);
+}
+
+TEST_F(ExpressionConvertTest, BinDataToBinDataConversionDifferentSubtypes) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << BSON("type"
+                                                << "binData"
+                                                << "subtype" << static_cast<int>(newUUID))));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    std::string data = "(^_^)";
+    BSONBinData input{data.data(), static_cast<int>(data.size()), BinDataGeneral};
+    BSONBinData expected{data.data(), static_cast<int>(data.size()), newUUID};
+
+    Document binDataInput{{"path1", input}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(binDataInput, &expCtx->variables), expected, BSONType::BinData);
+}
+
+TEST_F(ExpressionConvertTest, Base64StringToNonUUIDBinDataConversion) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << BSON("type"
+                                                << "binData"
+                                                << "subtype" << static_cast<int>(BinDataGeneral))
+                                        << "format" << toStringData(BinDataFormat::kBase64)));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    const std::string data{"(^_^)"};
+    const auto input = base64::encode(data);
+    const BSONBinData expected{data.data(), static_cast<int>(data.size()), BinDataGeneral};
+
+    Document stringInput{{"path1", input}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(stringInput, &expCtx->variables), expected, BSONType::BinData);
+}
+
+TEST_F(ExpressionConvertTest, UUIDStringToNonUUIDBinDataConversionFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << BSON("type"
+                                                << "binData"
+                                                << "subtype" << static_cast<int>(BinDataGeneral))
+                                        << "format" << toStringData(BinDataFormat::kUuid)));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    const std::string uuidString{"867dee52-c331-484e-92d1-c56479b8e67e"};
+
+    Document stringInput{{"path1", uuidString}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(stringInput, &expCtx->variables),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "Only the 'uuid' format is allowed with the UUID subtype");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, InvalidStringToUUIDBinDataConversionFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$toUUID"
+                     << "$path1");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    // The input string is not a valid UUID string.
+    const std::string input{"867dee52---484e-92d1"};
+
+    Document stringInput{{"path1", input}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(stringInput, &expCtx->variables),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(), "Invalid UUID string");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, BinDataToStringConversionWithoutFormatFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "string"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    const std::string data{"(^_^)"};
+    const BSONBinData input{data.data(), static_cast<int>(data.size()), BinDataGeneral};
+
+    Document stringInput{{"path1", input}};
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(stringInput, &expCtx->variables),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), 4341115);
+            ASSERT_STRING_CONTAINS(
+                exception.reason(),
+                "Format must be speficied when converting from 'binData' to 'string'");
+        });
+}
+
+TEST_F(ExpressionConvertTest, StringToUUIDBinDataConversion) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$toUUID"
+                     << "$path1");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    const auto uuid = UUID::gen();
+
+    Document stringInput{{"path1", uuid.toString()}};
+    ASSERT_EQ(convertExp->evaluate(stringInput, &expCtx->variables).getUuid(), uuid);
+}
+
+TEST_F(ExpressionConvertTest, UUIDStringRoundTripConversion) {
+    const auto evalWithValueOnPath = [&](const BSONObj spec, const Value inputValue) {
+        auto expCtx = getExpCtx();
+
+        auto convertExp =
+            Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+        Document inputDoc{{"path1", inputValue}};
+        return convertExp->evaluate(inputDoc, &expCtx->variables);
+    };
+
+    const Value stringValue{"867dee52-c331-484e-92d1-c56479b8e67e"_sd};
+
+    const auto binDataValue = evalWithValueOnPath(BSON("$toUUID"
+                                                       << "$path1"),
+                                                  stringValue);
+
+    const auto roundTripStringValue = evalWithValueOnPath(BSON("$toString"
+                                                               << "$path1"),
+                                                          binDataValue);
+    ASSERT_VALUE_EQ(stringValue, roundTripStringValue);
+
+    const auto roundTripBinDataValue = evalWithValueOnPath(BSON("$toUUID"
+                                                                << "$path1"),
+                                                           roundTripStringValue);
+    ASSERT_VALUE_EQ(binDataValue, roundTripBinDataValue);
 }
 
 TEST_F(ExpressionConvertTest, ConvertDateToBool) {

@@ -778,6 +778,7 @@ TEST(CstPipelineTranslationTest, TranslatesProjectionWithConvert) {
                    CNode{CNode::ObjectChildren{
                        {KeyFieldname::inputArg, CNode{UserBoolean{true}}},
                        {KeyFieldname::toArg, CNode{UserString{"bool"}}},
+                       {KeyFieldname::formatArg, CNode{KeyValue::absentKey}},
                        {KeyFieldname::onErrorArg, CNode{KeyValue::absentKey}},
                        {KeyFieldname::onNullArg, CNode{KeyValue::absentKey}}}}}}}},
              {ProjectionPath{makeVector<std::string>("b")},
@@ -786,6 +787,7 @@ TEST(CstPipelineTranslationTest, TranslatesProjectionWithConvert) {
                    CNode{CNode::ObjectChildren{
                        {KeyFieldname::inputArg, CNode{UserDouble{1.999999}}},
                        {KeyFieldname::toArg, CNode{UserString{"int"}}},
+                       {KeyFieldname::formatArg, CNode{KeyValue::absentKey}},
                        {KeyFieldname::onErrorArg, CNode{UserString{"Can't convert"}}},
                        {KeyFieldname::onNullArg, CNode{UserInt{1}}}}}}}}}}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
@@ -815,6 +817,7 @@ TEST(CstPipelineTranslationTest, TranslatesConvertExpression) {
         {KeyFieldname::convert,
          CNode{CNode::ObjectChildren{{KeyFieldname::inputArg, CNode{UserString{"true"}}},
                                      {KeyFieldname::toArg, CNode{UserString{"bool"}}},
+                                     {KeyFieldname::formatArg, CNode{KeyValue::absentKey}},
                                      {KeyFieldname::onErrorArg, CNode{KeyValue::absentKey}},
                                      {KeyFieldname::onNullArg, CNode{UserInt{1}}}}}}}};
     auto expCtx = getExpCtx();

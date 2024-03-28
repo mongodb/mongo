@@ -3843,6 +3843,9 @@ TEST(ExpressionGetFieldTest, GetFieldWithDynamicFieldExpressionSerializesCorrect
                             input: "$foo",
                             to: {
                                 $const: "string"
+                            },
+                            format: {
+                                $const: "auto"
                             }
                         }
                     },
@@ -3865,7 +3868,8 @@ TEST(ExpressionGetFieldTest, GetFieldWithDynamicFieldExpressionSerializesCorrect
                             "input": "$foo",
                             "to": {
                                 "$const": "string"
-                            }
+                            },
+                            "format": "?"
                         }
                     },
                     "input": {
@@ -3884,7 +3888,8 @@ TEST(ExpressionGetFieldTest, GetFieldWithDynamicFieldExpressionSerializesCorrect
                     field: {
                         $convert: {
                             input: "$foo",
-                            to: "string"
+                            to: "string",
+                            format: "?string"
                         }
                     },
                     input: "?object"

@@ -325,14 +325,18 @@ boost::intrusive_ptr<Expression> translateFunctionObject(const CNode::ObjectChil
         case KeyFieldname::convert:
             dassert(verifyFieldnames({KeyFieldname::inputArg,
                                       KeyFieldname::toArg,
+                                      KeyFieldname::formatArg,
                                       KeyFieldname::onErrorArg,
                                       KeyFieldname::onNullArg},
                                      object[0].second.objectChildren()));
-            return make_intrusive<ExpressionConvert>(expCtx,
-                                                     std::move(expressions[0]),
-                                                     std::move(expressions[1]),
-                                                     std::move(expressions[2]),
-                                                     std::move(expressions[3]));
+            return make_intrusive<ExpressionConvert>(
+                expCtx,
+                std::move(expressions[0]),
+                std::move(expressions[1]),
+                std::move(expressions[2]),
+                std::move(expressions[3]),
+                std::move(expressions[4]),
+                ExpressionConvert::checkBinDataConvertAllowed());
         case KeyFieldname::toBool:
             return ExpressionConvert::create(expCtx, std::move(expressions[0]), BSONType::Bool);
         case KeyFieldname::toDate:

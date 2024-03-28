@@ -127,6 +127,13 @@ feature_flags:
       default: false
       shouldBeFCVGated: false
 
+    featureFlagBinDataConvert:
+      description: "Feature flag to enable BinData support in $convert."
+      cpp_varname: gFeatureFlagBinDataConvert
+      default: true
+      version: 8.0
+      shouldBeFCVGated: true
+
     featureFlagSearchBatchSizeTuning:
       description: "Feature flag to enable batchSize tuning for search queries."
       cpp_varname: gFeatureFlagSearchBatcSizeTuning
