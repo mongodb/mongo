@@ -50,6 +50,17 @@ env.Benchmark(
     ],
 )
 
+env.Library(
+    target='bson_column_fuzzer_impl',
+    source=[
+        'bsoncolumn_fuzzer_impl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'bson_column',
+    ],
+)
+
 env.CppUnitTest(
     target='bson_util_test',
     source=[
@@ -66,6 +77,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/sbe_values',
         '$BUILD_DIR/mongo/util/safe_num',
         'bson_column',
+        'bson_column_fuzzer_impl',
         'bson_extract',
     ],
 )
@@ -112,5 +124,17 @@ env.Benchmark(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppLibfuzzerTest(
+    target='bsoncolumnbuilder_reopen_fuzzer',
+    source=[
+        'bsoncolumnbuilder_reopen_fuzzer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/bson_validate',
+        'bson_column_fuzzer_impl',
     ],
 )
