@@ -278,7 +278,8 @@ RecordId PlanExecutorExpress::getRIDForPoint(const BSONElement& val) const {
         sortedAccessMethod->getSortedDataInterface()->getOrdering(),
         true /* forward */,
         true /* startKeyInclusive */);
-    auto kv = indexCursor->seek(keyStringForSeek);
+    auto kv =
+        indexCursor->seek(keyStringForSeek, SortedDataInterface::Cursor::KeyInclusion::kExclude);
     if (!kv) {
         return {};
     }

@@ -141,7 +141,8 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
                     indexAccessMethod()->getSortedDataInterface()->getOrdering(),
                     true, /* forward */
                     _startKeyInclusive);
-                entry = _cursor->seek(keyStringForSeek);
+                entry = _cursor->seek(keyStringForSeek,
+                                      SortedDataInterface::Cursor::KeyInclusion::kExclude);
             } else {
                 entry = _cursor->next(SortedDataInterface::Cursor::KeyInclusion::kExclude);
             }
