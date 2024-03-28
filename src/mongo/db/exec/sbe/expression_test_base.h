@@ -115,14 +115,6 @@ protected:
     }
 
     /**
-     * Compile and run the given expression.
-     */
-    FastTuple<bool, value::TypeTags, value::Value> runExpression(const EExpression& expr) {
-        auto compiledExpr = expr.compile(_ctx);
-        return _vm.run(compiledExpr.get());
-    }
-
-    /**
      * The caller takes ownership of the Value returned by this function and must call
      * 'releaseValue()' on it. The preferred way to ensure the Value is properly released is to
      * immediately store it in a ValueGuard.

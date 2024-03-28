@@ -259,7 +259,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
                 value::copyValue(extractedValue.tags()[i], extractedValue.vals()[i]);
         }
     }
-    auto res = buildBlockFromStorage(std::move(tagOut), std::move(valueOut));
+    auto res = std::make_unique<value::HeterogeneousBlock>(std::move(tagOut), std::move(valueOut));
 
     return {
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
@@ -268,19 +268,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
 template <bool less>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockMinMaxImpl(
     value::ValueBlock* inputBlock, value::ValueBlock* bitsetBlock) {
+    // Finding the true minimum of the timefield has some computational overhead so can avoid this
+    // work if we aren't trying to find a minimum.
+    auto [minTag, minVal] = std::pair{value::TypeTags::Nothing, value::Value{0u}};
+    if constexpr (less) {
+        std::tie(minTag, minVal) = inputBlock->tryMin();
+    }
+    // The true maximum can be found with no extra cost.
+    auto [maxTag, maxVal] = inputBlock->tryMax();
     if (bitsetBlock->allTrue().get_value_or(false)) {
-        if constexpr (less) {
-            auto [minTag, minVal] = inputBlock->tryMin();
-            if (minTag != value::TypeTags::Nothing) {
-                auto [minTagCpy, minValCpy] = value::copyValue(minTag, minVal);
-                return {true, minTagCpy, minValCpy};
-            }
-        } else {
-            auto [maxTag, maxVal] = inputBlock->tryMax();
-            if (maxTag != value::TypeTags::Nothing) {
-                auto [maxTagCpy, maxValCpy] = value::copyValue(maxTag, maxVal);
-                return {true, maxTagCpy, maxValCpy};
-            }
+        if (less && minTag != value::TypeTags::Nothing) {
+            auto [minTagCpy, minValCpy] = value::copyValue(minTag, minVal);
+            return {true, minTagCpy, minValCpy};
+        } else if (!less && maxTag != value::TypeTags::Nothing) {
+            auto [maxTagCpy, maxValCpy] = value::copyValue(maxTag, maxVal);
+            return {true, maxTagCpy, maxValCpy};
         }
     }
 
@@ -296,17 +298,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockMinMaxImpl(
     value::TypeTags accTag = value::TypeTags::Nothing;
     value::Value accVal = 0;
     for (size_t i = 0; i < block.count(); ++i) {
-        // Skip unselected and Nothing values.
-        if (!value::bitcastTo<bool>(bitset[i].second) ||
-            block.tags()[i] == value::TypeTags::Nothing) {
-            continue;
-        }
-        // If our current result is nothing, set the result to be this value.
-        if (accTag == value::TypeTags::Nothing) {
+        if (value::bitcastTo<bool>(bitset[i].second) && accTag == value::TypeTags::Nothing &&
+            block.tags()[i] != value::TypeTags::Nothing) {
             accTag = block.tags()[i];
             accVal = block.vals()[i];
-        } else if (comp({block.tags()[i], block.vals()[i]}, {accTag, accVal})) {
-            accTag = block.tags()[i], accVal = block.vals()[i];
+        } else if (value::bitcastTo<bool>(bitset[i].second) &&
+                   block.tags()[i] != value::TypeTags::Nothing) {
+            if (comp({block.tags()[i], block.vals()[i]}, {accTag, accVal})) {
+                accTag = block.tags()[i], accVal = block.vals()[i];
+            }
         }
     }
 
@@ -1060,7 +1060,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockBlockArithm
         }
     }
 
-    auto resBlock = buildBlockFromStorage(std::move(tagsOut), std::move(valuesOut));
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
 
     return {true,
             value::TypeTags::valueBlock,
@@ -1100,7 +1101,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockBlockArithm
         }
     }
 
-    auto resBlock = buildBlockFromStorage(std::move(tagsOut), std::move(valuesOut));
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
 
     return {true,
             value::TypeTags::valueBlock,
@@ -1146,7 +1148,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarBlockArith
         }
     }
 
-    auto resBlock = buildBlockFromStorage(std::move(tagsOut), std::move(valuesOut));
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
 
     return {true,
             value::TypeTags::valueBlock,
@@ -1185,7 +1188,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarBlockArith
         }
     }
 
-    auto resBlock = buildBlockFromStorage(std::move(tagsOut), std::move(valuesOut));
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
 
     return {true,
             value::TypeTags::valueBlock,
@@ -1231,7 +1235,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArith
         }
     }
 
-    auto resBlock = buildBlockFromStorage(std::move(tagsOut), std::move(valuesOut));
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
 
     return {true,
             value::TypeTags::valueBlock,
@@ -1270,7 +1275,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArith
         }
     }
 
-    auto resBlock = buildBlockFromStorage(std::move(tagsOut), std::move(valuesOut));
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
 
     return {true,
             value::TypeTags::valueBlock,
@@ -1800,8 +1806,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCombin
         }
     }
 
-    auto blockOut = buildBlockFromStorage(std::move(tagOut), std::move(valueOut));
-
+    auto blockOut =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagOut), std::move(valueOut));
     return {true,
             value::TypeTags::valueBlock,
             value::bitcastFrom<value::ValueBlock*>(blockOut.release())};
@@ -1866,7 +1872,8 @@ void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
                     invoker(extracted.tags()[i], extracted.vals()[i]);
             }
         }
-        outBlock = buildBlockFromStorage(std::move(tagOut), std::move(valueOut));
+        outBlock =
+            std::make_unique<value::HeterogeneousBlock>(std::move(tagOut), std::move(valueOut));
     } else {
         outBlock = block->map(invokeLambdaOp.bindParams(*this, code, lamPos));
     }
@@ -1902,6 +1909,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
     tassert(8649600, "Mismatch on size", leftBlockSize == rightBlockSize);
     tassert(8625712, "Expected bitmap vectors to be non-empty", leftBlockSize > 0);
 
+    auto leftMonoBlock = leftValueBlock->as<value::MonoBlock>();
+
     auto outputLeft = [](value::TypeTags lTag, value::Value lValue) -> bool {
         if constexpr (static_cast<int>(LogicalOp::AND) == op) {
             return (lTag == value::TypeTags::Boolean && !value::bitcastTo<bool>(lValue));
@@ -1910,8 +1919,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
         }
     };
 
-    if (auto leftMonoBlock = leftValueBlock->as<value::MonoBlock>(); leftMonoBlock) {
-        // If the first item is a Nothing, the answer is always Nothing.
+    if (leftMonoBlock) {
         if (leftMonoBlock->getTag() == value::TypeTags::Nothing) {
             auto nothingBlock =
                 std::make_unique<value::MonoBlock>(leftBlockSize, value::TypeTags::Nothing, 0);
@@ -1944,7 +1952,39 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
         valuesOut[i] = resVal;
     }
 
-    auto blockOut = buildBlockFromStorage(std::move(tagsOut), std::move(valuesOut));
+    auto computeBlockOut = [&]() -> std::unique_ptr<value::ValueBlock> {
+        if (valuesOut.size() == 0) {
+            return std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut),
+                                                               std::move(valuesOut));
+        }
+        value::TypeTags firstTag = tagsOut[0];
+        value::Value firstValue = valuesOut[0];
+
+        auto sameType = std::all_of(tagsOut.begin(),
+                                    tagsOut.end(),
+                                    [firstTag](value::TypeTags tag) { return tag == firstTag; });
+
+        auto sameValue = sameType &&
+            std::all_of(valuesOut.begin(), valuesOut.end(), [firstValue](value::Value value) {
+                             return value == firstValue;
+                         });
+
+        if (sameValue) {
+            // All results are of the same type and have the same value. Return a MonoBlock.
+            return std::make_unique<value::MonoBlock>(leftBlockSize, tagsOut[0], valuesOut[0]);
+        }
+
+        if (sameType && firstTag == value::TypeTags::Boolean) {
+            // All results are boolean. Return a BoolBlock.
+            return std::make_unique<value::BoolBlock>(std::move(valuesOut));
+        }
+
+        // No special case. Return a HeterogeneousBlock
+        return std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut),
+                                                           std::move(valuesOut));
+    };
+
+    auto blockOut = computeBlockOut();
 
     return {true,
             value::TypeTags::valueBlock,
@@ -2049,67 +2089,68 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
             cellTag == value::TypeTags::cellBlock);
     auto* cellBlock = value::bitcastTo<value::CellBlock*>(cellVal);
 
-    const auto& positionInfo = cellBlock->filterPositionInfo();
-    const bool isEmptyPositionInfo = emptyPositionInfo(positionInfo);
-
-    if (isEmptyPositionInfo && valueBlock->allTrue().has_value()) {
-        // The block is made of all boolean values, return the input unchanged.
-        return moveFromStack(0);
-    }
-
     auto valsExtracted = valueBlock->extract();
-    std::vector<value::Value> folded;
+    const auto& positionInfo = cellBlock->filterPositionInfo();
 
-    if (isEmptyPositionInfo) {
-        folded.resize(valsExtracted.count(), value::Value(0));
-        for (size_t i = 0; i < valsExtracted.count(); ++i) {
-            auto [t, v] = valsExtracted[i];
-            folded[i] = (t == value::TypeTags::Boolean && value::bitcastTo<bool>(v));
-        }
-    } else {
-        // Note that the representation for positionInfo was chosen for simplicity and not for
-        // performance.  If this code ends up being a bottleneck, there are plenty of tricks we can
-        // do to speed it up. At time of writing, this code was not at all "hot," so we kept it
-        // simple.
-
-        folded.resize(positionInfo.size(), value::Value(0));
-
-        // We keep two parallel iterators, one over the position info and another over the vector of
-        // values. There is exactly one position info element per row, so our output is guaranteed
-        // to be of size positionInfo.size().
-
-        // pos info: [1, 1, 2, 1, 1, 0, 1, 1]
-        //                  ^rowIdx
-        //
-        // vals:     [true, false, true, true, Nothing, ...]
-        //                         ^valIdx
-        //
-        // We then logically OR the values associated with the same row. So if a row has any 'trues'
-        // associated with it, its result is true. Otherwise its result is false. In the special
-        // case where a row has 0 values associated with it (corresponding to an empty array), it's
-        // result is false.
-
-        size_t valIdx = 0;
-        for (size_t rowIdx = 0; rowIdx < positionInfo.size(); ++rowIdx) {
-            const auto nElementsForRow = positionInfo[rowIdx];
-            invariant(nElementsForRow >= 0);
-
-            bool foldedResultForRow = false;
-            for (int elementForDoc = 0; elementForDoc < nElementsForRow; ++elementForDoc) {
-                tassert(8604101, "Corrupt position info", valIdx < valsExtracted.count());
-
-                const bool valForElement =
-                    valsExtracted[valIdx].first == sbe::value::TypeTags::Boolean &&
-                    value::bitcastTo<bool>(valsExtracted[valIdx].second);
-                ++valIdx;
-
-                foldedResultForRow = foldedResultForRow || valForElement;
+    if (emptyPositionInfo(positionInfo)) {
+        if (valsExtracted.count() > 0 && allBools(valsExtracted.tags(), valsExtracted.count())) {
+            // Return the input unchanged.
+            return moveFromStack(0);
+        } else {
+            auto out = std::make_unique<value::BoolBlock>();
+            for (size_t i = 0; i < valsExtracted.count(); ++i) {
+                auto [t, v] = valsExtracted[i];
+                out->push_back(t == value::TypeTags::Boolean && value::bitcastTo<bool>(v));
             }
-            folded[rowIdx] = foldedResultForRow;
+
+            return {true,
+                    value::TypeTags::valueBlock,
+                    value::bitcastFrom<value::ValueBlock*>(out.release())};
         }
     }
 
-    auto blockOut = std::make_unique<value::BoolBlock>(std::move(folded));
+    // Note that the representation for positionInfo was chosen for simplicity and not for
+    // performance.  If this code ends up being a bottleneck, there are plenty of tricks we can do
+    // to speed it up. At time of writing, this code was not at all "hot," so we kept it simple.
+
+    std::vector<value::Value> folded(positionInfo.size(), value::Value(0));
+
+    // We keep two parallel iterators, one over the position info and another over the vector of
+    // values. There is exactly one position info element per row, so our output is guaranteed to be
+    // of size positionInfo.size().
+
+    // pos info: [1, 1, 2, 1, 1, 0, 1, 1]
+    //                  ^rowIdx
+    //
+    // vals:     [true, false, true, true, Nothing, ...]
+    //                         ^valIdx
+    //
+    // We then logically OR the values associated with the same row. So if a row has any 'trues'
+    // associated with it, its result is true. Otherwise its result is false. In the special case
+    // where a row has 0 values associated with it (corresponding to an empty array), it's result
+    // is false.
+
+    size_t valIdx = 0;
+    for (size_t rowIdx = 0; rowIdx < positionInfo.size(); ++rowIdx) {
+        const auto nElementsForRow = positionInfo[rowIdx];
+        invariant(nElementsForRow >= 0);
+
+        bool foldedResultForRow = false;
+        for (int elementForDoc = 0; elementForDoc < nElementsForRow; ++elementForDoc) {
+            tassert(8604101, "Corrupt position info", valIdx < valsExtracted.count());
+
+            const bool valForElement =
+                valsExtracted[valIdx].first == sbe::value::TypeTags::Boolean &&
+                value::bitcastTo<bool>(valsExtracted[valIdx].second);
+            ++valIdx;
+
+            foldedResultForRow = foldedResultForRow || valForElement;
+        }
+        folded[rowIdx] = foldedResultForRow;
+    }
+
+    auto blockOut = std::make_unique<value::HeterogeneousBlock>(
+        std::vector<value::TypeTags>(folded.size(), value::TypeTags::Boolean), std::move(folded));
 
     return {true,
             value::TypeTags::valueBlock,

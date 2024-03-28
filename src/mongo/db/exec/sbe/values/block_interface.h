@@ -317,12 +317,11 @@ protected:
 
     std::unique_ptr<ValueBlock> defaultMapImpl(const ColumnOp& op);
 
+    std::unique_ptr<ValueBlock> buildBlockFromStorage(std::vector<value::TypeTags> tags,
+                                                      std::vector<value::Value> vals);
+
     boost::optional<DeblockedTagValStorage> _deblockedStorage;
 };
-
-// Create the ValueBlock that best adapt to the provided data.
-std::unique_ptr<ValueBlock> buildBlockFromStorage(std::vector<value::TypeTags> tags,
-                                                  std::vector<value::Value> vals);
 
 // TODO SERVER-83799 Remove TypeTags::Boolean
 inline constexpr bool validHomogeneousType(TypeTags tag) {
@@ -649,8 +648,12 @@ public:
 
         // Fast path for dense case.
         if (_presentBitset.all()) {
+            storage->vals.resize(_vals.size());
+            for (size_t i = 0; i < _presentBitset.size(); ++i) {
+                storage->vals[i] = _vals[i];
+            }
             storage->tags.resize(_vals.size(), TypeTag);
-            return {_presentBitset.size(), storage->tags.data(), _vals.data()};
+            return {storage->tags.size(), storage->tags.data(), storage->vals.data()};
         }
 
         storage->vals.resize(_presentBitset.size());
