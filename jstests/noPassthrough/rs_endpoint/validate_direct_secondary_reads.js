@@ -16,6 +16,12 @@ function enableProfiling(rst, dbName) {
     });
 }
 
+function waitForProfilerDocuments(db, numDocs) {
+    assert.soon(() => {
+        return db.system.profile.find().itcount() >= numDocs;
+    });
+}
+
 const rst = new ReplSetTest({
     nodes: [
         {},
@@ -49,10 +55,6 @@ const secondary1TestDB = secondaries[1].getDB(dbName);  // excluded from reading
 const secondary2TestDB = secondaries[2].getDB(dbName);
 const secondary3TestDB = secondaries[3].getDB(dbName);
 
-enableProfiling(rst, "config");
-enableProfiling(rst, "local");
-enableProfiling(rst, "admin");
-
 {
     jsTest.log("Testing no reads in user database");
     const numProfilerDocsPerHost = {};
@@ -76,7 +78,12 @@ enableProfiling(rst, "admin");
         secondary2TestDB.runCommand({find: collName, filter: {}, comment: hostDocs[3].comment}));
     assert.commandWorked(
         secondary3TestDB.runCommand({find: collName, filter: {}, comment: hostDocs[4].comment}));
-    rst.awaitReplication();
+
+    waitForProfilerDocuments(primaryTestDB, 1);
+    waitForProfilerDocuments(secondary0TestDB, 2);
+    waitForProfilerDocuments(secondary1TestDB, 1);
+    waitForProfilerDocuments(secondary2TestDB, 2);
+    waitForProfilerDocuments(secondary3TestDB, 2);
 
     const numProfilerDocsPerHost = {};
     validateProfilerCollections(hostDocs[0], hostDocs, numProfilerDocsPerHost);
@@ -95,7 +102,9 @@ enableProfiling(rst, "admin");
     assert.commandWorked(primaryTestDB.runCommand({insert: collName, documents: [{x: 1}]}));
     assert.commandWorked(
         secondary0TestDB.runCommand({find: collName, filter: {}, comment: hostDocs[3].comment}));
-    rst.awaitReplication();
+
+    waitForProfilerDocuments(primaryTestDB, 1);
+    waitForProfilerDocuments(secondary0TestDB, 1);
 
     const numProfilerDocsPerHost = {};
     validateProfilerCollections(hostDocs[0], hostDocs, numProfilerDocsPerHost);
@@ -114,7 +123,9 @@ enableProfiling(rst, "admin");
     assert.commandWorked(primaryTestDB.runCommand({insert: collName, documents: [{x: 1}]}));
     assert.commandWorked(
         secondary1TestDB.runCommand({find: collName, filter: {}, comment: hostDocs[3].comment}));
-    rst.awaitReplication();
+
+    waitForProfilerDocuments(primaryTestDB, 1);
+    waitForProfilerDocuments(secondary1TestDB, 1);
 
     const numProfilerDocsPerHost = {};
     validateProfilerCollections(hostDocs[0], hostDocs, numProfilerDocsPerHost);
@@ -129,8 +140,12 @@ enableProfiling(rst, "admin");
 
 {
     jsTest.log("Testing reads in config database on primary");
-    assert.commandWorked(primary.getDB("config").runCommand(
-        {find: "chunks", filter: {}, comment: hostDocs[3].comment}));
+    enableProfiling(rst, "config");
+    const primaryConfigDB = primary.getDB("config");
+    assert.commandWorked(
+        primaryConfigDB.runCommand({find: "chunks", filter: {}, comment: hostDocs[3].comment}));
+
+    waitForProfilerDocuments(primaryConfigDB, 1);
 
     const numProfilerDocsPerHost = {};
     validateProfilerCollections(hostDocs[0], hostDocs, numProfilerDocsPerHost);
@@ -158,7 +173,8 @@ enableProfiling(rst, "admin");
     assert.commandWorked(primaryTestDB.runCommand(
         {findAndModify: collName, query: {x: 1}, update: {$set: {z: 1}}, comment}));
     assert.commandWorked(primaryTestDB.runCommand({drop: collName, comment}));
-    rst.awaitReplication();
+
+    waitForProfilerDocuments(primaryTestDB, 8);
 
     const numProfilerDocsPerHost = {};
     validateProfilerCollections(hostDocs[0], hostDocs, numProfilerDocsPerHost);
