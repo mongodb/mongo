@@ -11,6 +11,7 @@ class BuildProfileType(str, enum.Enum):
     FAST = "fast"
     OPT = "opt"
     SAN = "san"
+    TSAN = "tsan"
     COMPILE_DB = "compiledb"
     RELEASE = "release"
 
@@ -143,6 +144,28 @@ LINUX_BUILD_PROFILES = {
             jlink=0.99,
         ),
 
+    # This build leverages thread sanitizers.
+    BuildProfileType.TSAN:
+        BuildProfile(
+            ninja="enabled",
+            variables_files=[
+                './etc/scons/developer_versions.vars',
+                './etc/scons/mongodbtoolchain_stable_clang.vars',
+            ],
+            allocator="system",
+            sanitize="thread",
+            link_model="dynamic",
+            dbg="on",
+            opt="on",
+            ICECC="icecc",
+            CCACHE="ccache",
+            NINJA_PREFIX="tsan",
+            VARIANT_DIR="tsan",
+            disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
+        ),
+
     #These options are the preferred settings for compiledb to generating compile_commands.json
     BuildProfileType.COMPILE_DB:
         BuildProfile(
@@ -249,6 +272,10 @@ WINDOWS_BUILD_PROFILES = {
     BuildProfileType.SAN:
         None,
 
+    # This build leverages thread sanitizers.
+    BuildProfileType.TSAN:
+        None,
+
     #These options are the preferred settings for compiledb to generating compile_commands.json
     BuildProfileType.COMPILE_DB:
         BuildProfile(
@@ -352,6 +379,10 @@ MACOS_BUILD_PROFILES = {
         ),
     # This build leverages santizers & is the suggested build profile to use for development.
     BuildProfileType.SAN:
+        None,
+
+    # This build leverages thread sanitizers.
+    BuildProfileType.TSAN:
         None,
 
     #These options are the preferred settings for compiledb to generating compile_commands.json
@@ -460,6 +491,10 @@ MACOS_ARM_BUILD_PROFILES = {
         ),
     # This build leverages santizers & is the suggested build profile to use for development.
     BuildProfileType.SAN:
+        None,
+
+    # This build leverages thread sanitizers.
+    BuildProfileType.TSAN:
         None,
 
     #These options are the preferred settings for compiledb to generating compile_commands.json
