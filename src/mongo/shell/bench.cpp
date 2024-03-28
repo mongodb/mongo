@@ -141,61 +141,69 @@ BSONObj fixQuery(const BSONObj& obj, BsonTemplateEvaluator& btl) {
     return b.obj();
 }
 
-bool runCommandWithSession(DBClientBase* conn,
+// This function sets up a command to be run on a dbclient. It can throw either an illegal operation
+// or command failed error
+void runCommandWithSession(DBClientBase* conn,
                            const DatabaseName& dbName,
                            const BSONObj& cmdObj,
                            int options,
                            const boost::optional<LogicalSessionIdToClient>& lsid,
                            boost::optional<TxnNumber> txnNumber,
                            BSONObj* result) {
-    if (!lsid) {
+    BSONObjBuilder cmdBuilder;
+    BSONObj effectiveCmdObj = cmdObj;
+    if (lsid) {
+        for (const auto& cmdArg : cmdObj) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "Command cannot contain session id",
+                    cmdArg.fieldName() != OperationSessionInfoFromClient::kSessionIdFieldName);
+            uassert(ErrorCodes::IllegalOperation,
+                    "Command cannot contain transaction id",
+                    cmdArg.fieldName() != OperationSessionInfoFromClient::kTxnNumberFieldName);
+
+            cmdBuilder.append(cmdArg);
+        }
+
+        {
+            BSONObjBuilder lsidBuilder(
+                cmdBuilder.subobjStart(OperationSessionInfoFromClient::kSessionIdFieldName));
+            lsid->serialize(&lsidBuilder);
+            lsidBuilder.doneFast();
+        }
+
+        if (txnNumber) {
+            cmdBuilder.append(OperationSessionInfoFromClient::kTxnNumberFieldName, *txnNumber);
+        }
+
+        if (options & kMultiStatementTransactionOption) {
+            cmdBuilder.append("autocommit", false);
+        }
+
+        if (options & kStartTransactionOption) {
+            cmdBuilder.append("startTransaction", true);
+        }
+        effectiveCmdObj = cmdBuilder.done();
+    } else {
         invariant(!txnNumber);
-        return conn->runCommand(dbName, cmdObj, *result);
     }
 
-    BSONObjBuilder cmdObjWithLsidBuilder;
-
-    for (const auto& cmdArg : cmdObj) {
-        uassert(ErrorCodes::IllegalOperation,
-                "Command cannot contain session id",
-                cmdArg.fieldName() != OperationSessionInfoFromClient::kSessionIdFieldName);
-        uassert(ErrorCodes::IllegalOperation,
-                "Command cannot contain transaction id",
-                cmdArg.fieldName() != OperationSessionInfoFromClient::kTxnNumberFieldName);
-
-        cmdObjWithLsidBuilder.append(cmdArg);
+    if (!conn->runCommand(dbName, effectiveCmdObj, *result)) {
+        LOGV2_INFO(8830300,
+                   "Command failed",
+                   "command"_attr = effectiveCmdObj.firstElementFieldNameStringData(),
+                   "result"_attr = *result);
+        uasserted(ErrorCodes::CommandFailed, str::stream() << "Result=" << *result);
     }
-
-    {
-        BSONObjBuilder lsidBuilder(
-            cmdObjWithLsidBuilder.subobjStart(OperationSessionInfoFromClient::kSessionIdFieldName));
-        lsid->serialize(&lsidBuilder);
-        lsidBuilder.doneFast();
-    }
-
-    if (txnNumber) {
-        cmdObjWithLsidBuilder.append(OperationSessionInfoFromClient::kTxnNumberFieldName,
-                                     *txnNumber);
-    }
-
-    if (options & kMultiStatementTransactionOption) {
-        cmdObjWithLsidBuilder.append("autocommit", false);
-    }
-
-    if (options & kStartTransactionOption) {
-        cmdObjWithLsidBuilder.append("startTransaction", true);
-    }
-
-    return conn->runCommand(dbName, cmdObjWithLsidBuilder.done(), *result);
 }
 
-bool runCommandWithSession(DBClientBase* conn,
+void runCommandWithSession(DBClientBase* conn,
                            const DatabaseName& dbName,
                            const BSONObj& cmdObj,
                            int options,
                            const boost::optional<LogicalSessionIdToClient>& lsid,
                            BSONObj* result) {
-    return runCommandWithSession(conn, dbName, cmdObj, options, lsid, boost::none, result);
+    runCommandWithSession(
+        conn, dbName, cmdObj, options, lsid, boost::optional<TxnNumber>{}, result);
 }
 
 void abortTransaction(DBClientBase* conn,
@@ -203,17 +211,19 @@ void abortTransaction(DBClientBase* conn,
                       boost::optional<TxnNumber> txnNumber) {
     BSONObj abortTransactionCmd = BSON("abortTransaction" << 1);
     BSONObj abortCommandResult;
-    const bool successful = runCommandWithSession(conn,
-                                                  DatabaseName::kAdmin,
-                                                  abortTransactionCmd,
-                                                  kMultiStatementTransactionOption,
-                                                  lsid,
-                                                  txnNumber,
-                                                  &abortCommandResult);
-    // Transaction could be aborted already
-    uassert(ErrorCodes::CommandFailed,
-            str::stream() << "abort command failed; reply was: " << abortCommandResult,
-            successful || abortCommandResult["codeName"].valueStringData() == "NoSuchTransaction");
+    try {
+        runCommandWithSession(conn,
+                              DatabaseName::kAdmin,
+                              abortTransactionCmd,
+                              kMultiStatementTransactionOption,
+                              lsid,
+                              txnNumber,
+                              &abortCommandResult);
+    } catch (const ExceptionFor<ErrorCodes::CommandFailed>&) {
+        // `NoSuchTransaction` errors are tolerated if the command fails.
+        if (abortCommandResult["codeName"].valueStringData() != "NoSuchTransaction"_sd)
+            throw;
+    }
 }
 
 /**
@@ -238,18 +248,16 @@ int runQueryWithReadCommands(DBClientBase* conn,
 
     BSONObj findCommandResult;
     BSONObj findCommandObj = findCommand->toBSON(readPrefObj);
-    uassert(ErrorCodes::CommandFailed,
-            str::stream() << "find command failed; reply was: " << findCommandResult,
-            runCommandWithSession(
-                conn,
-                dbName,
-                findCommandObj,
-                // read command with txnNumber implies performing reads in a
-                // multi-statement transaction
-                txnNumber ? kStartTransactionOption | kMultiStatementTransactionOption : kNoOptions,
-                lsid,
-                txnNumber,
-                &findCommandResult));
+    runCommandWithSession(conn,
+                          dbName,
+                          findCommandObj,
+                          // read command with txnNumber implies performing reads in a
+                          // multi-statement transaction
+                          txnNumber ? kStartTransactionOption | kMultiStatementTransactionOption
+                                    : kNoOptions,
+                          lsid,
+                          txnNumber,
+                          &findCommandResult);
 
     CursorResponse cursorResponse =
         uassertStatusOK(CursorResponse::parseFromBSON(findCommandResult));
@@ -273,17 +281,15 @@ int runQueryWithReadCommands(DBClientBase* conn,
             findCommand->getNamespaceOrUUID().nss().coll().toString());
         getMoreRequest.setBatchSize(findCommand->getBatchSize());
         BSONObj getMoreCommandResult;
-        uassert(ErrorCodes::CommandFailed,
-                str::stream() << "getMore command failed; reply was: " << getMoreCommandResult,
-                runCommandWithSession(conn,
-                                      dbName,
-                                      getMoreRequest.toBSON({}),
-                                      // read command with txnNumber implies performing reads in a
-                                      // multi-statement transaction
-                                      txnNumber ? kMultiStatementTransactionOption : kNoOptions,
-                                      lsid,
-                                      txnNumber,
-                                      &getMoreCommandResult));
+        runCommandWithSession(conn,
+                              dbName,
+                              getMoreRequest.toBSON({}),
+                              // read command with txnNumber implies performing reads in a
+                              // multi-statement transaction
+                              txnNumber ? kMultiStatementTransactionOption : kNoOptions,
+                              lsid,
+                              txnNumber,
+                              &getMoreCommandResult);
 
         cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(getMoreCommandResult));
         count += cursorResponse.getBatch().size();
@@ -1121,21 +1127,20 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             }
         } break;
         case OpType::COMMAND: {
-            bool ok;
             BSONObj result;
-            {
+            try {
                 BenchRunEventTrace _bret(&state->stats->commandCounter);
-                ok = runCommandWithSession(
+                runCommandWithSession(
                     conn,
                     DatabaseName::createDatabaseName_forTest(this->tenantId, this->ns),
                     fixQuery(this->command, *state->bsonTemplateEvaluator),
                     this->options,
                     lsid,
                     &result);
-            }
-            if (!ok) {
+            } catch (const DBException&) {
                 ++state->stats->errCount;
             }
+
 
             if (!result["cursor"].eoo()) {
                 // The command returned a cursor, so iterate all results.
@@ -1145,16 +1150,13 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     GetMoreCommandRequest getMoreRequest(cursorResponse.getCursorId(),
                                                          cursorResponse.getNSS().coll().toString());
                     BSONObj getMoreCommandResult;
-                    uassert(ErrorCodes::CommandFailed,
-                            str::stream()
-                                << "getMore command failed; reply was: " << getMoreCommandResult,
-                            runCommandWithSession(
-                                conn,
-                                DatabaseName::createDatabaseName_forTest(this->tenantId, this->ns),
-                                getMoreRequest.toBSON({}),
-                                kNoOptions,
-                                lsid,
-                                &getMoreCommandResult));
+                    runCommandWithSession(
+                        conn,
+                        DatabaseName::createDatabaseName_forTest(this->tenantId, this->ns),
+                        getMoreRequest.toBSON({}),
+                        kNoOptions,
+                        lsid,
+                        &getMoreCommandResult);
                     cursorResponse =
                         uassertStatusOK(CursorResponse::parseFromBSON(getMoreCommandResult));
                     count += cursorResponse.getBatch().size();
