@@ -105,6 +105,32 @@ buildvariants:
     - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
     - name: .default .requires_compile_variant !.incompatible_development_variant
 
+- &enterprise-amazon-linux2-arm64-template
+  <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
+  name: &enterprise-amazon-linux2-arm64 enterprise-amazon-linux2-arm64
+  display_name: "* Amazon Linux 2 arm64 Enterprise"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  run_on:
+    - amazon2-arm64-small
+  stepback: true
+  expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
+    <<: *amazon_linux2_arm64_dynamic_expansions
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 5
+    idle_timeout_factor: 1.5
+    exec_timeout_factor: 1.5
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+  tasks:
+  - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+  - name: .default !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+
 - name: &commit-queue commit-queue
   display_name: "~ Commit Queue"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
