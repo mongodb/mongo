@@ -20,7 +20,9 @@
 
 #include <stddef.h>
 
+#include "absl/base/attributes.h"
 #include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/malloc_extension.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -70,7 +72,13 @@ ABSL_MUST_USE_RESULT bool SystemRelease(void* start, size_t length);
 // best-effort hint, but in practice we will unconditionally fault the
 // range.)
 // REQUIRES: [start, start + length) is a range aligned to 4KiB boundaries.
-void SystemBack(void* start, size_t length);
+inline void SystemBack(void* start, size_t length) {
+  // TODO(b/134694141): use madvise when we have better support for that;
+  // taking faults is not free.
+
+  // TODO(b/134694141): enable this, if we can avoid causing trouble for apps
+  // that routinely make large mallocs they never touch (sigh).
+}
 
 // Returns the current address region factory.
 AddressRegionFactory* GetRegionFactory();

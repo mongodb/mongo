@@ -15,7 +15,10 @@
 #ifndef TCMALLOC_TESTING_TEST_ALLOCATOR_HARNESS_H_
 #define TCMALLOC_TESTING_TEST_ALLOCATOR_HARNESS_H_
 
+#include <algorithm>
 #include <random>
+#include <utility>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "absl/base/optimization.h"
@@ -30,9 +33,9 @@ struct Object {
 
   Object(const Object& o) = delete;
   Object(Object&& o)
-      : ptr(absl::exchange(o.ptr, nullptr)),
-        size(absl::exchange(o.size, 0)),
-        generation(absl::exchange(o.generation, 0)) {}
+      : ptr(std::exchange(o.ptr, nullptr)),
+        size(std::exchange(o.size, 0)),
+        generation(std::exchange(o.generation, 0)) {}
 
   Object& operator=(const Object& o) = delete;
   Object& operator=(Object&& o) {

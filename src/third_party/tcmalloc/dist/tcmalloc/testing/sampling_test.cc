@@ -21,31 +21,31 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <new>
+#include <optional>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "benchmark/benchmark.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/base/attributes.h"
-#include "absl/base/thread_annotations.h"
 #include "absl/debugging/symbolize.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/random/random.h"
-#include "absl/synchronization/mutex.h"
-#include "absl/time/clock.h"
-#include "absl/time/time.h"
 #include "absl/types/optional.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/malloc_extension.h"
 #include "tcmalloc/testing/testutil.h"
-#include "tcmalloc/testing/thread_manager.h"
 
 namespace tcmalloc {
 namespace {
 
+constexpr int kMaxDemangledFunctionName = 256;
+
 bool StackMatches(const char* target, const void* const* stack, size_t len) {
-  char buf[256];
+  char buf[kMaxDemangledFunctionName];
 
   for (size_t i = 0; i < len; ++i) {
     if (!absl::Symbolize(stack[i], buf, sizeof(buf))) continue;
@@ -74,7 +74,7 @@ ABSL_ATTRIBUTE_NOINLINE static void* AllocateAllocate(bool align) {
   if (align) {
     // A 10000 byte allocation aligned to 2K will use a 10K size class
     // and get 'charged' identically to malloc(10000).
-    CHECK_CONDITION(posix_memalign(&p, 2048, 10000) == 0);
+    TC_CHECK_EQ(0, posix_memalign(&p, 2048, 10000));
   } else {
     p = malloc(10000);
   }
@@ -155,7 +155,7 @@ TEST(Sampling, AlwaysSampling) {
   }
   const absl::optional<size_t> alloc_size =
       MallocExtension::GetAllocatedSize(allocs[0]);
-  ASSERT_THAT(alloc_size, testing::Ne(absl::nullopt));
+  ASSERT_THAT(alloc_size, testing::Ne(std::nullopt));
   EXPECT_GT(*alloc_size, 0);
 
   size_t bytes = CountMatchingBytes<false>(
@@ -172,99 +172,11 @@ ABSL_ATTRIBUTE_NOINLINE static void* AllocateRandomBytes() {
   return ::operator new(absl::LogUniform<size_t>(rng, 1, 1 << 21));
 }
 
-// TODO(b/197108627): Remove after Census memory accounting changes land.
-TEST(Sampling, AlwaysSamplingMultiThreaded) {
-  // Check data accuracy when we always sample and allocate/deallocate through
-  // multiple threads. It is hard to test for data accuracy when we sample the
-  // the allocation with a probability < 1.
-  ScopedGuardedSamplingRate gs(-1);
-  ScopedProfileSamplingRate s(1);
-
-  struct Allocation {
-    void* ptr = nullptr;
-    bool has_alloc = false;
-    size_t alloc_size = 0;
-  };
-
-  struct AllocsForCleanup {
-    absl::Mutex lock;
-    // Managed by a dedicated thread to take items from other threads and
-    // deallocate them.
-    std::vector<Allocation> allocs ABSL_GUARDED_BY(lock);
-  } allocs_for_cleanup;
-
-  constexpr int kItems = 10000;
-  std::vector<Allocation> allocs(kItems);
-
-  constexpr int kThreads = 10;
-  ThreadManager manager;
-  // `kThreads` threads to allocate/deallocate and another thread to take items
-  // passed from them for deallocation.
-  std::vector<size_t> alloc_size_by_thread(kThreads + 1);
-
-  manager.Start(kThreads, [&](int thread_id) {
-    absl::BitGen rng;
-    // Each thread is responsible for modifying a subsection of the array.
-    const int startIndex = thread_id * kItems / kThreads;
-    const int endIndex = (thread_id + 1) * kItems / kThreads;
-    Allocation& alloc = allocs[absl::Uniform<int>(rng, startIndex, endIndex)];
-    if (alloc.has_alloc) {
-      // Flip a coin to decide whether we deallocate or transfer the item to the
-      // cleanup thread (lower probability to reduce contention and runtime).
-      const double coin = absl::Uniform(rng, 0., 1.);
-      if (coin < 0.9) {
-        ::operator delete(alloc.ptr);
-        alloc.ptr = nullptr;
-        alloc.has_alloc = false;
-        alloc_size_by_thread[thread_id] -= alloc.alloc_size;
-        alloc.alloc_size = 0;
-      } else {
-        alloc_size_by_thread[thread_id] -= alloc.alloc_size;
-        Allocation tmp;
-        std::swap(tmp, alloc);
-        absl::MutexLock m(&allocs_for_cleanup.lock);
-        alloc_size_by_thread[kThreads] += tmp.alloc_size;
-        allocs_for_cleanup.allocs.push_back(std::move(tmp));
-      }
-    } else {
-      alloc.ptr = AllocateRandomBytes();
-      const absl::optional<size_t> alloc_size =
-          MallocExtension::GetAllocatedSize(alloc.ptr);
-      ASSERT_THAT(alloc_size, testing::Ne(std::nullopt));
-      alloc.alloc_size = *alloc_size;
-      alloc_size_by_thread[thread_id] += alloc.alloc_size;
-      alloc.has_alloc = true;
-    }
-  });
-
-  manager.Start(1, [&](int thread_id) {
-    absl::MutexLock m(&allocs_for_cleanup.lock);
-    for (Allocation& alloc : allocs_for_cleanup.allocs) {
-      ::operator delete(alloc.ptr);
-    }
-    allocs_for_cleanup.allocs.clear();
-    alloc_size_by_thread[kThreads] = 0;
-  });
-
-  absl::SleepFor(absl::Milliseconds(500));
-  manager.Stop();
-
-  size_t bytes = CountMatchingBytes<false>(
-      "AllocateRandomBytes",
-      MallocExtension::SnapshotCurrent(ProfileType::kHeap));
-  size_t total_size = 0;
-  for (size_t cur_size : alloc_size_by_thread) total_size += cur_size;
-  EXPECT_EQ(bytes, total_size);
-
-  for (Allocation& alloc : allocs) {
-    if (alloc.has_alloc) {
-      ::operator delete(alloc.ptr);
-    }
-  }
-  absl::MutexLock m(&allocs_for_cleanup.lock);
-  for (Allocation& alloc : allocs_for_cleanup.allocs) {
-    ::operator delete(alloc.ptr);
-  }
+// We disable inlining and tail calls to ensure that we have a stack entry for
+// that function.
+ABSL_ATTRIBUTE_NOINLINE ABSL_ATTRIBUTE_NO_TAIL_CALL Profile
+GetHeapSnapshotNoinline() {
+  return MallocExtension::SnapshotCurrent(ProfileType::kHeap);
 }
 
 TEST(Sampling, InternalFragmentation) {
@@ -287,14 +199,22 @@ TEST(Sampling, InternalFragmentation) {
   const absl::optional<size_t> starting_fragmentation =
       MallocExtension::GetNumericProperty(
           "tcmalloc.sampled_internal_fragmentation");
-  ASSERT_THAT(starting_fragmentation, testing::Ne(absl::nullopt));
+  ASSERT_THAT(starting_fragmentation, testing::Ne(std::nullopt));
 
   auto ProfiledFragmentation = [&]() {
     size_t fragmentation = 0;
-    auto profile = MallocExtension::SnapshotCurrent(ProfileType::kHeap);
+    auto profile = GetHeapSnapshotNoinline();
     profile.Iterate([&](const tcmalloc::Profile::Sample& e) {
       EXPECT_GE(e.allocated_size, e.requested_size);
       EXPECT_GT(e.allocated_size, 0);
+      // Ignore temporary allocations from creating the snapshot. These
+      // allocations are not accounted for in
+      // "tcmalloc.sampled_internal_fragmentation".
+      if (StackMatches("GetHeapSnapshotNoinline", e.stack, e.depth)) {
+        LOG(INFO) << "ignoring allocation of size " << e.requested_size
+                  << " within `MallocExtension::SnapshotCurrent`";
+        return;
+      }
       fragmentation +=
           (e.allocated_size - e.requested_size) * (e.sum / e.allocated_size);
     });
@@ -309,7 +229,7 @@ TEST(Sampling, InternalFragmentation) {
 
   const absl::optional<size_t> actual_low =
       MallocExtension::GetAllocatedSize(low[0]);
-  ASSERT_THAT(actual_low, testing::Ne(absl::nullopt));
+  ASSERT_THAT(actual_low, testing::Ne(std::nullopt));
 
   for (int i = 0; i < kNumHigh; i++) {
     high.push_back(::operator new(kHighFragmentationSize));
@@ -317,14 +237,14 @@ TEST(Sampling, InternalFragmentation) {
 
   const absl::optional<size_t> actual_high =
       MallocExtension::GetAllocatedSize(high[0]);
-  ASSERT_THAT(actual_high, testing::Ne(absl::nullopt));
+  ASSERT_THAT(actual_high, testing::Ne(std::nullopt));
 
   const size_t ending_profiled_fragmentation = ProfiledFragmentation();
 
   const absl::optional<size_t> ending_fragmentation =
       MallocExtension::GetNumericProperty(
           "tcmalloc.sampled_internal_fragmentation");
-  ASSERT_THAT(ending_fragmentation, testing::Ne(absl::nullopt));
+  ASSERT_THAT(ending_fragmentation, testing::Ne(std::nullopt));
   const std::string stats = MallocExtension::GetStats();
 
   for (void* p : low) {

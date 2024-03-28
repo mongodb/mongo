@@ -17,12 +17,19 @@
 
 #include <stddef.h>
 
+#include <new>
+
 #include "absl/base/attributes.h"
+#include "absl/base/dynamic_annotations.h"
 #include "absl/base/optimization.h"
 #include "absl/base/thread_annotations.h"
 #include "tcmalloc/arena.h"
 #include "tcmalloc/common.h"
-#include "tcmalloc/internal/logging.h"
+#include "tcmalloc/internal/config.h"
+
+#ifdef ABSL_HAVE_ADDRESS_SANITIZER
+#include <sanitizer/asan_interface.h>
+#endif
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -54,20 +61,40 @@ class PageHeapAllocator {
 
   ABSL_ATTRIBUTE_RETURNS_NONNULL T* New()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock) {
+    return NewWithSize(sizeof(T), static_cast<std::align_val_t>(alignof(T)));
+  }
+
+  ABSL_ATTRIBUTE_RETURNS_NONNULL T* NewWithSize(size_t size,
+                                                std::align_val_t align)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock) {
+    TC_ASSERT_GE(static_cast<size_t>(align), alignof(T));
     // Consult free list
     T* result = free_list_;
     stats_.in_use++;
     if (ABSL_PREDICT_FALSE(result == nullptr)) {
       stats_.total++;
-      return reinterpret_cast<T*>(arena_->Alloc(sizeof(T)));
+      result = reinterpret_cast<T*>(arena_->Alloc(size, align));
+      ABSL_ANNOTATE_MEMORY_IS_UNINITIALIZED(result, size);
+      return result;
+    } else {
+#ifdef ABSL_HAVE_ADDRESS_SANITIZER
+      // Unpoison the object on the freelist.
+      ASAN_UNPOISON_MEMORY_REGION(result, size);
+#endif
     }
     free_list_ = *(reinterpret_cast<T**>(free_list_));
+    ABSL_ANNOTATE_MEMORY_IS_UNINITIALIZED(result, size);
     return result;
   }
 
   void Delete(T* p) ABSL_ATTRIBUTE_NONNULL()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock) {
     *(reinterpret_cast<void**>(p)) = free_list_;
+#ifdef ABSL_HAVE_ADDRESS_SANITIZER
+    // Poison the object on the freelist.  We do not dereference it after this
+    // point.
+    ASAN_POISON_MEMORY_REGION(p, sizeof(*p));
+#endif
     free_list_ = p;
     stats_.in_use--;
   }

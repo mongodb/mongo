@@ -17,7 +17,7 @@
 
 #include <stddef.h>
 
-#include <string>
+#include <optional>
 
 #include "absl/functional/function_ref.h"
 #include "absl/strings/string_view.h"
@@ -50,14 +50,15 @@ constexpr size_t kNumExperiments =
 // buffer must be sized for kMaxExperimentID entries.
 //
 // This is exposed for testing purposes only.
-const bool* SelectExperiments(bool* buffer, absl::string_view active,
-                              absl::string_view disabled);
+const bool* SelectExperiments(bool* buffer, absl::string_view test_target,
+                              absl::string_view active,
+                              absl::string_view disabled, bool unset);
 
 }  // namespace tcmalloc_internal
 
 bool IsExperimentActive(Experiment exp);
 
-absl::optional<Experiment> FindExperimentByName(absl::string_view name);
+std::optional<Experiment> FindExperimentByName(absl::string_view name);
 
 void WalkExperiments(
     absl::FunctionRef<void(absl::string_view name, bool active)> callback);

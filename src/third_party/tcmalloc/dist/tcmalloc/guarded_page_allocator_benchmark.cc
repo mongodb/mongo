@@ -15,10 +15,13 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstddef>
 
-#include "absl/base/internal/spinlock.h"
 #include "benchmark/benchmark.h"
+#include "tcmalloc/common.h"
 #include "tcmalloc/guarded_page_allocator.h"
+#include "tcmalloc/internal/allocation_guard.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/page_size.h"
 
@@ -39,7 +42,7 @@ static size_t PageSize() {
 void BM_AllocDealloc(benchmark::State& state) {
   static GuardedPageAllocator* gpa = []() {
     auto gpa = new GuardedPageAllocator;
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     gpa->Init(kMaxGpaPages, kMaxGpaPages);
     gpa->AllowAllocations();
     return gpa;
@@ -47,7 +50,7 @@ void BM_AllocDealloc(benchmark::State& state) {
   size_t alloc_size = state.range(0);
   for (auto _ : state) {
     char* ptr = reinterpret_cast<char*>(gpa->Allocate(alloc_size, 0).alloc);
-    CHECK_CONDITION(ptr != nullptr);
+    TC_CHECK_NE(ptr, nullptr);
     ptr[0] = 'X';               // Page fault first page.
     ptr[alloc_size - 1] = 'X';  // Page fault last page.
     gpa->Deallocate(ptr);

@@ -23,8 +23,10 @@
 
 #include "tcmalloc/internal/profile.pb.h"
 #include "gtest/gtest.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/gzip_stream.h"
@@ -53,6 +55,11 @@ TEST(ProfileTest, HeapProfile) {
 
   auto deleter = [](void* ptr) { ::operator delete(ptr); };
   std::vector<std::unique_ptr<void, decltype(deleter)>> allocs;
+  // Sometimes the compiler duplicates the tcmalloc call depending on if the
+  // fast path of the first `emplace_back` is taken. We reserve enough space for
+  // all insertions so that all `emplace_back` calls go through the fast path
+  // and there is only one stack trace for tcmalloc.
+  allocs.reserve(kAllocs * 2);
   for (int i = 0; i < kAllocs; i++) {
     allocs.emplace_back(::operator new(alloc_size), deleter);
     allocs.emplace_back(tcmalloc_size_returning_operator_new(alloc_size).p,
@@ -116,30 +123,54 @@ TEST(ProfileTest, HeapProfile) {
   // profile.proto.  Since all of the calls to operator new(alloc_size) are
   // similar in these dimensions, we expect to see only 2 samples, one for
   // ::operator new and one for tcmalloc_size_returning_operator_new.
-#ifndef __aarch64__
   EXPECT_EQ(samples, 2);
   EXPECT_EQ(size_returning_samples, 1);
-#else
-  // TODO(b/246562683):  We can see two distinct size-returning new callstacks
-  // on AArch64.
-  EXPECT_GE(samples, 2);
-  EXPECT_GE(size_returning_samples, 1);
-#endif
 
-  absl::flat_hash_set<int> mapping_ids;
-  mapping_ids.reserve(converted.mapping().size());
+  // Dump the profile in case of failures so that it's possible to debug.
+  // Since SCOPED_TRACE attaches output to every failure, we use ASSERTs below.
+  SCOPED_TRACE(converted.DebugString());
+
+  absl::flat_hash_map<int, const perftools::profiles::Mapping*> mappings;
+  mappings.reserve(converted.mapping().size());
   for (const auto& mapping : converted.mapping()) {
-    ASSERT_TRUE(mapping_ids.insert(mapping.id()).second);
+    ASSERT_NE(mapping.id(), 0);
+    ASSERT_TRUE(mappings.insert({mapping.id(), &mapping}).second);
   }
 
-  // Every location should have a mapping.
-  int mappings_seen = 0;
+  absl::flat_hash_map<int, const perftools::profiles::Location*> locations;
   for (const auto& location : converted.location()) {
-    const int mapping_id = location.mapping_id();
-    EXPECT_NE(mapping_id, 0);
-    mappings_seen += mapping_ids.contains(mapping_id);
+    ASSERT_NE(location.id(), 0);
+    ASSERT_TRUE(locations.insert({location.id(), &location}).second);
   }
-  EXPECT_EQ(mappings_seen, converted.location().size());
+
+  // We can't unwind past optimized libstdc++.so, and as the result have some
+  // bogus frames (random numbers), which don't have a mapping.
+  absl::flat_hash_set<int> unreliable_locations;
+  for (const auto& sample : converted.sample()) {
+    bool unreliable = false;
+    for (auto loc_id : sample.location_id()) {
+      if (unreliable) {
+        unreliable_locations.insert(loc_id);
+        continue;
+      }
+      const auto* loc = locations[loc_id];
+      ASSERT_NE(loc, nullptr);
+      const auto* mapping = mappings[loc->mapping_id()];
+      ASSERT_NE(mapping, nullptr);
+      ASSERT_LT(mapping->filename(), converted.string_table().size());
+      const auto& file = converted.string_table()[mapping->filename()];
+      unreliable = absl::StrContains(file, "libstdc++.so");
+    }
+  }
+
+  // Every reliable location should have a mapping.
+  for (const auto& location : converted.location()) {
+    if (unreliable_locations.contains(location.id())) {
+      continue;
+    }
+    const int mapping_id = location.mapping_id();
+    ASSERT_TRUE(mappings.contains(mapping_id)) << mapping_id;
+  }
 }
 
 }  // namespace

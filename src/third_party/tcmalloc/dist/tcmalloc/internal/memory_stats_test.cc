@@ -17,7 +17,6 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include <string>
 
 #include "gtest/gtest.h"
 

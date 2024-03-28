@@ -14,8 +14,13 @@
 
 #include "tcmalloc/arena.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <new>
 
+#include "absl/base/optimization.h"
+#include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/static_vars.h"
 #include "tcmalloc/system-alloc.h"
@@ -26,7 +31,7 @@ namespace tcmalloc_internal {
 
 void* Arena::Alloc(size_t bytes, std::align_val_t alignment) {
   size_t align = static_cast<size_t>(alignment);
-  ASSERT(align > 0);
+  TC_ASSERT_GT(align, 0);
   {  // First we need to move up to the correct alignment.
     const int misalignment = reinterpret_cast<uintptr_t>(free_area_) % align;
     const int alignment_bytes = misalignment != 0 ? align - misalignment : 0;
@@ -37,30 +42,14 @@ void* Arena::Alloc(size_t bytes, std::align_val_t alignment) {
   char* result;
   if (free_avail_ < bytes) {
     size_t ask = bytes > kAllocIncrement ? bytes : kAllocIncrement;
-    // TODO(b/171081864): Arena allocations should be made relatively
-    // infrequently.  Consider tagging this memory with sampled objects which
-    // are also infrequently allocated.
-    //
-    // In the meantime it is important that we use the current NUMA partition
-    // rather than always using a particular one because it's possible that any
-    // single partition we choose might only contain nodes that the process is
-    // unable to allocate from due to cgroup restrictions.
-    MemoryTag tag;
-    const auto& numa_topology = tc_globals.numa_topology();
-    if (numa_topology.numa_aware()) {
-      tag = NumaNormalTag(numa_topology.GetCurrentPartition());
-    } else {
-      tag = MemoryTag::kNormal;
-    }
-
-    auto [ptr, actual_size] = SystemAlloc(ask, kPageSize, tag);
+    auto [ptr, actual_size] = SystemAlloc(ask, kPageSize, MemoryTag::kMetadata);
     free_area_ = reinterpret_cast<char*>(ptr);
     if (ABSL_PREDICT_FALSE(free_area_ == nullptr)) {
-      Crash(kCrash, __FILE__, __LINE__,
-            "FATAL ERROR: Out of memory trying to allocate internal tcmalloc "
-            "data (bytes, object-size); is something preventing mmap from "
-            "succeeding (sandbox, VSS limitations)?",
-            kAllocIncrement, bytes);
+      TC_BUG(
+          "FATAL ERROR: Out of memory trying to allocate internal tcmalloc "
+          "data (bytes=%v, object-size=%v); is something preventing mmap from "
+          "succeeding (sandbox, VSS limitations)?",
+          kAllocIncrement, bytes);
     }
     SystemBack(free_area_, actual_size);
 
@@ -72,7 +61,7 @@ void* Arena::Alloc(size_t bytes, std::align_val_t alignment) {
     free_avail_ = actual_size;
   }
 
-  ASSERT(reinterpret_cast<uintptr_t>(free_area_) % align == 0);
+  TC_ASSERT_EQ(reinterpret_cast<uintptr_t>(free_area_) % align, 0);
   result = free_area_;
   free_area_ += bytes;
   free_avail_ -= bytes;

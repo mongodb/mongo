@@ -14,7 +14,7 @@
 
 #include "tcmalloc/internal/logging.h"
 
-#include <inttypes.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,14 +22,22 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 
 #include "absl/base/attributes.h"
 #include "absl/base/const_init.h"
 #include "absl/base/internal/spinlock.h"
 #include "absl/base/macros.h"
 #include "absl/debugging/stacktrace.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
+#include "tcmalloc/internal/allocation_guard.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/environment.h"
 #include "tcmalloc/internal/parameter_accessors.h"
-#include "tcmalloc/malloc_extension.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -52,73 +60,84 @@ static void WriteMessage(const char* msg, int length) {
 
 void (*log_message_writer)(const char* msg, int length) = WriteMessage;
 
-class Logger {
- public:
-  bool Add(const LogItem& item);
-  bool AddStr(const char* str, int n);
-  bool AddNum(uint64_t num, int base);  // base must be 10 or 16.
+// If this failure occurs during "bazel test", writes a warning for Bazel to
+// display.
+static void RecordBazelWarning(absl::string_view type,
+                               absl::string_view error) {
+  constexpr absl::string_view kHeaderSuffix = " error detected: ";
 
-  static constexpr int kBufSize = 512;
-  char* p_;
-  char* end_;
-  char buf_[kBufSize];
+  const char* warning_file = thread_safe_getenv("TEST_WARNINGS_OUTPUT_FILE");
+  if (!warning_file) return;  // Not a bazel test.
 
+  int fd = open(warning_file, O_CREAT | O_WRONLY | O_APPEND, 0644);
+  if (fd == -1) return;
+  (void)write(fd, type.data(), type.size());
+  (void)write(fd, kHeaderSuffix.data(), kHeaderSuffix.size());
+  (void)write(fd, error.data(), error.size());
+  (void)write(fd, "\n", 1);
+  close(fd);
+}
+
+// If this failure occurs during a gUnit test, writes an XML file describing the
+// error type.  Note that we cannot use ::testing::Test::RecordProperty()
+// because it doesn't write the XML file if a test crashes (which we're about to
+// do here).  So we write directly to the XML file instead.
+//
+static void RecordTestFailure(absl::string_view detector,
+                              absl::string_view error) {
+  const char* xml_file = thread_safe_getenv("XML_OUTPUT_FILE");
+  if (!xml_file) return;  // Not a gUnit test.
+
+  // Record test failure for Sponge.
+  constexpr absl::string_view kXmlHeaderPart1 =
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+      "<testsuites><testsuite><testcase>"
+      "  <properties>"
+      "    <property name=\"";
+  constexpr absl::string_view kXmlHeaderPart2 = "-report\" value=\"";
+  constexpr absl::string_view kXmlFooterPart1 =
+      "\"/>"
+      "  </properties>"
+      "  <failure message=\"MemoryError\">"
+      "    ";
+  constexpr absl::string_view kXmlFooterPart2 =
+      " detected a memory error.  See the test log for full report."
+      "  </failure>"
+      "</testcase></testsuite></testsuites>";
+
+  int fd = open(xml_file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+  if (fd == -1) return;
+  (void)write(fd, kXmlHeaderPart1.data(), kXmlHeaderPart1.size());
+  for (char c : detector) {
+    c = absl::ascii_tolower(c);
+    (void)write(fd, &c, 1);
+  }
+  (void)write(fd, kXmlHeaderPart2.data(), kXmlHeaderPart2.size());
+  (void)write(fd, error.data(), error.size());
+  (void)write(fd, kXmlFooterPart1.data(), kXmlFooterPart1.size());
+  (void)write(fd, detector.data(), detector.size());
+  (void)write(fd, kXmlFooterPart2.data(), kXmlFooterPart2.size());
+  close(fd);
+}
+//
+// If this crash occurs in a test, records test failure summaries.
+//
+// detector is the bug detector or tools that found the error
+// error contains the type of error to record.
+void RecordCrash(absl::string_view detector, absl::string_view error) {
+  TC_ASSERT(!detector.empty());
+  TC_ASSERT(!error.empty());
+
+  RecordBazelWarning(detector, error);
+  RecordTestFailure(detector, error);
+}
+
+ABSL_ATTRIBUTE_NOINLINE
+ABSL_ATTRIBUTE_NORETURN
+static void Crash(const char* filename, int line, const char* msg,
+                  size_t msglen, bool oom) {
   StackTrace trace;
-};
-
-static Logger FormatLog(bool with_stack, const char* filename, int line,
-                        LogItem a, LogItem b, LogItem c, LogItem d, LogItem e,
-                        LogItem f) {
-  Logger state;
-  state.p_ = state.buf_;
-  state.end_ = state.buf_ + sizeof(state.buf_);
-  // clang-format off
-  state.AddStr(filename, strlen(filename)) &&
-      state.AddStr(":", 1) &&
-      state.AddNum(line, 10) &&
-      state.AddStr("]", 1) &&
-      state.Add(a) &&
-      state.Add(b) &&
-      state.Add(c) &&
-      state.Add(d) &&
-      state.Add(e) &&
-      state.Add(f);
-  // clang-format on
-
-  if (with_stack) {
-    state.trace.depth =
-        absl::GetStackTrace(state.trace.stack, kMaxStackDepth, 1);
-    state.Add(LogItem("@"));
-    for (int i = 0; i < state.trace.depth; i++) {
-      state.Add(LogItem(state.trace.stack[i]));
-    }
-  }
-
-  // Teminate with newline
-  if (state.p_ >= state.end_) {
-    state.p_ = state.end_ - 1;
-  }
-  *state.p_ = '\n';
-  state.p_++;
-
-  return state;
-}
-
-ABSL_ATTRIBUTE_NOINLINE
-void Log(LogMode mode, const char* filename, int line, LogItem a, LogItem b,
-         LogItem c, LogItem d, LogItem e, LogItem f) {
-  Logger state =
-      FormatLog(mode == kLogWithStack, filename, line, a, b, c, d, e, f);
-  int msglen = state.p_ - state.buf_;
-  (*log_message_writer)(state.buf_, msglen);
-}
-
-ABSL_ATTRIBUTE_NOINLINE
-void Crash(CrashMode mode, const char* filename, int line, LogItem a, LogItem b,
-           LogItem c, LogItem d, LogItem e, LogItem f) {
-  Logger state = FormatLog(true, filename, line, a, b, c, d, e, f);
-
-  int msglen = state.p_ - state.buf_;
+  trace.depth = absl::GetStackTrace(trace.stack, kMaxStackDepth, 1);
 
   // FailureSignalHandler mallocs for various logging attempts.
   // We might be crashing holding tcmalloc locks.
@@ -132,15 +151,15 @@ void Crash(CrashMode mode, const char* filename, int line, LogItem a, LogItem b,
 
   bool first_crash = false;
   {
-    absl::base_internal::SpinLockHolder l(&crash_lock);
+    AllocationGuardSpinLockHolder l(&crash_lock);
     if (!crashed) {
       crashed = true;
       first_crash = true;
     }
   }
 
-  (*log_message_writer)(state.buf_, msglen);
-  if (first_crash && mode == kCrashWithStats) {
+  (*log_message_writer)(msg, msglen);
+  if (first_crash && oom) {
 #ifndef __APPLE__
     if (&TCMalloc_Internal_GetStats != nullptr) {
       size_t n = TCMalloc_Internal_GetStats(stats_buffer, kStatsBufferSize);
@@ -152,68 +171,30 @@ void Crash(CrashMode mode, const char* filename, int line, LogItem a, LogItem b,
   abort();
 }
 
-bool Logger::Add(const LogItem& item) {
-  // Separate real items with spaces
-  if (item.tag_ != LogItem::kEnd && p_ < end_) {
-    *p_ = ' ';
-    p_++;
-  }
+ABSL_ATTRIBUTE_NORETURN void CheckFailed(const char* file, int line,
+                                         const char* msg, int msglen) {
+  Crash(file, line, msg, msglen, false);
+}
 
-  switch (item.tag_) {
-    case LogItem::kStr:
-      return AddStr(item.u_.str, strlen(item.u_.str));
-    case LogItem::kUnsigned:
-      return AddNum(item.u_.unum, 10);
-    case LogItem::kSigned:
-      if (item.u_.snum < 0) {
-        // The cast to uint64_t is intentionally before the negation
-        // so that we do not attempt to negate -2^63.
-        return AddStr("-", 1) &&
-               AddNum(-static_cast<uint64_t>(item.u_.snum), 10);
-      } else {
-        return AddNum(static_cast<uint64_t>(item.u_.snum), 10);
-      }
-    case LogItem::kPtr:
-      return AddStr("0x", 2) &&
-             AddNum(reinterpret_cast<uintptr_t>(item.u_.ptr), 16);
-    default:
-      return false;
+void CrashWithOOM(size_t alloc_size) {
+  char buf[512];
+  int n = absl::SNPrintF(buf, sizeof(buf),
+                         "Unable to allocate %zu (new failed)", alloc_size);
+  Crash("tcmalloc", 0, buf, n, true);
+}
+
+void PrintStackTrace(void** stack_frames, size_t depth) {
+  for (size_t i = 0; i < depth; ++i) {
+    TC_LOG("  @  %p", stack_frames[i]);
   }
 }
 
-bool Logger::AddStr(const char* str, int n) {
-  ptrdiff_t remaining = end_ - p_;
-  if (remaining < n) {
-    // Try to log a truncated message if there is some space.
-    static constexpr absl::string_view kDots = "...";
-    if (remaining > kDots.size() + 1) {
-      int truncated = remaining - kDots.size();
-      memcpy(p_, str, truncated);
-      p_ += truncated;
-      memcpy(p_, kDots.data(), kDots.size());
-      p_ += kDots.size();
-
-      return true;
-    }
-    return false;
-  } else {
-    memcpy(p_, str, n);
-    p_ += n;
-    return true;
-  }
-}
-
-bool Logger::AddNum(uint64_t num, int base) {
-  static const char kDigits[] = "0123456789abcdef";
-  char space[22];  // more than enough for 2^64 in smallest supported base (10)
-  char* end = space + sizeof(space);
-  char* pos = end;
-  do {
-    pos--;
-    *pos = kDigits[num % base];
-    num /= base;
-  } while (num > 0 && pos > space);
-  return AddStr(pos, end - pos);
+void PrintStackTraceFromSignalHandler(void* context) {
+  void* stack_frames[kMaxStackDepth];
+  size_t depth = absl::GetStackTraceWithContext(stack_frames, kMaxStackDepth,
+  1,
+                                                context, nullptr);
+  PrintStackTrace(stack_frames, depth);
 }
 
 PbtxtRegion::PbtxtRegion(Printer* out, PbtxtRegionType type)

@@ -17,9 +17,14 @@
 
 #include <utility>
 
+#include "absl/base/thread_annotations.h"
 #include "tcmalloc/arena.h"
+#include "tcmalloc/common.h"
+#include "tcmalloc/internal/allocation_guard.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/logging.h"
+#include "tcmalloc/internal/sampled_allocation.h"
 #include "tcmalloc/page_heap_allocator.h"
-#include "tcmalloc/sampled_allocation.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -44,14 +49,14 @@ class SampledAllocationAllocator {
       ABSL_LOCKS_EXCLUDED(pageheap_lock) {
     SampledAllocation* s;
     {
-      absl::base_internal::SpinLockHolder h(&pageheap_lock);
+      PageHeapSpinLockHolder l;
       s = allocator_.New();
     }
     return new (s) SampledAllocation(std::move(stack_trace));
   }
 
   void Delete(SampledAllocation* s) ABSL_LOCKS_EXCLUDED(pageheap_lock) {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     allocator_.Delete(s);
   }
 

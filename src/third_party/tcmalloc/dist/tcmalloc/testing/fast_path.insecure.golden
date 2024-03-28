@@ -1,0 +1,16 @@
+func                  call div jcc jmp load mul pop push rmw rsp store
+aligned_alloc            -   -   7   -    6   -   2    1   1   1     2
+calloc                   -   -   6   -    6   1   2    3   1   2     2
+delete                   -   -   4   -    5   -   -    -   -   -     3
+delete(size)             -   -   4   -    4   -   -    -   -   -     3
+delete(size,align)       -   -   6   -    5   -   -    -   -   -     3
+malloc                   -   -   5   -    6   -   -    -   1   -     2
+new                      -   -   4   -    5   -   -    -   1   -     2
+new(align)               -   -   6   -    6   -   -    -   1   -     2
+new(align)->size         -   -   6   -    7   -   -    -   1   -     2
+new(align,cold)->size    -   -  13   2   14   -   -    -   2   -     4
+new(align,nothrow)       -   -   6   -    6   -   -    -   1   -     2
+new(cold)->size          -   -   9   2   12   -   -    -   2   -     4
+new(nothrow)             -   -   4   -    5   -   -    -   1   -     2
+new->size                -   -   4   -    6   -   -    -   1   -     2
+posix_memalign           -   -   8   -    6   -   3    3   1   2     3

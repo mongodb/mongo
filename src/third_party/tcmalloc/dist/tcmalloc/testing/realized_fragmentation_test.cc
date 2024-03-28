@@ -15,6 +15,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <new>
 #include <optional>
 #include <string>
 

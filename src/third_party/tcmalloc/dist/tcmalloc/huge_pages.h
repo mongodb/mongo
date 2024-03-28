@@ -27,6 +27,7 @@
 #include <utility>
 
 #include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/optimization.h"
 #include "tcmalloc/pages.h"
@@ -41,29 +42,39 @@ inline constexpr Length kPagesPerHugePage =
 // A single aligned huge page.
 struct HugePage {
   void* start_addr() const {
-    ASSERT(pn <= kMaxPageNumber);
+    TC_ASSERT_LE(pn, kMaxPageNumber);
     return reinterpret_cast<void*>(pn << kHugePageShift);
   }
 
   PageId first_page() const {
-    ASSERT(pn <= kMaxPageNumber);
+    TC_ASSERT_LE(pn, kMaxPageNumber);
     return PageId(pn << (kHugePageShift - kPageShift));
   }
 
   size_t index() const {
-    ASSERT(pn <= kMaxPageNumber);
+    TC_ASSERT_LE(pn, kMaxPageNumber);
     return pn;
+  }
+
+  template <typename H>
+  friend H AbslHashValue(H h, const HugePage& p) {
+    return H::combine(std::move(h), p.pn);
   }
 
   static constexpr uintptr_t kMaxPageNumber =
       std::numeric_limits<uintptr_t>::max() >> kHugePageShift;
+
+  template <typename Sink>
+  friend void AbslStringify(Sink& sink, const HugePage& v) {
+    absl::Format(&sink, "%p", v.start_addr());
+  }
 
   uintptr_t pn;
 };
 
 struct HugeLength {
   constexpr HugeLength() : n(0) {}
-  explicit HugeLength(double x) : n(ceil(x)) { ASSERT(x >= 0); }
+  explicit HugeLength(double x) : n(ceil(x)) { TC_ASSERT_GE(x, 0); }
   constexpr size_t raw_num() const { return n; }
   constexpr size_t in_bytes() const { return n * kHugePageSize; }
   constexpr size_t in_mib() const {
@@ -80,6 +91,11 @@ struct HugeLength {
   }
   static constexpr HugeLength max() {
     return HugeLength(static_cast<size_t>(HugePage::kMaxPageNumber));
+  }
+
+  template <typename Sink>
+  friend void AbslStringify(Sink& sink, const HugeLength& v) {
+    absl::Format(&sink, "%zu", v.in_bytes());
   }
 
  private:
@@ -132,13 +148,13 @@ inline HugeLength& operator++(HugeLength& len) {  // NOLINT(runtime/references)
 }
 
 inline HugePage& operator++(HugePage& p) {  // NOLINT(runtime/references)
-  ASSERT(p.pn + 1 <= HugePage::kMaxPageNumber);
+  TC_ASSERT_LE(p.pn + 1, HugePage::kMaxPageNumber);
   p.pn++;
   return p;
 }
 
 inline HugeLength& operator--(HugeLength& len) {  // NOLINT(runtime/references)
-  ASSERT(len.n >= 1);
+  TC_ASSERT_GE(len.n, 1);
   len.n--;
   return len;
 }
@@ -229,7 +245,7 @@ inline constexpr HugeLength operator%(HugeLength lhs, HugeLength rhs) {
 
 TCMALLOC_ATTRIBUTE_CONST
 inline constexpr HugePage operator+(HugePage lhs, HugeLength rhs) {
-  ASSERT(lhs.pn + rhs.n <= HugePage::kMaxPageNumber);
+  TC_ASSERT_LE(lhs.pn + rhs.n, HugePage::kMaxPageNumber);
   return HugePage{lhs.pn + rhs.n};
 }
 
@@ -240,16 +256,16 @@ inline constexpr HugePage operator+(HugeLength lhs, HugePage rhs) {
 
 TCMALLOC_ATTRIBUTE_CONST
 inline constexpr HugePage operator-(HugePage lhs, HugeLength rhs) {
-  return ASSERT(lhs.pn >= rhs.n), HugePage{lhs.pn - rhs.n};
+  return TC_ASSERT_GE(lhs.pn, rhs.n), HugePage{lhs.pn - rhs.n};
 }
 
 TCMALLOC_ATTRIBUTE_CONST
 inline constexpr HugeLength operator-(HugePage lhs, HugePage rhs) {
-  return ASSERT(lhs.pn >= rhs.pn), NHugePages(lhs.pn - rhs.pn);
+  return TC_ASSERT_GE(lhs.pn, rhs.pn), NHugePages(lhs.pn - rhs.pn);
 }
 
 inline HugePage& operator+=(HugePage& lhs, HugeLength rhs) {
-  ASSERT(lhs.pn + rhs.n <= HugePage::kMaxPageNumber);
+  TC_ASSERT_LE(lhs.pn + rhs.n, HugePage::kMaxPageNumber);
   lhs.pn += rhs.n;
   return lhs;
 }
@@ -266,11 +282,11 @@ inline HugeLength& operator+=(HugeLength& lhs, HugeLength rhs) {
 
 TCMALLOC_ATTRIBUTE_CONST
 inline constexpr HugeLength operator-(HugeLength lhs, HugeLength rhs) {
-  return ASSERT(lhs.n >= rhs.n), NHugePages(lhs.n - rhs.n);
+  return TC_ASSERT_GE(lhs.n, rhs.n), NHugePages(lhs.n - rhs.n);
 }
 
 inline HugeLength& operator-=(HugeLength& lhs, HugeLength rhs) {
-  ASSERT(lhs.n >= rhs.n);
+  TC_ASSERT_GE(lhs.n, rhs.n);
   lhs.n -= rhs.n;
   return lhs;
 }
@@ -346,7 +362,7 @@ inline constexpr bool operator==(HugeRange lhs, HugeRange rhs) {
 // REQUIRES: a and b are disjoint but adjacent (in that order)
 
 inline HugeRange Join(HugeRange a, HugeRange b) {
-  CHECK_CONDITION(a.precedes(b));
+  TC_CHECK(a.precedes(b));
   return {a.start(), a.len() + b.len()};
 }
 
@@ -354,7 +370,7 @@ inline HugeRange Join(HugeRange a, HugeRange b) {
 // Splits r into two ranges, one of length n.  The other is either the rest
 // of the space (if any) or Nil.
 inline std::pair<HugeRange, HugeRange> Split(HugeRange r, HugeLength n) {
-  ASSERT(r.len() >= n);
+  TC_ASSERT_GE(r.len(), n);
   if (r.len() > n) {
     return {HugeRange::Make(r.start(), n),
             HugeRange::Make(r.start() + n, r.len() - n)};

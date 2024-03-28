@@ -17,13 +17,13 @@
 #ifndef TCMALLOC_STACK_TRACE_TABLE_H_
 #define TCMALLOC_STACK_TRACE_TABLE_H_
 
-#include <stdint.h>
 
-#include <string>
 
 #include "absl/base/thread_annotations.h"
+#include "absl/time/time.h"
 #include "tcmalloc/common.h"
-#include "tcmalloc/internal_malloc_extension.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/logging.h"
 #include "tcmalloc/malloc_extension.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -63,8 +63,6 @@ class StackTraceTable final : public ProfileBase {
 
  private:
   ProfileType type_;
-  // TODO(b/245788128): Investigate why this impacts sampling_test.cc.
-  void* ABSL_ATTRIBUTE_UNUSED padding_[2];
   absl::Duration duration_ = absl::ZeroDuration();
   int depth_total_;
   LinkedSample* all_;

@@ -16,7 +16,7 @@
 
 #include <stddef.h>
 
-#include <optional>
+#include <new>
 #include <vector>
 
 #include "gtest/gtest.h"

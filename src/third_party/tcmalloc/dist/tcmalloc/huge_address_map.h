@@ -17,8 +17,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "absl/base/attributes.h"
 #include "tcmalloc/huge_pages.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
+#include "tcmalloc/metadata_allocator.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -33,8 +36,8 @@ namespace tcmalloc_internal {
 // for use on extremely hot paths.
 class HugeAddressMap {
  public:
-  typedef void* (*MetadataAllocFunction)(size_t bytes);
-  explicit constexpr HugeAddressMap(MetadataAllocFunction meta);
+  explicit constexpr HugeAddressMap(
+      MetadataAllocator& meta ABSL_ATTRIBUTE_LIFETIME_BOUND);
 
   // IMPORTANT: DESTROYING A HUGE ADDRESS MAP DOES NOT MAKE ANY ATTEMPT
   // AT FREEING ALLOCATED METADATA.
@@ -111,7 +114,7 @@ class HugeAddressMap {
   Node* freelist_{nullptr};
   size_t freelist_size_{0};
   // How we get more
-  MetadataAllocFunction meta_;
+  MetadataAllocator& meta_;
   Node* Get(HugeRange r);
   void Put(Node* n);
 
@@ -125,7 +128,7 @@ class HugeAddressMap {
   unsigned int seed_{0};
 };
 
-inline constexpr HugeAddressMap::HugeAddressMap(MetadataAllocFunction meta)
+inline constexpr HugeAddressMap::HugeAddressMap(MetadataAllocator& meta)
     : meta_(meta) {}
 
 inline HugeRange HugeAddressMap::Node::range() const { return range_; }

@@ -796,8 +796,8 @@ fluctuation peak within `--tcmalloc_skip_subrelease_short_interval` and
 long-term trend within `--tcmalloc_skip_subrelease_long_interval`.
 
 **Note:** Conducting skip-subrelease using both short-term and long-term
-intervals is an experimental feature, and should not be enabled without
-understanding its performance tradeoffs.
+intervals is the current default. The calculated demand cannot be higher than
+the largest peak recorded in the recent history (last 10 mins).
 
 ```
 HugePageFiller: Since the start of the execution, 0 subreleases (0 pages) were skipped due to either recent (0s) peaks, or the sum of short-term (0s) fluctuations and long-term (0s) trends..

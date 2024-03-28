@@ -21,10 +21,12 @@
 
 #include "absl/base/internal/spinlock.h"
 #include "absl/memory/memory.h"
+#include "tcmalloc/internal/allocation_guard.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
+#include "tcmalloc/internal/sampled_allocation.h"
+#include "tcmalloc/malloc_extension.h"
 #include "tcmalloc/parameters.h"
-#include "tcmalloc/sampled_allocation.h"
-#include "tcmalloc/sampler.h"
 #include "tcmalloc/stack_trace_table.h"
 #include "tcmalloc/static_vars.h"
 
@@ -34,10 +36,8 @@ namespace tcmalloc_internal {
 
 bool PeakHeapTracker::IsNewPeak() {
   size_t current_peak_size = CurrentPeakSize();
-  return current_peak_size == 0 ||
-         (static_cast<double>(tc_globals.sampled_objects_size_.value()) /
-              current_peak_size >
-          Parameters::peak_sampling_heap_growth_fraction());
+  return (static_cast<double>(tc_globals.sampled_objects_size_.value()) >
+          current_peak_size * Parameters::peak_sampling_heap_growth_fraction());
 }
 
 void PeakHeapTracker::MaybeSaveSample() {
@@ -45,7 +45,7 @@ void PeakHeapTracker::MaybeSaveSample() {
     return;
   }
 
-  absl::base_internal::SpinLockHolder h(&recorder_lock_);
+  AllocationGuardSpinLockHolder h(&recorder_lock_);
 
   // double-check in case another allocation was sampled (or a sampled
   // allocation freed) while we were waiting for the lock
@@ -66,9 +66,9 @@ void PeakHeapTracker::MaybeSaveSample() {
 }
 
 std::unique_ptr<ProfileBase> PeakHeapTracker::DumpSample() {
-  auto profile = absl::make_unique<StackTraceTable>(ProfileType::kPeakHeap);
+  auto profile = std::make_unique<StackTraceTable>(ProfileType::kPeakHeap);
 
-  absl::base_internal::SpinLockHolder h(&recorder_lock_);
+  AllocationGuardSpinLockHolder h(&recorder_lock_);
   peak_heap_recorder_.get_mutable().Iterate(
       [&profile](const SampledAllocation& peak_heap_record) {
         profile->AddTrace(1.0, peak_heap_record.sampled_stack);

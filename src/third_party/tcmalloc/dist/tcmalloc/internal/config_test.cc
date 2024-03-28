@@ -34,9 +34,9 @@ TEST(AddressBits, CpuVirtualBits) {
   // Check that kAddressBits is as least as large as either the number of bits
   // in a pointer or as the number of virtual bits handled by the processor.
   // To be effective this test must be run on each processor model.
+#ifdef __x86_64__
   const int kPointerBits = 8 * sizeof(void*);
 
-#ifdef __x86_64__
   // LLVM has a miscompile bug around %rbx, see
   // https://bugs.llvm.org/show_bug.cgi?id=17907
   int ret;
@@ -52,6 +52,8 @@ TEST(AddressBits, CpuVirtualBits) {
   const int kImplementedVirtualBits = (ret >> 8) & ((1 << 8) - 1);
   ASSERT_GE(kAddressBits, std::min(kImplementedVirtualBits, kPointerBits));
 #elif __aarch64__
+  const int kPointerBits = 8 * sizeof(void*);
+
   int fd = signal_safe_open("/proc/config.gz", O_RDONLY);
   if (fd < 0) {
     GTEST_SKIP() << "Unable to open kernel config.";

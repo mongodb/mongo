@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TCMALLOC_HINTED_TRACKER_LIST_H_
-#define TCMALLOC_HINTED_TRACKER_LIST_H_
+#ifndef TCMALLOC_HINTED_TRACKER_LISTS_H_
+#define TCMALLOC_HINTED_TRACKER_LISTS_H_
 
+#include <cstddef>
+
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/linked_list.h"
+#include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/range_tracker.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -34,12 +38,12 @@ class HintedTrackerLists {
   // Removes a TrackerType from the first non-empty freelist with index at
   // least n and returns it. Returns nullptr if there is none.
   TrackerType* GetLeast(const size_t n) {
-    ASSERT(n < N);
+    TC_ASSERT_LT(n, N);
     size_t i = nonempty_.FindSet(n);
     if (i == N) {
       return nullptr;
     }
-    ASSERT(!lists_[i].empty());
+    TC_ASSERT(!lists_[i].empty());
     TrackerType* pt = lists_[i].first();
     if (lists_[i].remove(pt)) {
       nonempty_.ClearBit(i);
@@ -54,20 +58,20 @@ class HintedTrackerLists {
   // Unlike GetLeast, this does not remove the pointer from the list when it is
   // found.
   TrackerType* PeekLeast(const size_t n) {
-    ASSERT(n < N);
+    TC_ASSERT_LT(n, N);
     size_t i = nonempty_.FindSet(n);
     if (i == N) {
       return nullptr;
     }
-    ASSERT(!lists_[i].empty());
+    TC_ASSERT(!lists_[i].empty());
     return lists_[i].first();
   }
 
   // Adds pointer <pt> to the nonempty_[i] list.
   // REQUIRES: i < N && pt != nullptr.
   void Add(TrackerType* pt, const size_t i) {
-    ASSERT(i < N);
-    ASSERT(pt != nullptr);
+    TC_ASSERT_LT(i, N);
+    TC_ASSERT_NE(pt, nullptr);
     lists_[i].prepend(pt);
     ++size_;
     nonempty_.SetBit(i);
@@ -76,15 +80,15 @@ class HintedTrackerLists {
   // Removes pointer <pt> from the nonempty_[i] list.
   // REQUIRES: i < N && pt != nullptr.
   void Remove(TrackerType* pt, const size_t i) {
-    ASSERT(i < N);
-    ASSERT(pt != nullptr);
+    TC_ASSERT_LT(i, N);
+    TC_ASSERT_NE(pt, nullptr);
     if (lists_[i].remove(pt)) {
       nonempty_.ClearBit(i);
     }
     --size_;
   }
   const TrackerList& operator[](const size_t n) const {
-    ASSERT(n < N);
+    TC_ASSERT_LT(n, N);
     return lists_[n];
   }
   size_t size() const { return size_; }
@@ -93,7 +97,7 @@ class HintedTrackerLists {
   // Returns length of the list at an index <n>.
   // REQUIRES: n < N.
   size_t SizeOfList(const size_t n) const {
-    ASSERT(n < N);
+    TC_ASSERT_LT(n, N);
     return lists_[n].length();
   }
   // Runs a functor on all pointers in the TrackerLists.
@@ -104,7 +108,7 @@ class HintedTrackerLists {
     size_t i = nonempty_.FindSet(start);
     while (i < N) {
       auto& list = lists_[i];
-      ASSERT(!list.empty());
+      TC_ASSERT(!list.empty());
       for (TrackerType* pt : list) {
         func(pt);
       }
@@ -123,4 +127,4 @@ class HintedTrackerLists {
 }  // namespace tcmalloc
 GOOGLE_MALLOC_SECTION_END
 
-#endif  // TCMALLOC_HINTED_TRACKER_LIST_H_
+#endif  // TCMALLOC_HINTED_TRACKER_LISTS_H_

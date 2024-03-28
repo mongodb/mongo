@@ -839,7 +839,11 @@ TCMALLOC_ERROR_MESSAGE = (
 )
 
 TCMALLOC_DEPS = select({
-    "//bazel/config:tcmalloc_google_enabled": ["//src/third_party/tcmalloc:tcmalloc"],
+    "//bazel/config:tcmalloc_google_enabled": [
+        "//src/third_party/tcmalloc:tcmalloc",
+        "//src/third_party/tcmalloc:tcmalloc_internal_percpu_tcmalloc",
+        "//src/third_party/tcmalloc:tcmalloc_internal_sysinfo",
+    ],
     "//bazel/config:tcmalloc_gperf_enabled": ["//src/third_party/gperftools:tcmalloc_minimal"],
     "//bazel/config:system_allocator_enabled": [],
 }, no_match_error = TCMALLOC_ERROR_MESSAGE)

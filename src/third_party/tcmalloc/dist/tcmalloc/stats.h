@@ -18,10 +18,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "absl/base/attributes.h"
 #include "absl/base/internal/cycleclock.h"
 #include "absl/strings/string_view.h"
 #include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/pages.h"
 
@@ -88,106 +88,8 @@ void PrintStats(const char* label, Printer* out, const BackingStats& backing,
                 const SmallSpanStats& small, const LargeSpanStats& large,
                 bool everything);
 
-class PageAgeHistograms {
- public:
-  // <now> assumed to be taken from absl::base_internal::CycleClock::Now (done
-  // like this for tests)
-  explicit PageAgeHistograms(int64_t now);
-
-  // <when> = absl::base_internal::CycleClock::Now() when the span was last
-  // changed.
-  void RecordRange(Length pages, bool released, int64_t when);
-
-  void Print(const char* label, Printer* out) const;
-
-  static constexpr size_t kNumBuckets = 7;
-  static constexpr size_t kNumSizes = 64;
-
-  static constexpr Length kLargeSize = Length(kNumSizes);
-  class Histogram {
-   public:
-    void Record(Length pages, double age);
-    void Print(Printer* out) const;
-
-    uint32_t pages_in_bucket(size_t i) const { return buckets_[i]; }
-
-    Length total() const { return total_pages_; }
-
-    double avg_age() const {
-      return empty() ? 0.0 : total_age_ / total_pages_.raw_num();
-    }
-
-    bool empty() const { return total_pages_ == Length(0); }
-
-   private:
-    // total number of pages fitting in this bucket We are actually
-    // somewhat space constrained so it's important to _not_ use a
-    // 64-bit counter here.  This comfortably supports terabytes of
-    // RAM, and just in case we will update this with saturating arithmetic.
-    uint32_t buckets_[kNumBuckets] = {0};
-
-    Length total_pages_;
-    double total_age_ = 0;
-  };
-
-  const Histogram* GetSmallHistogram(bool released, Length n) const {
-    if (released) {
-      return returned_.GetSmall(n);
-    } else {
-      return live_.GetSmall(n);
-    }
-  }
-
-  const Histogram* GetLargeHistogram(bool released) const {
-    if (released) {
-      return returned_.GetLarge();
-    } else {
-      return live_.GetLarge();
-    }
-  }
-
-  const Histogram* GetTotalHistogram(bool released) {
-    if (released) {
-      return returned_.GetTotal();
-    } else {
-      return live_.GetTotal();
-    }
-  }
-
- private:
-  struct PerSizeHistograms {
-    void Record(Length pages, double age);
-    void Print(const char* kind, Printer* out) const;
-
-    Histogram* GetSmall(Length n) {
-      CHECK_CONDITION(n.raw_num() < kNumSizes);
-      return &small[n.raw_num() - 1];
-    }
-    const Histogram* GetSmall(Length n) const {
-      CHECK_CONDITION(n.raw_num() < kNumSizes);
-      return &small[n.raw_num() - 1];
-    }
-
-    Histogram* GetLarge() { return &large; }
-    const Histogram* GetLarge() const { return &large; }
-
-    Histogram* GetTotal() { return &total; }
-
-    Histogram small[kNumSizes - 1];
-    Histogram large;
-    Histogram total;
-  };
-
-  const int64_t now_;
-  const double freq_;
-
-  PerSizeHistograms live_;
-  PerSizeHistograms returned_;
-};
-
 void PrintStatsInPbtxt(PbtxtRegion* region, const SmallSpanStats& small,
-                       const LargeSpanStats& large,
-                       const PageAgeHistograms& ages);
+                       const LargeSpanStats& large);
 
 class PageAllocInfo {
  private:
@@ -198,8 +100,8 @@ class PageAllocInfo {
 
   // Subclasses are responsible for calling these methods when
   // the relevant actions occur
-  void RecordAlloc(PageId p, Length n, size_t num_objects);
-  void RecordFree(PageId p, Length n, size_t num_objects);
+  void RecordAlloc(PageId p, Length n);
+  void RecordFree(PageId p, Length n);
   void RecordRelease(Length n, Length got);
   // And invoking this in their Print() implementation.
   void Print(Printer* out) const;

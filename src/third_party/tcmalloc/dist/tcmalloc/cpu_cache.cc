@@ -15,22 +15,16 @@
 #include "tcmalloc/cpu_cache.h"
 
 #include <stdlib.h>
-#include <string.h>
 
-#include <algorithm>
-#include <atomic>
+#include <cstdint>
+#include <new>
 
-#include "absl/base/dynamic_annotations.h"
-#include "absl/base/macros.h"
-#include "absl/base/thread_annotations.h"
-#include "absl/container/fixed_array.h"
-#include "tcmalloc/arena.h"
-#include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
+#include "tcmalloc/internal/percpu.h"
 #include "tcmalloc/internal_malloc_extension.h"
 #include "tcmalloc/parameters.h"
 #include "tcmalloc/static_vars.h"
-#include "tcmalloc/transfer_cache.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {

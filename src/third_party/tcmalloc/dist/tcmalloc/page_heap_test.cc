@@ -40,7 +40,7 @@ void CheckStats(const PageHeap* ph, Length system_pages, Length free_pages,
                 Length unmapped_pages) ABSL_LOCKS_EXCLUDED(pageheap_lock) {
   BackingStats stats;
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     stats = ph->stats();
   }
 
@@ -52,13 +52,13 @@ void CheckStats(const PageHeap* ph, Length system_pages, Length free_pages,
 static void Delete(PageHeap* ph, Span* s, size_t objects_per_span)
     ABSL_LOCKS_EXCLUDED(pageheap_lock) {
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     ph->Delete(s, objects_per_span);
   }
 }
 
 static Length Release(PageHeap* ph, Length n) {
-  absl::base_internal::SpinLockHolder h(&pageheap_lock);
+  PageHeapSpinLockHolder l;
   return ph->ReleaseAtLeastNPages(n);
 }
 
@@ -73,7 +73,7 @@ class PageHeapTest : public ::testing::Test {
 
 // TODO(b/36484267): replace this test wholesale.
 TEST_F(PageHeapTest, Stats) {
-  auto pagemap = absl::make_unique<PageMap>();
+  auto pagemap = std::make_unique<PageMap>();
   void* memory = calloc(1, sizeof(PageHeap));
   PageHeap* ph = new (memory) PageHeap(pagemap.get(), MemoryTag::kNormal);
 
@@ -81,19 +81,19 @@ TEST_F(PageHeapTest, Stats) {
   CheckStats(ph, Length(0), Length(0), Length(0));
 
   // Allocate a span 's1'
-  const size_t objects_per_span1 = 10;
-  Span* s1 = ph->New(kMinSpanLength, objects_per_span1);
+  constexpr SpanAllocInfo kSpanAllocInfo = {10,
+                                            AccessDensityPrediction::kSparse};
+  Span* s1 = ph->New(kMinSpanLength, kSpanAllocInfo);
   CheckStats(ph, kMinSpanLength, Length(0), Length(0));
 
   // Allocate an aligned span 's2'
   static const Length kHalf = kMinSpanLength / 2;
-  const size_t objects_per_span2 = 20;
-  Span* s2 = ph->NewAligned(kHalf, kHalf, objects_per_span2);
+  Span* s2 = ph->NewAligned(kHalf, kHalf, kSpanAllocInfo);
   ASSERT_EQ(s2->first_page().index() % kHalf.raw_num(), 0);
   CheckStats(ph, kMinSpanLength * 2, Length(0), kHalf);
 
   // Delete the old one
-  Delete(ph, s1, objects_per_span1);
+  Delete(ph, s1, kSpanAllocInfo.objects_per_span);
   CheckStats(ph, kMinSpanLength * 2, kMinSpanLength, kHalf);
 
   // Release the space from there:
@@ -102,7 +102,7 @@ TEST_F(PageHeapTest, Stats) {
   CheckStats(ph, kMinSpanLength * 2, Length(0), kHalf + kMinSpanLength);
 
   // and delete the new one
-  Delete(ph, s2, objects_per_span2);
+  Delete(ph, s2, kSpanAllocInfo.objects_per_span);
   CheckStats(ph, kMinSpanLength * 2, kHalf, kHalf + kMinSpanLength);
 
   free(memory);

@@ -21,14 +21,12 @@
 #include <sys/types.h>
 
 #include "absl/base/attributes.h"
-#include "absl/base/config.h"
 #include "absl/base/optimization.h"
 #include "absl/base/thread_annotations.h"
 #include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/linked_list.h"
-#include "tcmalloc/internal/logging.h"
 #include "tcmalloc/page_heap_allocator.h"
-#include "tcmalloc/sampler.h"
 #include "tcmalloc/static_vars.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -41,49 +39,26 @@ namespace tcmalloc_internal {
 
 class ThreadCache {
  public:
-  void Init(pthread_t tid) ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock);
+  explicit ThreadCache(pthread_t tid)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock);
   void Cleanup();
 
-  // Accessors (mostly just for printing stats)
-  int freelist_length(size_t size_class) const {
-    return list_[size_class].length();
-  }
-
-  // Total byte size in cache
-  size_t Size() const { return size_; }
-
-  // Allocate an object of the given size class. When allocation fails
-  // (from this cache and after running FetchFromCentralCache),
-  // OOMHandler(size) is called and its return value is
-  // returned from Allocate. OOMHandler is used to parameterize
-  // out-of-memory handling (raising exception, returning nullptr,
-  // calling new_handler or anything else). "Passing" OOMHandler in
-  // this way allows Allocate to be used in tail-call position in
-  // fast-path, making allocate tail-call slow path code.
-  template <void* OOMHandler(size_t)>
+  // Allocate an object of the given size class.
+  // Returns nullptr when allocation fails.
   void* Allocate(size_t size_class);
 
   void Deallocate(void* ptr, size_t size_class);
 
-  void Scavenge();
-
-  Sampler* GetSampler();
-
   static void InitTSD();
   static ThreadCache* GetCache();
   static ThreadCache* GetCacheIfPresent();
-  static ThreadCache* CreateCacheIfNecessary();
   static void BecomeIdle();
-
-  // returns stats on total thread caches created/used
-  static inline AllocatorStats HeapStats()
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock);
 
   // Adds to *total_bytes the total number of bytes used by all thread heaps.
   // Also, if class_count is not NULL, it must be an array of size kNumClasses,
   // and this function will increment each element of class_count by the number
   // of items in all thread-local freelists of the corresponding size class.
-  static void GetThreadStats(uint64_t* total_bytes, uint64_t* class_count)
+  static AllocatorStats GetStats(uint64_t* total_bytes, uint64_t* class_count)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock);
 
   // Sets the total thread cache size to new_size, recomputing the
@@ -94,16 +69,6 @@ class ThreadCache {
   static size_t overall_thread_cache_size()
       ABSL_SHARED_LOCKS_REQUIRED(pageheap_lock) {
     return overall_thread_cache_size_;
-  }
-
-  template <void* OOMHandler(size_t)>
-  void* ABSL_ATTRIBUTE_NOINLINE AllocateSlow(size_t size_class,
-                                             size_t allocated_size) {
-    void* ret = FetchFromCentralCache(size_class, allocated_size);
-    if (ABSL_PREDICT_TRUE(ret != nullptr)) {
-      return ret;
-    }
-    return OOMHandler(allocated_size);
   }
 
  private:
@@ -119,11 +84,6 @@ class ThreadCache {
     // length_ > max_length_.  After the kMaxOverages'th time, max_length_
     // shrinks and length_overages_ is reset to zero.
     uint32_t length_overages_;
-
-    // This extra unused field pads FreeList size to 32 bytes on 64
-    // bit machines, helping compiler generate faster code for
-    // indexing array of lists.
-    void* ABSL_ATTRIBUTE_UNUSED extra_;
 
    public:
     void Init() {
@@ -162,16 +122,9 @@ class ThreadCache {
     }
   };
 
-// we've deliberately introduced unused extra_ field into FreeList
-// to pad the size. Lets ensure that it is still working as
-// intended.
-#ifdef _LP64
-  static_assert(sizeof(FreeList) == 32, "Freelist size has changed");
-#endif
-
-  // Gets and returns an object from the central cache, and, if possible,
+  // Gets and returns an object from the transfer cache, and, if possible,
   // also adds some objects of that size class to this thread cache.
-  void* FetchFromCentralCache(size_t size_class, size_t byte_size);
+  void* FetchFromTransferCache(size_t size_class, size_t byte_size);
 
   // Releases some number of items from src.  Adjusts the list's max_length
   // to eventually converge on num_objects_to_move(size_class).
@@ -180,7 +133,7 @@ class ThreadCache {
   void DeallocateSlow(void* ptr, FreeList* list, size_t size_class);
 
   // Releases N items from this thread cache.
-  void ReleaseToCentralCache(FreeList* src, size_t size_class, int N);
+  void ReleaseToTransferCache(FreeList* src, size_t size_class, int N);
 
   // Increase max_size_ by reducing unclaimed_cache_space_ or by
   // reducing the max_size_ of some other thread.  In both cases,
@@ -189,6 +142,9 @@ class ThreadCache {
 
   // Same as above but called with pageheap_lock held.
   void IncreaseCacheLimitLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock);
+
+  void Scavenge();
+  static ThreadCache* CreateCacheIfNecessary();
 
   // If TLS is available, we also store a copy of the per-thread object
   // in a __thread variable since __thread variables are faster to read
@@ -231,8 +187,7 @@ class ThreadCache {
   static size_t per_thread_cache_size_ ABSL_GUARDED_BY(pageheap_lock);
 
   // Represents overall_thread_cache_size_ minus the sum of max_size_
-  // across all ThreadCaches. We use int64_t even in 32-bit builds because
-  // with enough ThreadCaches, this number can get smaller than -2^31.
+  // across all ThreadCaches.
   static int64_t unclaimed_cache_space_ ABSL_GUARDED_BY(pageheap_lock);
 
   // This class is laid out with the most frequently used fields
@@ -257,27 +212,18 @@ class ThreadCache {
   static void RecomputePerThreadCacheSize()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock);
 
- public:
   // All ThreadCache objects are kept in a linked list (for stats collection)
   ThreadCache* next_;
   ThreadCache* prev_;
 
- private:
-#ifdef ABSL_CACHELINE_SIZE
   // Ensure that two instances of this class are never on the same cache line.
   // This is critical for performance, as false sharing would negate many of
   // the benefits of a per-thread cache.
   char padding_[ABSL_CACHELINE_SIZE];
-#endif
 };
 
-inline AllocatorStats ThreadCache::HeapStats() {
-  return tc_globals.threadcache_allocator().stats();
-}
-
-template <void* OOMHandler(size_t)>
-inline void* ABSL_ATTRIBUTE_ALWAYS_INLINE
-ThreadCache::Allocate(size_t size_class) {
+inline ABSL_ATTRIBUTE_ALWAYS_INLINE void* ThreadCache::Allocate(
+    size_t size_class) {
   const size_t allocated_size = tc_globals.sizemap().class_to_size(size_class);
 
   FreeList* list = &list_[size_class];
@@ -287,7 +233,7 @@ ThreadCache::Allocate(size_t size_class) {
     return ret;
   }
 
-  return AllocateSlow<OOMHandler>(size_class, allocated_size);
+  return FetchFromTransferCache(size_class, allocated_size);
 }
 
 inline void ABSL_ATTRIBUTE_ALWAYS_INLINE

@@ -19,6 +19,7 @@
 
 #include "tcmalloc/malloc_tracing_extension.h"
 
+#include "absl/base/attributes.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "tcmalloc/internal_malloc_tracing_extension.h"

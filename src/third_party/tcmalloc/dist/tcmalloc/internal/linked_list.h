@@ -23,6 +23,7 @@
 
 #include "absl/base/attributes.h"
 #include "absl/base/optimization.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -104,7 +105,7 @@ class LinkedList {
 
   // PushBatch and PopBatch do not guarantee an ordering.
   void PushBatch(int N, void** batch) {
-    ASSERT(N > 0);
+    TC_ASSERT_GT(N, 0);
     for (int i = 0; i < N - 1; ++i) {
       SLL_SetNext(batch[i], batch[i + 1]);
     }
@@ -120,7 +121,7 @@ class LinkedList {
       p = SLL_Next(p);
     }
     list_ = p;
-    ASSERT(length_ >= N);
+    TC_ASSERT_GE(length_, N);
     length_ -= N;
   }
 };
@@ -149,9 +150,9 @@ class TList {
       // potential aliasing and does unnecessary reloads after stores.
       Elem* next = next_;
       Elem* prev = prev_;
-      ASSERT(prev->next_ == this);
+      TC_ASSERT_EQ(prev->next_, this);
       prev->next_ = next;
-      ASSERT(next->prev_ == this);
+      TC_ASSERT_EQ(next->prev_, this);
       next->prev_ = prev;
 #ifndef NDEBUG
       prev_ = nullptr;
@@ -199,15 +200,15 @@ class TList {
 
   // Returns first element in the list. The list must not be empty.
   ABSL_ATTRIBUTE_RETURNS_NONNULL T* first() const {
-    ASSERT(!empty());
-    ASSERT(head_.next_ != nullptr);
+    TC_ASSERT(!empty());
+    TC_ASSERT_NE(head_.next_, nullptr);
     return static_cast<T*>(head_.next_);
   }
 
   // Returns last element in the list. The list must not be empty.
   ABSL_ATTRIBUTE_RETURNS_NONNULL T* last() const {
-    ASSERT(!empty());
-    ASSERT(head_.prev_ != nullptr);
+    TC_ASSERT(!empty());
+    TC_ASSERT_NE(head_.prev_, nullptr);
     return static_cast<T*>(head_.prev_);
   }
 

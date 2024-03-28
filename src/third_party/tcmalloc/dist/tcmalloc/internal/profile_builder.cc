@@ -14,7 +14,17 @@
 
 #include "tcmalloc/internal/profile_builder.h"
 
+#include <cstddef>
+#include <cstdlib>
+#include <cstring>
+
+#include "absl/base/casts.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/hash/hash.h"
+#include "absl/status/statusor.h"
 #include "absl/time/time.h"
+#include "absl/types/span.h"
+#include "tcmalloc/internal/pageflags.h"
 #include "tcmalloc/malloc_extension.h"
 
 #if defined(__linux__)
@@ -33,12 +43,9 @@
 
 #include "tcmalloc/internal/profile.pb.h"
 #include "absl/base/attributes.h"
-#include "absl/base/config.h"
 #include "absl/base/macros.h"
-#include "absl/numeric/bits.h"
 #include "absl/status/status.h"
 #include "absl/strings/escaping.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/residency.h"
@@ -83,11 +90,11 @@ static const char* GetSoName(const dl_phdr_info* const info) {
   if (dt_soname == nullptr) {
     return nullptr;
   }
-  CHECK_CONDITION(dt_strtab != nullptr);
-  CHECK_CONDITION(dt_strsz != nullptr);
+  TC_CHECK_NE(dt_strtab, nullptr);
+  TC_CHECK_NE(dt_strsz, nullptr);
   const char* const strtab =
       reinterpret_cast<char*>(info->dlpi_addr + dt_strtab->d_un.d_val);
-  CHECK_CONDITION(dt_soname->d_un.d_val < dt_strsz->d_un.d_val);
+  TC_CHECK_LT(dt_soname->d_un.d_val, dt_strsz->d_un.d_val);
   return strtab + dt_soname->d_un.d_val;
 }
 #endif  // defined(__linux__)
@@ -97,6 +104,8 @@ struct SampleMergedData {
   int64_t sum = 0;
   std::optional<size_t> resident_size;
   std::optional<size_t> swapped_size;
+  std::optional<size_t> stale_size;
+  std::optional<size_t> locked_size;
 };
 
 // The equality and hash methods of Profile::Sample only use a subset of its
@@ -106,7 +115,7 @@ struct SampleEqWithSubFields {
     auto fields = [](const Profile::Sample& s) {
       return std::tie(s.depth, s.requested_size, s.requested_alignment,
                       s.requested_size_returning, s.allocated_size,
-                      s.access_hint, s.access_allocated);
+                      s.access_hint, s.access_allocated, s.guarded_status);
     };
     return fields(a) == fields(b) &&
            std::equal(a.stack, a.stack + a.depth, b.stack, b.stack + b.depth);
@@ -118,7 +127,7 @@ struct SampleHashWithSubFields {
     return absl::HashOf(absl::MakeConstSpan(s.stack, s.depth), s.depth,
                         s.requested_size, s.requested_alignment,
                         s.requested_size_returning, s.allocated_size,
-                        s.access_hint, s.access_allocated);
+                        s.access_hint, s.access_allocated, s.guarded_status);
   }
 };
 
@@ -127,19 +136,15 @@ using SampleMergedMap =
                         SampleHashWithSubFields, SampleEqWithSubFields>;
 
 SampleMergedMap MergeProfileSamplesAndMaybeGetResidencyInfo(
-    const tcmalloc::Profile& profile) {
+    const tcmalloc::Profile& profile, PageFlags* pageflags,
+    Residency* residency) {
   SampleMergedMap map;
-  // Used to populate residency info in heap profile.
-  std::optional<Residency> residency;
 
-  if (profile.Type() == ProfileType::kHeap) {
-    residency.emplace();
-  }
   profile.Iterate([&](const tcmalloc::Profile::Sample& entry) {
     SampleMergedData& data = map[entry];
     data.count += entry.count;
     data.sum += entry.sum;
-    if (residency.has_value()) {
+    if (residency) {
       auto residency_info =
           residency->Get(entry.span_start_address, entry.allocated_size);
       // As long as `residency_info` provides data in some samples, the merged
@@ -159,6 +164,27 @@ SampleMergedMap MergeProfileSamplesAndMaybeGetResidencyInfo(
         }
       }
     }
+
+    // TODO(b/266739315): This is "tested" by the fact that it is a clone of the
+    // above logic. But that's not sufficient -- we need to refactor this code
+    // to actually allow pageflags to return a non-zero number. Until then, be
+    // very careful while changing the below -- it needs to match entirely the
+    // form above.
+    if (pageflags) {
+      auto page_stats =
+          pageflags->Get(entry.span_start_address, entry.allocated_size);
+      if (page_stats.has_value()) {
+        if (!data.stale_size.has_value()) {
+          data.stale_size.emplace();
+        }
+        data.stale_size.value() += entry.count * page_stats->bytes_stale;
+
+        if (!data.locked_size.has_value()) {
+          data.locked_size.emplace();
+        }
+        data.locked_size.value() += entry.count * page_stats->bytes_locked;
+      }
+    }
   });
   return map;
 }
@@ -170,11 +196,6 @@ SampleMergedMap MergeProfileSamplesAndMaybeGetResidencyInfo(
 //
 // On failure, returns an empty string.
 std::string GetBuildId(const dl_phdr_info* const info) {
-  const ElfW(Phdr)* pt_note = GetFirstSegment(info, PT_NOTE);
-  if (pt_note == nullptr) {
-    // Failed to find note segment.
-    return "";
-  }
   std::string result;
 
   // pt_note contains entries (of type ElfW(Nhdr)) starting at
@@ -183,54 +204,54 @@ std::string GetBuildId(const dl_phdr_info* const info) {
   //   pt_note->p_memsz
   //
   // The length of each entry is given by
-  //   sizeof(ElfW(Nhdr)) + AlignTo4Bytes(nhdr->n_namesz) +
-  //   AlignTo4Bytes(nhdr->n_descsz)
-  const char* note =
-      reinterpret_cast<char*>(info->dlpi_addr + pt_note->p_vaddr);
-  const char* const last = note + pt_note->p_memsz;
-  while (note < last) {
-    const ElfW(Nhdr)* const nhdr = reinterpret_cast<const ElfW(Nhdr)*>(note);
-    if (note + sizeof(*nhdr) > last) {
-      // Corrupt PT_NOTE
-      break;
-    }
+  //   Align(sizeof(ElfW(Nhdr)) + nhdr->n_namesz) + Align(nhdr->n_descsz)
+  for (int i = 0; i < info->dlpi_phnum; ++i) {
+    const ElfW(Phdr)* pt_note = &info->dlpi_phdr[i];
+    if (pt_note->p_type != PT_NOTE) continue;
 
-    ElfW(Word) name_size = nhdr->n_namesz;
-    ElfW(Word) desc_size = nhdr->n_descsz;
-    if (name_size >= static_cast<ElfW(Word)>(-3) ||
-        desc_size >= static_cast<ElfW(Word)>(-3)) {
-      // These would wrap around when aligned.  The PT_NOTE is corrupt.
-      break;
-    }
-
-    // Beware of overflows / wrap-around.
-    if (name_size >= pt_note->p_memsz || desc_size >= pt_note->p_memsz ||
-        note + sizeof(*nhdr) + name_size + desc_size > last) {
-      // Corrupt PT_NOTE
-      break;
-    }
-
-    if (nhdr->n_type == NT_GNU_BUILD_ID) {
-      const char* const note_name = note + sizeof(*nhdr);
-      // n_namesz is the length of note_name.
-      if (name_size == 4 && memcmp(note_name, "GNU\0", 4) == 0) {
-        if (!result.empty()) {
-          // Repeated build-ids.  Ignore them.
-          return "";
-        }
-        const char* note_data =
-            reinterpret_cast<const char*>(nhdr) + sizeof(*nhdr) + name_size;
-        result =
-            absl::BytesToHexString(absl::string_view(note_data, desc_size));
+    const char* note =
+        reinterpret_cast<char*>(info->dlpi_addr + pt_note->p_vaddr);
+    const char* const last = note + pt_note->p_filesz;
+    const ElfW(Word) align = pt_note->p_align;
+    while (note < last) {
+      const ElfW(Nhdr)* const nhdr = reinterpret_cast<const ElfW(Nhdr)*>(note);
+      if (note + sizeof(*nhdr) > last) {
+        // Corrupt PT_NOTE
+        break;
       }
+
+      // Both the start and end of the descriptor are aligned by sh_addralign
+      // (= p_align).
+      const ElfW(Word) desc_start =
+          (sizeof(*nhdr) + nhdr->n_namesz + align - 1) & -align;
+      const ElfW(Word) size =
+          desc_start + ((nhdr->n_descsz + align - 1) & -align);
+
+      // Beware of wrap-around.
+      if (nhdr->n_namesz >= static_cast<ElfW(Word)>(-align) ||
+          nhdr->n_descsz >= static_cast<ElfW(Word)>(-align) ||
+          desc_start < sizeof(*nhdr) || size < desc_start ||
+          size > last - note) {
+        // Corrupt PT_NOTE
+        break;
+      }
+
+      if (nhdr->n_type == NT_GNU_BUILD_ID) {
+        const char* const note_name = note + sizeof(*nhdr);
+        // n_namesz is the length of note_name.
+        if (nhdr->n_namesz == 4 && memcmp(note_name, "GNU\0", 4) == 0) {
+          if (!result.empty()) {
+            // Repeated build-ids.  Ignore them.
+            return "";
+          }
+          result = absl::BytesToHexString(
+              absl::string_view(note + desc_start, nhdr->n_descsz));
+        }
+      }
+      note += size;
     }
-
-    // Align name_size, desc_size.
-    name_size = (name_size + 3) & ~3;
-    desc_size = (desc_size + 3) & ~3;
-
-    note += name_size + desc_size + sizeof(*nhdr);
   }
+
   return result;
 }
 #endif  // defined(__linux__)
@@ -247,6 +268,8 @@ ABSL_CONST_INIT const absl::string_view kProfileDropFrames =
     "pvalloc|"
     "valloc|"
     "realloc|"
+    "aligned_alloc|"
+    "sdallocx|"
 
     // TCMalloc.
     "tcmalloc::.*|"
@@ -270,13 +293,24 @@ ABSL_CONST_INIT const absl::string_view kProfileDropFrames =
 
     // libstdc++ memory allocation routines
     "__gnu_cxx::new_allocator::allocate|"
+    "__gnu_cxx::new_allocator::deallocate|"
     "__malloc_alloc_template::allocate|"
     "_M_allocate|"
 
     // libc++ memory allocation routines
-    "std::__u::__libcpp_allocate|"
-    "std::__u::allocator::allocate|"
-    "std::__u::allocator_traits::allocate|"
+    "std::__(u|1)::__libcpp_allocate|"
+    "std::__(u|1)::__libcpp_deallocate|"
+    "std::__(u|1)::__libcpp_operator_new|"
+    "std::__(u|1)::__libcpp_operator_delete|"
+    "std::__(u|1)::allocator::allocate|"
+    "std::__(u|1)::allocator::deallocate|"
+    "std::__(u|1)::allocator_traits::allocate|"
+    "std::__(u|1)::allocator_traits::deallocate|"
+    "std::__(u|1)::__builtin_new_allocator::__allocate_bytes|"
+    "std::__(u|1)::__do_deallocate_handle_size|"
+    "std::__(u|1)::__allocate_at_least|"
+    "std::__(u|1)::__allocation_guard::(~)?__allocation_guard|"
+    "std::__(u|1)::__split_buffer::(~)?__split_buffer|"
 
     // Other misc. memory allocation routines
     "(::)?do_malloc_pages|"
@@ -287,10 +321,11 @@ ABSL_CONST_INIT const absl::string_view kProfileDropFrames =
     "__libc_malloc|"
     "__libc_memalign|"
     "__libc_realloc|"
-    "(::)?slow_alloc|"
+    "slow_alloc|"
     "fast_alloc|"
-    "(::)?AllocSmall|"
-    "operator new(\\[\\])?";
+    "AllocSmall|"
+    "operator new|"
+    "operator delete";
 
 ProfileBuilder::ProfileBuilder()
     : profile_(std::make_unique<perftools::profiles::Profile>()) {
@@ -324,7 +359,7 @@ int ProfileBuilder::InternLocation(const void* ptr) {
     return inserted.first->second;
   }
   perftools::profiles::Location& location = *profile_->add_location();
-  ASSERT(inserted.first->second == index);
+  TC_ASSERT_EQ(inserted.first->second, index);
   location.set_id(index);
   location.set_address(address);
 
@@ -343,7 +378,7 @@ int ProfileBuilder::InternLocation(const void* ptr) {
   const perftools::profiles::Mapping& mapping =
       profile_->mapping(mapping_index);
   const int mapping_id = mapping.id();
-  ASSERT(it->first == mapping.memory_start());
+  TC_ASSERT(it->first == mapping.memory_start());
 
   if (it->first <= address && address < mapping.memory_limit()) {
     location.set_mapping_id(mapping_id);
@@ -362,7 +397,7 @@ void ProfileBuilder::InternCallstack(absl::Span<const void* const> stack,
         absl::bit_cast<const void*>(absl::bit_cast<uintptr_t>(frame) - 1));
     sample.add_location_id(id);
   }
-  ASSERT(sample.location_id().size() == stack.size());
+  TC_ASSERT_EQ(sample.location_id().size(), stack.size());
 }
 
 void ProfileBuilder::AddCurrentMappings() {
@@ -383,7 +418,7 @@ void ProfileBuilder::AddCurrentMappings() {
       }
       const ElfW(Phdr)* pt_load = &info->dlpi_phdr[i];
 
-      CHECK_CONDITION(pt_load != nullptr);
+      TC_CHECK_NE(pt_load, nullptr);
 
       // Extract data.
       const size_t memory_start = info->dlpi_addr + pt_load->p_vaddr;
@@ -434,24 +469,26 @@ void ProfileBuilder::AddCurrentMappings() {
 #endif  // defined(__linux__)
 }
 
-void ProfileBuilder::AddMapping(uintptr_t memory_start, uintptr_t memory_limit,
-                                uintptr_t file_offset,
-                                absl::string_view filename,
-                                absl::string_view build_id) {
+int ProfileBuilder::AddMapping(uintptr_t memory_start, uintptr_t memory_limit,
+                               uintptr_t file_offset,
+                               absl::string_view filename,
+                               absl::string_view build_id) {
   perftools::profiles::Mapping& mapping = *profile_->add_mapping();
-  mapping.set_id(profile_->mapping_size());
+  const int mapping_id = profile_->mapping_size();
+  mapping.set_id(mapping_id);
   mapping.set_memory_start(memory_start);
   mapping.set_memory_limit(memory_limit);
   mapping.set_file_offset(file_offset);
   mapping.set_filename(InternString(filename));
   mapping.set_build_id(InternString(build_id));
 
-  mappings_.emplace(memory_start, mapping.id() - 1);
+  mappings_.emplace(memory_start, mapping_id - 1);
+  return mapping_id;
 }
 
 static void MakeLifetimeProfileProto(const tcmalloc::Profile& profile,
                                      ProfileBuilder* builder) {
-  CHECK_CONDITION(builder != nullptr);
+  TC_CHECK_NE(builder, nullptr);
   perftools::profiles::Profile& converted = builder->profile();
   perftools::profiles::ValueType* period_type = converted.mutable_period_type();
 
@@ -484,6 +521,9 @@ static void MakeLifetimeProfileProto(const tcmalloc::Profile& profile,
   const int min_lifetime_id = builder->InternString("min_lifetime");
   const int max_lifetime_id = builder->InternString("max_lifetime");
   const int active_cpu_id = builder->InternString("active CPU");
+  const int active_vcpu_id = builder->InternString("active vCPU");
+  const int active_l3_id = builder->InternString("active L3");
+  const int active_numa_id = builder->InternString("active NUMA");
   const int same_id = builder->InternString("same");
   const int different_id = builder->InternString("different");
   const int active_thread_id = builder->InternString("active thread");
@@ -493,7 +533,7 @@ static void MakeLifetimeProfileProto(const tcmalloc::Profile& profile,
   profile.Iterate([&](const tcmalloc::Profile::Sample& entry) {
     perftools::profiles::Sample& sample = *converted.add_sample();
 
-    CHECK_CONDITION(entry.depth <= ABSL_ARRAYSIZE(entry.stack));
+    TC_CHECK_LE(entry.depth, ABSL_ARRAYSIZE(entry.stack));
     builder->InternCallstack(absl::MakeSpan(entry.stack, entry.depth), sample);
 
     auto add_label = [&](int key, int unit, size_t value) {
@@ -540,7 +580,16 @@ static void MakeLifetimeProfileProto(const tcmalloc::Profile& profile,
                        absl::ToInt64Nanoseconds(entry.max_lifetime));
 
     add_optional_string_label(active_cpu_id,
-                              entry.allocator_deallocator_cpu_matched, same_id,
+                              entry.allocator_deallocator_physical_cpu_matched,
+                              same_id, different_id);
+    add_optional_string_label(active_vcpu_id,
+                              entry.allocator_deallocator_virtual_cpu_matched,
+                              same_id, different_id);
+    add_optional_string_label(active_l3_id,
+                              entry.allocator_deallocator_l3_matched, same_id,
+                              different_id);
+    add_optional_string_label(active_numa_id,
+                              entry.allocator_deallocator_numa_matched, same_id,
                               different_id);
     add_optional_string_label(active_thread_id,
                               entry.allocator_deallocator_thread_matched,
@@ -581,7 +630,8 @@ std::unique_ptr<perftools::profiles::Profile> ProfileBuilder::Finalize() && {
 }
 
 absl::StatusOr<std::unique_ptr<perftools::profiles::Profile>> MakeProfileProto(
-    const ::tcmalloc::Profile& profile) {
+    const ::tcmalloc::Profile& profile, PageFlags* pageflags,
+    Residency* residency) {
   ProfileBuilder builder;
   builder.AddCurrentMappings();
 
@@ -599,6 +649,8 @@ absl::StatusOr<std::unique_ptr<perftools::profiles::Profile>> MakeProfileProto(
   const int space_id = builder.InternString("space");
   const int resident_space_id = builder.InternString("resident_space");
   const int swapped_space_id = builder.InternString("swapped_space");
+  const int stale_space_id = builder.InternString("stale_space");
+  const int locked_space_id = builder.InternString("locked_space");
   const int access_hint_id = builder.InternString("access_hint");
   const int access_allocated_id = builder.InternString("access_allocated");
   const int cold_id = builder.InternString("cold");
@@ -611,6 +663,7 @@ absl::StatusOr<std::unique_ptr<perftools::profiles::Profile>> MakeProfileProto(
   const int sampled_resident_id =
       builder.InternString("sampled_resident_bytes");
   const int swapped_id = builder.InternString("swapped_bytes");
+  const int stale_id = builder.InternString("stale_bytes");
 
   perftools::profiles::Profile& converted = builder.profile();
 
@@ -644,6 +697,14 @@ absl::StatusOr<std::unique_ptr<perftools::profiles::Profile>> MakeProfileProto(
     sample_type = converted.add_sample_type();
     sample_type->set_type(swapped_space_id);
     sample_type->set_unit(bytes_id);
+
+    sample_type = converted.add_sample_type();
+    sample_type->set_type(stale_space_id);
+    sample_type->set_unit(bytes_id);
+
+    sample_type = converted.add_sample_type();
+    sample_type->set_type(locked_space_id);
+    sample_type->set_unit(bytes_id);
   }
 
   int default_sample_type_id;
@@ -669,13 +730,13 @@ absl::StatusOr<std::unique_ptr<perftools::profiles::Profile>> MakeProfileProto(
 
   converted.set_default_sample_type(default_sample_type_id);
 
-  SampleMergedMap samples =
-      MergeProfileSamplesAndMaybeGetResidencyInfo(profile);
+  SampleMergedMap samples = MergeProfileSamplesAndMaybeGetResidencyInfo(
+      profile, pageflags, residency);
   for (const auto& [entry, data] : samples) {
     perftools::profiles::Profile& profile = builder.profile();
     perftools::profiles::Sample& sample = *profile.add_sample();
 
-    CHECK_CONDITION(entry.depth <= ABSL_ARRAYSIZE(entry.stack));
+    TC_CHECK_LE(entry.depth, ABSL_ARRAYSIZE(entry.stack));
     builder.InternCallstack(absl::MakeSpan(entry.stack, entry.depth), sample);
 
     sample.add_value(data.count);
@@ -683,6 +744,8 @@ absl::StatusOr<std::unique_ptr<perftools::profiles::Profile>> MakeProfileProto(
     if (exporting_residency) {
       sample.add_value(data.resident_size.value_or(0));
       sample.add_value(data.swapped_size.value_or(0));
+      sample.add_value(data.stale_size.value_or(0));
+      sample.add_value(data.locked_size.value_or(0));
     }
 
     // add fields that are common to all memory profiles
@@ -707,6 +770,9 @@ absl::StatusOr<std::unique_ptr<perftools::profiles::Profile>> MakeProfileProto(
     if (data.resident_size.has_value()) {
       add_label(sampled_resident_id, bytes_id, data.resident_size.value());
       add_label(swapped_id, bytes_id, data.swapped_size.value());
+    }
+    if (data.stale_size.has_value()) {
+      add_label(stale_id, bytes_id, data.stale_size.value());
     }
 
     auto add_access_label = [&](int key,
@@ -791,6 +857,23 @@ absl::StatusOr<std::unique_ptr<perftools::profiles::Profile>> MakeProfileProto(
   }
 
   return std::move(builder).Finalize();
+}
+
+absl::StatusOr<std::unique_ptr<perftools::profiles::Profile>> MakeProfileProto(
+    const ::tcmalloc::Profile& profile) {
+  // Used to populate residency info in heap profile.
+  std::optional<PageFlags> pageflags;
+  std::optional<Residency> residency;
+
+  PageFlags* p = nullptr;
+  Residency* r = nullptr;
+
+  if (profile.Type() == ProfileType::kHeap) {
+    p = &pageflags.emplace();
+    r = &residency.emplace();
+  }
+
+  return MakeProfileProto(profile, p, r);
 }
 
 }  // namespace tcmalloc_internal

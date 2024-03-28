@@ -14,15 +14,20 @@
 
 #include "tcmalloc/central_freelist.h"
 
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
-#include "tcmalloc/internal/linked_list.h"
+#include "absl/base/optimization.h"
+#include "absl/base/thread_annotations.h"
+#include "absl/types/span.h"
+#include "tcmalloc/common.h"
+#include "tcmalloc/internal/allocation_guard.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
-#include "tcmalloc/internal/optimization.h"
 #include "tcmalloc/internal/prefetch.h"
-#include "tcmalloc/page_heap.h"
 #include "tcmalloc/pagemap.h"
 #include "tcmalloc/pages.h"
+#include "tcmalloc/span.h"
 #include "tcmalloc/static_vars.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -48,22 +53,28 @@ Length StaticForwarder::class_to_pages(int size_class) {
   return Length(tc_globals.sizemap().class_to_pages(size_class));
 }
 
-Span* StaticForwarder::MapObjectToSpan(const void* object) {
-  const PageId p = PageIdContaining(object);
-  Span* span = tc_globals.pagemap().GetExistingDescriptor(p);
-  return span;
+void StaticForwarder::MapObjectsToSpans(absl::Span<void*> batch, Span** spans) {
+  // Prefetch Span objects to reduce cache misses.
+  for (int i = 0; i < batch.size(); ++i) {
+    const PageId p = PageIdContaining(batch[i]);
+    Span* span = tc_globals.pagemap().GetExistingDescriptor(p);
+    TC_ASSERT_NE(span, nullptr);
+    span->Prefetch();
+    spans[i] = span;
+  }
 }
 
-Span* StaticForwarder::AllocateSpan(int size_class, size_t objects_per_span,
+Span* StaticForwarder::AllocateSpan(int size_class,
+                                    SpanAllocInfo span_alloc_info,
                                     Length pages_per_span) {
   const MemoryTag tag = MemoryTagFromSizeClass(size_class);
   Span* span =
-      tc_globals.page_allocator().New(pages_per_span, objects_per_span, tag);
+      tc_globals.page_allocator().New(pages_per_span, span_alloc_info, tag);
   if (ABSL_PREDICT_FALSE(span == nullptr)) {
     return nullptr;
   }
-  ASSERT(tag == GetMemoryTag(span->start_address()));
-  ASSERT(span->num_pages() == pages_per_span);
+  TC_ASSERT_EQ(tag, GetMemoryTag(span->start_address()));
+  TC_ASSERT_EQ(span->num_pages(), pages_per_span);
 
   tc_globals.pagemap().RegisterSizeClass(span, size_class);
   return span;
@@ -72,9 +83,9 @@ Span* StaticForwarder::AllocateSpan(int size_class, size_t objects_per_span,
 static void ReturnSpansToPageHeap(MemoryTag tag, absl::Span<Span*> free_spans,
                                   size_t objects_per_span)
     ABSL_LOCKS_EXCLUDED(pageheap_lock) {
-  absl::base_internal::SpinLockHolder h(&pageheap_lock);
+  PageHeapSpinLockHolder l;
   for (Span* const free_span : free_spans) {
-    ASSERT(tag == GetMemoryTag(free_span->start_address()));
+    TC_ASSERT_EQ(tag, GetMemoryTag(free_span->start_address()));
     tc_globals.page_allocator().Delete(free_span, objects_per_span, tag);
   }
 }
@@ -83,16 +94,11 @@ void StaticForwarder::DeallocateSpans(int size_class, size_t objects_per_span,
                                       absl::Span<Span*> free_spans) {
   // Unregister size class doesn't require holding any locks.
   for (Span* const free_span : free_spans) {
-    ASSERT(IsNormalMemory(free_span->start_address()) ||
-           IsColdMemory(free_span->start_address()));
+    TC_ASSERT_NE(GetMemoryTag(free_span->start_address()), MemoryTag::kSampled);
     tc_globals.pagemap().UnregisterSizeClass(free_span);
 
     // Before taking pageheap_lock, prefetch the PageTrackers these spans are
     // on.
-    //
-    // Small-but-slow does not use the HugePageAwareAllocator (by default), so
-    // do not prefetch on this config.
-#ifndef TCMALLOC_SMALL_BUT_SLOW
     const PageId p = free_span->first_page();
 
     // In huge_page_filler.h, we static_assert that PageTracker's key elements
@@ -103,7 +109,6 @@ void StaticForwarder::DeallocateSpans(int size_class, size_t objects_per_span,
     PrefetchW(pt);
     PrefetchW(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(pt) +
                                       ABSL_CACHELINE_SIZE));
-#endif  // TCMALLOC_SMALL_BUT_SLOW
   }
 
   const MemoryTag tag = MemoryTagFromSizeClass(size_class);

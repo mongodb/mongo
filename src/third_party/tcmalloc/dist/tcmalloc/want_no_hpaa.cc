@@ -23,7 +23,7 @@ namespace tcmalloc_internal {
 // forces HPAA off/subrelease off.
 ABSL_ATTRIBUTE_UNUSED int default_want_hpaa() { return -1; }
 
-ABSL_ATTRIBUTE_UNUSED int default_subrelease() { return -1; }
+ABSL_ATTRIBUTE_UNUSED int default_subrelease() { return 0; }
 
 }  // namespace tcmalloc_internal
 }  // namespace tcmalloc

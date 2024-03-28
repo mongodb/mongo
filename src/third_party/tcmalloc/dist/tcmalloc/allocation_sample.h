@@ -15,10 +15,15 @@
 #ifndef TCMALLOC_ALLOCATION_SAMPLE_H_
 #define TCMALLOC_ALLOCATION_SAMPLE_H_
 
-#include "absl/base/dynamic_annotations.h"
+#include <memory>
+
+#include "absl/base/const_init.h"
 #include "absl/base/internal/spinlock.h"
+#include "absl/base/thread_annotations.h"
 #include "absl/time/time.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
+#include "tcmalloc/malloc_extension.h"
 #include "tcmalloc/stack_trace_table.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -46,18 +51,18 @@ class AllocationSampleList {
   constexpr AllocationSampleList() = default;
 
   void Add(AllocationSample* as) {
-    absl::base_internal::SpinLockHolder h(&lock_);
+    AllocationGuardSpinLockHolder h(&lock_);
     as->next_ = first_;
     first_ = as;
   }
 
   // This list is very short and we're nowhere near a hot path, just walk
   void Remove(AllocationSample* as) {
-    absl::base_internal::SpinLockHolder h(&lock_);
+    AllocationGuardSpinLockHolder h(&lock_);
     AllocationSample** link = &first_;
     AllocationSample* cur = first_;
     while (cur != as) {
-      CHECK_CONDITION(cur != nullptr);
+      TC_CHECK_NE(cur, nullptr);
       link = &cur->next_;
       cur = cur->next_;
     }
@@ -65,7 +70,7 @@ class AllocationSampleList {
   }
 
   void ReportMalloc(const struct StackTrace& sample) {
-    absl::base_internal::SpinLockHolder h(&lock_);
+    AllocationGuardSpinLockHolder h(&lock_);
     AllocationSample* cur = first_;
     while (cur != nullptr) {
       cur->mallocs_->AddTrace(1.0, sample);

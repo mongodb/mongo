@@ -16,8 +16,8 @@
 #define TCMALLOC_INTERNAL_ATOMIC_STATS_COUNTER_H_
 
 #include <atomic>
+#include <cstdint>
 
-#include "absl/base/macros.h"
 #include "tcmalloc/internal/config.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN

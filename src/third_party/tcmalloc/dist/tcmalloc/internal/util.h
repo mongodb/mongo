@@ -20,14 +20,13 @@
 #include <sched.h>
 #include <signal.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
 
-#include "absl/base/internal/sysinfo.h"
 #include "absl/time/time.h"
 #include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/logging.h"
 
 #define TCMALLOC_RETRY_ON_TEMP_FAILURE(expression)               \
   (__extension__({                                               \
@@ -92,6 +91,39 @@ ssize_t signal_safe_read(int fd, char* buf, size_t count, size_t* bytes_read);
 // not attempting to re-enable them.  Protecting us from the traditional races
 // involved with the latter.
 int signal_safe_poll(struct ::pollfd* fds, int nfds, absl::Duration timeout);
+
+class ScopedSigmask {
+ public:
+  // Masks all signal handlers. (SIG_SETMASK, All)
+  ScopedSigmask() noexcept;
+
+  // No copy, move or assign
+  ScopedSigmask(const ScopedSigmask &) = delete;
+  ScopedSigmask &operator=(const ScopedSigmask &) = delete;
+
+  // Restores the masked signal handlers to its former state.
+  ~ScopedSigmask() noexcept;
+
+ private:
+  void Setmask(int how, sigset_t *set, sigset_t *old);
+
+  sigset_t old_set_;
+};
+
+inline ScopedSigmask::ScopedSigmask() noexcept {
+  sigset_t set;
+  sigfillset(&set);
+  Setmask(SIG_SETMASK, &set, &old_set_);
+}
+
+inline ScopedSigmask::~ScopedSigmask() noexcept {
+  Setmask(SIG_SETMASK, &old_set_, nullptr);
+}
+
+inline void ScopedSigmask::Setmask(int how, sigset_t *set, sigset_t *old) {
+  const int result = pthread_sigmask(how, set, old);
+  TC_CHECK_EQ(result, 0);
+}
 
 }  // namespace tcmalloc_internal
 }  // namespace tcmalloc

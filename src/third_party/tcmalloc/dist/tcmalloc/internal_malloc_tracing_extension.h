@@ -20,6 +20,7 @@
 #ifndef TCMALLOC_INTERNAL_MALLOC_TRACING_EXTENSION_H_
 #define TCMALLOC_INTERNAL_MALLOC_TRACING_EXTENSION_H_
 
+#include "absl/base/attributes.h"
 #include "absl/status/statusor.h"
 #include "tcmalloc/malloc_tracing_extension.h"
 

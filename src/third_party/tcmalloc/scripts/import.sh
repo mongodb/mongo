@@ -6,8 +6,8 @@ IFS=$'\n\t'
 
 set -vx
 
-# This is a tag of the upstream rev 093ba93
-LIB_GIT_REVISION=mongo-SERVER-85737
+# This is a tag of the upstream rev f24c98a2700212382b3efc0e1c089a9fb6f774c2 + compiler fixes
+LIB_GIT_REVISION=mongo-SERVER-88161
 LIB_GIT_REPO=git@github.com:mongodb-forks/tcmalloc.git
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/tcmalloc

@@ -18,6 +18,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 
 #include "tcmalloc/internal/config.h"

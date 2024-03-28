@@ -18,67 +18,42 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdio>
 #include <memory>
 #include <new>
 #include <string>
+#include <tuple>
 
 #include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 #include "absl/base/attributes.h"
 #include "absl/base/casts.h"
-#include "absl/memory/memory.h"
 #include "absl/numeric/bits.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "tcmalloc/common.h"
+#include "tcmalloc/guarded_allocations.h"
 #include "tcmalloc/guarded_page_allocator.h"
-#include "tcmalloc/internal/declarations.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/malloc_extension.h"
 #include "tcmalloc/static_vars.h"
 #include "tcmalloc/testing/testutil.h"
 
 namespace tcmalloc {
-namespace {
 
 using tcmalloc_internal::kPageShift;
 using tcmalloc_internal::kPageSize;
 using tcmalloc_internal::tc_globals;
 
-class GuardedAllocAlignmentTest : public testing::Test {
- protected:
+class GuardedAllocAlignmentTest : public testing::Test, ScopedAlwaysSample {
+ public:
   GuardedAllocAlignmentTest() {
-    profile_sampling_rate_ = MallocExtension::GetProfileSamplingRate();
-    guarded_sample_rate_ = MallocExtension::GetGuardedSamplingRate();
-    MallocExtension::SetProfileSamplingRate(1);  // Always do heapz samples.
-    MallocExtension::SetGuardedSamplingRate(
-        0);  // TODO(b/201336703): Guard every heapz sample.
     MallocExtension::ActivateGuardedSampling();
-
-    // Eat up unsampled bytes remaining to flush the new sample rates.
-    while (true) {
-      void* p = ::operator new(kPageSize);
-      if (tcmalloc::tc_globals.guardedpage_allocator().PointerIsMine(p)) {
-        ::operator delete(p);
-        break;
-      }
-      ::operator delete(p);
-    }
-
-    // Ensure subsequent allocations are guarded.
-    void* p = ::operator new(1);
-    CHECK_CONDITION(
-        tcmalloc::tc_globals.guardedpage_allocator().PointerIsMine(p));
-    ::operator delete(p);
+    tc_globals.guardedpage_allocator().Reset();
   }
-
-  ~GuardedAllocAlignmentTest() override {
-    MallocExtension::SetProfileSamplingRate(profile_sampling_rate_);
-    MallocExtension::SetGuardedSamplingRate(guarded_sample_rate_);
-  }
-
- private:
-  int64_t profile_sampling_rate_;
-  int32_t guarded_sample_rate_;
 };
+
+namespace {
 
 TEST_F(GuardedAllocAlignmentTest, Malloc) {
   for (size_t lg = 0; lg <= kPageShift; lg++) {
@@ -135,66 +110,122 @@ TEST_F(GuardedAllocAlignmentTest, AlignedNew) {
   }
 }
 
+}  // namespace
+
+// By placing this class in the tcmalloc namespace, it may call the private
+// method StackTraceFilter::Reset as a friend.
 class TcMallocTest : public testing::Test {
  protected:
   TcMallocTest() {
+    // Start with clean state to avoid hash collisions.
+    tc_globals.guardedpage_allocator().Reset();
     MallocExtension::SetGuardedSamplingRate(
-        100 * MallocExtension::GetProfileSamplingRate());
+        10 * MallocExtension::GetProfileSamplingRate());
 
     // Prevent SEGV handler from writing XML properties in death tests.
     unsetenv("XML_OUTPUT_FILE");
   }
+
+  void ResetStackTraceFilter() { tc_globals.guardedpage_allocator().Reset(); }
 };
 
-TEST_F(TcMallocTest, UnderflowReadDetected) {
-  auto RepeatUnderflowRead = []() {
+namespace {
+
+class ReadWriteTcMallocTest
+    : public TcMallocTest,
+      public testing::WithParamInterface<bool /* write_test */> {};
+
+TEST_P(ReadWriteTcMallocTest, UnderflowDetected) {
+  const bool write_test = GetParam();
+  auto RepeatUnderflow = [&]() {
     for (int i = 0; i < 1000000; i++) {
-      auto buf = absl::make_unique<char[]>(kPageSize / 2);
+      auto buf = std::make_unique<char[]>(kPageSize / 2);
       benchmark::DoNotOptimize(buf);
       // TCMalloc may crash without a GWP-ASan report if we underflow a regular
       // allocation.  Make sure we have a guarded allocation.
-      if (tcmalloc::tc_globals.guardedpage_allocator().PointerIsMine(
-              buf.get())) {
-        volatile char sink = buf[-1];
-        benchmark::DoNotOptimize(sink);
+      if (tc_globals.guardedpage_allocator().PointerIsMine(buf.get())) {
+        if (write_test) {
+          buf[-1] = 'A';
+        } else {
+          volatile char sink = buf[-1];
+          benchmark::DoNotOptimize(sink);
+        }
+        ResetStackTraceFilter();
       }
     }
   };
-  EXPECT_DEATH(RepeatUnderflowRead(),
-               "Buffer underflow occurs in thread [0-9]+ at");
+  std::string expected_output = absl::StrCat(
+      "Buffer underflow ",
+#if !defined(__riscv)
+      write_test ? "\\(write\\)" : "\\(read\\)",
+#else
+      "\\(read or write: indeterminate\\)",
+#endif
+      " occurs in thread [0-9]+ at"
+  );
+  EXPECT_DEATH(RepeatUnderflow(), expected_output);
 }
 
-TEST_F(TcMallocTest, OverflowReadDetected) {
-  auto RepeatOverflowRead = []() {
+TEST_P(ReadWriteTcMallocTest, OverflowDetected) {
+  const bool write_test = GetParam();
+  auto RepeatOverflow = [&]() {
     for (int i = 0; i < 1000000; i++) {
-      auto buf = absl::make_unique<char[]>(kPageSize / 2);
+      auto buf = std::make_unique<char[]>(kPageSize / 2);
       benchmark::DoNotOptimize(buf);
       // TCMalloc may crash without a GWP-ASan report if we overflow a regular
       // allocation.  Make sure we have a guarded allocation.
-      if (tcmalloc::tc_globals.guardedpage_allocator().PointerIsMine(
-              buf.get())) {
-        volatile char sink = buf[kPageSize / 2];
-        benchmark::DoNotOptimize(sink);
+      if (tc_globals.guardedpage_allocator().PointerIsMine(buf.get())) {
+        if (write_test) {
+          buf[kPageSize / 2] = 'A';
+          benchmark::DoNotOptimize(buf[kPageSize / 2]);
+        } else {
+          volatile char sink = buf[kPageSize / 2];
+          benchmark::DoNotOptimize(sink);
+        }
+        ResetStackTraceFilter();
       }
     }
   };
-  EXPECT_DEATH(RepeatOverflowRead(),
-               "Buffer overflow occurs in thread [0-9]+ at");
+  std::string expected_output = absl::StrCat(
+      "Buffer overflow ",
+#if !defined(__riscv)
+      write_test ? "\\(write\\)" : "\\(read\\)",
+#else
+      "\\(read or write: indeterminate\\)",
+#endif
+      " occurs in thread [0-9]+ at"
+  );
+  EXPECT_DEATH(RepeatOverflow(), expected_output);
 }
 
-TEST_F(TcMallocTest, UseAfterFreeDetected) {
-  auto RepeatUseAfterFree = []() {
+TEST_P(ReadWriteTcMallocTest, UseAfterFreeDetected) {
+  const bool write_test = GetParam();
+  auto RepeatUseAfterFree = [&]() {
     for (int i = 0; i < 1000000; i++) {
       char* sink_buf = new char[kPageSize];
       benchmark::DoNotOptimize(sink_buf);
       delete[] sink_buf;
-      volatile char sink = sink_buf[0];
-      benchmark::DoNotOptimize(sink);
+      if (write_test) {
+        sink_buf[0] = 'A';
+      } else {
+        volatile char sink = sink_buf[0];
+        benchmark::DoNotOptimize(sink);
+      }
     }
   };
-  EXPECT_DEATH(RepeatUseAfterFree(),
-               "Use-after-free occurs in thread [0-9]+ at");
+  std::string expected_output = absl::StrCat(
+      "Use-after-free ",
+#if !defined(__riscv)
+      write_test ? "\\(write\\)" : "\\(read\\)",
+#else
+      "\\(read or write: indeterminate\\)",
+#endif
+      " occurs in thread [0-9]+ at"
+  );
+  EXPECT_DEATH(RepeatUseAfterFree(), expected_output);
 }
+
+INSTANTIATE_TEST_SUITE_P(rwtmt, ReadWriteTcMallocTest, testing::Bool());
 
 // Double free triggers an ASSERT within TCMalloc in non-opt builds.  So only
 // run this test for opt builds.
@@ -206,29 +237,37 @@ TEST_F(TcMallocTest, DoubleFreeDetected) {
       ::operator delete(buf);
       // TCMalloc often SEGVs on double free (without GWP-ASan report). Make
       // sure we have a guarded allocation before double-freeing.
-      if (tcmalloc::tc_globals.guardedpage_allocator().PointerIsMine(buf)) {
+      if (tc_globals.guardedpage_allocator().PointerIsMine(buf)) {
         ::operator delete(buf);
       }
     }
   };
-  EXPECT_DEATH(RepeatDoubleFree(), "Double free occurs in thread [0-9]+ at");
+  std::string expected_output =
+      absl::StrCat("Double free occurs in thread [0-9]+ at"
+      );
+  EXPECT_DEATH(RepeatDoubleFree(), expected_output);
 }
 #endif
 
 TEST_F(TcMallocTest, OverflowWriteDetectedAtFree) {
-  auto RepeatOverflowWrite = []() {
+  auto RepeatOverflowWrite = [&]() {
     for (int i = 0; i < 1000000; i++) {
       // Make buffer smaller than kPageSize to test detection-at-free of write
       // overflows.
       constexpr size_t kSize = kPageSize - 1;
-      auto sink_buf = absl::make_unique<char[]>(kSize);
+      auto sink_buf = std::make_unique<char[]>(kSize);
       benchmark::DoNotOptimize(sink_buf);
       sink_buf[kSize] = '\0';
       benchmark::DoNotOptimize(sink_buf[kSize]);
+      if (tc_globals.guardedpage_allocator().PointerIsMine(sink_buf.get())) {
+        ResetStackTraceFilter();
+      }
     }
   };
-  EXPECT_DEATH(RepeatOverflowWrite(),
-               "Buffer overflow \\(write\\) detected in thread [0-9]+ at free");
+  std::string expected_output = absl::StrCat(
+      "Buffer overflow \\(write\\) detected in thread [0-9]+ at free"
+  );
+  EXPECT_DEATH(RepeatOverflowWrite(), expected_output);
 }
 
 TEST_F(TcMallocTest, ReallocNoFalsePositive) {
@@ -243,24 +282,29 @@ TEST_F(TcMallocTest, ReallocNoFalsePositive) {
 }
 
 TEST_F(TcMallocTest, OffsetAndLength) {
-  auto RepeatUseAfterFree = [](size_t buffer_len, off_t access_offset) {
+  auto RepeatUseAfterFree = [&](size_t buffer_len, off_t access_offset) {
     for (int i = 0; i < 1000000; i++) {
       void* buf = ::operator new(buffer_len);
       ::operator delete(buf);
       // TCMalloc may crash without a GWP-ASan report if we overflow a regular
       // allocation.  Make sure we have a guarded allocation.
-      if (tcmalloc::tc_globals.guardedpage_allocator().PointerIsMine(buf)) {
+      if (tc_globals.guardedpage_allocator().PointerIsMine(buf)) {
         volatile char sink = static_cast<char*>(buf)[access_offset];
         benchmark::DoNotOptimize(sink);
+        ResetStackTraceFilter();
       }
     }
   };
   EXPECT_DEATH(RepeatUseAfterFree(3999, -42),
                ">>> Access at offset -42 into buffer of length 3999");
-  EXPECT_DEATH(RepeatUseAfterFree(6543, 1221),
-               ">>> Access at offset 1221 into buffer of length 6543");
-  EXPECT_DEATH(RepeatUseAfterFree(8192, 8484),
-               ">>> Access at offset 8484 into buffer of length 8192");
+  if (kPageSize > 4096) {
+    EXPECT_DEATH(RepeatUseAfterFree(6543, 1221),
+                 ">>> Access at offset 1221 into buffer of length 6543");
+    EXPECT_DEATH(RepeatUseAfterFree(8192, 8484),
+                 ">>> Access at offset 8484 into buffer of length 8192");
+    EXPECT_DEATH(RepeatUseAfterFree(4096, 4096),
+                 ">>> Access at offset 4096 into buffer of length 4096");
+  }
 }
 
 // Ensure non-GWP-ASan segfaults also crash.
@@ -290,7 +334,7 @@ TEST_F(TcMallocTest, b201199449_AlignedObjectConstruction) {
         absl::bit_cast<uintptr_t>(a.get()) % __STDCPP_DEFAULT_NEW_ALIGNMENT__,
         0);
 
-    if (tcmalloc::tc_globals.guardedpage_allocator().PointerIsMine(a.get())) {
+    if (tc_globals.guardedpage_allocator().PointerIsMine(a.get())) {
       allocated = true;
       break;
     }
@@ -299,7 +343,7 @@ TEST_F(TcMallocTest, b201199449_AlignedObjectConstruction) {
   EXPECT_TRUE(allocated) << "Failed to allocate with GWP-ASan";
 }
 
-TEST(AlwaysSamplingTest, DoubleFree) {
+TEST_F(TcMallocTest, DoubleFree) {
   ScopedGuardedSamplingRate gs(-1);
   ScopedProfileSamplingRate s(1);
   auto DoubleFree = []() {
@@ -307,7 +351,71 @@ TEST(AlwaysSamplingTest, DoubleFree) {
     ::operator delete(buf);
     ::operator delete(buf);
   };
-  EXPECT_DEATH(DoubleFree(), "span != nullptr|Span::Unsample\\(\\)");
+  EXPECT_DEATH(DoubleFree(),
+               "span != "
+               "nullptr|Span::Unsample\\(\\)|Span::IN_USE|"
+               "InvokeHooksAndFreePages\\(\\)");
+}
+
+TEST_F(TcMallocTest, ReallocLarger) {
+  // Note: sizes are chosen so that size + 2 access below
+  // does not write out of actual allocation bounds.
+  for (size_t size : {2, 29, 60, 505}) {
+    EXPECT_DEATH(
+        {
+          fprintf(stderr, "size=%zu\n", size);
+          ScopedAlwaysSample always_sample;
+          for (size_t i = 0; i < 10000; ++i) {
+            char* volatile ptr = static_cast<char*>(malloc(size));
+            ptr = static_cast<char*>(realloc(ptr, size + 1));
+            ptr[size + 2] = 'A';
+            free(ptr);
+            ResetStackTraceFilter();
+          }
+        },
+        "SIGSEGV");
+  }
+}
+
+TEST_F(TcMallocTest, ReallocSmaller) {
+#ifdef ABSL_HAVE_ADDRESS_SANITIZER
+  GTEST_SKIP() << "ASan will trap ahead of us";
+#endif
+  for (size_t size : {8, 29, 60, 505}) {
+    SCOPED_TRACE(absl::StrCat("size=", size));
+    EXPECT_DEATH(
+        {
+          ScopedAlwaysSample always_sample;
+          for (size_t i = 0; i < 10000; ++i) {
+            char* volatile ptr = static_cast<char*>(malloc(size));
+            ptr = static_cast<char*>(realloc(ptr, size - 1));
+            ptr[size - 1] = 'A';
+            free(ptr);
+            ResetStackTraceFilter();
+          }
+        },
+        "SIGSEGV");
+  }
+}
+
+TEST_F(TcMallocTest, ReallocUseAfterFree) {
+#ifdef ABSL_HAVE_ADDRESS_SANITIZER
+  GTEST_SKIP() << "ASan will trap ahead of us";
+#endif
+  for (size_t size : {8, 29, 60, 505}) {
+    SCOPED_TRACE(absl::StrCat("size=", size));
+    EXPECT_DEATH(
+        {
+          ScopedAlwaysSample always_sample;
+          for (size_t i = 0; i < 10000; ++i) {
+            char* volatile old_ptr = static_cast<char*>(malloc(size));
+            void* volatile new_ptr = realloc(old_ptr, size - 1);
+            old_ptr[0] = 'A';
+            free(new_ptr);
+          }
+        },
+        "SIGSEGV");
+  }
 }
 
 }  // namespace

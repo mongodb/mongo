@@ -16,12 +16,16 @@
 #define TCMALLOC_PAGES_H_
 
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
 #include <string>
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/optimization.h"
 
@@ -57,7 +61,7 @@ class Length {
   }
 
   constexpr Length& operator-=(Length rhs) {
-    ASSERT(n_ >= rhs.n_);
+    TC_ASSERT_GE(n_, rhs.n_);
     n_ -= rhs.n_;
     return *this;
   }
@@ -68,13 +72,13 @@ class Length {
   }
 
   constexpr Length& operator/=(size_t rhs) {
-    ASSERT(rhs != 0);
+    TC_ASSERT_NE(rhs, 0);
     n_ /= rhs;
     return *this;
   }
 
   constexpr Length& operator%=(Length rhs) {
-    ASSERT(rhs.n_ != 0);
+    TC_ASSERT_NE(rhs.n_, 0);
     n_ %= rhs.n_;
     return *this;
   }
@@ -85,6 +89,11 @@ class Length {
   friend constexpr bool operator>=(Length lhs, Length rhs);
   friend constexpr bool operator==(Length lhs, Length rhs);
   friend constexpr bool operator!=(Length lhs, Length rhs);
+
+  template <typename Sink>
+  friend void AbslStringify(Sink& sink, const Length& v) {
+    absl::Format(&sink, "%zu", v.in_bytes());
+  }
 
  private:
   uintptr_t n_;
@@ -127,7 +136,7 @@ class PageId {
   }
 
   constexpr PageId& operator-=(Length rhs) {
-    ASSERT(pn_ >= rhs.raw_num());
+    TC_ASSERT_GE(pn_, rhs.raw_num());
     pn_ -= rhs.raw_num();
     return *this;
   }
@@ -135,6 +144,11 @@ class PageId {
   template <typename H>
   friend H AbslHashValue(H h, const PageId& p) {
     return H::combine(std::move(h), p.pn_);
+  }
+
+  template <typename Sink>
+  friend void AbslStringify(Sink& sink, const PageId& v) {
+    absl::Format(&sink, "%p", v.start_addr());
   }
 
  private:
@@ -216,7 +230,7 @@ inline constexpr PageId operator-(PageId lhs, Length rhs) { return lhs -= rhs; }
 
 TCMALLOC_ATTRIBUTE_CONST
 inline constexpr Length operator-(PageId lhs, PageId rhs) {
-  ASSERT(lhs.pn_ >= rhs.pn_);
+  TC_ASSERT_GE(lhs.pn_, rhs.pn_);
   return Length(lhs.pn_ - rhs.pn_);
 }
 
@@ -260,40 +274,30 @@ inline Length& operator++(Length& l) { return l += Length(1); }
 inline Length& operator--(Length& l) { return l -= Length(1); }
 
 TCMALLOC_ATTRIBUTE_CONST
-inline constexpr Length operator+(Length lhs, Length rhs) {
-  return Length(lhs.raw_num() + rhs.raw_num());
-}
+inline constexpr Length operator+(Length lhs, Length rhs) { return lhs += rhs; }
 
 TCMALLOC_ATTRIBUTE_CONST
-inline constexpr Length operator-(Length lhs, Length rhs) {
-  return Length(lhs.raw_num() - rhs.raw_num());
-}
+inline constexpr Length operator-(Length lhs, Length rhs) { return lhs -= rhs; }
 
 TCMALLOC_ATTRIBUTE_CONST
-inline constexpr Length operator*(Length lhs, size_t rhs) {
-  return Length(lhs.raw_num() * rhs);
-}
+inline constexpr Length operator*(Length lhs, size_t rhs) { return lhs *= rhs; }
 
 TCMALLOC_ATTRIBUTE_CONST
-inline constexpr Length operator*(size_t lhs, Length rhs) {
-  return Length(lhs * rhs.raw_num());
-}
+inline constexpr Length operator*(size_t lhs, Length rhs) { return rhs *= lhs; }
 
 TCMALLOC_ATTRIBUTE_CONST
 inline constexpr size_t operator/(Length lhs, Length rhs) {
+  TC_ASSERT_NE(rhs.raw_num(), 0);
   return lhs.raw_num() / rhs.raw_num();
 }
 
 TCMALLOC_ATTRIBUTE_CONST
-inline constexpr Length operator/(Length lhs, size_t rhs) {
-  ASSERT(rhs != 0);
-  return Length(lhs.raw_num() / rhs);
-}
+inline constexpr Length operator/(Length lhs, size_t rhs) { return lhs /= rhs; }
 
 TCMALLOC_ATTRIBUTE_CONST
 inline constexpr Length operator%(Length lhs, Length rhs) {
-  ASSERT(rhs.raw_num() != 0);
-  return Length(lhs.raw_num() % rhs.raw_num());
+  TC_ASSERT_NE(rhs.raw_num(), 0);
+  return lhs %= rhs;
 }
 
 }  // namespace tcmalloc_internal

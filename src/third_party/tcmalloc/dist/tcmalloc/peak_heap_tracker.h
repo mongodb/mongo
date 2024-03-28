@@ -16,14 +16,21 @@
 #define TCMALLOC_PEAK_HEAP_TRACKER_H_
 
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 
+#include "absl/base/const_init.h"
+#include "absl/base/internal/spinlock.h"
 #include "absl/base/thread_annotations.h"
+#include "tcmalloc/arena.h"
 #include "tcmalloc/common.h"
-#include "tcmalloc/explicitly_constructed.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/explicitly_constructed.h"
+#include "tcmalloc/internal/sampled_allocation.h"
+#include "tcmalloc/internal/sampled_allocation_recorder.h"
 #include "tcmalloc/malloc_extension.h"
 #include "tcmalloc/sampled_allocation_allocator.h"
-#include "tcmalloc/sampled_allocation_recorder.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -39,7 +46,7 @@ class PeakHeapTracker {
   void Init(Arena* arena) ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock)
       ABSL_LOCKS_EXCLUDED(recorder_lock_) {
     peak_heap_record_allocator_.Init(arena);
-    absl::base_internal::SpinLockHolder h(&recorder_lock_);
+    AllocationGuardSpinLockHolder h(&recorder_lock_);
     peak_heap_recorder_.Construct(&peak_heap_record_allocator_);
     peak_heap_recorder_.get_mutable().Init();
   }

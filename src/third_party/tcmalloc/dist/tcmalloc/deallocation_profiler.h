@@ -19,6 +19,7 @@
 
 #include "absl/base/const_init.h"
 #include "absl/base/internal/spinlock.h"
+#include "absl/time/time.h"
 #include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/malloc_extension.h"

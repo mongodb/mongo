@@ -17,7 +17,10 @@
 #include <string.h>
 
 #include "tcmalloc/huge_address_map.h"
+#include "tcmalloc/huge_pages.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
+#include "tcmalloc/stats.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -90,11 +93,11 @@ void HugeAllocator::CheckFreelist() {
   size_t num_nodes = free_.nranges();
   HugeLength n = free_.total_mapped();
   free_.Check();
-  CHECK_CONDITION(n == from_system_ - in_use_);
+  TC_CHECK_EQ(n, from_system_ - in_use_);
   LargeSpanStats large;
-  AddSpanStats(nullptr, &large, nullptr);
-  CHECK_CONDITION(num_nodes == large.spans);
-  CHECK_CONDITION(n.in_pages() == large.returned_pages);
+  AddSpanStats(nullptr, &large);
+  TC_CHECK_EQ(num_nodes, large.spans);
+  TC_CHECK_EQ(n.in_pages(), large.returned_pages);
 }
 
 HugeRange HugeAllocator::AllocateRange(HugeLength n) {
@@ -106,16 +109,16 @@ HugeRange HugeAllocator::AllocateRange(HugeLength n) {
     // OOM...
     return HugeRange::Nil();
   }
-  CHECK_CONDITION(ptr != nullptr);
+  TC_CHECK_NE(ptr, nullptr);
   // It's possible for a request to return extra hugepages.
-  CHECK_CONDITION(actual % kHugePageSize == 0);
+  TC_CHECK_EQ(actual % kHugePageSize, 0);
   n = HLFromBytes(actual);
   from_system_ += n;
   return HugeRange::Make(HugePageContaining(ptr), n);
 }
 
 HugeRange HugeAllocator::Get(HugeLength n) {
-  CHECK_CONDITION(n > NHugePages(0));
+  TC_CHECK_GT(n, NHugePages(0));
   auto* node = Find(n);
   if (!node) {
     // Get more memory, then "delete" it
@@ -124,7 +127,7 @@ HugeRange HugeAllocator::Get(HugeLength n) {
     in_use_ += r.len();
     Release(r);
     node = Find(n);
-    CHECK_CONDITION(node != nullptr);
+    TC_CHECK_NE(node, nullptr);
   }
   in_use_ += n;
 
@@ -134,8 +137,8 @@ HugeRange HugeAllocator::Get(HugeLength n) {
     HugeLength before = r.len();
     HugeRange extra = HugeRange::Make(r.start() + n, before - n);
     r = HugeRange::Make(r.start(), n);
-    ASSERT(r.precedes(extra));
-    ASSERT(r.len() + extra.len() == before);
+    TC_ASSERT(r.precedes(extra));
+    TC_ASSERT_EQ(r.len() + extra.len(), before);
     in_use_ += extra.len();
     Release(extra);
   } else {
@@ -153,18 +156,14 @@ void HugeAllocator::Release(HugeRange r) {
   DebugCheckFreelist();
 }
 
-void HugeAllocator::AddSpanStats(SmallSpanStats* small, LargeSpanStats* large,
-                                 PageAgeHistograms* ages) const {
+void HugeAllocator::AddSpanStats(SmallSpanStats* small,
+                                 LargeSpanStats* large) const {
   for (const HugeAddressMap::Node* node = free_.first(); node != nullptr;
        node = node->next()) {
     HugeLength n = node->range().len();
     if (large != nullptr) {
       large->spans++;
       large->returned_pages += n.in_pages();
-    }
-
-    if (ages != nullptr) {
-      ages->RecordRange(n.in_pages(), true, node->when());
     }
   }
 }

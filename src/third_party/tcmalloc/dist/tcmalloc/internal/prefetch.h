@@ -63,36 +63,36 @@ inline void PrefetchNta(const void* addr) { __builtin_prefetch(addr, 0, 0); }
 // manually emit prefetchw. PREFETCHW is recognized as a no-op on older Intel
 // processors and has been present on AMD processors since the K6-2.
 inline void PrefetchW(const void* addr) {
-#if defined(__x86_64__)
-  asm("prefetchw (%0)" : : "r"(addr));
+#if defined(__x86_64__) && !defined(__PRFCHW__)
+  asm("prefetchw %0" : : "m"(*static_cast<const char*>(addr)));
 #else
   __builtin_prefetch(addr, /*rw=*/1, 0);
 #endif
 }
 inline void PrefetchWT0(const void* addr) {
-#if defined(__x86_64__)
-  asm("prefetchw (%0)" : : "r"(addr));
+#if defined(__x86_64__) && !defined(__PRFCHW__)
+  asm("prefetchw %0" : : "m"(*static_cast<const char*>(addr)));
 #else
   __builtin_prefetch(addr, 1, 3);
 #endif
 }
 inline void PrefetchWT1(const void* addr) {
-#if defined(__x86_64__)
-  asm("prefetchw (%0)" : : "r"(addr));
+#if defined(__x86_64__) && !defined(__PRFCHW__)
+  asm("prefetchw %0" : : "m"(*static_cast<const char*>(addr)));
 #else
   __builtin_prefetch(addr, 1, 2);
 #endif
 }
 inline void PrefetchWT2(const void* addr) {
-#if defined(__x86_64__)
-  asm("prefetchw (%0)" : : "r"(addr));
+#if defined(__x86_64__) && !defined(__PRFCHW__)
+  asm("prefetchw %0" : : "m"(*static_cast<const char*>(addr)));
 #else
   __builtin_prefetch(addr, 1, 1);
 #endif
 }
 inline void PrefetchWNta(const void* addr) {
-#if defined(__x86_64__)
-  asm("prefetchw (%0)" : : "r"(addr));
+#if defined(__x86_64__) && !defined(__PRFCHW__)
+  asm("prefetchw %0" : : "m"(*static_cast<const char*>(addr)));
 #else
   __builtin_prefetch(addr, 1, 0);
 #endif

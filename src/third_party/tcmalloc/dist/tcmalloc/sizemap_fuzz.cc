@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <algorithm>
-#include <vector>
+#include <cstddef>
+#include <cstdint>
 
 #include "absl/log/check.h"
+#include "absl/types/span.h"
 #include "tcmalloc/common.h"
 #include "tcmalloc/size_class_info.h"
 #include "tcmalloc/sizemap.h"
@@ -28,13 +29,12 @@ using tcmalloc::tcmalloc_internal::SizeClassInfo;
 using tcmalloc::tcmalloc_internal::SizeMap;
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-  const SizeClassInfo* info;
-  if (size % sizeof(*info) != 0) {
+  if (size == 0) {
     return 0;
   }
-  info = reinterpret_cast<const SizeClassInfo*>(data);
 
   SizeMap m;
+  const SizeClassInfo* info = reinterpret_cast<const SizeClassInfo*>(data);
   if (!m.Init(absl::MakeSpan(info, size / sizeof(*info)))) {
     return 0;
   }

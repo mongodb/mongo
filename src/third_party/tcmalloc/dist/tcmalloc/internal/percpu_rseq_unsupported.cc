@@ -15,7 +15,6 @@
 // Provides skeleton RSEQ functions which raise a hard error in the case of
 // being erroneously called on an unsupported platform.
 
-#include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/percpu.h"
 
 #if !TCMALLOC_PERCPU_RSEQ_SUPPORTED_PLATFORM
@@ -27,8 +26,7 @@ namespace subtle {
 namespace percpu {
 
 static void Unsupported() {
-  Crash(kCrash, __FILE__, __LINE__,
-        "RSEQ function called on unsupported platform.");
+  TC_BUG("RSEQ function called on unsupported platform.");
 }
 
 int TcmallocSlab_Internal_PerCpuCmpxchg64(int target_cpu, intptr_t* p,

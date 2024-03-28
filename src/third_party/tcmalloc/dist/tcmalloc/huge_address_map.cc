@@ -17,9 +17,11 @@
 #include <stdlib.h>
 
 #include <algorithm>
-#include <new>
+#include <cstdint>
 
 #include "absl/base/internal/cycleclock.h"
+#include "tcmalloc/huge_pages.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -56,31 +58,31 @@ void HugeAddressMap::Node::Check(size_t* num_nodes, HugeLength* size) const {
 
   if (left_) {
     // tree
-    CHECK_CONDITION(left_->range_.start() < range_.start());
+    TC_CHECK_LT(left_->range_.start(), range_.start());
     // disjoint
-    CHECK_CONDITION(left_->range_.end_addr() < range_.start_addr());
+    TC_CHECK_LT(left_->range_.end_addr(), range_.start_addr());
     // well-formed
-    CHECK_CONDITION(left_->parent_ == this);
+    TC_CHECK_EQ(left_->parent_, this);
     // heap
-    CHECK_CONDITION(left_->prio_ <= prio_);
+    TC_CHECK_LE(left_->prio_, prio_);
     left_->Check(num_nodes, size);
     if (left_->longest_ > longest) longest = left_->longest_;
   }
 
   if (right_) {
     // tree
-    CHECK_CONDITION(right_->range_.start() > range_.start());
+    TC_CHECK_GT(right_->range_.start(), range_.start());
     // disjoint
-    CHECK_CONDITION(right_->range_.start_addr() > range_.end_addr());
+    TC_CHECK_GT(right_->range_.start_addr(), range_.end_addr());
     // well-formed
-    CHECK_CONDITION(right_->parent_ == this);
+    TC_CHECK_EQ(right_->parent_, this);
     // heap
-    CHECK_CONDITION(right_->prio_ <= prio_);
+    TC_CHECK_LE(right_->prio_, prio_);
     right_->Check(num_nodes, size);
     if (right_->longest_ > longest) longest = right_->longest_;
   }
 
-  CHECK_CONDITION(longest_ == longest);
+  TC_CHECK_EQ(longest_, longest);
 }
 
 const HugeAddressMap::Node* HugeAddressMap::first() const {
@@ -104,12 +106,12 @@ void HugeAddressMap::Check() {
   size_t nodes = 0;
   HugeLength size = NHugePages(0);
   if (root_) {
-    CHECK_CONDITION(root_->parent_ == nullptr);
+    TC_CHECK_EQ(root_->parent_, nullptr);
     root_->Check(&nodes, &size);
   }
-  CHECK_CONDITION(nodes == nranges());
-  CHECK_CONDITION(size == total_mapped());
-  CHECK_CONDITION(total_nodes_ == used_nodes_ + freelist_size_);
+  TC_CHECK_EQ(nodes, nranges());
+  TC_CHECK_EQ(size, total_mapped());
+  TC_CHECK_EQ(total_nodes_, used_nodes_ + freelist_size_);
 }
 
 size_t HugeAddressMap::nranges() const { return used_nodes_; }
@@ -196,9 +198,9 @@ void HugeAddressMap::Insert(HugeRange r) {
   // First, try to merge if necessary. Note there are three possibilities:
   // we might need to merge before with r, r with after, or all three together.
   Node* before = Predecessor(r.start());
-  CHECK_CONDITION(!before || !before->range_.intersects(r));
+  TC_CHECK(!before || !before->range_.intersects(r));
   Node* after = before ? before->next() : first();
-  CHECK_CONDITION(!after || !after->range_.intersects(r));
+  TC_CHECK(!after || !after->range_.intersects(r));
   if (before && before->range_.precedes(r)) {
     if (after && r.precedes(after->range_)) {
       Merge(before, r, after);
@@ -210,8 +212,8 @@ void HugeAddressMap::Insert(HugeRange r) {
     Merge(nullptr, r, after);
     return;
   }
-  CHECK_CONDITION(!before || !before->range_.precedes(r));
-  CHECK_CONDITION(!after || !r.precedes(after->range_));
+  TC_CHECK(!before || !before->range_.precedes(r));
+  TC_CHECK(!after || !r.precedes(after->range_));
   // No merging possible; just add a new node.
   Node* n = Get(r);
   Node* curr = root();
@@ -351,7 +353,7 @@ void HugeAddressMap::Put(Node* n) {
 }
 
 HugeAddressMap::Node* HugeAddressMap::Get(HugeRange r) {
-  CHECK_CONDITION((freelist_ == nullptr) == (freelist_size_ == 0));
+  TC_CHECK_EQ(freelist_ == nullptr, freelist_size_ == 0);
   used_nodes_++;
   int prio = rand_r(&seed_);
   if (freelist_size_ == 0) {

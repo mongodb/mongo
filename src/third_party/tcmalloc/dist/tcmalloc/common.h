@@ -21,24 +21,19 @@
 #include <stdint.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <limits>
 #include <new>
 #include <type_traits>
 
-#include "absl/base/attributes.h"
-#include "absl/base/dynamic_annotations.h"
 #include "absl/base/internal/spinlock.h"
-#include "absl/base/macros.h"
 #include "absl/base/optimization.h"
 #include "absl/numeric/bits.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/span.h"
-#include "tcmalloc/experiment.h"
 #include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/optimization.h"
 #include "tcmalloc/malloc_extension.h"
-#include "tcmalloc/size_class_info.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -57,12 +52,12 @@ static_assert(sizeof(void*) == 8);
 //   The default configuration strives for good performance while trying to
 //   minimize fragmentation.  It uses a smaller page size to reduce
 //   fragmentation, but allocates per-thread and per-cpu capacities similar to
-//   TCMALLOC_LARGE_PAGES / TCMALLOC_256K_PAGES.
+//   TCMALLOC_INTERNAL_32K_PAGES / TCMALLOC_INTERNAL_256K_PAGES.
 //
-// TCMALLOC_LARGE_PAGES:
-//   Larger page sizes increase the bookkeeping granularity used by TCMalloc for
-//   its allocations.  This can reduce PageMap size and traffic to the
-//   innermost cache (the page heap), but can increase memory footprints.  As
+// TCMALLOC_INTERNAL_32K_PAGES:
+//   Larger page sizes (32KB) increase the bookkeeping granularity used by
+//   TCMalloc for its allocations.  This can reduce PageMap size and traffic to
+//   the innermost cache (the page heap), but can increase memory footprints. As
 //   TCMalloc will not reuse a page for a different allocation size until the
 //   entire page is deallocated, this can be a source of increased memory
 //   fragmentation.
@@ -73,11 +68,11 @@ static_assert(sizeof(void*) == 8);
 //   (https://isocpp.org/files/papers/n3778.html), this optimization is less
 //   significant.
 //
-// TCMALLOC_256K_PAGES
+// TCMALLOC_INTERNAL_256K_PAGES
 //   This configuration uses an even larger page size (256KB) as the unit of
 //   accounting granularity.
 //
-// TCMALLOC_SMALL_BUT_SLOW:
+// TCMALLOC_INTERNAL_SMALL_BUT_SLOW:
 //   Used for situations where minimizing the memory footprint is the most
 //   desirable attribute, even at the cost of performance.
 //
@@ -98,18 +93,26 @@ static_assert(sizeof(void*) == 8);
 // a page-shift parameter that is checked below.
 
 #ifndef TCMALLOC_PAGE_SHIFT
-#ifdef TCMALLOC_SMALL_BUT_SLOW
+#ifdef TCMALLOC_INTERNAL_SMALL_BUT_SLOW
 #define TCMALLOC_PAGE_SHIFT 12
 #define TCMALLOC_USE_PAGEMAP3
-#elif defined(TCMALLOC_256K_PAGES)
+#elif defined(TCMALLOC_INTERNAL_256K_PAGES)
 #define TCMALLOC_PAGE_SHIFT 18
-#elif defined(TCMALLOC_LARGE_PAGES)
+#elif defined(TCMALLOC_INTERNAL_32K_PAGES)
 #define TCMALLOC_PAGE_SHIFT 15
 #else
 #define TCMALLOC_PAGE_SHIFT 13
 #endif
 #else
 #error "TCMALLOC_PAGE_SHIFT is an internal macro!"
+#endif
+
+#if defined(TCMALLOC_INTERNAL_SMALL_BUT_SLOW) + \
+        defined(TCMALLOC_INTERNAL_8K_PAGES) +   \
+        defined(TCMALLOC_INTERNAL_256K_PAGES) + \
+        defined(TCMALLOC_INTERNAL_32K_PAGES) >  \
+    1
+#error "At most 1 variant configuration must be used."
 #endif
 
 #if TCMALLOC_PAGE_SHIFT == 12
@@ -123,7 +126,6 @@ inline constexpr size_t kMaxCpuCacheSize = 10 * 1024;
 inline constexpr size_t kDefaultOverallThreadCacheSize = kMaxThreadCacheSize;
 inline constexpr size_t kStealAmount = kMinThreadCacheSize;
 inline constexpr size_t kDefaultProfileSamplingRate = 1 << 19;
-inline constexpr size_t kMinPages = 2;
 #elif TCMALLOC_PAGE_SHIFT == 15
 inline constexpr size_t kPageShift = 15;
 inline constexpr size_t kNumBaseClasses = 78;
@@ -136,7 +138,6 @@ inline constexpr size_t kDefaultOverallThreadCacheSize =
     8u * kMaxThreadCacheSize;
 inline constexpr size_t kStealAmount = 1 << 16;
 inline constexpr size_t kDefaultProfileSamplingRate = 1 << 21;
-inline constexpr size_t kMinPages = 8;
 #elif TCMALLOC_PAGE_SHIFT == 18
 inline constexpr size_t kPageShift = 18;
 inline constexpr size_t kNumBaseClasses = 89;
@@ -149,7 +150,6 @@ inline constexpr size_t kDefaultOverallThreadCacheSize =
     8u * kMaxThreadCacheSize;
 inline constexpr size_t kStealAmount = 1 << 16;
 inline constexpr size_t kDefaultProfileSamplingRate = 1 << 21;
-inline constexpr size_t kMinPages = 8;
 #elif TCMALLOC_PAGE_SHIFT == 13
 inline constexpr size_t kPageShift = 13;
 inline constexpr size_t kNumBaseClasses = 86;
@@ -162,17 +162,24 @@ inline constexpr size_t kDefaultOverallThreadCacheSize =
     8u * kMaxThreadCacheSize;
 inline constexpr size_t kStealAmount = 1 << 16;
 inline constexpr size_t kDefaultProfileSamplingRate = 1 << 21;
-inline constexpr size_t kMinPages = 8;
 #else
 #error "Unsupported TCMALLOC_PAGE_SHIFT value!"
 #endif
 
 // Sanitizers constrain the memory layout which causes problems with the
-// enlarged tags required to represent NUMA partitions. Disable NUMA awareness
-// to avoid failing to mmap memory.
-#if defined(TCMALLOC_NUMA_AWARE) && !defined(MEMORY_SANITIZER) && \
-    !defined(THREAD_SANITIZER)
-inline constexpr size_t kNumaPartitions = 2;
+// enlarged tags required to represent NUMA partitions and for SelSan.
+#if defined(ABSL_HAVE_MEMORY_SANITIZER) || defined(ABSL_HAVE_THREAD_SANITIZER)
+#ifdef TCMALLOC_INTERNAL_SELSAN
+#error "MSan/TSan are incompatible with SelSan."
+#endif
+inline constexpr bool kSanitizerAddressSpace = true;
+#else
+inline constexpr bool kSanitizerAddressSpace = false;
+#endif
+
+// Disable NUMA awareness under Sanitizers to avoid failing to mmap memory.
+#if defined(TCMALLOC_INTERNAL_NUMA_AWARE)
+inline constexpr size_t kNumaPartitions = kSanitizerAddressSpace ? 1 : 2;
 #else
 inline constexpr size_t kNumaPartitions = 1;
 #endif
@@ -204,18 +211,6 @@ inline constexpr size_t kMinObjectsToMove = 2;
 inline constexpr size_t kMaxObjectsToMove = 128;
 
 inline constexpr size_t kPageSize = 1 << kPageShift;
-// Verify that the page size used is at least 8x smaller than the maximum
-// element size in the thread cache.  This guarantees at most 12.5% internal
-// fragmentation (1/8). When page size is 256k (kPageShift == 18), the benefit
-// of increasing kMaxSize to be multiple of kPageSize is unclear. Object size
-// profile data indicates that the number of simultaneously live objects (of
-// size >= 256k) tends to be very small. Keeping those objects as 'large'
-// objects won't cause too much memory waste, while heap memory reuse can be
-// improved. Increasing kMaxSize to be too large has another bad side effect --
-// the thread cache pressure is increased, which will in turn increase traffic
-// between central cache and thread cache, leading to performance degradation.
-static_assert((kMaxSize / kPageSize) >= kMinPages || kPageShift >= 18,
-              "Ratio of kMaxSize / kPageSize is too small");
 
 inline constexpr std::align_val_t kAlignment{8};
 // log2 (kAlignment)
@@ -227,70 +222,51 @@ inline constexpr size_t kAlignmentShift =
 inline constexpr int kMaxOverages = 3;
 
 // Maximum length we allow a per-thread free-list to have before we
-// move objects from it into the corresponding central free-list.  We
-// want this big to avoid locking the central free-list too often.  It
+// move objects from it into the corresponding transfer cache.  We
+// want this big to avoid locking the transfer cache too often.  It
 // should not hurt to make this list somewhat big because the
 // scavenging code will shrink it down when its contents are not in use.
-inline constexpr int kMaxDynamicFreeListLength = 8192;
+inline constexpr size_t kMaxDynamicFreeListLength = 8192;
 
 enum class MemoryTag : uint8_t {
   // Sampled, infrequently allocated
   kSampled = 0x0,
-  // Not sampled, NUMA partition 0
-  kNormalP0 = 0x1,
-  // Not sampled, NUMA partition 1
-  kNormalP1 = (kNumaPartitions > 1) ? 0x2 : 0xff,
-  // Not sampled
+  // Normal memory, NUMA partition 0
+  kNormalP0 = kSanitizerAddressSpace ? 0x1 : 0x4,
+  // Normal memory, NUMA partition 1
+  kNormalP1 = kSanitizerAddressSpace ? 0xff : 0x6,
+  // Normal memory
   kNormal = kNormalP0,
   // Cold
-  kCold = (kNumaPartitions > 1) ? 0x4 : 0x2,
+  kCold = 0x2,
+  // Metadata
+  kMetadata = 0x3,
 };
 
-// We make kNormal and kCold disjoint so that IsCold implies IsSampled.  This
-// allows us to avoid modifying the fast delete path in any way when cold-tagged
-// memory allocations are absent.  We can overload the IsSampled check and then
-// do a second check for whether the possibly-sampled allocation is actually
-// IsCold.
-static_assert((static_cast<uint8_t>(MemoryTag::kNormal) &
-               static_cast<uint8_t>(MemoryTag::kCold)) == 0,
-              "kNormal and kCold should have disjoint bit patterns");
-
 inline constexpr uintptr_t kTagShift = std::min(kAddressBits - 4, 42);
-inline constexpr uintptr_t kTagMask = uintptr_t{kNumaPartitions > 1 ? 0x7 : 0x3}
-                                      << kTagShift;
-
-inline bool IsSampledMemory(const void* ptr) {
-  constexpr uintptr_t kSampledNormalMask = kNumaPartitions > 1 ? 0x3 : 0x1;
-
-  static_assert(static_cast<uintptr_t>(MemoryTag::kNormalP0) &
-                kSampledNormalMask);
-  static_assert(static_cast<uintptr_t>(MemoryTag::kNormalP1) &
-                kSampledNormalMask);
-
-  const uintptr_t tag =
-      (reinterpret_cast<uintptr_t>(ptr) & kTagMask) >> kTagShift;
-  return (tag & kSampledNormalMask) ==
-         static_cast<uintptr_t>(MemoryTag::kSampled);
-}
-
-inline bool IsNormalMemory(const void* ptr) { return !IsSampledMemory(ptr); }
-
-inline bool IsColdMemory(const void* ptr) {
-  bool r = (reinterpret_cast<uintptr_t>(ptr) & kTagMask) ==
-           (static_cast<uintptr_t>(MemoryTag::kCold) << kTagShift);
-  // IsColdMemory(ptr) implies IsSampledMemory(ptr).  This allows us to avoid
-  // introducing new branches on the delete fast path when cold memory tags are
-  // not in use.
-  ASSERT(!r || IsSampledMemory(ptr));
-  return r;
-}
-
-inline constexpr bool ColdFeatureActive() { return kHasExpandedClasses; }
+inline constexpr uintptr_t kTagMask =
+    uintptr_t{kSanitizerAddressSpace ? 0x3 : 0x7} << kTagShift;
 
 inline MemoryTag GetMemoryTag(const void* ptr) {
   return static_cast<MemoryTag>((reinterpret_cast<uintptr_t>(ptr) & kTagMask) >>
                                 kTagShift);
 }
+
+inline bool IsNormalMemory(const void* ptr) {
+  // This is slightly faster than checking kNormalP0/P1 separetly.
+  static_assert((static_cast<uint8_t>(MemoryTag::kNormalP0) &
+                 (static_cast<uint8_t>(MemoryTag::kSampled) |
+                  static_cast<uint8_t>(MemoryTag::kCold))) == 0);
+  bool res = (static_cast<uintptr_t>(GetMemoryTag(ptr)) &
+              static_cast<uintptr_t>(MemoryTag::kNormal)) != 0;
+  TC_ASSERT(res == (GetMemoryTag(ptr) == MemoryTag::kNormalP0 ||
+                    GetMemoryTag(ptr) == MemoryTag::kNormalP1),
+            "ptr=%p res=%d tag=%d", ptr, res,
+            static_cast<int>(GetMemoryTag(ptr)));
+  return res;
+}
+
+inline constexpr bool ColdFeatureActive() { return kHasExpandedClasses; }
 
 absl::string_view MemoryTagToLabel(MemoryTag tag);
 
@@ -298,7 +274,7 @@ inline constexpr bool IsExpandedSizeClass(unsigned size_class) {
   return kHasExpandedClasses && (size_class >= kExpandedClassesStart);
 }
 
-#if !defined(TCMALLOC_SMALL_BUT_SLOW) && __SIZEOF_POINTER__ != 4
+#if !defined(TCMALLOC_INTERNAL_SMALL_BUT_SLOW)
 // Always allocate at least a huge page
 inline constexpr size_t kMinSystemAlloc = kHugePageSize;
 inline constexpr size_t kMinMmapAlloc = 1 << 30;  // mmap() in 1GiB ranges.
@@ -326,12 +302,13 @@ inline bool IsColdHint(hot_cold_t hint) {
 
 inline AllocationAccess AccessFromPointer(void* ptr) {
   if (!kHasExpandedClasses) {
-    ASSERT(!IsColdMemory(ptr));
+    TC_ASSERT_NE(GetMemoryTag(ptr), MemoryTag::kCold);
     return AllocationAccess::kHot;
   }
 
-  return ABSL_PREDICT_FALSE(IsColdMemory(ptr)) ? AllocationAccess::kCold
-                                               : AllocationAccess::kHot;
+  return ABSL_PREDICT_FALSE(GetMemoryTag(ptr) == MemoryTag::kCold)
+             ? AllocationAccess::kCold
+             : AllocationAccess::kHot;
 }
 
 inline MemoryTag NumaNormalTag(size_t numa_partition) {
@@ -364,6 +341,16 @@ inline size_t NumaPartitionFromPointer(void* ptr) {
 // if both are going to be held simultaneously.
 extern absl::base_internal::SpinLock pageheap_lock;
 
+class ABSL_SCOPED_LOCKABLE PageHeapSpinLockHolder {
+ public:
+  PageHeapSpinLockHolder()
+      ABSL_EXCLUSIVE_LOCK_FUNCTION(pageheap_lock) = default;
+  ~PageHeapSpinLockHolder() ABSL_UNLOCK_FUNCTION() = default;
+
+ private:
+  AllocationGuardSpinLockHolder lock_{&pageheap_lock};
+};
+
 // Evaluates a/b, avoiding division by zero.
 inline double safe_div(double a, double b) {
   if (b == 0) {
@@ -372,6 +359,19 @@ inline double safe_div(double a, double b) {
     return a / b;
   }
 }
+
+// RAII class that will restore errno to the value it has when created.
+class ErrnoRestorer {
+ public:
+  ErrnoRestorer() : saved_errno_(errno) {}
+  ~ErrnoRestorer() { errno = saved_errno_; }
+
+  ErrnoRestorer(const ErrnoRestorer&) = delete;
+  ErrnoRestorer& operator=(const ErrnoRestorer&) = delete;
+
+ private:
+  int saved_errno_;
+};
 
 }  // namespace tcmalloc_internal
 }  // namespace tcmalloc

@@ -41,7 +41,7 @@ void MinimalFakeCentralFreeList::AllocateBatch(void** batch, int n) {
 }
 
 void MinimalFakeCentralFreeList::FreeBatch(absl::Span<void*> batch) {
-  for (void* x : batch) CHECK_CONDITION(x != nullptr);
+  for (void* x : batch) TC_CHECK_NE(x, nullptr);
 }
 
 void MinimalFakeCentralFreeList::InsertRange(absl::Span<void*> batch) {

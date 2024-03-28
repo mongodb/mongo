@@ -13,11 +13,13 @@
 // limitations under the License.
 
 #include <atomic>
+#include <optional>
 
+#include "absl/random/distributions.h"
+#include "absl/random/random.h"
 #include "absl/types/optional.h"
 #include "benchmark/benchmark.h"
-#include "tcmalloc/central_freelist.h"
-#include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/mock_central_freelist.h"
 #include "tcmalloc/mock_transfer_cache.h"
 #include "tcmalloc/transfer_cache_internals.h"
@@ -44,7 +46,10 @@ void BM_CrossThread(benchmark::State& state) {
   void* batch[kMaxObjectsToMove];
 
   struct CrossThreadState {
-    CrossThreadState() : m{}, c{Cache(&m, 1), Cache(&m, 1)} {}
+    CrossThreadState()
+        : m{},
+          c{Cache(&m, 1, /*use_all_buckets_for_few_object_spans=*/false),
+            Cache(&m, 1, /*use_all_buckets_for_few_object_spans=*/false)} {}
     FakeTransferCacheManager m;
     Cache c[2];
   };
@@ -100,7 +105,7 @@ void BM_InsertRange(benchmark::State& state) {
 
   // optional to have more precise control of when the destruction occurs, as
   // we want to avoid polluting the timing with the dtor.
-  absl::optional<Env> e;
+  std::optional<Env> e;
   void* batch[kMaxObjectsToMove];
   for (auto iter : state) {
     state.PauseTiming();
@@ -121,7 +126,7 @@ void BM_RemoveRange(benchmark::State& state) {
 
   // optional to have more precise control of when the destruction occurs, as
   // we want to avoid polluting the timing with the dtor.
-  absl::optional<Env> e;
+  std::optional<Env> e;
   void* batch[kMaxObjectsToMove];
   for (auto iter : state) {
     state.PauseTiming();
@@ -214,24 +219,12 @@ void BM_RealisticHitRate(benchmark::State& state) {
 
   const TransferCacheStats stats = e.transfer_cache().GetStats();
   const size_t total_inserts = stats.insert_hits + stats.insert_misses;
-  const size_t insert_batch_misses =
-      stats.insert_misses - stats.insert_non_batch_misses;
   state.counters["insert_aggregate_miss_ratio"] =
       static_cast<double>(stats.insert_misses) / total_inserts;
-  state.counters["insert_batch_miss_ratio"] =
-      static_cast<double>(insert_batch_misses) / total_inserts;
-  state.counters["insert_non_batch_miss_ratio"] =
-      static_cast<double>(stats.insert_non_batch_misses) / total_inserts;
 
   const size_t total_removes = stats.remove_hits + stats.remove_misses;
-  const size_t remove_batch_misses =
-      stats.remove_misses - stats.remove_non_batch_misses;
   state.counters["remove_aggregate_miss_ratio"] =
       static_cast<double>(stats.remove_misses) / total_removes;
-  state.counters["remove_batch_miss_ratio"] =
-      static_cast<double>(remove_batch_misses) / total_removes;
-  state.counters["remove_non_batch_miss_ratio"] =
-      static_cast<double>(stats.remove_non_batch_misses) / total_removes;
 }
 
 BENCHMARK_TEMPLATE(BM_CrossThread, TransferCacheEnv)->ThreadRange(2, 64);

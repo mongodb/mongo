@@ -16,6 +16,7 @@
 #define TCMALLOC_TESTING_THREAD_MANAGER_H_
 
 #include <atomic>
+#include <functional>
 #include <thread>
 #include <vector>
 
@@ -31,6 +32,7 @@ class ThreadManager {
     EXPECT_TRUE(shutdown_.load()) << "ThreadManager not stopped";
   }
 
+  // Invokes `func` repeatedly on each of `n` threads until `Stop` is called.
   void Start(int n, const std::function<void(int)>& func) {
     absl::BlockingCounter started(n);
     for (int i = 0; i < n; ++i) {

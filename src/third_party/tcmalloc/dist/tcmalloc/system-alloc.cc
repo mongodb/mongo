@@ -19,35 +19,64 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/mman.h>
+#include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
-#include <new>
-#include <tuple>
+#include <cstring>
+#include <limits>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
 #include "absl/base/attributes.h"
+#include "absl/base/call_once.h"
 #include "absl/base/const_init.h"
 #include "absl/base/internal/spinlock.h"
-#include "absl/base/macros.h"
 #include "absl/base/optimization.h"
+#include "absl/base/thread_annotations.h"
+#include "absl/numeric/bits.h"
+#include "absl/strings/str_format.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "tcmalloc/common.h"
+#include "tcmalloc/internal/allocation_guard.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/exponential_biased.h"
 #include "tcmalloc/internal/logging.h"
+#include "tcmalloc/internal/numa.h"
 #include "tcmalloc/internal/optimization.h"
 #include "tcmalloc/internal/page_size.h"
-#include "tcmalloc/internal/parameter_accessors.h"
 #include "tcmalloc/malloc_extension.h"
 #include "tcmalloc/parameters.h"
-#include "tcmalloc/sampler.h"
+#include "tcmalloc/static_vars.h"
 
 // On systems (like freebsd) that don't define MAP_ANONYMOUS, use the old
 // form of the name instead.
 #ifndef MAP_ANONYMOUS
 #define MAP_ANONYMOUS MAP_ANON
+#endif
+
+#ifndef MADV_FREE
+#define MADV_FREE 8
+#endif
+
+#ifndef MAP_FIXED_NOREPLACE
+#define MAP_FIXED_NOREPLACE 0x100000
+#endif
+
+// The <sys/prctl.h> on some systems may not define these macros yet even though
+// the kernel may have support for the new PR_SET_VMA syscall, so we explicitly
+// define them here.
+#ifndef PR_SET_VMA
+#define PR_SET_VMA 0x53564d41
+#endif
+
+#ifndef PR_SET_VMA_ANON_NAME
+#define PR_SET_VMA_ANON_NAME 0
 #endif
 
 // Solaris has a bug where it doesn't declare madvise() for C++.
@@ -69,7 +98,7 @@ namespace {
 // Check that no bit is set at position ADDRESS_BITS or higher.
 template <int ADDRESS_BITS>
 void CheckAddressBits(uintptr_t ptr) {
-  ASSERT((ptr >> ADDRESS_BITS) == 0);
+  TC_ASSERT_EQ(ptr >> ADDRESS_BITS, 0);
 }
 
 // Specialize for the bit width of a pointer to avoid undefined shift.
@@ -102,7 +131,7 @@ ABSL_CONST_INIT AddressRegionFactory* region_factory ABSL_GUARDED_BY(spinlock) =
 // Rounds size down to a multiple of alignment.
 size_t RoundDown(const size_t size, const size_t alignment) {
   // Checks that the alignment has only one bit set.
-  ASSERT(absl::has_single_bit(alignment));
+  TC_ASSERT(absl::has_single_bit(alignment));
   return (size) & ~(alignment - 1);
 }
 
@@ -148,6 +177,7 @@ class RegionManager {
     std::fill(normal_region_.begin(), normal_region_.end(), nullptr);
     sampled_region_ = nullptr;
     cold_region_ = nullptr;
+    metadata_region_ = nullptr;
   }
 
  private:
@@ -161,6 +191,7 @@ class RegionManager {
   std::array<AddressRegion*, kNumaPartitions> normal_region_{{nullptr}};
   AddressRegion* sampled_region_{nullptr};
   AddressRegion* cold_region_{nullptr};
+  AddressRegion* metadata_region_{nullptr};
 };
 ABSL_CONST_INIT
 std::aligned_storage<sizeof(RegionManager), alignof(RegionManager)>::type
@@ -185,12 +216,11 @@ std::pair<void*, size_t> MmapRegion::Alloc(size_t request_size,
   if (result < start_) return {nullptr, 0};  // Out of memory in region.
   size_t actual_size = end - result;
 
-  ASSERT(result % GetPageSize() == 0);
+  TC_ASSERT_EQ(result % GetPageSize(), 0);
   void* result_ptr = reinterpret_cast<void*>(result);
   if (mprotect(result_ptr, actual_size, PROT_READ | PROT_WRITE) != 0) {
-    Log(kLogWithStack, __FILE__, __LINE__,
-        "mprotect() region failed (ptr, size, error)", result_ptr, actual_size,
-        strerror(errno));
+    TC_LOG("mprotect(%p, %v) failed (%s)", result_ptr, actual_size,
+           strerror(errno));
     return {nullptr, 0};
   }
   // For cold regions (kInfrequentAccess) and sampled regions
@@ -199,6 +229,7 @@ std::pair<void*, size_t> MmapRegion::Alloc(size_t request_size,
   if (hint_ == AddressRegionFactory::UsageHint::kInfrequentAccess ||
       hint_ == AddressRegionFactory::UsageHint::kInfrequentAllocation) {
     // This is only advisory, so ignore the error.
+    ErrnoRestorer errno_restorer;
     (void)madvise(result_ptr, actual_size, MADV_NOHUGEPAGE);
   }
   free_size_ -= actual_size;
@@ -236,7 +267,15 @@ static AddressRegionFactory::UsageHint TagToHint(MemoryTag tag) {
   using UsageHint = AddressRegionFactory::UsageHint;
   switch (tag) {
     case MemoryTag::kNormal:
+      if (tc_globals.numa_topology().numa_aware()) {
+        return UsageHint::kNormalNumaAwareS0;
+      }
+      return UsageHint::kNormal;
+      break;
     case MemoryTag::kNormalP1:
+      if (tc_globals.numa_topology().numa_aware()) {
+        return UsageHint::kNormalNumaAwareS1;
+      }
       return UsageHint::kNormal;
       break;
     case MemoryTag::kSampled:
@@ -244,10 +283,12 @@ static AddressRegionFactory::UsageHint TagToHint(MemoryTag tag) {
       break;
     case MemoryTag::kCold:
       return UsageHint::kInfrequentAccess;
-    default:
-      ASSUME(false);
-      __builtin_unreachable();
+    case MemoryTag::kMetadata:
+      return UsageHint::kInfrequentAllocation;
   }
+
+  ASSUME(false);
+  __builtin_unreachable();
 }
 
 std::pair<void*, size_t> RegionManager::Alloc(size_t request_size,
@@ -279,10 +320,10 @@ std::pair<void*, size_t> RegionManager::Alloc(size_t request_size,
     }
     std::pair<void*, size_t> result = region->Alloc(size, alignment);
     if (result.first != nullptr) {
-      ASSERT(result.first == ptr);
-      ASSERT(result.second == size);
+      TC_ASSERT_EQ(result.first, ptr);
+      TC_ASSERT_EQ(result.second, size);
     } else {
-      ASSERT(result.second == 0);
+      TC_ASSERT_EQ(result.second, 0);
     }
     return result;
   }
@@ -301,10 +342,12 @@ std::pair<void*, size_t> RegionManager::Allocate(size_t size, size_t alignment,
         return &sampled_region_;
       case MemoryTag::kCold:
         return &cold_region_;
-      default:
-        ASSUME(false);
-        __builtin_unreachable();
+      case MemoryTag::kMetadata:
+        return &metadata_region_;
     }
+
+    ASSUME(false);
+    __builtin_unreachable();
   }();
   // For sizes that fit in our reserved range first of all check if we can
   // satisfy the request from what we have available.
@@ -360,17 +403,42 @@ void BindMemory(void* const base, const size_t size, const size_t partition) {
   }
 
   if (bind_mode == NumaBindMode::kAdvisory) {
-    Log(kLogWithStack, __FILE__, __LINE__, "Warning: Unable to mbind memory",
-        err, base, nodemask);
+    TC_LOG("Warning: Unable to mbind memory (errno=%d, base=%p, nodemask=%v)",
+           errno, base, nodemask);
     return;
   }
 
-  ASSERT(bind_mode == NumaBindMode::kStrict);
-  Crash(kCrash, __FILE__, __LINE__, "Unable to mbind memory", err, base,
-        nodemask);
+  TC_ASSERT_EQ(bind_mode, NumaBindMode::kStrict);
+  TC_BUG("Unable to mbind memory (errno=%d, base=%p, nodemask=%v)", errno, base,
+         nodemask);
 }
 
 ABSL_CONST_INIT std::atomic<int> system_release_errors(0);
+
+int MapFixedNoReplaceFlagAvailable() {
+  ABSL_CONST_INIT static int noreplace_flag;
+  ABSL_CONST_INIT static absl::once_flag flag;
+
+  absl::base_internal::LowLevelCallOnce(&flag, [&]() {
+    void* ptr =
+        mmap(nullptr, kPageSize, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    TC_CHECK_NE(ptr, MAP_FAILED);
+
+    // Try to map over ptr.  If we get a different address, we don't have
+    // MAP_FIXED_NOREPLACE.
+    void* ptr2 = mmap(ptr, kPageSize, PROT_NONE,
+                      MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    const bool rejected = ptr2 == MAP_FAILED;
+    if (!rejected) {
+      munmap(ptr2, kPageSize);
+    }
+    munmap(ptr, kPageSize);
+
+    noreplace_flag = rejected ? MAP_FIXED_NOREPLACE : 0;
+  });
+
+  return noreplace_flag;
+}
 
 }  // namespace
 
@@ -382,7 +450,7 @@ AddressRange SystemAlloc(size_t bytes, size_t alignment, const MemoryTag tag) {
   // Discard requests that overflow
   if (bytes + alignment < bytes) return {nullptr, 0};
 
-  absl::base_internal::SpinLockHolder lock_holder(&spinlock);
+  AllocationGuardSpinLockHolder lock_holder(&spinlock);
 
   InitSystemAllocatorIfNecessary();
 
@@ -391,20 +459,22 @@ AddressRange SystemAlloc(size_t bytes, size_t alignment, const MemoryTag tag) {
   if (result != nullptr) {
     CheckAddressBits<kAddressBits>(reinterpret_cast<uintptr_t>(result) +
                                    actual_bytes - 1);
-    ASSERT(GetMemoryTag(result) == tag);
+    TC_ASSERT_EQ(GetMemoryTag(result), tag);
   }
   return {result, actual_bytes};
 }
 
 static bool ReleasePages(void* start, size_t length) {
+  ErrnoRestorer errno_restorer;
+
   int ret;
   // Note -- ignoring most return codes, because if this fails it
   // doesn't matter...
-  // Moreover, MADV_REMOVE *will* fail (with EINVAL) on anonymous memory,
+  // Moreover, MADV_REMOVE *will* fail (with EINVAL) on private memory,
   // but that's harmless.
 #ifdef MADV_REMOVE
-  // MADV_REMOVE deletes any backing storage for non-anonymous memory
-  // (tmpfs).
+  // MADV_REMOVE deletes any backing storage for tmpfs or anonymous shared
+  // memory.
   do {
     ret = madvise(start, length, MADV_REMOVE);
   } while (ret == -1 && errno == EAGAIN);
@@ -413,20 +483,49 @@ static bool ReleasePages(void* start, size_t length) {
     return true;
   }
 #endif
+
 #ifdef MADV_FREE
-  if (Parameters::madvise_free()) {
+  const bool do_madvfree = []() {
+    if (Parameters::madvise_free()) {
+      return true;
+    }
+
+    switch (Parameters::madvise()) {
+      case MadvisePreference::kFreeAndDontNeed:
+      case MadvisePreference::kFreeOnly:
+        return true;
+      case MadvisePreference::kDontNeed:
+        return false;
+    }
+
+    ABSL_UNREACHABLE();
+  }();
+
+  if (do_madvfree) {
     do {
       ret = madvise(start, length, MADV_FREE);
     } while (ret == -1 && errno == EAGAIN);
-
-    // We deliberately fall through to use MADV_DONTNEED.
   }
 #endif
 #ifdef MADV_DONTNEED
+  const bool do_madvdontneed = []() {
+    switch (Parameters::madvise()) {
+      case MadvisePreference::kDontNeed:
+      case MadvisePreference::kFreeAndDontNeed:
+        return true;
+      case MadvisePreference::kFreeOnly:
+        return false;
+    }
+
+    ABSL_UNREACHABLE();
+  }();
+
   // MADV_DONTNEED drops page table info and any anonymous pages.
-  do {
-    ret = madvise(start, length, MADV_DONTNEED);
-  } while (ret == -1 && errno == EAGAIN);
+  if (do_madvdontneed) {
+    do {
+      ret = madvise(start, length, MADV_DONTNEED);
+    } while (ret == -1 && errno == EAGAIN);
+  }
 
   if (ret == 0) {
     return true;
@@ -441,9 +540,10 @@ int SystemReleaseErrors() {
 }
 
 bool SystemRelease(void* start, size_t length) {
-  int saved_errno = errno;
+  bool result = false;
 
 #if defined(MADV_DONTNEED) || defined(MADV_REMOVE)
+  ErrnoRestorer errno_restorer;
   const size_t pagemask = GetPageSize() - 1;
 
   size_t new_start = reinterpret_cast<size_t>(start);
@@ -455,12 +555,11 @@ bool SystemRelease(void* start, size_t length) {
   new_start = (new_start + GetPageSize() - 1) & ~pagemask;
   new_end = new_end & ~pagemask;
 
-  ASSERT((new_start & pagemask) == 0);
-  ASSERT((new_end & pagemask) == 0);
-  ASSERT(new_start >= reinterpret_cast<size_t>(start));
-  ASSERT(new_end <= end);
+  TC_ASSERT_EQ(new_start & pagemask, 0);
+  TC_ASSERT_EQ(new_end & pagemask, 0);
+  TC_ASSERT_GE(new_start, reinterpret_cast<size_t>(start));
+  TC_ASSERT_LE(new_end, end);
 
-  bool result = false;
   if (new_end > new_start) {
     void* new_ptr = reinterpret_cast<void*>(new_start);
     size_t new_length = new_end - new_start;
@@ -485,47 +584,17 @@ bool SystemRelease(void* start, size_t length) {
   }
 #endif
 
-  errno = saved_errno;
   return result;
 }
 
-void SystemBack(void* start, size_t length) {
-  // TODO(b/134694141): use madvise when we have better support for that;
-  // taking faults is not free.
-
-  // TODO(b/134694141): enable this, if we can avoid causing trouble for apps
-  // that routinely make large mallocs they never touch (sigh).
-  return;
-
-  // Strictly speaking, not everything uses 4K pages.  However, we're
-  // not asking the OS for anything actually page-related, just taking
-  // a fault on every "page".  If the real page size is bigger, we do
-  // a few extra reads; this is not worth worrying about.
-  static const size_t kHardwarePageSize = 4 * 1024;
-  CHECK_CONDITION(reinterpret_cast<intptr_t>(start) % kHardwarePageSize == 0);
-  CHECK_CONDITION(length % kHardwarePageSize == 0);
-  const size_t num_pages = length / kHardwarePageSize;
-
-  struct PageStruct {
-    volatile size_t data[kHardwarePageSize / sizeof(size_t)];
-  };
-  CHECK_CONDITION(sizeof(PageStruct) == kHardwarePageSize);
-
-  PageStruct* ps = reinterpret_cast<PageStruct*>(start);
-  PageStruct* limit = ps + num_pages;
-  for (; ps < limit; ++ps) {
-    ps->data[0] = 0;
-  }
-}
-
 AddressRegionFactory* GetRegionFactory() {
-  absl::base_internal::SpinLockHolder lock_holder(&spinlock);
+  AllocationGuardSpinLockHolder lock_holder(&spinlock);
   InitSystemAllocatorIfNecessary();
   return region_factory;
 }
 
 void SetRegionFactory(AddressRegionFactory* factory) {
-  absl::base_internal::SpinLockHolder lock_holder(&spinlock);
+  AllocationGuardSpinLockHolder lock_holder(&spinlock);
   InitSystemAllocatorIfNecessary();
   region_manager->DiscardMappedRegions();
   region_factory = factory;
@@ -534,16 +603,19 @@ void SetRegionFactory(AddressRegionFactory* factory) {
 static uintptr_t RandomMmapHint(size_t size, size_t alignment,
                                 const MemoryTag tag) {
   // Rely on kernel's mmap randomization to seed our RNG.
-  static uintptr_t rnd = []() {
+  ABSL_CONST_INIT static uintptr_t rnd;
+  ABSL_CONST_INIT static absl::once_flag flag;
+
+  absl::base_internal::LowLevelCallOnce(&flag, [&]() {
     void* seed =
         mmap(nullptr, kPageSize, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (seed == MAP_FAILED) {
-      Crash(kCrash, __FILE__, __LINE__,
-            "Initial mmap() reservation failed (size)", kPageSize);
+      TC_BUG("Initial mmap() reservation failed (errno=%v, size=%v)", errno,
+             kPageSize);
     }
     munmap(seed, kPageSize);
-    return reinterpret_cast<uintptr_t>(seed);
-  }();
+    rnd = reinterpret_cast<uintptr_t>(seed);
+  });
 
 #if !defined(MEMORY_SANITIZER) && !defined(THREAD_SANITIZER)
   // We don't use the following bits:
@@ -554,39 +626,35 @@ static uintptr_t RandomMmapHint(size_t size, size_t alignment,
   //
   //  *  Below that, the top highest the hardware allows us to use, since it is
   //     reserved for kernel space addresses.
-  //
-  //  *  One additional bit below that, to avoid collisions with mappings that
-  //     tend to be placed in the upper half of the address space (e.g. stack,
-  //     executable, and VDSO mappings).
-  //
-  constexpr uintptr_t kAddrMask = (uintptr_t{1} << (kAddressBits - 2)) - 1;
+  constexpr uintptr_t kAddrMask = (uintptr_t{1} << (kAddressBits - 1)) - 1;
 #else
   // MSan and TSan use up all of the lower address space, so we allow use of
   // mid-upper address space when they're active.  This only matters for
   // TCMalloc-internal tests, since sanitizers install their own malloc/free.
-  constexpr uintptr_t kAddrMask = (uintptr_t{3} << (kAddressBits - 3)) - 1;
+  constexpr uintptr_t kAddrMask = (uintptr_t{0xF} << (kAddressBits - 5)) - 1;
 #endif
 
   // Ensure alignment >= size so we're guaranteed the full mapping has the same
   // tag.
   alignment = absl::bit_ceil(std::max(alignment, size));
 
-  rnd = Sampler::NextRandom(rnd);
+  rnd = ExponentialBiased::NextRandom(rnd);
   uintptr_t addr = rnd & kAddrMask & ~(alignment - 1) & ~kTagMask;
   addr |= static_cast<uintptr_t>(tag) << kTagShift;
-  ASSERT(GetMemoryTag(reinterpret_cast<const void*>(addr)) == tag);
+  TC_ASSERT_EQ(GetMemoryTag(reinterpret_cast<const void*>(addr)), tag);
   return addr;
 }
 
 void* MmapAligned(size_t size, size_t alignment, const MemoryTag tag) {
-  ASSERT(size <= kTagMask);
-  ASSERT(alignment <= kTagMask);
+  TC_ASSERT_LE(size, kTagMask);
+  TC_ASSERT_LE(alignment, kTagMask);
 
   static uintptr_t next_sampled_addr = 0;
   static std::array<uintptr_t, kNumaPartitions> next_normal_addr = {0};
   static uintptr_t next_cold_addr = 0;
+  static uintptr_t next_metadata_addr = 0;
 
-  absl::optional<int> numa_partition;
+  std::optional<int> numa_partition;
   uintptr_t& next_addr = *[&]() {
     switch (tag) {
       case MemoryTag::kSampled:
@@ -599,10 +667,12 @@ void* MmapAligned(size_t size, size_t alignment, const MemoryTag tag) {
         return &next_normal_addr[1];
       case MemoryTag::kCold:
         return &next_cold_addr;
-      default:
-        ASSUME(false);
-        __builtin_unreachable();
+      case MemoryTag::kMetadata:
+        return &next_metadata_addr;
     }
+
+    ASSUME(false);
+    __builtin_unreachable();
   }();
 
   if (!next_addr || next_addr & (alignment - 1) ||
@@ -610,41 +680,65 @@ void* MmapAligned(size_t size, size_t alignment, const MemoryTag tag) {
       GetMemoryTag(reinterpret_cast<void*>(next_addr + size - 1)) != tag) {
     next_addr = RandomMmapHint(size, alignment, tag);
   }
+  const int map_fixed_noreplace_flag = MapFixedNoReplaceFlagAvailable();
   void* hint;
   for (int i = 0; i < 1000; ++i) {
     hint = reinterpret_cast<void*>(next_addr);
-    ASSERT(GetMemoryTag(hint) == tag);
-    // TODO(b/140190055): Use MAP_FIXED_NOREPLACE once available.
-    void* result =
-        mmap(hint, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    TC_ASSERT_EQ(GetMemoryTag(hint), tag);
+    int flags = MAP_PRIVATE | MAP_ANONYMOUS | map_fixed_noreplace_flag;
+
+    void* result = mmap(hint, size, PROT_NONE, flags, -1, 0);
     if (result == hint) {
       if (numa_partition.has_value()) {
         BindMemory(result, size, *numa_partition);
       }
       // Attempt to keep the next mmap contiguous in the common case.
       next_addr += size;
-      CHECK_CONDITION(kAddressBits == std::numeric_limits<uintptr_t>::digits ||
-                      next_addr <= uintptr_t{1} << kAddressBits);
+      TC_CHECK(kAddressBits == std::numeric_limits<uintptr_t>::digits ||
+               next_addr <= uintptr_t{1} << kAddressBits);
 
-      ASSERT((reinterpret_cast<uintptr_t>(result) & (alignment - 1)) == 0);
+      TC_ASSERT_EQ(reinterpret_cast<uintptr_t>(result) & (alignment - 1), 0);
+      // Give the mmaped region a name based on its tag.
+#ifdef __linux__
+      // Make a best-effort attempt to name the allocated region based on its
+      // tag.
+      //
+      // The call to prctl() may fail if the kernel was not configured with the
+      // CONFIG_ANON_VMA_NAME kernel option.  This is OK since the call is
+      // primarily a debugging aid.
+      char name[256];
+      absl::SNPrintF(name, sizeof(name), "tcmalloc_region_%s",
+                     MemoryTagToLabel(tag));
+      // Save the existing errno and restore it after the prctl system call.
+      // Since PR_SET_VMA is a best effort call, we don't want it to overwrite
+      // the existing errno value.
+      ErrnoRestorer errno_restorer;
+      prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, result, size, name);
+#endif  // __linux__
       return result;
     }
-    if (result == MAP_FAILED) {
-      Log(kLogWithStack, __FILE__, __LINE__,
-          "mmap() reservation failed (hint, size, error)", hint, size,
-          strerror(errno));
-      return nullptr;
-    }
-    if (int err = munmap(result, size)) {
-      Log(kLogWithStack, __FILE__, __LINE__, "munmap() failed");
-      ASSERT(err == 0);
+    if (map_fixed_noreplace_flag) {
+      // If MAP_FIXED_NOREPLACE was correctly detected, we should either get
+      // result == hint or MAP_FAILED.  Any other value indicates incorrect
+      // detection.
+      TC_CHECK_EQ(result, MAP_FAILED);
+    } else {
+      if (result == MAP_FAILED) {
+        TC_LOG("mmap(%p, %v) reservation failed (%s)", hint, size,
+               strerror(errno));
+        return nullptr;
+      }
+      if (int err = munmap(result, size)) {
+        TC_LOG("munmap(%p, %v) failed (%s)", result, size, strerror(errno));
+        TC_ASSERT_EQ(err, 0);
+      }
     }
     next_addr = RandomMmapHint(size, alignment, tag);
   }
 
-  Log(kLogWithStack, __FILE__, __LINE__,
-      "MmapAligned() failed - unable to allocate with tag (hint, size, "
-      "alignment) - is something limiting address placement?",
+  TC_LOG(
+      "MmapAligned() failed - unable to allocate with tag (hint=%p, size=%v, "
+      "alignment=%v) - is something limiting address placement?",
       hint, size, alignment);
   return nullptr;
 }

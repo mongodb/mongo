@@ -2,6 +2,13 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
+TCMALLOC_DEFINES = select(
+    {
+        "//bazel/config:linkdynamic_required_settings": ["MONGO_TCMALLOC_DYNAMIC_BUILD"],
+        "//conditions:default": [],
+    },
+)
+
 TCMALLOC_HEADERS = [
     "dist/tcmalloc/allocation_sample.h",
     "dist/tcmalloc/allocation_sampling.h",
@@ -10,10 +17,10 @@ TCMALLOC_HEADERS = [
     "dist/tcmalloc/common.h",
     "dist/tcmalloc/cpu_cache.h",
     "dist/tcmalloc/deallocation_profiler.h",
-    "dist/tcmalloc/experiment.h",
     "dist/tcmalloc/experiment_config.h",
-    "dist/tcmalloc/explicitly_constructed.h",
+    "dist/tcmalloc/experiment.h",
     "dist/tcmalloc/global_stats.h",
+    "dist/tcmalloc/guarded_allocations.h",
     "dist/tcmalloc/guarded_page_allocator.h",
     "dist/tcmalloc/hinted_tracker_lists.h",
     "dist/tcmalloc/huge_address_map.h",
@@ -21,9 +28,13 @@ TCMALLOC_HEADERS = [
     "dist/tcmalloc/huge_cache.h",
     "dist/tcmalloc/huge_page_aware_allocator.h",
     "dist/tcmalloc/huge_page_filler.h",
+    "dist/tcmalloc/huge_page_subrelease.h",
     "dist/tcmalloc/huge_pages.h",
     "dist/tcmalloc/huge_region.h",
+    "dist/tcmalloc/internal_malloc_extension.h",
+    "dist/tcmalloc/internal_malloc_tracing_extension.h",
     "dist/tcmalloc/internal/affinity.h",
+    "dist/tcmalloc/internal/allocation_guard.h",
     "dist/tcmalloc/internal/atomic_danger.h",
     "dist/tcmalloc/internal/atomic_stats_counter.h",
     "dist/tcmalloc/internal/cache_topology.h",
@@ -31,9 +42,9 @@ TCMALLOC_HEADERS = [
     "dist/tcmalloc/internal/config.h",
     "dist/tcmalloc/internal/declarations.h",
     "dist/tcmalloc/internal/environment.h",
+    "dist/tcmalloc/internal/explicitly_constructed.h",
+    "dist/tcmalloc/internal/exponential_biased.h",
     "dist/tcmalloc/internal/fake_profile.h",
-    "dist/tcmalloc/internal/lifetime_predictions.h",
-    "dist/tcmalloc/internal/lifetime_tracker.h",
     "dist/tcmalloc/internal/linked_list.h",
     "dist/tcmalloc/internal/linux_syscall_support.h",
     "dist/tcmalloc/internal/logging.h",
@@ -45,57 +56,58 @@ TCMALLOC_HEADERS = [
     "dist/tcmalloc/internal/overflow.h",
     "dist/tcmalloc/internal/page_size.h",
     "dist/tcmalloc/internal/parameter_accessors.h",
-    "dist/tcmalloc/internal/percpu.h",
     "dist/tcmalloc/internal/percpu_tcmalloc.h",
+    "dist/tcmalloc/internal/percpu.h",
     "dist/tcmalloc/internal/prefetch.h",
     "dist/tcmalloc/internal/proc_maps.h",
     "dist/tcmalloc/internal/profile_builder.h",
     "dist/tcmalloc/internal/range_tracker.h",
     "dist/tcmalloc/internal/residency.h",
+    "dist/tcmalloc/internal/sampled_allocation_recorder.h",
+    "dist/tcmalloc/internal/sampled_allocation.h",
     "dist/tcmalloc/internal/stacktrace_filter.h",
+    "dist/tcmalloc/internal/sysinfo.h",
     "dist/tcmalloc/internal/timeseries_tracker.h",
     "dist/tcmalloc/internal/util.h",
-    "dist/tcmalloc/internal_malloc_extension.h",
-    "dist/tcmalloc/internal_malloc_tracing_extension.h",
     "dist/tcmalloc/libc_override.h",
-    "dist/tcmalloc/lifetime_based_allocator.h",
     "dist/tcmalloc/malloc_extension.h",
     "dist/tcmalloc/malloc_tracing_extension.h",
+    "dist/tcmalloc/metadata_allocator.h",
     "dist/tcmalloc/mock_central_freelist.h",
     "dist/tcmalloc/mock_static_forwarder.h",
     "dist/tcmalloc/mock_transfer_cache.h",
     "dist/tcmalloc/new_extension.h",
-    "dist/tcmalloc/page_allocator.h",
     "dist/tcmalloc/page_allocator_interface.h",
     "dist/tcmalloc/page_allocator_test_util.h",
-    "dist/tcmalloc/page_heap.h",
+    "dist/tcmalloc/page_allocator.h",
     "dist/tcmalloc/page_heap_allocator.h",
+    "dist/tcmalloc/page_heap.h",
     "dist/tcmalloc/pagemap.h",
     "dist/tcmalloc/pages.h",
     "dist/tcmalloc/parameters.h",
     "dist/tcmalloc/peak_heap_tracker.h",
     "dist/tcmalloc/profile_marshaler.h",
-    "dist/tcmalloc/sampled_allocation.h",
     "dist/tcmalloc/sampled_allocation_allocator.h",
-    "dist/tcmalloc/sampled_allocation_recorder.h",
     "dist/tcmalloc/sampler.h",
+    "dist/tcmalloc/segv_handler.h",
+    "dist/tcmalloc/selsan/selsan.h",
     "dist/tcmalloc/size_class_info.h",
     "dist/tcmalloc/sizemap.h",
-    "dist/tcmalloc/span.h",
     "dist/tcmalloc/span_stats.h",
+    "dist/tcmalloc/span.h",
     "dist/tcmalloc/stack_trace_table.h",
     "dist/tcmalloc/static_vars.h",
     "dist/tcmalloc/stats.h",
     "dist/tcmalloc/system-alloc.h",
-    "dist/tcmalloc/tcmalloc.h",
     "dist/tcmalloc/tcmalloc_policy.h",
+    "dist/tcmalloc/tcmalloc.h",
     "dist/tcmalloc/testing/test_allocator_harness.h",
     "dist/tcmalloc/testing/testutil.h",
     "dist/tcmalloc/testing/thread_manager.h",
     "dist/tcmalloc/thread_cache.h",
-    "dist/tcmalloc/transfer_cache.h",
     "dist/tcmalloc/transfer_cache_internals.h",
     "dist/tcmalloc/transfer_cache_stats.h",
+    "dist/tcmalloc/transfer_cache.h",
 ]
 
 INCLUDES = ["dist"]
@@ -132,9 +144,10 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
-        "tcmalloc_common",
+        "tcmalloc_common_8k_pages",
         "tcmalloc_experiment",
         "tcmalloc_internal_logging",
         "tcmalloc_internal_page_size",
@@ -142,7 +155,6 @@ mongo_cc_library(
         "tcmalloc_malloc_extension",
         "tcmalloc_malloc_tracing_extension",
         "tcmalloc_new_extension",
-        "tcmalloc_sampled_allocation",
         "//src/third_party/abseil-cpp:absl_base",
         "//src/third_party/abseil-cpp:absl_stacktrace",
         "//src/third_party/abseil-cpp:absl_status",
@@ -159,6 +171,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_internal_logging",
@@ -176,6 +189,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = ["//src/third_party/abseil-cpp:absl_base"],
 )
@@ -188,6 +202,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_malloc_extension",
@@ -206,6 +221,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_internal_logging",
@@ -223,6 +239,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_internal_page_size",
@@ -238,6 +255,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_internal_environment",
@@ -257,6 +275,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "//src/third_party/abseil-cpp:absl_base",
@@ -276,6 +295,7 @@ mongo_cc_library(
     }),
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_internal_logging",
@@ -292,6 +312,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_internal_logging",
@@ -301,9 +322,57 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "tcmalloc_common",
+    name = "tcmalloc_internal_percpu_tcmalloc",
+    srcs = [
+        "dist/tcmalloc/internal/percpu_tcmalloc.cc",
+    ],
+    hdrs = TCMALLOC_HEADERS,
+    copts = COPTS,
+    includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
+    target_compatible_with = KERNEL_SUPPORTED,
+    deps = [
+        "//src/third_party/abseil-cpp:absl_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "tcmalloc_internal_sysinfo",
+    srcs = [
+        "dist/tcmalloc/internal/sysinfo.cc",
+    ],
+    hdrs = TCMALLOC_HEADERS,
+    copts = COPTS,
+    includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
+    target_compatible_with = KERNEL_SUPPORTED,
+    deps = [
+        "//src/third_party/abseil-cpp:absl_base",
+        "//src/third_party/abseil-cpp:absl_strings",
+    ],
+)
+
+mongo_cc_library(
+    name = "tcmalloc_internal_allocation_guard",
+    srcs = [
+        "dist/tcmalloc/internal/allocation_guard.cc",
+    ],
+    hdrs = TCMALLOC_HEADERS,
+    copts = COPTS,
+    includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
+    target_compatible_with = KERNEL_SUPPORTED,
+    deps = [
+        "//src/third_party/abseil-cpp:absl_base",
+        "//src/third_party/abseil-cpp:absl_strings",
+    ],
+)
+
+mongo_cc_library(
+    name = "tcmalloc_common_8k_pages",
     srcs = [
         "dist/tcmalloc/allocation_sample.cc",
+        "dist/tcmalloc/allocation_sampling.cc",
         "dist/tcmalloc/arena.cc",
         "dist/tcmalloc/background.cc",
         "dist/tcmalloc/central_freelist.cc",
@@ -318,7 +387,7 @@ mongo_cc_library(
         "dist/tcmalloc/huge_cache.cc",
         "dist/tcmalloc/huge_page_aware_allocator.cc",
         "dist/tcmalloc/legacy_size_classes.cc",
-        "dist/tcmalloc/lifetime_based_allocator.cc",
+        "dist/tcmalloc/lowfrag_size_classes.cc",
         "dist/tcmalloc/page_allocator.cc",
         "dist/tcmalloc/page_allocator_interface.cc",
         "dist/tcmalloc/page_heap.cc",
@@ -326,6 +395,7 @@ mongo_cc_library(
         "dist/tcmalloc/parameters.cc",
         "dist/tcmalloc/peak_heap_tracker.cc",
         "dist/tcmalloc/sampler.cc",
+        "dist/tcmalloc/segv_handler.cc",
         "dist/tcmalloc/size_classes.cc",
         "dist/tcmalloc/sizemap.cc",
         "dist/tcmalloc/span.cc",
@@ -339,6 +409,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_experiment",
@@ -354,7 +425,6 @@ mongo_cc_library(
         "tcmalloc_malloc_extension",
         "tcmalloc_malloc_tracing_extension",
         "tcmalloc_new_extension",
-        "tcmalloc_sampled_allocation",
         "//src/third_party/abseil-cpp:absl_base",
         "//src/third_party/abseil-cpp:absl_hash",
         "//src/third_party/abseil-cpp:absl_malloc_internal",
@@ -374,6 +444,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_internal_environment",
@@ -390,6 +461,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "//src/third_party/abseil-cpp:absl_malloc_internal",
@@ -406,6 +478,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "//src/third_party/abseil-cpp:absl_status",
@@ -421,6 +494,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_malloc_extension",
@@ -428,17 +502,16 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "tcmalloc_sampled_allocation",
+    name = "tcmalloc_selsan",
     srcs = [
-        "dist/tcmalloc/sampled_allocation.cc",
+        "dist/tcmalloc/selsan/selsan.cc",
     ],
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
     includes = INCLUDES,
+    local_defines = TCMALLOC_DEFINES,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
-        "tcmalloc_internal_logging",
-        "//src/third_party/abseil-cpp:absl_base",
-        "//src/third_party/abseil-cpp:absl_stacktrace",
+        "tcmalloc_malloc_extension",
     ],
 )

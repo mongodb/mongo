@@ -109,7 +109,7 @@ fiddly, but reasonably efficient and not stunningly complicated.
 
 #### `HugeCache`
 
-This is a very simple wrapper on top of HugeAllocator. It's only purpose is to
+This is a very simple wrapper on top of HugeAllocator. Its only purpose is to
 store some number of backed *single* hugepage ranges as a hot cache (in case we
 rapidly allocate and deallocate a 2 MiB chunk).
 
@@ -253,6 +253,27 @@ We do wire that information to the point we drop the pageheap lock; we then back
 it without producing lock contention. This made a noticeable performance
 difference when explicitly backing memory before returning it to the
 application.
+
+### Leveraging hot/cold hints
+
+TCMalloc provides a
+[hot_cold variant](https://google.github.io/tcmalloc/reference.html#operator-new-operator-new)
+that applications may use to provide hints as to how frequently an allocation
+would be accessed. It's more likely that a larger-sized page may be considered
+hot by kernel even if some allocations are frequently accessed and placed
+together with infrequently-accessed data. By specifying hot and cold hints,
+TCMalloc may separate allocations to improve data locality for *hot* heap, and
+the effectiveness of
+[memory tiering](https://dl.acm.org/doi/abs/10.1145/3582016.3582031) by placing
+*cold* heap on a slower, but cheaper, memory tier. In the backend, TCMalloc
+[bifurcates](https://github.com/google/tcmalloc/blob/master/tcmalloc/page_allocator.cc)
+the page heap to store cold allocations separately from the hot allocations.
+This avoids TCMalloc to place these allocations together on the same hugepage.
+TCMalloc encodes hot/cold signal into size classes, that is then used to decide
+which page heap to use. It marks the separate *cold* heap as `MADV_NOHUGEPAGE`,
+such that cold allocations are placed on native-sized pages. By avoiding placing
+cold allocations on hugepages, we intend to improve hugepage availability for
+the *hot* heap.
 
 ## Notes
 

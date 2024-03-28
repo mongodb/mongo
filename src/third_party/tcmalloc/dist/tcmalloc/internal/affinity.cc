@@ -13,14 +13,14 @@
 // limitations under the License.
 #include "tcmalloc/internal/affinity.h"
 
-#include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
-#include <string.h>
 #include <unistd.h>
 
-#include <utility>
+#include <vector>
 
+#include "absl/types/span.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -31,8 +31,7 @@ std::vector<int> AllowedCpus() {
   // We have no need for dynamically sized sets (currently >1024 CPUs for glibc)
   // at the present time.  We could change this in the future.
   cpu_set_t allowed_cpus;
-  CHECK_CONDITION(sched_getaffinity(0, sizeof(allowed_cpus), &allowed_cpus) ==
-                  0);
+  TC_CHECK_EQ(0, sched_getaffinity(0, sizeof(allowed_cpus), &allowed_cpus));
   int n = CPU_COUNT(&allowed_cpus), c = 0;
 
   std::vector<int> result(n);
@@ -42,7 +41,7 @@ std::vector<int> AllowedCpus() {
       n--;
     }
   }
-  CHECK_CONDITION(0 == n);
+  TC_CHECK_EQ(0, n);
 
   return result;
 }
@@ -59,8 +58,7 @@ static cpu_set_t SpanToCpuSetT(absl::Span<int> mask) {
 ScopedAffinityMask::ScopedAffinityMask(absl::Span<int> allowed_cpus) {
   specified_cpus_ = SpanToCpuSetT(allowed_cpus);
   // getaffinity should never fail.
-  CHECK_CONDITION(
-      sched_getaffinity(0, sizeof(original_cpus_), &original_cpus_) == 0);
+  TC_CHECK_EQ(0, sched_getaffinity(0, sizeof(original_cpus_), &original_cpus_));
   // See destructor comments on setaffinity interactions.  Tampered() will
   // necessarily be true in this case.
   sched_setaffinity(0, sizeof(specified_cpus_), &specified_cpus_);
@@ -71,8 +69,7 @@ ScopedAffinityMask::ScopedAffinityMask(int allowed_cpu) {
   CPU_SET(allowed_cpu, &specified_cpus_);
 
   // getaffinity should never fail.
-  CHECK_CONDITION(
-      sched_getaffinity(0, sizeof(original_cpus_), &original_cpus_) == 0);
+  TC_CHECK_EQ(0, sched_getaffinity(0, sizeof(original_cpus_), &original_cpus_));
   // See destructor comments on setaffinity interactions.  Tampered() will
   // necessarily be true in this case.
   sched_setaffinity(0, sizeof(specified_cpus_), &specified_cpus_);
@@ -91,8 +88,7 @@ ScopedAffinityMask::~ScopedAffinityMask() {
 
 bool ScopedAffinityMask::Tampered() {
   cpu_set_t current_cpus;
-  CHECK_CONDITION(sched_getaffinity(0, sizeof(current_cpus), &current_cpus) ==
-                  0);
+  TC_CHECK_EQ(0, sched_getaffinity(0, sizeof(current_cpus), &current_cpus));
   return !CPU_EQUAL(&current_cpus, &specified_cpus_);  // Mismatch => modified.
 }
 

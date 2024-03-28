@@ -16,7 +16,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include <string>
+#include <optional>
 #include <thread>  // NOLINT(build/c++11)
 
 #include "gtest/gtest.h"
@@ -67,7 +67,7 @@ TEST(MarkIdleTest, MultipleIdleNonIdlePhases) {
 
 // Get current thread cache usage
 static size_t GetTotalThreadCacheSize() {
-  absl::optional<size_t> result = MallocExtension::GetNumericProperty(
+  std::optional<size_t> result = MallocExtension::GetNumericProperty(
       "tcmalloc.current_total_thread_cache_bytes");
   EXPECT_TRUE(result.has_value());
   return *result;

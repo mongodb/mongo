@@ -14,7 +14,9 @@
 
 #include <stdint.h>
 
+#include <cstddef>
 #include <map>
+#include <optional>
 #include <string>
 
 #include "absl/types/optional.h"
@@ -24,12 +26,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* d, size_t size) {
   using tcmalloc::MallocExtension;
 
   const std::string property(reinterpret_cast<const char*>(d), size);
-  absl::optional<size_t> val = MallocExtension::GetNumericProperty(property);
+  std::optional<size_t> val = MallocExtension::GetNumericProperty(property);
   if (!val.has_value()) {
     // Rather than inspect the result of MallocExtension::GetProperties, we
-    // defer to the test in //tcmalloc/malloc_extension_test.cc to
-    // ensure that every key in GetProperties has a value returned by
-    // GetNumericProperty.
+    // defer to the test in
+    // //tcmalloc/testing/malloc_extension_test.cc to ensure that
+    // every key in GetProperties has a value returned by GetNumericProperty.
     return 0;
   }
 

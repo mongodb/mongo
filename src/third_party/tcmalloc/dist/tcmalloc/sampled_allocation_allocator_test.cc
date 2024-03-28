@@ -16,6 +16,7 @@
 
 #include "gtest/gtest.h"
 #include "absl/debugging/stacktrace.h"
+#include "tcmalloc/common.h"
 #include "tcmalloc/internal/logging.h"
 
 namespace tcmalloc {
@@ -26,7 +27,7 @@ TEST(SampledAllocationAllocatorTest, AllocAndDealloc) {
   Arena arena;
   SampledAllocationAllocator allocator;
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     allocator.Init(&arena);
   }
   StackTrace st;

@@ -19,6 +19,7 @@
 
 #include "absl/random/random.h"
 #include "benchmark/benchmark.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/linked_list.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/mock_span.h"
@@ -110,7 +111,7 @@ static void BM_AppendRemove(benchmark::State& state) {
   // Create MockSpans in append order
   for (int i = 0; i < sequential_calls; i++) {
     MockSpan* s = MockSpan::New(i);
-    CHECK_CONDITION(s != nullptr);
+    TC_CHECK_NE(s, nullptr);
     vappend[i] = s;
   }
 

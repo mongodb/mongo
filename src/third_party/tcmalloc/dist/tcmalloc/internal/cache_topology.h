@@ -15,16 +15,41 @@
 #ifndef TCMALLOC_INTERNAL_CACHE_TOPOLOGY_H_
 #define TCMALLOC_INTERNAL_CACHE_TOPOLOGY_H_
 
+#include <cstdint>
+
+#include "absl/base/attributes.h"
+#include "absl/strings/string_view.h"
 #include "tcmalloc/internal/config.h"
-#include "tcmalloc/internal/util.h"
+#include "tcmalloc/internal/logging.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
 namespace tcmalloc_internal {
 
-// Build a mapping from cpuid to the index of the L3 cache used by that cpu.
-// Returns the number of caches detected.
-int BuildCpuToL3CacheMap(uint8_t l3_cache_index[CPU_SETSIZE]);
+class CacheTopology {
+ public:
+  static CacheTopology& Instance() {
+    ABSL_CONST_INIT static CacheTopology instance;
+    return instance;
+  }
+
+  constexpr CacheTopology() = default;
+
+  void Init();
+
+  unsigned l3_count() const { return l3_count_; }
+
+  unsigned GetL3FromCpuId(int cpu) const {
+    TC_ASSERT_GE(cpu, 0);
+    TC_ASSERT_LT(cpu, cpu_count_);
+    return l3_cache_index_[cpu];
+  }
+
+ private:
+  unsigned cpu_count_ = 0;
+  unsigned l3_count_ = 0;
+  uint8_t l3_cache_index_[CPU_SETSIZE] = {};
+};
 
 // Helper function exposed to permit testing it.
 int BuildCpuToL3CacheMap_FindFirstNumberInBuf(absl::string_view current);

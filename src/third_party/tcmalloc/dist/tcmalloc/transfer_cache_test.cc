@@ -19,24 +19,23 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
-#include <string>
 #include <thread>
 #include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/base/internal/spinlock.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "tcmalloc/central_freelist.h"
 #include "tcmalloc/common.h"
 #include "tcmalloc/internal/logging.h"
+#include "tcmalloc/internal/percpu.h"
 #include "tcmalloc/mock_central_freelist.h"
 #include "tcmalloc/mock_transfer_cache.h"
-#include "tcmalloc/static_vars.h"
 #include "tcmalloc/testing/thread_manager.h"
 #include "tcmalloc/transfer_cache_internals.h"
+#include "tcmalloc/transfer_cache_stats.h"
 
 namespace tcmalloc {
 namespace tcmalloc_internal {
@@ -51,20 +50,16 @@ TYPED_TEST_SUITE_P(TransferCacheTest);
 TYPED_TEST_P(TransferCacheTest, IsolatedSmoke) {
   const int batch_size = TypeParam::kBatchSize;
   TypeParam e;
-  EXPECT_CALL(e.central_freelist(), InsertRange)
-      .Times(e.transfer_cache().IsFlexible() ? 0 : 1);
-  EXPECT_CALL(e.central_freelist(), RemoveRange)
-      .Times(e.transfer_cache().IsFlexible() ? 0 : 1);
+  EXPECT_CALL(e.central_freelist(), InsertRange).Times(0);
+  EXPECT_CALL(e.central_freelist(), RemoveRange).Times(0);
 
   TransferCacheStats stats = e.transfer_cache().GetStats();
   EXPECT_EQ(stats.insert_hits, 0);
   EXPECT_EQ(stats.insert_misses, 0);
   EXPECT_EQ(stats.insert_object_misses, 0);
-  EXPECT_EQ(stats.insert_non_batch_misses, 0);
   EXPECT_EQ(stats.remove_hits, 0);
   EXPECT_EQ(stats.remove_misses, 0);
   EXPECT_EQ(stats.remove_object_misses, 0);
-  EXPECT_EQ(stats.remove_non_batch_misses, 0);
   EXPECT_EQ(stats.used, 0);
 
   int capacity = e.transfer_cache().CapacityNeeded(kSizeClass).capacity;
@@ -87,20 +82,11 @@ TYPED_TEST_P(TransferCacheTest, IsolatedSmoke) {
 
   e.Insert(batch_size - 1);
   stats = e.transfer_cache().GetStats();
-  if (e.transfer_cache().IsFlexible()) {
-    EXPECT_EQ(stats.insert_hits, 3);
-    EXPECT_EQ(stats.insert_misses, 0);
-    EXPECT_EQ(stats.insert_object_misses, 0);
-    EXPECT_EQ(stats.insert_non_batch_misses, 0);
-    used_expected += batch_size - 1;
-    EXPECT_EQ(stats.used, used_expected);
-  } else {
-    EXPECT_EQ(stats.insert_hits, 2);
-    EXPECT_EQ(stats.insert_misses, 1);
-    EXPECT_EQ(stats.insert_object_misses, batch_size - 1);
-    EXPECT_EQ(stats.insert_non_batch_misses, 1);
-    EXPECT_EQ(stats.used, used_expected);
-  }
+  EXPECT_EQ(stats.insert_hits, 3);
+  EXPECT_EQ(stats.insert_misses, 0);
+  EXPECT_EQ(stats.insert_object_misses, 0);
+  used_expected += batch_size - 1;
+  EXPECT_EQ(stats.used, used_expected);
   EXPECT_EQ(stats.capacity, capacity);
   EXPECT_LE(capacity, e.transfer_cache().max_capacity());
 
@@ -120,22 +106,25 @@ TYPED_TEST_P(TransferCacheTest, IsolatedSmoke) {
 
   e.Remove(batch_size - 1);
   stats = e.transfer_cache().GetStats();
-  if (e.transfer_cache().IsFlexible()) {
-    EXPECT_EQ(stats.remove_hits, 3);
-    EXPECT_EQ(stats.remove_misses, 0);
-    EXPECT_EQ(stats.remove_object_misses, 0);
-    EXPECT_EQ(stats.remove_non_batch_misses, 0);
-    used_expected -= (batch_size - 1);
-    EXPECT_EQ(stats.used, used_expected);
-  } else {
-    EXPECT_EQ(stats.remove_hits, 2);
-    EXPECT_EQ(stats.remove_misses, 1);
-    EXPECT_EQ(stats.remove_object_misses, batch_size - 1);
-    EXPECT_EQ(stats.remove_non_batch_misses, 1);
-    EXPECT_EQ(stats.used, used_expected);
-  }
+  EXPECT_EQ(stats.remove_hits, 3);
+  EXPECT_EQ(stats.remove_misses, 0);
+  EXPECT_EQ(stats.remove_object_misses, 0);
+  used_expected -= (batch_size - 1);
+  EXPECT_EQ(stats.used, used_expected);
   EXPECT_EQ(stats.capacity, capacity);
   EXPECT_EQ(stats.max_capacity, e.transfer_cache().max_capacity());
+
+  e.Insert(kMaxObjectsToMove, kMaxObjectsToMove);
+  stats = e.transfer_cache().GetStats();
+  EXPECT_EQ(stats.insert_hits, 4);
+  used_expected += kMaxObjectsToMove;
+  EXPECT_EQ(stats.used, used_expected);
+
+  e.Remove(kMaxObjectsToMove, kMaxObjectsToMove);
+  stats = e.transfer_cache().GetStats();
+  EXPECT_EQ(stats.remove_hits, 4);
+  used_expected -= kMaxObjectsToMove;
+  EXPECT_EQ(stats.used, used_expected);
 }
 
 TYPED_TEST_P(TransferCacheTest, ReadStats) {
@@ -153,11 +142,9 @@ TYPED_TEST_P(TransferCacheTest, ReadStats) {
   ASSERT_EQ(stats.insert_hits, 1);
   ASSERT_EQ(stats.insert_misses, 0);
   ASSERT_EQ(stats.insert_object_misses, 0);
-  ASSERT_EQ(stats.insert_non_batch_misses, 0);
   ASSERT_EQ(stats.remove_hits, 1);
   ASSERT_EQ(stats.remove_misses, 0);
   ASSERT_EQ(stats.remove_object_misses, 0);
-  ASSERT_EQ(stats.remove_non_batch_misses, 0);
 
   std::atomic<bool> stop{false};
 
@@ -170,15 +157,12 @@ TYPED_TEST_P(TransferCacheTest, ReadStats) {
 
   std::thread t2([&]() {
     while (!stop.load(std::memory_order_acquire)) {
-      TransferCacheStats stats = e.transfer_cache().GetStats();
-      CHECK_CONDITION(stats.insert_hits >= 1);
-      CHECK_CONDITION(stats.insert_misses == 0);
-      CHECK_CONDITION(stats.insert_object_misses == 0);
-      CHECK_CONDITION(stats.insert_non_batch_misses == 0);
-      CHECK_CONDITION(stats.remove_hits >= 1);
-      CHECK_CONDITION(stats.remove_misses == 0);
-      CHECK_CONDITION(stats.remove_object_misses == 0);
-      CHECK_CONDITION(stats.remove_non_batch_misses == 0);
+      TC_CHECK_GE(stats.insert_hits, 1);
+      TC_CHECK_EQ(stats.insert_misses, 0);
+      TC_CHECK_EQ(stats.insert_object_misses, 0);
+      TC_CHECK_GE(stats.remove_hits, 1);
+      TC_CHECK_EQ(stats.remove_misses, 0);
+      TC_CHECK_EQ(stats.remove_object_misses, 0);
     }
   });
 
@@ -195,16 +179,15 @@ TYPED_TEST_P(TransferCacheTest, SingleItemSmoke) {
     GTEST_SKIP() << "skipping trivial batch size";
   }
   TypeParam e;
-  const int actions = e.transfer_cache().IsFlexible() ? 2 : 0;
-  EXPECT_CALL(e.central_freelist(), InsertRange).Times(2 - actions);
-  EXPECT_CALL(e.central_freelist(), RemoveRange).Times(2 - actions);
+  EXPECT_CALL(e.central_freelist(), InsertRange).Times(0);
+  EXPECT_CALL(e.central_freelist(), RemoveRange).Times(0);
 
   e.Insert(1);
   e.Insert(1);
-  EXPECT_EQ(e.transfer_cache().GetStats().insert_hits, actions);
+  EXPECT_EQ(e.transfer_cache().GetStats().insert_hits, 2);
   e.Remove(1);
   e.Remove(1);
-  EXPECT_EQ(e.transfer_cache().GetStats().remove_hits, actions);
+  EXPECT_EQ(e.transfer_cache().GetStats().remove_hits, 2);
 }
 
 TYPED_TEST_P(TransferCacheTest, FetchesFromFreelist) {
@@ -267,11 +250,9 @@ TYPED_TEST_P(TransferCacheTest, WrappingWorks) {
     env.Remove(batch_size);
     env.Insert(batch_size);
   }
-  if (env.transfer_cache().IsFlexible()) {
-    for (size_t size = 1; size < batch_size + 2; size++) {
-      env.Remove(size);
-      env.Insert(size);
-    }
+  for (size_t size = 1; size < batch_size + 2; size++) {
+    env.Remove(size);
+    env.Insert(size);
   }
 }
 
@@ -350,8 +331,7 @@ static size_t PickCoprimeBatchSize(size_t max_batch_size) {
   return max_batch_size;
 }
 
-// TODO(b/172283201): Improve the performance of this test and reenable it.
-TYPED_TEST_P(TransferCacheTest, DISABLED_b172283201) {
+TYPED_TEST_P(TransferCacheTest, b172283201) {
   // This test is designed to exercise the wraparound behavior for the transfer
   // cache, which manages its indices in uint32_t's.  Because it uses a
   // non-standard batch size (kBatchSize) as part of PickCoprimeBatchSize, it
@@ -361,7 +341,7 @@ TYPED_TEST_P(TransferCacheTest, DISABLED_b172283201) {
   // For performance reasons, limit to optimized builds.
 #if !defined(NDEBUG)
   GTEST_SKIP() << "skipping long running test on debug build";
-#elif defined(THREAD_SANITIZER)
+#elif defined(ABSL_HAVE_THREAD_SANITIZER)
   // This test is single threaded, so thread sanitizer will not be useful.
   GTEST_SKIP() << "skipping under thread sanitizer, which slows test execution";
 #endif
@@ -386,9 +366,8 @@ TYPED_TEST_P(TransferCacheTest, DISABLED_b172283201) {
     pointers.push_back(&buffer[i]);
   }
 
-  // To produce wraparound in the RingBufferTransferCache, we fill up the cache
-  // completely and then keep inserting new elements. This makes the cache
-  // return old elements to the freelist and eventually wrap around.
+  // Fill up the cache completely and then keep inserting new elements.
+  // This makes the cache return old elements to the freelist.
   EXPECT_CALL(env.central_freelist(), RemoveRange).Times(0);
   // We do return items to the freelist, don't try to actually free them.
   ON_CALL(env.central_freelist(), InsertRange).WillByDefault(testing::Return());
@@ -405,11 +384,11 @@ TYPED_TEST_P(TransferCacheTest, DISABLED_b172283201) {
   const size_t kObjects = env.transfer_cache().tc_length() + 2 * batch_size;
 
   // From now on, calls to InsertRange() should result in a corresponding call
-  // to the freelist whenever the cache is full. This doesn't happen on every
-  // call, as we return up to num_to_move (i.e. kBatchSize) items to the free
-  // list in one batch.
+  // to the freelist whenever the cache is full. Once the transfer cache is
+  // full, we should return batch_size number of items to the free list.
   EXPECT_CALL(env.central_freelist(),
-              InsertRange(testing::SizeIs(TypeParam::kBatchSize)))
+              InsertRange(testing::SizeIs(
+                  testing::AllOf(testing::Gt(0), testing::Le(batch_size)))))
       .Times(testing::AnyNumber());
   for (size_t i = 0; i < kObjects; i += batch_size) {
     env.transfer_cache().InsertRange(kSizeClass, absl::MakeSpan(pointers));
@@ -429,74 +408,10 @@ TYPED_TEST_P(TransferCacheTest, DISABLED_b172283201) {
   ASSERT_EQ(env.transfer_cache().tc_length(), 0);
 }
 
-TEST(FlexibleTransferCacheTest, ToggleCacheFlexibility) {
-  // In this test, we toggle flexibility of the legacy transfer cache to make
-  // sure that we encounter expected number of misses and do not lose capacity
-  // in the process.
-  using EnvType = FakeFlexibleTransferCacheEnvironment<
-      internal_transfer_cache::TransferCache<MockCentralFreeList,
-                                             FakeTransferCacheManager>>;
-  EnvType env;
-
-  // Make sure that flexibility is enabled by default in this environment.
-  ASSERT_EQ(env.transfer_cache().IsFlexible(), true);
-
-  const int batch_size = EnvType::kBatchSize;
-  while (env.transfer_cache().HasSpareCapacity(kSizeClass)) {
-    env.Insert(batch_size);
-  }
-
-  EXPECT_CALL(env.central_freelist(), InsertRange).Times(batch_size / 2);
-  EXPECT_CALL(env.central_freelist(), RemoveRange).Times(batch_size / 2);
-
-  bool flexible = env.transfer_cache().IsFlexible();
-  TransferCacheStats previous_stats = env.transfer_cache().GetStats();
-  size_t expected_object_misses = 0;
-  for (size_t size = 1; size <= batch_size; size++) {
-    flexible = !flexible;
-    env.transfer_cache_manager().SetPartialLegacyTransferCache(flexible);
-    ASSERT_EQ(env.transfer_cache().IsFlexible(), flexible);
-
-    env.Remove(size);
-    env.Insert(size);
-    if (!flexible && size != batch_size) {
-      expected_object_misses += size;
-    }
-  }
-
-  // Make sure we haven't lost capacity and the number of used bytes in the
-  // cache is same as before.
-  TransferCacheStats current_stats = env.transfer_cache().GetStats();
-  EXPECT_EQ(current_stats.used, previous_stats.used);
-  EXPECT_EQ(current_stats.capacity, previous_stats.capacity);
-  EXPECT_EQ(current_stats.max_capacity, previous_stats.max_capacity);
-
-  // We should have missed half the number of times when the transfer cache did
-  // not allow partial updates.
-  EXPECT_EQ(current_stats.insert_misses, batch_size / 2);
-  EXPECT_EQ(current_stats.insert_non_batch_misses, batch_size / 2);
-  EXPECT_EQ(current_stats.insert_object_misses, expected_object_misses);
-  EXPECT_EQ(current_stats.remove_object_misses, expected_object_misses);
-
-  // Enable flexibility.
-  flexible = true;
-  env.transfer_cache_manager().SetPartialLegacyTransferCache(flexible);
-
-  // When flexibility is enabled, we should be able to drain the transfer cache
-  // one object at a time.
-  int used = current_stats.used;
-  while (used > 0) {
-    env.Remove(1);
-    --used;
-    EXPECT_EQ(env.transfer_cache().tc_length(), used);
-  }
-  EXPECT_EQ(env.transfer_cache().tc_length(), 0);
-}
-
 REGISTER_TYPED_TEST_SUITE_P(TransferCacheTest, IsolatedSmoke, ReadStats,
                             FetchesFromFreelist, PartialFetchFromFreelist,
                             PushesToFreelist, WrappingWorks, SingleItemSmoke,
-                            Plunder, DISABLED_b172283201);
+                            Plunder, b172283201);
 
 template <typename Env>
 using FuzzTest = ::testing::Test;
@@ -579,7 +494,7 @@ TEST(ShardedTransferCacheManagerTest, MinimumNumShards) {
 
   using ShardedManager = FakeShardedTransferCacheEnvironment::ShardedManager;
   constexpr int kNumShards = ShardedManager::kMinShardsAllowed - 1;
-  ASSERT(kNumShards > 0);
+  TC_ASSERT_GT(kNumShards, 0);
   FakeShardedTransferCacheEnvironment env(kNumShards,
                                           /*use_generic_cache=*/true);
   ShardedManager& manager = env.sharded_manager();
@@ -613,6 +528,7 @@ TEST(ShardedTransferCacheManagerTest, MinimumNumShards) {
     EXPECT_TRUE(manager.shard_initialized(0));
     EXPECT_FALSE(manager.shard_initialized(1));
     EXPECT_EQ(manager.tc_length(0, kSizeClass), 0);
+    EXPECT_EQ(manager.TotalObjectsOfClass(kSizeClass), 0);
     EXPECT_EQ(manager.GetStats(kSizeClass).capacity, 0);
     EXPECT_EQ(manager.GetStats(kSizeClass).max_capacity, 0);
     EXPECT_GT(env.MetadataAllocated(), metadata);
@@ -628,6 +544,7 @@ TEST(ShardedTransferCacheManagerTest, MinimumNumShards) {
     EXPECT_TRUE(manager.shard_initialized(0));
     EXPECT_FALSE(manager.shard_initialized(1));
     EXPECT_EQ(manager.tc_length(0, kSizeClass), 0);
+    EXPECT_EQ(manager.TotalObjectsOfClass(kSizeClass), 0);
     EXPECT_EQ(manager.GetStats(kSizeClass).capacity, 0);
     EXPECT_EQ(manager.GetStats(kSizeClass).max_capacity, 0);
     EXPECT_EQ(env.MetadataAllocated(), metadata);
@@ -643,6 +560,7 @@ TEST(ShardedTransferCacheManagerTest, MinimumNumShards) {
     EXPECT_TRUE(manager.shard_initialized(0));
     EXPECT_FALSE(manager.shard_initialized(1));
     EXPECT_EQ(manager.tc_length(1, kSizeClass), 0);
+    EXPECT_EQ(manager.TotalObjectsOfClass(kSizeClass), 0);
     EXPECT_EQ(manager.GetStats(kSizeClass).capacity, 0);
     EXPECT_EQ(manager.GetStats(kSizeClass).max_capacity, 0);
     // No new metadata allocated
@@ -660,6 +578,7 @@ TEST(ShardedTransferCacheManagerTest, MinimumNumShards) {
     EXPECT_TRUE(manager.shard_initialized(0));
     EXPECT_TRUE(manager.shard_initialized(1));
     EXPECT_EQ(manager.tc_length(2, kSizeClass), 0);
+    EXPECT_EQ(manager.TotalObjectsOfClass(kSizeClass), 0);
     EXPECT_EQ(manager.GetStats(kSizeClass).capacity, 0);
     EXPECT_EQ(manager.GetStats(kSizeClass).max_capacity, 0);
     EXPECT_GT(env.MetadataAllocated(), metadata);
@@ -696,6 +615,7 @@ TEST(ShardedTransferCacheManagerTest, ShardsOnDemand) {
       manager.Push(kSizeClass, ptr);
       EXPECT_TRUE(manager.shard_initialized(0));
       EXPECT_EQ(manager.tc_length(0, kSizeClass), 1);
+      EXPECT_EQ(manager.TotalObjectsOfClass(kSizeClass), 1);
       EXPECT_FALSE(manager.shard_initialized(1));
       EXPECT_GT(env.MetadataAllocated(), metadata);
       metadata = env.MetadataAllocated();
@@ -708,6 +628,7 @@ TEST(ShardedTransferCacheManagerTest, ShardsOnDemand) {
       env.central_freelist().FreeBatch({&ptr, 1});
       EXPECT_TRUE(manager.shard_initialized(0));
       EXPECT_EQ(manager.tc_length(0, kSizeClass), 0);
+      EXPECT_EQ(manager.TotalObjectsOfClass(kSizeClass), 0);
       EXPECT_FALSE(manager.shard_initialized(1));
       EXPECT_EQ(env.MetadataAllocated(), metadata);
     }
@@ -720,6 +641,7 @@ TEST(ShardedTransferCacheManagerTest, ShardsOnDemand) {
       manager.Push(kSizeClass, ptr);
       EXPECT_TRUE(manager.shard_initialized(0));
       EXPECT_EQ(manager.tc_length(1, kSizeClass), 1);
+      EXPECT_EQ(manager.TotalObjectsOfClass(kSizeClass), 1);
       EXPECT_FALSE(manager.shard_initialized(1));
       // No new metadata allocated
       EXPECT_EQ(env.MetadataAllocated(), metadata);
@@ -734,6 +656,7 @@ TEST(ShardedTransferCacheManagerTest, ShardsOnDemand) {
       EXPECT_TRUE(manager.shard_initialized(0));
       EXPECT_TRUE(manager.shard_initialized(1));
       EXPECT_EQ(manager.tc_length(2, kSizeClass), 1);
+      EXPECT_EQ(manager.TotalObjectsOfClass(kSizeClass), 2);
       EXPECT_GT(env.MetadataAllocated(), metadata);
     }
   }
@@ -745,12 +668,6 @@ using Env = FakeTransferCacheEnvironment<internal_transfer_cache::TransferCache<
 INSTANTIATE_TYPED_TEST_SUITE_P(TransferCache, TransferCacheTest,
                                ::testing::Types<Env>);
 
-using FlexibleTransferCacheEnv =
-    FakeFlexibleTransferCacheEnvironment<internal_transfer_cache::TransferCache<
-        MockCentralFreeList, FakeTransferCacheManager>>;
-INSTANTIATE_TYPED_TEST_SUITE_P(FlexibleTransferCache, TransferCacheTest,
-                               ::testing::Types<FlexibleTransferCacheEnv>);
-
 }  // namespace unit_tests
 
 namespace fuzz_tests {
@@ -760,13 +677,6 @@ namespace fuzz_tests {
 using Env = FakeTransferCacheEnvironment<internal_transfer_cache::TransferCache<
     MockCentralFreeList, FakeTransferCacheManager>>;
 INSTANTIATE_TYPED_TEST_SUITE_P(TransferCache, FuzzTest, ::testing::Types<Env>);
-
-using FlexibleTransferCacheEnv =
-    FakeFlexibleTransferCacheEnvironment<internal_transfer_cache::TransferCache<
-        MockCentralFreeList, FakeTransferCacheManager>>;
-
-INSTANTIATE_TYPED_TEST_SUITE_P(FlexibleTransferCache, TransferCacheTest,
-                               ::testing::Types<FlexibleTransferCacheEnv>);
 
 }  // namespace fuzz_tests
 

@@ -22,15 +22,17 @@
 #include <algorithm>
 #include <limits>
 
+#include "absl/base/attributes.h"
+#include "absl/base/internal/cycleclock.h"
 #include "absl/time/time.h"
-#include "tcmalloc/common.h"
-#include "tcmalloc/experiment.h"
-#include "tcmalloc/experiment_config.h"
+#include "tcmalloc/huge_address_map.h"
 #include "tcmalloc/huge_allocator.h"
 #include "tcmalloc/huge_pages.h"
+#include "tcmalloc/internal/clock.h"
 #include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/timeseries_tracker.h"
+#include "tcmalloc/metadata_allocator.h"
 #include "tcmalloc/stats.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -38,17 +40,10 @@ namespace tcmalloc {
 namespace tcmalloc_internal {
 
 class MemoryModifyFunction {
-  using ReleaseFunction = bool (*)(void*, size_t);
-
  public:
-  explicit MemoryModifyFunction(ReleaseFunction func) : func_(func) {}
+  virtual ~MemoryModifyFunction() = default;
 
-  ABSL_MUST_USE_RESULT bool operator()(void* start, size_t len) {
-    return func_(start, len);
-  }
-
- private:
-  ReleaseFunction func_;
+  ABSL_MUST_USE_RESULT virtual bool operator()(void* start, size_t len) = 0;
 };
 
 // Track the extreme values of a HugeLength value over the past
@@ -106,8 +101,9 @@ constexpr HugeLength MinMaxTracker<kEpochs>::kMaxVal;
 class HugeCache {
  public:
   // For use in production
-  HugeCache(HugeAllocator* allocator, MetadataAllocFunction meta_allocate,
-            MemoryModifyFunction unback)
+  HugeCache(HugeAllocator* allocator,
+            MetadataAllocator& meta_allocate ABSL_ATTRIBUTE_LIFETIME_BOUND,
+            MemoryModifyFunction& unback ABSL_ATTRIBUTE_LIFETIME_BOUND)
       : HugeCache(allocator, meta_allocate, unback,
                   Clock{.now = absl::base_internal::CycleClock::Now,
                         .freq = absl::base_internal::CycleClock::Frequency}) {}
@@ -138,8 +134,10 @@ class HugeCache {
   // capture the empirical dynamics we've seen.  See "Beyond Malloc
   // Efficiency..." (https://research.google/pubs/pub50370/) for more
   // information.
-  HugeCache(HugeAllocator* allocator, MetadataAllocFunction meta_allocate,
-            MemoryModifyFunction unback, Clock clock)
+  HugeCache(HugeAllocator* allocator,
+            MetadataAllocator& meta_allocate ABSL_ATTRIBUTE_LIFETIME_BOUND,
+            MemoryModifyFunction& unback ABSL_ATTRIBUTE_LIFETIME_BOUND,
+            Clock clock)
       : allocator_(allocator),
         cache_(meta_allocate),
         clock_(clock),
@@ -177,8 +175,7 @@ class HugeCache {
   // Sum total of unreleased requests.
   HugeLength usage() const { return usage_; }
 
-  void AddSpanStats(SmallSpanStats* small, LargeSpanStats* large,
-                    PageAgeHistograms* ages) const;
+  void AddSpanStats(SmallSpanStats* small, LargeSpanStats* large) const;
 
   BackingStats stats() const {
     BackingStats s;
@@ -253,7 +250,7 @@ class HugeCache {
   HugeLength total_fast_unbacked_{NHugePages(0)};
   HugeLength total_periodic_unbacked_{NHugePages(0)};
 
-  MemoryModifyFunction unback_;
+  MemoryModifyFunction& unback_;
 };
 
 }  // namespace tcmalloc_internal

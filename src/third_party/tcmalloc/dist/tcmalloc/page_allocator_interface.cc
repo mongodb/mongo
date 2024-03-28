@@ -14,17 +14,14 @@
 
 #include "tcmalloc/page_allocator_interface.h"
 
-#include <errno.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "tcmalloc/internal/environment.h"
+#include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
-#include "tcmalloc/internal/optimization.h"
-#include "tcmalloc/internal/util.h"
 #include "tcmalloc/static_vars.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -40,7 +37,7 @@ PageAllocatorInterface::PageAllocatorInterface(const char* label, PageMap* map,
 
 PageAllocatorInterface::~PageAllocatorInterface() {
   // This is part of tcmalloc statics - they must be immortal.
-  Crash(kCrash, __FILE__, __LINE__, "should never destroy this");
+  TC_BUG("should never destroy this");
 }
 
 }  // namespace tcmalloc_internal

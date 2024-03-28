@@ -31,18 +31,21 @@
 #include "tcmalloc/central_freelist.h"
 #include "tcmalloc/common.h"
 #include "tcmalloc/deallocation_profiler.h"
-#include "tcmalloc/explicitly_constructed.h"
 #include "tcmalloc/guarded_page_allocator.h"
 #include "tcmalloc/internal/atomic_stats_counter.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/explicitly_constructed.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/numa.h"
 #include "tcmalloc/internal/percpu.h"
+#include "tcmalloc/internal/sampled_allocation.h"
+#include "tcmalloc/internal/sampled_allocation_recorder.h"
 #include "tcmalloc/page_allocator.h"
 #include "tcmalloc/page_heap_allocator.h"
+#include "tcmalloc/pages.h"
+#include "tcmalloc/parameters.h"
 #include "tcmalloc/peak_heap_tracker.h"
-#include "tcmalloc/sampled_allocation.h"
 #include "tcmalloc/sampled_allocation_allocator.h"
-#include "tcmalloc/sampled_allocation_recorder.h"
 #include "tcmalloc/sizemap.h"
 #include "tcmalloc/span.h"
 #include "tcmalloc/stack_trace_table.h"
@@ -59,6 +62,13 @@ class ThreadCache;
 using SampledAllocationRecorder =
     ::tcmalloc::tcmalloc_internal::SampleRecorder<SampledAllocation,
                                                   SampledAllocationAllocator>;
+
+enum class SizeClassConfiguration {
+  kPow2Below64 = 1,
+  kPow2Only = 2,
+  kLowFrag = 3,
+  kLegacy = 4,
+};
 
 class Static final {
  public:
@@ -157,25 +167,8 @@ class Static final {
     cpu_cache_active_.store(true, std::memory_order_release);
   }
 
-  static bool ABSL_ATTRIBUTE_ALWAYS_INLINE IsOnFastPath() {
-    return
-        // These boolean operations do not require short-circuiting from &&.
-        // Bitwise AND of booleans triggers -Wbitwise-instead-of-logical, as
-        // this can be a common source of bugs.  Suppress this by casting to
-        // int first.
-
-#ifndef TCMALLOC_DEPRECATED_PERTHREAD
-        // When the per-cpu cache is enabled, and the thread's current cpu
-        // variable is initialized we will try to allocate from the per-cpu
-        // cache. If something fails, we bail out to the full malloc.
-        // Checking the current cpu variable here allows us to remove it from
-        // the fast-path, since we will fall back to the slow path until this
-        // variable is initialized.
-        static_cast<int>(CpuCacheActive()) &
-        static_cast<int>(subtle::percpu::IsFastNoInit());
-#else
-        !CpuCacheActive();
-#endif
+  static bool ABSL_ATTRIBUTE_ALWAYS_INLINE HaveHooks() {
+    return false;
   }
 
   static size_t metadata_bytes() ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock);
@@ -183,6 +176,8 @@ class Static final {
   // The root of the pagemap is potentially a large poorly utilized
   // structure, so figure out how much of it is actually resident.
   static size_t pagemap_residence();
+
+  static SizeClassConfiguration size_class_configuration();
 
  private:
 #if defined(__clang__)
@@ -252,15 +247,21 @@ inline void Static::InitIfNecessary() {
 // TODO(b/134687001): move span_allocator to Span, getting rid of the need for
 // this.
 inline Span* Span::New(PageId p, Length len) {
-  Span* result = Static::span_allocator().New();
+  const uint32_t max_span_cache_size = Parameters::max_span_cache_size();
+  Span* result = Static::span_allocator().NewWithSize(
+      Span::CalcSizeOf(max_span_cache_size),
+      Span::CalcAlignOf(max_span_cache_size));
   result->Init(p, len);
   return result;
 }
 
 inline void Span::Delete(Span* span) {
 #ifndef NDEBUG
+  const uint32_t max_span_cache_size = Parameters::max_span_cache_size();
+  const size_t span_size = Span::CalcSizeOf(max_span_cache_size);
+
   // In debug mode, trash the contents of deleted Spans
-  memset(static_cast<void*>(span), 0x3f, sizeof(*span));
+  memset(static_cast<void*>(span), 0x3f, span_size);
 #endif
   Static::span_allocator().Delete(span);
 }

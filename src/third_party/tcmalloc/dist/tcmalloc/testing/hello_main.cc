@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstddef>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "absl/strings/str_cat.h"
@@ -24,14 +27,14 @@
 int main(int argc, char** argv) {
   std::string msg = absl::StrCat("hello ", argc < 2 ? "world" : argv[1], "!");
 
-  absl::optional<size_t> heap_size =
+  std::optional<size_t> heap_size =
       tcmalloc::MallocExtension::GetNumericProperty(
           "generic.current_allocated_bytes");
   if (heap_size.has_value()) {
-    std::cout << "Current heap size = " << *heap_size << " bytes" << std::endl;
+    std::cout << "Current heap size = " << *heap_size << " bytes" << '\n';
   }
 
-  std::cout << msg << std::endl;
+  std::cout << msg << '\n';
 
   // Allocate memory, printing the pointer to deter an optimizing compiler from
   // eliding the allocation.
@@ -43,7 +46,7 @@ int main(int argc, char** argv) {
   heap_size = tcmalloc::MallocExtension::GetNumericProperty(
       "generic.current_allocated_bytes");
   if (heap_size.has_value()) {
-    std::cout << "Current heap size = " << *heap_size << " bytes" << std::endl;
+    std::cout << "Current heap size = " << *heap_size << " bytes" << '\n';
   }
 
   void* ptr2 = malloc(kSize);
@@ -52,7 +55,7 @@ int main(int argc, char** argv) {
   heap_size = tcmalloc::MallocExtension::GetNumericProperty(
       "generic.current_allocated_bytes");
   if (heap_size.has_value()) {
-    std::cout << "Current heap size = " << *heap_size << " bytes" << std::endl;
+    std::cout << "Current heap size = " << *heap_size << " bytes" << '\n';
   }
 
   free(ptr2);

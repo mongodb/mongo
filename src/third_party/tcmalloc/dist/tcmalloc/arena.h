@@ -23,6 +23,8 @@
 #include "absl/base/attributes.h"
 #include "absl/base/thread_annotations.h"
 #include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/logging.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -60,9 +62,9 @@ class Arena {
   // Updates the stats for allocated and non-resident bytes.
   void UpdateAllocatedAndNonresident(int64_t allocated, int64_t nonresident)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(pageheap_lock) {
-    ASSERT(static_cast<int64_t>(bytes_allocated_) + allocated >= 0);
+    TC_ASSERT_GE(static_cast<int64_t>(bytes_allocated_) + allocated, 0);
     bytes_allocated_ += allocated;
-    ASSERT(static_cast<int64_t>(bytes_nonresident_) + nonresident >= 0);
+    TC_ASSERT_GE(static_cast<int64_t>(bytes_nonresident_) + nonresident, 0);
     bytes_nonresident_ += nonresident;
   }
 

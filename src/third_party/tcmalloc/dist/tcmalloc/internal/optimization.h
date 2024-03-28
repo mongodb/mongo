@@ -16,16 +16,21 @@
 #define TCMALLOC_INTERNAL_OPTIMIZATION_H_
 
 #include "absl/base/attributes.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
+
+GOOGLE_MALLOC_SECTION_BEGIN
+namespace tcmalloc {
+namespace tcmalloc_internal {
 
 // Our wrapper for __builtin_assume, allowing us to check the assumption on
 // debug builds.
 #ifndef NDEBUG
 #ifdef __clang__
-#define ASSUME(cond) CHECK_CONDITION(cond), __builtin_assume(cond)
+#define ASSUME(cond) TC_CHECK(cond), __builtin_assume(cond)
 #else
 #define ASSUME(cond) \
-  CHECK_CONDITION(cond), (!(cond) ? __builtin_unreachable() : (void)0)
+  TC_CHECK(cond), (!(cond) ? __builtin_unreachable() : (void)0)
 #endif
 #else
 #ifdef __clang__
@@ -43,11 +48,21 @@
 #define TCMALLOC_ATTRIBUTE_CONST
 #endif
 
-#if ABSL_HAVE_CPP_ATTRIBUTE(no_unique_address)
-#define TCMALLOC_NO_UNIQUE_ADDRESS [[no_unique_address]]
+// Can be applied to a return statement to tell the compiler to generate
+// a tail call.
+#if ABSL_HAVE_CPP_ATTRIBUTE(clang::musttail)
+#define TCMALLOC_MUSTTAIL [[clang::musttail]]
 #else
-#define TCMALLOC_NO_UNIQUE_ADDRESS
-#error
+#define TCMALLOC_MUSTTAIL
 #endif
+
+static inline void* AssumeNotNull(void* p) {
+  ASSUME(p != nullptr);
+  return p;
+}
+
+}  // namespace tcmalloc_internal
+}  // namespace tcmalloc
+GOOGLE_MALLOC_SECTION_END
 
 #endif  // TCMALLOC_INTERNAL_OPTIMIZATION_H_

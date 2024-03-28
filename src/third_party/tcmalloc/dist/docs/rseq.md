@@ -2,7 +2,7 @@
 
 <!--*
 # Document freshness: For more information, see go/fresh-source.
-freshness: { owner: 'ckennelly' reviewed: '2022-12-14' }
+freshness: { owner: 'ckennelly' reviewed: '2024-02-01' }
 *-->
 
 ## per-CPU Caches
@@ -54,33 +54,21 @@ these are represented as:
 
 ```
 struct Slabs {
-  std::atomic<int64_t> header[NumClasses];
+  std::atomic<int32_t> header[NumClasses];
   void* mem[((1ul << Shift) - sizeof(header)) / sizeof(void*)];
 };
 
-// Slab header (packed, atomically updated 64-bit).
-// All {begin, current, end} values are pointer offsets from per-CPU region
-// start. The slot array is in [begin, end), and the occupied slots are in
-// [begin, current).
-struct Header {
-  // The end offset of the currently occupied slots.
-  uint16_t current;
-  // Copy of end. Updated by Shrink/Grow, but is not overwritten by Drain.
-  uint16_t end_copy;
-  // Lock updates only begin and end with a 32-bit write.
-
-  // The begin offset of the slot array for this size class.
-  uint16_t begin;
-  // The end offset of the slot array for this size class.
-  uint16_t end;
-
-  // Lock is used by Drain to stop concurrent mutations of the Header.
-  // Lock sets begin to 0xffff and end to 0, which makes Push and Pop fail
-  // regardless of current value.
-  bool IsLocked() const;
-  void Lock();
-};
-
+  // Slab header (packed, atomically updated 32-bit).
+  // Current and end are pointer offsets from per-CPU region start.
+  // The slot array is in [begin, end), and the occupied slots are in
+  // [begin, current). Begin is stored separately, it's constant and
+  // the same for all CPUs.
+  struct Header {
+    // The end offset of the currently occupied slots.
+    uint16_t current;
+    // The end offset of the slot array for this size class.
+    uint16_t end;
+  };
 ```
 
 The atomic `header` allows us to read the state (esp. for telemetry purposes) of
@@ -120,21 +108,19 @@ start:
   uint64_t cpu_id = __rseq_abi.cpu_id;
   Header* hdr = &slabs[cpu_id].header[size_class];
   uint64_t current = hdr->current;
-  uint64_t begin = hdr->begin;
-  if (ABSL_PREDICT_FALSE(current <= begin)) {
+  void* ret = *(&slabs[cpu_id] + current * sizeof(void*) - sizeof(void*));
+  // The element before the array is specifically marked with the low bit set.
+  if (ABSL_PREDICT_FALSE((uintptr_t)ret & 1)) {
     goto underflow;
   }
-
   void* next = *(&slabs[cpu_id] + current * sizeof(void*) - 2 * sizeof(void*))
-  prefetcht0(next);
-
-  void* ret = *(&slabs[cpu_id] + current * sizeof(void*) - sizeof(void*));
   --current;
   hdr->current = current;
 commit:
+  prefetcht0(next);
   return ret;
 underflow:
-  return underflow_handler(cpu_id, size_class);
+  return nullptr;
 }
 
 // This is implemented in assembly, but for exposition.
@@ -160,7 +146,7 @@ pointer-to-self.
 
 This sequence terminates with the *single* committing store to `hdr->current`.
 If we are migrated or otherwise interrupted, we restart the preparatory steps,
-as the values of `cpu_id`, `current`, `begin` may have changed.
+as the values of `cpu_id` and `current` may have changed.
 
 As these operations work on a single core's data and are executed on that core.
 From a memory ordering perspective, loads and stores need to appear on that core
@@ -233,13 +219,9 @@ overflow:
 
 ## Initialization of the Slab
 
-To reduce metadata demands, we lazily initialize the slabs, relying on the
-kernel to provide zeroed pages from the `mmap` call to obtain memory for the
-slab metadata.
-
-At startup, this leaves the `Header` of each initialized to `current = begin =
-end = 0`. The initial push or pop will trigger the overflow or underflow paths
-(respectively), so that we can populate these values.
+To reduce metadata demands, we lazily initialize the slabs for each CPU. When we
+first cache slab pointer for the given CPU (see slab pointer caching section
+below), we initialize `Header` for each size class.
 
 ## More Complex Operations: Batches
 
@@ -375,12 +357,38 @@ The two CPU ID fields are maintained as follows:
     [called](https://github.com/torvalds/linux/blob/414eece95b98b209cef0f49cfcac108fd00b8ced/kernel/rseq.c#L322)
     in the unregister path discussed above.
 
+## Current CPU Slabs Pointer Caching
+
+Calculation of the pointer to the current CPU slabs pointer is relatively
+expensive due to support for virtual CPU IDs and variable shifts. To remove this
+calculation from fast paths, we cache the slabs address for the current CPU in
+thread local storage. To understand that the cached pointer is not valid anymore
+when a thread is rescheduled to another CPU, we overlap the top 4 bytes of the
+cached address with `__rseq_abi.cpu_id_start`. When a thread is rescheduled the
+kernel overwrites `cpu_id_start` with the current CPU number, which gives us the
+signal that the cached address is not valid anymore. To distinguish the high
+part of the cached address from the CPU number, we set the top bit in the cached
+address, real CPU numbers (`<2^31`) do not have this bit set.
+
+With these arrangements, slabs address calculation on allocation/deallocation
+fast paths reduces to load and check of the cached address:
+
+```
+  slabs = __rseq_abi[-4];
+  if ((slabs & (1 << 63)) == 0) goto slowpath;
+  slabs &= ~(1 << 63);
+```
+
+Slow paths of these operations do full slabs address calculation and cache it.
+
+Note: this makes `__rseq_abi.cpu_id_start` unusable for its original purpose.
+
 ## Cross-CPU Operations
 
 With restartable sequences, we've optimized the fast path for same-CPU
 operations at the expense of costlier cross-CPU operations. Cross-CPU operations
-are rare&mdash;typically done only to facilitate periodic drains of idle
-caches&mdash;so this is a desirable tradeoff.
+are rare, so this is a desirable tradeoff. Cross-CPU operations include capacity
+growing/shrinking, and periodic drains and resizes of idle caches.
 
 Cross-CPU operations rely on operating system assistance (wrapped in
 `tcmalloc::tcmalloc_internal::subtle::percpu::FenceCpu`) to interrupt any
@@ -389,36 +397,25 @@ the thread running on that core, we have guaranteed that either the restartable
 sequence that was running has completed *or* that the restartable sequence was
 preempted.
 
-We use preemption and "locks" (`TcmallocSlab::Header::Lock`) to ensure that
-during a particular period, all accesses to the fast path will fail&mdash;the
-cache is both simultaneously "full" and "empty" so all inserts and removes will
-go to the slow path. Unlike using `sched_setaffinity` to run a remote core, this
-approach allows us to perform longer operations, such as taking elements from
-the cache and inserting them into the `TransferCache` as part of `Drain`, while
-still maintaining correctness.
+Synchronization protocol between start of a cross-CPU operation and local
+allocation/deallocation: cross-CPU operation sets `stopped_[cpu]` flag and calls
+`FenceCpu`; local operations check `stopped_[cpu]` during slabs pointer caching
+and don't cache the pointer if the flag is set. This ensures that after
+`FenceCpu` completes, all local operations have finished or aborted, and no new
+operations will start (since they require a cached slabs pointer). This part of
+the synchronization protocol uses relaxed atomic operations on `stopped_[cpu]`
+and only compiler ordering. This is sufficient because `FenceCpu` provides all
+necessary synchronization between threads.
 
-Since we are using relaxed loads and stores, potentially with word-level
-granularity, our operations need to potentially store part of the needed data to
-`Header`, fence, and then write additional fields. For example, at the end of of
-`Drain`, we:
+Synchronization protocol between end of a cross-CPU operation and local
+allocation/deallocation: cross-CPU operation unsets `stopped_[cpu]` flag using
+release memory ordering. Slabs pointer caching observes unset `stopped_[cpu]`
+flag with acquire memory ordering and caches the pointer, thus allowing local
+operations. Use of release/acquire memory ordering ensures that if a thread
+observes unset `stopped_[cpu]` flag, it will also see all side-effects of the
+cross-CPU operation.
 
-*   Store `hdr.current`. `hdr.begin = 0xFFFF` and `hdr.end = 0x0`, ensuring
-    insert and remove operations continue to fail.
-*   `FenceCpu`
-*   Store `hdr.begin` and `hdr.end` to their proper values.
-
-This sequence ensures that a thread running on the remote core can only see one
-of:
-
-*   `hdr.current = X`; `hdr.begin = 0xFFFF`; `hdr.end = 0x0`
-*   `hdr.current = Y`; `hdr.begin = 0xFFFF`; `hdr.end = 0x0`
-*   `hdr.current = Y`; `hdr.begin = Y`; `hdr.end = Y`
-
-`FenceCpu` ensures that after it completes, no thread can see `current=X` any
-longer.
-
-If we did a single store or omitted the intervening fence operation, a thread on
-the remote core could potentially see `hdr.begin = Y < hdr.current = X` and
-attempt to remove an element from the cache. (This failure would lead to data
-corruption as the element had already been "deallocated" to the `TransferCache`,
-essentially triggering a double-free.)
+Combined these 2 parts of the synchronization protocol ensure that cross-CPU
+operations work on completely quiescent state, with no other threads
+reading/writing slabs. The only exception is `Length`/`Capacity` methods that
+can still read slabs.

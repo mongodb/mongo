@@ -17,14 +17,14 @@
 // tuning the internal implementation of TCMalloc. The internal implementation
 // functions use weak linkage, allowing an application to link against the
 // extensions without always linking against TCMalloc.
+//
+// Many of these APIs are also supported when built with sanitizers.
 
 #ifndef TCMALLOC_MALLOC_EXTENSION_H_
 #define TCMALLOC_MALLOC_EXTENSION_H_
 
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <limits>
 #include <map>
 #include <memory>
@@ -32,13 +32,11 @@
 #include <optional>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "absl/base/attributes.h"
-#include "absl/base/macros.h"
-#include "absl/base/policy_checks.h"
-#include "absl/base/port.h"
 #include "absl/functional/function_ref.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "absl/types/optional.h"
@@ -48,7 +46,7 @@
 // 0   - The allocation is rarely accessed.
 // ...
 // 255 - The allocation is accessed very frequently.
-enum class hot_cold_t : uint8_t;
+enum class __hot_cold_t : uint8_t;
 
 // TODO(ckennelly): Lifetimes
 
@@ -56,9 +54,28 @@ namespace tcmalloc {
 
 // Alias to the newer type in the global namespace, so that existing code works
 // as is.
-using ::hot_cold_t;
+using hot_cold_t = __hot_cold_t;
 
 }  // namespace tcmalloc
+
+inline bool AbslParseFlag(absl::string_view text, tcmalloc::hot_cold_t* hotness,
+                          std::string* /* error */) {
+  uint32_t value;
+  if (!absl::SimpleAtoi(text, &value)) {
+    return false;
+  }
+  // hot_cold_t is a uint8_t, so make sure the flag is within the allowable
+  // range before casting.
+  if (value > std::numeric_limits<uint8_t>::max()) {
+    return false;
+  }
+  *hotness = static_cast<tcmalloc::hot_cold_t>(value);
+  return true;
+}
+
+inline std::string AbslUnparseFlag(tcmalloc::hot_cold_t hotness) {
+  return absl::StrCat(hotness);
+}
 
 namespace tcmalloc {
 namespace tcmalloc_internal {
@@ -153,7 +170,10 @@ class Profile final {
     // For the *_matched vars below we use true = "same", false = "different".
     // When the value is unavailable the profile contains "none". For
     // right-censored observations, CPU and thread matched values are "none".
-    std::optional<bool> allocator_deallocator_cpu_matched;
+    std::optional<bool> allocator_deallocator_physical_cpu_matched;
+    std::optional<bool> allocator_deallocator_virtual_cpu_matched;
+    std::optional<bool> allocator_deallocator_l3_matched;
+    std::optional<bool> allocator_deallocator_numa_matched;
     std::optional<bool> allocator_deallocator_thread_matched;
 
     // Provide the status of GWP-ASAN guarding for a given sample.
@@ -188,7 +208,7 @@ class Profile final {
       // Request guard: may still not be guarded for other reasons (see
       //    above)
       Requested = 1,
-      // Require guard: If at all possible, guard this sample to maintain rates.
+      // Unused.
       Required = 2,
       // The result when a sample is actually guarded by GWP-ASAN.
       Guarded = 10,
@@ -239,6 +259,11 @@ class AddressRegionFactory {
     kInfrequent ABSL_DEPRECATED("Use kInfrequentAllocation") =
         kInfrequentAllocation,
     kInfrequentAccess,  // TCMalloc places cold allocations in these regions.
+    // Usage of the below implies numa_aware is enabled. tcmalloc will mbind the
+    // address region to the hinted socket, but also passes the hint in case
+    // mbind is not sufficient (e.g. when dealing with pre-faulted memory).
+    kNormalNumaAwareS0,  // Normal usage intended for NUMA S0 under numa_aware.
+    kNormalNumaAwareS1,  // Normal usage intended for NUMA S1 under numa_aware.
   };
 
   AddressRegionFactory() {}
@@ -335,7 +360,7 @@ class MallocExtension final {
   // -------------------------------------------------------------------
 
   // Gets the named property's value or a nullopt if the property is not valid.
-  static absl::optional<size_t> GetNumericProperty(absl::string_view property);
+  static std::optional<size_t> GetNumericProperty(absl::string_view property);
 
   // Marks the current thread as "idle".  This function may optionally be called
   // by threads as a hint to the malloc implementation that any thread-specific
@@ -393,7 +418,19 @@ class MallocExtension final {
   //   back in.
   static void ReleaseMemoryToSystem(size_t num_bytes);
 
-  struct MemoryLimit {
+  enum class LimitKind { kSoft, kHard };
+
+  // Make a best effort attempt to prevent more than limit bytes of memory
+  // from being allocated by the system. In particular, if satisfying a given
+  // malloc call would require passing this limit, release as much memory to
+  // the OS as needed to stay under it if possible.
+  //
+  // If limit_kind == kHard, crash if returning memory is unable to get below
+  // the limit.
+  static size_t GetMemoryLimit(LimitKind limit_kind);
+  static void SetMemoryLimit(size_t limit, LimitKind limit_kind);
+
+  struct ABSL_DEPRECATED("Use LimitKind instead") MemoryLimit {
     // Make a best effort attempt to prevent more than limit bytes of memory
     // from being allocated by the system. In particular, if satisfying a given
     // malloc call would require passing this limit, release as much memory to
@@ -407,8 +444,21 @@ class MallocExtension final {
     bool hard = false;
   };
 
-  static MemoryLimit GetMemoryLimit();
-  static void SetMemoryLimit(const MemoryLimit& limit);
+  // Deprecated compatibility shim.
+  ABSL_DEPRECATED("Use LimitKind version")
+  static void SetMemoryLimit(const MemoryLimit& limit) {
+    if (limit.hard) {
+      SetMemoryLimit(limit.limit, LimitKind::kHard);
+    } else {
+      // To maintain legacy behavior, remove hard limit before setting the
+      // soft one.
+      SetMemoryLimit(std::numeric_limits<size_t>::max(), LimitKind::kHard);
+      SetMemoryLimit(limit.limit, LimitKind::kSoft);
+    }
+  }
+
+  // Deprecated compatibility shim.
+  ABSL_DEPRECATED("Use LimitKind version") static MemoryLimit GetMemoryLimit();
 
   // Gets the sampling rate.  Returns a value < 0 if unknown.
   static int64_t GetProfileSamplingRate();
@@ -427,10 +477,6 @@ class MallocExtension final {
   // ActivateGuardedSampling).
   static void SetGuardedSamplingRate(int64_t rate);
 
-  // TODO(b/263387812): remove when experimentation is complete
-  static bool GetImprovedGuardedSampling();
-  static void SetImprovedGuardedSampling(bool enable);
-
   // Switches TCMalloc to guard sampled allocations for underflow, overflow, and
   // use-after-free according to the guarded sample parameter value.
   static void ActivateGuardedSampling();
@@ -447,6 +493,15 @@ class MallocExtension final {
   static int64_t GetMaxTotalThreadCacheBytes();
   // Sets the maximum thread cache size.  This is a whole-process limit.
   static void SetMaxTotalThreadCacheBytes(int64_t value);
+
+  // Enables or disables background processes.
+  static bool GetBackgroundProcessActionsEnabled();
+  static void SetBackgroundProcessActionsEnabled(bool value);
+
+  // Gets and sets background process sleep time. This controls the interval
+  // granularity at which the actions are invoked.
+  static absl::Duration GetBackgroundProcessSleepInterval();
+  static void SetBackgroundProcessSleepInterval(absl::Duration value);
 
   // Gets and sets intervals used for finding recent demand peak, short-term
   // demand fluctuation, and long-term demand trend. Zero duration means not
@@ -480,7 +535,7 @@ class MallocExtension final {
   // -- that is, must be exactly the pointer returned to by malloc() et al., not
   // some offset from that -- and should not have been freed yet.  p may be
   // null.
-  static absl::optional<size_t> GetAllocatedSize(const void* p);
+  static std::optional<size_t> GetAllocatedSize(const void* p);
 
   // Returns
   // * kOwned if TCMalloc allocated the memory pointed to by p, or
@@ -606,9 +661,10 @@ extern "C" void sdallocx(void* ptr, size_t size, int flags) noexcept;
 
 namespace tcmalloc {
 
-// Pointer / capacity information as returned by
-// tcmalloc_size_returning_operator_new(). See
-// tcmalloc_size_returning_operator_new() for more information.
+// sized_ptr_t constains pointer / capacity information as returned
+// by `tcmalloc_size_returning_operator_new()`.
+// See `tcmalloc_size_returning_operator_new()` for more information.
+
 struct sized_ptr_t {
   void* p;
   size_t n;
@@ -719,6 +775,42 @@ class ProfileBase {
   // (heap, peakheap, etc.), this returns absl::ZeroDuration().
   virtual absl::Duration Duration() const = 0;
 };
+
+enum class MadvisePreference {
+  kDontNeed = 0x1,
+  kFreeAndDontNeed = 0x3,
+  kFreeOnly = 0x2,
+};
+
+inline bool AbslParseFlag(absl::string_view text, MadvisePreference* preference,
+                          std::string* /* error */) {
+  if (text == "DONTNEED") {
+    *preference = MadvisePreference::kDontNeed;
+    return true;
+  } else if (text == "FREE_AND_DONTNEED") {
+    *preference = MadvisePreference::kFreeAndDontNeed;
+    return true;
+  } else if (text == "FREE_ONLY") {
+    *preference = MadvisePreference::kFreeOnly;
+    return true;
+  } else {
+    return false;
+  }
+}
+
+inline std::string AbslUnparseFlag(MadvisePreference preference) {
+  switch (preference) {
+    case MadvisePreference::kDontNeed:
+      return "DONTNEED";
+    case MadvisePreference::kFreeAndDontNeed:
+      return "FREE_AND_DONTNEED";
+    case MadvisePreference::kFreeOnly:
+      return "FREE_ONLY";
+  }
+
+  ABSL_UNREACHABLE();
+  return "";
+}
 
 }  // namespace tcmalloc_internal
 }  // namespace tcmalloc

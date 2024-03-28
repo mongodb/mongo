@@ -26,33 +26,25 @@
 #include <stdlib.h>
 
 #include <algorithm>
-#include <optional>
 
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/malloc_extension.h"
 
-using std::max;
-using tcmalloc::tcmalloc_internal::Crash;
-using tcmalloc::tcmalloc_internal::kCrash;
-
-const char kCurrent[] = "generic.current_allocated_bytes";
-
 int main() {
+  const char kCurrent[] = "generic.current_allocated_bytes";
   size_t before_bytes =
       *tcmalloc::MallocExtension::GetNumericProperty(kCurrent);
 
   free(malloc(200));
 
   size_t after_bytes = *tcmalloc::MallocExtension::GetNumericProperty(kCurrent);
-  if (before_bytes != after_bytes) {
-    Crash(kCrash, __FILE__, __LINE__, "before != after", before_bytes,
-          after_bytes);
-  }
+  TC_CHECK_EQ(before_bytes, after_bytes);
 
   // Do a lot of different allocs in a lot of different size classes,
   // then free them all, to make sure that the logic is correct.
   void* ptrs[1000];  // how many pointers to allocate in one run
-  for (int size = 1; size < 1000000; size = max(size + 1, size * 2 - 100)) {
+  for (int size = 1; size < 1000000;
+       size = std::max(size + 1, size * 2 - 100)) {
     for (int cycles = 0; cycles < 2; ++cycles) {
       for (int repeat = 0; repeat < sizeof(ptrs) / sizeof(*ptrs); ++repeat) {
         ptrs[repeat] = malloc(size);
@@ -64,10 +56,7 @@ int main() {
   }
 
   after_bytes = *tcmalloc::MallocExtension::GetNumericProperty(kCurrent);
-  if (before_bytes != after_bytes) {
-    Crash(kCrash, __FILE__, __LINE__, "before != after", before_bytes,
-          after_bytes);
-  }
+  TC_CHECK_EQ(before_bytes, after_bytes);
 
   printf("PASS\n");
   return 0;

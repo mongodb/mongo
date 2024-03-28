@@ -322,7 +322,7 @@ TEST(StackTraceTableTest, StackTraceTable) {
   }
 
   // Same stack as t1, but w/ different alignment
-  StackTrace t4;
+  StackTrace t4 = {};
   t4.requested_size = static_cast<uintptr_t>(512);
   t4.requested_alignment = static_cast<uintptr_t>(32);
   t4.allocated_size = static_cast<uintptr_t>(1024);
@@ -358,7 +358,7 @@ TEST(StackTraceTableTest, StackTraceTable) {
   }
 
   // Same stack as t1, but w/ different hint
-  StackTrace t5;
+  StackTrace t5 = {};
   t5.requested_size = static_cast<uintptr_t>(512);
   t5.requested_alignment = static_cast<uintptr_t>(32);
   t5.allocated_size = static_cast<uintptr_t>(1024);

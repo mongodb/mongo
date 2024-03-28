@@ -15,13 +15,14 @@
 #ifndef TCMALLOC_MOCK_STATIC_FORWARDER_H_
 #define TCMALLOC_MOCK_STATIC_FORWARDER_H_
 
+#include <cstddef>
+#include <cstdint>
 #include <map>
 #include <new>
 
 #include "gmock/gmock.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/types/span.h"
-#include "tcmalloc/mock_transfer_cache.h"
 #include "tcmalloc/pages.h"
 #include "tcmalloc/span.h"
 
@@ -30,8 +31,26 @@ namespace tcmalloc_internal {
 
 class FakeStaticForwarder {
  public:
-  static constexpr size_t class_to_size(int size_class) { return kClassSize; }
-  static constexpr Length class_to_pages(int size_class) { return Length(1); }
+  FakeStaticForwarder() : class_size_(0), pages_() {}
+  void Init(size_t class_size, size_t pages, size_t num_objects_to_move,
+            bool use_large_spans) {
+    class_size_ = class_size;
+    pages_ = Length(pages);
+    num_objects_to_move_ = num_objects_to_move;
+    use_large_spans_ = use_large_spans;
+  }
+  size_t class_to_size(int size_class) const { return class_size_; }
+  Length class_to_pages(int size_class) const { return pages_; }
+  size_t num_objects_to_move() const { return num_objects_to_move_; }
+  uint32_t max_span_cache_size() const {
+    return use_large_spans_ ? Span::kLargeCacheSize : Span::kCacheSize;
+  }
+
+  void MapObjectsToSpans(absl::Span<void*> batch, Span** spans) {
+    for (size_t i = 0; i < batch.size(); ++i) {
+      spans[i] = MapObjectToSpan(batch[i]);
+    }
+  }
 
   Span* MapObjectToSpan(const void* object) {
     const PageId page = PageIdContaining(object);
@@ -49,75 +68,111 @@ class FakeStaticForwarder {
     return nullptr;
   }
 
-  Span* AllocateSpan(int, size_t objects_per_span, Length pages_per_span) {
+  Span* AllocateSpan(int, SpanAllocInfo span_alloc_info,
+                     Length pages_per_span) {
     void* backing =
         ::operator new(pages_per_span.in_bytes(), std::align_val_t(kPageSize));
     PageId page = PageIdContaining(backing);
 
-    auto* span = new Span();
+    void* span_buf = ::operator new(Span::CalcSizeOf(max_span_cache_size()),
+                                    Span::CalcAlignOf(max_span_cache_size()));
+
+    auto* span = new (span_buf) Span();
     span->Init(page, pages_per_span);
 
     absl::MutexLock l(&mu_);
     SpanInfo info;
     info.span = span;
-    info.objects_per_span = objects_per_span;
+    info.span_alloc_info = span_alloc_info;
     map_.emplace(page, info);
     return span;
   }
 
-  void DeallocateSpans(int, size_t objects_per_span,
-                       absl::Span<Span*> free_spans) {
+  void DeallocateSpans(int, size_t, absl::Span<Span*> free_spans) {
     {
       absl::MutexLock l(&mu_);
       for (Span* span : free_spans) {
         auto it = map_.find(span->first_page());
         EXPECT_NE(it, map_.end());
-        EXPECT_EQ(it->second.objects_per_span, objects_per_span);
         map_.erase(it);
       }
     }
 
+    const std::align_val_t span_alignment =
+        Span::CalcAlignOf(max_span_cache_size());
+
     for (Span* span : free_spans) {
       ::operator delete(span->start_address(), std::align_val_t(kPageSize));
-      delete span;
+
+      span->~Span();
+      ::operator delete(span, span_alignment);
     }
   }
 
  private:
   struct SpanInfo {
     Span* span;
-    size_t objects_per_span;
+    SpanAllocInfo span_alloc_info;
   };
 
   absl::Mutex mu_;
   std::map<PageId, SpanInfo> map_ ABSL_GUARDED_BY(mu_);
+  size_t class_size_;
+  Length pages_;
+  size_t num_objects_to_move_;
+  bool use_large_spans_;
 };
 
 class RawMockStaticForwarder : public FakeStaticForwarder {
  public:
   RawMockStaticForwarder() {
-    ON_CALL(*this, MapObjectToSpan).WillByDefault([this](const void* object) {
-      return static_cast<FakeStaticForwarder*>(this)->MapObjectToSpan(object);
+    ON_CALL(*this, class_to_size).WillByDefault([this](int size_class) {
+      return FakeStaticForwarder::class_to_size(size_class);
     });
+    ON_CALL(*this, class_to_pages).WillByDefault([this](int size_class) {
+      return FakeStaticForwarder::class_to_pages(size_class);
+    });
+    ON_CALL(*this, num_objects_to_move).WillByDefault([this]() {
+      return FakeStaticForwarder::num_objects_to_move();
+    });
+    ON_CALL(*this, Init)
+        .WillByDefault([this](size_t size_class, size_t pages,
+                              size_t num_objects_to_move,
+                              bool use_large_spans) {
+          FakeStaticForwarder::Init(size_class, pages, num_objects_to_move,
+                                    use_large_spans);
+        });
+
+    ON_CALL(*this, MapObjectsToSpans)
+        .WillByDefault([this](absl::Span<void*> batch, Span** spans) {
+          return FakeStaticForwarder::MapObjectsToSpans(batch, spans);
+        });
     ON_CALL(*this, AllocateSpan)
-        .WillByDefault([this](int size_class, size_t objects_per_span,
+        .WillByDefault([this](int size_class, SpanAllocInfo span_alloc_info,
                               Length pages_per_span) {
-          return static_cast<FakeStaticForwarder*>(this)->AllocateSpan(
-              size_class, objects_per_span, pages_per_span);
+          return FakeStaticForwarder::AllocateSpan(size_class, span_alloc_info,
+                                                   pages_per_span);
         });
     ON_CALL(*this, DeallocateSpans)
         .WillByDefault([this](int size_class, size_t objects_per_span,
                               absl::Span<Span*> free_spans) {
-          static_cast<FakeStaticForwarder*>(this)->DeallocateSpans(
-              size_class, objects_per_span, free_spans);
+          FakeStaticForwarder::DeallocateSpans(size_class, objects_per_span,
+                                               free_spans);
         });
   }
 
-  MOCK_METHOD(Span*, MapObjectToSpan, (const void* object));
+  MOCK_METHOD(size_t, class_to_size, (int size_class));
+  MOCK_METHOD(Length, class_to_pages, (int size_class));
+  MOCK_METHOD(size_t, num_objects_to_move, ());
+  MOCK_METHOD(void, Init,
+              (size_t class_size, size_t pages, size_t num_objects_to_move,
+               bool use_large_spans));
+  MOCK_METHOD(void, MapObjectsToSpans, (absl::Span<void*> batch, Span** spans));
   MOCK_METHOD(Span*, AllocateSpan,
-              (int size_class, size_t objects_per_span, Length pages_per_span));
+              (int size_class, SpanAllocInfo span_alloc_info,
+               Length pages_per_span));
   MOCK_METHOD(void, DeallocateSpans,
-              (int size_class, size_t objects_per_span,
+              (int size_class, size_t object_per_span,
                absl::Span<Span*> free_spans));
 };
 
@@ -137,12 +192,23 @@ class FakeCentralFreeListEnvironment {
   using Forwarder = typename CentralFreeListT::Forwarder;
 
   static constexpr int kSizeClass = 1;
-  static constexpr size_t kBatchSize = kMaxObjectsToMove;
-  static constexpr size_t kObjectsPerSpan =
-      Forwarder::class_to_pages(kSizeClass).in_bytes() /
-      Forwarder::class_to_size(kSizeClass);
+  bool use_all_buckets_for_few_object_spans() const {
+    return use_all_buckets_for_few_object_spans_;
+  }
+  size_t objects_per_span() {
+    return forwarder().class_to_pages(kSizeClass).in_bytes() /
+           forwarder().class_to_size(kSizeClass);
+  }
+  size_t batch_size() { return forwarder().num_objects_to_move(); }
 
-  FakeCentralFreeListEnvironment() { cache_.Init(kSizeClass); }
+  explicit FakeCentralFreeListEnvironment(
+      size_t class_size, size_t pages, size_t num_objects_to_move,
+      bool use_all_buckets_for_few_object_spans, bool use_large_spans)
+      : use_all_buckets_for_few_object_spans_(
+            use_all_buckets_for_few_object_spans) {
+    forwarder().Init(class_size, pages, num_objects_to_move, use_large_spans);
+    cache_.Init(kSizeClass, use_all_buckets_for_few_object_spans);
+  }
 
   ~FakeCentralFreeListEnvironment() { EXPECT_EQ(cache_.length(), 0); }
 
@@ -151,6 +217,7 @@ class FakeCentralFreeListEnvironment {
   Forwarder& forwarder() { return cache_.forwarder(); }
 
  private:
+  const bool use_all_buckets_for_few_object_spans_;
   CentralFreeList cache_;
 };
 

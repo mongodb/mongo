@@ -15,13 +15,15 @@
 #ifndef TCMALLOC_GLOBAL_STATS_H_
 #define TCMALLOC_GLOBAL_STATS_H_
 
+#include <cstddef>
 #include <cstdint>
 
+#include "tcmalloc/arena.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/page_allocator.h"
-#include "tcmalloc/span_stats.h"
+#include "tcmalloc/page_heap_allocator.h"
 #include "tcmalloc/stats.h"
-#include "tcmalloc/transfer_cache_stats.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -51,11 +53,6 @@ struct TCMallocStats {
   // Explicitly declare the ctor to put it in the google_malloc section.
   TCMallocStats() = default;
 };
-
-void ExtractStats(TCMallocStats* r, uint64_t* class_count,
-                  SpanStats* span_stats, SmallSpanStats* small_spans,
-                  LargeSpanStats* large_spans, TransferCacheStats* tc_stats,
-                  bool report_residence);
 
 void ExtractTCMallocStats(TCMallocStats* r, bool report_residence);
 

@@ -40,14 +40,14 @@ int64_t MemoryUsageSlow(pid_t pid) {
 
   FILE* f =
       fopen(absl::StrCat("/proc/", pid, "/task/", pid, "/smaps").c_str(), "r");
-  CHECK_CONDITION(f != nullptr);
+  TC_CHECK_NE(f, nullptr);
 
   char buf[BUFSIZ];
   while (fgets(buf, sizeof(buf), f) != nullptr) {
     size_t rss;
     if (sscanf(buf, "Rss: %zu kB", &rss) == 1) ret += rss;
   }
-  CHECK_CONDITION(feof(f));
+  TC_CHECK(feof(f));
   fclose(f);
 
   // Rss is reported in KiB
@@ -56,7 +56,7 @@ int64_t MemoryUsageSlow(pid_t pid) {
   // A sanity check: our return value should be in the same ballpark as
   // GetMemoryStats.
   tcmalloc::tcmalloc_internal::MemoryStats stats;
-  CHECK_CONDITION(tcmalloc::tcmalloc_internal::GetMemoryStats(&stats));
+  TC_CHECK(tcmalloc::tcmalloc_internal::GetMemoryStats(&stats));
   EXPECT_GE(ret, 0.9 * stats.rss);
   EXPECT_LE(ret, 1.1 * stats.rss);
 

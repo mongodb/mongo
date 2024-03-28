@@ -67,7 +67,7 @@ TEST(AllocationSample, Threaded) {
     ret = std::move(global.samplers.back());
     global.samplers.pop_back();
 
-    CHECK_CONDITION(ret != nullptr);
+    TC_CHECK_NE(ret.get(), nullptr);
     return ret;
   };
 
@@ -109,7 +109,7 @@ TEST(AllocationSample, Threaded) {
         // StackTraceTable uses a global allocator, rather than one that is
         // injected.  Consult the global state to see how many allocations are
         // active.
-        absl::base_internal::SpinLockHolder h(&pageheap_lock);
+        PageHeapSpinLockHolder l;
         allocations = tc_globals.linked_sample_allocator().stats().in_use;
       }
       if (allocations >= kMaxAllocations) {

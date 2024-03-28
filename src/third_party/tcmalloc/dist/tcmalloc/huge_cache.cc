@@ -15,13 +15,18 @@
 #include "tcmalloc/huge_cache.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <tuple>
 
+#include "absl/base/optimization.h"
 #include "absl/time/time.h"
-#include "tcmalloc/common.h"
 #include "tcmalloc/huge_address_map.h"
 #include "tcmalloc/huge_pages.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
+#include "tcmalloc/pages.h"
 #include "tcmalloc/stats.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -184,7 +189,7 @@ void HugeCache::DecUsage(HugeLength n) {
   usage_tracker_.Report(usage_);
   detailed_tracker_.Report(usage_);
   const HugeLength max = usage_tracker_.MaxOverTime(kCacheTime);
-  ASSERT(max >= usage_);
+  TC_ASSERT_GE(max, usage_);
   const HugeLength off_peak = max - usage_;
   off_peak_tracker_.Report(off_peak);
 }
@@ -262,7 +267,7 @@ HugeLength HugeCache::ShrinkCache(HugeLength target) {
   while (size_ > target) {
     // Remove smallest-ish nodes, to avoid fragmentation where possible.
     auto* node = Find(NHugePages(1));
-    CHECK_CONDITION(node);
+    TC_CHECK_NE(node, nullptr);
     HugeRange r = node->range();
     cache_.Remove(node);
     // Suppose we're 10 MiB over target but the smallest available node
@@ -274,7 +279,7 @@ HugeLength HugeCache::ShrinkCache(HugeLength target) {
     if (r.len() > delta) {
       HugeRange to_remove, leftover;
       std::tie(to_remove, leftover) = Split(r, delta);
-      ASSERT(leftover.valid());
+      TC_ASSERT(leftover.valid());
       cache_.Insert(leftover);
       r = to_remove;
     }
@@ -311,8 +316,8 @@ HugeLength HugeCache::ReleaseCachedPages(HugeLength n) {
   return released;
 }
 
-void HugeCache::AddSpanStats(SmallSpanStats* small, LargeSpanStats* large,
-                             PageAgeHistograms* ages) const {
+void HugeCache::AddSpanStats(SmallSpanStats* small,
+                             LargeSpanStats* large) const {
   static_assert(kPagesPerHugePage >= kMaxPages);
   for (const HugeAddressMap::Node* node = cache_.first(); node != nullptr;
        node = node->next()) {
@@ -320,10 +325,6 @@ void HugeCache::AddSpanStats(SmallSpanStats* small, LargeSpanStats* large,
     if (large != nullptr) {
       large->spans++;
       large->normal_pages += n.in_pages();
-    }
-
-    if (ages != nullptr) {
-      ages->RecordRange(n.in_pages(), false, node->when());
     }
   }
 }

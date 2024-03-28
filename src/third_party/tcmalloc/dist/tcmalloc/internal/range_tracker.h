@@ -20,11 +20,11 @@
 #include <sys/types.h>
 
 #include <algorithm>
-#include <climits>
 #include <limits>
 #include <type_traits>
 
 #include "absl/numeric/bits.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/optimization.h"
 
@@ -193,7 +193,7 @@ inline size_t RangeTracker<N>::allocs() const {
 
 template <size_t N>
 inline size_t RangeTracker<N>::FindAndMark(size_t n) {
-  ASSERT(n > 0);
+  TC_ASSERT_GT(n, 0);
 
   // We keep the two longest ranges in the bitmap since we might allocate
   // from one.
@@ -223,7 +223,7 @@ inline size_t RangeTracker<N>::FindAndMark(size_t n) {
     index += len;
   }
 
-  CHECK_CONDITION(best_index < N);
+  TC_CHECK_LT(best_index, N);
   bits_.SetRange(best_index, n);
 
   if (best_len == longest_len) {
@@ -241,7 +241,7 @@ inline size_t RangeTracker<N>::FindAndMark(size_t n) {
 // Unmarks it.
 template <size_t N>
 inline void RangeTracker<N>::Unmark(size_t index, size_t n) {
-  ASSERT(bits_.FindClear(index) >= index + n);
+  TC_ASSERT(bits_.FindClear(index) >= index + n);
   bits_.ClearRange(index, n);
   nused_ -= n;
   nallocs_--;
@@ -274,12 +274,12 @@ inline void RangeTracker<N>::Clear() {
 // Count the set bits [from, to) in the i-th word to Value.
 template <size_t N>
 inline size_t Bitmap<N>::CountWordBits(size_t i, size_t from, size_t to) const {
-  ASSERT(from < kWordSize);
-  ASSERT(to <= kWordSize);
+  TC_ASSERT_LT(from, kWordSize);
+  TC_ASSERT_LE(to, kWordSize);
   const size_t all_ones = ~static_cast<size_t>(0);
   // how many bits are we setting?
   const size_t n = to - from;
-  ASSERT(0 < n && n <= kWordSize);
+  TC_ASSERT(0 < n && n <= kWordSize);
   const size_t mask = (all_ones >> (kWordSize - n)) << from;
 
   ASSUME(i < kWords);
@@ -290,12 +290,12 @@ inline size_t Bitmap<N>::CountWordBits(size_t i, size_t from, size_t to) const {
 template <size_t N>
 template <bool Value>
 inline void Bitmap<N>::SetWordBits(size_t i, size_t from, size_t to) {
-  ASSERT(from < kWordSize);
-  ASSERT(to <= kWordSize);
+  TC_ASSERT_LT(from, kWordSize);
+  TC_ASSERT_LE(to, kWordSize);
   const size_t all_ones = ~static_cast<size_t>(0);
   // how many bits are we setting?
   const size_t n = to - from;
-  ASSERT(n > 0 && n <= kWordSize);
+  TC_ASSERT(n > 0 && n <= kWordSize);
   const size_t mask = (all_ones >> (kWordSize - n)) << from;
   ASSUME(i < kWords);
   if (Value) {
@@ -307,7 +307,7 @@ inline void Bitmap<N>::SetWordBits(size_t i, size_t from, size_t to) {
 
 template <size_t N>
 inline bool Bitmap<N>::GetBit(size_t i) const {
-  ASSERT(i < N);
+  TC_ASSERT_LT(i, N);
   size_t word = i / kWordSize;
   size_t offset = i % kWordSize;
   ASSUME(word < kWords);
@@ -316,7 +316,7 @@ inline bool Bitmap<N>::GetBit(size_t i) const {
 
 template <size_t N>
 inline void Bitmap<N>::SetBit(size_t i) {
-  ASSERT(i < N);
+  TC_ASSERT_LT(i, N);
   size_t word = i / kWordSize;
   size_t offset = i % kWordSize;
   ASSUME(word < kWords);
@@ -325,7 +325,7 @@ inline void Bitmap<N>::SetBit(size_t i) {
 
 template <size_t N>
 inline void Bitmap<N>::ClearBit(size_t i) {
-  ASSERT(i < N);
+  TC_ASSERT_LT(i, N);
   size_t word = i / kWordSize;
   size_t offset = i % kWordSize;
   ASSUME(word < kWords);
@@ -388,7 +388,7 @@ inline void Bitmap<N>::ClearLowestBit() {
 template <size_t N>
 template <bool Value>
 inline void Bitmap<N>::SetRangeValue(size_t index, size_t n) {
-  ASSERT(index + n <= N);
+  TC_ASSERT_LE(index + n, N);
   size_t word = index / kWordSize;
   size_t offset = index % kWordSize;
   size_t k = offset + n;
@@ -446,7 +446,7 @@ inline void Bitmap<N>::Clear() {
 template <size_t N>
 template <bool Goal>
 inline size_t Bitmap<N>::FindValue(size_t index) const {
-  ASSERT(index < N);
+  TC_ASSERT_LT(index, N);
   size_t offset = index % kWordSize;
   size_t word = index / kWordSize;
   ASSUME(word < kWords);
@@ -475,7 +475,7 @@ inline size_t Bitmap<N>::FindValue(size_t index) const {
 template <size_t N>
 template <bool Goal>
 inline ssize_t Bitmap<N>::FindValueBackwards(size_t index) const {
-  ASSERT(index < N);
+  TC_ASSERT_LT(index, N);
   size_t offset = index % kWordSize;
   ssize_t word = index / kWordSize;
   ASSUME(word < kWords);

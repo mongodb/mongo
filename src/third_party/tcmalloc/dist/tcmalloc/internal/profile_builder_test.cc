@@ -22,14 +22,12 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include <climits>
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <optional>
 #include <string>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -370,13 +368,50 @@ perftools::profiles::Profile MakeTestProfile(const absl::Duration duration,
     sample.access_allocated = Profile::Sample::Access::Hot;
   }
 
+  {  // We have three samples here that will be merged (if guarded_status is not
+     // considered). The second and third samples have different
+     // guarded_status-es.
+    Profile::Sample sample;
+
+    sample.sum = 1235;
+    sample.count = 2;
+    sample.requested_size = 2;
+    sample.requested_alignment = 4;
+    sample.requested_size_returning = true;
+    sample.allocated_size = 16;
+
+    std::vector<char> bytes(sample.allocated_size);
+    sample.span_start_address = bytes.data();
+
+    // This stack is mostly artificial, but we include a real symbol from the
+    // binary to confirm that at least one location was indexed into its
+    // mapping.
+    sample.depth = 5;
+    sample.stack[0] = absl::bit_cast<void*>(uintptr_t{0x12345});
+    sample.stack[1] = absl::bit_cast<void*>(uintptr_t{0x23451});
+    sample.stack[2] = absl::bit_cast<void*>(uintptr_t{0x34512});
+    sample.stack[3] = absl::bit_cast<void*>(uintptr_t{0x45123});
+    sample.stack[4] = reinterpret_cast<void*>(&ProfileAccessor::MakeProfile);
+    sample.access_hint = hot_cold_t{253};
+    sample.access_allocated = Profile::Sample::Access::Cold;
+    sample.guarded_status = Profile::Sample::GuardedStatus::RateLimited;
+    samples.push_back(sample);
+
+    Profile::Sample sample2 = sample;
+    sample2.guarded_status = Profile::Sample::GuardedStatus::Filtered;
+    samples.push_back(sample2);
+
+    Profile::Sample sample3 = sample;
+    sample3.guarded_status = Profile::Sample::GuardedStatus::Guarded;
+    samples.push_back(sample3);
+  }
   auto fake_profile = std::make_unique<FakeProfile>();
   fake_profile->SetType(profile_type);
   fake_profile->SetDuration(duration);
   fake_profile->SetSamples(std::move(samples));
   Profile profile = ProfileAccessor::MakeProfile(std::move(fake_profile));
   auto converted_or = MakeProfileProto(profile);
-  CHECK(converted_or.ok());
+  CHECK_OK(converted_or.status());
   return **converted_or;
 }
 
@@ -440,11 +475,12 @@ TEST(ProfileConverterTest, HeapProfile) {
   // Require that the default_sample_type appeared in sample_type.
   EXPECT_THAT(sample_types, testing::Contains(converted.default_sample_type()));
 
-  EXPECT_THAT(
-      extracted_sample_type,
-      UnorderedElementsAre(Pair("objects", "count"), Pair("space", "bytes"),
-                           Pair("resident_space", "bytes"),
-                           Pair("swapped_space", "bytes")));
+  EXPECT_THAT(extracted_sample_type,
+              UnorderedElementsAre(
+                  Pair("objects", "count"), Pair("space", "bytes"),
+                  Pair("resident_space", "bytes"),
+                  Pair("stale_space", "bytes"), Pair("locked_space", "bytes"),
+                  Pair("swapped_space", "bytes")));
 
   SampleLabels extracted;
   {
@@ -490,7 +526,22 @@ TEST(ProfileConverterTest, HeapProfile) {
               Pair("bytes", 16), Pair("request", 16),
               Pair("sampled_resident_bytes", 0), Pair("swapped_bytes", 0),
               Pair("access_hint", 0), Pair("access_allocated", "hot"),
-              Pair("size_returning", 1), Pair("guarded_status", "Unknown"))));
+              Pair("size_returning", 1), Pair("guarded_status", "Unknown")),
+          UnorderedElementsAre(
+              Pair("bytes", 16), Pair("request", 2), Pair("alignment", 4),
+              Pair("sampled_resident_bytes", 32), Pair("swapped_bytes", 0),
+              Pair("access_hint", 253), Pair("access_allocated", "cold"),
+              Pair("size_returning", 1), Pair("guarded_status", "RateLimited")),
+          UnorderedElementsAre(
+              Pair("bytes", 16), Pair("request", 2), Pair("alignment", 4),
+              Pair("sampled_resident_bytes", 32), Pair("swapped_bytes", 0),
+              Pair("access_hint", 253), Pair("access_allocated", "cold"),
+              Pair("size_returning", 1), Pair("guarded_status", "Filtered")),
+          UnorderedElementsAre(
+              Pair("bytes", 16), Pair("request", 2), Pair("alignment", 4),
+              Pair("sampled_resident_bytes", 32), Pair("swapped_bytes", 0),
+              Pair("access_hint", 253), Pair("access_allocated", "cold"),
+              Pair("size_returning", 1), Pair("guarded_status", "Guarded"))));
 
   ASSERT_GE(converted.sample().size(), 3);
   // The addresses for the samples at stack[0], stack[1] should match.
@@ -618,7 +669,10 @@ TEST(ProfileBuilderTest, LifetimeProfile) {
         .stddev_lifetime = absl::Nanoseconds(22),
         .min_lifetime = absl::Nanoseconds(55),
         .max_lifetime = absl::Nanoseconds(99),
-        .allocator_deallocator_cpu_matched = true,
+        .allocator_deallocator_physical_cpu_matched = true,
+        .allocator_deallocator_virtual_cpu_matched = true,
+        .allocator_deallocator_l3_matched = true,
+        .allocator_deallocator_numa_matched = true,
         .allocator_deallocator_thread_matched = false,
     };
     // This stack is mostly artificial, but we include a couple of real symbols
@@ -646,7 +700,10 @@ TEST(ProfileBuilderTest, LifetimeProfile) {
     censored_alloc1.is_censored = true;
     // The *_matched fields are unset for censored allocations since we did not
     // observe the deallocation.
-    censored_alloc1.allocator_deallocator_cpu_matched = std::nullopt;
+    censored_alloc1.allocator_deallocator_physical_cpu_matched = std::nullopt;
+    censored_alloc1.allocator_deallocator_virtual_cpu_matched = std::nullopt;
+    censored_alloc1.allocator_deallocator_l3_matched = std::nullopt;
+    censored_alloc1.allocator_deallocator_numa_matched = std::nullopt;
     censored_alloc1.allocator_deallocator_thread_matched = std::nullopt;
     censored_alloc1.profile_id++;
     samples.push_back(censored_alloc1);
@@ -712,20 +769,26 @@ TEST(ProfileBuilderTest, LifetimeProfile) {
               Pair("callstack-pair-id", 33), Pair("avg_lifetime", 77),
               Pair("stddev_lifetime", 22), Pair("min_lifetime", 55),
               Pair("max_lifetime", 99),
-              Pair("active CPU", "same"), Pair("active thread", "different")),
+              Pair("active CPU", "same"), Pair("active vCPU", "same"),
+              Pair("active L3", "same"), Pair("active NUMA", "same"),
+              Pair("active thread", "different")),
           UnorderedElementsAre(
               Pair("bytes", 16), Pair("request", 2), Pair("alignment", 4),
               Pair("callstack-pair-id", 33), Pair("avg_lifetime", 77),
               Pair("stddev_lifetime", 22), Pair("min_lifetime", 55),
               Pair("max_lifetime", 99),
-              Pair("active CPU", "same"), Pair("active thread", "different")),
+              Pair("active CPU", "same"), Pair("active vCPU", "same"),
+              Pair("active L3", "same"), Pair("active NUMA", "same"),
+              Pair("active thread", "different")),
           // Check the contents of the censored sample.
           UnorderedElementsAre(
               Pair("bytes", 16), Pair("request", 2), Pair("alignment", 4),
               Pair("callstack-pair-id", 34), Pair("avg_lifetime", 77),
               Pair("stddev_lifetime", 22), Pair("min_lifetime", 55),
               Pair("max_lifetime", 99),
-              Pair("active CPU", "none"), Pair("active thread", "none"))));
+              Pair("active CPU", "none"), Pair("active vCPU", "none"),
+              Pair("active L3", "none"), Pair("active NUMA", "none"),
+              Pair("active thread", "none"))));
 
   // Checks for common fields.
   EXPECT_THAT(converted.string_table(converted.drop_frames()),
@@ -770,7 +833,44 @@ TEST(BuildId, CorruptImage_b180635896) {
       reinterpret_cast<ElfW(Phdr)*>(info.dlpi_addr + ehdr->e_phoff);
   info.dlpi_phnum = ehdr->e_phnum;
 
-  EXPECT_EQ(GetBuildId(&info), "eef53a1c14b9bb601e82514621e51dc58145f1ab");
+  EXPECT_EQ(GetBuildId(&info), "");
+  munmap(p, 4096);
+}
+
+// There are two PT_NOTE segments, one with .note.gnu.property and the other
+// with .note.gnu.build-id. Test that we correctly skip .note.gnu.property.
+//
+// .note.gnu.property intentionally contains two NT_GNU_PROPERTY_TYPE_0 notes
+// to simulate outputs from old linkers (no NT_GNU_PROPERTY_TYPE_0 merging).
+// Test that we correctly parse and skip the notes.
+TEST(BuildId, GnuProperty) {
+  std::string image_path;
+  const char* srcdir = thread_safe_getenv("TEST_SRCDIR");
+  if (srcdir) {
+    absl::StrAppend(&image_path, srcdir, "/");
+  }
+  const char* workspace = thread_safe_getenv("TEST_WORKSPACE");
+  if (workspace) {
+    absl::StrAppend(&image_path, workspace, "/");
+  }
+  absl::StrAppend(&image_path,
+                  "tcmalloc/internal/testdata/gnu-property.so");
+
+  int fd = open(image_path.c_str(), O_RDONLY);
+  ASSERT_TRUE(fd != -1) << "open: " << errno << " " << image_path;
+  void* p = mmap(nullptr, /*size*/ 4096, PROT_READ, MAP_PRIVATE, fd, /*off*/ 0);
+  ASSERT_TRUE(p != MAP_FAILED) << "mmap: " << errno;
+  close(fd);
+
+  const ElfW(Ehdr)* const ehdr = reinterpret_cast<ElfW(Ehdr)*>(p);
+  dl_phdr_info info = {};
+  info.dlpi_name = image_path.c_str();
+  info.dlpi_addr = reinterpret_cast<ElfW(Addr)>(p);
+  info.dlpi_phdr =
+      reinterpret_cast<ElfW(Phdr)*>(info.dlpi_addr + ehdr->e_phoff);
+  info.dlpi_phnum = ehdr->e_phnum;
+
+  EXPECT_EQ(GetBuildId(&info), "1f2a67344247b1cb91260e53c03817f9");
   munmap(p, 4096);
 }
 

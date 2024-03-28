@@ -200,6 +200,8 @@ message Line {
   uint64 function_id = 1;
   // Line number in source code.
   int64 line = 2;
+  // Column number in source code.
+  int64 column = 3;
 }
 
 message Function {

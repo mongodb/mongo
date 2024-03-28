@@ -18,11 +18,13 @@
 #include <stddef.h>
 
 #include <new>
-#include <string>
 
 #include "gtest/gtest.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/linked_list.h"
+#include "tcmalloc/malloc_extension.h"
 #include "tcmalloc/testing/testutil.h"
 
 namespace tcmalloc {
@@ -30,11 +32,17 @@ namespace {
 
 class OutOfMemoryTest : public ::testing::Test {
  public:
-  OutOfMemoryTest() { SetTestResourceLimit(); }
+  static const size_t kGiB = 1024 * 1024 * 1024;
+  OutOfMemoryTest() {
+    MallocExtension::SetBackgroundProcessActionsEnabled(false);
+    // If memory releaser thread is doing anything at the moment, let it finish.
+    absl::SleepFor(absl::Seconds(1));
+  }
 };
 
 TEST_F(OutOfMemoryTest, TestUntilFailure) {
   ScopedNeverSample never_sample;
+  ScopedResourceLimit limit{6 * kGiB};
 
   // Check that large allocations fail with NULL instead of crashing.
   static const size_t kIncrement = 100 << 20;
@@ -52,6 +60,7 @@ TEST_F(OutOfMemoryTest, TestUntilFailure) {
 
 TEST_F(OutOfMemoryTest, SmallAllocs) {
   ScopedNeverSample never_sample;
+  ScopedResourceLimit limit{6 * kGiB};
 
   // Check that large allocations fail with NULL instead of crashing.
   static constexpr size_t kSize = tcmalloc_internal::kHugePageSize / 2 - 1;

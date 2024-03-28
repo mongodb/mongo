@@ -15,8 +15,14 @@
 #include "tcmalloc/allocation_sample.h"
 
 #include <memory>
+#include <utility>
 
 #include "absl/time/clock.h"
+#include "absl/time/time.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal_malloc_extension.h"
+#include "tcmalloc/malloc_extension.h"
+#include "tcmalloc/stack_trace_table.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc::tcmalloc_internal {

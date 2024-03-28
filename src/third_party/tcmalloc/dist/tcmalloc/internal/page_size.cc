@@ -16,18 +16,27 @@
 
 #include <unistd.h>
 
+#include <cstddef>
+
+#include "absl/base/attributes.h"
+#include "absl/base/call_once.h"
+#include "tcmalloc/internal/config.h"
+
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
 namespace tcmalloc_internal {
 
 size_t GetPageSize() {
-  static const size_t page_size = []() -> size_t {
+  ABSL_CONST_INIT static size_t page_size;
+  ABSL_CONST_INIT static absl::once_flag flag;
+
+  absl::base_internal::LowLevelCallOnce(&flag, [&]() {
 #if defined(__wasm__) || defined(__asmjs__)
-    return static_cast<size_t>(getpagesize());
+    page_size = static_cast<size_t>(getpagesize());
 #else
-    return static_cast<size_t>(sysconf(_SC_PAGESIZE));
+      page_size = static_cast<size_t>(sysconf(_SC_PAGESIZE));
 #endif
-  }();
+  });
   return page_size;
 }
 

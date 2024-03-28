@@ -20,19 +20,29 @@
 #include "tcmalloc/experiment.h"
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* d, size_t size) {
+  if (size == 0) {
+    return 0;
+  }
   const char* data = reinterpret_cast<const char*>(d);
 
   bool buffer[tcmalloc::tcmalloc_internal::kNumExperiments];
-  absl::string_view active, disabled;
+  absl::string_view test_target, active, disabled;
+  bool unset = false;
 
-  const char* split = static_cast<const char*>(memchr(data, ';', size));
-  if (split == nullptr) {
-    active = absl::string_view(data, size);
+  if (size != 0 && data[--size] == 0) {
+    test_target = absl::string_view(data, size);
+    unset = true;
   } else {
-    active = absl::string_view(data, split - data);
-    disabled = absl::string_view(split + 1, size - (split - data + 1));
+    const char* split = static_cast<const char*>(memchr(data, ';', size));
+    if (split == nullptr) {
+      active = absl::string_view(data, size);
+    } else {
+      active = absl::string_view(data, split - data);
+      disabled = absl::string_view(split + 1, size - (split - data + 1));
+    }
   }
 
-  tcmalloc::tcmalloc_internal::SelectExperiments(buffer, active, disabled);
+  tcmalloc::tcmalloc_internal::SelectExperiments(buffer, test_target, active,
+                                                 disabled, unset);
   return 0;
 }

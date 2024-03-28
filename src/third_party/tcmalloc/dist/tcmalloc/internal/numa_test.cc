@@ -39,6 +39,7 @@
 #include "absl/types/span.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/percpu.h"
+#include "tcmalloc/internal/sysinfo.h"
 
 namespace tcmalloc {
 namespace tcmalloc_internal {
@@ -58,12 +59,11 @@ class SyntheticCpuList {
  public:
   explicit SyntheticCpuList(const absl::string_view content) {
     fd_ = memfd_create("cpulist", MFD_CLOEXEC);
-    CHECK_CONDITION(fd_ != -1);
+    TC_CHECK_NE(fd_, -1);
 
-    CHECK_CONDITION(write(fd_, content.data(), content.size()) ==
-                    content.size());
-    CHECK_CONDITION(write(fd_, "\n", 1) == 1);
-    CHECK_CONDITION(lseek(fd_, 0, SEEK_SET) == 0);
+    TC_CHECK_EQ(write(fd_, content.data(), content.size()), content.size());
+    TC_CHECK_EQ(write(fd_, "\n", 1), 1);
+    TC_CHECK_EQ(lseek(fd_, 0, SEEK_SET), 0);
   }
 
   ~SyntheticCpuList() { close(fd_); }
@@ -107,10 +107,10 @@ class NumaTopologyTest : public ::testing::Test {
   }
 };
 
-template <size_t NumPartitions>
-NumaTopology<NumPartitions> CreateNumaTopology(
+template <size_t NumPartitions, size_t ScaleBy = 1>
+NumaTopology<NumPartitions, ScaleBy> CreateNumaTopology(
     const absl::Span<const SyntheticCpuList> cpu_lists) {
-  NumaTopology<NumPartitions> nt;
+  NumaTopology<NumPartitions, ScaleBy> nt;
   nt.InitForTest([&](const size_t node) {
     if (node >= cpu_lists.size()) {
       errno = ENOENT;
@@ -132,6 +132,7 @@ TEST_F(NumaTopologyTest, NoCompileTimeNuma) {
 
   EXPECT_EQ(nt.numa_aware(), false);
   EXPECT_EQ(nt.active_partitions(), 1);
+  EXPECT_EQ(nt.GetCurrentPartition(), 0);
 }
 
 // Ensure that if we run on a system with no NUMA support at all (i.e. no
@@ -142,6 +143,7 @@ TEST_F(NumaTopologyTest, NoRunTimeNuma) {
 
   EXPECT_EQ(nt.numa_aware(), false);
   EXPECT_EQ(nt.active_partitions(), 1);
+  EXPECT_EQ(nt.GetCurrentPartition(), 0);
 }
 
 // Ensure that if we run on a system with only 1 node then we disable NUMA
@@ -195,6 +197,20 @@ TEST_F(NumaTopologyTest, EmptyNode) {
   }
 }
 
+TEST_F(NumaTopologyTest, IsLocalToCpuPartition) {
+  std::vector<SyntheticCpuList> nodes;
+  nodes.emplace_back("0-1");
+  nodes.emplace_back("2-3");
+
+  const auto nt = CreateNumaTopology<2, 2>(nodes);
+
+  EXPECT_EQ(nt.numa_aware(), true);
+  EXPECT_TRUE(nt.IsLocalToCpuPartition(/*size_class=*/0, /*cpu=*/0));
+  EXPECT_TRUE(nt.IsLocalToCpuPartition(/*size_class=*/2, /*cpu=*/2));
+  EXPECT_FALSE(nt.IsLocalToCpuPartition(/*size_class=*/0, /*cpu=*/2));
+  EXPECT_FALSE(nt.IsLocalToCpuPartition(/*size_class=*/2, /*cpu=*/0));
+}
+
 // Test that cpulists too long to fit into the 16 byte buffer used by
 // InitNumaTopology() parse successfully.
 TEST_F(NumaTopologyTest, LongCpuLists) {
@@ -237,109 +253,13 @@ TEST_F(NumaTopologyTest, Host) {
   NumaTopology<4> nt;
   nt.Init();
 
+  const size_t active_partitions = nt.active_partitions();
+
   // We don't actually know anything about the host, so there's not much more
   // we can do beyond checking that we didn't crash.
-}
-
-TEST(ParseCpulistTest, Empty) {
-  absl::string_view empty("\n");
-
-  const absl::optional<cpu_set_t> parsed =
-      ParseCpulist([&](char* const buf, const size_t count) -> ssize_t {
-        // Calculate how much data we have left to provide.
-        const size_t to_copy = std::min(count, empty.size());
-
-        // If none, we have no choice but to provide nothing.
-        if (to_copy == 0) return 0;
-
-        memcpy(buf, empty.data(), to_copy);
-        empty.remove_prefix(to_copy);
-        return to_copy;
-      });
-
-  // No CPUs should be active on this NUMA node.
-  ASSERT_THAT(parsed, testing::Ne(std::nullopt));
-  EXPECT_EQ(CPU_COUNT(&*parsed), 0);
-}
-
-TEST(ParseCpulistTest, NotInBounds) {
-  std::string cpulist = absl::StrCat("0-", CPU_SETSIZE);
-
-  const absl::optional<cpu_set_t> parsed =
-      ParseCpulist([&](char* const buf, const size_t count) -> ssize_t {
-        // Calculate how much data we have left to provide.
-        const size_t to_copy = std::min(count, cpulist.size());
-
-        // If none, we have no choice but to provide nothing.
-        if (to_copy == 0) return 0;
-
-        memcpy(buf, cpulist.data(), to_copy);
-        cpulist.erase(0, to_copy);
-        return to_copy;
-      });
-
-  ASSERT_THAT(parsed, testing::Eq(std::nullopt));
-}
-
-// Ensure that we can parse randomized cpulists correctly.
-TEST(ParseCpulistTest, Random) {
-  absl::BitGen gen;
-
-  static constexpr int kIterations = 100;
-  for (int i = 0; i < kIterations; i++) {
-    cpu_set_t reference;
-    CPU_ZERO(&reference);
-
-    // Set a random number of CPUs within the reference set.
-    const double density = absl::Uniform(gen, 0.0, 1.0);
-    for (int cpu = 0; cpu < CPU_SETSIZE; cpu++) {
-      if (absl::Bernoulli(gen, density)) {
-        CPU_SET(cpu, &reference);
-      }
-    }
-
-    // Serialize the reference set into a cpulist-style string.
-    std::vector<std::string> components;
-    for (int cpu = 0; cpu < CPU_SETSIZE; cpu++) {
-      if (!CPU_ISSET(cpu, &reference)) continue;
-
-      const int start = cpu;
-      int next = cpu + 1;
-      while (next < CPU_SETSIZE && CPU_ISSET(next, &reference)) {
-        cpu = next;
-        next = cpu + 1;
-      }
-
-      if (cpu == start) {
-        components.push_back(absl::StrCat(cpu));
-      } else {
-        components.push_back(absl::StrCat(start, "-", cpu));
-      }
-    }
-    const std::string serialized = absl::StrJoin(components, ",");
-
-    // Now parse that string using our ParseCpulist function, randomizing the
-    // amount of data we provide to it from each read.
-    absl::string_view remaining(serialized);
-    const absl::optional<cpu_set_t> parsed =
-        ParseCpulist([&](char* const buf, const size_t count) -> ssize_t {
-          // Calculate how much data we have left to provide.
-          const size_t max = std::min(count, remaining.size());
-
-          // If none, we have no choice but to provide nothing.
-          if (max == 0) return 0;
-
-          // If we do have data, return a randomly sized subset of it to stress
-          // the logic around reading partial values.
-          const size_t copy = absl::Uniform(gen, static_cast<size_t>(1), max);
-          memcpy(buf, remaining.data(), copy);
-          remaining.remove_prefix(copy);
-          return copy;
-        });
-
-    // We ought to have parsed the same set of CPUs that we serialized.
-    ASSERT_THAT(parsed, testing::Ne(std::nullopt));
-    EXPECT_TRUE(CPU_EQUAL(&*parsed, &reference));
+  for (int cpu = 0, n = NumCPUs(); cpu < n; ++cpu) {
+    size_t partition = nt.GetCpuPartition(cpu);
+    EXPECT_LT(partition, active_partitions) << cpu;
   }
 }
 

@@ -17,41 +17,18 @@
 #include <fcntl.h>
 #include <string.h>
 
-#include <atomic>
-#include <cstdint>
 #include <new>
-#include <optional>
 
 #include "absl/base/attributes.h"
-#include "absl/base/optimization.h"
-#include "tcmalloc/common.h"
-#include "tcmalloc/experiment.h"
-#include "tcmalloc/guarded_page_allocator.h"
-#include "tcmalloc/internal/cache_topology.h"
-#include "tcmalloc/internal/environment.h"
-#include "tcmalloc/internal/linked_list.h"
-#include "tcmalloc/internal/logging.h"
-#include "tcmalloc/internal/optimization.h"
-#include "tcmalloc/internal/util.h"
+#include "absl/types/span.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/static_vars.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
 namespace tcmalloc_internal {
 
-absl::string_view TransferCacheImplementationToLabel(
-    TransferCacheImplementation type) {
-  switch (type) {
-    case TransferCacheImplementation::kLifo:
-      return "LIFO";
-    case TransferCacheImplementation::kNone:
-      return "NO_TRANSFERCACHE";
-    default:
-      ASSUME(false);
-  }
-}
-
-#ifndef TCMALLOC_SMALL_BUT_SLOW
+#ifndef TCMALLOC_INTERNAL_SMALL_BUT_SLOW
 
 size_t StaticForwarder::class_to_size(int size_class) {
   return tc_globals.sizemap().class_to_size(size_class);

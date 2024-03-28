@@ -13,13 +13,15 @@
 // limitations under the License.
 
 #include <algorithm>
-#include <utility>
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
 #include "absl/base/attributes.h"
 #include "absl/random/distributions.h"
 #include "absl/random/random.h"
 #include "benchmark/benchmark.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/range_tracker.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN

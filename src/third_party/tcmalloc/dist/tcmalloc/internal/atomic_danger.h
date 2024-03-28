@@ -19,6 +19,7 @@
 
 #include <atomic>
 #include <type_traits>
+#include <version>
 
 #include "tcmalloc/internal/config.h"
 

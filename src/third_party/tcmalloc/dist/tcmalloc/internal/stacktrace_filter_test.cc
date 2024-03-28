@@ -44,9 +44,10 @@ class StackTraceFilterTest : public testing::Test {
       ASSERT_NE(pc, 0);
       stacktrace.stack[0] = reinterpret_cast<void*>(pc);
       auto hash = HashOfStackTrace(stacktrace);
-      if (!hash_bases.contains(hash & mask()) && !hashes.contains(hash)) {
+      size_t hash_base = HashBaseOfStackTrace(stacktrace);
+      if (!hash_bases.contains(hash_base) && !hashes.contains(hash)) {
         hashes.insert(hash);
-        hash_bases.insert(hash & mask());
+        hash_bases.insert(hash_base);
         break;
       }
     }
@@ -63,14 +64,14 @@ class StackTraceFilterTest : public testing::Test {
     // insure no collisions among test set (the initializer above should prove
     // this, but this is additional insurance)
     ASSERT_NE(HashOfStackTrace(stacktrace1_), HashOfStackTrace(stacktrace2_));
-    ASSERT_NE(HashOfStackTrace(stacktrace1_) & mask(),
-              HashOfStackTrace(stacktrace2_) & mask());
+    ASSERT_NE(HashBaseOfStackTrace(stacktrace1_),
+              HashBaseOfStackTrace(stacktrace2_));
     ASSERT_NE(HashOfStackTrace(stacktrace1_), HashOfStackTrace(stacktrace3_));
-    ASSERT_NE(HashOfStackTrace(stacktrace1_) & mask(),
-              HashOfStackTrace(stacktrace3_) & mask());
+    ASSERT_NE(HashBaseOfStackTrace(stacktrace1_),
+              HashBaseOfStackTrace(stacktrace3_));
     ASSERT_NE(HashOfStackTrace(stacktrace2_), HashOfStackTrace(stacktrace3_));
-    ASSERT_NE(HashOfStackTrace(stacktrace2_) & mask(),
-              HashOfStackTrace(stacktrace3_) & mask());
+    ASSERT_NE(HashBaseOfStackTrace(stacktrace2_),
+              HashBaseOfStackTrace(stacktrace3_));
   }
 
   void InitializeColliderStackTrace() {
@@ -81,24 +82,25 @@ class StackTraceFilterTest : public testing::Test {
     // created.
     hashes.insert(HashOfStackTrace(stacktrace1_));
     hashes.insert(HashOfStackTrace(stacktrace2_));
-    hash_bases.insert(HashOfStackTrace(stacktrace2_) & mask());
+    hash_bases.insert(HashBaseOfStackTrace(stacktrace2_));
     hashes.insert(HashOfStackTrace(stacktrace3_));
-    hash_bases.insert(HashOfStackTrace(stacktrace3_) & mask());
+    hash_bases.insert(HashBaseOfStackTrace(stacktrace3_));
 
-    auto hash1_base = HashOfStackTrace(stacktrace1_) & mask();
+    size_t hash1_base = HashBaseOfStackTrace(stacktrace1_);
     collider_stacktrace_.depth = 1;
     uint64_t pc = reinterpret_cast<uint64_t>(stacktrace1_.stack[0]);
     size_t collider_hash;
+    size_t collider_hash_base;
     while (true) {
       ++pc;
       // Checking for wrap around
       ASSERT_NE(pc, 0);
       collider_stacktrace_.stack[0] = reinterpret_cast<void*>(pc);
       collider_hash = HashOfStackTrace(collider_stacktrace_);
+      collider_hash_base = HashBaseOfStackTrace(collider_stacktrace_);
       // if a possible match, check to avoid collisions with others
-      if (hash1_base == (collider_hash & mask()) &&
-          !hashes.contains(collider_hash) &&
-          !hash_bases.contains(collider_hash & mask())) {
+      if (hash1_base == collider_hash_base && !hashes.contains(collider_hash) &&
+          !hash_bases.contains(collider_hash_base)) {
         break;
       }
     }
@@ -106,26 +108,36 @@ class StackTraceFilterTest : public testing::Test {
     // Double check the work above
     ASSERT_NE(HashOfStackTrace(stacktrace1_),
               HashOfStackTrace(collider_stacktrace_));
-    ASSERT_EQ(HashOfStackTrace(stacktrace1_) & mask(),
-              HashOfStackTrace(collider_stacktrace_) & mask());
+    ASSERT_EQ(HashBaseOfStackTrace(stacktrace1_),
+              HashBaseOfStackTrace(collider_stacktrace_));
     ASSERT_NE(HashOfStackTrace(stacktrace2_),
               HashOfStackTrace(collider_stacktrace_));
-    ASSERT_NE(HashOfStackTrace(stacktrace2_) & mask(),
-              HashOfStackTrace(collider_stacktrace_) & mask());
+    ASSERT_NE(HashBaseOfStackTrace(stacktrace2_),
+              HashBaseOfStackTrace(collider_stacktrace_));
     ASSERT_NE(HashOfStackTrace(stacktrace3_),
               HashOfStackTrace(collider_stacktrace_));
-    ASSERT_NE(HashOfStackTrace(stacktrace3_) & mask(),
-              HashOfStackTrace(collider_stacktrace_) & mask());
+    ASSERT_NE(HashBaseOfStackTrace(stacktrace3_),
+              HashBaseOfStackTrace(collider_stacktrace_));
   }
 
-  static size_t mask() { return StackTraceFilter::kMask; }
-
-  size_t most_frequent_hash_count() const {
-    return filter_.most_frequent_hash_count_.load(std::memory_order_relaxed);
+  static size_t filter_hash_count_limit() {
+    return StackTraceFilter::kHashCountLimit;
   }
 
   size_t HashOfStackTrace(const StackTrace& stacktrace) const {
     return filter_.HashOfStackTrace(stacktrace);
+  }
+
+  size_t HashBaseOfStackTrace(const StackTrace& stacktrace) const {
+    return filter_.HashOfStackTrace(stacktrace) % StackTraceFilter::kSize;
+  }
+
+  void Reset() { filter_.Reset(); }
+
+  size_t count(const StackTrace& stacktrace) const {
+    return filter_.stack_hashes_with_count_[HashBaseOfStackTrace(stacktrace)]
+               .load(std::memory_order_relaxed) &
+           StackTraceFilter::kMask;
   }
 
   StackTraceFilter filter_;
@@ -134,6 +146,8 @@ class StackTraceFilterTest : public testing::Test {
   StackTrace stacktrace3_{0};
   StackTrace collider_stacktrace_{0};
 };
+
+namespace {
 
 // This test proves that class can be owned by a constexpr constructor class.
 // This is required as the class will be instantiated within
@@ -149,90 +163,69 @@ TEST_F(StackTraceFilterTest, ConstexprConstructor) {
   [[maybe_unused]] Wrapper wrapper;
 }
 
-TEST_F(StackTraceFilterTest, AllowNew) {
-  EXPECT_TRUE(filter_.Allow(stacktrace1_));
-  EXPECT_EQ(filter_.Evaluate(stacktrace1_),
-            StackTraceFilter::EvaluateResult::AllowNew);
+TEST_F(StackTraceFilterTest, CountNew) {
+  EXPECT_EQ(0, filter_.Count(stacktrace1_));
 }
 
-TEST_F(StackTraceFilterTest, AllowDifferent) {
+TEST_F(StackTraceFilterTest, CountDifferent) {
   InitializeColliderStackTrace();
   filter_.Add(stacktrace1_);
-  EXPECT_TRUE(filter_.Allow(collider_stacktrace_));
-  EXPECT_EQ(filter_.Evaluate(collider_stacktrace_),
-            StackTraceFilter::EvaluateResult::AllowNewCollision);
+  EXPECT_EQ(1, filter_.max_slots_used());
+  EXPECT_EQ(0, filter_.replacement_inserts());
+  EXPECT_EQ(0, filter_.Count(collider_stacktrace_));
 }
 
-TEST_F(StackTraceFilterTest, AllowLessFrequent) {
+TEST_F(StackTraceFilterTest, Add) {
   filter_.Add(stacktrace1_);
+  EXPECT_EQ(1, filter_.max_slots_used());
+  EXPECT_EQ(0, filter_.replacement_inserts());
+  EXPECT_EQ(1, filter_.Count(stacktrace1_));
   filter_.Add(stacktrace1_);
-  filter_.Add(stacktrace2_);
-  EXPECT_TRUE(filter_.Allow(stacktrace2_));
-  EXPECT_EQ(filter_.Evaluate(stacktrace2_),
-            StackTraceFilter::EvaluateResult::AllowInfrequent);
-}
-
-// Also covers case where add is in unused location
-TEST_F(StackTraceFilterTest, AllowDisallow) {
-  filter_.Add(stacktrace1_);
-  EXPECT_FALSE(filter_.Allow(stacktrace1_));
-  EXPECT_EQ(filter_.Evaluate(stacktrace1_),
-            StackTraceFilter::EvaluateResult::DenyTooFrequent);
-}
-
-TEST_F(StackTraceFilterTest, AddMoreFrequent) {
-  filter_.Add(stacktrace1_);
-  EXPECT_EQ(most_frequent_hash_count(), 1);
-  filter_.Add(stacktrace1_);
-  EXPECT_EQ(most_frequent_hash_count(), 2);
+  EXPECT_EQ(1, filter_.max_slots_used());
+  EXPECT_EQ(0, filter_.replacement_inserts());
+  EXPECT_EQ(2, filter_.Count(stacktrace1_));
 }
 
 TEST_F(StackTraceFilterTest, AddCountLimitReached) {
-  while (most_frequent_hash_count() < mask()) {
+  while (count(stacktrace1_) < filter_hash_count_limit()) {
     filter_.Add(stacktrace1_);
   }
-  size_t current_most_frequent_hash_count = most_frequent_hash_count();
+  EXPECT_EQ(1, filter_.max_slots_used());
+  EXPECT_EQ(0, filter_.replacement_inserts());
+  EXPECT_EQ(filter_hash_count_limit(), filter_.Count(stacktrace1_));
   filter_.Add(stacktrace1_);
-  EXPECT_EQ(current_most_frequent_hash_count, most_frequent_hash_count());
+  EXPECT_EQ(1, filter_.max_slots_used());
+  EXPECT_EQ(0, filter_.replacement_inserts());
+  EXPECT_EQ(filter_hash_count_limit(), filter_.Count(stacktrace1_));
 }
 
 TEST_F(StackTraceFilterTest, AddReplace) {
   InitializeColliderStackTrace();
   filter_.Add(stacktrace1_);
-  EXPECT_EQ(most_frequent_hash_count(), 1);
+  EXPECT_EQ(1, filter_.max_slots_used());
+  EXPECT_EQ(0, filter_.replacement_inserts());
+  EXPECT_EQ(1, filter_.Count(stacktrace1_));
   filter_.Add(stacktrace1_);
-  EXPECT_EQ(most_frequent_hash_count(), 2);
+  EXPECT_EQ(1, filter_.max_slots_used());
+  EXPECT_EQ(0, filter_.replacement_inserts());
+  EXPECT_EQ(2, filter_.Count(stacktrace1_));
   filter_.Add(collider_stacktrace_);
-  EXPECT_EQ(most_frequent_hash_count(), 1);
+  EXPECT_EQ(1, filter_.max_slots_used());
+  EXPECT_EQ(1, filter_.replacement_inserts());
+  EXPECT_EQ(0, filter_.Count(stacktrace1_));
+  EXPECT_EQ(1, filter_.Count(collider_stacktrace_));
 }
 
-TEST_F(StackTraceFilterTest, AllowLessFrequentAfterAddReplace) {
-  InitializeColliderStackTrace();
+TEST_F(StackTraceFilterTest, Reset) {
   filter_.Add(stacktrace1_);
+  EXPECT_EQ(1, filter_.Count(stacktrace1_));
   filter_.Add(stacktrace1_);
-  filter_.Add(stacktrace1_);
-  filter_.Add(stacktrace2_);
-  filter_.Add(stacktrace2_);
-  EXPECT_EQ(most_frequent_hash_count(), 3);
-  filter_.Add(collider_stacktrace_);
-  EXPECT_EQ(most_frequent_hash_count(), 2);
-  // Newly added, but still lest frequent
-  EXPECT_TRUE(filter_.Allow(collider_stacktrace_));
-  EXPECT_EQ(filter_.Evaluate(collider_stacktrace_),
-            StackTraceFilter::EvaluateResult::AllowInfrequent);
-  // Not present, functionally never seen before
-  EXPECT_TRUE(filter_.Allow(stacktrace1_));
-  EXPECT_EQ(filter_.Evaluate(stacktrace1_),
-            StackTraceFilter::EvaluateResult::AllowNewCollision);
-  // Current holder of maximum encounter (disallowed)
-  EXPECT_FALSE(filter_.Allow(stacktrace2_));
-  EXPECT_EQ(filter_.Evaluate(stacktrace2_),
-            StackTraceFilter::EvaluateResult::DenyTooFrequent);
-  // Never seen before
-  EXPECT_TRUE(filter_.Allow(stacktrace3_));
-  EXPECT_EQ(filter_.Evaluate(stacktrace3_),
-            StackTraceFilter::EvaluateResult::AllowNew);
+  EXPECT_EQ(2, filter_.Count(stacktrace1_));
+  Reset();
+  EXPECT_EQ(0, filter_.Count(stacktrace1_));
 }
+
+}  // namespace
 
 // A collection of threaded tests which are useful for demonstrating
 // correct functioning in a threaded environment.
@@ -241,12 +234,12 @@ class StackTraceFilterThreadedTest : public testing::Test {
   class FilterExerciser {
    public:
     FilterExerciser(StackTraceFilter& filter, int stacktrace_count,
-                    int colliding_stacktrace_count, int allow_calls_requested,
-                    int add_calls_requested)
+                    int colliding_stacktrace_count,
+                    int evaluate_calls_requested, int add_calls_requested)
         : filter_(filter),
           stacktraces_(stacktrace_count),
           colliding_stacktrace_count_(colliding_stacktrace_count),
-          allow_calls_requested_(allow_calls_requested),
+          evaluate_calls_requested_(evaluate_calls_requested),
           add_calls_requested_(add_calls_requested) {}
 
     void Initialize() {
@@ -265,7 +258,7 @@ class StackTraceFilterThreadedTest : public testing::Test {
                             std::numeric_limits<size_t>::max()));
         }
         hashes.insert(HashOfStackTrace(stacktrace));
-        hash_bases.insert(HashOfStackTrace(stacktrace) & mask());
+        hash_bases.insert(HashBaseOfStackTrace(stacktrace));
       }
 
       // Create colliding stack traces
@@ -283,29 +276,29 @@ class StackTraceFilterThreadedTest : public testing::Test {
       if (hasrun()) {
         return;
       }
-      absl::flat_hash_map<int, int> allow_calls_counts;
+      absl::flat_hash_map<int, int> evaluate_calls_count;
       absl::flat_hash_map<int, int> add_calls_counts;
       for (int stacktrace_index = 0; stacktrace_index < stacktraces_.size();
            ++stacktrace_index) {
-        allow_calls_counts[stacktrace_index] = allow_calls_requested_;
+        evaluate_calls_count[stacktrace_index] = evaluate_calls_requested_;
         add_calls_counts[stacktrace_index] = add_calls_requested_;
       }
 
-      int allow_calls = 0;
+      int evaluate_calls = 0;
       int add_calls = 0;
-      while (!allow_calls_counts.empty() || !add_calls_counts.empty()) {
-        bool do_allow_call = absl::Uniform(bitgen_, 0, 2);
-        if (do_allow_call && !allow_calls_counts.empty()) {
-          auto iter = allow_calls_counts.begin();
-          std::advance(iter,
-                       absl::Uniform(bitgen_, 0UL, allow_calls_counts.size()));
+      while (!evaluate_calls_count.empty() || !add_calls_counts.empty()) {
+        bool do_evaluate_call = absl::Uniform(bitgen_, 0, 2);
+        if (do_evaluate_call && !evaluate_calls_count.empty()) {
+          auto iter = evaluate_calls_count.begin();
+          std::advance(
+              iter, absl::Uniform(bitgen_, 0UL, evaluate_calls_count.size()));
           size_t stacktrace_index = iter->first;
-          filter_.Allow(stacktraces_[stacktrace_index]);
-          ++allow_calls;
-          if (--allow_calls_counts[stacktrace_index] == 0) {
-            allow_calls_counts.erase(iter);
+          filter_.Count(stacktraces_[stacktrace_index]);
+          ++evaluate_calls;
+          if (--evaluate_calls_count[stacktrace_index] == 0) {
+            evaluate_calls_count.erase(iter);
           }
-        } else if (!do_allow_call && !add_calls_counts.empty()) {
+        } else if (!do_evaluate_call && !add_calls_counts.empty()) {
           auto iter = add_calls_counts.begin();
           std::advance(iter,
                        absl::Uniform(bitgen_, 0UL, add_calls_counts.size()));
@@ -318,16 +311,19 @@ class StackTraceFilterThreadedTest : public testing::Test {
         }
       }
 
-      EXPECT_EQ(allow_calls, allow_calls_requested_ * stacktraces_.size());
+      EXPECT_EQ(evaluate_calls,
+                evaluate_calls_requested_ * stacktraces_.size());
       EXPECT_EQ(add_calls, add_calls_requested_ * stacktraces_.size());
 
       hasrun_.store(true, std::memory_order_relaxed);
     }
 
-    static size_t mask() { return StackTraceFilter::kMask; }
-
     size_t HashOfStackTrace(const StackTrace& stacktrace) const {
       return filter_.HashOfStackTrace(stacktrace);
+    }
+
+    size_t HashBaseOfStackTrace(const StackTrace& stacktrace) const {
+      return filter_.HashOfStackTrace(stacktrace) % StackTraceFilter::kSize;
     }
 
     const std::vector<StackTrace>& stacktraces() const { return stacktraces_; }
@@ -339,7 +335,7 @@ class StackTraceFilterThreadedTest : public testing::Test {
     int colliding_stacktrace_count_;
     // Each exerciser must have its own, as BitGen is not thread safe.
     absl::BitGen bitgen_;
-    int allow_calls_requested_;
+    int evaluate_calls_requested_;
     int add_calls_requested_;
     std::atomic<bool> hasrun_{false};
 
@@ -348,7 +344,7 @@ class StackTraceFilterThreadedTest : public testing::Test {
                                       const StackTrace& target_stacktrace,
                                       StackTrace& stacktrace) {
       stacktrace = target_stacktrace;
-      size_t target_hash_base = HashOfStackTrace(target_stacktrace) & mask();
+      size_t target_hash_base = HashBaseOfStackTrace(target_stacktrace);
       hash_bases.erase(target_hash_base);
 
       uint64_t pc = 0;
@@ -358,10 +354,11 @@ class StackTraceFilterThreadedTest : public testing::Test {
         ASSERT_NE(pc, 0);
         stacktrace.stack[0] = reinterpret_cast<void*>(pc);
         auto hash = HashOfStackTrace(stacktrace);
-        if ((hash & mask()) == target_hash_base &&
-            !hash_bases.contains(hash & mask()) && !hashes.contains(hash)) {
+        size_t hash_base = HashBaseOfStackTrace(stacktrace);
+        if (hash_base == target_hash_base && !hash_bases.contains(hash_base) &&
+            !hashes.contains(hash)) {
           hashes.insert(hash);
-          hash_bases.insert(hash & mask());
+          hash_bases.insert(hash_base);
           break;
         }
       }
@@ -395,7 +392,7 @@ class StackTraceFilterThreadedTest : public testing::Test {
     for (auto& filter_exerciser : filter_exercisers) {
       for (const auto& stacktrace : filter_exerciser->stacktraces()) {
         auto hash_base =
-            filter_.HashOfStackTrace(stacktrace) & StackTraceFilter::kMask;
+            filter_.HashOfStackTrace(stacktrace) % StackTraceFilter::kSize;
         if (hash_bases.contains(hash_base)) {
           colliding_base_to_stacktrace_hashes[hash_base].insert(
               filter_.HashOfStackTrace(stacktrace));
@@ -441,6 +438,8 @@ class StackTraceFilterThreadedTest : public testing::Test {
   ThreadManager thread_manager_;
 };
 
+namespace {
+
 TEST_F(StackTraceFilterThreadedTest, SingleEntry) {
   std::vector<std::unique_ptr<FilterExerciser>> filter_exercisers;
   for (int exerciser_index = 0; exerciser_index < 10; ++exerciser_index) {
@@ -477,5 +476,6 @@ TEST_F(StackTraceFilterThreadedTest, MultipleEntriesWithColliders) {
   Exercise(filter_exercisers);
 }
 
+}  // namespace
 }  // namespace tcmalloc_internal
 }  // namespace tcmalloc

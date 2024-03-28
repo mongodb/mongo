@@ -26,6 +26,7 @@
 #include "absl/time/time.h"
 #include "tcmalloc/cpu_cache.h"
 #include "tcmalloc/internal/percpu.h"
+#include "tcmalloc/internal/sysinfo.h"
 #include "tcmalloc/internal_malloc_extension.h"
 #include "tcmalloc/static_vars.h"
 
@@ -46,7 +47,7 @@ TEST(CpuCacheActivateTest, GlobalInstance) {
   absl::Notification done;
 
   std::thread t([&]() {
-    const int num_cpus = absl::base_internal::NumCPUs();
+    const int num_cpus = NumCPUs();
     absl::BitGen rng;
 
     while (!done.HasBeenNotified()) {

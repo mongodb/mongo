@@ -17,9 +17,15 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <limits>
 
-#include "tcmalloc/common.h"
+#include "absl/base/attributes.h"
+#include "absl/base/optimization.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/exponential_biased.h"
+#include "tcmalloc/internal/logging.h"
 #include "tcmalloc/parameters.h"
 #include "tcmalloc/static_vars.h"
 
@@ -27,13 +33,21 @@ GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
 namespace tcmalloc_internal {
 
+// We used to select an initial value for the sampling counter and then sample
+// an allocation when the counter becomes less or equal to zero.
+// Now we sample when the counter becomes less than zero, so that we can use
+// __builtin_usubl_overflow, which is the only way to get good machine code
+// for both x86 and arm. To account for that, we subtract 1 from the initial
+// counter value and then add it back when we calculate the sample weight.
+constexpr ssize_t kIntervalOffset = 1;
+
 ssize_t Sampler::GetSamplePeriod() {
   return Parameters::profile_sampling_rate();
 }
 
 // Run this before using your sampler
 ABSL_ATTRIBUTE_NOINLINE void Sampler::Init(uint64_t seed) {
-  ASSERT(seed != 0);
+  TC_ASSERT_NE(seed, 0);
 
   // do_malloc comes here without having initialized statics, and
   // PickNextSamplingPoint uses data initialized in static vars.
@@ -43,19 +57,10 @@ ABSL_ATTRIBUTE_NOINLINE void Sampler::Init(uint64_t seed) {
   rnd_ = seed;
   // Step it forward 20 times for good measure
   for (int i = 0; i < 20; i++) {
-    rnd_ = NextRandom(rnd_);
+    rnd_ = ExponentialBiased::NextRandom(rnd_);
   }
   // Initialize counters
-  true_bytes_until_sample_ = PickNextSamplingPoint();
-  if (tc_globals.IsOnFastPath()) {
-    bytes_until_sample_ = true_bytes_until_sample_;
-    was_on_fast_path_ = true;
-  } else {
-    // Force the next allocation to hit the slow path.
-    ASSERT(bytes_until_sample_ == 0);
-    was_on_fast_path_ = false;
-  }
-  allocs_until_guarded_sample_ = PickNextGuardedSamplingPoint();
+  bytes_until_sample_ = PickNextSamplingPoint();
 }
 
 ssize_t Sampler::PickNextSamplingPoint() {
@@ -72,24 +77,10 @@ ssize_t Sampler::PickNextSamplingPoint() {
   if (ABSL_PREDICT_FALSE(sample_period_ == 1)) {
     // A sample period of 1, generally used only in tests due to its exorbitant
     // cost, is a request for *every* allocation to be sampled.
-    return 1;
+    return 0;
   }
-  return GetGeometricVariable(sample_period_);
-}
-
-ssize_t Sampler::PickNextGuardedSamplingPoint() {
-  double guarded_sample_rate = Parameters::guarded_sampling_rate();
-  double profile_sample_rate = Parameters::profile_sampling_rate();
-  if (guarded_sample_rate < 0 || profile_sample_rate <= 0) {
-    // Guarded sampling is disabled but could be turned on at run time.  So we
-    // return a sampling point (default mean=100) in case guarded sampling is
-    // later enabled.  Since the flag is also checked in
-    // ShouldSampleGuardedAllocation(), guarded sampling is still guaranteed
-    // not to run until it is enabled.
-    return GetGeometricVariable(/*mean=*/100);
-  }
-  return GetGeometricVariable(
-      std::ceil(guarded_sample_rate / profile_sample_rate));
+  return std::max<ssize_t>(
+      0, GetGeometricVariable(sample_period_) - kIntervalOffset);
 }
 
 // Generates a geometric variable with the specified mean.
@@ -104,7 +95,7 @@ ssize_t Sampler::PickNextGuardedSamplingPoint() {
 // log_2(q) * (-log_e(2) * 1/m) = x
 // In the code, q is actually in the range 1 to 2**26, hence the -26 below
 ssize_t Sampler::GetGeometricVariable(ssize_t mean) {
-  rnd_ = NextRandom(rnd_);
+  rnd_ = ExponentialBiased::NextRandom(rnd_);
   // Take the top 26 bits as the random number
   // (This plus the 1<<58 sampling bound give a max possible step of
   // 5194297183973780480 bytes.)
@@ -136,59 +127,26 @@ size_t Sampler::RecordAllocationSlow(size_t k) {
     uint64_t global_seed =
         global_randomness.fetch_add(1, std::memory_order_relaxed);
     Init(reinterpret_cast<uintptr_t>(this) ^ global_seed);
-    if (static_cast<size_t>(true_bytes_until_sample_) > k) {
-      true_bytes_until_sample_ -= k;
-      if (tc_globals.IsOnFastPath()) {
-        bytes_until_sample_ -= k;
-        was_on_fast_path_ = true;
-      }
+    // Avoid missampling 0.
+    bytes_until_sample_ -= k + 1;
+    if (ABSL_PREDICT_TRUE(bytes_until_sample_ >= 0)) {
       return 0;
     }
-  }
-
-  if (ABSL_PREDICT_FALSE(true_bytes_until_sample_ > k)) {
-    // The last time we picked a sampling point, we were on the slow path.  We
-    // don't want to sample yet since true_bytes_until_sample_ >= k.
-    true_bytes_until_sample_ -= k;
-
-    if (ABSL_PREDICT_TRUE(tc_globals.IsOnFastPath())) {
-      // We've moved from the slow path to the fast path since the last sampling
-      // point was picked.
-      bytes_until_sample_ = true_bytes_until_sample_;
-      true_bytes_until_sample_ = 0;
-      was_on_fast_path_ = true;
-    } else {
-      bytes_until_sample_ = 0;
-      was_on_fast_path_ = false;
-    }
-
-    return 0;
   }
 
   // Compute sampling weight (i.e. the number of bytes represented by this
   // sample in expectation).
   //
-  // Let k be the size of the allocation, p be the sample period
+  // Let k be the size of the allocation, T be the sample period
   // (sample_period_), and f the number of bytes after which we decided to
-  // sample (either bytes_until_sample_ or true_bytes_until_sample_). On
-  // average, if we were to continue taking samples every p bytes, we would take
-  // (k - f) / p additional samples in this allocation, plus the one we are
-  // taking now, for 1 + (k - f) / p total samples. Multiplying by p, the mean
-  // number of bytes between samples, gives us a weight of p + k - f.
+  // sample (bytes_until_sample_). On average, if we were to continue taking
+  // samples every T bytes, we would take (k - f) / T additional samples in
+  // this allocation, plus the one we are taking now, for 1 + (k - f) / T
+  // total samples. Multiplying by T, the mean number of bytes between samples,
+  // gives us a weight of T + k - f.
   //
-  size_t weight =
-      sample_period_ + k -
-      (was_on_fast_path_ ? bytes_until_sample_ : true_bytes_until_sample_);
-  const auto point = PickNextSamplingPoint();
-  if (ABSL_PREDICT_TRUE(tc_globals.IsOnFastPath())) {
-    bytes_until_sample_ = point;
-    true_bytes_until_sample_ = 0;
-    was_on_fast_path_ = true;
-  } else {
-    bytes_until_sample_ = 0;
-    true_bytes_until_sample_ = point;
-    was_on_fast_path_ = false;
-  }
+  size_t weight = sample_period_ - bytes_until_sample_ - kIntervalOffset;
+  bytes_until_sample_ = PickNextSamplingPoint();
   return GetSamplePeriod() <= 0 ? 0 : weight;
 }
 

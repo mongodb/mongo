@@ -17,11 +17,11 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdint>
 #include <string>
 #include <thread>
 
 #include "gtest/gtest.h"
-#include "absl/base/internal/sysinfo.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -30,6 +30,7 @@
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/parameter_accessors.h"
 #include "tcmalloc/internal/percpu.h"
+#include "tcmalloc/internal/sysinfo.h"
 #include "tcmalloc/malloc_extension.h"
 #include "tcmalloc/testing/test_allocator_harness.h"
 #include "tcmalloc/testing/thread_manager.h"
@@ -43,7 +44,7 @@ namespace {
 int64_t ParseCpuCacheSize(absl::string_view buf, int cpu) {
   char needlebuf[32];
   int len = absl::SNPrintF(needlebuf, sizeof(needlebuf), "\ncpu %3d: ", cpu);
-  CHECK_CONDITION(0 < len && len < sizeof(needlebuf));
+  TC_CHECK(0 < len && len < sizeof(needlebuf));
 
   const absl::string_view needle = needlebuf;
 
@@ -75,7 +76,7 @@ int64_t ParseCpuCacheSize(absl::string_view buf, int cpu) {
 void GetMallocStats(std::string* buffer) {
   buffer->resize(buffer->capacity());
 
-  CHECK_CONDITION(&TCMalloc_Internal_GetStats != nullptr);
+  TC_CHECK(&TCMalloc_Internal_GetStats != nullptr);
   size_t required = TCMalloc_Internal_GetStats(buffer->data(), buffer->size());
   EXPECT_LE(required, buffer->size());
 
@@ -114,8 +115,7 @@ TEST(ReclaimTest, ReclaimWorks) {
   GetMallocStats(&before);
   int cpu = -1;
   ssize_t used_bytes = -1;
-  for (int i = 0, num_cpus = absl::base_internal::NumCPUs(); i < num_cpus;
-       ++i) {
+  for (int i = 0, num_cpus = tcmalloc_internal::NumCPUs(); i < num_cpus; ++i) {
     used_bytes = ParseCpuCacheSize(before, i);
     if (used_bytes > 0) {
       cpu = i;
@@ -148,16 +148,16 @@ TEST(ReclaimTest, ReclaimStable) {
     static void Go(std::atomic<bool>* sync, bool initialize_rseq) {
       if (initialize_rseq) {
         // Require initialization to succeed.
-        CHECK_CONDITION(tcmalloc_internal::subtle::percpu::IsFast());
+        TC_CHECK(tcmalloc_internal::subtle::percpu::IsFast());
       } else {
         // Require that we have not initialized this thread with rseq yet.
-        CHECK_CONDITION(!tcmalloc_internal::subtle::percpu::IsFastNoInit());
+        TC_CHECK(!tcmalloc_internal::subtle::percpu::IsFastNoInit());
       }
 
       int iter = 0;
       while (!sync->load(std::memory_order_acquire)) {
         iter++;
-        for (int i = 0, num_cpus = absl::base_internal::NumCPUs(); i < num_cpus;
+        for (int i = 0, num_cpus = tcmalloc_internal::NumCPUs(); i < num_cpus;
              ++i) {
           MallocExtension::ReleaseCpuMemory(i);
         }
@@ -186,3 +186,8 @@ TEST(ReclaimTest, ReclaimStable) {
 
 }  // namespace
 }  // namespace tcmalloc
+
+int main(int argc, char** argv) {
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}

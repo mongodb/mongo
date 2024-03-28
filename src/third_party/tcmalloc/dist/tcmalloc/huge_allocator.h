@@ -19,9 +19,12 @@
 
 #include <stddef.h>
 
-#include "tcmalloc/common.h"
+#include "absl/base/attributes.h"
 #include "tcmalloc/huge_address_map.h"
 #include "tcmalloc/huge_pages.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/logging.h"
+#include "tcmalloc/metadata_allocator.h"
 #include "tcmalloc/stats.h"
 #include "tcmalloc/system-alloc.h"
 
@@ -30,16 +33,29 @@ namespace tcmalloc {
 namespace tcmalloc_internal {
 
 // these typedefs allow replacement of tcmalloc::System* for tests.
-using MemoryAllocFunction = AddressRange (*)(size_t bytes, size_t align);
-using MetadataAllocFunction = void* (*)(size_t bytes);
+class VirtualAllocator {
+ public:
+  VirtualAllocator() = default;
+  virtual ~VirtualAllocator() = default;
+
+  VirtualAllocator(const VirtualAllocator&) = delete;
+  VirtualAllocator(VirtualAllocator&&) = delete;
+  VirtualAllocator& operator=(const VirtualAllocator&) = delete;
+  VirtualAllocator& operator=(VirtualAllocator&&) = delete;
+
+  // Allocates bytes of virtual address space with align alignment.
+  ABSL_MUST_USE_RESULT virtual AddressRange operator()(size_t bytes,
+                                                       size_t align) = 0;
+};
 
 // This tracks available ranges of hugepages and fulfills requests for
 // usable memory, allocating more from the system as needed.  All
 // hugepages are treated as (and assumed to be) unbacked.
 class HugeAllocator {
  public:
-  constexpr HugeAllocator(MemoryAllocFunction allocate,
-                          MetadataAllocFunction meta_allocate)
+  constexpr HugeAllocator(
+      VirtualAllocator& allocate ABSL_ATTRIBUTE_LIFETIME_BOUND,
+      MetadataAllocator& meta_allocate ABSL_ATTRIBUTE_LIFETIME_BOUND)
       : free_(meta_allocate), allocate_(allocate) {}
 
   // Obtain a range of n unbacked hugepages, distinct from all other
@@ -57,8 +73,7 @@ class HugeAllocator {
   // Unused memory in the allocator.
   HugeLength size() const { return from_system_ - in_use_; }
 
-  void AddSpanStats(SmallSpanStats* small, LargeSpanStats* large,
-                    PageAgeHistograms* ages) const;
+  void AddSpanStats(SmallSpanStats* small, LargeSpanStats* large) const;
 
   BackingStats stats() const {
     BackingStats s;
@@ -97,7 +112,7 @@ class HugeAllocator {
   HugeLength from_system_{NHugePages(0)};
   HugeLength in_use_{NHugePages(0)};
 
-  MemoryAllocFunction allocate_;
+  VirtualAllocator& allocate_;
   HugeRange AllocateRange(HugeLength n);
 };
 

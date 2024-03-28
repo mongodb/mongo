@@ -17,22 +17,43 @@
 #include <stddef.h>
 
 #include <atomic>
-#include <new>
 
 #include "absl/base/attributes.h"
 #include "absl/base/const_init.h"
 #include "absl/base/internal/spinlock.h"
-#include "absl/base/macros.h"
+#include "absl/base/optimization.h"
+#include "absl/types/span.h"
+#include "tcmalloc/allocation_sample.h"
+#include "tcmalloc/arena.h"
+#include "tcmalloc/common.h"
 #include "tcmalloc/cpu_cache.h"
 #include "tcmalloc/deallocation_profiler.h"
+#include "tcmalloc/experiment.h"
+#include "tcmalloc/experiment_config.h"
+#include "tcmalloc/guarded_page_allocator.h"
+#include "tcmalloc/internal/allocation_guard.h"
+#include "tcmalloc/internal/atomic_stats_counter.h"
+#include "tcmalloc/internal/cache_topology.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/explicitly_constructed.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/internal/mincore.h"
 #include "tcmalloc/internal/numa.h"
+#include "tcmalloc/internal/percpu.h"
+#include "tcmalloc/internal/sysinfo.h"
 #include "tcmalloc/malloc_extension.h"
+#include "tcmalloc/page_allocator.h"
+#include "tcmalloc/page_heap_allocator.h"
 #include "tcmalloc/pagemap.h"
-#include "tcmalloc/sampler.h"
+#include "tcmalloc/parameters.h"
+#include "tcmalloc/peak_heap_tracker.h"
+#include "tcmalloc/sampled_allocation_allocator.h"
+#include "tcmalloc/size_class_info.h"
 #include "tcmalloc/sizemap.h"
+#include "tcmalloc/span.h"
+#include "tcmalloc/stack_trace_table.h"
 #include "tcmalloc/thread_cache.h"
+#include "tcmalloc/transfer_cache.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -101,7 +122,8 @@ size_t Static::metadata_bytes() {
       sizeof(sampled_internal_fragmentation_) + sizeof(total_sampled_count_) +
       sizeof(allocation_samples) + sizeof(deallocation_samples) +
       sizeof(sampled_alloc_handle_generator) + sizeof(peak_heap_tracker_) +
-      sizeof(guardedpage_allocator_) + sizeof(numa_topology_);
+      sizeof(guardedpage_allocator_) + sizeof(numa_topology_) +
+      sizeof(CacheTopology::Instance());
   // LINT.ThenChange(:static_vars)
 
   const size_t allocated = arena().stats().bytes_allocated +
@@ -117,46 +139,53 @@ size_t Static::pagemap_residence() {
 
 int ABSL_ATTRIBUTE_WEAK default_want_legacy_size_classes();
 
+SizeClassConfiguration Static::size_class_configuration() {
+  if (IsExperimentActive(Experiment::TEST_ONLY_TCMALLOC_POW2_SIZECLASS)) {
+    return SizeClassConfiguration::kPow2Only;
+  } else if (default_want_legacy_size_classes != nullptr &&
+             default_want_legacy_size_classes() > 0) {
+    // TODO(b/242710633): remove this opt out.
+    return SizeClassConfiguration::kLegacy;
+  } else if (IsExperimentActive(
+                 Experiment::TEST_ONLY_TCMALLOC_LOWFRAG_SIZECLASSES)) {
+    return SizeClassConfiguration::kLowFrag;
+  } else {
+    return SizeClassConfiguration::kPow2Below64;
+  }
+}
+
 ABSL_ATTRIBUTE_COLD ABSL_ATTRIBUTE_NOINLINE void Static::SlowInitIfNecessary() {
-  absl::base_internal::SpinLockHolder h(&pageheap_lock);
+  PageHeapSpinLockHolder l;
 
   // double-checked locking
   if (!inited_.load(std::memory_order_acquire)) {
-    absl::Span<const SizeClassInfo> size_classes;
-
-    if (IsExperimentActive(Experiment::TEST_ONLY_TCMALLOC_POW2_SIZECLASS)) {
-      size_classes = kExperimentalPow2SizeClasses;
-    } else if (default_want_legacy_size_classes != nullptr &&
-               default_want_legacy_size_classes() > 0) {
-      // TODO(b/242710633): remove this opt out.
-      size_classes = kLegacySizeClasses;
-    } else {
-      size_classes = kSizeClasses;
-    }
-
-    CHECK_CONDITION(sizemap_.Init(size_classes));
+    TC_CHECK(sizemap_.Init(SizeMap::CurrentClasses().classes));
+    // Verify we can determine the number of CPUs now, since we will need it
+    // later for per-CPU caches and initializing the cache topology.
+    (void)NumCPUs();
+    (void)subtle::percpu::IsFast();
     numa_topology_.Init();
+    CacheTopology::Instance().Init();
     sampledallocation_allocator_.Init(&arena_);
     sampled_allocation_recorder_.Construct(&sampledallocation_allocator_);
     sampled_allocation_recorder().Init();
     peak_heap_tracker_.Init(&arena_);
+
+    const bool large_span_experiment =
+        IsExperimentActive(Experiment::TEST_ONLY_TCMALLOC_BIG_SPAN);
+    Parameters::set_max_span_cache_size(
+        large_span_experiment ? Span::kLargeCacheSize : Span::kCacheSize);
+
     span_allocator_.Init(&arena_);
     span_allocator_.New();  // Reduce cache conflicts
     span_allocator_.New();  // Reduce cache conflicts
     linked_sample_allocator_.Init(&arena_);
     // Do a bit of sanitizing: make sure central_cache is aligned properly
-    CHECK_CONDITION((sizeof(transfer_cache_) % ABSL_CACHELINE_SIZE) == 0);
+    TC_CHECK_EQ((sizeof(transfer_cache_) % ABSL_CACHELINE_SIZE), 0);
     transfer_cache_.Init();
-    if (IsExperimentActive(
-            Experiment::TEST_ONLY_TCMALLOC_SHARDED_TRANSFER_CACHE) ||
-        IsExperimentActive(
-            Experiment::TEST_ONLY_TCMALLOC_GENERIC_SHARDED_TRANSFER_CACHE) ||
-        IsExperimentActive(
-            Experiment::TCMALLOC_GENERIC_SHARDED_TRANSFER_CACHE)) {
-      // The constructor of the sharded transfer cache leaves it in a disabled
-      // state.
-      sharded_transfer_cache_.Init();
-    }
+    // The constructor of the sharded transfer cache leaves it in a disabled
+    // state.
+    sharded_transfer_cache_.Init();
     new (page_allocator_.memory) PageAllocator;
     threadcache_allocator_.Init(&arena_);
     pagemap_.MapRootWithSmallPages();

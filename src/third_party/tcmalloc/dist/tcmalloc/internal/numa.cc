@@ -16,25 +16,22 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <sched.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
 
-#include <array>
 #include <cstring>
 #include <optional>
 
 #include "absl/base/attributes.h"
-#include "absl/base/internal/sysinfo.h"
 #include "absl/functional/function_ref.h"
-#include "absl/strings/numbers.h"
-#include "absl/strings/string_view.h"
 #include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/environment.h"
 #include "tcmalloc/internal/logging.h"
+#include "tcmalloc/internal/percpu.h"
+#include "tcmalloc/internal/sysinfo.h"
 #include "tcmalloc/internal/util.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -53,75 +50,6 @@ int OpenSysfsCpulist(size_t node) {
   return signal_safe_open(path, O_RDONLY | O_CLOEXEC);
 }
 
-namespace {
-bool IsInBounds(int cpu) { return 0 <= cpu && cpu < CPU_SETSIZE; }
-}  // namespace
-
-std::optional<cpu_set_t> ParseCpulist(
-    absl::FunctionRef<ssize_t(char*, size_t)> read) {
-  cpu_set_t set;
-  CPU_ZERO(&set);
-
-  std::array<char, 16> buf;
-  size_t carry_over = 0;
-  int cpu_from = -1;
-
-  while (true) {
-    const ssize_t rc = read(buf.data() + carry_over, buf.size() - carry_over);
-    if (ABSL_PREDICT_FALSE(rc < 0)) {
-      return std::nullopt;
-    }
-
-    const absl::string_view current(buf.data(), carry_over + rc);
-
-    // If we have no more data to parse & couldn't read any then we've reached
-    // the end of the input & are done.
-    if (current.empty() && rc == 0) {
-      break;
-    }
-    if (current == "\n" && rc == 0) {
-      break;
-    }
-
-    size_t consumed;
-    const size_t dash = current.find('-');
-    const size_t comma = current.find(',');
-    if (dash != absl::string_view::npos && dash < comma) {
-      if (!absl::SimpleAtoi(current.substr(0, dash), &cpu_from) ||
-          !IsInBounds(cpu_from)) {
-        return std::nullopt;
-      }
-      consumed = dash + 1;
-    } else if (comma != absl::string_view::npos || rc == 0) {
-      int cpu;
-      if (!absl::SimpleAtoi(current.substr(0, comma), &cpu) ||
-          !IsInBounds(cpu)) {
-        return std::nullopt;
-      }
-      if (comma == absl::string_view::npos) {
-        consumed = current.size();
-      } else {
-        consumed = comma + 1;
-      }
-      if (cpu_from != -1) {
-        for (int c = cpu_from; c <= cpu; c++) {
-          CPU_SET(c, &set);
-        }
-        cpu_from = -1;
-      } else {
-        CPU_SET(cpu, &set);
-      }
-    } else {
-      consumed = 0;
-    }
-
-    carry_over = current.size() - consumed;
-    memmove(buf.data(), buf.data() + consumed, carry_over);
-  }
-
-  return set;
-}
-
 bool InitNumaTopology(size_t cpu_to_scaled_partition[CPU_SETSIZE],
                       uint64_t* const partition_to_nodes,
                       NumaBindMode* const bind_mode,
@@ -131,10 +59,6 @@ bool InitNumaTopology(size_t cpu_to_scaled_partition[CPU_SETSIZE],
   // doesn't support NUMA or the user opts out of our awareness of it - in
   // either case we'll record nothing in the loop below.
   partition_to_nodes[NodeToPartition(0, num_partitions)] |= 1 << 0;
-
-  // If we only compiled in support for one partition then we're trivially
-  // done; NUMA awareness is unavailable.
-  if (num_partitions == 1) return false;
 
   // We rely on rseq to quickly obtain a CPU ID & lookup the appropriate
   // partition in NumaTopology::GetCurrentPartition(). If rseq is unavailable,
@@ -152,9 +76,12 @@ bool InitNumaTopology(size_t cpu_to_scaled_partition[CPU_SETSIZE],
   // CPU 0 added above.
   const char* e =
       tcmalloc::tcmalloc_internal::thread_safe_getenv("TCMALLOC_NUMA_AWARE");
+  bool enabled = true;
   if (e == nullptr) {
     // Enable NUMA awareness iff default_want_numa_aware().
-    if (!default_want_numa_aware()) return false;
+    if (!default_want_numa_aware()) {
+      enabled = false;
+    }
   } else if (!strcmp(e, "no-binding")) {
     // Enable NUMA awareness with no memory binding behavior.
     *bind_mode = NumaBindMode::kNone;
@@ -166,9 +93,9 @@ bool InitNumaTopology(size_t cpu_to_scaled_partition[CPU_SETSIZE],
     *bind_mode = NumaBindMode::kStrict;
   } else if (!strcmp(e, "0")) {
     // Disable NUMA awareness.
-    return false;
+    enabled = false;
   } else {
-    Crash(kCrash, __FILE__, __LINE__, "bad TCMALLOC_NUMA_AWARE env var", e);
+    TC_BUG("bad TCMALLOC_NUMA_AWARE env var '%s'", e);
   }
 
   // The cpu_to_scaled_partition array has a fixed size so that we can
@@ -176,8 +103,8 @@ bool InitNumaTopology(size_t cpu_to_scaled_partition[CPU_SETSIZE],
   // allocated prior to lookups. It has CPU_SETSIZE entries which ought to be
   // sufficient, but sanity check that indexing it by CPU number shouldn't
   // exceed its bounds.
-  int num_cpus = absl::base_internal::NumCPUs();
-  CHECK_CONDITION(num_cpus <= CPU_SETSIZE);
+  int num_cpus = NumCPUs();
+  TC_CHECK_LE(num_cpus, CPU_SETSIZE);
 
   // We could just always report that we're NUMA aware, but if a NUMA-aware
   // binary runs on a system that doesn't include multiple NUMA nodes then our
@@ -192,7 +119,7 @@ bool InitNumaTopology(size_t cpu_to_scaled_partition[CPU_SETSIZE],
     if (fd == -1) {
       // We expect to encounter ENOENT once node surpasses the actual number of
       // nodes present in the system. Any other error is a problem.
-      CHECK_CONDITION(errno == ENOENT);
+      TC_CHECK_EQ(errno, ENOENT);
       break;
     }
 
@@ -215,7 +142,7 @@ bool InitNumaTopology(size_t cpu_to_scaled_partition[CPU_SETSIZE],
     // We are on the same side of an airtight hatchway as the kernel, but we
     // want to know if we can no longer parse the values the kernel is
     // providing.
-    CHECK_CONDITION(node_cpus.has_value());
+    TC_CHECK(node_cpus.has_value());
 
     // Assign local CPUs to the appropriate partition.
     for (size_t cpu = 0; cpu < CPU_SETSIZE; cpu++) {
@@ -233,7 +160,7 @@ bool InitNumaTopology(size_t cpu_to_scaled_partition[CPU_SETSIZE],
     signal_safe_close(fd);
   }
 
-  return numa_aware;
+  return enabled && numa_aware;
 }
 
 }  // namespace tcmalloc_internal

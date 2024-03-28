@@ -77,7 +77,7 @@ TEST(HotColdNew, OperatorNew) {
 
   // Try a single allocation using the new hot_cold_t type from the global
   // namespace.
-  void* ret = ::operator new(1, static_cast<::hot_cold_t>(0));
+  void* ret = ::operator new(1, static_cast<__hot_cold_t>(0));
   ASSERT_NE(ret, nullptr);
   benchmark::DoNotOptimize(memset(ret, 0xBF, 1));
   ::operator delete(ret);
@@ -124,7 +124,7 @@ TEST(HotColdNew, OperatorNewNothrow) {
 
   // Try a single allocation using the new hot_cold_t type from the global
   // namespace.
-  void* ret = ::operator new(1, std::nothrow, static_cast<::hot_cold_t>(0));
+  void* ret = ::operator new(1, std::nothrow, static_cast<__hot_cold_t>(0));
   ASSERT_NE(ret, nullptr);
   benchmark::DoNotOptimize(memset(ret, 0xBF, 1));
   ::operator delete(ret);
@@ -171,7 +171,7 @@ TEST(HotColdNew, OperatorNewArray) {
 
   // Try a single allocation using the new hot_cold_t type from the global
   // namespace.
-  void* ret = ::operator new[](1, static_cast<::hot_cold_t>(0));
+  void* ret = ::operator new[](1, static_cast<__hot_cold_t>(0));
   ASSERT_NE(ret, nullptr);
   benchmark::DoNotOptimize(memset(ret, 0xBF, 1));
   ::operator delete[](ret);
@@ -218,7 +218,7 @@ TEST(HotColdNew, OperatorNewArrayNothrow) {
 
   // Try a single allocation using the new hot_cold_t type from the global
   // namespace.
-  void* ret = ::operator new[](1, std::nothrow, static_cast<::hot_cold_t>(0));
+  void* ret = ::operator new[](1, std::nothrow, static_cast<__hot_cold_t>(0));
   ASSERT_NE(ret, nullptr);
   benchmark::DoNotOptimize(memset(ret, 0xBF, 1));
   ::operator delete[](ret);
@@ -298,7 +298,7 @@ TEST(HotColdNew, OperatorNewAligned) {
   // namespace.
   void* ptr =
       ::operator new(kSmall, static_cast<std::align_val_t>(kSmallAlignment),
-                     static_cast<::hot_cold_t>(0));
+                     static_cast<__hot_cold_t>(0));
   ASSERT_NE(ptr, nullptr);
   EXPECT_EQ(reinterpret_cast<uintptr_t>(ptr) & (kSmallAlignment - 1u), 0);
   benchmark::DoNotOptimize(memset(ptr, 0xBF, kSmall));
@@ -354,7 +354,7 @@ TEST(HotColdNew, OperatorNewAlignedNothrow) {
   // namespace.
   void* ptr =
       ::operator new(kSmall, static_cast<std::align_val_t>(kSmallAlignment),
-                     std::nothrow, static_cast<::hot_cold_t>(0));
+                     std::nothrow, static_cast<__hot_cold_t>(0));
   ASSERT_NE(ptr, nullptr);
   EXPECT_EQ(reinterpret_cast<uintptr_t>(ptr) & (kSmallAlignment - 1u), 0);
   benchmark::DoNotOptimize(memset(ptr, 0xBF, kSmall));
@@ -410,7 +410,7 @@ TEST(HotColdNew, OperatorNewArrayAligned) {
   // namespace.
   void* ptr =
       ::operator new[](kSmall, static_cast<std::align_val_t>(kSmallAlignment),
-                       static_cast<::hot_cold_t>(0));
+                       static_cast<__hot_cold_t>(0));
   ASSERT_NE(ptr, nullptr);
   EXPECT_EQ(reinterpret_cast<uintptr_t>(ptr) & (kSmallAlignment - 1u), 0);
   benchmark::DoNotOptimize(memset(ptr, 0xBF, kSmall));
@@ -466,7 +466,7 @@ TEST(HotColdNew, OperatorNewArrayAlignedNothrow) {
   // namespace.
   void* ptr =
       ::operator new[](kSmall, static_cast<std::align_val_t>(kSmallAlignment),
-                       std::nothrow, static_cast<::hot_cold_t>(0));
+                       std::nothrow, static_cast<__hot_cold_t>(0));
   ASSERT_NE(ptr, nullptr);
   EXPECT_EQ(reinterpret_cast<uintptr_t>(ptr) & (kSmallAlignment - 1u), 0);
   benchmark::DoNotOptimize(memset(ptr, 0xBF, kSmall));

@@ -92,6 +92,11 @@ if not use_system_version_of_library('tcmalloc-google'):
         'CPPPATH': ['#/src/third_party/tcmalloc/dist'],
     }
 
+    if get_option('link-model') == 'dynamic':
+        thirdPartyEnvironmentModifications['tcmalloc']['CPPDEFINES'] = [
+            ('MONGO_TCMALLOC_DYNAMIC_BUILD', 1)
+        ]
+
 if not use_system_version_of_library('pcre2'):
     thirdPartyEnvironmentModifications['pcre2'] = {
         'CPPPATH': ['#/src/third_party/pcre2/src'],

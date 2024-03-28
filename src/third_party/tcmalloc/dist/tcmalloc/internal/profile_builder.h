@@ -50,10 +50,11 @@ class ProfileBuilder {
   // Adds the current process mappings to the profile.
   void AddCurrentMappings();
 
-  // Adds a single mapping to the profile and to lookup cache.
-  void AddMapping(uintptr_t memory_start, uintptr_t memory_limit,
-                  uintptr_t file_offset, absl::string_view filename,
-                  absl::string_view build_id);
+  // Adds a single mapping to the profile and to lookup cache and returns the
+  // resulting ID.
+  int AddMapping(uintptr_t memory_start, uintptr_t memory_limit,
+                 uintptr_t file_offset, absl::string_view filename,
+                 absl::string_view build_id);
 
   // Interns sv in the profile's string table and returns the resulting ID.
   int InternString(absl::string_view sv);
@@ -80,6 +81,14 @@ extern const absl::string_view kProfileDropFrames;
 
 absl::StatusOr<std::unique_ptr<perftools::profiles::Profile>> MakeProfileProto(
     const ::tcmalloc::Profile& profile);
+
+class PageFlags;
+class Residency;
+
+// Exposed to facilitate testing.
+absl::StatusOr<std::unique_ptr<perftools::profiles::Profile>> MakeProfileProto(
+    const ::tcmalloc::Profile& profile, PageFlags* pageflags,
+    Residency* residency);
 
 }  // namespace tcmalloc_internal
 }  // namespace tcmalloc

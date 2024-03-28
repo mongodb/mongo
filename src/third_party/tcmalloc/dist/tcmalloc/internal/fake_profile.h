@@ -15,13 +15,11 @@
 #ifndef TCMALLOC_INTERNAL_FAKE_PROFILE_H_
 #define TCMALLOC_INTERNAL_FAKE_PROFILE_H_
 
-#include <cstdint>
 #include <utility>
 #include <vector>
 
 #include "absl/functional/function_ref.h"
 #include "absl/time/time.h"
-#include "tcmalloc/internal_malloc_extension.h"
 #include "tcmalloc/malloc_extension.h"
 
 namespace tcmalloc {

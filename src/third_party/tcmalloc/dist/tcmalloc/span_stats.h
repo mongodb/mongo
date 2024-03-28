@@ -17,7 +17,7 @@
 
 #include <stddef.h>
 
-#include "absl/base/macros.h"
+#include "absl/base/optimization.h"
 #include "tcmalloc/internal/config.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN

@@ -14,14 +14,9 @@
 
 #include "tcmalloc/common.h"
 
-#include <algorithm>
-
-#include "tcmalloc/experiment.h"
-#include "tcmalloc/internal/environment.h"
+#include "absl/strings/string_view.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/optimization.h"
-#include "tcmalloc/pages.h"
-#include "tcmalloc/sampler.h"
-#include "tcmalloc/span.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -37,15 +32,17 @@ absl::string_view MemoryTagToLabel(MemoryTag tag) {
       return "SAMPLED";
     case MemoryTag::kCold:
       return "COLD";
-    default:
-      ASSUME(false);
+    case MemoryTag::kMetadata:
+      return "METADATA";
   }
+
+  ASSUME(false);
 }
 
 // This only provides correct answer for TCMalloc-allocated memory,
 // and may give a false positive for non-allocated block.
 extern "C" bool TCMalloc_Internal_PossiblyCold(const void* ptr) {
-  return IsColdMemory(ptr);
+  return GetMemoryTag(ptr) == MemoryTag::kCold;
 }
 
 }  // namespace tcmalloc_internal

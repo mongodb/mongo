@@ -15,6 +15,10 @@
 #ifndef TCMALLOC_INTERNAL_LINUX_SYSCALL_SUPPORT_H_
 #define TCMALLOC_INTERNAL_LINUX_SYSCALL_SUPPORT_H_
 
+#ifdef __linux__
+#include <linux/kernel-page-flags.h>
+#endif  // __linux__
+
 /* include/uapi/linux/rseq.h                                                 */
 
 struct kernel_rseq {
@@ -55,6 +59,10 @@ static_assert(sizeof(kernel_rseq_cs) == (4 * sizeof(unsigned long long)),
 #elif defined(__PPC__)
 #define __NR_rseq 387
 #endif
+#endif
+
+#ifndef KPF_ZERO_PAGE
+#define KPF_ZERO_PAGE 24
 #endif
 
 #endif  // TCMALLOC_INTERNAL_LINUX_SYSCALL_SUPPORT_H_

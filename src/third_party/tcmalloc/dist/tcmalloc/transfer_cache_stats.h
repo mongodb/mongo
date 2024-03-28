@@ -24,11 +24,9 @@ struct TransferCacheStats {
   size_t insert_hits;
   size_t insert_misses;
   size_t insert_object_misses;
-  size_t insert_non_batch_misses;
   size_t remove_hits;
   size_t remove_misses;
   size_t remove_object_misses;
-  size_t remove_non_batch_misses;
   size_t used;
   size_t capacity;
   size_t max_capacity;

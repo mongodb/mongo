@@ -1,3 +1,4 @@
+
 // Copyright 2019 The TCMalloc Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,8 +17,8 @@
 // a pointer that contains info about that page using a two-level array.
 //
 // The BITS parameter should be the number of bits required to hold
-// a page number.  E.g., with 32 bit pointers and 8K pages (i.e.,
-// page offset fits in lower 13 bits), BITS == 19.
+// a page number.  E.g., with 48-bit virtual address space and 8K pages
+// (i.e., page offset fits in lower 13 bits), BITS == 35 (48-13).
 //
 // A PageMap requires external synchronization, except for the get/sizeclass
 // methods (see explanation at top of tcmalloc.cc).
@@ -35,6 +36,8 @@
 #include "absl/base/attributes.h"
 #include "absl/base/thread_annotations.h"
 #include "tcmalloc/common.h"
+#include "tcmalloc/internal/allocation_guard.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
 #include "tcmalloc/malloc_tracing_extension.h"
 #include "tcmalloc/pages.h"
@@ -115,8 +118,8 @@ class PageMap2 {
   Span* get_existing(Number k) const ABSL_NO_THREAD_SAFETY_ANALYSIS {
     const Number i1 = k >> kLeafBits;
     const Number i2 = k & (kLeafLength - 1);
-    ASSERT((k >> BITS) == 0);
-    ASSERT(root_[i1] != nullptr);
+    TC_ASSERT_EQ(k >> BITS, 0);
+    TC_ASSERT_NE(root_[i1], nullptr);
     return root_[i1]->span[i2];
   }
 
@@ -126,20 +129,20 @@ class PageMap2 {
   sizeclass(Number k) const ABSL_NO_THREAD_SAFETY_ANALYSIS {
     const Number i1 = k >> kLeafBits;
     const Number i2 = k & (kLeafLength - 1);
-    ASSERT((k >> BITS) == 0);
-    ASSERT(root_[i1] != nullptr);
+    TC_ASSERT_EQ(k >> BITS, 0);
+    TC_ASSERT_NE(root_[i1], nullptr);
     return root_[i1]->sizeclass[i2];
   }
 
   void set(Number k, Span* s) {
-    ASSERT(k >> BITS == 0);
+    TC_ASSERT_EQ(k >> BITS, 0);
     const Number i1 = k >> kLeafBits;
     const Number i2 = k & (kLeafLength - 1);
     root_[i1]->span[i2] = s;
   }
 
   void set_with_sizeclass(Number k, Span* s, CompactSizeClass sc) {
-    ASSERT(k >> BITS == 0);
+    TC_ASSERT_EQ(k >> BITS, 0);
     const Number i1 = k >> kLeafBits;
     const Number i2 = k & (kLeafLength - 1);
     Leaf* leaf = root_[i1];
@@ -148,30 +151,30 @@ class PageMap2 {
   }
 
   void clear_sizeclass(Number k) {
-    ASSERT(k >> BITS == 0);
+    TC_ASSERT_EQ(k >> BITS, 0);
     const Number i1 = k >> kLeafBits;
     const Number i2 = k & (kLeafLength - 1);
     root_[i1]->sizeclass[i2] = 0;
   }
 
   void* get_hugepage(Number k) {
-    ASSERT(k >> BITS == 0);
+    TC_ASSERT_EQ(k >> BITS, 0);
     const Number i1 = k >> kLeafBits;
     const Number i2 = k & (kLeafLength - 1);
     const Leaf* leaf = root_[i1];
-    ASSERT(leaf != nullptr);
+    TC_ASSERT_NE(leaf, nullptr);
     return leaf->hugepage[i2 >> (kLeafBits - kLeafHugeBits)];
   }
 
   void set_hugepage(Number k, void* v) {
-    ASSERT(k >> BITS == 0);
+    TC_ASSERT_EQ(k >> BITS, 0);
     const Number i1 = k >> kLeafBits;
     const Number i2 = k & (kLeafLength - 1);
     root_[i1]->hugepage[i2 >> (kLeafBits - kLeafHugeBits)] = v;
   }
 
   bool Ensure(Number start, size_t n) {
-    ASSERT(n > 0);
+    TC_ASSERT_GT(n, 0);
     for (Number key = start; key <= start + n - 1;) {
       const Number i1 = key >> kLeafBits;
 
@@ -203,7 +206,7 @@ class PageMap2 {
 };
 
 // Three-level radix tree
-// Currently only used for TCMALLOC_SMALL_BUT_SLOW
+// Currently only used for TCMALLOC_INTERNAL_SMALL_BUT_SLOW
 template <int BITS, PagemapAllocator Allocator>
 class PageMap3 {
  private:
@@ -289,9 +292,9 @@ class PageMap3 {
     const Number i1 = k >> (kLeafBits + kMidBits);
     const Number i2 = (k >> kLeafBits) & (kMidLength - 1);
     const Number i3 = k & (kLeafLength - 1);
-    ASSERT((k >> BITS) == 0);
-    ASSERT(root_[i1] != nullptr);
-    ASSERT(root_[i1]->leafs[i2] != nullptr);
+    TC_ASSERT_EQ(k >> BITS, 0);
+    TC_ASSERT_NE(root_[i1], nullptr);
+    TC_ASSERT_NE(root_[i1]->leafs[i2], nullptr);
     return root_[i1]->leafs[i2]->span[i3];
   }
 
@@ -302,14 +305,14 @@ class PageMap3 {
     const Number i1 = k >> (kLeafBits + kMidBits);
     const Number i2 = (k >> kLeafBits) & (kMidLength - 1);
     const Number i3 = k & (kLeafLength - 1);
-    ASSERT((k >> BITS) == 0);
-    ASSERT(root_[i1] != nullptr);
-    ASSERT(root_[i1]->leafs[i2] != nullptr);
+    TC_ASSERT_EQ((k >> BITS), 0);
+    TC_ASSERT_NE(root_[i1], nullptr);
+    TC_ASSERT_NE(root_[i1]->leafs[i2], nullptr);
     return root_[i1]->leafs[i2]->sizeclass[i3];
   }
 
   void set(Number k, Span* s) {
-    ASSERT(k >> BITS == 0);
+    TC_ASSERT_EQ(k >> BITS, 0);
     const Number i1 = k >> (kLeafBits + kMidBits);
     const Number i2 = (k >> kLeafBits) & (kMidLength - 1);
     const Number i3 = k & (kLeafLength - 1);
@@ -317,7 +320,7 @@ class PageMap3 {
   }
 
   void set_with_sizeclass(Number k, Span* s, CompactSizeClass sc) {
-    ASSERT(k >> BITS == 0);
+    TC_ASSERT_EQ(k >> BITS, 0);
     const Number i1 = k >> (kLeafBits + kMidBits);
     const Number i2 = (k >> kLeafBits) & (kMidLength - 1);
     const Number i3 = k & (kLeafLength - 1);
@@ -327,7 +330,7 @@ class PageMap3 {
   }
 
   void clear_sizeclass(Number k) {
-    ASSERT(k >> BITS == 0);
+    TC_ASSERT_EQ(k >> BITS, 0);
     const Number i1 = k >> (kLeafBits + kMidBits);
     const Number i2 = (k >> kLeafBits) & (kMidLength - 1);
     const Number i3 = k & (kLeafLength - 1);
@@ -335,19 +338,19 @@ class PageMap3 {
   }
 
   void* get_hugepage(Number k) {
-    ASSERT(k >> BITS == 0);
+    TC_ASSERT_EQ(k >> BITS, 0);
     const Number i1 = k >> (kLeafBits + kMidBits);
     const Number i2 = (k >> kLeafBits) & (kMidLength - 1);
     const Number i3 = k & (kLeafLength - 1);
     const Node* node = root_[i1];
-    ASSERT(node != nullptr);
+    TC_ASSERT_NE(node, nullptr);
     const Leaf* leaf = node->leafs[i2];
-    ASSERT(leaf != nullptr);
+    TC_ASSERT_NE(leaf, nullptr);
     return leaf->hugepage[i3 >> (kLeafBits - kLeafHugeBits)];
   }
 
   void set_hugepage(Number k, void* v) {
-    ASSERT(k >> BITS == 0);
+    TC_ASSERT_EQ(k >> BITS, 0);
     const Number i1 = k >> (kLeafBits + kMidBits);
     const Number i2 = (k >> kLeafBits) & (kMidLength - 1);
     const Number i3 = k & (kLeafLength - 1);
@@ -438,7 +441,7 @@ class PageMap {
   ABSL_ATTRIBUTE_RETURNS_NONNULL inline Span* GetExistingDescriptor(
       PageId p) const ABSL_NO_THREAD_SAFETY_ANALYSIS {
     Span* span = map_.get_existing(p.index());
-    ASSERT(span != nullptr);
+    TC_ASSERT_NE(span, nullptr);
     return span;
   }
 
@@ -463,7 +466,7 @@ class PageMap {
   int GetAllocatedSpans(
       std::vector<tcmalloc::malloc_tracing_extension::AllocatedAddressRanges::
                       SpanDetails>& allocated_spans) {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     int allocated_span_count = 0;
     for (std::optional<uintptr_t> i = 0; i.has_value();
          i = map_.get_next_set_page(i.value())) {
@@ -471,13 +474,13 @@ class PageMap {
       Span* s = GetDescriptor(page_id);
       if (s == nullptr) {
         // The value returned by get_next_set_page should belong to a Span.
-        ASSERT(i == 0);
+        TC_ASSERT_EQ(i, 0);
         continue;
       }
       // Free'd up Span that's not yet removed from PageMap.
       if (page_id < s->first_page() || s->last_page() < page_id) continue;
       CompactSizeClass size_class = sizeclass(page_id);
-      ASSERT(s->first_page().index() == i);
+      TC_ASSERT_EQ(s->first_page().index(), i);
       // As documented, GetAllocatedSpans wants to avoid allocating more memory
       // for the output vector while holding the pageheap_lock. So, we stop
       // adding more entries after we reach its existing capacity. Note that the

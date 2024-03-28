@@ -36,11 +36,11 @@ try:
 except OSError as exc:
     print(f"""
 Failed to open {ninja_last_cmd_file}, this is expected to be generated on ninja execution by the mongo-ninja-python module.
-          
-Make sure you are in the recommended virtualenv: 
+
+Make sure you are in the recommended virtualenv:
 https://github.com/10gen/mongo/blob/master/docs/building.md#python-prerequisites
-          
-The command `hash -r && which ninja` should reference a ninja file located within the virtualenv. 
+
+The command `hash -r && which ninja` should reference a ninja file located within the virtualenv.
 If this is not the case, the virtualenv may have become corrupted and you will need to delete it
 and create a new one from scratch based on the commands in the doc link above.
 """)

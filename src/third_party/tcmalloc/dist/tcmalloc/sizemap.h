@@ -18,13 +18,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <algorithm>
-#include <limits>
-#include <type_traits>
-
 #include "absl/base/attributes.h"
 #include "absl/base/dynamic_annotations.h"
-#include "absl/base/macros.h"
 #include "absl/base/optimization.h"
 #include "absl/numeric/bits.h"
 #include "absl/types/span.h"
@@ -39,24 +34,63 @@ namespace tcmalloc {
 namespace tcmalloc_internal {
 
 // Definition of size class that is set in size_classes.cc
-extern const absl::Span<const SizeClassInfo> kSizeClasses;
+extern const SizeClasses kSizeClasses;
 
 // Experimental size classes:
-extern const absl::Span<const SizeClassInfo> kExperimentalPow2SizeClasses;
-extern const absl::Span<const SizeClassInfo> kLegacySizeClasses;
+extern const SizeClasses kExperimentalPow2SizeClasses;
+extern const SizeClasses kLegacySizeClasses;
+extern const SizeClasses kLowFragSizeClasses;
 
 // Size-class information + mapping
 class SizeMap {
  public:
-  // All size classes <= 512 in all configs always have 1 page spans.
-  static constexpr size_t kMultiPageSize = 512;
-  // Min alignment for all size classes > kMultiPageSize in all configs.
-  static constexpr size_t kMultiPageAlignment = 64;
-  // log2 (kMultiPageAlignment)
-  static constexpr size_t kMultiPageAlignmentShift =
-      absl::bit_width(kMultiPageAlignment - 1u);
+  // Min allocation size for cold. Once more applications can provide cold hints
+  // with PGHO, we can consider adding more size classes for cold to increase
+  // cold coverage fleet-wide.
+  static constexpr size_t kMinAllocSizeForCold = 4096;
+  static constexpr int kLargeSize = 1024;
+  static constexpr int kLargeSizeAlignment = 128;
 
  private:
+  // Shifts the provided value right by `n` bits.
+  //
+  // TODO(b/281517865): the LLVM codegen for ClassIndexMaybe() doesn't use
+  // an immediate shift for the `>> 3` and `>> 7` operations due to a missed
+  // optimization / miscompile in clang, resulting in this codegen:
+  //
+  //   mov        $0x3,%ecx
+  //   mov        $0x7,%eax
+  //   add        %edi,%eax
+  //   shr        %cl,%rax
+  //
+  // Immediate shift has latency 1 vs 3 for cl shift, and also the `add` can
+  // be far more efficient, which we force into inline assembly here:
+  //
+  //   lea        0x7(%rdi),%rax
+  //   shr        $0x3,%rax
+  //
+  // Benchmark:
+  // BM_new_sized_delete/1      6.51ns ± 5%   6.00ns ± 1%   -7.73%  (p=0.000)
+  // BM_new_sized_delete/8      6.51ns ± 5%   6.01ns ± 1%   -7.66%  (p=0.000)
+  // BM_new_sized_delete/64     6.52ns ± 5%   6.04ns ± 1%   -7.37%  (p=0.000)
+  // BM_new_sized_delete/512    6.71ns ± 6%   6.21ns ± 1%   -7.40%  (p=0.000)
+  template <int n>
+  ABSL_ATTRIBUTE_ALWAYS_INLINE static inline size_t Shr(size_t value) {
+    TC_ASSERT_LE(value, std::numeric_limits<uint32_t>::max());
+#if defined(__x86_64__)
+    asm("shrl %[n], %k[value]" : [value] "+r"(value) : [n] "n"(n));
+    return value;
+#elif defined(__aarch64__)
+    size_t result;
+    asm("lsr %[result], %[value], %[n]"
+        : [result] "=r"(result)
+        : [value] "r"(value), [n] "n"(n));
+    return result;
+#else
+    return value >> n;
+#endif
+  }
+
   //-------------------------------------------------------------------
   // Mapping from size to size_class and vice versa
   //-------------------------------------------------------------------
@@ -79,7 +113,6 @@ class SizeMap {
   //   1025       (1025 + 127 + (120<<7)) / 128   129
   //   ...
   //   32768      (32768 + 127 + (120<<7)) / 128  376
-  static constexpr int kMaxSmallSize = 1024;
   static constexpr size_t kClassArraySize =
       ((kMaxSize + 127 + (120 << 7)) >> 7) + 1;
 
@@ -100,24 +133,26 @@ class SizeMap {
   // per-thread free list until the scavenger cleans up the list.
   BatchSize num_objects_to_move_[kNumClasses] = {0};
 
+  uint32_t max_capacity_[kNumClasses] = {0};
+
   // If size is no more than kMaxSize, compute index of the
   // class_array[] entry for it, putting the class index in output
   // parameter idx and returning true. Otherwise return false.
-  ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool ClassIndexMaybe(
-      size_t s, uint32_t* idx) {
-    if (ABSL_PREDICT_TRUE(s <= kMaxSmallSize)) {
-      *idx = (static_cast<uint32_t>(s) + 7) >> 3;
+  ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool ClassIndexMaybe(size_t s,
+                                                                  size_t& idx) {
+    if (ABSL_PREDICT_TRUE(s <= kLargeSize)) {
+      idx = Shr<3>(s + 7);
       return true;
     } else if (s <= kMaxSize) {
-      *idx = (static_cast<uint32_t>(s) + 127 + (120 << 7)) >> 7;
+      idx = Shr<7>(s + 127 + (120 << 7));
       return true;
     }
     return false;
   }
 
   ABSL_ATTRIBUTE_ALWAYS_INLINE static inline size_t ClassIndex(size_t s) {
-    uint32_t ret;
-    CHECK_CONDITION(ClassIndexMaybe(s, &ret));
+    size_t ret;
+    TC_CHECK(ClassIndexMaybe(s, ret));
     return ret;
   }
 
@@ -132,12 +167,19 @@ class SizeMap {
   bool SetSizeClasses(absl::Span<const SizeClassInfo> size_classes);
 
   // Check that the size classes meet all requirements.
-  bool ValidSizeClasses(absl::Span<const SizeClassInfo> size_classes);
+  static bool ValidSizeClasses(absl::Span<const SizeClassInfo> size_classes);
 
-  size_t cold_sizes_[12] = {0};
+  size_t cold_sizes_[kNumBaseClasses] = {0};
   size_t cold_sizes_count_ = 0;
 
  public:
+  // Returns size classes to use in the current process.
+  static const SizeClasses& CurrentClasses();
+
+  // Checks assumptions used to generate the current size classes.
+  // Prints any wrong assumptions to stderr.
+  static void CheckAssumptions();
+
   // constexpr constructor to guarantee zero-initialization at compile-time.  We
   // rely on Init() to populate things.
   constexpr SizeMap() = default;
@@ -163,17 +205,17 @@ class SizeMap {
   // absl::optional<uint32_t>.
   template <typename Policy>
   ABSL_ATTRIBUTE_ALWAYS_INLINE inline bool GetSizeClass(
-      Policy policy, size_t size, uint32_t* size_class) const {
+      Policy policy, size_t size, size_t* size_class) const {
     const size_t align = policy.align();
-    ASSERT(align == 0 || absl::has_single_bit(align));
+    TC_ASSERT(absl::has_single_bit(align));
 
     if (ABSL_PREDICT_FALSE(align > kPageSize)) {
       ABSL_ANNOTATE_MEMORY_IS_UNINITIALIZED(size_class, sizeof(*size_class));
       return false;
     }
 
-    uint32_t idx;
-    if (ABSL_PREDICT_FALSE(!ClassIndexMaybe(size, &idx))) {
+    size_t idx;
+    if (ABSL_PREDICT_FALSE(!ClassIndexMaybe(size, idx))) {
       ABSL_ANNOTATE_MEMORY_IS_UNINITIALIZED(size_class, sizeof(*size_class));
       return false;
     }
@@ -182,19 +224,31 @@ class SizeMap {
     } else {
       *size_class = class_array_[idx] + policy.scaled_numa_partition();
     }
-    if (align == 0) return true;
+
+    // Don't search for suitably aligned class for operator new
+    // (when alignment is statically known to be no greater than kAlignment).
+    // But don't do this check at runtime when the alignment is dynamic.
+    // We assume aligned allocation functions are not used with small alignment
+    // most of the time (does not make much sense). And for alignment larger
+    // than kAlignment, this is just an unnecessary check that always fails.
+    if (__builtin_constant_p(align) &&
+        align <= static_cast<size_t>(kAlignment)) {
+      return true;
+    }
 
     // Predict that size aligned allocs most often directly map to a proper
     // size class, i.e., multiples of 32, 64, etc, matching our class sizes.
-    const size_t mask = align - 1;
-    do {
-      if (ABSL_PREDICT_TRUE((class_to_size(*size_class) & mask) == 0)) {
-        return true;
-      }
-    } while ((++*size_class % kNumBaseClasses) != 0);
-
-    ABSL_ANNOTATE_MEMORY_IS_UNINITIALIZED(size_class, sizeof(*size_class));
-    return false;
+    // Since alignment is <= kPageSize, we must find a suitable class
+    // (at least kMaxSize is aligned on kPageSize).
+    static_assert((kMaxSize % kPageSize) == 0, "the loop below won't work");
+    // Profiles say we usually get the right class based on the size,
+    // so avoid the loop overhead on the fast path.
+    if (ABSL_PREDICT_FALSE(class_to_size(*size_class) & (align - 1))) {
+      do {
+        ++*size_class;
+      } while (ABSL_PREDICT_FALSE(class_to_size(*size_class) & (align - 1)));
+    }
+    return true;
   }
 
   // Returns size class for given size, or 0 if this instance has not been
@@ -202,8 +256,8 @@ class SizeMap {
   template <typename Policy>
   ABSL_ATTRIBUTE_ALWAYS_INLINE inline size_t SizeClass(Policy policy,
                                                        size_t size) const {
-    ASSERT(size <= kMaxSize);
-    uint32_t ret = 0;
+    ASSUME(size <= kMaxSize);
+    size_t ret = 0;
     GetSizeClass(policy, size, &ret);
     return ret;
   }
@@ -212,14 +266,14 @@ class SizeMap {
   // kNumClasses.
   ABSL_ATTRIBUTE_ALWAYS_INLINE inline size_t class_to_size(
       size_t size_class) const {
-    ASSERT(size_class < kNumClasses);
+    TC_ASSERT_LT(size_class, kNumClasses);
     return class_to_size_[size_class];
   }
 
   // Mapping from size class to number of pages to allocate at a time
   ABSL_ATTRIBUTE_ALWAYS_INLINE inline size_t class_to_pages(
       size_t size_class) const {
-    ASSERT(size_class < kNumClasses);
+    TC_ASSERT_LT(size_class, kNumClasses);
     return class_to_pages_[size_class];
   }
 
@@ -230,8 +284,16 @@ class SizeMap {
   // per-thread free list until the scavenger cleans up the list.
   ABSL_ATTRIBUTE_ALWAYS_INLINE inline SizeMap::BatchSize num_objects_to_move(
       size_t size_class) const {
-    ASSERT(size_class < kNumClasses);
+    TC_ASSERT_LT(size_class, kNumClasses);
     return num_objects_to_move_[size_class];
+  }
+
+  // Max per-CPU slab capacity for the default 256KB slab size.
+  //
+  // TODO(b/271598304): Revise this when 512KB slabs are available.
+  ABSL_ATTRIBUTE_ALWAYS_INLINE size_t max_capacity(size_t size_class) const {
+    TC_ASSERT_LT(size_class, kNumClasses);
+    return max_capacity_[size_class];
   }
 
   ABSL_ATTRIBUTE_ALWAYS_INLINE absl::Span<const size_t> ColdSizeClasses()

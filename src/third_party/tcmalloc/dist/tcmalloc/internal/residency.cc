@@ -14,18 +14,16 @@
 
 #include "tcmalloc/internal/residency.h"
 
-#include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <optional>
-#include <string>
 
 #include "absl/status/status.h"
-#include "absl/strings/str_cat.h"
 #include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/util.h"
 

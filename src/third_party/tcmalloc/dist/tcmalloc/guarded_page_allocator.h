@@ -15,17 +15,22 @@
 #ifndef TCMALLOC_GUARDED_PAGE_ALLOCATOR_H_
 #define TCMALLOC_GUARDED_PAGE_ALLOCATOR_H_
 
-#include <stddef.h>
-#include <stdint.h>
-#include <sys/types.h>
-
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <utility>
 
 #include "absl/base/attributes.h"
+#include "absl/base/const_init.h"
 #include "absl/base/internal/spinlock.h"
 #include "absl/base/thread_annotations.h"
 #include "tcmalloc/common.h"
+#include "tcmalloc/guarded_allocations.h"
+#include "tcmalloc/internal/atomic_stats_counter.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
+#include "tcmalloc/internal/stacktrace_filter.h"
+#include "tcmalloc/pages.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {
@@ -64,23 +69,8 @@ namespace tcmalloc_internal {
 //   }
 class GuardedPageAllocator {
  public:
-  struct GpaStackTrace {
-    void* stack[kMaxStackDepth];
-    size_t depth = 0;
-    pid_t tid = 0;
-  };
-
   // Maximum number of pages this class can allocate.
   static constexpr size_t kGpaMaxPages = 512;
-
-  enum class ErrorType {
-    kUseAfterFree,
-    kBufferUnderflow,
-    kBufferOverflow,
-    kDoubleFree,
-    kBufferOverflowOnDealloc,
-    kUnknown,
-  };
 
   constexpr GuardedPageAllocator()
       : guarded_page_lock_(absl::kConstInit,
@@ -88,14 +78,14 @@ class GuardedPageAllocator {
         free_pages_{},
         num_alloced_pages_(0),
         num_alloced_pages_max_(0),
-        num_allocation_requests_(0),
-        num_failed_allocations_(0),
         data_(nullptr),
         pages_base_addr_(0),
         pages_end_addr_(0),
         first_page_addr_(0),
         max_alloced_pages_(0),
         total_pages_(0),
+        total_pages_used_(0),
+        alloced_page_count_when_all_used_once_(0),
         page_size_(0),
         rand_(0),
         initialized_(false),
@@ -127,25 +117,27 @@ class GuardedPageAllocator {
   // and avoiding use-after-destruction issues for static/global instances.
   void Destroy();
 
-  struct AllocWithStatus {
-    void* alloc = nullptr;
-    Profile::Sample::GuardedStatus status =
-        Profile::Sample::GuardedStatus::Unknown;
-  };
+  // If this allocation can be guarded, and if it's time to do a guarded sample,
+  // returns an instance of GuardedAllocWithStatus, that includes guarded
+  // allocation Span and guarded status. Otherwise, returns nullptr and the
+  // status indicating why the allocation may not be guarded.
+  GuardedAllocWithStatus TrySample(size_t size, size_t alignment,
+                                   Length num_pages,
+                                   const StackTrace& stack_trace);
 
-  // On success, returns an instance of AllocWithStatus which includes a pointer
-  // to size bytes of page-guarded memory, aligned to alignment.  The member
-  // 'alloc' is a pointer that is guaranteed to be tagged.
-  // The 'status' member is set to GuardedStatus::Guarded.
-  // On failure, returns an instance of AllocWithStatus (the 'alloc' member is
-  // set to 'nullptr').  Failure can occur if memory could not be mapped or
-  // protected, if all guarded pages are already allocated, or if size is 0.
-  // These conditions are reflected in the 'status' member of the
-  // AllocWithStatus return value.
+  // On success, returns an instance of GuardedAllocWithStatus which includes a
+  // pointer to size bytes of page-guarded memory, aligned to alignment.  The
+  // member 'alloc' is a pointer that is guaranteed to be tagged.  The 'status'
+  // member is set to GuardedStatus::Guarded.  On failure, returns an instance
+  // of GuardedAllocWithStatus (the 'alloc' member is set to 'nullptr').
+  // Failure can occur if memory could not be mapped or protected, if all
+  // guarded pages are already allocated, or if size is 0.  These conditions are
+  // reflected in the 'status' member of the GuardedAllocWithStatus return
+  // value.
   //
   // Precondition:  size and alignment <= page_size_
   // Precondition:  alignment is 0 or a power of 2
-  AllocWithStatus Allocate(size_t size, size_t alignment)
+  GuardedAllocWithStatus Allocate(size_t size, size_t alignment)
       ABSL_LOCKS_EXCLUDED(guarded_page_lock_);
 
   // Deallocates memory pointed to by ptr.  ptr must have been previously
@@ -169,8 +161,9 @@ class GuardedPageAllocator {
   // Returns the likely error type for an access at ptr.
   //
   // Requires that ptr points to memory mapped by this class.
-  ErrorType GetStackTraces(const void* ptr, GpaStackTrace* alloc_trace,
-                           GpaStackTrace* dealloc_trace) const;
+  GuardedAllocationsErrorType GetStackTraces(
+      const void* ptr, GuardedAllocationsStackTrace** alloc_trace,
+      GuardedAllocationsStackTrace** dealloc_trace) const;
 
   // Writes a human-readable summary of GuardedPageAllocator's internal state to
   // *out.
@@ -187,22 +180,29 @@ class GuardedPageAllocator {
 
   // Allows Allocate() to start returning allocations.
   void AllowAllocations() ABSL_LOCKS_EXCLUDED(guarded_page_lock_) {
-    absl::base_internal::SpinLockHolder h(&guarded_page_lock_);
+    AllocationGuardSpinLockHolder h(&guarded_page_lock_);
     allow_allocations_ = true;
   }
 
   // Returns the number of pages available for allocation, based on how many are
   // currently in use.  (Should only be used in testing.)
   size_t GetNumAvailablePages() ABSL_LOCKS_EXCLUDED(guarded_page_lock_) {
-    absl::base_internal::SpinLockHolder h(&guarded_page_lock_);
+    AllocationGuardSpinLockHolder h(&guarded_page_lock_);
     return max_alloced_pages_ - num_alloced_pages_;
   }
+
+  size_t SuccessfulAllocations() { return num_successful_allocations_.value(); }
+
+  // Resets sampling state.
+  void Reset();
+
+  size_t page_size() const { return page_size_; }
 
  private:
   // Structure for storing data about a slot.
   struct SlotMetadata {
-    GpaStackTrace alloc_trace;
-    GpaStackTrace dealloc_trace;
+    GuardedAllocationsStackTrace alloc_trace;
+    GuardedAllocationsStackTrace dealloc_trace;
     size_t requested_size = 0;
     uintptr_t allocation_start = 0;
   };
@@ -245,7 +245,8 @@ class GuardedPageAllocator {
 
   // Returns the likely error type for the given access address and metadata
   // associated with the nearest slot.
-  ErrorType GetErrorType(uintptr_t addr, const SlotMetadata& d) const;
+  GuardedAllocationsErrorType GetErrorType(uintptr_t addr,
+                                           const SlotMetadata& d) const;
 
   // Magic constant used for detecting write-overflows at deallocation time.
   static uint8_t GetWriteOverflowMagic(size_t slot) {
@@ -264,6 +265,11 @@ class GuardedPageAllocator {
   uintptr_t SlotToAddr(size_t slot) const;
   size_t AddrToSlot(uintptr_t addr) const;
 
+  // Returns a random number in range [0, max).
+  size_t Rand(size_t max);
+
+  StackTraceFilter stacktrace_filter_;
+
   absl::base_internal::SpinLock guarded_page_lock_;
 
   // Maps each bool to one page.
@@ -276,11 +282,11 @@ class GuardedPageAllocator {
   // The high-water mark for num_alloced_pages_.
   size_t num_alloced_pages_max_ ABSL_GUARDED_BY(guarded_page_lock_);
 
-  // Number of calls to Allocate.
-  size_t num_allocation_requests_ ABSL_GUARDED_BY(guarded_page_lock_);
+  // Number of successful allocations (calls to Allocate - failed).
+  tcmalloc_internal::StatsCounter num_successful_allocations_;
 
   // Number of times Allocate has failed.
-  size_t num_failed_allocations_ ABSL_GUARDED_BY(guarded_page_lock_);
+  tcmalloc_internal::StatsCounter num_failed_allocations_;
 
   // A dynamically-allocated array of stack trace data captured when each page
   // is allocated/deallocated.  Printed by the SEGV handler when a memory error
@@ -292,8 +298,14 @@ class GuardedPageAllocator {
   uintptr_t first_page_addr_;  // Points to first page returnable by Allocate.
   size_t max_alloced_pages_;   // Max number of pages to allocate at once.
   size_t total_pages_;         // Size of the page pool to allocate from.
+  // Number of pages allocated at least once from page pool.
+  size_t total_pages_used_ ABSL_GUARDED_BY(guarded_page_lock_);
+  // The count of allocs when all the pages had been used at least once (i.e.
+  // when total_pages_used_ == total_pages_).
+  size_t alloced_page_count_when_all_used_once_
+      ABSL_GUARDED_BY(guarded_page_lock_);
   size_t page_size_;           // Size of pages we allocate.
-  uint64_t rand_;              // RNG seed.
+  std::atomic<uint64_t> rand_;  // RNG seed.
 
   // True if this object has been fully initialized.
   bool initialized_ ABSL_GUARDED_BY(guarded_page_lock_);

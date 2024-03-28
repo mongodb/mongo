@@ -15,9 +15,10 @@
 #ifndef TCMALLOC_INTERNAL_PROC_MAPS_H_
 #define TCMALLOC_INTERNAL_PROC_MAPS_H_
 
-#include <limits.h>
 #include <stdint.h>
 #include <sys/types.h>
+
+#include <cstddef>
 
 #include "tcmalloc/internal/config.h"
 

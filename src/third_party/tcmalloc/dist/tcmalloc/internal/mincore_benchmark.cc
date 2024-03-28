@@ -16,14 +16,13 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <set>
 
-#include "absl/memory/memory.h"
 #include "benchmark/benchmark.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
-#include "tcmalloc/internal/mincore.h"
 #include "tcmalloc/internal/page_size.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -39,7 +38,7 @@ void BM_mincore(benchmark::State& state) {
   // If we want to place the array on the stack then the maximum frame size is
   // 16KiB. So there is no point in benchmarking sizes larger than this.
   const int kMaxArraySize = 16 * 1024;
-  CHECK_CONDITION(size <= kMaxArraySize);
+  TC_CHECK_LE(size, kMaxArraySize);
   auto resident = std::make_unique<unsigned char[]>(kMaxArraySize);
 
   const size_t kPageSize = tcmalloc_internal::GetPageSize();

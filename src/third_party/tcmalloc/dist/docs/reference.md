@@ -72,6 +72,12 @@ enabled with the Abseil build-time configuration macro
 If the `std::no_throw_t` variant is utilized, upon failure, `::operator new`
 will return `nullptr` instead.
 
+The `tcmalloc::hot_cold_t` variant accepts a `hot_cold` hint for how frequently
+an allocation would be accessed. It takes an 8-bit unsigned integer value, with
+`0` indicating that the allocation is rarely used and `255` indicating that the
+allocation is accessed very frequently. TCMalloc may use these hints for better
+data placement and locality.
+
 ### `::operator delete` / `::operator delete[]`
 
 ```

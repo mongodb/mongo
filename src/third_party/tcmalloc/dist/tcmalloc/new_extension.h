@@ -16,29 +16,28 @@
 #define TCMALLOC_NEW_EXTENSION_H_
 
 #include <cstddef>
-#include <cstdint>
 #include <new>
 
 #include "tcmalloc/malloc_extension.h"
 
 void* operator new(size_t size, tcmalloc::hot_cold_t hot_cold) noexcept(false);
-void* operator new(size_t size, const std::nothrow_t,
+void* operator new(size_t size, const std::nothrow_t&,
                    tcmalloc::hot_cold_t hot_cold) noexcept;
 void* operator new[](size_t size,
                      tcmalloc::hot_cold_t hot_cold) noexcept(false);
-void* operator new[](size_t size, const std::nothrow_t,
+void* operator new[](size_t size, const std::nothrow_t&,
                      tcmalloc::hot_cold_t hot_cold) noexcept;
 
 #ifdef __cpp_aligned_new
 void* operator new(size_t size, std::align_val_t alignment,
                    tcmalloc::hot_cold_t hot_cold) noexcept(false);
 void* operator new(size_t size, std::align_val_t alignment,
-                   const std::nothrow_t,
+                   const std::nothrow_t&,
                    tcmalloc::hot_cold_t hot_cold) noexcept;
 void* operator new[](size_t size, std::align_val_t alignment,
                      tcmalloc::hot_cold_t hot_cold) noexcept(false);
 void* operator new[](size_t size, std::align_val_t alignment,
-                     const std::nothrow_t,
+                     const std::nothrow_t&,
                      tcmalloc::hot_cold_t hot_cold) noexcept;
 #endif  // __cpp_aligned_new
 

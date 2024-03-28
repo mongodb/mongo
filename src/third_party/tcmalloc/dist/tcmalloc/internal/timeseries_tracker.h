@@ -162,7 +162,7 @@ void TimeSeriesTracker<T, S, kEpochs>::IterBackwards(
   // -1 means that we are outputting all epochs.
   num_epochs = (num_epochs == -1) ? kEpochs : num_epochs;
   size_t j = current_epoch_;
-  ASSERT(num_epochs <= kEpochs);
+  TC_ASSERT_LE(num_epochs, kEpochs);
   int64_t timestamp = last_epoch_ * absl::ToInt64Nanoseconds(epoch_length_);
   for (size_t offset = 0; offset < num_epochs; ++offset) {
     // This is deliberately int64_t and not a time unit, since clock_ is not

@@ -14,8 +14,16 @@
 
 #include "tcmalloc/internal/timeseries_tracker.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/base/internal/cycleclock.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
+#include "tcmalloc/internal/clock.h"
 
 using ::testing::ElementsAre;
 

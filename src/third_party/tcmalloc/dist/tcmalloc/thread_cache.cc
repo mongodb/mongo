@@ -15,9 +15,18 @@
 #include "tcmalloc/thread_cache.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 
-#include "absl/base/internal/spinlock.h"
+#include "absl/base/attributes.h"
 #include "absl/base/macros.h"
+#include "absl/base/optimization.h"
+#include "absl/types/span.h"
+#include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/logging.h"
+#include "tcmalloc/page_heap_allocator.h"
+#include "tcmalloc/static_vars.h"
 #include "tcmalloc/transfer_cache.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -35,7 +44,7 @@ ABSL_CONST_INIT thread_local ThreadCache* ThreadCache::thread_local_data_
 ABSL_CONST_INIT bool ThreadCache::tsd_inited_ = false;
 pthread_key_t ThreadCache::heap_key_;
 
-void ThreadCache::Init(pthread_t tid) {
+ThreadCache::ThreadCache(pthread_t tid) {
   size_ = 0;
 
   max_size_ = 0;
@@ -47,7 +56,7 @@ void ThreadCache::Init(pthread_t tid) {
 
     // Take unclaimed_cache_space_ negative.
     unclaimed_cache_space_ -= kMinThreadCacheSize;
-    ASSERT(unclaimed_cache_space_ < 0);
+    TC_ASSERT_LT(unclaimed_cache_space_, 0);
   }
 
   next_ = nullptr;
@@ -57,24 +66,26 @@ void ThreadCache::Init(pthread_t tid) {
   for (size_t size_class = 0; size_class < kNumClasses; ++size_class) {
     list_[size_class].Init();
   }
+
+  (void)padding_;  // to suppress "private field is not used" warning
 }
 
 void ThreadCache::Cleanup() {
-  // Put unused memory back into central cache
+  // Put unused memory back into transfer cache
   for (int size_class = 0; size_class < kNumClasses; ++size_class) {
-    if (list_[size_class].length() > 0) {
-      ReleaseToCentralCache(&list_[size_class], size_class,
-                            list_[size_class].length());
+    if (!list_[size_class].empty()) {
+      ReleaseToTransferCache(&list_[size_class], size_class,
+                             list_[size_class].length());
     }
   }
 }
 
-// Remove some objects of class "size_class" from central cache and add to
+// Remove some objects of class "size_class" from transfer cache and add to
 // thread heap. On success, return the first object for immediate use; otherwise
 // return NULL.
-void* ThreadCache::FetchFromCentralCache(size_t size_class, size_t byte_size) {
+void* ThreadCache::FetchFromTransferCache(size_t size_class, size_t byte_size) {
   FreeList* list = &list_[size_class];
-  ASSERT(list->empty());
+  TC_ASSERT(list->empty());
   const int batch_size = tc_globals.sizemap().num_objects_to_move(size_class);
 
   const int num_to_move = std::min<int>(list->max_length(), batch_size);
@@ -96,16 +107,14 @@ void* ThreadCache::FetchFromCentralCache(size_t size_class, size_t byte_size) {
   if (list->max_length() < batch_size) {
     list->set_max_length(list->max_length() + 1);
   } else {
-    // Don't let the list get too long.  In 32 bit builds, the length
-    // is represented by a 16 bit int, so we need to watch out for
-    // integer overflow.
-    int new_length = std::min<int>(list->max_length() + batch_size,
-                                   kMaxDynamicFreeListLength);
+    // Don't let the list get too long.
+    size_t new_length =
+        std::min(list->max_length() + batch_size, kMaxDynamicFreeListLength);
     // The list's max_length must always be a multiple of batch_size,
     // and kMaxDynamicFreeListLength is not necessarily a multiple
     // of batch_size.
     new_length -= new_length % batch_size;
-    ASSERT(new_length % batch_size == 0);
+    TC_ASSERT_EQ(new_length % batch_size, 0);
     list->set_max_length(new_length);
   }
   return batch[0];
@@ -113,10 +122,10 @@ void* ThreadCache::FetchFromCentralCache(size_t size_class, size_t byte_size) {
 
 void ThreadCache::ListTooLong(FreeList* list, size_t size_class) {
   const int batch_size = tc_globals.sizemap().num_objects_to_move(size_class);
-  ReleaseToCentralCache(list, size_class, batch_size);
+  ReleaseToTransferCache(list, size_class, batch_size);
 
   // If the list is too long, we need to transfer some number of
-  // objects to the central cache.  Ideally, we would transfer
+  // objects to the transfer cache.  Ideally, we would transfer
   // num_objects_to_move, so the code below tries to make max_length
   // converge on num_objects_to_move.
 
@@ -128,22 +137,22 @@ void ThreadCache::ListTooLong(FreeList* list, size_t size_class) {
     // shrink it, some amount of memory will always stay in this freelist.
     list->set_length_overages(list->length_overages() + 1);
     if (list->length_overages() > kMaxOverages) {
-      ASSERT(list->max_length() > batch_size);
+      TC_ASSERT_GT(list->max_length(), batch_size);
       list->set_max_length(list->max_length() - batch_size);
       list->set_length_overages(0);
     }
   }
 }
 
-// Remove some objects of class "size_class" from thread heap and add to central
-// cache
-void ThreadCache::ReleaseToCentralCache(FreeList* src, size_t size_class,
-                                        int N) {
-  ASSERT(src == &list_[size_class]);
+// Remove some objects of class "size_class" from thread heap and add to
+// transfer cache.
+void ThreadCache::ReleaseToTransferCache(FreeList* src, size_t size_class,
+                                         int N) {
+  TC_ASSERT_EQ(src, &list_[size_class]);
   if (N > src->length()) N = src->length();
   size_t delta_bytes = N * tc_globals.sizemap().class_to_size(size_class);
 
-  // We return prepackaged chains of the correct size to the central cache.
+  // We return prepackaged chains of the correct size to the transfer cache.
   void* batch[kMaxObjectsToMove];
   int batch_size = tc_globals.sizemap().num_objects_to_move(size_class);
   while (N > batch_size) {
@@ -162,10 +171,10 @@ void ThreadCache::ReleaseToCentralCache(FreeList* src, size_t size_class,
   size_ -= delta_bytes;
 }
 
-// Release idle memory to the central cache
+// Release idle memory to the transfer cache
 void ThreadCache::Scavenge() {
   // If the low-water mark for the free list is L, it means we would
-  // not have had to allocate anything from the central cache even if
+  // not have had to allocate anything from the transfer cache even if
   // we had reduced the free list size by L.  We aim to get closer to
   // that situation by dropping L/2 nodes from the free list.  This
   // may not release much memory, but if so we will call scavenge again
@@ -175,7 +184,7 @@ void ThreadCache::Scavenge() {
     const int lowmark = list->lowwatermark();
     if (lowmark > 0) {
       const int drop = (lowmark > 1) ? lowmark / 2 : 1;
-      ReleaseToCentralCache(list, size_class, drop);
+      ReleaseToTransferCache(list, size_class, drop);
 
       // Shrink the max length if it isn't used.  Only shrink down to
       // batch_size -- if the thread was active enough to get the max_length
@@ -207,7 +216,7 @@ void ThreadCache::DeallocateSlow(void* ptr, FreeList* list, size_t size_class) {
 }
 
 void ThreadCache::IncreaseCacheLimit() {
-  absl::base_internal::SpinLockHolder h(&pageheap_lock);
+  PageHeapSpinLockHolder l;
   IncreaseCacheLimitLocked();
 }
 
@@ -225,7 +234,7 @@ void ThreadCache::IncreaseCacheLimitLocked() {
   for (int i = 0; i < 10; ++i, next_memory_steal_ = next_memory_steal_->next_) {
     // Reached the end of the linked list.  Start at the beginning.
     if (next_memory_steal_ == nullptr) {
-      ASSERT(thread_heaps_ != nullptr);
+      TC_ASSERT_NE(thread_heaps_, nullptr);
       next_memory_steal_ = thread_heaps_;
     }
     if (next_memory_steal_ == this ||
@@ -241,7 +250,7 @@ void ThreadCache::IncreaseCacheLimitLocked() {
 }
 
 void ThreadCache::InitTSD() {
-  ASSERT(!tsd_inited_);
+  TC_ASSERT(!tsd_inited_);
   pthread_key_create(&heap_key_, DestroyThreadCache);
   tsd_inited_ = true;
 }
@@ -260,7 +269,7 @@ ThreadCache* ThreadCache::CreateCacheIfNecessary() {
   }
 
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     const pthread_t me = pthread_self();
 
     // This may be a recursive malloc call from pthread_setspecific()
@@ -297,14 +306,14 @@ ThreadCache* ThreadCache::CreateCacheIfNecessary() {
 ThreadCache* ThreadCache::NewHeap(pthread_t tid) {
   // Create the heap and add it to the linked list
   ThreadCache* heap = tc_globals.threadcache_allocator().New();
-  heap->Init(tid);
+  new (heap) ThreadCache(tid);
   heap->next_ = thread_heaps_;
   heap->prev_ = nullptr;
   if (thread_heaps_ != nullptr) {
     thread_heaps_->prev_ = heap;
   } else {
     // This is the only thread heap at the moment.
-    ASSERT(next_memory_steal_ == nullptr);
+    TC_ASSERT_EQ(next_memory_steal_, nullptr);
     next_memory_steal_ = heap;
   }
   thread_heaps_ = heap;
@@ -348,7 +357,7 @@ void ThreadCache::DeleteCache(ThreadCache* heap) {
   heap->Cleanup();
 
   // Remove from linked list
-  absl::base_internal::SpinLockHolder h(&pageheap_lock);
+  PageHeapSpinLockHolder l;
   if (heap->next_ != nullptr) heap->next_->prev_ = heap->prev_;
   if (heap->prev_ != nullptr) heap->prev_->next_ = heap->next_;
   if (thread_heaps_ == heap) thread_heaps_ = heap->next_;
@@ -384,15 +393,17 @@ void ThreadCache::RecomputePerThreadCacheSize() {
   per_thread_cache_size_ = space;
 }
 
-void ThreadCache::GetThreadStats(uint64_t* total_bytes, uint64_t* class_count) {
+AllocatorStats ThreadCache::GetStats(uint64_t* total_bytes,
+                                     uint64_t* class_count) {
   for (ThreadCache* h = thread_heaps_; h != nullptr; h = h->next_) {
-    *total_bytes += h->Size();
+    *total_bytes += h->size_;
     if (class_count) {
       for (int size_class = 0; size_class < kNumClasses; ++size_class) {
-        class_count[size_class] += h->freelist_length(size_class);
+        class_count[size_class] += h->list_[size_class].length();
       }
     }
   }
+  return tc_globals.threadcache_allocator().stats();
 }
 
 void ThreadCache::set_overall_thread_cache_size(size_t new_size) {

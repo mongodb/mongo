@@ -19,8 +19,11 @@
 #include <unistd.h>
 
 #include <new>
+#include <string>
 
 #include "benchmark/benchmark.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "tcmalloc/internal/percpu.h"
 #include "tcmalloc/malloc_extension.h"
 
@@ -28,7 +31,8 @@
 // up trying to consume all of RAM+swap, and that can take quite some time.  By
 // limiting the address-space size we get sufficient coverage without blowing
 // out job limits.
-void SetTestResourceLimit();
+void SetTestResourceLimit(size_t limit);
+size_t GetTestResourceLimit();
 
 namespace tcmalloc {
 
@@ -102,6 +106,58 @@ class ScopedProfileSamplingRate {
   int64_t previous_;
 };
 
+// Sets custom background thread actions enable/disable when in scope.
+class ScopedBackgroundProcessActionsEnabled {
+ public:
+  explicit ScopedBackgroundProcessActionsEnabled(bool value)
+      : previous_(MallocExtension::GetBackgroundProcessActionsEnabled()) {
+    MallocExtension::SetBackgroundProcessActionsEnabled(value);
+    if (!value) {
+      // If the thread is doing something at the moment, let it finish.
+      // This is unreliable, but simple. The thread sleeps for 1 sec,
+      // so we sleep for 5.
+      absl::SleepFor(absl::Seconds(5));
+    }
+  }
+
+  ~ScopedBackgroundProcessActionsEnabled() {
+    MallocExtension::SetBackgroundProcessActionsEnabled(previous_);
+  }
+
+ private:
+  bool previous_;
+};
+
+// Sets a custom background thread process sleep interval when in scope.
+class ScopedBackgroundProcessSleepInterval {
+ public:
+  explicit ScopedBackgroundProcessSleepInterval(absl::Duration limit)
+      : previous_(MallocExtension::GetBackgroundProcessSleepInterval()) {
+    MallocExtension::SetBackgroundProcessSleepInterval(limit);
+  }
+
+  ~ScopedBackgroundProcessSleepInterval() {
+    MallocExtension::SetBackgroundProcessSleepInterval(previous_);
+  }
+
+ private:
+  absl::Duration previous_;
+};
+
+// Sets a custom resource limit when in scope.
+class ScopedResourceLimit {
+ public:
+  explicit ScopedResourceLimit(size_t limit)
+      : previous_(GetTestResourceLimit()) {
+    SetTestResourceLimit(limit);
+  }
+
+  ~ScopedResourceLimit() { SetTestResourceLimit(previous_); }
+
+ private:
+  size_t previous_;
+};
+
 class ScopedGuardedSamplingRate {
  public:
   explicit ScopedGuardedSamplingRate(int64_t temporary_value)
@@ -147,8 +203,7 @@ inline void UnregisterRseq() {
           tcmalloc_internal::subtle::percpu::kRseqUnregister,
           TCMALLOC_PERCPU_RSEQ_SIGNATURE);
 #else
-  // rseq is is unavailable in this build
-  CHECK_CONDITION(false);
+  TC_BUG("rseq is is unavailable in this build");
 #endif
 }
 
@@ -159,18 +214,18 @@ class ScopedUnregisterRseq {
   ScopedUnregisterRseq() {
     // Since we expect that we will be able to register the thread for rseq in
     // the destructor, verify that we can do so now.
-    CHECK_CONDITION(tcmalloc_internal::subtle::percpu::IsFast());
+    TC_CHECK(tcmalloc_internal::subtle::percpu::IsFast());
 
     UnregisterRseq();
 
     // Unregistering stores kCpuIdUninitialized to the cpu_id field.
-    CHECK_CONDITION(tcmalloc_internal::subtle::percpu::RseqCpuId() ==
-                    tcmalloc_internal::subtle::percpu::kCpuIdUninitialized);
+    TC_CHECK_EQ(tcmalloc_internal::subtle::percpu::RseqCpuId(),
+                tcmalloc_internal::subtle::percpu::kCpuIdUninitialized);
   }
 
   // REQUIRES: __rseq_abi.cpu_id == kCpuIdUninitialized
   ~ScopedUnregisterRseq() {
-    CHECK_CONDITION(tcmalloc_internal::subtle::percpu::IsFast());
+    TC_CHECK(tcmalloc_internal::subtle::percpu::IsFast());
   }
 };
 
@@ -225,6 +280,13 @@ class ScopedFakeCpuId {
 // equivalent compiler options.
 #define PRAGMA_NO_UNROLL
 #endif
+
+// Tests if the array of doubles is uniformly distributed.
+// Returns the p-value of the Anderson Darling Statistic
+// for the given set of sorted random doubles
+// See "Evaluating the Anderson-Darling Distribution" by
+// Marsaglia and Marsaglia for details.
+double AndersonDarlingTest(absl::Span<const double> random_sample);
 
 }  // namespace tcmalloc
 

@@ -53,6 +53,33 @@ cc_test(
 )
 
 cc_library(
+    name = "allocation_guard",
+    srcs = ["allocation_guard.cc"],
+    hdrs = ["allocation_guard.h"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    visibility = [
+        "//tcmalloc:__subpackages__",
+    ],
+    deps = [
+        ":config",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/base:core_headers",
+    ],
+)
+
+cc_test(
+    name = "allocation_guard_test",
+    srcs = ["allocation_guard_test.cc"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    deps = [
+        ":allocation_guard",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "atomic_danger",
     hdrs = ["atomic_danger.h"],
     copts = TCMALLOC_DEFAULT_COPTS,
@@ -67,10 +94,7 @@ cc_library(
     visibility = [
         "//tcmalloc:__subpackages__",
     ],
-    deps = [
-        ":config",
-        "@com_google_absl//absl/base:core_headers",
-    ],
+    deps = [":config"],
 )
 
 cc_library(
@@ -80,12 +104,7 @@ cc_library(
     visibility = [
         "//tcmalloc:__subpackages__",
     ],
-    deps = [
-        ":config",
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/functional:function_ref",
-        "@com_google_absl//absl/time",
-    ],
+    deps = [":config"],
 )
 
 cc_library(
@@ -144,6 +163,36 @@ cc_test(
 )
 
 cc_library(
+    name = "explicitly_constructed",
+    hdrs = ["explicitly_constructed.h"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    visibility = ["//tcmalloc:__subpackages__"],
+    deps = [
+        ":config",
+    ],
+)
+
+cc_library(
+    name = "exponential_biased",
+    hdrs = ["exponential_biased.h"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    visibility = [
+        "//tcmalloc:__subpackages__",
+    ],
+)
+
+cc_test(
+    name = "exponential_biased_test",
+    srcs = ["exponential_biased_test.cc"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    deps = [
+        ":exponential_biased",
+        "//tcmalloc/testing:testutil",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "fake_profile",
     hdrs = ["fake_profile.h"],
     copts = TCMALLOC_DEFAULT_COPTS,
@@ -158,72 +207,6 @@ cc_library(
 )
 
 cc_library(
-    name = "lifetime_predictions",
-    hdrs = ["lifetime_predictions.h"],
-    copts = TCMALLOC_DEFAULT_COPTS,
-    visibility = [
-        "//tcmalloc:__subpackages__",
-    ],
-    deps = [
-        ":linked_list",
-        "@com_google_absl//absl/algorithm:container",
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/base:malloc_internal",
-        "@com_google_absl//absl/debugging:stacktrace",
-        "@com_google_absl//absl/hash",
-        "@com_google_absl//absl/time",
-    ],
-)
-
-cc_test(
-    name = "lifetime_predictions_test",
-    srcs = ["lifetime_predictions_test.cc"],
-    copts = TCMALLOC_DEFAULT_COPTS,
-    deps = [
-        ":lifetime_predictions",
-        "//tcmalloc/testing:testutil",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/hash:hash_testing",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "lifetime_tracker",
-    hdrs = ["lifetime_tracker.h"],
-    visibility = [
-        "//tcmalloc:__subpackages__",
-    ],
-    deps = [
-        ":clock",
-        ":lifetime_predictions",
-        ":linked_list",
-        "@com_google_absl//absl/algorithm:container",
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/base:malloc_internal",
-        "@com_google_absl//absl/debugging:stacktrace",
-        "@com_google_absl//absl/hash",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/time",
-    ],
-)
-
-cc_test(
-    name = "lifetime_tracker_test",
-    srcs = ["lifetime_tracker_test.cc"],
-    copts = TCMALLOC_DEFAULT_COPTS,
-    deps = [
-        ":clock",
-        ":lifetime_predictions",
-        ":lifetime_tracker",
-        "@com_google_absl//absl/time",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_library(
     name = "linked_list",
     hdrs = ["linked_list.h"],
     copts = TCMALLOC_DEFAULT_COPTS,
@@ -231,6 +214,7 @@ cc_library(
         "//tcmalloc:__subpackages__",
     ],
     deps = [
+        ":config",
         ":logging",
         "@com_google_absl//absl/base:core_headers",
     ],
@@ -242,6 +226,7 @@ create_tcmalloc_benchmark(
     copts = TCMALLOC_DEFAULT_COPTS,
     malloc = "//tcmalloc",
     deps = [
+        ":config",
         ":linked_list",
         ":logging",
         ":mock_span",
@@ -281,9 +266,10 @@ cc_library(
         "//tcmalloc:__subpackages__",
     ],
     deps = [
+        ":allocation_guard",
         ":config",
+        ":environment",
         ":parameter_accessors",
-        "//tcmalloc:malloc_extension",
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/debugging:stacktrace",
@@ -301,7 +287,9 @@ cc_test(
     ],
     deps = [
         ":logging",
-        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:string_view",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -347,7 +335,9 @@ cc_library(
     hdrs = ["mincore.h"],
     copts = TCMALLOC_DEFAULT_COPTS,
     linkstatic = 1,
-    visibility = ["//tcmalloc:__subpackages__"],
+    visibility = [
+        "//tcmalloc:__subpackages__",
+    ],
     deps = [
         ":config",
         ":page_size",
@@ -360,13 +350,56 @@ cc_library(
     hdrs = ["residency.h"],
     copts = TCMALLOC_DEFAULT_COPTS,
     linkstatic = 1,
-    visibility = ["//tcmalloc:__subpackages__"],
+    visibility = [
+        "//tcmalloc:__subpackages__",
+    ],
     deps = [
         ":config",
         ":page_size",
         ":util",
         "@com_google_absl//absl/status",
+    ],
+)
+
+cc_library(
+    name = "pageflags",
+    srcs = ["pageflags.cc"],
+    hdrs = ["pageflags.h"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    linkstatic = 1,
+    visibility = [
+        "//tcmalloc:__pkg__",
+        "//tcmalloc:__subpackages__",
+    ],
+    deps = [
+        ":config",
+        ":logging",
+        ":page_size",
+        ":util",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/status",
+    ],
+)
+
+cc_test(
+    name = "pageflags_test",
+    srcs = ["pageflags_test.cc"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    linkstatic = 1,
+    tags = [
+    ],
+    deps = [
+        ":pageflags",
+        ":util",
+        "@com_github_google_benchmark//:benchmark",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/random",
+        "@com_google_absl//absl/random:distributions",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -375,11 +408,10 @@ create_tcmalloc_benchmark(
     srcs = ["mincore_benchmark.cc"],
     copts = TCMALLOC_DEFAULT_COPTS,
     deps = [
+        ":config",
         ":logging",
-        ":mincore",
         ":page_size",
         "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/memory",
     ],
 )
 
@@ -431,10 +463,9 @@ cc_library(
     deps = [
         ":config",
         ":logging",
+        ":sysinfo",
         ":util",
-        "@com_google_absl//absl/base",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/functional:function_ref",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -446,8 +477,7 @@ cc_test(
     linkstatic = 1,
     deps = [
         ":cache_topology",
-        "@com_google_absl//absl/random",
-        "@com_google_absl//absl/types:span",
+        ":sysinfo",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -465,22 +495,10 @@ cc_library(
         ":environment",
         ":logging",
         ":percpu",
+        ":sysinfo",
         ":util",
-        "@com_google_absl//absl/base",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/functional:function_ref",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-    ],
-)
-
-cc_fuzz_test(
-    name = "numa_fuzz",
-    testonly = 1,
-    srcs = ["numa_fuzz.cc"],
-    copts = TCMALLOC_DEFAULT_COPTS,
-    deps = [
-        ":numa",
     ],
 )
 
@@ -493,6 +511,7 @@ cc_test(
         ":logging",
         ":numa",
         ":percpu",
+        ":sysinfo",
         "//tcmalloc:want_numa_aware",
         "@com_google_absl//absl/random",
         "@com_google_absl//absl/strings",
@@ -510,6 +529,7 @@ cc_library(
         "//tcmalloc:__subpackages__",
     ],
     deps = [
+        ":config",
         ":logging",
         "@com_google_absl//absl/base:core_headers",
     ],
@@ -538,6 +558,7 @@ cc_library(
     ],
     deps = [
         ":config",
+        "@com_google_absl//absl/base",
         "@com_google_absl//absl/base:core_headers",
     ],
 )
@@ -547,10 +568,10 @@ cc_library(
     hdrs = ["parameter_accessors.h"],
     copts = TCMALLOC_DEFAULT_COPTS,
     visibility = [
-        "//base:__pkg__",
         "//tcmalloc:__subpackages__",
     ],
     deps = [
+        "//tcmalloc:malloc_extension",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/time",
     ],
@@ -565,38 +586,79 @@ cc_library(
     ],
     hdrs = ["percpu.h"],
     copts = TCMALLOC_DEFAULT_COPTS,
+    # See b/299621672 for detials.
+    linkstatic = 1,
     textual_hdrs = [
         "percpu_rseq_aarch64.S",
         "percpu_rseq_x86_64.S",
     ],
-    visibility = ["//tcmalloc:__subpackages__"],
+    visibility = [
+        "//tcmalloc:__subpackages__",
+    ],
     deps = [
         ":atomic_danger",
         ":config",
         ":linux_syscall_support",
         ":logging",
         ":optimization",
+        ":sysinfo",
         ":util",
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/base:dynamic_annotations",
+    ],
+)
+
+cc_test(
+    name = "percpu_test",
+    srcs = ["percpu_test.cc"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    deps = [
+        ":logging",
+        ":percpu",
+        "//tcmalloc/testing:testutil",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/log:absl_check",
+        "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "percpu_early_test",
+    srcs = ["percpu_early_test.cc"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    linkstatic = 1,
+    tags = [
+    ],
+    deps = [
+        ":percpu",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
 cc_library(
     name = "percpu_tcmalloc",
+    srcs = ["percpu_tcmalloc.cc"],
     hdrs = ["percpu_tcmalloc.h"],
     copts = TCMALLOC_DEFAULT_COPTS,
     visibility = [
         "//tcmalloc:__subpackages__",
     ],
     deps = [
+        ":config",
+        ":linux_syscall_support",
+        ":logging",
         ":mincore",
+        ":optimization",
         ":percpu",
+        ":prefetch",
+        ":sysinfo",
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/base:dynamic_annotations",
         "@com_google_absl//absl/functional:function_ref",
+        "@com_google_absl//absl/numeric:bits",
     ],
 )
 
@@ -606,25 +668,26 @@ cc_test(
     srcs = ["percpu_tcmalloc_test.cc"],
     copts = TCMALLOC_DEFAULT_COPTS,
     linkstatic = 1,
-    malloc = "//tcmalloc:tcmalloc_deprecated_perthread",
+    malloc = ":system_malloc",
     deps = [
         ":affinity",
         ":config",
         ":logging",
         ":page_size",
+        ":percpu",
         ":percpu_tcmalloc",
+        ":sysinfo",
         ":util",
         "//tcmalloc:malloc_extension",
         "//tcmalloc/testing:testutil",
         "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/algorithm:container",
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:fixed_array",
         "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/functional:function_ref",
         "@com_google_absl//absl/random",
         "@com_google_absl//absl/random:seed_sequences",
-        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
@@ -639,10 +702,7 @@ cc_library(
     visibility = [
         "//tcmalloc:__subpackages__",
     ],
-    deps = [
-        ":config",
-        "@com_google_absl//absl/base",
-    ],
+    deps = [":config"],
 )
 
 cc_test(
@@ -662,7 +722,9 @@ proto_library(
 
 cc_proto_library(
     name = "profile_cc_proto",
-    visibility = ["//tcmalloc:__subpackages__"],
+    visibility = [
+        "//tcmalloc:__subpackages__",
+    ],
     deps = [":profile_proto"],
 )
 
@@ -671,17 +733,20 @@ cc_library(
     srcs = ["profile_builder.cc"],
     hdrs = ["profile_builder.h"],
     copts = TCMALLOC_DEFAULT_COPTS,
-    visibility = ["//tcmalloc:__subpackages__"],
+    visibility = [
+        "//tcmalloc:__subpackages__",
+    ],
     deps = [
         ":logging",
+        ":pageflags",
         ":residency",
         "//tcmalloc:malloc_extension",
         "//tcmalloc/internal:profile_cc_proto",
-        "@com_google_absl//absl/base:config",
+        "@com_google_absl//absl/base",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:btree",
         "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/numeric:bits",
+        "@com_google_absl//absl/hash",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -706,6 +771,7 @@ cc_test(
     copts = TCMALLOC_DEFAULT_COPTS,
     data = [
         "testdata/b180635896.so",
+        "testdata/gnu-property.so",
     ],
     deps = [
         ":environment",
@@ -738,7 +804,6 @@ cc_library(
         ":config",
         ":logging",
         ":util",
-        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings:str_format",
     ],
 )
@@ -751,6 +816,7 @@ cc_library(
         "//tcmalloc:__subpackages__",
     ],
     deps = [
+        ":config",
         ":logging",
         ":optimization",
         "@com_google_absl//absl/numeric:bits",
@@ -763,10 +829,10 @@ create_tcmalloc_benchmark(
     copts = TCMALLOC_DEFAULT_COPTS,
     malloc = "//tcmalloc",
     deps = [
+        ":config",
         ":range_tracker",
         "@com_github_google_benchmark//:benchmark",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:fixed_array",
         "@com_google_absl//absl/random",
         "@com_google_absl//absl/random:distributions",
     ],
@@ -781,6 +847,59 @@ cc_test(
         ":range_tracker",
         "@com_google_absl//absl/container:fixed_array",
         "@com_google_absl//absl/random",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "sampled_allocation",
+    hdrs = ["sampled_allocation.h"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    visibility = ["//tcmalloc:__subpackages__"],
+    deps = [
+        ":logging",
+        ":sampled_allocation_recorder",
+    ],
+)
+
+cc_test(
+    name = "sampled_allocation_test",
+    srcs = ["sampled_allocation_test.cc"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    deps = [
+        ":logging",
+        ":sampled_allocation",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/debugging:stacktrace",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "sampled_allocation_recorder",
+    hdrs = ["sampled_allocation_recorder.h"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    visibility = ["//tcmalloc:__subpackages__"],
+    deps = [
+        ":allocation_guard",
+        ":config",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/functional:function_ref",
+    ],
+)
+
+cc_test(
+    name = "sampled_allocation_recorder_test",
+    srcs = ["sampled_allocation_recorder_test.cc"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    deps = [
+        ":explicitly_constructed",
+        ":sampled_allocation_recorder",
+        "//tcmalloc/testing:thread_manager",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -810,6 +929,50 @@ cc_test(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/random",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "sysinfo",
+    srcs = ["sysinfo.cc"],
+    hdrs = ["sysinfo.h"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    visibility = [
+        "//tcmalloc:__subpackages__",
+    ],
+    deps = [
+        ":config",
+        ":logging",
+        ":util",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/functional:function_ref",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_fuzz_test(
+    name = "sysinfo_fuzz",
+    testonly = 1,
+    srcs = ["sysinfo_fuzz.cc"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    deps = [
+        ":sysinfo",
+    ],
+)
+
+cc_test(
+    name = "sysinfo_test",
+    srcs = ["sysinfo_test.cc"],
+    copts = TCMALLOC_DEFAULT_COPTS,
+    deps = [
+        ":allocation_guard",
+        ":sysinfo",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/random",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -847,7 +1010,10 @@ cc_test(
     srcs = ["timeseries_tracker_test.cc"],
     copts = TCMALLOC_DEFAULT_COPTS,
     deps = [
+        ":clock",
         ":timeseries_tracker",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/time",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -863,7 +1029,6 @@ cc_library(
     deps = [
         ":config",
         ":logging",
-        "@com_google_absl//absl/base",
         "@com_google_absl//absl/time",
     ],
 )

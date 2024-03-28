@@ -22,11 +22,10 @@
 #include <unistd.h>
 
 #include <type_traits>
-#include <utility>
 
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "tcmalloc/internal/logging.h"
+#include "tcmalloc/internal/config.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
 namespace tcmalloc {

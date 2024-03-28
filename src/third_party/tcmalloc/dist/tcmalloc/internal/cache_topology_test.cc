@@ -14,29 +14,27 @@
 
 #include "tcmalloc/internal/cache_topology.h"
 
-#include <sched.h>
-
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "tcmalloc/internal/sysinfo.h"
 
+namespace tcmalloc::tcmalloc_internal {
 namespace {
 
 TEST(CacheTopology, ComputesSomethingReasonable) {
   // This test verifies that each L3 cache serves the same number of CPU. This
   // is not a strict requirement for the correct operation of this code, but a
   // sign of sanity.
-  uint8_t l3_cache_index[CPU_SETSIZE];
-  const int num_nodes =
-      tcmalloc::tcmalloc_internal::BuildCpuToL3CacheMap(l3_cache_index);
-  EXPECT_EQ(absl::base_internal::NumCPUs() % num_nodes, 0);
-  ASSERT_GT(num_nodes, 0);
+  CacheTopology topology;
+  topology.Init();
+  EXPECT_EQ(NumCPUs() % topology.l3_count(), 0);
+  ASSERT_GT(topology.l3_count(), 0);
   static const int kMaxNodes = 256 / 8;
   int count_per_node[kMaxNodes] = {0};
-  for (int i = 0; i < absl::base_internal::NumCPUs(); ++i) {
-    count_per_node[l3_cache_index[i]]++;
+  for (int i = 0, n = NumCPUs(); i < n; ++i) {
+    count_per_node[topology.GetL3FromCpuId(i)]++;
   }
-  for (int i = 0; i < num_nodes; ++i) {
-    EXPECT_EQ(count_per_node[i], absl::base_internal::NumCPUs() / num_nodes);
+  for (int i = 0; i < topology.l3_count(); ++i) {
+    EXPECT_EQ(count_per_node[i], NumCPUs() / topology.l3_count());
   }
 }
 
@@ -49,3 +47,4 @@ TEST(CacheTopology, FindFirstNumberInBuf) {
 }
 
 }  // namespace
+}  // namespace tcmalloc::tcmalloc_internal

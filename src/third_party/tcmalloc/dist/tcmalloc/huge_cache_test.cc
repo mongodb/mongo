@@ -38,6 +38,8 @@
 #include "tcmalloc/internal/clock.h"
 #include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
+#include "tcmalloc/mock_metadata_allocator.h"
+#include "tcmalloc/mock_virtual_allocator.h"
 #include "tcmalloc/stats.h"
 
 namespace tcmalloc {
@@ -59,73 +61,23 @@ class HugeCacheTest : public testing::Test {
                absl::ToDoubleNanoseconds(absl::Seconds(1));
   }
 
-  // Use a tiny fraction of actual size so we can test aggressively.
-  static AddressRange AllocateFake(size_t bytes, size_t align) {
-    if (bytes % kHugePageSize != 0) {
-      Crash(kCrash, __FILE__, __LINE__, "not aligned", bytes, kHugePageSize);
-    }
-    if (align % kHugePageSize != 0) {
-      Crash(kCrash, __FILE__, __LINE__, "not aligned", align, kHugePageSize);
-    }
-    // we'll actually provide hidden backing, one word per hugepage.
-    bytes /= kHugePageSize;
-    align /= kHugePageSize;
-    size_t index = backing.size();
-    if (index % align != 0) {
-      index += (align - (index & align));
-    }
-    backing.resize(index + bytes);
-    void* ptr = reinterpret_cast<void*>(index * kHugePageSize);
-    return {ptr, bytes * kHugePageSize};
-  }
-  // This isn't super good form but we'll never have more than one HAT
-  // extant at once.
-  static std::vector<size_t> backing;
-
-  // We use actual malloc for metadata allocations, but we track them so they
-  // can be deleted.  (TODO make this an arena if we care, which I doubt)
-  static void* MallocMetadata(size_t size) {
-    metadata_bytes += size;
-    void* ptr = calloc(size, 1);
-    metadata_allocs.push_back(ptr);
-    return ptr;
-  }
-  static std::vector<void*> metadata_allocs;
-  static size_t metadata_bytes;
-
-  // This is wordy, but necessary for mocking:
-  class BackingInterface {
+  class MockBackingInterface : public MemoryModifyFunction {
    public:
-    virtual bool Unback(void* p, size_t len) = 0;
-    virtual ~BackingInterface() {}
-  };
+    MOCK_METHOD(bool, Unback, (void* p, size_t len), ());
 
-  class MockBackingInterface : public BackingInterface {
-   public:
-    MOCK_METHOD(bool, Unback, (void* p, size_t len), (override));
+    bool operator()(void* p, size_t len) override { return Unback(p, len); }
   };
-
-  static bool MockUnback(void* p, size_t len) { return mock_->Unback(p, len); }
 
  protected:
-  static std::unique_ptr<testing::NiceMock<MockBackingInterface>> mock_;
+  testing::NiceMock<MockBackingInterface> mock_unback_;
 
   HugeCacheTest() {
     // We don't use the first few bytes, because things might get weird
     // given zero pointers.
-    backing.resize(1024);
-    metadata_bytes = 0;
-    mock_ = absl::make_unique<testing::NiceMock<MockBackingInterface>>();
+    vm_allocator_.backing_.resize(1024);
   }
 
   ~HugeCacheTest() override {
-    for (void* p : metadata_allocs) {
-      free(p);
-    }
-    metadata_allocs.clear();
-    backing.clear();
-    mock_.reset(nullptr);
-
     clock_offset_ = 0;
   }
 
@@ -133,16 +85,12 @@ class HugeCacheTest : public testing::Test {
     clock_offset_ += absl::ToInt64Nanoseconds(d);
   }
 
-  HugeAllocator alloc_{AllocateFake, MallocMetadata};
-  HugeCache cache_{&alloc_, MallocMetadata, MemoryModifyFunction(MockUnback),
+  FakeVirtualAllocator vm_allocator_;
+  FakeMetadataAllocator metadata_allocator_;
+  HugeAllocator alloc_{vm_allocator_, metadata_allocator_};
+  HugeCache cache_{&alloc_, metadata_allocator_, mock_unback_,
                    Clock{.now = GetClock, .freq = GetClockFrequency}};
 };
-
-std::vector<size_t> HugeCacheTest::backing;
-std::vector<void*> HugeCacheTest::metadata_allocs;
-size_t HugeCacheTest::metadata_bytes;
-std::unique_ptr<testing::NiceMock<HugeCacheTest::MockBackingInterface>>
-    HugeCacheTest::mock_;
 
 int64_t HugeCacheTest::clock_offset_ = 0;
 
@@ -202,13 +150,13 @@ TEST_F(HugeCacheTest, Release) {
   cache_.Release(r5);
 
   ASSERT_EQ(NHugePages(3), cache_.size());
-  EXPECT_CALL(*mock_, Unback(r5.start_addr(), kHugePageSize * 1))
+  EXPECT_CALL(mock_unback_, Unback(r5.start_addr(), kHugePageSize * 1))
       .WillOnce(Return(true));
   EXPECT_EQ(NHugePages(1), cache_.ReleaseCachedPages(NHugePages(1)));
   cache_.Release(r3);
   cache_.Release(r4);
 
-  EXPECT_CALL(*mock_, Unback(r1.start_addr(), 4 * kHugePageSize))
+  EXPECT_CALL(mock_unback_, Unback(r1.start_addr(), 4 * kHugePageSize))
       .WillOnce(Return(true));
   EXPECT_EQ(NHugePages(4), cache_.ReleaseCachedPages(NHugePages(200)));
 }
@@ -244,13 +192,13 @@ TEST_F(HugeCacheTest, ReleaseFailure) {
   cache_.Release(r5);
 
   ASSERT_EQ(NHugePages(3), cache_.size());
-  EXPECT_CALL(*mock_, Unback(r5.start_addr(), 1 * kHugePageSize))
+  EXPECT_CALL(mock_unback_, Unback(r5.start_addr(), 1 * kHugePageSize))
       .WillOnce(Return(false));
   EXPECT_EQ(NHugePages(0), cache_.ReleaseCachedPages(NHugePages(1)));
   cache_.Release(r3);
   cache_.Release(r4);
 
-  EXPECT_CALL(*mock_, Unback(r1.start_addr(), 5 * kHugePageSize))
+  EXPECT_CALL(mock_unback_, Unback(r1.start_addr(), 5 * kHugePageSize))
       .WillOnce(Return(false));
   EXPECT_EQ(NHugePages(0), cache_.ReleaseCachedPages(NHugePages(200)));
 }
@@ -294,48 +242,37 @@ TEST_F(HugeCacheTest, Stats) {
 
   struct Helper {
     static void Stat(const HugeCache& cache, size_t* spans,
-                     Length* pages_backed, Length* pages_unbacked,
-                     double* avg_age) {
-      PageAgeHistograms ages(absl::base_internal::CycleClock::Now());
+                     Length* pages_backed, Length* pages_unbacked) {
       LargeSpanStats large;
-      cache.AddSpanStats(nullptr, &large, &ages);
+      cache.AddSpanStats(nullptr, &large);
 
-      const PageAgeHistograms::Histogram* hist = ages.GetTotalHistogram(false);
       *spans = large.spans;
       *pages_backed = large.normal_pages;
       *pages_unbacked = large.returned_pages;
-      *avg_age = hist->avg_age();
     }
   };
 
-  double avg_age;
   size_t spans;
   Length pages_backed;
   Length pages_unbacked;
 
   cache_.Release(r1);
-  absl::SleepFor(absl::Microseconds(5000));
-  Helper::Stat(cache_, &spans, &pages_backed, &pages_unbacked, &avg_age);
+  Helper::Stat(cache_, &spans, &pages_backed, &pages_unbacked);
   EXPECT_EQ(Length(0), pages_unbacked);
   EXPECT_EQ(1, spans);
   EXPECT_EQ(NHugePages(1).in_pages(), pages_backed);
-  EXPECT_LE(0.005, avg_age);
 
   cache_.Release(r2);
-  absl::SleepFor(absl::Microseconds(2500));
-  Helper::Stat(cache_, &spans, &pages_backed, &pages_unbacked, &avg_age);
+  Helper::Stat(cache_, &spans, &pages_backed, &pages_unbacked);
   EXPECT_EQ(Length(0), pages_unbacked);
   EXPECT_EQ(2, spans);
   EXPECT_EQ(NHugePages(3).in_pages(), pages_backed);
-  EXPECT_LE((0.0075 * 1 + 0.0025 * 2) / (1 + 2), avg_age);
 
   cache_.Release(r3);
-  absl::SleepFor(absl::Microseconds(1250));
-  Helper::Stat(cache_, &spans, &pages_backed, &pages_unbacked, &avg_age);
+  Helper::Stat(cache_, &spans, &pages_backed, &pages_unbacked);
   EXPECT_EQ(Length(0), pages_unbacked);
   EXPECT_EQ(3, spans);
   EXPECT_EQ(NHugePages(6).in_pages(), pages_backed);
-  EXPECT_LE((0.00875 * 1 + 0.00375 * 2 + 0.00125 * 3) / (1 + 2 + 3), avg_age);
 }
 
 static double Frac(HugeLength num, HugeLength denom) {
@@ -343,7 +280,7 @@ static double Frac(HugeLength num, HugeLength denom) {
 }
 
 TEST_F(HugeCacheTest, Growth) {
-  EXPECT_CALL(*mock_, Unback(testing::_, testing::_))
+  EXPECT_CALL(mock_unback_, Unback(testing::_, testing::_))
       .WillRepeatedly(Return(true));
 
   bool released;
@@ -423,7 +360,7 @@ TEST_F(HugeCacheTest, Growth) {
 // If we repeatedly grow and shrink, but do so very slowly, we should *not*
 // cache the large variation.
 TEST_F(HugeCacheTest, SlowGrowthUncached) {
-  EXPECT_CALL(*mock_, Unback(testing::_, testing::_))
+  EXPECT_CALL(mock_unback_, Unback(testing::_, testing::_))
       .WillRepeatedly(Return(true));
 
   absl::BitGen rng;
@@ -447,7 +384,7 @@ TEST_F(HugeCacheTest, SlowGrowthUncached) {
 
 // If very rarely we have a huge increase in usage, it shouldn't be cached.
 TEST_F(HugeCacheTest, SpikesUncached) {
-  EXPECT_CALL(*mock_, Unback(testing::_, testing::_))
+  EXPECT_CALL(mock_unback_, Unback(testing::_, testing::_))
       .WillRepeatedly(Return(true));
 
   absl::BitGen rng;

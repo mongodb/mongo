@@ -19,6 +19,8 @@
 #include <new>
 
 #include "gtest/gtest.h"
+#include "absl/base/internal/spinlock.h"
+#include "tcmalloc/common.h"
 
 namespace tcmalloc {
 namespace tcmalloc_internal {
@@ -30,7 +32,7 @@ std::align_val_t Align(int align) {
 
 TEST(Arena, AlignedAlloc) {
   Arena arena;
-  absl::base_internal::SpinLockHolder h(&pageheap_lock);
+  PageHeapSpinLockHolder l;
   EXPECT_EQ(reinterpret_cast<uintptr_t>(arena.Alloc(64, Align(64))) % 64, 0);
   EXPECT_EQ(reinterpret_cast<uintptr_t>(arena.Alloc(7)) % 8, 0);
   EXPECT_EQ(reinterpret_cast<uintptr_t>(arena.Alloc(128, Align(64))) % 64, 0);
@@ -46,7 +48,7 @@ TEST(Arena, Stats) {
 
   ArenaStats stats;
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     stats = arena.stats();
   }
   EXPECT_EQ(stats.bytes_allocated, 0);
@@ -59,7 +61,7 @@ TEST(Arena, Stats) {
   ArenaStats stats_after_alloc;
   void* ptr;
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     ptr = arena.Alloc(1, Align(1));
     stats_after_alloc = arena.stats();
   }
@@ -76,7 +78,7 @@ TEST(Arena, Stats) {
   // TODO(b/201694482): Optimize this.
   ArenaStats stats_after_alloc2;
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     ptr = arena.Alloc(stats_after_alloc.bytes_unallocated + 1, Align(1));
     stats_after_alloc2 = arena.stats();
   }
@@ -96,7 +98,7 @@ TEST(Arena, ReportUnmapped) {
   ArenaStats stats_after_alloc;
   void* ptr;
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     ptr = arena.Alloc(10, Align(1));
     stats_after_alloc = arena.stats();
   }
@@ -106,7 +108,7 @@ TEST(Arena, ReportUnmapped) {
   EXPECT_EQ(stats_after_alloc.bytes_nonresident, 0);
 
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     arena.UpdateAllocatedAndNonresident(-5, 5);
     stats_after_alloc = arena.stats();
   }
@@ -115,7 +117,7 @@ TEST(Arena, ReportUnmapped) {
   EXPECT_EQ(stats_after_alloc.bytes_nonresident, 5);
 
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     arena.UpdateAllocatedAndNonresident(3, -3);
     stats_after_alloc = arena.stats();
   }
@@ -129,13 +131,13 @@ TEST(Arena, BytesImpending) {
 
   ArenaStats stats;
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     stats = arena.stats();
   }
   EXPECT_EQ(stats.bytes_allocated, 0);
 
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     arena.UpdateAllocatedAndNonresident(100, 0);
     stats = arena.stats();
   }
@@ -144,7 +146,7 @@ TEST(Arena, BytesImpending) {
 
   void* ptr;
   {
-    absl::base_internal::SpinLockHolder h(&pageheap_lock);
+    PageHeapSpinLockHolder l;
     arena.UpdateAllocatedAndNonresident(-100, 0);
     ptr = arena.Alloc(100, Align(1));
     stats = arena.stats();

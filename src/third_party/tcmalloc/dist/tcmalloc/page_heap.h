@@ -15,11 +15,14 @@
 #ifndef TCMALLOC_PAGE_HEAP_H_
 #define TCMALLOC_PAGE_HEAP_H_
 
-#include <stdint.h>
+#include <cstddef>
 
 #include "absl/base/thread_annotations.h"
 #include "tcmalloc/common.h"
+#include "tcmalloc/internal/config.h"
+#include "tcmalloc/internal/logging.h"
 #include "tcmalloc/page_allocator_interface.h"
+#include "tcmalloc/pages.h"
 #include "tcmalloc/span.h"
 #include "tcmalloc/stats.h"
 
@@ -46,12 +49,12 @@ class PageHeap final : public PageAllocatorInterface {
   // objects. Returns zero if out of memory.  Caller should not pass "n == 0" --
   // instead, n should have been rounded up already.  The returned memory is
   // backed.
-  Span* New(Length n, size_t objects_per_span)
+  Span* New(Length n, SpanAllocInfo span_alloc_info)
       ABSL_LOCKS_EXCLUDED(pageheap_lock) override;
 
   // As New, but the returned span is aligned to a <align>-page boundary.
   // <align> must be a power of two.
-  Span* NewAligned(Length n, Length align, size_t objects_per_span)
+  Span* NewAligned(Length n, Length align, SpanAllocInfo span_alloc_info)
       ABSL_LOCKS_EXCLUDED(pageheap_lock) override;
 
   // Delete the span "[p, p+n-1]".

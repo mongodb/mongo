@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstddef>
+#include <cstdint>
+
 #include "tcmalloc/internal/profile_builder.h"
 
 #if defined(__linux__)
@@ -24,7 +27,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   ElfW(Phdr) note;
   note.p_type = PT_NOTE;
   note.p_vaddr = reinterpret_cast<ElfW(Addr)>(nullptr);
+  note.p_filesz = size;
   note.p_memsz = size;
+  note.p_align = 4;
 
   dl_phdr_info info = {};
   info.dlpi_name = "test";

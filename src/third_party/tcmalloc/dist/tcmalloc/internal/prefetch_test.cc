@@ -47,6 +47,26 @@ TEST(Prefetch, PrefetchForWrite) {
   EXPECT_EQ(number, 42);
 }
 
+TEST(Prefetch, WriteTemporalLocalityNone) {
+  PrefetchWNta(&number);
+  EXPECT_EQ(number, 42);
+}
+
+TEST(Prefetch, WriteTemporalLocalityLow) {
+  PrefetchWT2(&number);
+  EXPECT_EQ(number, 42);
+}
+
+TEST(Prefetch, WriteTemporalLocalityMedium) {
+  PrefetchWT1(&number);
+  EXPECT_EQ(number, 42);
+}
+
+TEST(Prefetch, WriteTemporalLocalityHigh) {
+  PrefetchWT0(&number);
+  EXPECT_EQ(number, 42);
+}
+
 }  // namespace
 }  // namespace tcmalloc_internal
 }  // namespace tcmalloc

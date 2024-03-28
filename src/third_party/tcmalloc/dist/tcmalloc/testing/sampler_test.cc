@@ -21,7 +21,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <new>
 #include <vector>
 
 #include "gtest/gtest.h"
@@ -39,7 +38,7 @@ class SamplerTest {
 
 namespace {
 
-// Note that these tests are stochastic. This mean that the chance of correct
+// Note that these tests are stochastic. This means that the chance of correct
 // code passing the test is ~(1 - 10 ^ -kSigmas).
 static const double kSigmas = 6;
 static const size_t kSamplingInterval =
@@ -54,125 +53,6 @@ TEST(Sampler, TestGetSamplePeriod) {
   uint64_t sample_period;
   sample_period = sampler.GetSamplePeriod();
   EXPECT_GT(sample_period, 0);
-}
-
-// Tests of the quality of the random numbers generated
-// This uses the Anderson Darling test for uniformity.
-// See "Evaluating the Anderson-Darling Distribution" by Marsaglia
-// for details.
-
-// Short cut version of ADinf(z), z>0 (from Marsaglia)
-// This returns the p-value for Anderson Darling statistic in
-// the limit as n-> infinity. For finite n, apply the error fix below.
-double AndersonDarlingInf(double z) {
-  if (z < 2) {
-    return exp(-1.2337141 / z) / sqrt(z) *
-           (2.00012 +
-            (0.247105 -
-             (0.0649821 - (0.0347962 - (0.011672 - 0.00168691 * z) * z) * z) *
-                 z) *
-                z);
-  }
-  return exp(
-      -exp(1.0776 -
-           (2.30695 -
-            (0.43424 - (0.082433 - (0.008056 - 0.0003146 * z) * z) * z) * z) *
-               z));
-}
-
-// Corrects the approximation error in AndersonDarlingInf for small values of n
-// Add this to AndersonDarlingInf to get a better approximation
-// (from Marsaglia)
-double AndersonDarlingErrFix(int n, double x) {
-  if (x > 0.8) {
-    return (-130.2137 +
-            (745.2337 -
-             (1705.091 - (1950.646 - (1116.360 - 255.7844 * x) * x) * x) * x) *
-                x) /
-           n;
-  }
-  double cutoff = 0.01265 + 0.1757 / n;
-  double t;
-  if (x < cutoff) {
-    t = x / cutoff;
-    t = sqrt(t) * (1 - t) * (49 * t - 102);
-    return t * (0.0037 / (n * n) + 0.00078 / n + 0.00006) / n;
-  } else {
-    t = (x - cutoff) / (0.8 - cutoff);
-    t = -0.00022633 +
-        (6.54034 - (14.6538 - (14.458 - (8.259 - 1.91864 * t) * t) * t) * t) *
-            t;
-    return t * (0.04213 + 0.01365 / n) / n;
-  }
-}
-
-// Returns the AndersonDarling p-value given n and the value of the statistic
-double AndersonDarlingPValue(int n, double z) {
-  double ad = AndersonDarlingInf(z);
-  double errfix = AndersonDarlingErrFix(n, ad);
-  return ad + errfix;
-}
-
-double AndersonDarlingStatistic(const std::vector<double>& random_sample) {
-  int n = random_sample.size();
-  double ad_sum = 0;
-  for (int i = 0; i < n; i++) {
-    ad_sum += (2 * i + 1) *
-              std::log(random_sample[i] * (1 - random_sample[n - 1 - i]));
-  }
-  double ad_statistic = -n - 1 / static_cast<double>(n) * ad_sum;
-  return ad_statistic;
-}
-
-// Tests if the array of doubles is uniformly distributed.
-// Returns the p-value of the Anderson Darling Statistic
-// for the given set of sorted random doubles
-// See "Evaluating the Anderson-Darling Distribution" by
-// Marsaglia and Marsaglia for details.
-double AndersonDarlingTest(const std::vector<double>& random_sample) {
-  double ad_statistic = AndersonDarlingStatistic(random_sample);
-  double p = AndersonDarlingPValue(random_sample.size(), ad_statistic);
-  return p;
-}
-
-// Testing that NextRandom generates uniform
-// random numbers.
-// Applies the Anderson-Darling test for uniformity
-void TestNextRandom(int n) {
-  Sampler sampler;
-  SamplerTest::Init(&sampler, 1);
-  uint64_t x = 1;
-  // This assumes that the prng returns 48 bit numbers
-  uint64_t max_prng_value = static_cast<uint64_t>(1) << 48;
-  // Initialize
-  for (int i = 1; i <= 20; i++) {  // 20 mimics sampler.Init()
-    x = sampler.NextRandom(x);
-  }
-  std::vector<uint64_t> int_random_sample(n);
-  // Collect samples
-  for (int i = 0; i < n; i++) {
-    int_random_sample[i] = x;
-    x = sampler.NextRandom(x);
-  }
-  // First sort them...
-  std::sort(int_random_sample.begin(), int_random_sample.end());
-  std::vector<double> random_sample(n);
-  // Convert them to uniform randoms (in the range [0,1])
-  for (int i = 0; i < n; i++) {
-    random_sample[i] =
-        static_cast<double>(int_random_sample[i]) / max_prng_value;
-  }
-  // Now compute the Anderson-Darling statistic
-  double ad_pvalue = AndersonDarlingTest(random_sample);
-  EXPECT_GT(std::min(ad_pvalue, 1 - ad_pvalue), 0.0001)
-      << "prng is not uniform: n = " << n << " p = " << ad_pvalue;
-}
-
-TEST(Sampler, TestNextRandom_MultipleValues) {
-  TestNextRandom(10);  // Check short-range correlation
-  TestNextRandom(100);
-  TestNextRandom(1000);
-  TestNextRandom(10000);  // Make sure there's no systematic error
 }
 
 void TestSampleAndersonDarling(int sample_period,
@@ -224,27 +104,6 @@ TEST(Sampler, TestPickNextSample_MultipleValues) {
   TestPickNextSample(10000);  // Make sure there's no systematic error
 }
 
-void TestPickNextGuardedSample(int n) {
-  Sampler sampler;
-  SamplerTest::Init(&sampler, 1);
-  std::vector<uint64_t> int_random_sample(n);
-  for (int i = 0; i < n; i++) {
-    int_random_sample[i] = 1 + sampler.PickNextGuardedSamplingPoint();
-    ASSERT_GE(int_random_sample[i], 1);
-  }
-  TestSampleAndersonDarling(kGuardedSamplingInterval / kSamplingInterval,
-                            &int_random_sample);
-}
-
-TEST(Sampler, TestPickNextGuardedSample_MultipleValues) {
-  ScopedGuardedSamplingRate s(kGuardedSamplingInterval);
-
-  TestPickNextGuardedSample(10);  // Make sure the first few are good (enough)
-  TestPickNextGuardedSample(100);
-  TestPickNextGuardedSample(1000);
-  TestPickNextGuardedSample(10000);  // Make sure there's no systematic error
-}
-
 // Further tests
 
 double StandardDeviationsErrorInSample(int total_samples, int picked_samples,
@@ -283,25 +142,6 @@ TEST(Sampler, LargeAndSmallAllocs_CombinedTest) {
   ASSERT_LE(fabs(small_allocs_sds), kSigmas) << small_allocs_sds;
 }
 
-TEST(Sampler, TestShouldSampleGuardedAllocation) {
-  ScopedGuardedSamplingRate s(kGuardedSamplingInterval);
-
-  Sampler sampler;
-  SamplerTest::Init(&sampler, 1);
-  int counter = 0;
-  int num_iters = 10000;
-  for (int i = 0; i < num_iters; i++) {
-    if (sampler.ShouldSampleGuardedAllocation() ==
-        Profile::Sample::GuardedStatus::Required) {
-      counter++;
-    }
-  }
-  double sd = StandardDeviationsErrorInSample(
-      num_iters, counter, /*alloc_size=*/1,
-      kGuardedSamplingInterval / kSamplingInterval);
-  EXPECT_LE(fabs(sd), kSigmas);
-}
-
 template <typename Body>
 void DoCheckMean(size_t mean, int num_samples, Body next_sampling_point) {
   size_t total = 0;
@@ -313,25 +153,12 @@ void DoCheckMean(size_t mean, int num_samples, Body next_sampling_point) {
   EXPECT_LT(fabs(mean - empirical_mean), expected_sd * kSigmas);
 }
 
-void CheckMean(size_t mean, int num_samples, bool guarded) {
-  Sampler sampler;
-  SamplerTest::Init(&sampler, 1);
-  DoCheckMean(mean, num_samples, [guarded, &sampler]() {
-    if (guarded) {
-      return sampler.PickNextGuardedSamplingPoint();
-    } else {
-      return sampler.PickNextSamplingPoint();
-    }
-  });
-}
-
 // Tests whether the mean is about right over 1000 samples
 TEST(Sampler, IsMeanRight) {
-  ScopedGuardedSamplingRate s(kGuardedSamplingInterval);
-
-  CheckMean(kSamplingInterval, 1000, /*guarded=*/false);
-  CheckMean(kGuardedSamplingInterval / kSamplingInterval, 1000,
-            /*guarded=*/true);
+  Sampler sampler;
+  SamplerTest::Init(&sampler, 1);
+  DoCheckMean(kSamplingInterval, 1000,
+              [&sampler]() { return sampler.PickNextSamplingPoint(); });
 }
 
 // This checks that the stated maximum value for the sampling rate never
@@ -369,47 +196,6 @@ TEST(Sampler, bytes_until_sample_Overflow_Underflow) {
         1 + static_cast<uint64_t>((std::log2(q) - 26) * sample_scaling);
     ASSERT_LE(largest_sample_step, one << 63);
     ASSERT_GE(largest_sample_step, smallest_sample_step);
-  }
-}
-
-// Test that NextRand is in the right range.  Unfortunately, this is a
-// stochastic test which could miss problems.
-TEST(Sampler, NextRand_range) {
-  Sampler sampler;
-  SamplerTest::Init(&sampler, 1);
-  uint64_t one = 1;
-  // The next number should be (one << 48) - 1
-  uint64_t max_value = (one << 48) - 1;
-  uint64_t x = (one << 55);
-  int n = 22;                            // 27;
-  for (int i = 1; i <= (1 << n); i++) {  // 20 mimics sampler.Init()
-    x = sampler.NextRandom(x);
-    ASSERT_LE(x, max_value);
-  }
-}
-
-// Tests certain arithmetic operations to make sure they compute what we
-// expect them too (for testing across different platforms)
-TEST(Sampler, arithmetic_1) {
-  Sampler sampler;
-  SamplerTest::Init(&sampler, 1);
-  uint64_t rnd;  // our 48 bit random number, which we don't trust
-  const uint64_t prng_mod_power = 48;
-  uint64_t one = 1;
-  rnd = one;
-  uint64_t max_value = (one << 48) - 1;
-  for (int i = 1; i <= (1 << 27); i++) {  // 20 mimics sampler.Init()
-    rnd = sampler.NextRandom(rnd);
-    ASSERT_LE(rnd, max_value);
-    double q = (rnd >> (prng_mod_power - 26)) + 1.0;
-    ASSERT_GE(q, 0) << rnd << "  " << prng_mod_power;
-  }
-  // Test some potentially out of bounds value for rnd
-  for (int i = 1; i < 64; i++) {
-    rnd = one << i;
-    double q = (rnd >> (prng_mod_power - 26)) + 1.0;
-    ASSERT_GE(q, 0) << " rnd=" << rnd << "  i=" << i << " prng_mod_power"
-                    << prng_mod_power;
   }
 }
 

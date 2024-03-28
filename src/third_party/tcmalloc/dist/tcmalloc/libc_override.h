@@ -28,6 +28,8 @@
 #include <malloc.h>
 #include <stddef.h>
 
+#include <cstdio>
+#include <cstdlib>
 #include <new>
 
 #include "tcmalloc/tcmalloc.h"  // IWYU pragma: keep

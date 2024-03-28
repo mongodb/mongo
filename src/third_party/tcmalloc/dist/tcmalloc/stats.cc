@@ -14,25 +14,23 @@
 
 #include "tcmalloc/stats.h"
 
-#include <inttypes.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
 
 #include <algorithm>
+#include <climits>
 #include <cstdint>
 #include <limits>
 
-#include "absl/base/dynamic_annotations.h"
 #include "absl/base/internal/cycleclock.h"
 #include "absl/base/macros.h"
 #include "absl/numeric/bits.h"
 #include "absl/strings/string_view.h"
-#include "absl/time/time.h"
 #include "tcmalloc/common.h"
 #include "tcmalloc/huge_pages.h"
+#include "tcmalloc/internal/config.h"
 #include "tcmalloc/internal/logging.h"
-#include "tcmalloc/internal/util.h"
 #include "tcmalloc/pages.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -108,34 +106,13 @@ void PrintStats(const char* label, Printer* out, const BackingStats& backing,
       cum_returned_pages.in_mib());
 }
 
-struct HistBucket {
-  uint64_t min_sec;
-  const char* label;
-};
-
-static const HistBucket kSpanAgeHistBuckets[] = {
-    // clang-format off
-    {0, "<1s"},
-    {1, "1s"},
-    {30, "30s"},
-    {1 * 60, "1m"},
-    {30 * 60, "30m"},
-    {1 * 60 * 60, "1h"},
-    {8 * 60 * 60, "8+h"},
-    // clang-format on
-};
+struct HistBucket {};
 
 struct PageHeapEntry {
   int64_t span_size;  // bytes
   int64_t present;    // bytes
   int64_t released;   // bytes
   int64_t num_spans;
-  double avg_live_age_secs;
-  double avg_released_age_secs;
-  int64_t live_age_hist_bytes[PageAgeHistograms::kNumBuckets] = {0, 0, 0, 0,
-                                                                 0, 0, 0};
-  int64_t released_age_hist_bytes[PageAgeHistograms::kNumBuckets] = {0, 0, 0, 0,
-                                                                     0, 0, 0};
 
   void PrintInPbtxt(PbtxtRegion* parent,
                     absl::string_view sub_region_name) const;
@@ -148,32 +125,10 @@ void PageHeapEntry::PrintInPbtxt(PbtxtRegion* parent,
   page_heap.PrintI64("present", present);
   page_heap.PrintI64("released", released);
   page_heap.PrintI64("num_spans", num_spans);
-  page_heap.PrintDouble("avg_live_age_secs", avg_live_age_secs);
-  page_heap.PrintDouble("avg_released_age_secs", avg_released_age_secs);
-
-  for (int j = 0; j < PageAgeHistograms::kNumBuckets; j++) {
-    uint64_t min_age_secs = kSpanAgeHistBuckets[j].min_sec;
-    uint64_t max_age_secs = j != PageAgeHistograms::kNumBuckets - 1
-                                ? kSpanAgeHistBuckets[j + 1].min_sec
-                                : INT_MAX;
-    if (live_age_hist_bytes[j] != 0) {
-      auto live_age_hist = page_heap.CreateSubRegion("live_age_hist");
-      live_age_hist.PrintI64("bytes", live_age_hist_bytes[j]);
-      live_age_hist.PrintI64("min_age_secs", min_age_secs);
-      live_age_hist.PrintI64("max_age_secs", max_age_secs);
-    }
-    if (released_age_hist_bytes[j] != 0) {
-      auto released_age_hist = page_heap.CreateSubRegion("released_age_hist");
-      released_age_hist.PrintI64("bytes", released_age_hist_bytes[j]);
-      released_age_hist.PrintI64("min_age_secs", min_age_secs);
-      released_age_hist.PrintI64("max_age_secs", max_age_secs);
-    }
-  }
 }
 
 void PrintStatsInPbtxt(PbtxtRegion* region, const SmallSpanStats& small,
-                       const LargeSpanStats& large,
-                       const PageAgeHistograms& ages) {
+                       const LargeSpanStats& large) {
   // Print for small pages.
   for (auto i = Length(0); i < kMaxPages; ++i) {
     const size_t norm = small.normal_length[i.raw_num()];
@@ -188,21 +143,6 @@ void PrintStatsInPbtxt(PbtxtRegion* region, const SmallSpanStats& small,
     entry.released = ret_pages.in_bytes();
     entry.num_spans = total;
 
-    // Histogram is only collected for pages < ages.kNumSize.
-    if (i < Length(PageAgeHistograms::kNumSizes)) {
-      entry.avg_live_age_secs =
-          ages.GetSmallHistogram(/*released=*/false, i)->avg_age();
-      entry.avg_released_age_secs =
-          ages.GetSmallHistogram(/*released=*/true, i)->avg_age();
-      for (int j = 0; j < ages.kNumBuckets; j++) {
-        entry.live_age_hist_bytes[j] =
-            ages.GetSmallHistogram(/*released=*/false, i)->pages_in_bucket(j) *
-            kPageSize;
-        entry.released_age_hist_bytes[j] =
-            ages.GetSmallHistogram(/*released=*/true, i)->pages_in_bucket(j) *
-            kPageSize;
-      }
-    }
     entry.PrintInPbtxt(region, "page_heap");
   }
 
@@ -213,123 +153,10 @@ void PrintStatsInPbtxt(PbtxtRegion* region, const SmallSpanStats& small,
     entry.num_spans = large.spans;
     entry.present = large.normal_pages.in_bytes();
     entry.released = large.returned_pages.in_bytes();
-    entry.avg_live_age_secs =
-        ages.GetLargeHistogram(/*released=*/false)->avg_age();
-    entry.avg_released_age_secs =
-        ages.GetLargeHistogram(/*released=*/true)->avg_age();
-    for (int j = 0; j < ages.kNumBuckets; j++) {
-      entry.live_age_hist_bytes[j] =
-          ages.GetLargeHistogram(/*released=*/false)->pages_in_bucket(j) *
-          kPageSize;
-      entry.released_age_hist_bytes[j] =
-          ages.GetLargeHistogram(/*released=*/true)->pages_in_bucket(j) *
-          kPageSize;
-    }
     entry.PrintInPbtxt(region, "page_heap");
   }
 
   region->PrintI64("min_large_span_size", kMaxPages.raw_num());
-}
-
-static int HistBucketIndex(double age_exact) {
-  uint64_t age_secs = age_exact;  // truncate to seconds
-  for (int i = 0; i < ABSL_ARRAYSIZE(kSpanAgeHistBuckets) - 1; i++) {
-    if (age_secs < kSpanAgeHistBuckets[i + 1].min_sec) {
-      return i;
-    }
-  }
-  return ABSL_ARRAYSIZE(kSpanAgeHistBuckets) - 1;
-}
-
-PageAgeHistograms::PageAgeHistograms(int64_t now)
-    : now_(now), freq_(absl::base_internal::CycleClock::Frequency()) {
-  static_assert(
-      PageAgeHistograms::kNumBuckets == ABSL_ARRAYSIZE(kSpanAgeHistBuckets),
-      "buckets don't match constant in header");
-}
-
-void PageAgeHistograms::RecordRange(Length pages, bool released, int64_t when) {
-  double age = std::max(0.0, (now_ - when) / freq_);
-  (released ? returned_ : live_).Record(pages, age);
-}
-
-void PageAgeHistograms::PerSizeHistograms::Record(Length pages, double age) {
-  (pages < kLargeSize ? GetSmall(pages) : GetLarge())->Record(pages, age);
-  total.Record(pages, age);
-}
-
-static uint32_t SaturatingAdd(uint32_t x, uint32_t y) {
-  uint32_t z = x + y;
-  if (z < x) z = std::numeric_limits<uint32_t>::max();
-  return z;
-}
-
-void PageAgeHistograms::Histogram::Record(Length pages, double age) {
-  size_t bucket = HistBucketIndex(age);
-  buckets_[bucket] = SaturatingAdd(buckets_[bucket], pages.raw_num());
-  total_pages_ += pages;
-  total_age_ += pages.raw_num() * age;
-}
-
-void PageAgeHistograms::Print(const char* label, Printer* out) const {
-  out->printf("------------------------------------------------\n");
-  out->printf(
-      "%s cache entry age (count of pages in spans of "
-      "a given size that have been idle for up to the given period of time)\n",
-      label);
-  out->printf("------------------------------------------------\n");
-  out->printf("                             ");
-  // Print out the table header.  All columns have width 8 chars.
-  out->printf("    mean");
-  for (int b = 0; b < kNumBuckets; b++) {
-    out->printf("%8s", kSpanAgeHistBuckets[b].label);
-  }
-  out->printf("\n");
-
-  live_.Print("Live span", out);
-  out->printf("\n");
-  returned_.Print("Unmapped span", out);
-}
-
-static void PrintLineHeader(Printer* out, const char* kind, const char* prefix,
-                            Length num) {
-  // Print the beginning of the line, e.g. "Live span,   >=128 pages: ".  The
-  // span size ("128" in the example) is padded such that it plus the span
-  // prefix ("Live") plus the span size prefix (">=") is kHeaderExtraChars wide.
-  const int kHeaderExtraChars = 19;
-  const int span_size_width =
-      std::max<int>(0, kHeaderExtraChars - strlen(kind));
-  out->printf("%s, ", kind);
-  PrintRightAdjustedWithPrefix(out, prefix, num, span_size_width);
-  out->printf(" pages: ");
-}
-
-void PageAgeHistograms::PerSizeHistograms::Print(const char* kind,
-                                                 Printer* out) const {
-  out->printf("%-15s TOTAL PAGES: ", kind);
-  total.Print(out);
-
-  for (auto l = Length(1); l < Length(kNumSizes); ++l) {
-    const Histogram* here = &small[l.raw_num() - 1];
-    if (here->empty()) continue;
-    PrintLineHeader(out, kind, "", l);
-    here->Print(out);
-  }
-
-  if (!large.empty()) {
-    PrintLineHeader(out, kind, ">=", Length(kNumSizes));
-    large.Print(out);
-  }
-}
-
-void PageAgeHistograms::Histogram::Print(Printer* out) const {
-  const double mean = avg_age();
-  out->printf(" %7.1f", mean);
-  for (int b = 0; b < kNumBuckets; ++b) {
-    out->printf(" %7u", buckets_[b]);
-  }
-
-  out->printf("\n");
 }
 
 void PageAllocInfo::Print(Printer* out) const {
@@ -424,7 +251,7 @@ static Length RoundUp(Length value, Length alignment) {
                 ~(alignment.raw_num() - 1));
 }
 
-void PageAllocInfo::RecordAlloc(PageId p, Length n, size_t num_objects) {
+void PageAllocInfo::RecordAlloc(PageId p, Length n) {
   static_assert(kMaxPages.in_bytes() == 1024 * 1024, "threshold changed?");
   static_assert(kMaxPages < kPagesPerHugePage, "there should be slack");
   largest_seen_ = std::max(largest_seen_, n);
@@ -439,7 +266,7 @@ void PageAllocInfo::RecordAlloc(PageId p, Length n, size_t num_objects) {
   }
 }
 
-void PageAllocInfo::RecordFree(PageId p, Length n, size_t num_objects) {
+void PageAllocInfo::RecordFree(PageId p, Length n) {
   if (n <= kMaxPages) {
     total_small_ -= n;
     small_[n.raw_num() - 1].Free(n);

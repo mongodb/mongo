@@ -20,23 +20,25 @@
 
 #include <assert.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <algorithm>
+#include <map>
+#include <string>
 
+#include "absl/base/macros.h"
 #include "tcmalloc/internal_malloc_extension.h"
+#include "tcmalloc/malloc_extension.h"
 
 const size_t kMem = 10 << 20;
 const size_t kMin = 8;
 void* blocks[kMem / kMin];
 
 int main() {
-  const char* env = getenv("FORCE_CPU_CACHES");
-  if (env != nullptr && strcmp(env, "1") == 0) {
-    if (&TCMalloc_Internal_ForceCpuCacheActivation != nullptr) {
-      TCMalloc_Internal_ForceCpuCacheActivation();
-    }
+  if (&TCMalloc_Internal_ForceCpuCacheActivation != nullptr) {
+    TCMalloc_Internal_ForceCpuCacheActivation();
   }
 
   size_t step = 16;
@@ -69,5 +71,67 @@ int main() {
       ::operator delete(blocks[i]);
     }
     step = std::max(step, size / 32);
+  }
+
+  constexpr const char* kProperties[] = {
+      // TODO(b/329837900):  Source all properties from GetProperties, rather
+      // than a hard-coded list.
+      //
+      // go/keep-sorted start
+      "generic.bytes_in_use_by_app", "generic.current_allocated_bytes",
+      "generic.heap_size", "generic.peak_memory_usage",
+      "generic.physical_memory_used", "generic.virtual_memory_used",
+      "tcmalloc.central_cache_free", "tcmalloc.cpu_free",
+      "tcmalloc.current_total_thread_cache_bytes",
+      // TODO(b/329837900): Add tcmalloc.metadata_bytes to this list.
+      "tcmalloc.pageheap_free_bytes", "tcmalloc.pageheap_unmapped_bytes",
+      "tcmalloc.per_cpu_caches_active", "tcmalloc.sharded_transfer_cache_free",
+      "tcmalloc.transfer_cache_free",
+      // go/keep-sorted end
+  };
+  int scalar_values[ABSL_ARRAYSIZE(kProperties)];
+
+  if (&MallocExtension_Internal_GetProperties == nullptr ||
+      &MallocExtension_Internal_GetNumericProperty == nullptr) {
+    // Skip rest of test since we don't link against TCMalloc.  This should only
+    // happen under sanitizers.
+#if !defined(ABSL_HAVE_ADDRESS_SANITIZER) && \
+    !defined(ABSL_HAVE_MEMORY_SANITIZER) &&  \
+    !defined(ABSL_HAVE_THREAD_SANITIZER)
+    assert(false &&
+           "Not linked against TCMalloc, but not built with sanitizers.");
+#endif
+
+    return 0;
+  }
+
+  std::map<std::string, tcmalloc::MallocExtension::Property> properties;
+  // Run GetProperties twice.  Once to use some RAM, which will skew our stats,
+  // and a second time for the actual read-out.
+  MallocExtension_Internal_GetProperties(&properties);
+
+  for (int i = 0; i < ABSL_ARRAYSIZE(kProperties); ++i) {
+    const char* property = kProperties[i];
+    size_t value;
+    bool ret = MallocExtension_Internal_GetNumericProperty(
+        property, strlen(property), &value);
+
+    scalar_values[i] = ret ? value : 0;
+  }
+
+  MallocExtension_Internal_GetProperties(&properties);
+  for (int i = 0; i < ABSL_ARRAYSIZE(kProperties); ++i) {
+    const char* property = kProperties[i];
+    const size_t scalar_value = scalar_values[i];
+    const size_t set_value = properties[property].value;
+
+    const size_t tolerance = set_value * 0.01;
+
+    fprintf(stderr, "property '%s': scalar %zu versus set %zu\n", property,
+            scalar_value, set_value);
+    if (scalar_value < set_value - tolerance &&
+        scalar_value > set_value + tolerance) {
+      abort();
+    }
   }
 }

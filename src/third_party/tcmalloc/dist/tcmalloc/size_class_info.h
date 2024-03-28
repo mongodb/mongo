@@ -17,7 +17,9 @@
 #define TCMALLOC_SIZE_CLASS_INFO_H_
 
 #include <stddef.h>
+#include <stdint.h>
 
+#include "absl/types/span.h"
 #include "tcmalloc/internal/config.h"
 
 GOOGLE_MALLOC_SECTION_BEGIN
@@ -27,17 +29,34 @@ namespace tcmalloc_internal {
 // Precomputed size class parameters.
 struct SizeClassInfo {
   // Max size storable in that class
-  size_t size;
+  uint32_t size;
 
   // Number of pages to allocate at a time
-  size_t pages;
+  uint8_t pages;
 
   // Number of objects to move between a per-thread list and a central list in
   // one shot.  We want this to be not too small so we can amortize the lock
   // overhead for accessing the central list.  Making it too big may temporarily
   // cause unnecessary memory wastage in the per-thread free list until the
   // scavenger cleans up the list.
-  size_t num_to_move;
+  uint8_t num_to_move;
+
+  // Max per-CPU slab capacity for the default 256KB slab size.
+  // Scaled up/down for larger/smaller slab sizes.
+  uint32_t max_capacity;
+};
+
+struct SizeClassAssumptions {
+  bool has_expanded_classes;    // kHasExpandedClasses
+  size_t span_size;             // sizeof(Span)
+  size_t sampling_rate;         // kDefaultProfileSamplingRate
+  size_t large_size;            // SizeMap::kLargeSize
+  size_t large_size_alignment;  // SizeMap::kLargeSizeAlignment
+};
+
+struct SizeClasses {
+  absl::Span<const SizeClassInfo> classes;
+  SizeClassAssumptions assumptions;
 };
 
 }  // namespace tcmalloc_internal
