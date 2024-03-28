@@ -341,7 +341,7 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx,
     }
 
     {
-        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+        AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
         writeConflictRetry(
             opCtx,
             "session migration initialization majority commit barrier",

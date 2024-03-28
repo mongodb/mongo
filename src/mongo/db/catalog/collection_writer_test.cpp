@@ -58,6 +58,7 @@
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/framework.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 namespace mongo {
 namespace {
 
@@ -99,15 +100,20 @@ protected:
             ->lookupCollectionByNamespace(operationContext(), nss);
     }
 
-    void verifyCollectionInCatalogUsingDifferentClient(const Collection* expected) {
-        stdx::thread t([this, expected]() {
+    void verifyCollectionInCatalogUsingDifferentClient(const Collection* expected,
+                                                       const NamespaceString& nss) {
+        stdx::thread t([this, expected, nss]() {
             ThreadClient client(getServiceContext()->getService());
             auto opCtx = client->makeOperationContext();
-            ASSERT_EQ(expected,
-                      CollectionCatalog::get(opCtx.get())
-                          ->lookupCollectionByNamespace(opCtx.get(), kNss));
+            ASSERT_EQ(
+                expected,
+                CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss));
         });
         t.join();
+    }
+
+    void verifyCollectionInCatalogUsingDifferentClient(const Collection* expected) {
+        verifyCollectionInCatalogUsingDifferentClient(expected, kNss);
     }
 
     const NamespaceString kNss =
@@ -254,6 +260,41 @@ TEST_F(CatalogTestFixture, ConcurrentCatalogWritesSerialized) {
     for (auto&& thread : threads) {
         thread.join();
     }
+}
+
+// Validate that the oplog supports copy on write like any other collection.
+TEST_F(CollectionWriterTest, OplogCOW) {
+    const auto nss = NamespaceString::kRsOplogNamespace;
+
+    const auto& oplogInitial = lookupCollectionFromCatalogForRead(nss);
+    ASSERT(oplogInitial);
+
+    AutoGetCollection lock(operationContext(), nss, MODE_X);
+    CollectionWriter writer(operationContext(), nss);
+
+    const auto& oplogDuringDDL = lookupCollectionFromCatalogForRead(nss);
+    ASSERT(oplogDuringDDL);
+    ASSERT(oplogInitial == oplogDuringDDL);
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        auto writable = writer.getWritableCollection(operationContext());
+
+        // get() and getWritableCollection() should return the same instance
+        ASSERT_EQ(writer.get().get(), writable);
+
+        // Catalog lookups for this OperationContext should see the uncommitted collection.
+        ASSERT_EQ(writable, lookupCollectionFromCatalogForRead(nss));
+
+        wuow.commit();
+    }
+
+    // A new oplog lookup should return a new Collection pointer.
+    const auto& oplogAfterDDL = lookupCollectionFromCatalogForRead(nss);
+    ASSERT(oplogAfterDDL != oplogInitial);
+
+    // Likewise from another thread.
+    verifyCollectionInCatalogUsingDifferentClient(oplogAfterDDL, nss);
 }
 
 /**

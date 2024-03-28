@@ -61,7 +61,7 @@ public:
     StatusWith<Value> next() override;
 
 private:
-    AutoGetOplog _oplogRead;
+    AutoGetOplogFastPath _oplogRead;
     OldClientContext _ctx;
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 };

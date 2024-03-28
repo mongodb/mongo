@@ -758,7 +758,7 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
 
     // Prevent the node from being able to change state when reserving oplog slots and writing
     // entries.
-    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+    AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
 
     // We start WriteUnitOfWork only to reserve oplog slots. So, it's ok to abort the
     // WriteUnitOfWork when it goes out of scope.
@@ -884,7 +884,7 @@ void TenantOplogApplier::_writeSessionNoOp(OperationContext* opCtx,
                 "migrationId"_attr = _migrationUuid,
                 "op"_attr = redact(noopEntry.toBSON()));
 
-    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+    AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
     boost::optional<Lock::TenantLock> tenantLock;
     if (auto tid = noopEntry.getTid()) {
         tenantLock.emplace(opCtx, *tid, MODE_IX);
@@ -1076,7 +1076,7 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
 
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-    AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
+    AutoGetOplogFastPath oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
     auto tenantLocks = _acquireIntentExclusiveTenantLocks(opCtx.get(), begin, end);
 
     writeConflictRetry(opCtx.get(), "writeTenantNoOps", NamespaceString::kRsOplogNamespace, [&] {

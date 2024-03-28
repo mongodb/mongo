@@ -1060,7 +1060,7 @@ void ReshardingRecipientService::RecipientStateMachine::_writeStrictConsistencyO
     auto oplog = generateOplogEntry();
     writeConflictRetry(
         rawOpCtx, "ReshardDoneCatchUpOplog", NamespaceString::kRsOplogNamespace, [&] {
-            AutoGetOplog oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
+            AutoGetOplogFastPath oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
             WriteUnitOfWork wunit(rawOpCtx);
             const auto& oplogOpTime = repl::logOp(rawOpCtx, &oplog);
             uassert(5063601,

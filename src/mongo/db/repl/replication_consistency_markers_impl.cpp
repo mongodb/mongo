@@ -493,7 +493,7 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // oplog collection must be taken up front so that the mutex can also be taken around both
     // operations without causing deadlocks.
     AutoGetCollection autoTruncateColl(opCtx, _oplogTruncateAfterPointNss, MODE_IX);
-    AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
     stdx::lock_guard<Latch> lk(_refreshOplogTruncateAfterPointMutex);
 
     // Update the oplogTruncateAfterPoint to the storage engine's reported oplog timestamp with no

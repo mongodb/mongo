@@ -558,7 +558,7 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
 
     {
-        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+        AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
         if (!replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin)) {
             return {ErrorCodes::NotWritablePrimary,
                     "No longer primary when waiting for linearizable read concern"};

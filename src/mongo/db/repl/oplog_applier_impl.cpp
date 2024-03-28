@@ -347,7 +347,7 @@ Status _insertDocumentsToOplogAndChangeCollections(
     std::vector<InsertStatement>::const_iterator end,
     bool skipWritesToOplog) {
     WriteUnitOfWork wunit(opCtx);
-    boost::optional<AutoGetOplog> autoOplog;
+    boost::optional<AutoGetOplogFastPath> autoOplog;
     boost::optional<ChangeStreamChangeCollectionManager::ChangeCollectionsWriter>
         changeCollectionWriter;
 

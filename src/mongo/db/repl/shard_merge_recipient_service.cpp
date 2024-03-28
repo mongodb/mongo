@@ -1403,7 +1403,7 @@ void ShardMergeRecipientService::Instance::_processCommittedTransactionEntry(con
     // Use the same wallclock time as the noop entry.
     sessionTxnRecord.setLastWriteDate(noopEntry.getWallClockTime());
 
-    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+    AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
     writeConflictRetry(
         opCtx, "writeDonorCommittedTxnEntry", NamespaceString::kRsOplogNamespace, [&] {
             WriteUnitOfWork wuow(opCtx);
@@ -1863,7 +1863,7 @@ ShardMergeRecipientService::Instance::_advanceMajorityCommitTsToBkpCursorCheckpo
                        "mergeRecipientWriteNoopToAdvanceStableTimestamp",
                        NamespaceString::kRsOplogNamespace,
                        [&] {
-                           AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+                           AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
                            WriteUnitOfWork wuow(opCtx);
                            const std::string msg = str::stream()
                                << "Merge recipient advancing stable timestamp";
