@@ -85,3 +85,11 @@ server_parameters:
       name: TCMallocReleaseRateServerParameter
       override_set: false
     redact: false
+
+  tcmallocEnableBackgroundThread:
+    description: "Enable TCMalloc Background Thread"
+    set_at: startup
+    cpp_vartype: bool
+    cpp_varname: TCMallocEnableBackgroundThread
+    default: true
+    redact: false

@@ -382,6 +382,7 @@ for impl in [
 ]:
     if env['MONGO_ALLOCATOR'] in impl['options']:
         tcmallocAttrs = impl
+
 if tcmallocAttrs:
     tcmspEnv = env.Clone()
     if not use_system_version_of_library(tcmallocAttrs['sys_name']):
@@ -394,6 +395,18 @@ if tcmallocAttrs:
     if not use_system_version_of_library('valgrind'):
         # Include valgrind since tcmalloc disables itself while running under valgrind
         tcmspEnv.InjectThirdParty('valgrind')
+
+    tcmspEnv.Library(
+        target='allocator_thread',
+        source=[
+            'allocator_tcmalloc_thread.cpp',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/server_base',
+            '$BUILD_DIR/mongo/db/service_context',
+            'tcmalloc_set_parameter',
+        ],
+    )
 
     tcmspEnv.Library(
         target='tcmalloc_set_parameter',
@@ -442,6 +455,16 @@ if tcmallocAttrs:
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/server_base',
             'tcmalloc_set_parameter',
+        ],
+    )
+else:
+    env.Library(
+        target='allocator_thread',
+        source=[
+            'allocator_system_thread.cpp',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/server_base',
         ],
     )
 

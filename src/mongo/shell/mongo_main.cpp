@@ -107,6 +107,7 @@
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
+#include "mongo/util/allocator_thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/duration.h"
@@ -767,6 +768,8 @@ int mongo_main(int argc, char* argv[]) {
 
         // TODO This should use a TransportLayerManager or TransportLayerFactory
         auto serviceContext = getGlobalServiceContext();
+
+        startAllocatorThread();
 
         // Set up the periodic runner for background job execution. This is required to be running
         // before the transport layer is initialized.

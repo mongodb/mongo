@@ -141,6 +141,7 @@
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
+#include "mongo/util/allocator_thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/clock_source.h"
@@ -1135,6 +1136,8 @@ ExitCode mongos_main(int argc, char* argv[]) {
             return ExitCode::abrupt;
 
         startSignalProcessingThread();
+
+        startAllocatorThread();
 
         return main(service);
     } catch (const DBException& e) {
