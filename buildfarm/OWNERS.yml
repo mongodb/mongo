@@ -1,0 +1,7 @@
+version: 1.0.0
+aliases:
+  - //bazel/devprod_build_aliases.yml
+filters:
+  - "*":
+    approvers:
+      - devprod-build

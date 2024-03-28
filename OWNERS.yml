@@ -1,0 +1,81 @@
+version: 1.0.0
+aliases:
+  - //bazel/devprod_build_aliases.yml
+  - //buildscripts/resmokelib/devprod_correctness_aliases.yml
+filters:
+  - "OWNERS.yml":
+    approvers:
+      - IamXander
+      # TODO: add more owners here
+  - ".bazelignore":
+    approvers:
+      - devprod-build
+  - ".bazelrc":
+    approvers:
+      - devprod-build
+  - ".bazelversion":
+    approvers:
+      - devprod-build
+  - ".clang-format":
+    approvers:
+      - devprod-build
+  - ".eslint-ignore":
+    approvers:
+      - devprod-correctness
+  - ".eslintrc.yml":
+    approvers:
+      - devprod-correctness
+  - ".mypy.ini":
+    approvers:
+      - devprod-correctness
+      - devprod-build
+  - ".prettierignore":
+    approvers:
+      - devprod-correctness
+  - ".prettierrc":
+    approvers:
+      - devprod-correctness
+  - ".pydocstyle":
+    approvers:
+      - devprod-correctness
+      - devprod-build
+  - ".pylintrc":
+    approvers:
+      - devprod-correctness
+      - devprod-build
+  - ".style.yapf":
+    approvers:
+      - devprod-correctness
+      - devprod-build
+  - "BUILD.bazel":
+    approvers:
+      - devprod-build
+  - "copybara.sky":
+    approvers:
+      - IamXander
+  - "copybara.staging.sky":
+    approvers:
+      - devprod-correctness
+  - "jsconfig.json":
+    approvers:
+      - devprod-correctness
+  - "package.json":
+    approvers:
+      - devprod-correctness
+  - "pnpm-lock.yaml":
+    approvers:
+      - devprod-correctness
+  - "poetry.lock":
+    approvers:
+      - devprod-correctness
+      - devprod-build
+  - "pyproject.toml":
+    approvers:
+      - devprod-correctness
+      - devprod-build
+  - "SConstruct":
+    approvers:
+      - devprod-build
+  - "WORKSPACE.bazel":
+    approvers:
+      - devprod-build
