@@ -2306,7 +2306,7 @@ buildvariants:
 # clusters with dedicated routers.
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-dedicated-default-sharding.arm.aws.2023-11
-  display_name: PERF 3-Node ReplSet Dedicated Default Sharding ARM AWS 2023-11
+  display_name: Dedicated Default Sharding 3-Node ReplSet ARM AWS 2023-11
   cron: *linux-3-node-cron
   modules: *perf_modules
   expansions:
