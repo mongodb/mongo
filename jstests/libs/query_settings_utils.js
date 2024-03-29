@@ -2,6 +2,7 @@
  * Utility class for testing query settings.
  */
 import {
+    getAggPlanStages,
     getEngine,
     getPlanStages,
     getQueryPlanners,
@@ -202,6 +203,18 @@ export class QuerySettingsUtils {
         const engine = getEngine(explain);
         assert.eq(
             engine, expectedEngine, `Expected engine to be ${expectedEngine} but found ${engine}`);
+
+        // Ensure that no $cursor stage exists, which means the whole query got pushed down to find,
+        // if 'expectedEngine' is SBE.
+        if (query.aggregate) {
+            const cursorStages = getAggPlanStages(explain, "$cursor");
+
+            if (expectedEngine === "sbe") {
+                assert.eq(cursorStages.length, 0, cursorStages);
+            } else {
+                assert.gte(cursorStages.length, 0, cursorStages);
+            }
+        }
 
         // If a hinted index exists, assert it was used.
         if (query.hint) {

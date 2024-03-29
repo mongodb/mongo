@@ -36,6 +36,16 @@ const nonSbeEligibleQuery = {
     hint: indexKeyPattern,
 };
 
+const sbeRestrictedQuery = qsutils.makeAggregateQueryInstance({
+    pipeline: [{$group: {_id: "$groupID", count: {$sum: 1}}}],
+    hint: indexKeyPattern,
+});
+
+const nonSbeRestrictedQuery = qsutils.makeAggregateQueryInstance({
+    pipeline: [{$limit: 1}],
+    hint: indexKeyPattern,
+});
+
 qsutils.assertQueryFramework({
     query: sbeEligibleQuery,
     settings: {queryFramework: "classic"},
@@ -58,4 +68,28 @@ qsutils.assertQueryFramework({
     query: nonSbeEligibleQuery,
     settings: {queryFramework: "sbe"},
     expectedEngine: "classic",
+});
+
+qsutils.assertQueryFramework({
+    query: sbeRestrictedQuery,
+    settings: {queryFramework: "classic"},
+    expectedEngine: "classic",
+});
+
+qsutils.assertQueryFramework({
+    query: sbeRestrictedQuery,
+    settings: {queryFramework: "sbe"},
+    expectedEngine: "sbe",
+});
+
+qsutils.assertQueryFramework({
+    query: nonSbeRestrictedQuery,
+    settings: {queryFramework: "classic"},
+    expectedEngine: "classic",
+});
+
+qsutils.assertQueryFramework({
+    query: nonSbeRestrictedQuery,
+    settings: {queryFramework: "sbe"},
+    expectedEngine: "sbe",
 });

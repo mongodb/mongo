@@ -39,11 +39,12 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _sbeDisableTimeSeriesValue =
         internalQuerySlotBasedExecutionDisableTimeSeriesPushdown.loadRelaxed();
 
-    // TODO: SERVER-87031 Ensure internalQueryFrameworkControl value is overriden by query settings
-    // if present.
-    _queryFrameworkControlValue = ServerParameterSet::getNodeParameterSet()
-                                      ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                                      ->_data.get();
+    _queryFrameworkControlValue = querySettings.getQueryFramework().value_or_eval([]() {
+        return ServerParameterSet::getNodeParameterSet()
+            ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
+            ->_data.get();
+    });
+
     _planEvaluationMaxResults = internalQueryPlanEvaluationMaxResults.loadRelaxed();
     _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
 }

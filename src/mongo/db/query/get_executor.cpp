@@ -1206,11 +1206,6 @@ bool shouldAttemptSBE(const CanonicalQuery* canonicalQuery) {
         return false;
     }
 
-    // If query settings engine version is set, use it to determine which engine should be used.
-    if (auto queryFramework = canonicalQuery->getExpCtx()->getQuerySettings().getQueryFramework()) {
-        return *queryFramework == QueryFrameworkControlEnum::kTrySbeEngine;
-    }
-
     return !canonicalQuery->getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled();
 }
 
@@ -1317,14 +1312,7 @@ boost::optional<PlanExecutorSbeParams> tryGetSbeParams(
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
     const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
-    const bool querySettingsHintSbe = [&]() {
-        if (auto queryFramework =
-                canonicalQuery->getExpCtx()->getQuerySettings().getQueryFramework()) {
-            return *queryFramework == QueryFrameworkControlEnum::kTrySbeEngine;
-        }
-        return false;
-    }();
-    const bool canUseSbe = canUseRegularSbe || sbeFull || querySettingsHintSbe;
+    const bool canUseSbe = canUseRegularSbe || sbeFull;
     if (!canUseSbe) {
         return boost::none;
     }

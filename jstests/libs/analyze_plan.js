@@ -1091,8 +1091,18 @@ function getNestedProperty(object, key) {
  * This helper function can be used for any optimizer.
  */
 export function getEngine(explain) {
-    const queryPlanner = {...getQueryPlanner(explain)};
-    return getNestedProperty(queryPlanner, "slotBasedPlan") ? "sbe" : "classic";
+    const sbePlans = getQueryPlanners(explain).map(
+        queryPlanner => getNestedProperty(queryPlanner, "slotBasedPlan"));
+
+    if (sbePlans.every(plan => plan)) {
+        return "sbe";
+    }
+
+    if (sbePlans.every(plan => !plan)) {
+        return "classic"
+    }
+
+    assert(false, "Some shards are using SBE, while others are using Classic");
 }
 
 /**
