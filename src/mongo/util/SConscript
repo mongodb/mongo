@@ -453,9 +453,7 @@ if tcmallocAttrs:
             'tcmalloc_set_parameter_test.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/commands/server_status_core',
             '$BUILD_DIR/mongo/db/server_base',
-            'processinfo',
             'tcmalloc_set_parameter',
         ],
     )
