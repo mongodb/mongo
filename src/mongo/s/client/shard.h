@@ -249,10 +249,11 @@ public:
      * commands return errors in a different format than regular commands do, so checking for
      * retriable errors must be done differently.
      */
-    BatchedCommandResponse runBatchWriteCommand(OperationContext* opCtx,
-                                                Milliseconds maxTimeMS,
-                                                const BatchedCommandRequest& batchRequest,
-                                                RetryPolicy retryPolicy);
+    virtual BatchedCommandResponse runBatchWriteCommand(OperationContext* opCtx,
+                                                        Milliseconds maxTimeMS,
+                                                        const BatchedCommandRequest& batchRequest,
+                                                        const WriteConcernOptions& writeConcern,
+                                                        RetryPolicy retryPolicy) = 0;
 
     /**
      * Warning: This method exhausts the cursor and pulls all data into memory.
@@ -283,10 +284,22 @@ public:
 protected:
     Shard(const ShardId& id);
 
+    /**
+     * Submits the batch request applying the specified retry policy and timeout and using the
+     * machinery provided by each implementation.
+     * Callers of this function must ensure to have configured the write concern settings
+     * accordingly to their specific semantics.
+     */
+    BatchedCommandResponse _submitBatchWriteCommand(OperationContext* opCtx,
+                                                    const BSONObj& serialisedBatchRequest,
+                                                    const DatabaseName& dbName,
+                                                    Milliseconds maxTimeMS,
+                                                    RetryPolicy retryPolicy);
+
 private:
     /**
-     * Runs the specified command against the shard backed by this object with a timeout set to the
-     * minimum of maxTimeMSOverride or the timeout of the OperationContext.
+     * Runs the specified command against the shard backed by this object with a timeout set to
+     * the minimum of maxTimeMSOverride or the timeout of the OperationContext.
      *
      * The return value exposes RemoteShard's host for calls to updateReplSetMonitor.
      *

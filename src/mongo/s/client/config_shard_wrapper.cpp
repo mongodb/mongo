@@ -81,6 +81,17 @@ Status ConfigShardWrapper::runAggregation(
     return _configShard->runAggregation(opCtx, aggRequest, std::move(callback));
 }
 
+BatchedCommandResponse ConfigShardWrapper::runBatchWriteCommand(
+    OperationContext* opCtx,
+    Milliseconds maxTimeMS,
+    const BatchedCommandRequest& batchRequest,
+    const WriteConcernOptions& writeConcern,
+    RetryPolicy retryPolicy) {
+    return _configShard->runBatchWriteCommand(
+        opCtx, maxTimeMS, batchRequest, writeConcern, retryPolicy);
+}
+
+
 StatusWith<Shard::CommandResponse> ConfigShardWrapper::_runCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,

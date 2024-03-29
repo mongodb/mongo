@@ -478,23 +478,6 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
     return writeType;
 }
 
-BSONObj upgradeWriteConcern(const BSONObj& origWriteConcern) {
-    BSONObjIterator iter(origWriteConcern);
-    BSONObjBuilder newWriteConcern;
-
-    while (iter.more()) {
-        BSONElement elem(iter.next());
-
-        if (strncmp(elem.fieldName(), "w", 2) == 0) {
-            newWriteConcern.append("w", 1);
-        } else {
-            newWriteConcern.append(elem);
-        }
-    }
-
-    return newWriteConcern.obj();
-}
-
 BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest)
     : _opCtx(opCtx),
       _clientRequest(clientRequest),
@@ -685,18 +668,6 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
     auto dbVersion = endpoint.databaseVersion;
     if (dbVersion)
         request.setDbVersion(*dbVersion);
-
-    if (!TransactionRouter::get(_opCtx)) {
-        // Append the write concern from the opCtx extracted during command setup.
-        const auto wc = _opCtx->getWriteConcern();
-        if (wc.requiresWriteAcknowledgement()) {
-            request.setWriteConcern(wc.toBSON());
-        } else {
-            // Mongos needs to send to the shard with w > 0 so it will be able to see the
-            // writeErrors
-            request.setWriteConcern(upgradeWriteConcern(wc.toBSON()));
-        }
-    }
 
     return request;
 }

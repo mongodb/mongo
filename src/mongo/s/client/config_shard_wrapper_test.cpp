@@ -96,6 +96,17 @@ public:
         return Status::OK();
     }
 
+    BatchedCommandResponse runBatchWriteCommand(OperationContext* opCtx,
+                                                Milliseconds maxTimeMS,
+                                                const BatchedCommandRequest& batchRequest,
+                                                const WriteConcernOptions& writeConcern,
+                                                RetryPolicy retryPolicy) override {
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        return response;
+    }
+
+
     ReadPreferenceSetting lastReadPref;
 
 private:
