@@ -188,7 +188,7 @@ tasks:
 
 - <<: *task_template
   name: resmoke_end2end_tests
-  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "incompatible_aubsan"]
   commands:
   - func: "do setup"
   - func: "run tests"

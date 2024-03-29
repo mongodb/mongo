@@ -32,6 +32,7 @@ build_variant_large_distro_exceptions:
   - enterprise-ubuntu2004-arm64
   - enterprise-ubuntu2204-arm64
   - hot_backups-rhel-79-64-bit
+  - linux-debug-aubsan-compile-required
   - linux-x86-dynamic-compile
   - linux-x86-dynamic-debug-compile-required
   - macos

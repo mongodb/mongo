@@ -1284,7 +1284,7 @@ tasks:
 
 - <<: *task_template
   name: disk_wiredtiger
-  tags: ["assigned_to_jira_team_server_execution", "release_critical", "incompatible_ppc", "incompatible_s390x"]
+  tags: ["assigned_to_jira_team_server_execution", "release_critical", "incompatible_ppc", "incompatible_s390x", "incompatible_aubsan"]
   commands:
   - func: "do setup"
   - func: "run tests"

@@ -147,6 +147,11 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
     compile_variant: *linux-debug-aubsan-compile-required
+  tasks:
+  - name: compile_test_parallel_core_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
+  - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
 
 - &linux-64-debug-required-template
   <<: *linux_x86_dynamic_debug_compile_variant_dependency

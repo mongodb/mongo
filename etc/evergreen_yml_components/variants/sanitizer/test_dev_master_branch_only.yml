@@ -479,73 +479,10 @@ buildvariants:
     test_flags: >-
       --runAllFeatureFlagTests
   tasks:
-  - name: audit
-  - name: .aggregation
-  - name: .auth
-  - name: .bulk_write
-  - name: .concurrency !.no_txns !.repl !.kill_terminate
-  - name: .config_fuzzer
-  - name: .config_fuzzer_stress
-  - name: .causally_consistent !.wo_snapshot
-  - name: .change_streams
-  # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
-  - name: change_streams_multitenant_passthrough
-  - name: change_streams_multitenant_sharded_collections_passthrough
-  # - name: disk_wiredtiger
-  - name: aggregation_embedded_router_jscore_passthrough_gen
-  - name: aggregation_sharded_collections_embedded_router_jscore_passthrough_gen
-  - name: embedded_router_jscore_passthrough_gen
-  - name: embedded_router_jscore_passthrough_with_config_shard_gen
-  - name: embedded_router_jscore_txns_gen
-  - name: embedded_router_jscore_txns_with_config_shard_gen
-  - name: embedded_router_sharded_collections_jscore_passthrough_gen
-  - name: embedded_router_sharded_collections_jscore_txns_gen
-  - name: embedded_router_sharded_collections_jscore_txns_with_config_shard_gen
-  - name: external_auth
-  - name: external_auth_aws
-  - name: external_auth_oidc
-  - name: .encrypt
-  - name: initial_sync_fuzzer_gen
-  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
-  - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
-  - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
-  - name: .jscore .common
-  - name: jsCore_column_store_indexes
-  - name: jsCore_min_batch_repeat_queries_ese_gsm
-  - name: jsCore_txns_large_txns_format
-  - name: jsCore_wildcard_indexes
-  - name: json_schema
-  - name: .misc_js
-  - name: move_collection_fuzzer_gen
-  - name: .multi_shard .common
-  - name: query_golden_classic
-  - name: .query_fuzzer
-  # read-after-majority-write is no longer guaranteed with featureFlagReduceMajorityWriteConcern.
-  - name: .read_write_concern !.secondary_read_after_majority_write
-  - name: .recordids_replicated
-  - name: replica_sets_large_txns_format_jscore_passthrough_gen
-  - name: .replica_sets !.multi_oplog
-  - name: .replica_sets .encrypt
-  - name: .resharding_fuzzer
-  - name: .retry
-  - name: .read_only
-  - name: .rollbackfuzzer
-  - name: sasl
-  - name: secondary_reads_passthrough_gen
-  - name: session_jscore_passthrough
-  - name: streams
-  - name: .sharding .jscore !.wo_snapshot
-  - name: .sharding .common !.csrs
-  - name: .serverless
-  - name: .shard_split
-  - name: query_stats_aggregation_passthrough
-  - name: query_stats_mongos_aggregation_passthrough
-  - name: query_stats_mongos_passthrough
-  - name: query_stats_passthrough
-  - name: .unsplittable_collections
-  - name: unshard_collection_fuzzer_gen
-  - name: .updatefuzzer
-  - name: .watchdog
+  - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+  - name: .default !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+  - name: .non_deterministic !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
 
 - &enterprise-rhel80-debug-tsan-template
   name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan
