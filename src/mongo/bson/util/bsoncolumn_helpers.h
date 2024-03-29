@@ -503,6 +503,11 @@ public:
                 isInterleavedStartControlByte(control))
                 return ptr;
 
+            uassert(8873800,
+                    "Invalid control byte in BSON Column",
+                    bsoncolumn::scaleIndexForControlByte(control) ==
+                        Simple8bTypeUtil::kMemoryAsInteger);
+
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
 
             elemCount += simple8b::visitAll<Encoding>(
