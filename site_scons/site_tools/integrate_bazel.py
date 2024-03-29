@@ -400,9 +400,13 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
             return True
 
         # Pull the external hostname of the system from aws
-        response = requests.get(
-            "http://instance-data.ec2.internal/latest/meta-data/public-hostname")
-        if response.status_code == 200:
+        try:
+            response = requests.get(
+                "http://instance-data.ec2.internal/latest/meta-data/public-hostname")
+            status_code = response.status_code
+        except Exception as _:
+            status_code = 500
+        if status_code == 200:
             public_hostname = response.text
         else:
             public_hostname = "{{REPLACE_WITH_WORKSTATION_HOST_NAME}}"
