@@ -406,6 +406,21 @@ bool CommandHelpers::extractOrAppendOk(BSONObjBuilder& reply) {
     return true;
 }
 
+Status CommandHelpers::extractOrAppendOkAndGetStatus(BSONObjBuilder& reply) {
+    auto replyObj = reply.asTempObj();
+    auto okField = replyObj["ok"];
+    if (!okField) {
+        reply.append("ok", 1.0);
+        return Status::OK();
+    }
+
+    if (okField.trueValue()) {
+        return Status::OK();
+    }
+
+    return getErrorStatusFromCommandResult(replyObj);
+}
+
 void CommandHelpers::appendCommandWCStatus(BSONObjBuilder& result,
                                            const Status& awaitReplicationStatus,
                                            const WriteConcernResult& wcResult) {

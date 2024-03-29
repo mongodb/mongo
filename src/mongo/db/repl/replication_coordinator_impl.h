@@ -397,7 +397,7 @@ public:
                                       const ReplSetRequestVotesArgs& args,
                                       ReplSetRequestVotesResponse* response) override;
 
-    void prepareReplMetadata(const BSONObj& metadataRequestObj,
+    void prepareReplMetadata(const CommonRequestArgs& requestArgs,
                              const OpTime& lastOpTimeFromClient,
                              BSONObjBuilder* builder) const override;
 

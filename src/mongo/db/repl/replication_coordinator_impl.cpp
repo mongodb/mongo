@@ -5899,12 +5899,12 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
     return Status::OK();
 }
 
-void ReplicationCoordinatorImpl::prepareReplMetadata(const BSONObj& metadataRequestObj,
+void ReplicationCoordinatorImpl::prepareReplMetadata(const CommonRequestArgs& requestArgs,
                                                      const OpTime& lastOpTimeFromClient,
                                                      BSONObjBuilder* builder) const {
 
-    bool hasReplSetMetadata = metadataRequestObj.hasField(rpc::kReplSetMetadataFieldName);
-    bool hasOplogQueryMetadata = metadataRequestObj.hasField(rpc::kOplogQueryMetadataFieldName);
+    bool hasReplSetMetadata = !!requestArgs.getReplData();
+    bool hasOplogQueryMetadata = !!requestArgs.getOplogQueryData();
     // Don't take any locks if we do not need to.
     if (!hasReplSetMetadata && !hasOplogQueryMetadata) {
         return;

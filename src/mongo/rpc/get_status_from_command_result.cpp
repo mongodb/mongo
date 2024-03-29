@@ -48,8 +48,6 @@ const std::string kCmdResponseWriteErrorsField = "writeErrors";
 
 Status getStatusFromCommandResult(const BSONObj& result) {
     BSONElement okElement = result["ok"];
-    BSONElement codeElement = result["code"];
-    BSONElement errmsgElement = result["errmsg"];
 
     // StaleConfig doesn't pass "ok" in legacy servers
     BSONElement dollarErrElement = result["$err"];
@@ -61,6 +59,13 @@ Status getStatusFromCommandResult(const BSONObj& result) {
     if (okElement.trueValue()) {
         return Status::OK();
     }
+    return getErrorStatusFromCommandResult(result);
+}
+
+Status getErrorStatusFromCommandResult(const BSONObj& result) {
+    BSONElement codeElement = result["code"];
+    BSONElement errmsgElement = result["errmsg"];
+
     int code = codeElement.numberInt();
     if (0 == code) {
         code = ErrorCodes::UnknownError;

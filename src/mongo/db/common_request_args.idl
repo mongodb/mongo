@@ -100,3 +100,15 @@ structs:
         type: IDLAnyType
         cpp_name: dollarMaxTimeMS
         optional: true
+      requestGossipRoutingCache:
+        type: array<IDLAnyType>
+        cpp_name: requestGossipRoutingCache
+        optional: true
+      $oplogQueryData:
+        type: IDLAnyType
+        cpp_name: oplogQueryData
+        optional: true
+      $replData:
+        type: IDLAnyType
+        cpp_name: replData
+        optional: true

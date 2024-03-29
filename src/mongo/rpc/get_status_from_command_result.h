@@ -46,6 +46,12 @@ class Status;
  */
 Status getStatusFromCommandResult(const BSONObj& result);
 
+/**
+ * Converts error "result" into a Status object.  The input is expected to be the object returned
+ * by running a command.  Assumes the result does not represent ok: 1.
+ */
+Status getErrorStatusFromCommandResult(const BSONObj& result);
+
 
 /**
  * Extracts the write concern error from a command response.

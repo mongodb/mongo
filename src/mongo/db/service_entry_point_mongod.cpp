@@ -242,12 +242,12 @@ public:
                 !commandSpecifiesWriteConcern(requestArgs));
     }
 
-    void attachCurOpErrInfo(OperationContext* opCtx, const BSONObj& replyObj) const override {
-        CurOp::get(opCtx)->debug().errInfo = getStatusFromCommandResult(replyObj);
+    void attachCurOpErrInfo(OperationContext* opCtx, const Status status) const override {
+        CurOp::get(opCtx)->debug().errInfo = std::move(status);
     }
 
     void appendReplyMetadata(OperationContext* opCtx,
-                             const OpMsgRequest& request,
+                             const CommonRequestArgs& requestArgs,
                              BSONObjBuilder* metadataBob) const override {
         auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
         const bool isReplSet = replCoord->getSettings().isReplSet();
@@ -256,21 +256,21 @@ public:
             // Attach our own last opTime.
             repl::OpTime lastOpTimeFromClient =
                 repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-            replCoord->prepareReplMetadata(request.body, lastOpTimeFromClient, metadataBob);
+            replCoord->prepareReplMetadata(requestArgs, lastOpTimeFromClient, metadataBob);
         }
 
         // Gossip back requested routing table cache versions.
-        if (request.body.hasField(Generic_args_unstable_v1::kRequestGossipRoutingCacheFieldName)) {
-            const auto collectionsToGossip =
-                request.body.getField(Generic_args_unstable_v1::kRequestGossipRoutingCacheFieldName)
-                    .Array();
+        if (requestArgs.getRequestGossipRoutingCache()) {
+            const auto collectionsToGossip = *requestArgs.getRequestGossipRoutingCache();
 
             const auto catalogCache = Grid::get(opCtx)->catalogCache();
 
             BSONArrayBuilder arrayBuilder;
             for (const auto& collectionToGossip : collectionsToGossip) {
-                const auto nss = NamespaceStringUtil::deserialize(
-                    boost::none, collectionToGossip.String(), SerializationContext::stateDefault());
+                const auto nss =
+                    NamespaceStringUtil::deserialize(boost::none,
+                                                     collectionToGossip.getElement().String(),
+                                                     SerializationContext::stateDefault());
                 const auto cachedCollectionVersion = catalogCache->peekCollectionCacheVersion(nss);
                 if (cachedCollectionVersion) {
                     GossipedRoutingCache gossipedRoutingCache(nss, *cachedCollectionVersion);

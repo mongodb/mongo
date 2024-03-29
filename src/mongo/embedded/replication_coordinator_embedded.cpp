@@ -543,7 +543,7 @@ Status ReplicationCoordinatorEmbedded::processReplSetRequestVotes(OperationConte
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::prepareReplMetadata(const BSONObj&,
+void ReplicationCoordinatorEmbedded::prepareReplMetadata(const CommonRequestArgs&,
                                                          const OpTime&,
                                                          BSONObjBuilder*) const {
     UASSERT_NOT_IMPLEMENTED;

@@ -1233,21 +1233,16 @@ void RunCommandImpl::_epilogue() {
 
     {
         auto body = replyBuilder->getBodyBuilder();
-        _ok = CommandHelpers::extractOrAppendOk(body);
-    }
-    behaviors.attachCurOpErrInfo(opCtx, replyBuilder->getBodyBuilder().asTempObj());
+        auto status = CommandHelpers::extractOrAppendOkAndGetStatus(body);
+        _ok = status.isOK();
+        behaviors.attachCurOpErrInfo(opCtx, status);
 
-    {
-        boost::optional<ErrorCodes::Error> code;
+        boost::optional<ErrorCodes::Error> code =
+            _ok ? boost::none : boost::optional<ErrorCodes::Error>(status.code());
         boost::optional<ErrorCodes::Error> wcCode;
-        auto body = replyBuilder->getBodyBuilder();
         auto response = body.asTempObj();
-        auto codeField = response["code"];
-        if (!_ok && codeField.isNumber()) {
-            code = ErrorCodes::Error(codeField.numberInt());
-        }
-        if (response.hasField("writeConcernError")) {
-            wcCode = ErrorCodes::Error(response["writeConcernError"]["code"].numberInt());
+        if (auto wcErrElement = response["writeConcernError"]; !wcErrElement.eoo()) {
+            wcCode = ErrorCodes::Error(wcErrElement["code"].numberInt());
         }
         appendErrorLabelsAndTopologyVersion(opCtx,
                                             &body,
@@ -1261,7 +1256,7 @@ void RunCommandImpl::_epilogue() {
     }
 
     auto commandBodyBob = replyBuilder->getBodyBuilder();
-    behaviors.appendReplyMetadata(opCtx, request, &commandBodyBob);
+    behaviors.appendReplyMetadata(opCtx, _ecd->getCommonRequestArgs(), &commandBodyBob);
     appendClusterAndOperationTime(
         opCtx, &commandBodyBob, &commandBodyBob, _ecd->getStartOperationTime());
 }
@@ -2120,7 +2115,7 @@ void ExecCommandDatabase::_handleFailure(Status status) {
                                         getLastOpAfterRun());
 
     BSONObjBuilder metadataBob;
-    behaviors.appendReplyMetadata(opCtx, request, &metadataBob);
+    behaviors.appendReplyMetadata(opCtx, getCommonRequestArgs(), &metadataBob);
 
     // The read concern may not have yet been placed on the operation context, so attempt to parse
     // it here, so if it is valid it can be used to compute the proper operationTime.

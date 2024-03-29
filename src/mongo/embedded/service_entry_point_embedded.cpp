@@ -132,7 +132,7 @@ public:
                 !commandSpecifiesWriteConcern(requestArgs));
     }
 
-    void attachCurOpErrInfo(OperationContext*, const BSONObj&) const override {}
+    void attachCurOpErrInfo(OperationContext*, const Status) const override {}
 
     bool refreshDatabase(OperationContext* opCtx,
                          const StaleDbRoutingVersion& se) const noexcept override {
@@ -162,7 +162,7 @@ public:
     }
 
     void appendReplyMetadata(OperationContext* opCtx,
-                             const OpMsgRequest& request,
+                             const CommonRequestArgs& requestArgs,
                              BSONObjBuilder* metadataBob) const override {}
 };
 

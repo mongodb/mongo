@@ -91,7 +91,7 @@ struct ServiceEntryPointCommon {
         virtual void uassertCommandDoesNotSpecifyWriteConcern(
             const CommonRequestArgs& requestArgs) const = 0;
 
-        virtual void attachCurOpErrInfo(OperationContext* opCtx, const BSONObj& replyObj) const = 0;
+        virtual void attachCurOpErrInfo(OperationContext* opCtx, Status status) const = 0;
 
         virtual bool refreshDatabase(OperationContext* opCtx,
                                      const StaleDbRoutingVersion& se) const noexcept = 0;
@@ -112,7 +112,7 @@ struct ServiceEntryPointCommon {
         scopedOperationCompletionShardingActions(OperationContext* opCtx) const = 0;
 
         virtual void appendReplyMetadata(OperationContext* opCtx,
-                                         const OpMsgRequest& request,
+                                         const CommonRequestArgs& requestArgs,
                                          BSONObjBuilder* metadataBob) const = 0;
     };
 

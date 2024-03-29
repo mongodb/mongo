@@ -511,7 +511,7 @@ Status ReplicationCoordinatorNoOp::processReplSetRequestVotes(OperationContext*,
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::prepareReplMetadata(const BSONObj&,
+void ReplicationCoordinatorNoOp::prepareReplMetadata(const CommonRequestArgs&,
                                                      const OpTime&,
                                                      BSONObjBuilder*) const {
     MONGO_UNREACHABLE;

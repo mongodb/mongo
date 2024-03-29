@@ -222,6 +222,12 @@ struct CommandHelpers {
     static bool extractOrAppendOk(BSONObjBuilder& reply);
 
     /**
+     * Parses an "ok" field, or appends "ok" to the command reply. Additionally returns a Status
+     * representing an "ok" or an error.
+     */
+    static Status extractOrAppendOkAndGetStatus(BSONObjBuilder& reply);
+
+    /**
      * Helper for setting a writeConcernError field in the command result object if
      * a writeConcern error occurs.
      *

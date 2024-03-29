@@ -321,7 +321,9 @@ public:
                                       const repl::ReplSetRequestVotesArgs&,
                                       repl::ReplSetRequestVotesResponse*) override;
 
-    void prepareReplMetadata(const BSONObj&, const repl::OpTime&, BSONObjBuilder*) const override;
+    void prepareReplMetadata(const CommonRequestArgs&,
+                             const repl::OpTime&,
+                             BSONObjBuilder*) const override;
 
     Status processHeartbeatV1(const repl::ReplSetHeartbeatArgsV1&,
                               repl::ReplSetHeartbeatResponse*) override;

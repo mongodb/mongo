@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
+#include "mongo/db/common_request_args_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
@@ -6848,11 +6849,12 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
 
     auto opCtx = makeOperationContext();
 
+    auto requestArgs = CommonRequestArgs::parse(
+        IDLParserContext("mockRequest"),
+        BSON(rpc::kOplogQueryMetadataFieldName << 1 << rpc::kReplSetMetadataFieldName << 1 << "$db"
+                                               << "test"));
     BSONObjBuilder metadataBob;
-    getReplCoord()->prepareReplMetadata(
-        BSON(rpc::kOplogQueryMetadataFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-        OpTime(),
-        &metadataBob);
+    getReplCoord()->prepareReplMetadata(requestArgs, OpTime(), &metadataBob);
 
     BSONObj metadata = metadataBob.done();
     LOGV2(21506, "{metadata}", "metadata"_attr = metadata);
