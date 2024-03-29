@@ -92,29 +92,6 @@ buildvariants:
     - name: scons_compile_smoke_test_TG
     - name: ninja_compile_smoke_test_TG
 
-- name: &windows-dynamic-visibility-test windows-dynamic-visibility-test
-  display_name: "~ Shared Library Windows Enterprise (visibility test)"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  expansions:
-    # --link-model=dynamic is set by visiblity_test's task_compile_flags
-    # expansion
-    compile_flags: >-
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
-      -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
-      --win-version-min=win10
-    python: '/cygdrive/c/python/python310/python.exe'
-    ext: zip
-    has_packages: false
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    num_scons_link_jobs_available: 0.99
-    compile_variant: *windows-dynamic-visibility-test
-  tasks:
-  - name: compile_visibility_test
-    distros:
-    - windows-vsCurrent-large
-
 ### QO & QE Patch-Specific Build Variants ###
 - name: &windows-compile-query-patch-only windows-compile-query-patch-only
   display_name: "~ Windows Enterprise Compile Query Patch Only"
