@@ -69,7 +69,8 @@ class FTDCFileWriter {
     FTDCFileWriter& operator=(const FTDCFileWriter&) = delete;
 
 public:
-    FTDCFileWriter(const FTDCConfig* config) : _config(config), _compressor(_config) {}
+    FTDCFileWriter(const FTDCConfig* config, UseMultiServiceSchema multiservice)
+        : _config(config), _compressor(_config), _metadataCompressor(multiservice) {}
     ~FTDCFileWriter();
 
     /**

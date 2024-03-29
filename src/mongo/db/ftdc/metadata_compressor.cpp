@@ -41,43 +41,88 @@ bool haveSameFields(BSONObj ref, BSONObj sample) {
     bool match = true;
     BSONObjIterator refItr(ref);
     BSONObjIterator sampleItr(sample);
-    while (refItr.more() && sampleItr.more() && match) {
+    while (match && refItr.more() && sampleItr.more()) {
         match &= (refItr.next().fieldNameStringData() == sampleItr.next().fieldNameStringData());
     }
     match &= !(sampleItr.more() || refItr.more());
     return match;
 };
-}  // namespace
 
 /*
- * This expects the input sample document to have the following layout:
- * {
- *   start: Date_t,
- *   lvl1: {
- *      start: Date_t,
- *      lvl2field1: Value,
- *      ...
- *      end: Date_t,
- *   },
- *   lvl2: ...,
- *   end: Date_t,
- * }
- * where "lvl[N]" is a placeholder for a command name, and "lvl[N]field[M]"
- * is a placeholder for a field name in the command response.
+ * Manages a stack of BSONObjBuilders, each being a subobject builder for the previous builder.
+ * The actual creation of the topmost builder (and perhaps its parent builders) is deferred until
+ * a BSONElement is appended to it.
  */
-boost::optional<BSONObj> FTDCMetadataCompressor::addSample(const BSONObj& sample) {
+class JITBSONObjBuilderStack {
+    JITBSONObjBuilderStack(const JITBSONObjBuilderStack&) = delete;
+    JITBSONObjBuilderStack& operator=(const JITBSONObjBuilderStack&) = delete;
 
-    if (!haveSameFields(_referenceDoc, sample)) {
-        _reset(sample);
-        return sample;
+public:
+    JITBSONObjBuilderStack(BSONObjBuilder* root) : _root(root) {}
+
+    ~JITBSONObjBuilderStack() {
+        while (!_stack.empty()) {
+            _stack.pop_back();
+        }
     }
 
-    BSONObjBuilder deltaDocBuilder;
+    void push(StringData sd) {
+        _stack.emplace_back(sd, nullptr);
+    }
+
+    void append(const BSONElement& elt) {
+        activateBuilders().append(elt);
+    }
+
+    void pop() {
+        invariant(!_stack.empty());
+        _stack.pop_back();
+    }
+
+    size_t depth() const {
+        return _stack.size();
+    }
+
+private:
+    BSONObjBuilder& activateBuilders() {
+        if (!_stack.empty() && _stack.back().second) {
+            return *(_stack.back().second);
+        }
+
+        BSONObjBuilder* prevBuilder = _root;
+        for (auto& [name, optBuilder] : _stack) {
+            if (!optBuilder) {
+                optBuilder = std::make_unique<BSONObjBuilder>(prevBuilder->subobjStart(name));
+            }
+            prevBuilder = optBuilder.get();
+        }
+        return *prevBuilder;
+    }
+
+    std::vector<std::pair<StringData, std::unique_ptr<BSONObjBuilder>>> _stack;
+    BSONObjBuilder* _root;
+};
+
+/*
+ * Compares the elements of reference & sample and appends the delta to builder.
+ * Returns whether changes were detected in fields other than the "start" & "end" fields, or
+ * boost::none if there was a schema change.
+ */
+boost::optional<bool> compareAndBuildDeltaFinal(BSONObj reference,
+                                                BSONObj sample,
+                                                JITBSONObjBuilderStack* builder) {
+    if (!haveSameFields(reference, sample)) {
+        return boost::none;
+    }
+
+    // Holds any elements that don't need to appear if no substantial changes were found
+    std::vector<BSONElement> stash;
     bool hasChanges = false;
 
     BSONObjIterator sampleItr(sample);
-    BSONObjIterator refItr(_referenceDoc);
+    BSONObjIterator refItr(reference);
 
+    // reference and sample are the same size, as established in haveSameFields above
     while (refItr.more()) {
         auto refElement = refItr.next();
         auto sampleElement = sampleItr.next();
@@ -85,54 +130,137 @@ boost::optional<BSONObj> FTDCMetadataCompressor::addSample(const BSONObj& sample
 
         if (fieldName == "start"_sd || fieldName == "end"_sd) {
             dassert(sampleElement.type() == BSONType::Date);
-            deltaDocBuilder.append(sampleElement);
+            if (hasChanges) {
+                builder->append(sampleElement);
+            } else {
+                stash.push_back(sampleElement);
+            }
+            continue;
+        }
+
+        if (sampleElement.woCompare(refElement) != 0) {
+            if (!hasChanges) {
+                for (auto& elt : stash) {
+                    builder->append(elt);
+                }
+                stash.clear();
+                hasChanges = true;
+            }
+            builder->append(sampleElement);
+        }
+    }
+    return hasChanges;
+}
+
+/*
+ * Recursively builds the delta document between the reference & sample documents,
+ * up to the depth specified in maxDepth.
+ * Returns whether changes were detected between the reference and sample, or boost::none if
+ * there was a schema change.
+ */
+boost::optional<bool> compareAndBuildDelta(BSONObj reference,
+                                           BSONObj sample,
+                                           JITBSONObjBuilderStack* builder,
+                                           size_t maxDepth,
+                                           bool hasDates) {
+    dassert(maxDepth > 0);
+
+    if (!haveSameFields(reference, sample)) {
+        return boost::none;
+    }
+
+    BSONObjIterator sampleItr(sample);
+    BSONObjIterator refItr(reference);
+    bool hasChanges = false;
+
+    // reference and sample are the same size, as established in haveSameFields above
+    while (refItr.more()) {
+        auto refElement = refItr.next();
+        auto sampleElement = sampleItr.next();
+        auto fieldName = sampleElement.fieldNameStringData();
+
+        if (hasDates && (fieldName == "start"_sd || fieldName == "end"_sd)) {
+            dassert(sampleElement.type() == BSONType::Date);
+            builder->append(sampleElement);
             continue;
         }
 
         dassert(sampleElement.type() == BSONType::Object);
         dassert(refElement.type() == BSONType::Object);
-
         auto sampleSubObj = sampleElement.Obj();
         auto refSubObj = refElement.Obj();
 
-        if (!haveSameFields(refSubObj, sampleSubObj)) {
-            _reset(sample);
-            return sample;
+        boost::optional<bool> cleanCompare;
+        builder->push(fieldName);
+        if (maxDepth == 1) {
+            cleanCompare = compareAndBuildDeltaFinal(refSubObj, sampleSubObj, builder);
+        } else {
+            cleanCompare =
+                compareAndBuildDelta(refSubObj, sampleSubObj, builder, maxDepth - 1, false);
         }
+        builder->pop();
 
-        std::vector<BSONElement> deltaElements;
-        bool lvl2HasChanges = false;
-
-        BSONObjIterator sampleLvl2Itr(sampleSubObj);
-        BSONObjIterator refLvl2Itr(refSubObj);
-
-        while (refLvl2Itr.more()) {
-            auto refLvl2Element = refLvl2Itr.next();
-            auto sampleLvl2Element = sampleLvl2Itr.next();
-            auto lvl2FieldName = sampleLvl2Element.fieldNameStringData();
-
-            if (lvl2FieldName == "start"_sd || lvl2FieldName == "end"_sd) {
-                dassert(sampleLvl2Element.type() == BSONType::Date);
-                deltaElements.push_back(sampleLvl2Element);
-                continue;
-            }
-
-            if (sampleLvl2Element.woCompare(refLvl2Element) != 0) {
-                deltaElements.push_back(sampleLvl2Element);
-                lvl2HasChanges = true;
-            }
+        if (!cleanCompare.has_value()) {
+            return cleanCompare;
         }
-
-        if (lvl2HasChanges) {
-            BSONObjBuilder subBob = deltaDocBuilder.subobjStart(fieldName);
-            for (auto& element : deltaElements) {
-                subBob.append(element);
-            }
-            hasChanges = true;
-        }
+        hasChanges |= cleanCompare.value();
     }
 
-    if (hasChanges) {
+    return hasChanges;
+}
+}  // namespace
+
+/*
+ * Without multiServiceSchema, this expects the input sample document to have the following layout:
+ * {
+ *   start: Date_t,
+ *   cmdName: {
+ *      start: Date_t,
+ *      replyField: Value,
+ *      ...
+ *      end: Date_t,
+ *   },
+ *   ...,
+ *   end: Date_t,
+ * }
+ * where cmdName & replyField are placeholders for a command name and a field in the command
+ * response, respectively.
+ *
+ * With multiServiceSchema enabled, this expects the input sample document to have the following
+ * layout:
+ * {
+ *   start: Date_t,
+ *   roleName: {
+ *      cmdName: {
+ *         start: Date_t,
+ *         replyField: Value,
+ *         ...
+ *         end: Date_t,
+ *      },
+ *      ...
+ *   },
+ *   ...,
+ *   end: Date_t,
+ * }
+ * where roleName is either "shard", "router", or "common".
+ */
+boost::optional<BSONObj> FTDCMetadataCompressor::addSample(const BSONObj& sample) {
+    BSONObjBuilder deltaDocBuilder;
+    JITBSONObjBuilderStack jitBuilderStack(&deltaDocBuilder);
+
+    auto cleanCompare = compareAndBuildDelta(_referenceDoc,
+                                             sample,
+                                             &jitBuilderStack,
+                                             _multiServiceSchema ? 2 : 1 /*maxDepth*/,
+                                             true /*hasDates*/);
+    if (!cleanCompare.has_value()) {
+        _reset(sample);
+        return sample;
+    }
+
+    dassert(jitBuilderStack.depth() == 0);
+
+    if (cleanCompare.value()) {
         _referenceDoc = sample;
         _deltaCount++;
         return deltaDocBuilder.obj();

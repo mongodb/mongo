@@ -319,7 +319,7 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
     createDirectoryClean(dir);
 
     {
-        FTDCFileWriter writer(&c);
+        FTDCFileWriter writer(&c, UseMultiServiceSchema{false});
 
         ASSERT_OK(writer.open(fileOut));
 
@@ -365,6 +365,21 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
 }
 
 TEST_F(FTDCFileManagerTest, TestPeriodicMetadataCollection) {
+#define TEST_BEGIN auto runTest = [this](bool multiservice) { \
+    std::cout << "Running " << _testInfo.testName() <<" with multiservice=" << \
+    multiservice << std::endl
+
+#define TEST_END                          \
+    }                                     \
+    ;                                     \
+    do {                                  \
+        for (auto mode : {true, false}) { \
+            runTest(mode);                \
+        }                                 \
+    } while (0)
+
+    TEST_BEGIN;
+
     Client* client = &cc();
     FTDCConfig c;
     c.maxFileSizeBytes = 1024;
@@ -377,7 +392,7 @@ TEST_F(FTDCFileManagerTest, TestPeriodicMetadataCollection) {
 
     FTDCCollectorCollection rotate;
     auto mgr = uassertStatusOK(
-        FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false}));
+        FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{multiservice}));
 
     BSONObj subObj1 = BSON("f1_1" << 101 << "f1_2" << 102);
     BSONObj subObj2 = BSON("f2_1" << 201 << "f2_2" << 202);
@@ -386,6 +401,12 @@ TEST_F(FTDCFileManagerTest, TestPeriodicMetadataCollection) {
     BSONObj doc2 = BSON("field1" << altSubObj1 << "field2" << subObj2);
     BSONObj deltaDoc1 = BSON("field1" << altSubObj1);
     BSONObj deltaDoc2 = BSON("field1" << subObj1);
+
+    if (multiservice) {
+        for (auto ptr : {&doc1, &doc2, &deltaDoc1, &deltaDoc2}) {
+            *ptr = BSON("common" << *ptr);
+        }
+    }
 
     int pmSamplesBeforeRotate = 0;
     auto currentFiles = scanDirectory(dir);
@@ -449,6 +470,10 @@ TEST_F(FTDCFileManagerTest, TestPeriodicMetadataCollection) {
     verifyDeltaDocuments(pmSamplesBeforeRotate / 2);
 
     mgr->close().transitional_ignore();
+
+    TEST_END;
+#undef TEST_BEGIN
+#undef TEST_END
 }
 
 }  // namespace mongo

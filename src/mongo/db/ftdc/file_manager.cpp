@@ -66,7 +66,7 @@ FTDCFileManager::FTDCFileManager(const FTDCConfig* config,
                                  FTDCCollectorCollection* collection,
                                  UseMultiServiceSchema multiServiceSchema)
     : _config(config),
-      _writer(_config),
+      _writer(_config, multiServiceSchema),
       _path(path),
       _rotateCollectors(collection),
       _multiServiceSchema(multiServiceSchema) {}

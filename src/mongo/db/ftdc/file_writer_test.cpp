@@ -72,7 +72,7 @@ TEST_F(FTDCFileTest, TestFileBasicMetadata) {
                         << "key3" << 34 << "key5" << 45);
 
     FTDCConfig config;
-    FTDCFileWriter writer(&config);
+    FTDCFileWriter writer(&config, UseMultiServiceSchema{false});
 
     ASSERT_OK(writer.open(p));
 
@@ -117,7 +117,7 @@ TEST_F(FTDCFileTest, TestFileBasicCompress) {
                         << "key3" << 34 << "key5" << 45);
 
     FTDCConfig config;
-    FTDCFileWriter writer(&config);
+    FTDCFileWriter writer(&config, UseMultiServiceSchema{false});
 
     ASSERT_OK(writer.open(p));
 
@@ -147,6 +147,20 @@ TEST_F(FTDCFileTest, TestFileBasicCompress) {
 }
 
 TEST_F(FTDCFileTest, TestFileBasicPeriodicMetadata) {
+#define TEST_BEGIN auto runTest = [this](bool multiservice) { \
+    std::cout << "Running " << _testInfo.testName() <<" with multiservice=" << \
+    multiservice << std::endl
+
+#define TEST_END                          \
+    }                                     \
+    ;                                     \
+    do {                                  \
+        for (auto mode : {true, false}) { \
+            runTest(mode);                \
+        }                                 \
+    } while (0)
+    TEST_BEGIN;
+
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path p(tempdir.path());
     p /= kTestFile;
@@ -164,9 +178,14 @@ TEST_F(FTDCFileTest, TestFileBasicPeriodicMetadata) {
     BSONObj doc4 = BSON("field1" << subObj2 << "field2" << subObj1);
     BSONObj deltaDoc1 = BSON("field1" << altSubObj1);
     BSONObj deltaDoc2 = BSON("field2" << altSubObj2);
+    if (multiservice) {
+        for (auto ptr : {&doc1, &doc2, &doc3, &doc4, &deltaDoc1, &deltaDoc2}) {
+            *ptr = BSON("common" << *ptr);
+        }
+    }
 
     FTDCConfig config;
-    FTDCFileWriter writer(&config);
+    FTDCFileWriter writer(&config, UseMultiServiceSchema{multiservice});
 
     ASSERT_OK(writer.open(p));
     ASSERT_OK(writer.writePeriodicMetadataSample(doc1, Date_t()));  // writes doc1, resets delta
@@ -213,6 +232,10 @@ TEST_F(FTDCFileTest, TestFileBasicPeriodicMetadata) {
 
     ASSERT_OK(sw);
     ASSERT_EQUALS(sw.getValue(), false);
+
+    TEST_END;
+#undef TEST_BEGIN
+#undef TEST_END
 }
 
 /**
@@ -223,7 +246,7 @@ public:
     FileTestTie()
         : _tempdir("metrics_testpath"),
           _path(boost::filesystem::path(_tempdir.path()) / kTestFile),
-          _writer(&_config) {
+          _writer(&_config, UseMultiServiceSchema{false}) {
         deleteFileIfNeeded(_path);
 
         ASSERT_OK(_writer.open(_path));
