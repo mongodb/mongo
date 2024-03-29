@@ -1,8 +1,5 @@
 /**
  * Tests index prefix tie breaking heuritic for multiplanner.
- * @tags: [
- *   cqf_incompatible,
- * ]
  */
 
 "use strict";

@@ -4,8 +4,6 @@
  * suboptimal due to a change in data.
  *
  * @tags: [
- *  # TODO SERVER-84429 Test isCached for CQF.
- *   cqf_incompatible,
  *   assumes_unsharded_collection,
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,

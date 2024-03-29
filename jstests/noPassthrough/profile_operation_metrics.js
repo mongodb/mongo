@@ -7,9 +7,6 @@
  *   requires_fcv_63,
  *   requires_replication,
  *   requires_wiredtiger,
- *   # TODO SERVER-71170: docBytesRead for read operations using cqf are reported are higher than
- *   # tests expect.
- *   cqf_experimental_incompatible,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

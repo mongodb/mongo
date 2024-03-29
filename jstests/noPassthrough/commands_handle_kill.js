@@ -1,8 +1,4 @@
 // Tests that commands properly handle their underlying plan executor failing or being killed.
-// @tags: [
-//    # TODO SERVER-70446: Enable yielding for index plans in CQF.
-//    cqf_experimental_incompatible,
-// ]
 const dbpath = MongoRunner.dataPath + jsTest.name();
 resetDbpath(dbpath);
 const mongod = MongoRunner.runMongod({dbpath: dbpath});

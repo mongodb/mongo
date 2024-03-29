@@ -13,8 +13,6 @@
  *   # Plan cache state is node-local and will not get migrated alongside user data.
  *   tenant_migration_incompatible,
  *   assumes_balancer_off,
- *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
- *   cqf_incompatible,
  *   # Uses $where operation.
  *   requires_scripting,
  *   # This test is specifically verifying the behavior of the SBE plan cache, which is only enabled

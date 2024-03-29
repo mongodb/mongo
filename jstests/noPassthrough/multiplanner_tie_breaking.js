@@ -1,10 +1,6 @@
 /**
  * Tests for the new tie breaking behaviour with totalDocsExamined.
  * Plans in tests only tie on classic engine, not SBE.
- *
- * @tags: [
- *   cqf_incompatible,
- * ]
  */
 
 "use strict";

@@ -1,10 +1,6 @@
 /**
  * Tests that detailed debug information is excluded from new plan cache entries once the estimated
  * cumulative size of the system's plan caches exceeds a pre-configured threshold.
- * @tags: [
- *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
- *   cqf_experimental_incompatible,
- * ]
  */
 import {getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";

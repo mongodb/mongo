@@ -3,8 +3,6 @@
  * index available to queries that had a cached plan prior to the build.
  * @tags: [
  *   requires_replication,
- *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
- *   cqf_experimental_incompatible,
  * ]
  */
 import {getCachedPlan} from "jstests/libs/analyze_plan.js";

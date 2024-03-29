@@ -1,11 +1,6 @@
 /**
  * Test that the plan cache hits, misses and skipped serverStatus' counters are updated correctly
  * when serving queries.
- *
- * @tags: [
- *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
- *   cqf_incompatible,
- * ]
  */
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 

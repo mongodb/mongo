@@ -12,8 +12,6 @@
 //   does_not_support_stepdowns,
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
-//   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
-//   cqf_experimental_incompatible,
 // ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";

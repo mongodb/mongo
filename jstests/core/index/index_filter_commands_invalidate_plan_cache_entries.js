@@ -16,8 +16,6 @@
  *   requires_fcv_62,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
- *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
- *   cqf_experimental_incompatible,
  *   # Plan cache state is node-local and will not get migrated alongside user data
  *   assumes_balancer_off,
  * ]

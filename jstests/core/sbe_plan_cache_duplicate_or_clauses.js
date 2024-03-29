@@ -11,7 +11,6 @@ import {getQueryPlanner} from "jstests/libs/analyze_plan.js";
  *   # Plan cache state is node-local so the test assumes it is always reading from the same node.
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
- *   cqf_incompatible,
  *   # Plan cache state is node-local, so this test assumes it is always operating against the same
  *   # mongod.
  *   does_not_support_stepdowns,

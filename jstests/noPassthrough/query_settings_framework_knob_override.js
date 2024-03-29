@@ -2,7 +2,6 @@
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
 //   simulate_atlas_proxy_incompatible,
-//   cqf_incompatible,
 //   requires_fcv_80,
 // ]
 //

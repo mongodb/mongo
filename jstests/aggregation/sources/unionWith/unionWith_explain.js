@@ -4,7 +4,6 @@
  * the same as the optimizer for the "normal" pipeline. This assumption is not strictly true when
  * CQF is enabled.
  * @tags: [
- *   cqf_incompatible,
  *   do_not_wrap_aggregations_in_facets,
  * ]
  */

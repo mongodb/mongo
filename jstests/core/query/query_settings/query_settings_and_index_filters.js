@@ -5,7 +5,6 @@
 //   # Index filters are not replicated and therefore won't be applied on secondaries.
 //   assumes_read_preference_unchanged,
 //   assumes_read_concern_unchanged,
-//   cqf_incompatible,
 //   # Query settings commands can not be run on the shards directly.
 //   directly_against_shardsvrs_incompatible,
 //   # Index filter commands do not accept security token.

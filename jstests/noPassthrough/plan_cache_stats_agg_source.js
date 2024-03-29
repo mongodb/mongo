@@ -1,9 +1,5 @@
 /**
  * Tests for the $planCacheStats aggregation metadata source.
- * @tags: [
- *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
- *   cqf_experimental_incompatible,
- * ]
  */
 import {
     getAggPlanStage,

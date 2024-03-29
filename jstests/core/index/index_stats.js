@@ -15,8 +15,6 @@
 //   # Tenant migrations passthrough suites automatically retry operations on TenantMigrationAborted
 //   # errors.
 //   tenant_migration_incompatible,
-//   # TODO SERVER-67639: Verify $indexStats works for queries that are eligible for CQF.
-//   cqf_experimental_incompatible,
 //   # Uses mapReduce command.
 //   requires_scripting,
 //   references_foreign_collection,

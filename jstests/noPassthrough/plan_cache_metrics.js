@@ -1,10 +1,6 @@
 /**
  * Test that the plan cache memory estimate increases and decreases correctly as plans are added to
  * and cleared from the cache.
- * @tags: [
- *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
- *   cqf_experimental_incompatible,
- * ]
  */
 
 import {getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";

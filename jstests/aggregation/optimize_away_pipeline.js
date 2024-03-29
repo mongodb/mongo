@@ -11,7 +11,6 @@
 // optimization is disabled.
 // @tags: [
 //   assumes_unsharded_collection,
-//   cqf_incompatible,
 //   do_not_wrap_aggregations_in_facets,
 //   requires_pipeline_optimization,
 //   requires_profiling,

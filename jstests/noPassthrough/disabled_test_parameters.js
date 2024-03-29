@@ -1,7 +1,4 @@
 // Test that test-only set parameters are disabled.
-// Tests running with experimental CQF behavior require test commands to be enabled.
-// @tags: [cqf_experimental_incompatible]
-
 function assertFails(opts) {
     assert.throws(() => MongoRunner.runMongod(opts), [], "Mongod startup up");
 }

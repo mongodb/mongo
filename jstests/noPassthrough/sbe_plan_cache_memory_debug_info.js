@@ -5,8 +5,6 @@
  * threshold is reached by adding entries to the SBE plan cache, the classic cache will start
  * stripping debug info even though the size of the classic cache may be below the threshold.
  * @tags: [
- *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
- *   cqf_experimental_incompatible,
  *   featureFlagSbeFull
  * ]
  */

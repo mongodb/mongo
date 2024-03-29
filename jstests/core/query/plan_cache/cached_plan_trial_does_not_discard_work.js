@@ -18,8 +18,6 @@
 //   # Plan cache state is node-local and will not get migrated alongside user data.
 //   tenant_migration_incompatible,
 //   assumes_balancer_off,
-//   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
-//   cqf_experimental_incompatible,
 //   featureFlagSbeFull,
 // ]
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";

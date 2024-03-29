@@ -8,7 +8,6 @@
 //   # Profile command doesn't support stepdowns.
 //   does_not_support_stepdowns,
 //   simulate_atlas_proxy_incompatible,
-//   cqf_incompatible,
 //   requires_fcv_80,
 // ]
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";

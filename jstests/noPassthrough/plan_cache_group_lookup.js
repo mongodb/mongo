@@ -1,8 +1,6 @@
 /**
  * Test that plans with $group and $lookup lowered to SBE are cached and invalidated correctly.
  * @tags: [
- *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
- *   cqf_experimental_incompatible,
  *   featureFlagSbeFull
  * ]
  */

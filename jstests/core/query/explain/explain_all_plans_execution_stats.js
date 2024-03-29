@@ -3,7 +3,6 @@
 //
 // @tags: [
 //   assumes_read_concern_local,
-//   cqf_incompatible,
 // ]
 //
 import {getExecutionStats} from "jstests/libs/analyze_plan.js";

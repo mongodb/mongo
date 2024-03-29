@@ -2,8 +2,6 @@
  * Test consistency of query solution hashes by extracting from the plan cache.
  *
  * @tags: [
- *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
- *   cqf_incompatible,
  *   # Plan cache state is node-local and will not get migrated alongside user data.
  *   tenant_migration_incompatible,
  *   assumes_balancer_off,

@@ -7,8 +7,6 @@
 //   assumes_read_concern_unchanged,
 //   does_not_support_stepdowns,
 //   requires_profiling,
-//   # TODO SERVER-85564: support query hash in slow query log lines in Bonsai M4.
-//   cqf_experimental_incompatible,
 // ]
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
