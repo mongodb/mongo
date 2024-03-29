@@ -9,6 +9,7 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   featureFlagTimeseriesAlwaysUseCompressedBuckets,
  *   requires_timeseries,
+ *   requires_fcv_80,
  * ]
  */
 

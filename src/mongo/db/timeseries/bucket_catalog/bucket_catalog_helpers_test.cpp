@@ -501,6 +501,9 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
 }
 
 TEST_F(BucketCatalogHelpersTest, IncompatibleBucketsForNewMeasurements) {
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", false};
+
     ASSERT_OK(createCollection(
         operationContext(),
         kNss.dbName(),

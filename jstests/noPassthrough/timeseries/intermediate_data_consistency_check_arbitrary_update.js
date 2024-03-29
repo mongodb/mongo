@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   featureFlagTimeseriesAlwaysUseCompressedBuckets,
+ *   featureFlagTimeseriesUpdatesSupport,
  *   requires_fcv_80,
  * ]
  */

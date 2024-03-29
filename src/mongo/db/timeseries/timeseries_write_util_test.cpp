@@ -827,13 +827,12 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
     // Inserts a bucket document.
     const BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
-                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
-            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
-                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
-                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
-                    "a":{"0":1,"1":2,"2":3},
-                    "b":{"0":1,"1":2,"2":3}}})");
+            "control":{"version":2,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3},
+                                   "count":3},
+            "data":{"time":{"$binary":"CQBwO6c5gQEAAIANAAAAAAAAAAA=","$type":"07"},
+                    "a":{"$binary":"AQAAAAAAAADwP5AtAAAACAAAAAA=","$type":"07"},
+                    "b":{"$binary":"AQAAAAAAAADwP5AtAAAACAAAAAA=","$type":"07"}}})");
     OID bucketId = bucketDoc["_id"].OID();
     auto recordId = record_id_helpers::keyForOID(bucketId);
 
@@ -860,11 +859,12 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
     {
         const BSONObj replaceDoc = ::mongo::fromjson(
             R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":2,"b":2},
-                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2}},
-            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
-                    "a":{"0":2},
-                    "b":{"0":2}}})");
+            "control":{"version":2,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":2,"b":2},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2},
+                                   "count":1},
+            "data":{"time":{"$binary":"CQBwO6c5gQEAAAA=","$type":"07"},
+                    "a":{"$binary":"EAACAAAAAA==","$type":"07"},
+                    "b":{"$binary":"EAACAAAAAA==","$type":"07"}}})");
         Snapshotted<BSONObj> doc;
         bool found = bucketsColl->findDoc(opCtx, recordId, &doc);
 
@@ -904,13 +904,12 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
     // Inserts a bucket document.
     const BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
-                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
-            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
-                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
-                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
-                    "a":{"0":1,"1":2,"2":3},
-                    "b":{"0":1,"1":2,"2":3}}})");
+            "control":{"version":2,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3},
+                                   "count":3},
+            "data":{"time":{"$binary":"CQBwO6c5gQEAAIANAAAAAAAAAAA=","$type":"07"},
+                    "a":{"$binary":"AQAAAAAAAADwP5AtAAAACAAAAAA=","$type":"07"},
+                    "b":{"$binary":"AQAAAAAAAADwP5AtAAAACAAAAAA=","$type":"07"}}})");
     OID bucketId = bucketDoc["_id"].OID();
     auto recordId = record_id_helpers::keyForOID(bucketId);
 
@@ -949,11 +948,12 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
     {
         const BSONObj replaceDoc = ::mongo::fromjson(
             R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":2,"b":2},
-                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2}},
-            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
-                    "a":{"0":2},
-                    "b":{"0":2}}})");
+            "control":{"version":2,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":2,"b":2},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2},
+                                   "count":1},
+            "data":{"time":{"$binary":"CQBwO6c5gQEAAAA=","$type":"07"},
+                    "a":{"$binary":"EAACAAAAAA==","$type":"07"},
+                    "b":{"$binary":"EAACAAAAAA==","$type":"07"}}})");
         Snapshotted<BSONObj> doc;
         bool found = bucketsColl->findDoc(opCtx, recordId, &doc);
 

@@ -1465,6 +1465,9 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
 }
 
 TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement) {
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", false};
+
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1567,6 +1570,9 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
 }
 
 TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasurement) {
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", false};
+
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1733,6 +1739,8 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
 TEST_F(BucketCatalogTest, ReopenCompressedBucketFails) {
     // Reopening compressed buckets is not supported without the always use compressed buckets
     // feature flag.
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", false};
 
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
@@ -1757,6 +1765,10 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketFails) {
 }
 
 TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
+    // ClosedBuckets are not generated when using the always compressed feature.
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", false};
+
     RAIIServerParameterControllerForTest memoryLimit{
         "timeseriesIdleBucketExpiryMemoryUsageThreshold", 10000};
 
@@ -1989,7 +2001,10 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
     finish(_opCtx, *_bucketCatalog, _ns1, batch, {});
 }
 
-TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
+TEST_F(BucketCatalogTest, InsertIntoReopenedUncompressedBucket) {
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", false};
+
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
     // Insert a document so we have a base bucket and we can test that we soft close it when we

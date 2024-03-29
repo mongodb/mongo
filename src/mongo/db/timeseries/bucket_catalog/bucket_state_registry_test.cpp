@@ -765,6 +765,10 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
 }
 
 TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState) {
+    // ClosedBuckets are not generated when using the always compressed feature.
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", false};
+
     NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.foo");
     auto& bucket = createBucket(info1);
     auto bucketId = bucket.bucketId;

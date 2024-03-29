@@ -6,7 +6,8 @@
  * # We need a time-series collection.
  * requires_timeseries,
  * # V3 buckets are behind the timeseriesAlwaysUseCompressedBuckets feature flag
- * featureFlagTimeseriesAlwaysUseCompressedBuckets
+ * featureFlagTimeseriesAlwaysUseCompressedBuckets,
+ * requires_fcv_80,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
