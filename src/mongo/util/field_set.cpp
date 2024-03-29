@@ -74,8 +74,9 @@ inline void constructFieldSetImpl(FieldListT&& inList,
     // Pick up where the initial scan left off and finish building 'outSet' and 'outList'
     // and then return.
     for (; it != endIt; ++it) {
-        if (outSet.insert(*it).second) {
-            outList.emplace_back(*it);
+        auto [outSetIt, inserted] = outSet.insert(*it);
+        if (inserted) {
+            outList.emplace_back(*outSetIt);
         }
     }
 }
