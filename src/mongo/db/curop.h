@@ -363,8 +363,6 @@ public:
     boost::optional<uint32_t> planCacheKey;
     // The hash of the query's "stable" key. This represents the query's shape.
     boost::optional<uint32_t> queryHash;
-    // The hash of the query's shape.
-    boost::optional<query_shape::QueryShapeHash> queryShapeHash;
 
     /* The QueryStatsInfo struct was created to bundle all the queryStats related fields of CurOp &
      * OpDebug together (SERVER-83280).
@@ -1099,6 +1097,14 @@ public:
         _waitingForIngressAdmission = waiting;
     }
 
+    boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const {
+        return _queryShapeHash;
+    }
+
+    void setQueryShapeHash(const boost::optional<query_shape::QueryShapeHash>& hash) {
+        _queryShapeHash = hash;
+    }
+
 private:
     class CurOpStack;
 
@@ -1219,6 +1225,9 @@ private:
 
     // TODO SERVER-87201: Remove need to zero out blocked time prior to operation starting.
     Milliseconds _blockedTimeAtStart{0};
+
+    // The hash of the query's shape.
+    boost::optional<query_shape::QueryShapeHash> _queryShapeHash{boost::none};
 };
 
 }  // namespace mongo

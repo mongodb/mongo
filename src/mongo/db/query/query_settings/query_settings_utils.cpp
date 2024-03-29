@@ -72,7 +72,6 @@ void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& exp
         auto* opCtx = expCtx->opCtx;
         const Command* curCommand = CommandInvocation::get(opCtx)->definition();
         auto* curOp = CurOp::get(opCtx);
-        auto& opDebug = curOp->debug();
         auto query = curOp->opDescription();
 
         mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
@@ -81,7 +80,7 @@ void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& exp
                             2,
                             {logv2::LogComponent::kQueryRejected},
                             "Query rejected by QuerySettings",
-                            "queryShapeHash"_attr = opDebug.queryShapeHash->toHexString(),
+                            "queryShapeHash"_attr = curOp->getQueryShapeHash()->toHexString(),
                             "ns"_attr = CurOp::get(expCtx->opCtx)->getNS(),
                             "command"_attr = redact(cmdToLog.getObject()));
         uasserted(ErrorCodes::QueryRejectedBySettings, "Query rejected by admin query settings");
@@ -148,6 +147,15 @@ boost::optional<std::string> getStageExemptedFromRejection(const Pipeline& pipel
     return {std::string(firstStage->getSourceName())};
 }
 
+/**
+ * Sets query shape hash value 'hash' for the operation defined by 'opCtx' operation context.
+ */
+void setQueryShapeHash(OperationContext* opCtx, const boost::optional<QueryShapeHash>& hash) {
+    // Field 'queryShapeHash' is accessed by other threads therefore write the query shape hash
+    // within a critical section.
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    CurOp::get(opCtx)->setQueryShapeHash(hash);
+}
 }  // namespace
 
 /*
@@ -360,8 +368,9 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
 
     auto* opCtx = expCtx->opCtx;
     const auto& serializationContext = parsedFind.findCommandRequest->getSerializationContext();
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.queryShapeHash = [&]() -> boost::optional<QueryShapeHash> {
+    auto curOp = CurOp::get(opCtx);
+    auto& opDebug = curOp->debug();
+    auto hash = [&]() -> boost::optional<QueryShapeHash> {
         if (opDebug.queryStatsInfo.key) {
             return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
         }
@@ -373,15 +382,14 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
         }
         return shape->sha256Hash(expCtx->opCtx, serializationContext);
     }();
-    if (!opDebug.queryShapeHash) {
+    if (!hash) {
         return query_settings::QuerySettings();
     }
+    setQueryShapeHash(opCtx, hash);
 
     // Return the found query settings or an empty one.
     auto& manager = QuerySettingsManager::get(opCtx);
-    auto settings = manager
-                        .getQuerySettingsForQueryShapeHash(
-                            opCtx, *opDebug.queryShapeHash, nss.dbName().tenantId())
+    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, *hash, nss.dbName().tenantId())
                         .get_value_or({})
                         .first;
 
@@ -422,8 +430,9 @@ QuerySettings lookupQuerySettingsForAgg(
 
     auto* opCtx = expCtx->opCtx;
     const auto& serializationContext = aggregateCommandRequest.getSerializationContext();
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.queryShapeHash = [&]() -> boost::optional<QueryShapeHash> {
+    auto curOp = CurOp::get(opCtx);
+    auto& opDebug = curOp->debug();
+    auto hash = [&]() -> boost::optional<QueryShapeHash> {
         if (opDebug.queryStatsInfo.key) {
             return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
         }
@@ -435,15 +444,14 @@ QuerySettings lookupQuerySettingsForAgg(
         }
         return shape->sha256Hash(opCtx, serializationContext);
     }();
-    if (!opDebug.queryShapeHash) {
+    if (!hash) {
         return query_settings::QuerySettings();
     }
+    setQueryShapeHash(opCtx, hash);
 
     // Return the found query settings or an empty one.
     auto& manager = QuerySettingsManager::get(opCtx);
-    auto settings = manager
-                        .getQuerySettingsForQueryShapeHash(
-                            opCtx, *opDebug.queryShapeHash, nss.dbName().tenantId())
+    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, *hash, nss.dbName().tenantId())
                         .get_value_or({})
                         .first;
 
@@ -477,8 +485,9 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
     auto* opCtx = expCtx->opCtx;
     const auto& serializationContext =
         parsedDistinct.distinctCommandRequest->getSerializationContext();
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.queryShapeHash = [&]() -> boost::optional<QueryShapeHash> {
+    auto curOp = CurOp::get(opCtx);
+    auto& opDebug = curOp->debug();
+    auto hash = [&]() -> boost::optional<QueryShapeHash> {
         if (opDebug.queryStatsInfo.key) {
             return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
         }
@@ -490,15 +499,15 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
         }
         return shape->sha256Hash(expCtx->opCtx, serializationContext);
     }();
-    if (!opDebug.queryShapeHash) {
+
+    if (!hash) {
         return query_settings::QuerySettings();
     }
+    setQueryShapeHash(opCtx, hash);
 
     // Return the found query settings or an empty one.
     auto& manager = QuerySettingsManager::get(opCtx);
-    auto settings = manager
-                        .getQuerySettingsForQueryShapeHash(
-                            opCtx, *opDebug.queryShapeHash, nss.dbName().tenantId())
+    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, *hash, nss.dbName().tenantId())
                         .get_value_or({})
                         .first;
 

@@ -309,7 +309,7 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
         auto sc = SerializationContext::stateCommandReply(expCtx->serializationCtxt);
         CurOp::get(clientOpCtx)->reportState(infoBuilder, sc, truncateOps);
 
-        if (const auto& queryShapeHash = CurOp::get(clientOpCtx)->debug().queryShapeHash) {
+        if (const auto& queryShapeHash = CurOp::get(clientOpCtx)->getQueryShapeHash()) {
             infoBuilder->append("queryShapeHash", queryShapeHash->toHexString());
         }
     }
@@ -1050,7 +1050,7 @@ void OpDebug::report(OperationContext* opCtx,
 
     auto query = appendCommentField(opCtx, curop.opDescription());
     if (!query.isEmpty()) {
-        if (const auto shapeHash = CurOp::get(opCtx)->debug().queryShapeHash) {
+        if (const auto shapeHash = CurOp::get(opCtx)->getQueryShapeHash()) {
             pAttrs->addDeepCopy("queryShapeHash", shapeHash->toHexString());
         }
         if (iscommand) {
@@ -1406,7 +1406,7 @@ void OpDebug::append(OperationContext* opCtx,
     if (planCacheKey) {
         b.append("planCacheKey", zeroPaddedHex(*planCacheKey));
     }
-    if (const auto shapeHash = CurOp::get(opCtx)->debug().queryShapeHash) {
+    if (const auto shapeHash = CurOp::get(opCtx)->getQueryShapeHash()) {
         b.append("queryShapeHash", shapeHash->toHexString());
     }
 
@@ -1718,8 +1718,8 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
         }
     });
     addIfNeeded("queryShapeHash", [](auto field, auto args, auto& b) {
-        if (args.op.queryShapeHash) {
-            b.append(field, args.op.queryShapeHash->toHexString());
+        if (auto hash = args.curop.getQueryShapeHash()) {
+            b.append(field, hash->toHexString());
         }
     });
 
