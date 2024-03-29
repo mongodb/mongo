@@ -476,6 +476,10 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/replsets/ignore_dbcheck_in_startup_recovery.js
+    ticket: SERVER-30832
+  - test_file: jstests/replsets/ignore_dbcheck_in_rollback.js
+    ticket: SERVER-30832
   - test_file: jstests/replsets/ignore_dbcheck_in_initial_sync.js
     ticket: SERVER-80340
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_pauses_watchdog_checks_during_storage_change.js

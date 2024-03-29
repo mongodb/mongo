@@ -86,17 +86,9 @@ replSet.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
 // Check that the start, batch, and stop entries are warning logs since the node skips dbcheck
 // during initial sync.
 const initialSyncNodeHealthLog = initialSyncNode.getDB("local").system.healthlog;
-jsTestLog("printing primary health log");
-jsTestLog(primaryHealthlog.find({}).toArray());
-jsTestLog("printing initial sync health log");
-jsTestLog(initialSyncNodeHealthLog.find({}).toArray());
 checkHealthLog(initialSyncNodeHealthLog, logQueries.duringInitialSyncQuery, 3);
 // Check that the initial sync node does not have other info or error/warning entries.
 checkHealthLog(initialSyncNodeHealthLog, logQueries.infoBatchQuery, 0);
 checkHealthLog(initialSyncNodeHealthLog, logQueries.allErrorsOrWarningsQuery, 3);
-jsTestLog("printing primary health log");
-jsTestLog(primaryHealthlog.find({}).toArray());
-jsTestLog("printing initial sync health log");
-jsTestLog(initialSyncNodeHealthLog.find({}).toArray());
 
 replSet.stopSet();

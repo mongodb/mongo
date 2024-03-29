@@ -44,9 +44,12 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(SleepDbCheckInBatch);
+MONGO_FAIL_POINT_DEFINE(hangAfterGeneratingHashForExtraIndexKeysCheck);
 
 namespace {
 
@@ -444,6 +447,14 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             // every N batches.
             HealthLogInterface::get(opCtx)->log(*logEntry);
         }
+
+        if (MONGO_unlikely(hangAfterGeneratingHashForExtraIndexKeysCheck.shouldFail())) {
+            LOGV2_DEBUG(3083200,
+                        3,
+                        "Hanging due to hangAfterGeneratingHashForExtraIndexKeysCheck failpoint");
+            // hangAfterGeneratingHashForExtraIndexKeysCheck.pauseWhileSet(opCtx);
+            opCtx->sleepFor(Milliseconds(1000));
+        }
     } catch (const DBException& exception) {
         // In case of an error, report it to the health log,
         auto logEntry = dbCheckErrorHealthLogEntry(
@@ -472,7 +483,6 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
     const auto type = OplogEntries_parse(IDLParserContext("type"), cmd.getStringField("type"));
     const IDLParserContext ctx("o", false /*apiStrict*/, entry.getTid());
     auto skipDbCheck = mode != OplogApplication::Mode::kSecondary;
-    auto severity = skipDbCheck ? SeverityEnum::Warning : SeverityEnum::Info;
     std::string oplogApplicationMode;
     if (mode == OplogApplication::Mode::kInitialSync) {
         oplogApplicationMode = "initial sync";
@@ -535,7 +545,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
         case OplogEntriesEnum::Stop:
             const auto healthLogEntry = mongo::dbCheckHealthLogEntry(
                 boost::none /*nss*/,
-                severity,
+                skipDbCheck ? SeverityEnum::Warning : SeverityEnum::Info,
                 skipDbCheck ? "cannot execute dbcheck due to ongoing " + oplogApplicationMode : "",
                 type,
                 boost::none /*data*/);
