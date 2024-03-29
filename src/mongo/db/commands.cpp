@@ -871,7 +871,7 @@ void CommandInvocation::set(OperationContext* opCtx,
     invocationForOpCtx(opCtx) = std::move(invocation);
 }
 
-std::shared_ptr<CommandInvocation> CommandInvocation::get(OperationContext* opCtx) {
+std::shared_ptr<CommandInvocation>& CommandInvocation::get(OperationContext* opCtx) {
     return invocationForOpCtx(opCtx);
 }
 

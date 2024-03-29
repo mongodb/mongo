@@ -758,7 +758,7 @@ public:
     virtual ~CommandInvocation();
 
     static void set(OperationContext* opCtx, std::shared_ptr<CommandInvocation> invocation);
-    static std::shared_ptr<CommandInvocation> get(OperationContext* opCtx);
+    static std::shared_ptr<CommandInvocation>& get(OperationContext* opCtx);
 
     /**
      * Runs the command, filling in result. Any exception thrown from here will cause result

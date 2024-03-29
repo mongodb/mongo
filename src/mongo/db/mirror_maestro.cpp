@@ -123,7 +123,7 @@ public:
     /**
      * Mirror only if this maestro has been initialized.
      */
-    void tryMirror(std::shared_ptr<CommandInvocation> invocation) noexcept;
+    void tryMirror(const std::shared_ptr<CommandInvocation>& invocation) noexcept;
 
     /**
      * Maintains the state required for mirroring requests.
@@ -143,7 +143,7 @@ public:
 
         void mirror() noexcept {
             invariant(_maestro);
-            _maestro->_mirror(_hosts, _invocation, _params);
+            _maestro->_mirror(_hosts, *_invocation, _params);
         }
 
     private:
@@ -160,7 +160,7 @@ private:
      * This command is expected to only run on the _executor
      */
     void _mirror(const std::vector<HostAndPort>& hosts,
-                 std::shared_ptr<CommandInvocation> invocation,
+                 const CommandInvocation& invocation,
                  const MirroredReadsParameters& params) noexcept;
 
     /**
@@ -339,9 +339,9 @@ void MirrorMaestro::shutdown(ServiceContext* serviceContext) noexcept {
 void MirrorMaestro::tryMirrorRequest(OperationContext* opCtx) noexcept {
     auto& impl = getMirrorMaestroImpl(opCtx->getServiceContext());
 
-    auto invocation = CommandInvocation::get(opCtx);
+    const auto& invocation = CommandInvocation::get(opCtx);
 
-    impl.tryMirror(std::move(invocation));
+    impl.tryMirror(invocation);
 }
 
 void MirrorMaestro::onReceiveMirroredRead(OperationContext* opCtx) noexcept {
@@ -351,7 +351,7 @@ void MirrorMaestro::onReceiveMirroredRead(OperationContext* opCtx) noexcept {
     }
 }
 
-void MirrorMaestroImpl::tryMirror(std::shared_ptr<CommandInvocation> invocation) noexcept {
+void MirrorMaestroImpl::tryMirror(const std::shared_ptr<CommandInvocation>& invocation) noexcept {
     if (!_isInitialized.load()) {
         // If we're not even available, nothing to do
         return;
@@ -392,7 +392,7 @@ void MirrorMaestroImpl::tryMirror(std::shared_ptr<CommandInvocation> invocation)
     // out-of-line. This means the command itself can return quickly and we do the arduous work of
     // building new bsons and evaluating randomness in a less important context.
     auto requestState = std::make_unique<MirroredRequestState>(
-        this, std::move(hosts), std::move(invocation), std::move(params));
+        this, std::move(hosts), invocation, std::move(params));
     if (MONGO_unlikely(mirrorMaestroTracksPending.shouldFail())) {
         // We've scheduled the operation to be mirrored; it is now "pending" until it has actually
         // been sent to a secondary.
@@ -417,12 +417,12 @@ void MirrorMaestroImpl::tryMirror(std::shared_ptr<CommandInvocation> invocation)
 }
 
 void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
-                                std::shared_ptr<CommandInvocation> invocation,
+                                const CommandInvocation& invocation,
                                 const MirroredReadsParameters& params) noexcept try {
     auto payload = [&] {
         BSONObjBuilder bob;
 
-        invocation->appendMirrorableRequest(&bob);
+        invocation.appendMirrorableRequest(&bob);
 
         // Limit the maxTimeMS
         bob.append("maxTimeMS", params.getMaxTimeMS());
@@ -495,7 +495,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
         };
 
         auto newRequest = executor::RemoteCommandRequest(
-            host, invocation->getDBForReadMirroring(), payload, nullptr /* opCtx */);
+            host, invocation.getDBForReadMirroring(), payload, nullptr /* opCtx */);
 
         newRequest.options.fireAndForget = true;
         if (MONGO_unlikely(mirrorMaestroExpectsResponse.shouldFail()))
