@@ -201,15 +201,8 @@ void HashAggBaseStage<Derived>::spill(MemoryCheckData& mcd) {
 // row in the '_ht' table. If the estimated memory usage exceeds the allowed, this method initiates
 // spilling.
 template <class Derived>
-void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd,
-                                                                    bool emptyInKeyAccessors) {
+void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd) {
     invariant(!_ht->empty());
-
-    // If the group-by key is empty we will only ever aggregate into a single row so no sense in
-    // spilling.
-    if (emptyInKeyAccessors) {
-        return;
-    }
 
     mcd.memoryCheckpointCounter++;
     if (mcd.memoryCheckpointCounter < mcd.nextMemoryCheckpoint) {

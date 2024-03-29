@@ -302,16 +302,24 @@ void HashAggStage::open(bool reOpen) {
         MemoryCheckData memoryCheckData;
 
         value::MaterializedRow key{_inKeyAccessors.size()};
-        while (_children[0]->getNext() == PlanState::ADVANCED) {
-            // Copy keys in order to do the lookup.
-            size_t idx = 0;
-            for (auto& p : _inKeyAccessors) {
-                auto [tag, val] = p->getViewOfValue();
-                key.reset(idx++, false, tag, val);
-            }
 
+        // If the group-by key is empty, we aggregate into a single row. In this case, avoid hash
+        // table lookups for each child document.
+        bool first = true;
+        const bool groupByListHasSlots = !_inKeyAccessors.empty();
+        while (_children[0]->getNext() == PlanState::ADVANCED) {
             bool newKey = false;
-            _htIt = _ht->find(key);
+            if (groupByListHasSlots || first) {
+                // Copy keys in order to do the lookup.
+                size_t idx = 0;
+                for (auto& p : _inKeyAccessors) {
+                    auto [tag, val] = p->getViewOfValue();
+                    key.reset(idx++, false, tag, val);
+                }
+                _htIt = _ht->find(key);
+                first = false;
+            }
+            dassert(_htIt == _ht->find(key));
             if (_htIt == _ht->end()) {
                 // The key is not present in the hash table yet, so we insert it and initialize the
                 // corresponding accumulator. Note that as a future optimization, we could avoid
@@ -339,14 +347,19 @@ void HashAggStage::open(bool reOpen) {
                 _outHashAggAccessors[idx]->reset(owned, tag, val);
             }
 
-            if (_forceIncreasedSpilling && !newKey) {
-                // If configured to spill more than usual, we spill after seeing the same key twice.
-                spill(memoryCheckData);
-            } else {
-                // Estimates how much memory is being used. If we estimate that the hash table
-                // exceeds the allotted memory budget, its contents are spilled to the
-                // '_recordStore' and '_ht' is cleared.
-                checkMemoryUsageAndSpillIfNecessary(memoryCheckData, _inKeyAccessors.empty());
+            // If the group-by key is empty we will only ever aggregate into a single row so no
+            // sense in spilling.
+            if (groupByListHasSlots) {
+                if (_forceIncreasedSpilling && !newKey) {
+                    // If configured to spill more than usual, we spill after seeing the same key
+                    // twice.
+                    spill(memoryCheckData);
+                } else {
+                    // Estimates how much memory is being used. If we estimate that the hash table
+                    // exceeds the allotted memory budget, its contents are spilled to the
+                    // '_recordStore' and '_ht' is cleared.
+                    checkMemoryUsageAndSpillIfNecessary(memoryCheckData);
+                }
             }
 
             trackResult();

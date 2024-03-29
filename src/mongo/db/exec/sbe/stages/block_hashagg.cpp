@@ -722,7 +722,7 @@ void BlockHashAggStage::open(bool reOpen) {
                 // Estimates how much memory is being used. If we estimate that the hash table
                 // exceeds the allotted memory budget, its contents are spilled to the
                 // '_recordStore' and '_ht' is cleared.
-                checkMemoryUsageAndSpillIfNecessary(memoryCheckData, false);
+                checkMemoryUsageAndSpillIfNecessary(memoryCheckData);
             }
         }
 

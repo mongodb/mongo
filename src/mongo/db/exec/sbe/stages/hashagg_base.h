@@ -137,7 +137,7 @@ protected:
      */
     void spillRowToDisk(const value::MaterializedRow& key, const value::MaterializedRow& val);
     void spill(MemoryCheckData& mcd);
-    void checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd, bool emptyInKeyAccessors);
+    void checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd);
 
     // Memory tracking and spilling to disk.
     const long long _approxMemoryUseInBytesBeforeSpill =
