@@ -75,5 +75,12 @@ Date_t roundTimestampToGranularity(const Date_t& time, const TimeseriesOptions& 
  * are passed through we set them to their default values.
  */
 Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions);
+
+/**
+ * Validates the combination of bucketRoundingSeconds, bucketMaxSpanSeconds and granularity in
+ * TimeseriesOptions. Returns a non-OK status if the options are not valid or if required parameters
+ * are missing.
+ */
+Status validateBucketingParameters(const TimeseriesOptions&);
 }  // namespace timeseries
 }  // namespace mongo

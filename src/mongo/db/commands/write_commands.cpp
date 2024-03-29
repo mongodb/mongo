@@ -135,7 +135,21 @@ bool isTimeseries(OperationContext* opCtx, const Request& request) {
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);
     auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-    return (coll && coll->getTimeseriesOptions());
+    if (!coll) {
+        return false;
+    }
+
+    if (auto options = coll->getTimeseriesOptions()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Time-series buckets collection is not clustered",
+                coll->isClustered());
+
+        uassertStatusOK(timeseries::validateBucketingParameters(*options));
+
+        return true;
+    }
+
+    return false;
 }
 
 /**
