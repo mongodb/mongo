@@ -33,12 +33,20 @@ export const logQueries = {
     },
     duringInitialSyncQuery:
         {severity: "warning", "msg": "cannot execute dbcheck due to ongoing initial sync"},
+    duringStableRecovery:
+        {severity: "warning", "msg": "cannot execute dbcheck due to ongoing stable recovering"},
     errorQuery: {"severity": "error"},
     warningQuery: {"severity": "warning"},
     infoOrErrorQuery:
         {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]},
     infoBatchQuery: {"severity": "info", "operation": "dbCheckBatch"},
     inconsistentBatchQuery: {"severity": "error", "msg": "dbCheck batch inconsistent"},
+    startStopQuery: {
+        $or: [
+            {"operation": "dbCheckStart", "severity": "info"},
+            {"operation": "dbCheckStop", "severity": "info"}
+        ]
+    },
 };
 
 // Apply function on all secondary nodes except arbiters.
