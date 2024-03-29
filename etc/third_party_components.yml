@@ -417,3 +417,4 @@ components:
     release_monitoring_id: 12083
     local_directory_path: src/third_party/zstandard
     team_owner: "Storage Execution"
+    upgrade_suppression: TODO SERVER-88708
