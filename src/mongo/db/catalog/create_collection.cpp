@@ -110,6 +110,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(failTimeseriesViewCreation);
 MONGO_FAIL_POINT_DEFINE(clusterAllCollectionsByDefault);
 MONGO_FAIL_POINT_DEFINE(skipIdIndex);
+MONGO_FAIL_POINT_DEFINE(useRegularCreatePathForTimeseriesBucketsCreations);
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -1013,7 +1014,8 @@ Status createCollection(OperationContext* opCtx,
                 !options.clusteredIndex);
 
         return _createView(opCtx, ns, options);
-    } else if (options.timeseries && opCtx->writesAreReplicated()) {
+    } else if (options.timeseries && opCtx->writesAreReplicated() &&
+               MONGO_likely(!useRegularCreatePathForTimeseriesBucketsCreations.shouldFail())) {
         // system.profile must be a simple collection since new document insertions directly work
         // against the usual collection API. See introspect.cpp for more details.
         uassert(ErrorCodes::IllegalOperation,

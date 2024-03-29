@@ -47,6 +47,7 @@
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::timeseries {
@@ -122,6 +123,8 @@ concept IsRequestableOnTimeseriesView = HasNsGetter<T> || HasGetIsTimeseriesName
  *
  * If the 'request' is not made on a timeseries view, the second element of the pair is same as the
  * namespace of the 'request'.
+ *
+ * Throws if this is a time-series view request but the buckets collection is not valid.
  */
 template <typename T>
 requires IsRequestableOnTimeseriesView<T> std::pair<bool, NamespaceString> isTimeseriesViewRequest(
@@ -150,8 +153,20 @@ requires IsRequestableOnTimeseriesView<T> std::pair<bool, NamespaceString> isTim
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);
     auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-    bool isTimeseriesViewReq = (coll && coll->getTimeseriesOptions());
+    if (!coll) {
+        return {false, nss};
+    }
 
-    return {isTimeseriesViewReq, isTimeseriesViewReq ? bucketNss : nss};
+    if (auto options = coll->getTimeseriesOptions()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Time-series buckets collection is not clustered",
+                coll->isClustered());
+
+        uassertStatusOK(validateBucketingParameters(*options));
+
+        return {true, bucketNss};
+    }
+
+    return {false, nss};
 }
 }  // namespace mongo::timeseries
