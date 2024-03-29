@@ -678,7 +678,8 @@ def generate(env: SCons.Environment.Environment) -> None:
         # if the bazel command line changes.
         env['BAZEL_FLAGS_STR'] = ' '.join(bazel_internal_flags) + env.get("BAZEL_FLAGS", "")
 
-        if "--config=local" not in env['BAZEL_FLAGS_STR']:
+        if "--config=local" not in env['BAZEL_FLAGS_STR'] and "--config=public-release" not in env[
+                'BAZEL_FLAGS_STR']:
             print(
                 "Running bazel with remote execution enabled. To disable bazel remote execution, please add BAZEL_FLAGS=--config=local to the end of your scons command line invocation."
             )
