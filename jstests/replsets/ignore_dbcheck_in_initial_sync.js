@@ -65,6 +65,10 @@ runDbCheck(replSet,
                    maxDocsPerBatch  //, validateMode: "dataConsistencyAndMissingIndexKeysCheck"
            });
 
+// Wait until the primary finished dbcheck before turning off the initial sync failpoint so that the
+// initial sync node would need to apply (ignore) dbCheckStop in initial sync.
+checkHealthLog(primaryHealthlog, {"operation": "dbCheckStop"}, 1);
+
 assert.commandWorked(initialSyncNode.adminCommand(
     {configureFailPoint: 'initialSyncHangBeforeSplittingControlFlow', mode: 'off'}));
 

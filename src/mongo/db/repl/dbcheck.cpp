@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
@@ -43,10 +45,12 @@
 #include "mongo/db/repl/dbcheck_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(SleepDbCheckInBatch);
+MONGO_FAIL_POINT_DEFINE(hangAfterGeneratingHashForExtraIndexKeysCheck);
 
 namespace {
 
@@ -409,6 +413,14 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             // every N batches.
             HealthLogInterface::get(opCtx)->log(*logEntry);
         }
+
+        if (MONGO_unlikely(hangAfterGeneratingHashForExtraIndexKeysCheck.shouldFail())) {
+            LOGV2_DEBUG(3083200,
+                        3,
+                        "Hanging due to hangAfterGeneratingHashForExtraIndexKeysCheck failpoint");
+            // hangAfterGeneratingHashForExtraIndexKeysCheck.pauseWhileSet(opCtx);
+            opCtx->sleepFor(Milliseconds(1000));
+        }
     } catch (const DBException& exception) {
         // In case of an error, report it to the health log,
         auto logEntry = dbCheckErrorHealthLogEntry(
@@ -438,7 +450,6 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
     IDLParserErrorContext ctx("o");
 
     auto skipDbCheck = mode != OplogApplication::Mode::kSecondary;
-    auto severity = skipDbCheck ? SeverityEnum::Warning : SeverityEnum::Info;
     std::string oplogApplicationMode;
     if (mode == OplogApplication::Mode::kInitialSync) {
         oplogApplicationMode = "initial sync";
@@ -500,7 +511,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
         case OplogEntriesEnum::Stop:
             const auto healthLogEntry = mongo::dbCheckHealthLogEntry(
                 boost::none /*nss*/,
-                severity,
+                skipDbCheck ? SeverityEnum::Warning : SeverityEnum::Info,
                 skipDbCheck ? "cannot execute dbcheck due to ongoing " + oplogApplicationMode : "",
                 type,
                 boost::none /*data*/

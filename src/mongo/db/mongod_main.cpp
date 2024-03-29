@@ -1279,7 +1279,7 @@ void logShutdownTimeElapsedStatistics(ServiceContext* serviceContext,
                                        elapsedInitAndListen.toString());
     shutdownInfoBuilder->append("Statistics", shutdownTimeElapsedBuilder->obj());
     LOGV2_INFO(8423404,
-               "shutdownTask complete",
+               "mongod shutdown complete",
                "Summary of time elapsed"_attr = shutdownInfoBuilder->obj());
 }
 
