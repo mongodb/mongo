@@ -52,6 +52,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/execution_control_feature_flags_gen.h"
+#include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -1303,9 +1304,9 @@ void OpDebug::report(OperationContext* opCtx,
     }
 
     // (Ignore FCV check): This feature flag is not FCV gated (shouldBeFCVGated is false)
-    if (gFeatureFlagIngressAdmissionControl.isEnabledAndIgnoreFCVUnsafe() &&
-        waitForIngressAdmissionTicketDurationMicros > Microseconds::zero()) {
-        pAttrs->add("ingressAdmissionDuration", waitForIngressAdmissionTicketDurationMicros);
+    if (gFeatureFlagIngressAdmissionControl.isEnabledAndIgnoreFCVUnsafe()) {
+        pAttrs->add("ingressAdmissionDuration",
+                    IngressAdmissionContext::get(opCtx).totalTimeQueuedMicros());
     }
 
     // durationMillis should always be present for any operation

@@ -45,27 +45,23 @@
 
 namespace mongo {
 
-namespace {
-void updateQueueStatsOnRelease(ServiceContext* serviceContext,
-                               TicketHolder::QueueStats& queueStats,
-                               AdmissionContext* admCtx,
-                               TickSource::Tick startTime) {
+void TicketHolder::_updateQueueStatsOnRelease(TicketHolder::QueueStats& queueStats,
+                                              const Ticket& ticket) {
     queueStats.totalFinishedProcessing.fetchAndAddRelaxed(1);
-    auto tickSource = serviceContext->getTickSource();
-    auto delta = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTime);
+    auto tickSource = _serviceContext->getTickSource();
+    auto delta =
+        tickSource->ticksTo<Microseconds>(tickSource->getTicks() - ticket._acquisitionTime);
     queueStats.totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
 }
 
-void updateQueueStatsOnTicketAcquisition(ServiceContext* serviceContext,
-                                         TicketHolder::QueueStats& queueStats,
-                                         AdmissionContext* admCtx) {
+void TicketHolder::_updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx,
+                                                        TicketHolder::QueueStats& queueStats) {
     if (admCtx->getAdmissions() == 0) {
         queueStats.totalNewAdmissions.fetchAndAddRelaxed(1);
     }
     admCtx->recordAdmission();
     queueStats.totalStartedProcessing.fetchAndAddRelaxed(1);
 }
-}  // namespace
 
 TicketHolder::TicketHolder(ServiceContext* svcCtx, int32_t numTickets, bool trackPeakUsed)
     : _trackPeakUsed(trackPeakUsed), _outof(numTickets), _serviceContext(svcCtx) {}
@@ -114,35 +110,31 @@ void TicketHolder::appendStats(BSONObjBuilder& b) const {
 
 void TicketHolder::_releaseToTicketPool(Ticket& ticket) noexcept {
     if (ticket._priority == AdmissionContext::Priority::kExempt) {
-        updateQueueStatsOnRelease(
-            _serviceContext, _exemptQueueStats, ticket._admissionContext, ticket._acquisitionTime);
+        _updateQueueStatsOnRelease(_exemptQueueStats, ticket);
         return;
     }
 
     auto& queueStats = _getQueueStatsToUse(ticket._priority);
-    updateQueueStatsOnRelease(
-        _serviceContext, queueStats, ticket._admissionContext, ticket._acquisitionTime);
+    _updateQueueStatsOnRelease(queueStats, ticket);
     _releaseToTicketPoolImpl(ticket._admissionContext);
 }
 
-Ticket TicketHolder::waitForTicket(Interruptible& interruptible,
-                                   AdmissionContext* admCtx,
-                                   Microseconds& timeQueuedForTicketMicros) {
-    auto res = waitForTicketUntil(interruptible, admCtx, Date_t::max(), timeQueuedForTicketMicros);
+Ticket TicketHolder::waitForTicket(Interruptible& interruptible, AdmissionContext* admCtx) {
+    auto res = waitForTicketUntil(interruptible, admCtx, Date_t::max());
     invariant(res);
     return std::move(*res);
 }
 
 boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
     if (admCtx->getPriority() == AdmissionContext::Priority::kExempt) {
-        updateQueueStatsOnTicketAcquisition(_serviceContext, _exemptQueueStats, admCtx);
+        _updateQueueStatsOnTicketAcquisition(admCtx, _exemptQueueStats);
         return Ticket{this, admCtx};
     }
 
     auto ticket = _tryAcquireImpl(admCtx);
     if (ticket) {
         auto& queueStats = _getQueueStatsToUse(admCtx->getPriority());
-        updateQueueStatsOnTicketAcquisition(_serviceContext, queueStats, admCtx);
+        _updateQueueStatsOnTicketAcquisition(admCtx, queueStats);
         _updatePeakUsed();
     }
 
@@ -151,8 +143,7 @@ boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
 
 boost::optional<Ticket> TicketHolder::waitForTicketUntil(Interruptible& interruptible,
                                                          AdmissionContext* admCtx,
-                                                         Date_t until,
-                                                         Microseconds& timeQueuedForTicketMicros) {
+                                                         Date_t until) {
     // Attempt a quick acquisition first.
     if (auto ticket = tryAcquire(admCtx)) {
         return ticket;
@@ -160,16 +151,11 @@ boost::optional<Ticket> TicketHolder::waitForTicketUntil(Interruptible& interrup
 
     auto& queueStats = _getQueueStatsToUse(admCtx->getPriority());
     auto tickSource = _serviceContext->getTickSource();
-    auto currentWaitTime = tickSource->getTicks();
-    auto updateQueuedTime = [&]() {
-        auto oldWaitTime = std::exchange(currentWaitTime, tickSource->getTicks());
-        auto waitDelta = tickSource->ticksTo<Microseconds>(currentWaitTime - oldWaitTime);
-        timeQueuedForTicketMicros += waitDelta;
-        queueStats.totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta.count());
-    };
     queueStats.totalAddedQueue.fetchAndAddRelaxed(1);
-    ON_BLOCK_EXIT([&] {
-        updateQueuedTime();
+    ON_BLOCK_EXIT([&, startWaitTime = tickSource->getTicks()] {
+        auto waitDelta = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startWaitTime);
+        admCtx->recordTimeQueued(waitDelta);
+        queueStats.totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta.count());
         queueStats.totalRemovedQueue.fetchAndAddRelaxed(1);
     });
 
@@ -182,7 +168,7 @@ boost::optional<Ticket> TicketHolder::waitForTicketUntil(Interruptible& interrup
 
     if (ticket) {
         cancelWait.dismiss();
-        updateQueueStatsOnTicketAcquisition(_serviceContext, queueStats, admCtx);
+        _updateQueueStatsOnTicketAcquisition(admCtx, queueStats);
         _updatePeakUsed();
         return ticket;
     } else {
@@ -241,19 +227,15 @@ boost::optional<Ticket> MockTicketHolder::tryAcquire(AdmissionContext* admCtx) {
     return Ticket{this, admCtx};
 }
 
-Ticket MockTicketHolder::waitForTicket(Interruptible& interruptible,
-                                       AdmissionContext* admCtx,
-                                       Microseconds& timeQueuedForTicketMicros) {
+Ticket MockTicketHolder::waitForTicket(Interruptible& interruptible, AdmissionContext* admCtx) {
     auto ticket = tryAcquire(admCtx);
     invariant(ticket);
     return std::move(ticket.get());
 }
 
-boost::optional<Ticket> MockTicketHolder::waitForTicketUntil(
-    Interruptible& interruptible,
-    AdmissionContext* admCtx,
-    Date_t until,
-    Microseconds& timeQueuedForTicketMicros) {
+boost::optional<Ticket> MockTicketHolder::waitForTicketUntil(Interruptible& interruptible,
+                                                             AdmissionContext* admCtx,
+                                                             Date_t until) {
     return tryAcquire(admCtx);
 }
 

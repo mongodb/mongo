@@ -29,20 +29,20 @@
 
 #include "mongo/db/admission/ingress_admission_controller.h"
 
+#include <memory>
+
+#include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/decorable.h"
-#include <memory>
 
 namespace mongo {
 
 namespace {
 const auto getIngressAdmissionController =
     ServiceContext::declareDecoration<IngressAdmissionController>();
-const auto getIngressAdmissionContext =
-    OperationContext::declareDecoration<IngressAdmissionContext>();
 
 const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
     "InitIngressAdmissionController", [](ServiceContext* ctx) {
@@ -81,7 +81,6 @@ IngressAdmissionController& IngressAdmissionController::get(OperationContext* op
 
 Ticket IngressAdmissionController::admitOperation(OperationContext* opCtx) {
     auto& admCtx = IngressAdmissionContext::get(opCtx);
-    auto* curOp = CurOp::get(opCtx);
 
     // Try to get the ticket without waiting
     if (auto ticket = _ticketHolder->tryAcquire(&admCtx)) {
@@ -90,8 +89,7 @@ Ticket IngressAdmissionController::admitOperation(OperationContext* opCtx) {
 
     // Mark the operation as waiting for ticket
     WaitingForIngressAdmissionGuard guard{opCtx};
-    return _ticketHolder->waitForTicket(
-        *opCtx, &admCtx, curOp->debug().waitForIngressAdmissionTicketDurationMicros);
+    return _ticketHolder->waitForTicket(*opCtx, &admCtx);
 }
 
 void IngressAdmissionController::resizeTicketPool(int32_t newSize) {
@@ -110,10 +108,6 @@ Status IngressAdmissionController::onUpdateTicketPoolSize(int32_t newValue) try 
     return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus();
-}
-
-IngressAdmissionContext& IngressAdmissionContext::get(OperationContext* opCtx) {
-    return getIngressAdmissionContext(opCtx);
 }
 
 }  // namespace mongo

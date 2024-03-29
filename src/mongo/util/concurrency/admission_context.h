@@ -28,14 +28,10 @@
  */
 #pragma once
 
-#include <cstdint>
-#include <type_traits>
-
 #include <boost/optional.hpp>
 
 #include "mongo/base/string_data.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/tick_source.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
@@ -70,8 +66,11 @@ public:
      */
     enum class Priority { kExempt = 0, kLow, kNormal };
 
-    void recordAdmission() {
-        _admissions += 1;
+    /**
+     * Returns the total time this admission context has ever waited in a queue.
+     */
+    Microseconds totalTimeQueuedMicros() const {
+        return _totalTimeQueuedMicros;
     }
 
     /**
@@ -87,11 +86,20 @@ public:
 
 protected:
     friend class ScopedAdmissionPriorityBase;
+    friend class TicketHolder;
 
     AdmissionContext() = default;
 
+    void recordAdmission() {
+        _admissions += 1;
+    }
+    void recordTimeQueued(Microseconds timeQueued) {
+        _totalTimeQueuedMicros += timeQueued;
+    }
+
     int32_t _admissions{0};
     Priority _priority{Priority::kNormal};
+    Microseconds _totalTimeQueuedMicros{0};
 };
 
 /**

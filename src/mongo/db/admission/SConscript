@@ -11,7 +11,7 @@ env.Library(
         'ingress_admission_control.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/concurrency/admission_context',
+        'ingress_admission_context',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -19,6 +19,19 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+    ],
+)
+
+env.Library(
+    target='ingress_admission_context',
+    source=[
+        'ingress_admission_context.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/concurrency/admission_context',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 

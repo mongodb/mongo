@@ -79,9 +79,7 @@ public:
      * interrupted, throwing an AssertionException. Outputs 'timeQueuedForTicketMicros' with time
      * spent waiting for a ticket.
      */
-    virtual Ticket waitForTicket(Interruptible& interruptible,
-                                 AdmissionContext* admCtx,
-                                 Microseconds& timeQueuedForTicketMicros);
+    virtual Ticket waitForTicket(Interruptible& interruptible, AdmissionContext* admCtx);
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'. Returns 'true' if a ticket is
@@ -91,8 +89,7 @@ public:
      */
     virtual boost::optional<Ticket> waitForTicketUntil(Interruptible& interruptible,
                                                        AdmissionContext* admCtx,
-                                                       Date_t until,
-                                                       Microseconds& timeQueuedForTicketMicros);
+                                                       Date_t until);
 
     /**
      * The total number of tickets allotted to the ticket pool.
@@ -178,6 +175,10 @@ private:
 
     const bool _trackPeakUsed;
 
+    void _updateQueueStatsOnRelease(TicketHolder::QueueStats& queueStats, const Ticket& ticket);
+    void _updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx,
+                                              TicketHolder::QueueStats& queueStats);
+
     Mutex _resizeMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "TicketHolder::_resizeMutex");
     QueueStats _exemptQueueStats;
@@ -200,14 +201,11 @@ public:
 
     boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) override;
 
-    Ticket waitForTicket(Interruptible& interruptible,
-                         AdmissionContext* admCtx,
-                         Microseconds& timeQueuedForTicketMicros) override;
+    Ticket waitForTicket(Interruptible& interruptible, AdmissionContext* admCtx) override;
 
     boost::optional<Ticket> waitForTicketUntil(Interruptible& interruptible,
                                                AdmissionContext* admCtx,
-                                               Date_t until,
-                                               Microseconds& timeQueuedForTicketMicros) override;
+                                               Date_t until) override;
 
     void appendStats(BSONObjBuilder& b) const override {}
 

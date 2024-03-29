@@ -1002,8 +1002,11 @@ bool Locker::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadl
         if (auto ticket = holder->waitForTicketUntil(
                 _uninterruptibleLocksRequested ? *Interruptible::notInterruptible() : *opCtx,
                 &ExecutionAdmissionContext::get(opCtx),
-                deadline,
-                _timeQueuedForTicketMicros)) {
+                deadline)) {
+            // TODO(SERVER-88732): Remove `_timeQueuedForTicketMicros` when we only track admission
+            // context for waiting metrics.
+            _timeQueuedForTicketMicros =
+                ExecutionAdmissionContext::get(opCtx).totalTimeQueuedMicros();
             _ticket = std::move(*ticket);
         } else {
             return false;

@@ -57,6 +57,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/action_type.h"

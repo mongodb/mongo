@@ -514,9 +514,6 @@ public:
     // resolved views per query, a hash map would unlikely provide any benefits.
     std::map<NamespaceString, std::pair<std::vector<NamespaceString>, std::vector<BSONObj>>>
         resolvedViews;
-
-    // Stores the time the operation spent waiting for ingress admission control ticket
-    Microseconds waitForIngressAdmissionTicketDurationMicros{0};
 };
 
 /**

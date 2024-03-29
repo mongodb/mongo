@@ -26,59 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
 
-#include <memory>
-
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/semaphore_ticketholder.h"
 
 namespace mongo {
-class IngressAdmissionController {
+
+class OperationContext;
+
+/**
+ * Stores state and statistics related to execution control for a given transactional context.
+ */
+class IngressAdmissionContext : public AdmissionContext {
 public:
-    explicit IngressAdmissionController();
+    IngressAdmissionContext() = default;
 
     /**
-     * Returns the reference to IngressAdmissionController associated with the operation's service
-     * context.
+     * Retrieve the IngressAdmissionContext decoration the provided OperationContext
      */
-    static IngressAdmissionController& get(OperationContext* opCtx);
-
-    /**
-     * Attempts to acquire an ingress admission ticket for the operation. Blocks until a ticket is
-     * acquired, or the operation is interrupted, in which case it throws an AssertionException.
-     * Operations with kExempt admission priority will always acquire a ticket without waiting and
-     * without reducing the number of available tickets.
-     */
-    Ticket admitOperation(OperationContext* opCtx);
-
-    /**
-     * Adjusts the total number of tickets allocated for ingress admission control to 'newSize'.
-     */
-    void resizeTicketPool(int32_t newSize);
-
-    /**
-     * Reports the ingress admission control metrics.
-     */
-    void appendStats(BSONObjBuilder& b) const;
-
-    /**
-     * Called automatically when the value of the server parameter that controls the ticket pool
-     * size changes.
-     */
-    static Status onUpdateTicketPoolSize(int newValue);
-
-    /**
-     * Initialize the IngressAdmissionController after the ServiceContext is constructed. This will
-     * be called automatically during static initialization.
-     */
-    void init();
-
-private:
-    std::unique_ptr<SemaphoreTicketHolder> _ticketHolder{nullptr};
+    static IngressAdmissionContext& get(OperationContext* opCtx);
 };
 
 }  // namespace mongo

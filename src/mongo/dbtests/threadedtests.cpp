@@ -301,7 +301,6 @@ private:
         Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
         MockAdmissionContext admCtx;
-        Microseconds timeInQueue;
 
         for (int i = 0; i < checkIns; i++) {
             boost::optional<ScopedAdmissionPriorityBase> admissionPriority;
@@ -310,8 +309,7 @@ private:
                 admissionPriority.emplace(opCtx.get(), admCtx, AdmissionContext::Priority::kLow);
             }
 
-            auto ticket =
-                _tickets->waitForTicket(*Interruptible::notInterruptible(), &admCtx, timeInQueue);
+            auto ticket = _tickets->waitForTicket(*Interruptible::notInterruptible(), &admCtx);
 
             _hotel.checkIn();
 

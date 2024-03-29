@@ -157,11 +157,10 @@ BSONObj TicketedWorkloadDriver::metrics() const {
 void TicketedWorkloadDriver::_read(int32_t i) {
     auto client = _svcCtx->getService()->makeClient("reader_" + std::to_string(i));
     auto opCtx = client->makeOperationContext();
-    Microseconds timeInQueue;
 
     while (_readRunning.load() >= i) {
         auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
-        Ticket ticket = _readTicketHolder->waitForTicket(*opCtx, &admCtx, timeInQueue);
+        Ticket ticket = _readTicketHolder->waitForTicket(*opCtx, &admCtx);
         _doRead(opCtx.get(), &admCtx);
     }
 }
@@ -169,11 +168,10 @@ void TicketedWorkloadDriver::_read(int32_t i) {
 void TicketedWorkloadDriver::_write(int32_t i) {
     auto client = _svcCtx->getService()->makeClient("writer_" + std::to_string(i));
     auto opCtx = client->makeOperationContext();
-    Microseconds timeInQueue;
 
     while (_writeRunning.load() >= i) {
         auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
-        Ticket ticket = _writeTicketHolder->waitForTicket(*opCtx, &admCtx, timeInQueue);
+        Ticket ticket = _writeTicketHolder->waitForTicket(*opCtx, &admCtx);
         _doWrite(opCtx.get(), &admCtx);
     }
 }
