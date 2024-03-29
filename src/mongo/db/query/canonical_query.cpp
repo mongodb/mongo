@@ -51,7 +51,7 @@
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
-#include "mongo/db/query/query_decorations.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/server_parameter.h"
@@ -409,7 +409,7 @@ std::string CanonicalQuery::toStringShort(bool forErrMsg) const {
 }
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
-    return (!QueryKnobConfiguration::decoration(getOpCtx()).isForceClassicEngineEnabled() &&
+    return (!getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled() &&
             _sbeCompatible)
         ? canonical_query_encoder::encodeSBE(*this,
                                              canonical_query_encoder::Optimizer::kSbeStageBuilders)

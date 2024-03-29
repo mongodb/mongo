@@ -107,7 +107,7 @@
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/projection_policies.h"
-#include "mongo/db/query/query_decorations.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/db/server_parameter.h"
@@ -1251,9 +1251,10 @@ BonsaiEligibility checkSupportedFeatures(const CanonicalQuery& cq) {
 /**
  * Use the framework control to determine the minimum required eligibility level.
  */
-BonsaiEligibility::Eligibility getMinRequiredEligibility(OperationContext* opCtx) {
+BonsaiEligibility::Eligibility getMinRequiredEligibility(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto frameworkControl =
-        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+        expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
     switch (frameworkControl) {
         case QueryFrameworkControlEnum::kForceBonsai:
             return BonsaiEligibility::Ineligible;
@@ -1265,11 +1266,11 @@ BonsaiEligibility::Eligibility getMinRequiredEligibility(OperationContext* opCtx
 }
 }  // namespace
 
-bool isBonsaiEnabled(OperationContext* opCtx) {
+bool isBonsaiEnabled(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // We don't need to consult the feature flag here, since the framework control knob can only
     // be set to enable bonsai if featureFlagCommonQueryFramework is enabled.
     auto frameworkControl =
-        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+        expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
     LOGV2_DEBUG(7325101,
                 4,
                 "logging internalQueryFrameworkControl",
@@ -1295,11 +1296,12 @@ BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
                                              const CollectionPtr& collection,
                                              const AggregateCommandRequest& request,
                                              const Pipeline& pipeline) {
-    if (!isBonsaiEnabled(opCtx)) {
+    if (!isBonsaiEnabled(pipeline.getContext())) {
         return BonsaiEligibility::Ineligible;
     }
 
-    return BonsaiEligibility{BonsaiEligibility::FullyEligible, getMinRequiredEligibility(opCtx)}
+    return BonsaiEligibility{BonsaiEligibility::FullyEligible,
+                             getMinRequiredEligibility(pipeline.getContext())}
         .minOf([&]() { return determineEligibilityCommon(request, opCtx, collection); })
         .setIneligibleIf(request.getRequestReshardingResumeToken().has_value())
         .setIneligibleIf(request.getExchange().has_value())
@@ -1315,12 +1317,13 @@ BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
 BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
                                              const CollectionPtr& collection,
                                              const CanonicalQuery& cq) {
-    if (!isBonsaiEnabled(opCtx)) {
+    if (!isBonsaiEnabled(cq.getExpCtx())) {
         return BonsaiEligibility::Ineligible;
     }
 
     auto& request = cq.getFindCommandRequest();
-    return BonsaiEligibility{BonsaiEligibility::FullyEligible, getMinRequiredEligibility(opCtx)}
+    return BonsaiEligibility{BonsaiEligibility::FullyEligible,
+                             getMinRequiredEligibility(cq.getExpCtx())}
         .setIneligibleIf(!cq.useCqfIfEligible())
         .minOf([&]() { return determineEligibilityCommon(request, opCtx, collection); })
         .setIneligibleIf(!request.getSort().isEmpty())
@@ -1341,11 +1344,11 @@ BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
         .minOf([&]() { return checkSupportedFeatures(cq); });
 }
 
-bool isEligibleForBonsaiUnderFrameworkControl(OperationContext* opCtx,
+bool isEligibleForBonsaiUnderFrameworkControl(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               bool isExplain,
                                               BonsaiEligibility eligibility) {
     auto frameworkControl =
-        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+        expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
 
     // Explain is not currently supported but is allowed if the failpoint is set
     // for testing purposes.
@@ -1372,7 +1375,7 @@ bool isEligibleForBonsai(OperationContext* opCtx,
                          const Pipeline& pipeline) {
     auto eligibility = determineBonsaiEligibility(opCtx, collection, request, pipeline);
     return isEligibleForBonsaiUnderFrameworkControl(
-        opCtx, request.getExplain().has_value(), eligibility);
+        pipeline.getContext(), request.getExplain().has_value(), eligibility);
 }
 
 bool isEligibleForBonsai(OperationContext* opCtx,
@@ -1380,7 +1383,7 @@ bool isEligibleForBonsai(OperationContext* opCtx,
                          const CanonicalQuery& cq) {
     auto eligibility = determineBonsaiEligibility(opCtx, collection, cq);
     return isEligibleForBonsaiUnderFrameworkControl(
-        opCtx, cq.getExplain().has_value(), eligibility);
+        cq.getExpCtx(), cq.getExplain().has_value(), eligibility);
 }
 
 BonsaiEligibility isEligibleForBonsai_forTesting(const CanonicalQuery& cq) {

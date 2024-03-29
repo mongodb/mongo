@@ -27,69 +27,56 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_decorations.h"
+#include "mongo/db/query/query_knob_configuration.h"
 
 namespace mongo {
 
-const OperationContext::Decoration<QueryKnobConfiguration> QueryKnobConfiguration::decoration =
-    OperationContext::declareDecoration<QueryKnobConfiguration>();
-
-void QueryKnobConfiguration::_tryToSetAllValues() {
-    if (_isSet) {
-        return;
-    }
-    _queryFrameworkControlValue = ServerParameterSet::getNodeParameterSet()
-                                      ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                                      ->_data.get();
+QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettings& querySettings) {
     _sbeDisableGroupPushdownValue =
         internalQuerySlotBasedExecutionDisableGroupPushdown.loadRelaxed();
     _sbeDisableLookupPushdownValue =
         internalQuerySlotBasedExecutionDisableLookupPushdown.loadRelaxed();
     _sbeDisableTimeSeriesValue =
         internalQuerySlotBasedExecutionDisableTimeSeriesPushdown.loadRelaxed();
-    _planEvaluationMaxResults =
-        static_cast<size_t>(internalQueryPlanEvaluationMaxResults.loadRelaxed());
+
+    // TODO: SERVER-87031 Ensure internalQueryFrameworkControl value is overriden by query settings
+    // if present.
+    _queryFrameworkControlValue = ServerParameterSet::getNodeParameterSet()
+                                      ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
+                                      ->_data.get();
+    _planEvaluationMaxResults = internalQueryPlanEvaluationMaxResults.loadRelaxed();
     _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
-    _isSet = true;
 }
 
-QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() {
-    _tryToSetAllValues();
+QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
     return _queryFrameworkControlValue;
 }
 
-bool QueryKnobConfiguration::getSbeDisableGroupPushdownForOp() {
-    _tryToSetAllValues();
+bool QueryKnobConfiguration::getSbeDisableGroupPushdownForOp() const {
     return _sbeDisableGroupPushdownValue;
 }
 
-bool QueryKnobConfiguration::getSbeDisableLookupPushdownForOp() {
-    _tryToSetAllValues();
+bool QueryKnobConfiguration::getSbeDisableLookupPushdownForOp() const {
     return _sbeDisableLookupPushdownValue;
 }
 
-bool QueryKnobConfiguration::getSbeDisableTimeSeriesForOp() {
-    _tryToSetAllValues();
+bool QueryKnobConfiguration::getSbeDisableTimeSeriesForOp() const {
     return _sbeDisableTimeSeriesValue;
 }
 
-bool QueryKnobConfiguration::isForceClassicEngineEnabled() {
-    _tryToSetAllValues();
+bool QueryKnobConfiguration::isForceClassicEngineEnabled() const {
     return _queryFrameworkControlValue == QueryFrameworkControlEnum::kForceClassicEngine;
 }
 
-size_t QueryKnobConfiguration::getPlanEvaluationMaxResultsForOp() {
-    _tryToSetAllValues();
+size_t QueryKnobConfiguration::getPlanEvaluationMaxResultsForOp() const {
     return _planEvaluationMaxResults;
 }
 
-size_t QueryKnobConfiguration::getMaxScansToExplodeForOp() {
-    _tryToSetAllValues();
+size_t QueryKnobConfiguration::getMaxScansToExplodeForOp() const {
     return _maxScansToExplodeValue;
 }
 
-bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() {
-    _tryToSetAllValues();
+bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() const {
     switch (_queryFrameworkControlValue) {
         case QueryFrameworkControlEnum::kForceClassicEngine:
         case QueryFrameworkControlEnum::kTrySbeRestricted:

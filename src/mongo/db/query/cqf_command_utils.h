@@ -208,7 +208,7 @@ BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
  * Given a query's eligibility, determine whether it should be optimized using Bonsai taking into
  * account the value of internalQueryFrameworkControl knob for the current operation.
  */
-bool isEligibleForBonsaiUnderFrameworkControl(OperationContext* opCtx,
+bool isEligibleForBonsaiUnderFrameworkControl(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               bool isExplain,
                                               BonsaiEligibility eligibility);
 

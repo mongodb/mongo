@@ -370,13 +370,13 @@ void ClusterExplain::buildEOFExplainResult(OperationContext* opCtx,
     queryPlannerBob.doneFast();
 
     explain_common::generateServerInfo(out);
-    explain_common::generateServerParameters(opCtx, out);
+    explain_common::generateServerParameters(cq->getExpCtx(), out);
     appendIfRoom(out, command, "command");
 }
 
 // static
 Status ClusterExplain::buildExplainResult(
-    OperationContext* opCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const vector<AsyncRequestsSender::Response>& shardResponses,
     const char* mongosStageName,
     long long millisElapsed,
@@ -389,10 +389,10 @@ Status ClusterExplain::buildExplainResult(
         return ex.toStatus();
     }
 
-    buildPlannerInfo(opCtx, shardResponses, mongosStageName, out);
+    buildPlannerInfo(expCtx->opCtx, shardResponses, mongosStageName, out);
     buildExecStats(shardResponses, mongosStageName, millisElapsed, out);
     explain_common::generateServerInfo(out);
-    explain_common::generateServerParameters(opCtx, out);
+    explain_common::generateServerParameters(expCtx, out);
     appendIfRoom(out, command, "command");
 
     return Status::OK();

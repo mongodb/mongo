@@ -113,7 +113,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_decorations.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
@@ -240,6 +240,7 @@ ClientCursorPin registerCursor(OperationContext* opCtx,
  * or the given executor (otherwise) and collects them in the query stats store.
  */
 void collectQueryStats(OperationContext* opCtx,
+                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        mongo::PlanExecutor* maybeExec,
                        ClientCursorPin* maybePinnedCursor) {
     invariant(maybeExec || maybePinnedCursor);
@@ -256,7 +257,7 @@ void collectQueryStats(OperationContext* opCtx,
     if (maybePinnedCursor) {
         collectQueryStatsMongod(opCtx, *maybePinnedCursor);
     } else {
-        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsInfo.key));
+        collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().queryStatsInfo.key));
     }
 }
 
@@ -264,12 +265,13 @@ void collectQueryStats(OperationContext* opCtx,
  * Builds the reply for a pipeline over a sharded collection that contains an exchange stage.
  */
 void handleMultipleCursorsForExchange(OperationContext* opCtx,
+                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& nsForCursor,
                                       std::vector<ClientCursorPin>& pinnedCursors,
                                       const AggregateCommandRequest& request,
                                       rpc::ReplyBuilderInterface* result) {
     invariant(pinnedCursors.size() > 1);
-    collectQueryStats(opCtx, nullptr, &pinnedCursors[0]);
+    collectQueryStats(opCtx, expCtx, nullptr, &pinnedCursors[0]);
     long long batchSize =
         request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize);
 
@@ -466,7 +468,7 @@ boost::optional<ClientCursorPin> executeSingleExecUntilFirstBatch(
         cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
     }
 
-    collectQueryStats(opCtx, execs[0].get(), maybePinnedCursor.get_ptr());
+    collectQueryStats(opCtx, expCtx, execs[0].get(), maybePinnedCursor.get_ptr());
 
     boost::optional<CursorMetrics> metrics = request.getIncludeQueryStatsMetrics()
         ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
@@ -516,7 +518,7 @@ boost::optional<ClientCursorPin> executeUntilFirstBatch(
             registerCursor(opCtx, expCtx, origNss, *cmdObj, privileges, std::move(exec), nullptr);
         pinnedCursors.emplace_back(std::move(pinnedCursor));
     }
-    handleMultipleCursorsForExchange(opCtx, origNss, pinnedCursors, request, result);
+    handleMultipleCursorsForExchange(opCtx, expCtx, origNss, pinnedCursors, request, result);
 
     if (pinnedCursors.size() > 0) {
         return std::move(pinnedCursors[0]);
@@ -1563,7 +1565,7 @@ Status _runAggregate(OperationContext* opCtx,
         auto bonsaiEligibility =
             determineBonsaiEligibility(opCtx, collections.getMainCollection(), request, *pipeline);
         const bool bonsaiEligible = isEligibleForBonsaiUnderFrameworkControl(
-            opCtx, request.getExplain().has_value(), bonsaiEligibility);
+            expCtx, request.getExplain().has_value(), bonsaiEligibility);
 
         bool bonsaiExecSuccess = true;
         if (bonsaiEligible) {
@@ -1643,8 +1645,8 @@ Status _runAggregate(OperationContext* opCtx,
             } else {
                 // If we had an optimization failure, only error if we're not in tryBonsai.
                 bonsaiExecSuccess = false;
-                auto queryControl = QueryKnobConfiguration::decoration(opCtx)
-                                        .getInternalQueryFrameworkControlForOp();
+                auto queryControl =
+                    expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
                 tassert(7319401,
                         "Optimization failed either without tryBonsai set, or without a hint.",
                         queryControl == QueryFrameworkControlEnum::kTryBonsai &&
@@ -1716,7 +1718,7 @@ Status _runAggregate(OperationContext* opCtx,
                 *cmdObj,
                 &bodyBuilder);
         }
-        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsInfo.key));
+        collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().queryStatsInfo.key));
     } else {
         auto maybePinnedCursor = executeUntilFirstBatch(opCtx,
                                                         expCtx,

@@ -121,8 +121,8 @@
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
-#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -1822,7 +1822,7 @@ bool PipelineD::isSearchPresentAndEligibleForSbe(const Pipeline* pipeline) {
     auto searchInSbeEnabled = feature_flags::gFeatureFlagSearchInSbe.isEnabled(
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     auto forceClassicEngine =
-        QueryKnobConfiguration::decoration(expCtx->opCtx).getInternalQueryFrameworkControlForOp() ==
+        expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp() ==
         QueryFrameworkControlEnum::kForceClassicEngine;
 
     return firstStageIsSearch && searchInSbeEnabled && !forceClassicEngine;

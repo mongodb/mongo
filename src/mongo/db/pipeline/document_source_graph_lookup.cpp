@@ -533,7 +533,7 @@ void DocumentSourceGraphLookUp::performSearch() {
     // Query settings are looked up after parsing and therefore are not populated in the
     // '_fromExpCtx' as part of DocumentSourceGraphLookUp constructor. Assign query settings to the
     // '_fromExpCtx' by copying them from the parent query ExpressionContext.
-    _fromExpCtx->setQuerySettings(pExpCtx->getQuerySettings());
+    setQuerySettingsIfNeeded(_fromExpCtx, pExpCtx->getQuerySettings());
 
     try {
         doBreadthFirstSearch();
@@ -900,4 +900,16 @@ void DocumentSourceGraphLookUp::addInvolvedCollections(
         stage->addInvolvedCollections(collectionNames);
     }
 }
+
+void DocumentSourceGraphLookUp::setQuerySettingsIfNeeded(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const query_settings::QuerySettings& querySettings) {
+    if (_didSetQuerySettingsToPipeline) {
+        return;
+    }
+
+    expCtx->setQuerySettings(querySettings);
+    _didSetQuerySettingsToPipeline = true;
+}
+
 }  // namespace mongo

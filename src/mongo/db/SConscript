@@ -1943,6 +1943,7 @@ env.Library(
         'query/collation/collator_factory_interface',
         'query/collation/collator_interface',
         'query/datetime/date_time_support',
+        'query/query_knob_configuration',
         'query/query_knobs',
         'query/query_settings/query_settings',
         'query/query_shape/query_shape_common',

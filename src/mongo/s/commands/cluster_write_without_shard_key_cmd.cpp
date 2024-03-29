@@ -491,12 +491,13 @@ public:
             const auto millisElapsed = timer.millis();
 
             auto bodyBuilder = result->getBodyBuilder();
-            uassertStatusOK(ClusterExplain::buildExplainResult(opCtx,
-                                                               {response},
-                                                               ClusterExplain::kWriteOnShards,
-                                                               millisElapsed,
-                                                               writeCmdObj,
-                                                               &bodyBuilder));
+            uassertStatusOK(ClusterExplain::buildExplainResult(
+                ExpressionContext::makeBlankExpressionContext(opCtx, ns()),
+                {response},
+                ClusterExplain::kWriteOnShards,
+                millisElapsed,
+                writeCmdObj,
+                &bodyBuilder));
         }
 
         NamespaceString ns() const override {

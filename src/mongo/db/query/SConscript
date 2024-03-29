@@ -28,9 +28,9 @@ env.SConscript(
 )
 
 env.Library(
-    target='query_decorations',
+    target='query_knob_configuration',
     source=[
-        'query_decorations.cpp',
+        'query_knob_configuration.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/mongohasher',
@@ -58,7 +58,6 @@ env.Library(
         'collation/collator_factory_interface',
         'collation/collator_interface',
         'projection_ast',
-        'query_decorations',
         'sort_pattern',
     ],
     LIBDEPS_PRIVATE=[

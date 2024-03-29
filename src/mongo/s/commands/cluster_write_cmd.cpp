@@ -575,12 +575,13 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
     BatchItemRef targetingBatchItem(requestPtr, 0);
     std::vector<AsyncRequestsSender::Response> shardResponses;
     commandOpWrite(opCtx, nss, explainCmd, targetingBatchItem, &shardResponses);
-    uassertStatusOK(ClusterExplain::buildExplainResult(opCtx,
-                                                       shardResponses,
-                                                       ClusterExplain::kWriteOnShards,
-                                                       timer.millis(),
-                                                       requestBSON,
-                                                       &bodyBuilder));
+    uassertStatusOK(ClusterExplain::buildExplainResult(
+        ExpressionContext::makeBlankExpressionContext(opCtx, nss),
+        shardResponses,
+        ClusterExplain::kWriteOnShards,
+        timer.millis(),
+        requestBSON,
+        &bodyBuilder));
 }
 
 bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,

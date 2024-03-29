@@ -157,6 +157,7 @@ public:
             // applied on the shards.
             auto querySettings =
                 query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns());
+            expCtx->setQuerySettings(querySettings);
             findCommand = std::move(parsedFind->findCommandRequest);
 
             try {
@@ -189,7 +190,7 @@ public:
                     ClusterExplain::getStageNameForReadOp(shardResponses.size(), _request.body);
 
                 auto bodyBuilder = result->getBodyBuilder();
-                uassertStatusOK(ClusterExplain::buildExplainResult(opCtx,
+                uassertStatusOK(ClusterExplain::buildExplainResult(expCtx,
                                                                    shardResponses,
                                                                    mongosStageName,
                                                                    millisElapsed,

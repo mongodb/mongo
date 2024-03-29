@@ -33,7 +33,7 @@
 
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/query_decorations.h"
+#include "mongo/db/query/query_knob_configuration.h"
 
 namespace mongo {
 class CanonicalQuery;

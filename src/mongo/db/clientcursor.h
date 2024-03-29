@@ -643,5 +643,7 @@ void startClientCursorMonitor();
  * getMore requests), so these should only be called from those request paths.
  */
 void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& cursor);
-void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stats::Key> key);
+void collectQueryStatsMongod(OperationContext* opCtx,
+                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                             std::unique_ptr<query_stats::Key> key);
 }  // namespace mongo

@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/explain_common.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/query/query_decorations.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
@@ -51,7 +51,8 @@ void generateServerInfo(BSONObjBuilder* out) {
     serverBob.doneFast();
 }
 
-void generateServerParameters(OperationContext* opCtx, BSONObjBuilder* out) {
+void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              BSONObjBuilder* out) {
     BSONObjBuilder serverBob(out->subobjStart("serverParameters"));
     out->appendNumber("internalQueryFacetBufferSizeBytes",
                       internalQueryFacetBufferSizeBytes.load());
@@ -68,8 +69,7 @@ void generateServerParameters(OperationContext* opCtx, BSONObjBuilder* out) {
     out->appendNumber("internalQueryMaxAddToSetBytes", internalQueryMaxAddToSetBytes.load());
     out->appendNumber("internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
                       internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load());
-    auto queryControl =
-        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+    auto queryControl = expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
     out->append("internalQueryFrameworkControl", QueryFrameworkControl_serializer(queryControl));
 }
 

@@ -606,7 +606,7 @@ public:
 
             auto bodyBuilder = result->getBodyBuilder();
             uassertStatusOK(ClusterExplain::buildExplainResult(
-                opCtx,
+                ExpressionContext::makeBlankExpressionContext(opCtx, nss),
                 responses,
                 parsedInfoFromRequest.sort ? ClusterExplain::kMergeSortFromShards
                                            : ClusterExplain::kMergeFromShards,

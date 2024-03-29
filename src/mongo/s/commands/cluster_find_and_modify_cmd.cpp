@@ -701,7 +701,12 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
         *shardId, response, shard->getConnString().getServers().front()};
 
     return ClusterExplain::buildExplainResult(
-        opCtx, {arsResponse}, ClusterExplain::kSingleShard, millisElapsed, cmdObj, &bodyBuilder);
+        ExpressionContext::makeBlankExpressionContext(opCtx, nss),
+        {arsResponse},
+        ClusterExplain::kSingleShard,
+        millisElapsed,
+        cmdObj,
+        &bodyBuilder);
 }
 
 bool FindAndModifyCmd::run(OperationContext* opCtx,

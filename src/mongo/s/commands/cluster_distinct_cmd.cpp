@@ -256,7 +256,12 @@ public:
             ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
 
         return ClusterExplain::buildExplainResult(
-            opCtx, shardResponses, mongosStageName, millisElapsed, cmdObj, &bodyBuilder);
+            ExpressionContext::makeBlankExpressionContext(opCtx, nss),
+            shardResponses,
+            mongosStageName,
+            millisElapsed,
+            cmdObj,
+            &bodyBuilder);
     }
 
     bool run(OperationContext* opCtx,

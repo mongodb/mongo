@@ -315,7 +315,12 @@ public:
 
         auto bodyBuilder = result->getBodyBuilder();
         return ClusterExplain::buildExplainResult(
-            opCtx, shardResponses, mongosStageName, millisElapsed, cmdObj, &bodyBuilder);
+            ExpressionContext::makeBlankExpressionContext(opCtx, nss),
+            shardResponses,
+            mongosStageName,
+            millisElapsed,
+            cmdObj,
+            &bodyBuilder);
     }
 
 private:

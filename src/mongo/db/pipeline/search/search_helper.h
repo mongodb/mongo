@@ -160,7 +160,7 @@ void establishSearchQueryCursors(boost::intrusive_ptr<ExpressionContext> expCtx,
  * Encode $search/$searchMeta to SBE plan cache.
  * Returns true if $search/$searchMeta is at the front of the 'pipeline' and encoding is done.
  */
-bool encodeSearchForSbeCache(const ExpressionContext* expCtx,
+bool encodeSearchForSbeCache(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                              DocumentSource* ds,
                              BufBuilder* bufBuilder);
 /**

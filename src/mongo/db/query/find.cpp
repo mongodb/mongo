@@ -108,7 +108,10 @@ void endQueryOp(OperationContext* opCtx,
     if (cursor) {
         collectQueryStatsMongod(opCtx, *cursor);
     } else {
-        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsInfo.key));
+        auto* cq = exec.getCanonicalQuery();
+        const auto& expCtx =
+            cq ? cq->getExpCtx() : ExpressionContext::makeBlankExpressionContext(opCtx, exec.nss());
+        collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().queryStatsInfo.key));
     }
 
     if (collection) {

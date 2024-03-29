@@ -92,7 +92,7 @@ enum class Optimizer {
  * Wrapper that encodes pipelines that are eligible for the Bonsai plan cache.
  */
 CanonicalQuery::QueryShapeString encodePipeline(
-    const ExpressionContext* expCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const std::vector<boost::intrusive_ptr<DocumentSource>>& pipelineStages,
     Optimizer optimizer);
 

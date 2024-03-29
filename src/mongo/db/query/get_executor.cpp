@@ -137,8 +137,8 @@
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
-#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -1184,7 +1184,7 @@ std::unique_ptr<PlannerInterface> getSbePlannerForSbe(
 bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, const bool sbeFull) {
     // When featureFlagSbeFull is not enabled, we cannot use SBE unless 'trySbeEngine' is enabled or
     // if 'trySbeRestricted' is enabled, and we have eligible pushed down stages in the cq pipeline.
-    auto& queryKnob = QueryKnobConfiguration::decoration(opCtx);
+    auto& queryKnob = cq.getExpCtx()->getQueryKnobConfiguration();
     if (!queryKnob.canPushDownFullyCompatibleStages() && cq.cqPipeline().empty()) {
         return false;
     }
@@ -1211,8 +1211,7 @@ bool shouldAttemptSBE(const CanonicalQuery* canonicalQuery) {
         return *queryFramework == QueryFrameworkControlEnum::kTrySbeEngine;
     }
 
-    return !QueryKnobConfiguration::decoration(canonicalQuery->getOpCtx())
-                .isForceClassicEngineEnabled();
+    return !canonicalQuery->getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled();
 }
 
 boost::optional<ScopedCollectionFilter> getScopedCollectionFilter(
@@ -1267,7 +1266,8 @@ boost::optional<ExecParams> tryGetBonsaiParams(OperationContext* opCtx,
     auto eligibility =
         determineBonsaiEligibility(opCtx, collections.getMainCollection(), *canonicalQuery);
     const bool hasExplain = canonicalQuery->getExplain().has_value();
-    if (!isEligibleForBonsaiUnderFrameworkControl(opCtx, hasExplain, eligibility)) {
+    if (!isEligibleForBonsaiUnderFrameworkControl(
+            canonicalQuery->getExpCtx(), hasExplain, eligibility)) {
         return boost::none;
     }
 
@@ -1285,8 +1285,9 @@ boost::optional<ExecParams> tryGetBonsaiParams(OperationContext* opCtx,
         return execParams;
     }
 
-    auto queryControl =
-        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+    auto queryControl = canonicalQuery->getExpCtx()
+                            ->getQueryKnobConfiguration()
+                            .getInternalQueryFrameworkControlForOp();
     auto hasHint = !canonicalQuery->getFindCommandRequest().getHint().isEmpty();
     tassert(7319400,
             "Optimization failed either with forceBonsai set, or without a hint.",

@@ -61,7 +61,7 @@
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_decorations.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -102,10 +102,9 @@ void generatePlannerInfo(PlanExecutor* exec,
     boost::optional<uint32_t> queryHash;
     boost::optional<uint32_t> planCacheKeyHash;
     const auto& mainCollection = collections.getMainCollection();
-    if (mainCollection && exec->getCanonicalQuery()) {
-        if (exec->getCanonicalQuery()->isSbeCompatible() &&
-            !QueryKnobConfiguration::decoration(exec->getCanonicalQuery()->getOpCtx())
-                 .isForceClassicEngineEnabled()) {
+    if (auto* cq = exec->getCanonicalQuery(); mainCollection && cq) {
+        if (cq->isSbeCompatible() &&
+            !cq->getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled()) {
             const auto planCacheKeyInfo = plan_cache_key_factory::make(
                 *exec->getCanonicalQuery(),
                 collections,
@@ -451,7 +450,12 @@ void Explain::explainPipeline(PlanExecutor* exec,
     *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
 
     explain_common::generateServerInfo(out);
-    explain_common::generateServerParameters(exec->getOpCtx(), out);
+
+    auto* cq = exec->getCanonicalQuery();
+    const auto& expCtx = cq
+        ? cq->getExpCtx()
+        : ExpressionContext::makeBlankExpressionContext(exec->getOpCtx(), exec->nss());
+    explain_common::generateServerParameters(expCtx, out);
 
     explain_common::appendIfRoom(command, "command", out);
 }
@@ -496,7 +500,11 @@ void Explain::explainStages(PlanExecutor* exec,
                   out);
 
     explain_common::generateServerInfo(out);
-    explain_common::generateServerParameters(exec->getOpCtx(), out);
+    auto* cq = exec->getCanonicalQuery();
+    const auto& expCtx = cq
+        ? cq->getExpCtx()
+        : ExpressionContext::makeBlankExpressionContext(exec->getOpCtx(), exec->nss());
+    explain_common::generateServerParameters(expCtx, out);
 }
 
 void Explain::explainStages(PlanExecutor* exec,

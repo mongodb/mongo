@@ -47,7 +47,7 @@
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/cursor_server_params.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/query_decorations.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -460,7 +460,9 @@ void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCur
     pinnedCursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
 }
 
-void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stats::Key> key) {
+void collectQueryStatsMongod(OperationContext* opCtx,
+                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                             std::unique_ptr<query_stats::Key> key) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // query stats directly.
     auto& opDebug = CurOp::get(opCtx)->debug();
@@ -474,9 +476,9 @@ void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stat
 
     if (internalQueryCollectOptimizerMetrics.load()) {
         auto metricType(query_stats::SupplementalMetricType::Unknown);
-        const auto frameworkControlKnob =
-            QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
 
+        const auto frameworkControlKnob =
+            expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
         switch (opDebug.queryFramework) {
             case PlanExecutor::QueryFramework::kClassicOnly:
             case PlanExecutor::QueryFramework::kClassicHybrid:

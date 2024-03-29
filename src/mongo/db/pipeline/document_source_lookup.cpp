@@ -671,7 +671,7 @@ PipelinePtr DocumentSourceLookUp::buildPipeline(
     // Query settings are looked up after parsing and therefore are not populated in the
     // 'fromExpCtx' as part of DocumentSourceLookUp constructor. Assign query settings to the
     // 'fromExpCtx' by copying them from the parent query ExpressionContext.
-    fromExpCtx->setQuerySettings(getContext()->getQuerySettings());
+    setQuerySettingsIfNeeded(fromExpCtx, getContext()->getQuerySettings());
 
     // Resolve the 'let' variables to values per the given input document.
     resolveLetVariables(inputDoc, &fromExpCtx->variables);
@@ -1485,6 +1485,17 @@ void DocumentSourceLookUp::addInvolvedCollections(
     for (auto&& stage : _resolvedIntrospectionPipeline->getSources()) {
         stage->addInvolvedCollections(collectionNames);
     }
+}
+
+void DocumentSourceLookUp::setQuerySettingsIfNeeded(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const query_settings::QuerySettings& querySettings) {
+    if (_didSetQuerySettingsToPipeline) {
+        return;
+    }
+
+    expCtx->setQuerySettings(querySettings);
+    _didSetQuerySettingsToPipeline = true;
 }
 
 }  // namespace mongo

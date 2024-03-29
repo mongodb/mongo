@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 
 namespace mongo {
 /**
@@ -38,32 +39,37 @@ namespace mongo {
  */
 class QueryKnobConfiguration {
 public:
-    static const OperationContext::Decoration<QueryKnobConfiguration> decoration;
+    /**
+     * NOTE: QueryKnobConfiguration construction requires 'querySettings', because settings may
+     * override the query knob values.
+     */
+    QueryKnobConfiguration(const query_settings::QuerySettings& querySettings);
 
-    QueryFrameworkControlEnum getInternalQueryFrameworkControlForOp();
-    bool getSbeDisableGroupPushdownForOp();
-    bool getSbeDisableLookupPushdownForOp();
-    bool getSbeDisableTimeSeriesForOp();
-    /** Returns true if internal query framework control knob is set to 'forceClassicEngine', false
-     * otherwise.*/
-    bool isForceClassicEngineEnabled();
-    size_t getPlanEvaluationMaxResultsForOp();
-    size_t getMaxScansToExplodeForOp();
+    QueryFrameworkControlEnum getInternalQueryFrameworkControlForOp() const;
+    bool getSbeDisableGroupPushdownForOp() const;
+    bool getSbeDisableLookupPushdownForOp() const;
+    bool getSbeDisableTimeSeriesForOp() const;
+
+    /**
+     * Returns true if internal query framework control knob is set to 'forceClassicEngine', false
+     * otherwise.
+     */
+    bool isForceClassicEngineEnabled() const;
+    size_t getPlanEvaluationMaxResultsForOp() const;
+    size_t getMaxScansToExplodeForOp() const;
+
     /**
      * Returns whether we can push down fully compatible stages to sbe. This is only true when the
      * query knob is 'trySbeEngine'.
      */
-    bool canPushDownFullyCompatibleStages();
+    bool canPushDownFullyCompatibleStages() const;
 
 private:
-    void _tryToSetAllValues();
-
-    bool _isSet = false;
-    bool _sbeDisableGroupPushdownValue;
-    bool _sbeDisableLookupPushdownValue;
-    bool _sbeDisableTimeSeriesValue;
     QueryFrameworkControlEnum _queryFrameworkControlValue;
     size_t _planEvaluationMaxResults;
     size_t _maxScansToExplodeValue;
+    bool _sbeDisableGroupPushdownValue;
+    bool _sbeDisableLookupPushdownValue;
+    bool _sbeDisableTimeSeriesValue;
 };
 }  // namespace mongo

@@ -491,7 +491,7 @@ void establishSearchMetaCursor(const boost::intrusive_ptr<ExpressionContext>& ex
     }
 }
 
-bool encodeSearchForSbeCache(const ExpressionContext* expCtx,
+bool encodeSearchForSbeCache(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                              DocumentSource* ds,
                              BufBuilder* bufBuilder) {
     if ((!isSearchStage(ds) && !isSearchMetaStage(ds))) {

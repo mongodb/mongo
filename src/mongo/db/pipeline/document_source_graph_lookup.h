@@ -280,6 +280,12 @@ private:
      */
     bool foreignShardedGraphLookupAllowed() const;
 
+    /**
+     * Sets 'querySettings' to 'expCtx' if they were not previously set.
+     */
+    void setQuerySettingsIfNeeded(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  const query_settings::QuerySettings& querySettings);
+
     // $graphLookup options.
     NamespaceString _from;
     FieldPath _as;
@@ -331,6 +337,11 @@ private:
     // '_fromPipeline' execution.
     Variables _variables;
     VariablesParseState _variablesParseState;
+
+    // Flag, indicating if query settings were set to the '_fromExpCtx'. This is needed to avoid
+    // setting query settings multiple time, which results in assertion failure in cases when query
+    // knobs have already been initialized with the previous query settings.
+    bool _didSetQuerySettingsToPipeline = false;
 };
 
 }  // namespace mongo

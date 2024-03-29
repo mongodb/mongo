@@ -66,10 +66,12 @@
 #include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/query/util/deferred.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/unordered_set.h"
@@ -669,8 +671,15 @@ public:
         return _querySettings;
     }
 
+    const QueryKnobConfiguration& getQueryKnobConfiguration() const {
+        return _queryKnobConfiguration.get(_querySettings);
+    }
+
     void setQuerySettings(query_settings::QuerySettings querySettings) {
         _querySettings = std::move(querySettings);
+        tassert(8827100,
+                "Query knobs shouldn't be initialized before query settings are set",
+                !_queryKnobConfiguration.isInitialized());
     }
 
     // Forces the plan cache to be used even if there's only one solution available. Queries that
@@ -803,6 +812,11 @@ private:
     stdx::unordered_set<Variables::Id> _systemVarsReferencedInQuery;
 
     query_settings::QuerySettings _querySettings = query_settings::QuerySettings();
+
+    DeferredFn<QueryKnobConfiguration, const query_settings::QuerySettings&>
+        _queryKnobConfiguration{[](const auto& querySettings) {
+            return QueryKnobConfiguration(querySettings);
+        }};
 };
 
 }  // namespace mongo

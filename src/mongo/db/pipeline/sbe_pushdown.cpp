@@ -473,8 +473,10 @@ bool findSbeCompatibleStagesForPushdown(
     bool needsMerge,
     const Pipeline* pipeline,
     std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
+    const auto& queryKnob = cq->getExpCtx()->getQueryKnobConfiguration();
+
     // No pushdown if we're using the classic engine.
-    if (QueryKnobConfiguration::decoration(cq->getOpCtx()).isForceClassicEngineEnabled()) {
+    if (queryKnob.isForceClassicEngineEnabled()) {
         return false;
     }
 
@@ -484,8 +486,6 @@ bool findSbeCompatibleStagesForPushdown(
     if (const auto& mainColl = collections.getMainCollection()) {
         isMainCollectionSharded = mainColl.isSharded_DEPRECATED();
     }
-
-    auto& queryKnob = QueryKnobConfiguration::decoration(cq->getExpCtxRaw()->opCtx);
 
     const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());

@@ -104,7 +104,7 @@
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_decorations.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -443,7 +443,7 @@ static ExecParams createExecutor(
     // TODO SERVER-82709: Instead of using the framework control here, use the query eligibility
     // information.
     auto frameworkControl =
-        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+        expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
 
     ExplainVersion explainVersion = ExplainVersion::Vmax;
     const auto& explainVersionStr = internalCascadesOptimizerExplainVersion.get();

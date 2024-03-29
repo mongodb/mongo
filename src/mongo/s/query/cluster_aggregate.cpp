@@ -583,7 +583,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     if (request.getExplain()) {
         explain_common::generateServerInfo(result);
-        explain_common::generateServerParameters(opCtx, result);
+        explain_common::generateServerParameters(expCtx, result);
     }
 
     // Here we modify the original 'request' object by copying the query settings from 'expCtx' into
