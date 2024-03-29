@@ -79,6 +79,15 @@ namespace mongo {
 
 namespace decorable_detail {
 
+template <typename T>
+constexpr inline bool pretendTrivialInit = false;
+template <typename T>
+constexpr inline bool pretendTrivialInit<std::unique_ptr<T>> = true;
+template <typename T>
+constexpr inline bool pretendTrivialInit<std::shared_ptr<T>> = true;
+template <typename T>
+constexpr inline bool pretendTrivialInit<boost::optional<T>> = true;
+
 struct LifecycleOperations {
     using CtorFn = void(void*);
     using DtorFn = void(void*);
@@ -87,7 +96,7 @@ struct LifecycleOperations {
 
     template <typename T>
     static constexpr CtorFn* getCtor() {
-        if constexpr (!std::is_trivially_constructible_v<T>)
+        if constexpr (!std::is_trivially_constructible_v<T> && !pretendTrivialInit<T>)
             return +[](void* p) {
                 new (p) T;
             };

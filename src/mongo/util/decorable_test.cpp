@@ -29,6 +29,7 @@
 
 #include <cstdint>
 #include <fmt/format.h>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -265,6 +266,96 @@ TEST_F(DecorableTest, Overaligned) {
     static auto d = X::declareDecoration<Overaligned>();
 }
 #endif  // 0
+
+/**
+ * Tests that a type that `decorable_detail::pretendTrivialInit` resolves to false for is properly
+ * constructed.
+ */
+TEST_F(DecorableTest, DoNotZeroInitOther) {
+    struct X : Decorable<X> {};
+    class B : public A {
+    public:
+        B() : A() {
+            value = 123;
+        }
+    };
+    static auto decorator = X::declareDecoration<B>();
+    ASSERT_EQ(stats.constructed, 0);
+    X x;
+    ASSERT_EQ(stats.constructed, 1);
+    ASSERT_EQ(x[decorator].value, 123);
+}
+
+class DecorableZeroInitTest : public DecorableTest {
+public:
+    // Test decorated type needs copy assign and constructor removed so that types without copy
+    // assign or constructor can be used as decorations (such as std::unique_ptr).
+    struct X : Decorable<X> {
+        X(const X&) = delete;
+        X& operator=(const X&) = delete;
+        X() = default;
+    };
+
+    template <typename DecorationType>
+    bool isZeroBytes(const DecorationType& decoObj) {
+        auto first = reinterpret_cast<const unsigned char*>(&decoObj);
+        auto last = first + sizeof(decoObj);
+        return std::find_if(first, last, [](auto c) { return c != 0; }) == last;
+    }
+
+    /**
+     * Tests that value initializing the template type does not change the already zeroed buffer.
+     * This ensures that construction of these types can safely be skipped.
+     */
+    template <typename T>
+    void doBufferNoChangeTest() {
+        auto buf = std::make_unique<std::array<unsigned char, sizeof(T)>>();
+        invariant(isZeroBytes(*buf));
+        invariant(reinterpret_cast<std::uintptr_t>(buf.get()) % alignof(T) == 0);
+        auto ptr = new (buf->data()) T{};
+        ScopeGuard ptrCleanup = [&] {
+            ptr->~T();
+        };
+        ASSERT(isZeroBytes(*buf));
+    }
+
+    /**
+     * Helper to test that constructors of the types used in `decorable_detail::pretendTrivialInit`
+     * do not change the zeroed out decoration buffer.
+     */
+    template <typename DecorationType>
+    void doZeroInitTest() {
+        static auto decorator = X::template declareDecoration<DecorationType>();
+        auto x = std::make_unique<X>();
+
+        auto&& decorationObj = (*x)[decorator];
+        ASSERT(isZeroBytes(decorationObj));
+    }
+};
+
+TEST_F(DecorableZeroInitTest, BufferNoChangeBoostOptional) {
+    doBufferNoChangeTest<boost::optional<A>>();
+}
+
+TEST_F(DecorableZeroInitTest, BufferNoChangeStdUniquePtr) {
+    doBufferNoChangeTest<std::unique_ptr<A>>();
+}
+
+TEST_F(DecorableZeroInitTest, BufferNoChangeStdSharedPtr) {
+    doBufferNoChangeTest<std::shared_ptr<A>>();
+}
+
+TEST_F(DecorableZeroInitTest, ZeroInitBoostOptionalDecoration) {
+    doZeroInitTest<boost::optional<A>>();
+}
+
+TEST_F(DecorableZeroInitTest, ZeroInitStdUniquePtrDecoration) {
+    doZeroInitTest<std::unique_ptr<A>>();
+}
+
+TEST_F(DecorableZeroInitTest, ZeroInitStdSharedPtrDecoration) {
+    doZeroInitTest<std::shared_ptr<A>>();
+}
 
 }  // namespace
 }  // namespace mongo
