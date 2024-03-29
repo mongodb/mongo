@@ -15,6 +15,7 @@ import {
     getAggregateQueryStatsKey,
     runForEachDeployment,
 } from "jstests/libs/query_stats_utils.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/sbe_util.js";
 
 let collId = 0;
 function getNewCollectionName() {
@@ -87,13 +88,27 @@ function runUnindexedLookupPipelineTest(conn, localColl) {
         const queryStats =
             exhaustCursorAndGetQueryStats(conn, localColl, cmd, queryStatsKey, expectedDocs);
 
-        // In the sharded case, the lookup is a collection scan against the foreign collection
-        // for each document in the local collection. So, we examine each local document
-        // once, and each foreign document N times where N is the number of local documents.
-        // This gives N_{local} + N_{local} * N_{foreign} = 7 + 7*3 = 28.
-        // In unsharded and standalone cases, this done with an `EQ_LOOKUP` stage with a `HashJoin`
-        // strategy that examines N_{local} + N_{foreign} = 10 documents.
-        const expectedDocsExamined = FixtureHelpers.isSharded(localColl) ? 28 : 10;
+        // There are two cases for expectedDocs:
+        // 1. The query can be a collection scan against the foreign collection for each doc in
+        // the local collection. Each local doc is examined once and each foreign doc is examined
+        // once for each local doc, giving N_{local} + N_{local} * N_{foreign} = 7 + 7*3 = 28.
+        // 2. The query can have an EQ_LOOKUP stage with a HashJoin strategy. This examines
+        // N_{local} + N_{foreign} = 10 documents.
+        //
+        // For the classic engine, it's always case 1. For SBE, a sharded collection gives case 2,
+        // an unsharded collection gives case 1.
+        const expectedDocsExamined = (() => {
+            if (checkSbeCompletelyDisabled(conn.getDB("test"))) {
+                // Classic engine.
+                return 28;
+            } else if (FixtureHelpers.isSharded(localColl)) {
+                // SBE, sharded collection.
+                return 28;
+            } else {
+                // SBE, not sharded.
+                return 10;
+            }
+        })();
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 0,
             docsExamined: expectedDocsExamined,

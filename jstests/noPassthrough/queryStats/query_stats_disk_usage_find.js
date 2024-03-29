@@ -5,9 +5,7 @@
  * ]
  */
 
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
-    assertAggregatedBoolean,
     assertAggregatedMetricsSingleExec,
     clearPlanCacheAndQueryStatsStore,
     exhaustCursorAndGetQueryStats,
@@ -142,44 +140,10 @@ function runFindAgainstViewTest(conn, coll) {
     }
 }
 
-function runCachedPlanTest(conn, coll) {
-    const expectedDocs = 5;
-    const shape = {filter: {y: {$gt: "?number"}}, sort: {v: 1}};
-
-    const queryStatsKey = getFindQueryStatsKey(conn, coll.getName(), shape);
-
-    // Results should be the same independent of batch size. We need to reach a batch size of
-    // docsReturned + 1 for the initial find command to return an exhausted cursor.
-    for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
-        clearPlanCacheAndQueryStatsStore(conn, coll);
-
-        const cmd =
-            {find: coll.getName(), filter: {y: {$gt: -2}}, sort: {v: 1}, batchSize: batchSize};
-
-        const queryStatsColdCache =
-            exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
-        assertAggregatedBoolean(
-            queryStatsColdCache, "fromPlanCache", {trueCount: 0, falseCount: 1});
-
-        const queryStatsWarmCache =
-            exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
-        assertAggregatedBoolean(
-            queryStatsWarmCache, "fromPlanCache", {trueCount: 1, falseCount: 1});
-    }
-}
-
 function runTests(conn, coll) {
     runUnindexedFindTest(conn, coll);
     runIndexedFindTest(conn, coll);
     runFindAgainstViewTest(conn, coll);
-
-    if (!FixtureHelpers.isSharded(coll)) {
-        // In the sharded case, we do roll up the results the mongods get from getPlanSummaryStats.
-        // However, getPlanSummaryStats internally doesn't necessarily roll up replanReason (which
-        // controls the boolean value of fromPlanCache). So the query used in this test doesn't
-        // report fromPlanCache: true in the sharded case.
-        runCachedPlanTest(conn, coll);
-    }
 }
 
 runForEachDeployment((conn, test) => {

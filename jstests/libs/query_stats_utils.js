@@ -260,7 +260,11 @@ export function assertExpectedResults(results,
     for (const field of distributionFields) {
         assert.neq(totalExecMicros[field], NumberLong(0));
         assert.neq(firstResponseExecMicros[field], NumberLong(0));
-        if (getMores) {
+        if (metrics.execCount > 1) {
+            // If there are prior executions of the same query shape, we can't be certain if those
+            // runs had getMores or not, so we can only check totalExec >= firstResponse.
+            assert.gte(totalExecMicros[field], firstResponseExecMicros[field]);
+        } else if (getMores) {
             // If there are getMore calls, totalExecMicros fields should be greater than or equal to
             // firstResponseExecMicros.
             if (field == 'min' || field == 'max') {
@@ -624,10 +628,13 @@ export function exhaustCursorAndGetQueryStats(conn, coll, cmd, key, expectedDocs
     let cursor = initialResult.cursor;
     let allResults = cursor.firstBatch;
 
-    const expectGetMores = batchSize <= expectedDocs;
-    if (expectGetMores) {
+    // When batchSize equals expectedDocs, we may or may not get cursor ID 0 in the initial
+    // response depending on the exact query. However, if it is strictly greater or less than,
+    // we assert on whether or not the initial batch exhausts the cursor.
+    const expectGetMores = cursor.id != 0;
+    if (batchSize < expectedDocs) {
         assert.neq(0, cursor.id, "Cursor unexpectedly exhausted in initial batch");
-    } else {
+    } else if (batchSize > expectedDocs) {
         assert.eq(
             0, cursor.id, "Initial batch unexpectedly wasn't sufficient to exhaust the cursor");
     }
