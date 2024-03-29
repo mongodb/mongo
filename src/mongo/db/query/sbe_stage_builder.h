@@ -172,7 +172,7 @@ public:
         using is_transparent = void;
     };
 
-    using SlotNameMap = absl::flat_hash_map<OwnedSlotName, TypedSlot, NameHasher, NameEq>;
+    using SlotNameMap = absl::flat_hash_map<OwnedSlotName, SbSlot, NameHasher, NameEq>;
     using SlotNameSet = absl::flat_hash_set<OwnedSlotName, NameHasher, NameEq>;
 
     using PlanStageTree = std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>;
@@ -262,7 +262,7 @@ public:
 
     // Returns the slot corresponding to 'name'. This method will raise a tassert if
     // this PlanStageSlots does not have a mapping for 'name'.
-    TypedSlot get(const UnownedSlotName& name) const {
+    SbSlot get(const UnownedSlotName& name) const {
         auto it = _data->slotNameToIdMap.find(name);
         invariant(it != _data->slotNameToIdMap.end());
         return it->second;
@@ -270,7 +270,7 @@ public:
 
     // Returns the slot corresponding to 'name' if this PlanStageSlot has a mapping for 'name',
     // otherwise returns boost::none.
-    boost::optional<TypedSlot> getIfExists(const UnownedSlotName& name) const {
+    boost::optional<SbSlot> getIfExists(const UnownedSlotName& name) const {
         if (auto it = _data->slotNameToIdMap.find(name); it != _data->slotNameToIdMap.end()) {
             return it->second;
         }
@@ -278,7 +278,7 @@ public:
     }
 
     // This method is like getIfExists(), except that it returns 'boost::optional<SlotId>'
-    // instead of 'boost::optional<TypedSlot>'.
+    // instead of 'boost::optional<SbSlot>'.
     boost::optional<sbe::value::SlotId> getSlotIfExists(const UnownedSlotName& name) const {
         if (auto it = _data->slotNameToIdMap.find(name); it != _data->slotNameToIdMap.end()) {
             return it->second.slotId;
@@ -287,10 +287,10 @@ public:
     }
 
     // Maps 'name' to 'slot' and clears any prior mapping the 'name' may have had.
-    void set(const UnownedSlotName& name, TypedSlot slot) {
+    void set(const UnownedSlotName& name, SbSlot slot) {
         _data->slotNameToIdMap.insert_or_assign(name, slot);
     }
-    void set(OwnedSlotName name, TypedSlot slot) {
+    void set(OwnedSlotName name, SbSlot slot) {
         _data->slotNameToIdMap.insert_or_assign(std::move(name), slot);
     }
 
@@ -396,7 +396,7 @@ public:
 
     // Returns the slot that holds the materialized result object. This method will tassert
     // if 'hasResultObj()' is false.
-    TypedSlot getResultObj() const {
+    SbSlot getResultObj() const {
         tassert(8428000, "Expected result object to be set", hasResultObj());
 
         auto it = _data->slotNameToIdMap.find(kResult);
@@ -407,7 +407,7 @@ public:
 
     // If 'hasResultObj()' is true this method returns the slot that holds the materialized result
     // object, otherwise it will return boost::none.
-    boost::optional<TypedSlot> getResultObjIfExists() const {
+    boost::optional<SbSlot> getResultObjIfExists() const {
         if (hasResultObj()) {
             return getResultObj();
         }
@@ -415,7 +415,7 @@ public:
     }
 
     // This method is like getResultObjIfExists(), except that it returns 'boost::optional<SlotId>'
-    // instead of 'boost::optional<TypedSlot>'.
+    // instead of 'boost::optional<SbSlot>'.
     boost::optional<sbe::value::SlotId> getResultObjSlotIfExists() const {
         if (hasResultObj()) {
             return getResultObj().slotId;
@@ -426,7 +426,7 @@ public:
     // Maps kResult to 'slot', designates kResult as being a "materialized result object", and
     // clears any prior mapping or designation that kResult may have had. setResultObj() also
     // clears any ResultInfo-related state that may have been set.
-    void setResultObj(TypedSlot slot) {
+    void setResultObj(SbSlot slot) {
         set(kResult, slot);
         _data->resultInfoChanges.reset();
     }
@@ -439,7 +439,7 @@ public:
 
     // Returns the slot that holds the ResultInfo base object. This method will tassert if
     // 'hasResultInfo()' is false.
-    TypedSlot getResultInfoBaseObj() const {
+    SbSlot getResultInfoBaseObj() const {
         tassert(8428001, "Expected ResultInfo to be set", hasResultInfo());
 
         auto it = _data->slotNameToIdMap.find(kResult);
@@ -450,7 +450,7 @@ public:
 
     // If 'hasResultInfo()' is true this method returns the slot that holds the ResultInfo base
     // object, otherwise it will return boost::none.
-    boost::optional<TypedSlot> getResultInfoBaseObjIfExists() const {
+    boost::optional<SbSlot> getResultInfoBaseObjIfExists() const {
         if (hasResultInfo()) {
             return getResultInfoBaseObj();
         }
@@ -460,7 +460,7 @@ public:
     // Maps kResult to 'slot', designates kResult as being as a "ResultInfo base object", clears
     // any prior mapping or designation that kResult may have had, and sets 'resultInfoChanges' to
     // hold an empty list of changed fields.
-    void setResultInfoBaseObj(TypedSlot slot) {
+    void setResultInfoBaseObj(SbSlot slot) {
         set(kResult, slot);
         _data->resultInfoChanges.emplace();
     }
@@ -489,20 +489,20 @@ public:
 
     // Returns a list of slots that correspond pairwise to the list of names produced by calling
     // 'getRequiredNamesInOrder(reqs)'.
-    TypedSlotVector getRequiredSlotsInOrder(const PlanStageReqs& reqs) const;
+    SbSlotVector getRequiredSlotsInOrder(const PlanStageReqs& reqs) const;
 
     // This method returns a de-dupped list of all the slots that correspond to the names produced
     // calling by 'getRequiredNamesInOrder(reqs)'. The list returned by this method is sorted by
     // slot ID.
-    TypedSlotVector getRequiredSlotsUnique(const PlanStageReqs& reqs) const;
+    SbSlotVector getRequiredSlotsUnique(const PlanStageReqs& reqs) const;
 
     // Returns a sorted list of all the name->slot mappings in this PlanStageSlots, sorted by
     // slot name.
-    std::vector<std::pair<UnownedSlotName, TypedSlot>> getAllNameSlotPairsInOrder() const;
+    std::vector<std::pair<UnownedSlotName, SbSlot>> getAllNameSlotPairsInOrder() const;
 
     // This method calls getAllNameSlotPairsInOrder() and then returns a list of the slots only,
     // sorted by slot name.
-    TypedSlotVector getAllSlotsInOrder() const;
+    SbSlotVector getAllSlotsInOrder() const;
 
     // This method computes the list of required names 'L = getRequiredNamesInOrder(reqs)', and
     // then it adds a mapping 'N->NothingSlot' for each name N in list L where 'has(N)' is false.
@@ -1173,9 +1173,9 @@ std::unique_ptr<sbe::PlanStage> buildBlockToRow(std::unique_ptr<sbe::PlanStage> 
                                                 StageBuilderState& state,
                                                 PlanStageSlots& outputs);
 
-std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> buildBlockToRow(
+std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> buildBlockToRow(
     std::unique_ptr<sbe::PlanStage> stage,
     StageBuilderState& state,
     PlanStageSlots& outputs,
-    TypedSlotVector individualSlots);
+    SbSlotVector individualSlots);
 }  // namespace mongo::stage_builder

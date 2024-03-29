@@ -65,7 +65,7 @@ class PlanStageSlots;
  */
 SbExpr generateFilter(StageBuilderState& state,
                       const MatchExpression* root,
-                      boost::optional<TypedSlot> inputSlot,
+                      boost::optional<SbSlot> inputSlot,
                       const PlanStageSlots& slots,
                       const std::vector<std::string>& keyFields = {},
                       bool isFilterOverIxscan = false);

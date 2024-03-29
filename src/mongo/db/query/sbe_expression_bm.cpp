@@ -144,7 +144,7 @@ public:
         };
 
         auto rootSlot =
-            stage_builder::TypedSlot{_inputSlotId, stage_builder::TypeSignature::kAnyScalarType};
+            stage_builder::SbSlot{_inputSlotId, stage_builder::TypeSignature::kAnyScalarType};
 
         stage_builder::PlanStageSlots slots;
         slots.setResultObj(rootSlot);

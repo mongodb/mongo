@@ -141,15 +141,15 @@ void printPlan(const sbe::PlanStage& stage) {
 std::unique_ptr<sbe::PlanStage> buildBlockToRow(std::unique_ptr<sbe::PlanStage> stage,
                                                 StageBuilderState& state,
                                                 PlanStageSlots& outputs) {
-    auto [outStage, _] = buildBlockToRow(std::move(stage), state, outputs, TypedSlotVector{});
+    auto [outStage, _] = buildBlockToRow(std::move(stage), state, outputs, SbSlotVector{});
     return std::move(outStage);
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> buildBlockToRow(
+std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> buildBlockToRow(
     std::unique_ptr<sbe::PlanStage> stage,
     StageBuilderState& state,
     PlanStageSlots& outputs,
-    TypedSlotVector individualSlots) {
+    SbSlotVector individualSlots) {
     // For this stage we output the 'topLevelSlots' (i.e. kField) and NOT the 'traversedSlots' (i.e.
     // kFilterCellField).
     using UnownedSlotName = PlanStageSlots::UnownedSlotName;
@@ -161,7 +161,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> buildBlockToRow(
     std::vector<PlanStageSlots::UnownedSlotName> fieldNames, outputsToRemove;
     outputsToRemove.push_back(PlanStageSlots::kBlockSelectivityBitmap);
 
-    auto processSlot = [&](TypedSlot slot, boost::optional<UnownedSlotName> name) {
+    auto processSlot = [&](SbSlot slot, boost::optional<UnownedSlotName> name) {
         auto typeSig = slot.getTypeSignature();
         // If slot is a Block or Cell, add a mapping for it to 'blockIdToUnpackedIdMap'.
         if (typeSig &&
@@ -228,7 +228,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> buildBlockToRow(
             auto unpackedTypeSig =
                 typeSig->exclude(TypeSignature::kBlockType).exclude(TypeSignature::kCellType);
 
-            auto unpackedSlot = TypedSlot{it->second, unpackedTypeSig};
+            auto unpackedSlot = SbSlot{it->second, unpackedTypeSig};
             outputs.set(fieldName, unpackedSlot);
         }
     }
@@ -243,7 +243,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> buildBlockToRow(
             auto unpackedTypeSig =
                 typeSig->exclude(TypeSignature::kBlockType).exclude(TypeSignature::kCellType);
 
-            auto unpackedSlot = TypedSlot{it->second, unpackedTypeSig};
+            auto unpackedSlot = SbSlot{it->second, unpackedTypeSig};
             slot = unpackedSlot;
         }
     }
@@ -293,7 +293,7 @@ SbExpr buildVectorizedExpr(StageBuilderState& state,
         auto bitmapSlot = outputs.getSlotIfExists(PlanStageSlots::kBlockSelectivityBitmap);
 
         Vectorizer::VariableTypes bindings;
-        for (const TypedSlot& slot : outputs.getAllSlotsInOrder()) {
+        for (const SbSlot& slot : outputs.getAllSlotsInOrder()) {
             if (auto typeSig = slot.getTypeSignature()) {
                 bindings.emplace(getABTVariableName(slot), std::make_pair(*typeSig, boost::none));
             }
@@ -402,14 +402,14 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     for (size_t i = 0; i < topLevelReqs.size(); ++i) {
         auto field = getTopLevelField(topLevelReqs[i]);
         auto key = std::make_pair(PlanStageSlots::kField, field);
-        TypedSlot slot;
+        SbSlot slot;
         if (field == unpackNode->bucketSpec.timeField()) {
-            slot = TypedSlot{allCellSlots[i],
-                             TypeSignature::kCellType.include(TypeSignature::kDateTimeType)};
+            slot = SbSlot{allCellSlots[i],
+                          TypeSignature::kCellType.include(TypeSignature::kDateTimeType)};
             outputs.set(key, slot);
         } else {
-            slot = TypedSlot{allCellSlots[i],
-                             TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)};
+            slot = SbSlot{allCellSlots[i],
+                          TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)};
             outputs.set(key, slot);
         }
     }
@@ -419,12 +419,12 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         auto key = std::make_pair(PlanStageSlots::kFilterCellField, field);
         if (field == unpackNode->bucketSpec.timeField()) {
             outputs.set(key,
-                        TypedSlot{traversedCellSlots[i],
-                                  TypeSignature::kCellType.include(TypeSignature::kDateTimeType)});
+                        SbSlot{traversedCellSlots[i],
+                               TypeSignature::kCellType.include(TypeSignature::kDateTimeType)});
         } else {
             outputs.set(key,
-                        TypedSlot{traversedCellSlots[i],
-                                  TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)});
+                        SbSlot{traversedCellSlots[i],
+                               TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)});
         }
     }
 

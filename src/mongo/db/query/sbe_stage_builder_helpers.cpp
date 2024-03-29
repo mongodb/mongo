@@ -270,7 +270,7 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyTrue(std::unique_ptr<sbe::EExpres
     return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(true));
 }
 
-std::unique_ptr<sbe::EExpression> makeVariable(TypedSlot ts) {
+std::unique_ptr<sbe::EExpression> makeVariable(SbSlot ts) {
     return sbe::makeE<sbe::EVariable>(ts.slotId);
 }
 
@@ -694,15 +694,15 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
 }
 
 std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
-                                                     TypedSlot resultSlot,
-                                                     TypedSlot recordIdSlot,
+                                                     SbSlot resultSlot,
+                                                     SbSlot recordIdSlot,
                                                      std::vector<std::string> fields,
                                                      sbe::value::SlotVector fieldSlots,
-                                                     TypedSlot seekRecordIdSlot,
-                                                     TypedSlot snapshotIdSlot,
-                                                     TypedSlot indexIdentSlot,
-                                                     TypedSlot indexKeySlot,
-                                                     TypedSlot indexKeyPatternSlot,
+                                                     SbSlot seekRecordIdSlot,
+                                                     SbSlot snapshotIdSlot,
+                                                     SbSlot indexIdentSlot,
+                                                     SbSlot indexKeySlot,
+                                                     SbSlot indexKeyPatternSlot,
                                                      const CollectionPtr& collToFetch,
                                                      PlanNodeId planNodeId,
                                                      sbe::value::SlotVector slotsToForward) {
@@ -758,7 +758,7 @@ SbExpr generateArrayCheckForSort(StageBuilderState& state,
                                  const FieldPath& fp,
                                  FieldIndex level,
                                  sbe::value::FrameIdGenerator* frameIdGenerator,
-                                 boost::optional<TypedSlot> fieldSlot = boost::none) {
+                                 boost::optional<SbSlot> fieldSlot = boost::none) {
     invariant(level < fp.getPathLength());
 
     tassert(8102000,
@@ -801,7 +801,7 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
                             const FieldPath& fp,
                             size_t level,
                             StageBuilderState& state,
-                            boost::optional<TypedSlot> fieldSlot = boost::none) {
+                            boost::optional<SbSlot> fieldSlot = boost::none) {
     using namespace std::literals;
 
     invariant(level < fp.getPathLength());
@@ -997,7 +997,7 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
                plan.type == BuildSortKeysPlan::kCallGenCheapSortKey) {
         // generateSortKey() will handle the parallel arrays check and sort key traversal for us,
         // so we don't need to generate our own sort key traversal logic in the SBE plan.
-        const TypedSlot childResultSlotId = outputs.getResultObj();
+        const SbSlot childResultSlotId = outputs.getResultObj();
 
         StringData generateSortKeyFnName = plan.type == BuildSortKeysPlan::kCallGenSortKey
             ? "generateSortKey"
@@ -1249,16 +1249,16 @@ struct ProjectFieldsNodeValue {
     bool incrementedDepth{false};
 };
 
-std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> projectFieldsToSlots(
+std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
     std::unique_ptr<sbe::PlanStage> stage,
     const std::vector<std::string>& fields,
-    TypedSlot resultSlot,
+    SbSlot resultSlot,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     StageBuilderState& state,
     const PlanStageSlots* slots) {
     // 'outputSlots' will match the order of 'fields'. Bail out early if 'fields' is empty.
-    TypedSlotVector outputSlots;
+    SbSlotVector outputSlots;
     if (fields.empty()) {
         return {std::move(stage), std::move(outputSlots)};
     }

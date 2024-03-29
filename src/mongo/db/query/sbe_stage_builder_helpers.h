@@ -293,7 +293,7 @@ inline auto makeStrConstant(StringData str) {
     return sbe::makeE<sbe::EConstant>(tag, val);
 }
 
-std::unique_ptr<sbe::EExpression> makeVariable(TypedSlot ts);
+std::unique_ptr<sbe::EExpression> makeVariable(SbSlot ts);
 
 std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId, sbe::value::SlotId slotId);
 
@@ -564,15 +564,15 @@ std::unique_ptr<sbe::EExpression> makeLocalBind(sbe::value::FrameIdGenerator* fr
 }
 
 std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
-                                                     TypedSlot resultSlot,
-                                                     TypedSlot recordIdSlot,
+                                                     SbSlot resultSlot,
+                                                     SbSlot recordIdSlot,
                                                      std::vector<std::string> fields,
                                                      sbe::value::SlotVector fieldSlots,
-                                                     TypedSlot seekRecordIdSlot,
-                                                     TypedSlot snapshotIdSlot,
-                                                     TypedSlot indexIdentSlot,
-                                                     TypedSlot indexKeySlot,
-                                                     TypedSlot indexKeyPatternSlot,
+                                                     SbSlot seekRecordIdSlot,
+                                                     SbSlot snapshotIdSlot,
+                                                     SbSlot indexIdentSlot,
+                                                     SbSlot indexKeySlot,
+                                                     SbSlot indexKeyPatternSlot,
                                                      const CollectionPtr& collToFetch,
                                                      PlanNodeId planNodeId,
                                                      sbe::value::SlotVector slotsToForward);
@@ -1202,10 +1202,10 @@ std::pair<std::vector<std::string>, std::vector<ProjectNode>> getProjectNodes(
  *
  * The order of slots in 'outSlots' will match the order of field paths in 'fields'.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> projectFieldsToSlots(
+std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
     std::unique_ptr<sbe::PlanStage> stage,
     const std::vector<std::string>& fields,
-    TypedSlot resultSlot,
+    SbSlot resultSlot,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     StageBuilderState& state,

@@ -117,7 +117,7 @@ struct ExpressionVisitorContext {
     };
 
     ExpressionVisitorContext(StageBuilderState& state,
-                             boost::optional<TypedSlot> rootSlot,
+                             boost::optional<SbSlot> rootSlot,
                              const PlanStageSlots* slots = nullptr)
         : state(state), rootSlot(std::move(rootSlot)), slots(slots) {}
 
@@ -154,7 +154,7 @@ struct ExpressionVisitorContext {
 
     std::vector<SbExpr> exprStack;
 
-    boost::optional<TypedSlot> rootSlot;
+    boost::optional<SbSlot> rootSlot;
 
     // The lexical environment for the expression being traversed. A variable reference takes the
     // form "$$variable_name" in MQL's concrete syntax and gets transformed into a numeric
@@ -175,7 +175,7 @@ optimizer::ABT generateTraverseHelper(ExpressionVisitorContext* context,
                                       const FieldPath& fp,
                                       size_t level,
                                       sbe::value::FrameIdGenerator* frameIdGenerator,
-                                      boost::optional<TypedSlot> topLevelFieldSlot = boost::none) {
+                                      boost::optional<SbSlot> topLevelFieldSlot = boost::none) {
     using namespace std::literals;
 
     invariant(level < fp.getPathLength());
@@ -216,7 +216,7 @@ optimizer::ABT generateTraverse(ExpressionVisitorContext* context,
                                 bool expectsDocumentInputOnly,
                                 const FieldPath& fp,
                                 sbe::value::FrameIdGenerator* frameIdGenerator,
-                                boost::optional<TypedSlot> topLevelFieldSlot = boost::none) {
+                                boost::optional<SbSlot> topLevelFieldSlot = boost::none) {
     size_t level = 0;
 
     if (expectsDocumentInputOnly) {
@@ -2247,7 +2247,7 @@ public:
     }
     void visit(const ExpressionFieldPath* expr) final {
         SbExpr inputExpr;
-        boost::optional<TypedSlot> topLevelFieldSlot;
+        boost::optional<SbSlot> topLevelFieldSlot;
         bool expectsDocumentInputOnly = false;
         auto fp = (expr->getFieldPath().getPathLength() > 1)
             ? boost::make_optional(expr->getFieldPathWithoutCurrentPrefix())
@@ -4379,7 +4379,7 @@ private:
 
 SbExpr generateExpression(StageBuilderState& state,
                           const Expression* expr,
-                          boost::optional<TypedSlot> rootSlot,
+                          boost::optional<SbSlot> rootSlot,
                           const PlanStageSlots& slots) {
     ExpressionVisitorContext context(state, std::move(rootSlot), &slots);
 

@@ -424,7 +424,7 @@ SbExpr evaluateProjection(StageBuilderState& state,
                           const PlanStageSlots* slots) {
     using Node = PathTreeNode<boost::optional<ProjectNode>>;
 
-    boost::optional<TypedSlot> rootSlot =
+    boost::optional<SbSlot> rootSlot =
         slots ? slots->getIfExists(PlanStageSlots::kResult) : boost::none;
 
     auto tree = buildPathTree<boost::optional<ProjectNode>>(

@@ -699,13 +699,4 @@ SbExpr buildVectorizedExpr(StageBuilderState& state,
                            const PlanStageSlots& outputs,
                            bool forFilterStage);
 
-/**
- * In the past, "SbSlot" used to be named "TypedSlot". For now we have this type alias so that code
- * that refers to "TypedSlot" still works.
- *
- * TODO SERVER-84559: Remove these type aliases when they're no longer needed.
- */
-using TypedSlot = SbSlot;
-using TypedSlotVector = SbSlotVector;
-
 }  // namespace mongo::stage_builder

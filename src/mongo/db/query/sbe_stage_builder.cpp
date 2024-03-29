@@ -236,7 +236,7 @@ sbe::value::SlotVector getSlotsOrderedByName(const PlanStageReqs& reqs,
 
     auto outputSlots = sbe::makeSV();
     outputSlots.reserve(requiredNamedSlots.size());
-    for (const TypedSlot& slot : requiredNamedSlots) {
+    for (const SbSlot& slot : requiredNamedSlots) {
         outputSlots.emplace_back(slot.slotId);
     }
 
@@ -252,7 +252,7 @@ sbe::value::SlotVector getSlotsToForward(StageBuilderState& state,
     auto slots = state.data->metadataSlots.getSlotVector();
 
     if (exclude.empty()) {
-        for (const TypedSlot& slot : requiredNamedSlots) {
+        for (const SbSlot& slot : requiredNamedSlots) {
             if (!state.env->isSlotRegistered(slot.slotId)) {
                 slots.emplace_back(slot.slotId);
             }
@@ -260,7 +260,7 @@ sbe::value::SlotVector getSlotsToForward(StageBuilderState& state,
     } else {
         auto excludeSet = sbe::value::SlotSet{exclude.begin(), exclude.end()};
 
-        for (const TypedSlot& slot : requiredNamedSlots) {
+        for (const SbSlot& slot : requiredNamedSlots) {
             if (!state.env->isSlotRegistered(slot.slotId) && !excludeSet.count(slot.slotId)) {
                 slots.emplace_back(slot.slotId);
             }
@@ -470,7 +470,7 @@ PlanStageSlots PlanStageSlots::makeMergedPlanStageSlots(StageBuilderState& state
     auto& firstTreeOutputs = trees[0].second;
 
     for (const auto& slotName : firstTreeOutputs.getRequiredNamesInOrder(reqs)) {
-        outputs._data->slotNameToIdMap[slotName] = TypedSlot{state.slotId()};
+        outputs._data->slotNameToIdMap[slotName] = SbSlot{state.slotId()};
     }
 
     if (reqs.hasResultInfo()) {
@@ -518,11 +518,11 @@ std::vector<PlanStageSlots::OwnedSlotName> PlanStageSlots::getRequiredNamesInOrd
     return names;
 }
 
-TypedSlotVector PlanStageSlots::getRequiredSlotsInOrder(const PlanStageReqs& reqs) const {
+SbSlotVector PlanStageSlots::getRequiredSlotsInOrder(const PlanStageReqs& reqs) const {
     auto names = getRequiredNamesInOrder(reqs);
 
     // Build the list of corresponding slots.
-    TypedSlotVector result;
+    SbSlotVector result;
     for (const auto& name : names) {
         auto it = _data->slotNameToIdMap.find(name);
         tassert(8146615,
@@ -536,29 +536,29 @@ TypedSlotVector PlanStageSlots::getRequiredSlotsInOrder(const PlanStageReqs& req
     return result;
 }
 
-struct NameTypedSlotPairLt {
+struct NameSbSlotPairLt {
     using UnownedSlotName = PlanStageSlots::UnownedSlotName;
-    using PairType = std::pair<UnownedSlotName, TypedSlot>;
+    using PairType = std::pair<UnownedSlotName, SbSlot>;
 
     bool operator()(const PairType& lhs, const PairType& rhs) const {
         return lhs.first != rhs.first ? lhs.first < rhs.first
-                                      : TypedSlot::Less()(lhs.second, rhs.second);
+                                      : SbSlot::Less()(lhs.second, rhs.second);
     }
 };
 
-struct NameTypedSlotPairEq {
+struct NameSbSlotPairEq {
     using UnownedSlotName = PlanStageSlots::UnownedSlotName;
-    using PairType = std::pair<UnownedSlotName, TypedSlot>;
+    using PairType = std::pair<UnownedSlotName, SbSlot>;
 
     bool operator()(const PairType& lhs, const PairType& rhs) const {
-        return lhs.first == rhs.first && TypedSlot::EqualTo()(lhs.second, rhs.second);
+        return lhs.first == rhs.first && SbSlot::EqualTo()(lhs.second, rhs.second);
     }
 };
 
-TypedSlotVector PlanStageSlots::getRequiredSlotsUnique(const PlanStageReqs& reqs) const {
+SbSlotVector PlanStageSlots::getRequiredSlotsUnique(const PlanStageReqs& reqs) const {
     auto names = getRequiredNamesInOrder(reqs);
 
-    TypedSlotVector result;
+    SbSlotVector result;
 
     // Build the list of corresponding slots.
     for (const auto& name : names) {
@@ -572,9 +572,9 @@ TypedSlotVector PlanStageSlots::getRequiredSlotsUnique(const PlanStageReqs& reqs
     }
 
     // Sort and de-dup the list by SlotId.
-    std::sort(result.begin(), result.end(), TypedSlot::Less());
+    std::sort(result.begin(), result.end(), SbSlot::Less());
 
-    auto newEnd = std::unique(result.begin(), result.end(), TypedSlot::EqualTo());
+    auto newEnd = std::unique(result.begin(), result.end(), SbSlot::EqualTo());
     if (newEnd != result.end()) {
         result.erase(newEnd, result.end());
     }
@@ -582,22 +582,22 @@ TypedSlotVector PlanStageSlots::getRequiredSlotsUnique(const PlanStageReqs& reqs
     return result;
 }
 
-std::vector<std::pair<PlanStageSlots::UnownedSlotName, TypedSlot>>
+std::vector<std::pair<PlanStageSlots::UnownedSlotName, SbSlot>>
 PlanStageSlots::getAllNameSlotPairsInOrder() const {
-    std::vector<std::pair<UnownedSlotName, TypedSlot>> nameSlotPairs;
+    std::vector<std::pair<UnownedSlotName, SbSlot>> nameSlotPairs;
     nameSlotPairs.reserve(_data->slotNameToIdMap.size());
 
     for (auto& p : _data->slotNameToIdMap) {
         nameSlotPairs.emplace_back(p.first, p.second);
     }
 
-    std::sort(nameSlotPairs.begin(), nameSlotPairs.end(), NameTypedSlotPairLt());
+    std::sort(nameSlotPairs.begin(), nameSlotPairs.end(), NameSbSlotPairLt());
 
     return nameSlotPairs;
 }
 
-TypedSlotVector PlanStageSlots::getAllSlotsInOrder() const {
-    TypedSlotVector result;
+SbSlotVector PlanStageSlots::getAllSlotsInOrder() const {
+    SbSlotVector result;
 
     auto nameSlotPairs = getAllNameSlotPairsInOrder();
 
@@ -615,7 +615,7 @@ void PlanStageSlots::setMissingRequiredNamedSlotsToNothing(StageBuilderState& st
     // result and we don't have a materialized result, then we call setResultObj() to set
     // a materialized result of Nothing on 'outputs'.
     if ((reqs.hasResult() && !hasResult()) || (reqs.hasResultObj() && !hasResultObj())) {
-        auto nothingSlot = TypedSlot{state.getNothingSlot()};
+        auto nothingSlot = SbSlot{state.getNothingSlot()};
         setResultObj(nothingSlot);
     }
 
@@ -623,7 +623,7 @@ void PlanStageSlots::setMissingRequiredNamedSlotsToNothing(StageBuilderState& st
 
     for (const auto& name : names) {
         if (!has(name)) {
-            auto nothingSlot = TypedSlot{state.getNothingSlot()};
+            auto nothingSlot = SbSlot{state.getNothingSlot()};
             set(name, nothingSlot);
         }
     }
@@ -714,7 +714,7 @@ void PlanStageSlots::mergeResultInfos(StageBuilderState& state,
                     tassert(8378203,
                             "Expected field to have Keep effect or Drop effect",
                             treeEffects.isDrop(fieldName));
-                    auto nothingSlot = TypedSlot{state.getNothingSlot()};
+                    auto nothingSlot = SbSlot{state.getNothingSlot()};
                     treeOutputs.set(std::pair(kField, fieldName), nothingSlot);
                 }
             }
@@ -970,7 +970,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     if (reqs.has(kReturnKey)) {
         // Assign the 'returnKeySlot' to be the empty object.
-        outputs.set(kReturnKey, TypedSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType});
+        outputs.set(kReturnKey, SbSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType});
         stage = sbe::makeProjectStage(std::move(stage),
                                       root->nodeId(),
                                       outputs.get(kReturnKey).slotId,
@@ -1028,10 +1028,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     if (vsn->filter) {
-        auto filterExpr = generateFilter(_state,
-                                         vsn->filter.get(),
-                                         TypedSlot{resultSlot, TypeSignature::kAnyScalarType},
-                                         outputs);
+        auto filterExpr = generateFilter(
+            _state, vsn->filter.get(), SbSlot{resultSlot, TypeSignature::kAnyScalarType}, outputs);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
                 std::move(stage), filterExpr.extractExpr(_state), vsn->nodeId());
@@ -1132,7 +1130,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         auto rawKeyExpr = sbe::makeE<sbe::EFunction>("newObj"_sd, std::move(args));
         outputs.set(PlanStageSlots::kReturnKey,
-                    TypedSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType});
+                    SbSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType});
         stage = sbe::makeProjectStage(std::move(stage),
                                       ixn->nodeId(),
                                       outputs.get(PlanStageSlots::kReturnKey).slotId,
@@ -1234,7 +1232,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     if (reqs.hasResult() || reqs.hasFields()) {
         // COUNT_SCAN stage doesn't produce any output, make an empty object for the result.
         auto resultSlot = _slotIdGenerator.generate();
-        planStageSlots.setResultObj(TypedSlot{resultSlot, TypeSignature::kObjectType});
+        planStageSlots.setResultObj(SbSlot{resultSlot, TypeSignature::kObjectType});
         stage = sbe::makeProjectStage(
             std::move(stage), csn->nodeId(), resultSlot, makeFunction("newObj"));
     }
@@ -1508,7 +1506,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Generate post assembly filter.
     if (csn->postAssemblyFilter) {
         auto filterExpr = generateFilter(
-            _state, csn->postAssemblyFilter.get(), TypedSlot{reconstructedRecordSlot}, outputs);
+            _state, csn->postAssemblyFilter.get(), SbSlot{reconstructedRecordSlot}, outputs);
 
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
@@ -1581,7 +1579,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    auto resultSlot = TypedSlot{_slotIdGenerator.generate()};
+    auto resultSlot = SbSlot{_slotIdGenerator.generate()};
     auto ridSlot = _slotIdGenerator.generate();
     auto fieldSlots = _slotIdGenerator.generateMultiple(fields.size());
 
@@ -2452,7 +2450,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }  // else no "includeArrayIndex"
 
     // Create the ProjectStage that adds the output(s) to the result doc via 'finalProjectExpr'.
-    TypedSlot resultSlot = TypedSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType};
+    SbSlot resultSlot = SbSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType};
     stage = makeProjectStage(std::move(stage),
                              un->nodeId(),
                              resultSlot.slotId,  // output result document
@@ -3492,9 +3490,9 @@ SlotBasedStageBuilder::buildProjectionImpl(const QuerySolutionNode* root,
     std::vector<const Expression*> exprs;
     std::vector<std::string> exprPaths;
     std::vector<boost::optional<size_t>> exprNodeIdxs;
-    std::vector<boost::optional<TypedSlot>> exprSlots;
+    std::vector<boost::optional<SbSlot>> exprSlots;
     StringSet exprPathSet;
-    StringMap<TypedSlot> updatedPathsSlotMap;
+    StringMap<SbSlot> updatedPathsSlotMap;
 
     for (size_t i = 0; i < nodes.size(); ++i) {
         if (nodes[i].isExpr() && exprPathSet.emplace(paths[i]).second) {
@@ -3594,7 +3592,7 @@ SlotBasedStageBuilder::buildProjectionImpl(const QuerySolutionNode* root,
         if (numExprsProcessed != numExprs || !reqs.getCanProcessBlockValues() ||
             planType != BuildProjectionPlan::kDoNotMakeResult) {
             // Store all the slots from 'exprSlots' into the 'individualSlots' vector.
-            TypedSlotVector individualSlots;
+            SbSlotVector individualSlots;
             for (size_t i = 0; i < numExprs; ++i) {
                 if (exprSlots[i]) {
                     individualSlots.push_back(*exprSlots[i]);
@@ -3635,7 +3633,7 @@ SlotBasedStageBuilder::buildProjectionImpl(const QuerySolutionNode* root,
     auto projectType = isInclusion ? projection_ast::ProjectType::kInclusion
                                    : projection_ast::ProjectType::kExclusion;
 
-    boost::optional<TypedSlot> projOutputSlot;
+    boost::optional<SbSlot> projOutputSlot;
 
     // Produce a materialized result object (or a temporary result object) if needed.
     if (planType != BuildProjectionPlan::kDoNotMakeResult) {
@@ -3868,7 +3866,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     if (reqs.has(kReturnKey)) {
         // Assign the 'returnKeySlot' to be the empty object.
-        outputs.set(kReturnKey, TypedSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType});
+        outputs.set(kReturnKey, SbSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType});
         stage = sbe::makeProjectStage(std::move(stage),
                                       root->nodeId(),
                                       outputs.get(kReturnKey).slotId,
@@ -5173,7 +5171,7 @@ private:
     sbe::value::SlotIdGenerator& _slotIdGenerator;
     const PlanStageReqs& forwardingReqs;
     const PlanStageSlots& outputs;
-    boost::optional<TypedSlot> rootSlotOpt;
+    boost::optional<SbSlot> rootSlotOpt;
     const WindowNode* windowNode;
     const CanonicalQuery& _cq;
     boost::optional<SlotId> collatorSlot;
@@ -5653,8 +5651,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, bool> SlotBasedStageBuilder::buildVec
 
             // Use the result as the bitmap for the BlockToRow stage.
             outputs.set(PlanStageSlots::kBlockSelectivityBitmap,
-                        TypedSlot{bitmapSlotId,
-                                  TypeSignature::kBlockType.include(TypeSignature::kBooleanType)});
+                        SbSlot{bitmapSlotId,
+                               TypeSignature::kBlockType.include(TypeSignature::kBooleanType)});
 
             // Add a filter stage that pulls new data if there isn't at least one 'true' value
             // in the produced bitmap.

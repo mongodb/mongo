@@ -151,7 +151,7 @@ struct MatchExpressionVisitorContext {
     };
 
     MatchExpressionVisitorContext(StageBuilderState& state,
-                                  boost::optional<TypedSlot> rootSlot,
+                                  boost::optional<SbSlot> rootSlot,
                                   const MatchExpression* root,
                                   const PlanStageSlots* slots,
                                   bool isFilterOverIxscan)
@@ -204,7 +204,7 @@ struct MatchExpressionVisitorContext {
 
     // The current context must be initialized either with a slot that contains the root
     // document ('rootSlot') or with the set of kField slots ('slots').
-    boost::optional<TypedSlot> rootSlot;
+    boost::optional<SbSlot> rootSlot;
     const PlanStageSlots* slots = nullptr;
     bool isFilterOverIxscan = false;
 };
@@ -221,7 +221,7 @@ enum class LeafTraversalMode {
 };
 
 SbExpr generateTraverseF(SbExpr inputExpr,
-                         boost::optional<TypedSlot> topLevelFieldSlot,
+                         boost::optional<SbSlot> topLevelFieldSlot,
                          const sbe::MatchPath& fp,
                          FieldIndex level,
                          sbe::value::FrameIdGenerator* frameIdGenerator,
@@ -380,7 +380,7 @@ void generatePredicate(MatchExpressionVisitorContext* context,
     const bool isFieldPathOnRootDoc = context->framesCount() == 1;
     auto* slots = context->slots;
 
-    boost::optional<TypedSlot> topLevelFieldSlot;
+    boost::optional<SbSlot> topLevelFieldSlot;
     if (isFieldPathOnRootDoc && slots) {
         // If we are generating a filter over an index scan, search for a kField slot that
         // corresponds to the full path 'path'.
@@ -1311,7 +1311,7 @@ private:
 
 SbExpr generateFilter(StageBuilderState& state,
                       const MatchExpression* root,
-                      boost::optional<TypedSlot> rootSlot,
+                      boost::optional<SbSlot> rootSlot,
                       const PlanStageSlots& slots,
                       const std::vector<std::string>& keyFields,
                       bool isFilterOverIxscan) {
