@@ -63,7 +63,7 @@ public:
     AlwaysTimeOutYieldPolicy(OperationContext* opCtx, ClockSource* cs)
         : MockYieldPolicy(opCtx, cs, PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT) {}
 
-    bool shouldYieldOrInterrupt(OperationContext*) override {
+    bool doShouldYieldOrInterrupt(OperationContext*) override {
         return true;
     }
 
@@ -81,7 +81,7 @@ public:
     AlwaysPlanKilledYieldPolicy(OperationContext* opCtx, ClockSource* cs)
         : MockYieldPolicy(opCtx, cs, PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED) {}
 
-    bool shouldYieldOrInterrupt(OperationContext*) override {
+    bool doShouldYieldOrInterrupt(OperationContext*) override {
         return true;
     }
 
@@ -99,7 +99,7 @@ public:
     NoopYieldPolicy(OperationContext* opCtx, ClockSource* clockSource)
         : MockYieldPolicy(opCtx, clockSource, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY) {}
 
-    bool shouldYieldOrInterrupt(OperationContext*) override {
+    bool doShouldYieldOrInterrupt(OperationContext*) override {
         return false;
     }
 
