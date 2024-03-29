@@ -131,18 +131,9 @@ void executeChildBatches(OperationContext* opCtx,
             bulkReq.serialize(BSONObj(), &builder);
 
             logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
-
-            // Per-operation write concern is not supported in transactions.
             if (!TransactionRouter::get(opCtx)) {
-                auto wc = opCtx->getWriteConcern();
-                if (wc.requiresWriteAcknowledgement()) {
-                    builder.append(WriteConcernOptions::kWriteConcernField, wc.toBSON());
-                } else {
-                    // Mongos needs to send to the shard with w > 0 so it will be able to see the
-                    // writeErrors
-                    builder.append(WriteConcernOptions::kWriteConcernField,
-                                   upgradeWriteConcern(wc.toBSON()));
-                }
+                builder.append(WriteConcernOptions::kWriteConcernField,
+                               opCtx->getWriteConcern().toBSON());
             }
 
             auto obj = builder.obj();

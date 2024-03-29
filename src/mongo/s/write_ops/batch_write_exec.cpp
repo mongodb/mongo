@@ -188,6 +188,11 @@ std::vector<AsyncRequestsSender::Request> constructARSRequestsToSend(
 
             BSONObjBuilder requestBuilder;
             shardBatchRequest.serialize(&requestBuilder);
+            if (!TransactionRouter::get(opCtx)) {
+                requestBuilder.append(WriteConcernOptions::kWriteConcernField,
+                                      opCtx->getWriteConcern().toBSON());
+            }
+
             logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &requestBuilder);
 
             return requestBuilder.obj();
@@ -518,11 +523,18 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
         return childBatches.begin()->second.get();
     }();
 
-    auto cmdObj = batchOp
-                      .buildBatchRequest(*targetedWriteBatch,
-                                         targeter,
-                                         allowShardKeyUpdatesWithoutFullShardKeyInQuery)
-                      .toBSON();
+    auto cmdObj = [&] {
+        const auto shardBatchRequest = batchOp.buildBatchRequest(
+            *targetedWriteBatch, targeter, allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+        BSONObjBuilder requestBuilder;
+        shardBatchRequest.serialize(&requestBuilder);
+        if (!TransactionRouter::get(opCtx)) {
+            requestBuilder.append(WriteConcernOptions::kWriteConcernField,
+                                  opCtx->getWriteConcern().toBSON());
+        }
+
+        return requestBuilder.obj();
+    }();
 
     auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
         opCtx, targeter.getNS(), std::move(cmdObj));

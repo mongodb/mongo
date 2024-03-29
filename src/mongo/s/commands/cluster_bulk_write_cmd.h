@@ -346,6 +346,14 @@ public:
                 bulkRequest.setLet(expCtx->variables.toBSON(expCtx->variablesParseState, *let));
             }
 
+            // "Fire and forget" bulk writes requested by the external clients need to be upgraded
+            // to w: 1 for potential writeErrors to be properly managed.
+            if (auto wc = opCtx->getWriteConcern();
+                !wc.requiresWriteAcknowledgement() && !opCtx->inMultiDocumentTransaction()) {
+                wc.w = 1;
+                opCtx->setWriteConcern(wc);
+            }
+
             auto bulkWriteReply = cluster::bulkWrite(opCtx, bulkRequest, targeters);
             bool updatedShardKey =
                 handleWouldChangeOwningShardError(opCtx, bulkRequest, bulkWriteReply, targeters);

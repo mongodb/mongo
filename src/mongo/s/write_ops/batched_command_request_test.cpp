@@ -107,14 +107,12 @@ TEST(BatchedCommandRequest, InsertCloneWithIds) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    batchedRequest.setWriteConcern(BSON("w" << 2));
 
     const auto clonedRequest(BatchedCommandRequest::cloneInsertWithIds(std::move(batchedRequest)));
 
     ASSERT_EQ("xyz.abc", clonedRequest.getNS().ns_forTest());
     ASSERT(clonedRequest.getWriteCommandRequestBase().getOrdered());
     ASSERT(clonedRequest.getWriteCommandRequestBase().getBypassDocumentValidation());
-    ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
 
     const auto& insertDocs = clonedRequest.getInsertRequest().getDocuments();
     ASSERT_EQ(2u, insertDocs.size());

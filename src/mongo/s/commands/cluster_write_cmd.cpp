@@ -183,11 +183,6 @@ boost::optional<WouldChangeOwningShardInfo> getWouldChangeOwningShardErrorInfo(
 void handleWouldChangeOwningShardErrorNonTransaction(OperationContext* opCtx,
                                                      BatchedCommandRequest* request,
                                                      BatchedCommandResponse* response) {
-    // Strip write concern because this command will be sent as part of a
-    // transaction and the write concern has already been loaded onto the opCtx and
-    // will be picked up by the transaction API.
-    request->unsetWriteConcern();
-
     // Strip runtime constants because they will be added again when the API sends this command
     // through the service entry point.
     request->unsetLegacyRuntimeConstants();
@@ -357,10 +352,6 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
                     nss,
                     // RerunOriginalWriteFn:
                     [&]() {
-                        // Ensure the retried operation does not include WC inside the transaction.
-                        // The transaction commit will still use the WC, because it uses the WC from
-                        // the opCtx (which has been set previously in Strategy).
-                        request->unsetWriteConcern();
                         // Clear the error details from the response object before sending the write
                         // again
                         response->unsetErrDetails();
@@ -595,20 +586,12 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
     // request.
     batchedRequest.evaluateAndReplaceLetParams(opCtx);
 
-    // Append the write concern from the opCtx extracted during command setup.
-    if (!batchedRequest.hasWriteConcern()) {
-        batchedRequest.setWriteConcern(opCtx->getWriteConcern().toBSON());
-    }
-
-    // Write ops are never allowed to have writeConcern inside transactions. Normally
-    // disallowing WC on non-terminal commands in a transaction is handled earlier, during
-    // command dispatch. However, if this is a regular write operation being automatically
-    // retried inside a transaction (such as changing a document's shard key across shards),
-    // then batchedRequest will have a writeConcern (added by the if() above) from when it was
-    // initially run outside a transaction. Thus it's necessary to unconditionally clear the
-    // writeConcern when in a transaction.
-    if (TransactionRouter::get(opCtx)) {
-        batchedRequest.unsetWriteConcern();
+    // "Fire and forget" batch writes requested by the external clients need to be upgraded
+    // to w: 1 for potential writeErrors to be properly managed.
+    if (auto wc = opCtx->getWriteConcern();
+        !wc.requiresWriteAcknowledgement() && !opCtx->inMultiDocumentTransaction()) {
+        wc.w = 1;
+        opCtx->setWriteConcern(wc);
     }
 
     // Record the namespace that the write must be run on. It may differ from the request if this is

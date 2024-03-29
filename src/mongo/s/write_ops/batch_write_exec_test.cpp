@@ -467,7 +467,6 @@ TEST_F(BatchWriteExecTest, SingleOpUnordered) {
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     // Do single-target, single doc batch write op
     auto future = launchAsync([&] {
@@ -506,7 +505,6 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
                                                                        << "100")))});
         return updateOp;
     }());
-    updateRequest.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
     const static Timestamp timestamp(2);
@@ -606,7 +604,6 @@ TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
         deleteOp.setDeletes(std::vector{write_ops::DeleteOpEntry(q, false)});
         return deleteOp;
     }());
-    deleteRequest.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
 
@@ -706,7 +703,6 @@ TEST_F(BatchWriteExecTest, MultiOpLargeOrdered) {
         insertOp.setDocuments(docsToInsert);
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -739,7 +735,6 @@ TEST_F(BatchWriteExecTest, SingleOpUnorderedError) {
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -780,7 +775,6 @@ TEST_F(BatchWriteExecTest, MultiOpLargeUnorderedWithStaleShardVersionError) {
         insertOp.setDocuments(docsToInsert);
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -812,7 +806,6 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
             write_ops::UpdateModification::parseFromClassicUpdate(BSON("Key" << 100)))});
         return updateOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
     const static Timestamp timestamp(2);
@@ -930,7 +923,6 @@ TEST_F(BatchWriteExecTest, MultiOpLargeUnorderedWithCannotRefreshError) {
         insertOp.setDocuments(docsToInsert);
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -967,7 +959,6 @@ TEST_F(BatchWriteExecTest,
                 write_ops::UpdateModification::parseFromClassicUpdate(BSON("y" << 2)))});
         return updateOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
     const static Timestamp timestamp(2);
@@ -1095,7 +1086,6 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
                 write_ops::UpdateModification::parseFromClassicUpdate(BSON("y" << 2)))});
         return updateOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
     const static Timestamp timestamp(2);
@@ -1233,7 +1223,6 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
                 write_ops::UpdateModification::parseFromClassicUpdate(BSON("y" << 2)))});
         return updateOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
     const static Timestamp timestamp(2);
@@ -1367,7 +1356,6 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
             write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << 1)))});
         return updateOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
     const static Timestamp timestamp(2);
@@ -1490,7 +1478,6 @@ TEST_F(BatchWriteExecTest, StaleShardOp) {
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     // Execute request
     auto future = launchAsync([&] {
@@ -1522,7 +1509,6 @@ TEST_F(BatchWriteExecTest, MultiStaleShardOp) {
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -1560,7 +1546,6 @@ TEST_F(BatchWriteExecTest, TooManyStaleShardOp) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -1595,7 +1580,6 @@ TEST_F(BatchWriteExecTest, StaleDbOp) {
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     // Execute request
     auto future = launchAsync([&] {
@@ -1627,7 +1611,6 @@ TEST_F(BatchWriteExecTest, MultiStaleDbOp) {
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -1665,7 +1648,6 @@ TEST_F(BatchWriteExecTest, TooManyStaleDbOp) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -1700,7 +1682,6 @@ TEST_F(BatchWriteExecTest, MultiCannotRefreshShardOp) {
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -1736,7 +1717,6 @@ TEST_F(BatchWriteExecTest, TooManyCannotRefreshShardOp) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -1780,7 +1760,6 @@ TEST_F(BatchWriteExecTest, RetryableWritesLargeBatch) {
         insertOp.setDocuments(docsToInsert);
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
     operationContext()->setTxnNumber(5);
@@ -1815,7 +1794,6 @@ TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     BatchedCommandResponse retryableErrResponse;
     retryableErrResponse.setStatus({ErrorCodes::NotWritablePrimary, "mock retryable error"});
@@ -1854,7 +1832,6 @@ TEST_F(BatchWriteExecTest, RetryableErrorTxnNumber) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
     operationContext()->setTxnNumber(5);
@@ -1892,7 +1869,6 @@ TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
     operationContext()->setTxnNumber(5);
@@ -1934,7 +1910,6 @@ TEST_F(BatchWriteExecTest, StaleEpochIsNotRetryable) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
     operationContext()->setTxnNumber(5);
@@ -1974,7 +1949,6 @@ TEST_F(BatchWriteExecTest, TenantMigrationAbortedErrorOrderedOp) {
         insertOp.setDocuments(expected);
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     // Execute request
     auto future = launchAsync([&] {
@@ -2005,7 +1979,6 @@ TEST_F(BatchWriteExecTest, TenantMigrationAbortedErrorUnorderedOp) {
         insertOp.setDocuments(expected);
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     // Execute request
     auto future = launchAsync([&] {
@@ -2036,7 +2009,6 @@ TEST_F(BatchWriteExecTest, MultipleTenantMigrationAbortedErrorUnorderedOp) {
         insertOp.setDocuments(expected);
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     const int numTenantMigrationAbortedErrors = 3;
 
@@ -2071,7 +2043,6 @@ TEST_F(BatchWriteExecTest, MultipleTenantMigrationAbortedErrorOrderedOp) {
         insertOp.setDocuments(expected);
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     const int numTenantMigrationAbortedErrors = 3;
 
@@ -2106,7 +2077,6 @@ TEST_F(BatchWriteExecTest, PartialTenantMigrationAbortedErrorOrderedOp) {
         insertOp.setDocuments(expected);
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     // Execute request
     auto future = launchAsync([&] {
@@ -2139,7 +2109,6 @@ TEST_F(BatchWriteExecTest, PartialTenantMigrationErrorUnorderedOp) {
         insertOp.setDocuments(expected);
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     // Execute request
     auto future = launchAsync([&] {
@@ -4151,7 +4120,6 @@ TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {
             write_ops::UpdateModification::parseFromClassicUpdate(BSON("Key" << 100)))});
         return updateOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
     const static Timestamp timestamp(2);
@@ -4302,7 +4270,6 @@ TEST_F(BatchWriteExecTransactionTargeterErrorTest, TargetedFailedAndErrorRespons
             write_ops::UpdateModification::parseFromClassicUpdate(BSON("Key" << 100)))});
         return updateOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
     const static Timestamp timestamp(2);
@@ -4461,7 +4428,6 @@ TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorRespons
             write_ops::UpdateModification::parseFromClassicUpdate(BSON("Key" << 100)))});
         return updateOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
     const static Timestamp timestamp(2);
@@ -4664,7 +4630,6 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_CommandError) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -4696,7 +4661,6 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteError) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -4726,7 +4690,6 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteErrorOrdered) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -4756,7 +4719,6 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteErrorFromBusyCache) 
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -4786,7 +4748,6 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteErrorOrderedFromBusy
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -4816,7 +4777,6 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_TransientTxnError) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -4842,7 +4802,6 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_DispatchError) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -4874,7 +4833,6 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_TransientDispatchError) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSONObj());
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;

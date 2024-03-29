@@ -131,25 +131,6 @@ public:
 
     std::size_t sizeWriteOps() const;
 
-    void setWriteConcern(const BSONObj& writeConcern) {
-        _writeConcern = writeConcern.getOwned();
-    }
-
-    void unsetWriteConcern() {
-        _writeConcern = boost::none;
-    }
-
-    bool hasWriteConcern() const {
-        return _writeConcern.is_initialized();
-    }
-
-    const BSONObj& getWriteConcern() const {
-        invariant(_writeConcern);
-        return *_writeConcern;
-    }
-
-    bool requiresWriteAcknowledgement() const;
-
     void setShardVersion(ShardVersion shardVersion) {
         _shardVersion = std::move(shardVersion);
     }
@@ -271,8 +252,6 @@ private:
 
     boost::optional<ShardVersion> _shardVersion;
     boost::optional<DatabaseVersion> _dbVersion;
-
-    boost::optional<BSONObj> _writeConcern;
 };
 
 

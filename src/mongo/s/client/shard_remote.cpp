@@ -499,6 +499,23 @@ Status ShardRemote::runAggregation(
 }
 
 
+BatchedCommandResponse ShardRemote::runBatchWriteCommand(OperationContext* opCtx,
+                                                         const Milliseconds maxTimeMS,
+                                                         const BatchedCommandRequest& batchRequest,
+                                                         const WriteConcernOptions& writeConcern,
+                                                         RetryPolicy retryPolicy) {
+    const DatabaseName dbName = batchRequest.getNS().dbName();
+    const BSONObj cmdObj = [&] {
+        BSONObjBuilder cmdObjBuilder;
+        batchRequest.serialize(&cmdObjBuilder);
+        cmdObjBuilder.append(WriteConcernOptions::kWriteConcernField, writeConcern.toBSON());
+        return cmdObjBuilder.obj();
+    }();
+
+    return _submitBatchWriteCommand(opCtx, cmdObj, dbName, maxTimeMS, retryPolicy);
+}
+
+
 StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,

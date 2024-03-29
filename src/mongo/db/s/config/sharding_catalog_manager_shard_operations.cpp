@@ -775,6 +775,14 @@ void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext
 
         auto shardIdUpsertCmd = add_shard_util::createShardIdentityUpsertForAddShard(
             addShardCmd, ShardingCatalogClient::kLocalWriteConcern);
+
+        // A request dispatched through a local client is served within the same thread that submits
+        // it (so that the opCtx needs to be used as the vehicle to pass the WC to the
+        // ServiceEntryPoint).
+        const auto originalWC = opCtx->getWriteConcern();
+        ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
+        opCtx->setWriteConcern(ShardingCatalogClient::kLocalWriteConcern);
+
         DBDirectClient localClient(opCtx);
         BSONObj res;
 

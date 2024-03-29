@@ -306,7 +306,6 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
 
     BatchedCommandRequest targetBatch =
         batchOp.buildBatchRequest(*targeted.begin()->second, targeter, boost::none);
-    ASSERT(targetBatch.getWriteConcern().woCompare(_opCtx->getWriteConcern().toBSON()) == 0);
 
     BatchedCommandResponse response;
     buildResponse(1, &response);

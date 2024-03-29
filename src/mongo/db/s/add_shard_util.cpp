@@ -43,6 +43,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
+
 namespace add_shard_util {
 
 AddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName) {
@@ -61,6 +62,7 @@ AddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName) {
 
 BSONObj createShardIdentityUpsertForAddShard(const AddShard& addShardCmd,
                                              const WriteConcernOptions& wc) {
+    // TODO SERVER-88742 Just use write_ops::UpdateCommandRequest
     BatchedCommandRequest request([&] {
         write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
         updateOp.setUpdates({[&] {
@@ -74,9 +76,12 @@ BSONObj createShardIdentityUpsertForAddShard(const AddShard& addShardCmd,
 
         return updateOp;
     }());
-    request.setWriteConcern(wc.toBSON());
 
-    return request.toBSON();
+    // Add the WC to the serialized BatchedCommandRequest.
+    BSONObjBuilder cmdObjBuilder;
+    request.serialize(&cmdObjBuilder);
+    cmdObjBuilder.append(WriteConcernOptions::kWriteConcernField, wc.toBSON());
+    return cmdObjBuilder.obj();
 }
 
 }  // namespace add_shard_util

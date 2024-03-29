@@ -184,10 +184,12 @@ void deleteChunks(OperationContext* opCtx,
         return deleteOp;
     }());
 
-    request.setWriteConcern(writeConcern.toBSON());
-
-    auto response = configShard->runBatchWriteCommand(
-        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+    auto response =
+        configShard->runBatchWriteCommand(opCtx,
+                                          Milliseconds::max(),
+                                          request,
+                                          writeConcern,
+                                          Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
 
     uassertStatusOK(response.toStatus());
 }
@@ -274,10 +276,12 @@ void deleteShardingIndexCatalogMetadata(OperationContext* opCtx,
         return deleteOp;
     }());
 
-    request.setWriteConcern(writeConcern.toBSON());
-
-    auto response = configShard->runBatchWriteCommand(
-        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+    auto response =
+        configShard->runBatchWriteCommand(opCtx,
+                                          Milliseconds::max(),
+                                          request,
+                                          writeConcern,
+                                          Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
 
     uassertStatusOK(response.toStatus());
 }

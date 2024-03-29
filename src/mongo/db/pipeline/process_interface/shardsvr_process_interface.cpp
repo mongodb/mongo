@@ -91,19 +91,30 @@ namespace {
 // Writes to the local shard. It shall only be used to write to collections that are always
 // untracked (e.g. collections under the admin/config db).
 void writeToLocalShard(OperationContext* opCtx,
-                       const BatchedCommandRequest& batchedCommandRequest) {
+                       const BatchedCommandRequest& batchedCommandRequest,
+                       const WriteConcernOptions& writeConcern) {
     tassert(8144401,
             "Forbidden to write directly to local shard unless namespace is always shard local",
             batchedCommandRequest.getNS().isShardLocalNamespace());
-    tassert(8144402,
-            "Explicit write concern required for internal cluster operation",
-            batchedCommandRequest.hasWriteConcern());
+
+    // A request dispatched through a local client is served within the same thread that submits it
+    // (so that the opCtx needs to be used as the vehicle to pass the WC to the ServiceEntryPoint).
+    const auto originalWC = opCtx->getWriteConcern();
+    ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
+    opCtx->setWriteConcern(writeConcern);
+
+    const BSONObj cmdObj = [&] {
+        BSONObjBuilder cmdObjBuilder;
+        batchedCommandRequest.serialize(&cmdObjBuilder);
+        cmdObjBuilder.append(WriteConcernOptions::kWriteConcernField, writeConcern.toBSON());
+        return cmdObjBuilder.obj();
+    }();
 
     const auto cmdResponse =
         repl::ReplicationCoordinator::get(opCtx)->runCmdOnPrimaryAndAwaitResponse(
             opCtx,
             batchedCommandRequest.getNS().dbName(),
-            batchedCommandRequest.toBSON(),
+            cmdObj,
             [](executor::TaskExecutor::CallbackHandle handle) {},
             [](executor::TaskExecutor::CallbackHandle handle) {});
     uassertStatusOK(getStatusFromCommandResult(cmdResponse));
@@ -440,8 +451,7 @@ void ShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
         NamespaceString(NamespaceString::kAggTempCollections),
         std::vector<BSONObj>({BSON(
             "_id" << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))})});
-    bcr.setWriteConcern(CommandHelpers::kMajorityWriteConcern.toBSON());
-    writeToLocalShard(opCtx, bcr);
+    writeToLocalShard(opCtx, bcr, CommandHelpers::kMajorityWriteConcern);
 
     // Create the collection. Note we don't set the 'temp: true' option. The temporary-ness comes
     // from having registered on kAggTempCollections.
@@ -543,8 +553,7 @@ void ShardServerProcessInterface::dropTempCollection(OperationContext* opCtx,
         {write_ops::DeleteOpEntry(BSON("_id" << NamespaceStringUtil::serialize(
                                            nss, SerializationContext::stateDefault())),
                                   false /* multi */)}});
-    bcr.setWriteConcern(CommandHelpers::kMajorityWriteConcern.toBSON());
-    writeToLocalShard(opCtx, std::move(bcr));
+    writeToLocalShard(opCtx, std::move(bcr), CommandHelpers::kMajorityWriteConcern);
 }
 
 void ShardServerProcessInterface::createTimeseriesView(OperationContext* opCtx,

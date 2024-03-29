@@ -117,4 +117,24 @@ Status ShardLocal::runAggregation(
     return _rsLocalClient.runAggregation(opCtx, aggRequest, callback);
 }
 
+BatchedCommandResponse ShardLocal::runBatchWriteCommand(OperationContext* opCtx,
+                                                        const Milliseconds maxTimeMS,
+                                                        const BatchedCommandRequest& batchRequest,
+                                                        const WriteConcernOptions& writeConcern,
+                                                        RetryPolicy retryPolicy) {
+    // A request dispatched through a local client is served within the same thread that submits it
+    // (so that the opCtx needs to be used as the vehicle to pass the WC to the ServiceEntryPoint).
+    const auto originalWC = opCtx->getWriteConcern();
+    ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
+    opCtx->setWriteConcern(writeConcern);
+
+    const DatabaseName dbName = batchRequest.getNS().dbName();
+    const BSONObj cmdObj = [&] {
+        BSONObjBuilder cmdObjBuilder;
+        batchRequest.serialize(&cmdObjBuilder);
+        return cmdObjBuilder.obj();
+    }();
+
+    return _submitBatchWriteCommand(opCtx, cmdObj, dbName, maxTimeMS, retryPolicy);
+}
 }  // namespace mongo

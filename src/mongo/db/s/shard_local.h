@@ -93,6 +93,12 @@ public:
                                              const boost::optional<BSONObj>& postBatchResumeToken)>
                               callback) override;
 
+    BatchedCommandResponse runBatchWriteCommand(OperationContext* opCtx,
+                                                Milliseconds maxTimeMS,
+                                                const BatchedCommandRequest& batchRequest,
+                                                const WriteConcernOptions& writeConcern,
+                                                RetryPolicy retryPolicy) final;
+
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& unused,
