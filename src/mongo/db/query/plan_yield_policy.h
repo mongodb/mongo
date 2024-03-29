@@ -39,7 +39,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -212,14 +211,7 @@ public:
      * YIELD_AUTO and INTERRUPT_ONLY) or release locks or storage engine state (in the case of
      * auto-yielding plans).
      */
-    inline bool shouldYieldOrInterrupt(OperationContext* opCtx) {
-        if (auto t = _fastClock->now().toMillisSinceEpoch();
-            MONGO_unlikely(_forceYield || t > _nextYieldCheckpoint)) {
-            _nextYieldCheckpoint = t + _yieldIntervalMs;
-            return doShouldYieldOrInterrupt(opCtx);
-        }
-        return false;
-    }
+    virtual bool shouldYieldOrInterrupt(OperationContext* opCtx);
 
     /**
      * Resets the yield timer so that we wait for a while before yielding/interrupting again.
@@ -305,12 +297,6 @@ public:
         return holds_alternative<YieldThroughAcquisitions>(_yieldable);
     }
 
-protected:
-    /**
-     * The function that actually do check for interrupt or release locks or storage engine state.
-     */
-    MONGO_COMPILER_NOINLINE virtual bool doShouldYieldOrInterrupt(OperationContext* opCtx);
-
 private:
     /**
      * Functions to be implemented by derived classes which save and restore query execution state.
@@ -345,11 +331,8 @@ private:
     std::variant<const Yieldable*, YieldThroughAcquisitions> _yieldable;
     std::unique_ptr<const YieldPolicyCallbacks> _callbacks;
 
-    ElapsedTracker _elapsedTracker;
-    int64_t _yieldIntervalMs;
-    ClockSource* _fastClock;
-    int64_t _nextYieldCheckpoint{0};
     bool _forceYield = false;
+    ElapsedTracker _elapsedTracker;
 };
 
 }  // namespace mongo

@@ -439,8 +439,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryExecYieldIterations"
     cpp_vartype: AtomicWord<int>
-    default:
-      expr: std::numeric_limits<int>::max()
+    default: 1000
     redact: false
 
   internalQueryExecYieldPeriodMS:
