@@ -61,6 +61,81 @@ BSONObj wrapInArrayIf(bool doWrap, BSONObj&& obj) {
     return std::move(obj);
 }
 
+enum class MissingParameterTolerance {
+    kSetToDefault,
+    kError,
+};
+
+Status checkBucketingParameters(TimeseriesOptions& timeseriesOptions,
+                                MissingParameterTolerance tolerance) {
+    auto roundingSeconds = timeseriesOptions.getBucketRoundingSeconds();
+    auto maxSpanSeconds = timeseriesOptions.getBucketMaxSpanSeconds();
+    auto granularity = timeseriesOptions.getGranularity();
+
+    auto maxSpanSecondsFromGranularity =
+        getMaxSpanSecondsFromGranularity(granularity.get_value_or(BucketGranularityEnum::Seconds));
+
+    if (granularity) {
+        if (maxSpanSeconds && maxSpanSeconds != maxSpanSecondsFromGranularity) {
+            return {ErrorCodes::InvalidOptions,
+                    fmt::format("Time-series 'bucketMaxSpanSeconds' cannot be set to a value other "
+                                "than the default of {} for the provided granularity",
+                                maxSpanSecondsFromGranularity)};
+        }
+
+        if (roundingSeconds) {
+            return {ErrorCodes::InvalidOptions,
+                    "Time-series 'bucketRoundingSeconds' cannot be set alongside the granularity "
+                    "parameter"};
+        }
+
+        if (!maxSpanSeconds) {
+            switch (tolerance) {
+                case MissingParameterTolerance::kSetToDefault:
+                    timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
+                    break;
+                case MissingParameterTolerance::kError:
+                    return {ErrorCodes::InvalidOptions,
+                            "Time-series 'bucketRoundingSeconds' is missing"};
+            }
+        }
+    } else if (maxSpanSeconds || roundingSeconds) {
+        if (roundingSeconds != maxSpanSeconds) {
+            return {ErrorCodes::InvalidOptions,
+                    "Time-series 'bucketRoundingSeconds' must be equal to 'bucketMaxSpanSeconds'"};
+        }
+    } else {
+        if (maxSpanSeconds && maxSpanSecondsFromGranularity != maxSpanSeconds) {
+            return {ErrorCodes::InvalidOptions,
+                    fmt::format("Timeseries 'bucketMaxSpanSeconds' cannot be set to a value other "
+                                "than the default of {} for the provided granularity",
+                                maxSpanSecondsFromGranularity)};
+        }
+        if (!granularity) {
+            switch (tolerance) {
+                case MissingParameterTolerance::kSetToDefault:
+                    timeseriesOptions.setGranularity(BucketGranularityEnum::Seconds);
+                    break;
+                case MissingParameterTolerance::kError:
+                    return {ErrorCodes::InvalidOptions, "Time-series 'granularity' is missing"};
+            }
+        }
+
+        if (!maxSpanSeconds) {
+            switch (tolerance) {
+                case MissingParameterTolerance::kSetToDefault:
+                    timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
+                    break;
+                case MissingParameterTolerance::kError:
+                    return {ErrorCodes::InvalidOptions,
+                            "Time-series 'bucketMaxSpanSeconds' is missing"};
+            }
+        }
+    }
+
+    return Status::OK();
+}
+
 }  // namespace
 
 Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& currentOptions,
@@ -323,57 +398,12 @@ Date_t roundTimestampBySeconds(const Date_t& time, const long long roundingSecon
 }
 
 Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions) {
-    auto roundingSeconds = timeseriesOptions.getBucketRoundingSeconds();
-    auto maxSpanSeconds = timeseriesOptions.getBucketMaxSpanSeconds();
-    auto granularity = timeseriesOptions.getGranularity();
+    return checkBucketingParameters(timeseriesOptions, MissingParameterTolerance::kSetToDefault);
+}
 
-    auto maxSpanSecondsFromGranularity =
-        getMaxSpanSecondsFromGranularity(granularity.get_value_or(BucketGranularityEnum::Seconds));
-
-    if (granularity) {
-        if (maxSpanSeconds && maxSpanSeconds != maxSpanSecondsFromGranularity) {
-            return Status{
-                ErrorCodes::InvalidOptions,
-                fmt::format("Timeseries 'bucketMaxSpanSeconds' is not configurable to a value "
-                            "other than the default of {} for the provided granularity",
-                            maxSpanSecondsFromGranularity)};
-        }
-
-        if (roundingSeconds) {
-            return Status{ErrorCodes::InvalidOptions,
-                          "Timeseries 'bucketRoundingSeconds' is not configurable alongside the "
-                          "granularity parameter"};
-        }
-
-        if (!maxSpanSeconds)
-            timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
-
-        // If the granularity is specified, do not set the 'bucketRoundingSeconds' field.
-        timeseriesOptions.setBucketRoundingSeconds(boost::none);
-    } else if (maxSpanSeconds || roundingSeconds) {
-        if (roundingSeconds != maxSpanSeconds) {
-            return Status{ErrorCodes::InvalidOptions,
-                          "Timeseries 'bucketRoundingSeconds' needs to be equal to "
-                          "'bucketMaxSpanSeconds'"};
-        }
-    } else {
-        if (maxSpanSeconds && maxSpanSecondsFromGranularity != maxSpanSeconds) {
-            return Status{
-                ErrorCodes::InvalidOptions,
-                fmt::format("Timeseries 'bucketMaxSpanSeconds' is not configurable to a value "
-                            "other than the default of {} for the provided granularity",
-                            maxSpanSecondsFromGranularity)};
-        }
-        if (!granularity) {
-            timeseriesOptions.setGranularity(BucketGranularityEnum::Seconds);
-        }
-
-        if (!maxSpanSeconds) {
-            timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
-        }
-    }
-
-    return Status::OK();
+Status validateBucketingParameters(const TimeseriesOptions& timeseriesOptions) {
+    return checkBucketingParameters(const_cast<TimeseriesOptions&>(timeseriesOptions),
+                                    MissingParameterTolerance::kError);
 }
 
 }  // namespace timeseries

@@ -85,5 +85,12 @@ Date_t roundTimestampBySeconds(const Date_t& time, long long roundingSeconds);
  * are passed through we set them to their default values.
  */
 Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions);
+
+/**
+ * Validates the combination of bucketRoundingSeconds, bucketMaxSpanSeconds and granularity in
+ * TimeseriesOptions. Returns a non-OK status if the options are not valid or if required parameters
+ * are missing.
+ */
+Status validateBucketingParameters(const TimeseriesOptions&);
 }  // namespace timeseries
 }  // namespace mongo
