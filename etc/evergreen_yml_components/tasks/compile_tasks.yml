@@ -881,6 +881,37 @@ tasks:
       targets: install-all-meta-but-not-unittests
       compiling_for_test: true
 
+## clang_tidy - run clang_tidy
+- name: clang_tidy
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "requires_large_host"]
+  exec_timeout_secs: 7200 # 1 hour timeout for the task overall
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - func: "do scons setup"
+  - func: "scons compile"
+    vars:
+      task_compile_flags: >-
+        --build-profile=compiledb
+      targets: compiledb +mongo-tidy-tests
+      compiling_for_test: true
+      compile_flags: >-
+        --link-model=dynamic
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_${clang_tidy_toolchain}_clang.vars
+        --use-diagnostic-latches=on
+      show_scons_timings: false
+  - command: subprocess.exec
+    type: test
+    timeout_secs: 7000 # 1 hour timeout for no output
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/run_clang_tidy.sh"
+      env:
+        clang_tidy_file: ".clang-tidy"
+
 - <<: *clang_tidy_task_template
   name: clang_tidy_1
   commands:
