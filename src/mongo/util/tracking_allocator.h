@@ -155,7 +155,17 @@ public:
     }
 
     TrackingSharedBufferAllocator(TrackingSharedBufferAllocator&&) = default;
-    TrackingSharedBufferAllocator& operator=(TrackingSharedBufferAllocator&&) = default;
+    TrackingSharedBufferAllocator& operator=(TrackingSharedBufferAllocator&& other) {
+        if (&other == this) {
+            return *this;
+        }
+
+        _stats.get().bytesDeallocated(_buf.capacity());
+        _buf = std::move(other._buf);
+        _stats = other._stats;
+
+        return *this;
+    }
 
     void malloc(size_t size) {
         _stats.get().bytesAllocated(size);
