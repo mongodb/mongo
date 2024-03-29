@@ -70,12 +70,6 @@ public:
     explicit Simple8bBuilder(Allocator = {});
     ~Simple8bBuilder();
 
-    Simple8bBuilder(const Simple8bBuilder&) = default;
-    Simple8bBuilder(Simple8bBuilder&&) = default;
-
-    Simple8bBuilder& operator=(const Simple8bBuilder&) = default;
-    Simple8bBuilder& operator=(Simple8bBuilder&&) = default;
-
     /**
      * Appends val to Simple8b. Returns true if the append was successful and false if the value was
      * outside the range of possible values we can store in Simple8b.
