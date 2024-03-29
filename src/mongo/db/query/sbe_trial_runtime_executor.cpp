@@ -44,6 +44,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo::sbe {
+
 bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candidate,
                                              size_t maxNumResults) {
     auto* resultSlot = candidate->data.resultAccessor;
@@ -74,7 +75,7 @@ bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candida
         candidate->results.push_back({std::move(obj), {recordIdSlot != nullptr, recordId}});
         if (candidate->results.size() >= maxNumResults ||
             candidate->data.tracker->metricReached<TrialRunTracker::kNumPlanningResults>() ||
-            _stashSizeBytes >= _stashMemoryLimit) {
+            _stashSizeBytes >= _stashSizeMaxBytes) {
             return false;
         }
     } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
@@ -125,7 +126,6 @@ void TrialRuntimeExecutor::executeCachedCandidateTrial(plan_ranker::CandidatePla
                                                        size_t maxNumResults) {
     prepareCandidate(candidate, true /*preparingFromCache*/);
     _stashSizeBytes = 0;
-    _stashMemoryLimit = trial_period::getTrialPeriodNumToReturn(_cq) * BSONObjMaxInternalSize;
     while (fetchNextDocument(candidate, maxNumResults)) {
     }
 }

@@ -49,8 +49,11 @@ public:
                          const MultipleCollectionAccessor& collections,
                          const CanonicalQuery& cq,
                          PlanYieldPolicySBE* yieldPolicy,
-                         const AllIndicesRequiredChecker& indexExistenceChecker)
-        : _opCtx(opCtx),
+                         const AllIndicesRequiredChecker& indexExistenceChecker,
+                         size_t stashSizeMaxBytes = std::numeric_limits<size_t>::max())
+
+        : _stashSizeMaxBytes(stashSizeMaxBytes),
+          _opCtx(opCtx),
           _collections(collections),
           _cq(cq),
           _yieldPolicy(yieldPolicy),
@@ -99,7 +102,7 @@ public:
 
 private:
     size_t _stashSizeBytes = 0;
-    size_t _stashMemoryLimit = 0;
+    const size_t _stashSizeMaxBytes;
 
     // The following data members are not owned.
     OperationContext* const _opCtx;

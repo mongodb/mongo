@@ -143,11 +143,13 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
         candidate.data.tracker.get(),
         candidate.data.stageData.staticData->runtimePlanningRootNodeId);
 
-    sbe::TrialRuntimeExecutor{plannerData.opCtx,
-                              plannerData.collections,
-                              *plannerData.cq,
-                              plannerData.sbeYieldPolicy.get(),
-                              indexExistenceChecker}
+    sbe::TrialRuntimeExecutor{
+        plannerData.opCtx,
+        plannerData.collections,
+        *plannerData.cq,
+        plannerData.sbeYieldPolicy.get(),
+        indexExistenceChecker,
+        static_cast<size_t>(internalQuerySBEPlanEvaluationMaxMemoryBytes.load())}
         .executeCachedCandidateTrial(&candidate, maxTrialResults);
 
     return candidate;

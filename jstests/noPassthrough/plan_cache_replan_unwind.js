@@ -95,7 +95,7 @@ testFn(aUnwind, numExpectedResults, bUnwind, numExpectedResults, expectedCacheEn
 if (sbeEnabled) {
     // In classic runtime planning for SBE, we should stop trial run if inefficient plan produces
     // too much data to stash.
-    const hugeString = Array(10 * 1024 * 1024 + 1).toString();  // 10MB of ','
+    const hugeString = Array(1024 * 1024 + 1).toString();  // 10MB of ','
     const foreignColl = db.plan_cache_replan_unwind_foreign;
     assert.commandWorked(foreignColl.insertOne({_id: 0, str: hugeString}));
 
