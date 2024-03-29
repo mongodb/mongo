@@ -15,10 +15,10 @@ Ex: `buildscripts/clang_format.py lint`
 
 ### `clang-tidy`
 
-The `evergreen/run_clang_tidy.sh` shell script runs the `clang-tidy` linter. In order to run
+The `buildscripts/clang_tidy.py` shell script runs the `clang-tidy` linter. In order to run
 `clang-tidy` you must have a compilation database (`compile_commands.json` file).
 
-Ex: `bash buildscripts/run_clang_tidy.sh`
+Ex: `python3 buildscripts/clang_tidy.py`
 
 | Linter       | Configuration File(s) | Help Command        | Documentation                                                                                            |
 | ------------ | --------------------- | ------------------- | -------------------------------------------------------------------------------------------------------- |

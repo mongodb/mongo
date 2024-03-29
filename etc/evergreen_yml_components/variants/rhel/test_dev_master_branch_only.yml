@@ -253,7 +253,7 @@ buildvariants:
     - name: libdeps_graph_linting
       distros:
       - rhel80-large
-    - name: clang_tidy
+    - name: .clang_tidy
       distros:
       - rhel80-xxlarge
 

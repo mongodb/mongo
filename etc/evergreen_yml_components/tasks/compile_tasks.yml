@@ -106,6 +106,25 @@ variables:
   - func: "run hang analyzer"
   - func: "wait for resmoke to shutdown"
 
+- &clang_tidy_scons_compile_vars
+  task_compile_flags: >-
+    --build-profile=compiledb
+  targets: compiledb +mongo-tidy-tests
+  compiling_for_test: true
+  compile_flags: >-
+    --link-model=dynamic
+    -j$(grep -c ^processor /proc/cpuinfo)
+    --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars
+    --use-diagnostic-latches=on
+  show_scons_timings: false
+
+- &clang_tidy_task_template
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "requires_large_host", "clang_tidy"]
+  exec_timeout_secs: 7200 # 1 hour timeout for the task overall
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+
 # TODO: split this up into the user files.
 # List of all variants that make mongocryptd
 # If a variant is listed here and has a push task, mongocryptd is pushed
@@ -862,36 +881,49 @@ tasks:
       targets: install-all-meta-but-not-unittests
       compiling_for_test: true
 
-## clang_tidy - run clang_tidy
-- name: clang_tidy
-  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "requires_large_host"]
-  exec_timeout_secs: 7200 # 1 hour timeout for the task overall
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
+- <<: *clang_tidy_task_template
+  name: clang_tidy_1
   commands:
   - func: "do scons setup"
   - func: "scons compile"
     vars:
-      task_compile_flags: >-
-        --build-profile=compiledb
-      targets: compiledb +mongo-tidy-tests
-      compiling_for_test: true
-      compile_flags: >-
-        --link-model=dynamic
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_${clang_tidy_toolchain}_clang.vars
-        --use-diagnostic-latches=on
-      show_scons_timings: false
-  - command: subprocess.exec
-    type: test
-    timeout_secs: 7000 # 1 hour timeout for no output
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/run_clang_tidy.sh"
-      env:
-        clang_tidy_file: ".clang-tidy"
+      <<: *clang_tidy_scons_compile_vars
+  - func: "run clang tidy"
+    vars:
+      split: 1
+
+- <<: *clang_tidy_task_template
+  name: clang_tidy_2
+  commands:
+  - func: "do scons setup"
+  - func: "scons compile"
+    vars:
+      <<: *clang_tidy_scons_compile_vars
+  - func: "run clang tidy"
+    vars:
+      split: 2
+
+- <<: *clang_tidy_task_template
+  name: clang_tidy_3
+  commands:
+  - func: "do scons setup"
+  - func: "scons compile"
+    vars:
+      <<: *clang_tidy_scons_compile_vars
+  - func: "run clang tidy"
+    vars:
+      split: 3
+
+- <<: *clang_tidy_task_template
+  name: clang_tidy_4
+  commands:
+  - func: "do scons setup"
+  - func: "scons compile"
+    vars:
+      <<: *clang_tidy_scons_compile_vars
+  - func: "run clang tidy"
+    vars:
+      split: 4
 
 ## compile_unittests ##
 - &compile_unittests
@@ -907,9 +939,10 @@ tasks:
 
 - name: compile_and_run_unittests_first_quarter
   tags: ["assigned_to_jira_team_devprod_build"]
-  exec_timeout_secs: 10800 # 3 hours
   depends_on:
-  - name: compile_dist_test
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  exec_timeout_secs: 10800 # 3 hours
   commands:
   - func: "scons compile"
     vars:
@@ -928,9 +961,10 @@ tasks:
 
 - name: compile_and_run_unittests_second_quarter
   tags: ["assigned_to_jira_team_devprod_build"]
-  exec_timeout_secs: 10800 # 3 hours
   depends_on:
-  - name: compile_dist_test
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  exec_timeout_secs: 10800 # 3 hours
   commands:
   - func: "scons compile"
     vars:
@@ -949,9 +983,10 @@ tasks:
 
 - name: compile_and_run_unittests_third_quarter
   tags: ["assigned_to_jira_team_devprod_build"]
-  exec_timeout_secs: 10800 # 3 hours
   depends_on:
-  - name: compile_dist_test
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  exec_timeout_secs: 10800 # 3 hours
   commands:
   - func: "scons compile"
     vars:
@@ -970,9 +1005,10 @@ tasks:
 
 - name: compile_and_run_unittests_fourth_quarter
   tags: ["assigned_to_jira_team_devprod_build"]
-  exec_timeout_secs: 10800 # 3 hours
   depends_on:
-  - name: compile_dist_test
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  exec_timeout_secs: 10800 # 3 hours
   commands:
   - func: "scons compile"
     vars:

@@ -11,6 +11,7 @@ import sys
 import locale
 import hashlib
 import time
+import math
 from typing import Any, Dict, List, Optional, Tuple
 import multiprocessing
 from pathlib import Path
@@ -136,6 +137,14 @@ def main():
                         help="Report json file to write combined fixes to")
     parser.add_argument("-c", "--compile-commands", type=str, default="compile_commands.json",
                         help="compile_commands.json file to use to find the files to tidy")
+    parser.add_argument(
+        "--split-jobs", type=int, default=0, help=
+        "The total number of splits if splitting the jobs across multiple tasks. 0 means don't split."
+    )
+    parser.add_argument(
+        "--split", type=int, default=1, help=
+        "The interval to run out of the total number of --split-jobs. Must be a value between 1 and --split-jobs value."
+    )
     parser.add_argument("-q", "--show-stdout", type=bool, default=True,
                         help="Log errors to console")
     parser.add_argument("-l", "--log-file", type=str, default="clang_tidy",
@@ -158,7 +167,7 @@ def main():
 
     if os.path.exists(args.compile_commands):
         with open(args.compile_commands) as compile_commands:
-            compile_commands = json.load(compile_commands)
+            compile_commands = sorted(json.load(compile_commands), key=lambda x: x['file'])
     else:
         if args.compile_commands == parser.get_default('compile_commands'):
             print(
@@ -180,8 +189,20 @@ def main():
             print(f"Could not find config file: {args.clang_tidy_cfg}")
         sys.exit(1)
 
+    if args.split_jobs < 0:
+        print(f"--split-jobs: '{args.split_jobs}' must positive integer.")
+        sys.exit(1)
+
+    if args.split_jobs != 0:
+        if args.split < 1 or args.split > args.split_jobs:
+            print(
+                f"--split: '{args.split}' must be a value between 1 and --split-jobs: '{args.split_jobs}'"
+            )
+            sys.exit(1)
+
     files_to_tidy: List[Path] = list()
     files_to_parse = list()
+    filtered_compile_commands = []
     for file_doc in compile_commands:
         # A few special cases of files to ignore
         if not file_doc["file"].startswith("src/mongo/"):
@@ -194,7 +215,28 @@ def main():
         # TODO SERVER-49884 Remove this when we no longer check in generated Bison.
         if file_doc["file"].endswith("/parser_gen.cpp"):
             continue
-        files_to_tidy.append(Path(file_doc["file"]))
+        filtered_compile_commands.append(file_doc)
+
+    if args.split_jobs != 0:
+        original_compile_commands = filtered_compile_commands.copy()
+        total = len(filtered_compile_commands)
+        extra = total % args.split_jobs
+        chunk_size = int(total / args.split_jobs) + math.ceil(extra / args.split_jobs)
+        chunks = [
+            filtered_compile_commands[i:i + chunk_size]
+            for i in range(0, len(filtered_compile_commands), chunk_size)
+        ]
+        # verify we aren't silently forgetting anything.
+        for chunk in chunks:
+            for file_doc in chunk:
+                original_compile_commands.remove(file_doc)
+        if len(original_compile_commands) != 0:
+            raise Exception(
+                "Total compile_commands different from sum of splits! This means something could silently be ignored!"
+            )
+        filtered_compile_commands = chunks[args.split - 1]
+
+    files_to_tidy = [Path(file_doc['file']) for file_doc in filtered_compile_commands]
 
     total_jobs = len(files_to_tidy)
     workers = args.threads

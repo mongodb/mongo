@@ -170,7 +170,7 @@ buildvariants:
   - name: compile_test_parallel_dbtest_stream_TG
     distros:
     - amazon2-arm64-xlarge-commitqueue
-  - name: .development_critical_single_variant !.requires_large_host !clang_tidy !libdeps_graph_linting
+  - name: .development_critical_single_variant !.requires_large_host !.clang_tidy !libdeps_graph_linting
   - name: .development_critical .requires_large_host_commit_queue
     distros:
     - amazon2-arm64-large

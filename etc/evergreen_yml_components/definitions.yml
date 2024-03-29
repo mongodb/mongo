@@ -589,6 +589,17 @@ functions:
       content_type: text/plain
       display_name: Pip Requirements
 
+  "run clang tidy": &run_clang_tidy
+    - command: subprocess.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+        - "src/evergreen/run_python_script.sh"
+        - "buildscripts/clang_tidy.py"
+        - "--split-jobs=4"
+        - "--split=${split}"
+
   "upload clang tidy results": &upload_clang_tidy_results
     - command: s3.put
       display_name: "upload clang_tidy_fixes.tgz"
