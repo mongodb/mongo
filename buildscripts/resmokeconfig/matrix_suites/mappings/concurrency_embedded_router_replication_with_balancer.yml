@@ -1,0 +1,4 @@
+base_suite: concurrency_sharded_replication_with_balancer
+overrides:
+  - "embedded_router.embedded_router"
+  - "embedded_router.concurrency_embedded_router"

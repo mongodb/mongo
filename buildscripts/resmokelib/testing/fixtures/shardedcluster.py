@@ -200,7 +200,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             shard.await_ready()
 
         # Need to get the new config shard connection string generated from the auto-bootstrap procedure
-        if self.use_auto_bootstrap_procedure:
+        if self.use_auto_bootstrap_procedure and not self.embedded_router_mode:
             for mongos in self.mongos:
                 mongos.mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
 

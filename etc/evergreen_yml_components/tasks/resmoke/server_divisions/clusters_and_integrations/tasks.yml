@@ -276,6 +276,15 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
+  name: concurrency_embedded_router_causal_consistency_and_balancer_gen
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "large", "non_live_record", "sharded", "no_debug_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: concurrency_embedded_router_clusterwide_ops_add_remove_shards_gen
   tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
@@ -294,7 +303,25 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
+  name: concurrency_embedded_router_local_read_write_multi_stmt_txn_with_balancer_gen
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "large", "sharded", "no_debug_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: concurrency_embedded_router_multi_stmt_txn_gen
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "large", "sharded", "no_debug_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
+  name: concurrency_embedded_router_multi_stmt_txn_with_balancer_gen
   tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
@@ -321,6 +348,26 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
+  name: concurrency_embedded_router_replication_no_txns_with_balancer_gen
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "no_txns", "large", "sharded"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: concurrency_embedded_router_replication_with_balancer
+      resmoke_args: "--excludeWithAnyTags=uses_transactions"
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
+  name: concurrency_embedded_router_replication_with_balancer_gen
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "incompatible_mac", "incompatible_ibm", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: embedded_router_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_servicearch", "default"]
   commands:
@@ -329,6 +376,12 @@ tasks:
 - <<: *gen_task_template
   name: embedded_router_jscore_passthrough_with_config_shard_gen
   tags: ["assigned_to_jira_team_server_servicearch", "default"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: embedded_router_jscore_passthrough_with_balancer_gen
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "sharding", "jscore", "common"]
   commands:
   - func: "generate resmoke tasks"
 
