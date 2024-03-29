@@ -139,9 +139,26 @@ bool isTimeseries(OperationContext* opCtx, const Request& request) {
     // collection does not yet exist, this check may return false unnecessarily. As a result, an
     // insert attempt into the time-series namespace will either succeed or fail, depending on who
     // wins the race.
-    return CollectionCatalog::get(opCtx)
-        ->lookupCollectionByNamespaceForRead(opCtx, bucketNss)
-        .get();
+    // Hold reference to the catalog for collection lookup without locks to be safe.
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
+    if (!coll) {
+        return false;
+    }
+
+    if (auto options = coll->getTimeseriesOptions()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Time-series buckets collection is not clustered",
+                coll->isClustered());
+
+        uassert(ErrorCodes::InvalidOptions,
+                "Time-series buckets collection is missing bucketMaxSpanSeconds",
+                options->getBucketMaxSpanSeconds());
+
+        return true;
+    }
+
+    return false;
 }
 
 NamespaceString makeTimeseriesBucketsNamespace(const NamespaceString& nss) {
