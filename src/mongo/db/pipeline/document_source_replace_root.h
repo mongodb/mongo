@@ -40,6 +40,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -110,6 +111,49 @@ public:
     const boost::intrusive_ptr<Expression>& getExpression() const {
         return _newRoot;
     }
+
+    /**
+     * Detects if 'replaceRootTransform' represents the unnesting of a field path. If it does,
+     * returns the name of that field path. For example, if 'replaceRootTransform' represents the
+     * transformation associated with {$replaceWith: "$x"} or {$replaceRoot: {newRoot: "$x"}},
+     * returns "x".
+     */
+    boost::optional<std::string> unnestsPath() const;
+
+    /**
+     * This whole block adds
+     * {$expr: {$ne: [{$type: "$expression"}, {$const: "object"}]}}
+     * in order to match on documents which, when evaluated at $expression, don't resolve to
+     * objects.
+     */
+    static boost::intrusive_ptr<DocumentSourceMatch> createTypeNEObjectPredicate(
+        const std::string& expression, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Report renames from this stage to a MatchExpression. We only report a rename for a top-level
+     * field in a path to ensure that we only have at max one applicable rename per path in the ME.
+     */
+    void reportRenames(const MatchExpression* expr,
+                       const std::string& prefixPath,
+                       StringMap<std::string>& renames);
+
+    /**
+     * This optimization pushes a match stage before a replaceRoot stage to improve performance.
+     *
+     * Ex: [{$replaceWith: {"$subDocument"}}, {$match: {x: 2}}]
+     * ->
+     * [{$match: {"subDocument.x": 2}}, {$replaceWith: {"$subDocument"}}]
+     *
+     * We also append {$expr: {$ne: [{$type: "$expression"}, {$const: "object"}]}} to the pushed
+     * forward match stage to ensure that after we swap a $match stage before a $replaceRoot stage,
+     * we can still check that the structure of all documents in the collection can resolve to a
+     * document after `newRoot` is applied.
+     *
+     * Note: this optimization will not rename and push forward a match stage if there are
+     * dependencies between different paths contained in the match expression.
+     */
+    bool pushDotRenamedMatchBefore(Pipeline::SourceContainer::iterator itr,
+                                   Pipeline::SourceContainer* container);
 
     boost::intrusive_ptr<Expression>& getExpressionToModify() {
         return _newRoot;

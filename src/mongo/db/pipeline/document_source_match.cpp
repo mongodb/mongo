@@ -171,7 +171,7 @@ Pipeline::SourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
         invariant(!nextMatch->_isTextQuery);
 
         // Merge 'nextMatch' into this stage.
-        joinMatchWith(nextMatch);
+        joinMatchWith(nextMatch, "$and"_sd);
 
         // Erase 'nextMatch'.
         container->erase(std::next(itr));
@@ -418,9 +418,13 @@ bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
     return false;
 }
 
-void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other) {
+void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other,
+                                        StringData joinPred) {
+    invariant(joinPred == "$and"_sd || joinPred == "$or"_sd,
+              str::stream() << "joinPred must be '$and' or '$or', was " << joinPred);
+
     BSONObjBuilder bob;
-    BSONArrayBuilder arrBob(bob.subarrayStart("$and"));
+    BSONArrayBuilder arrBob(bob.subarrayStart(joinPred));
 
     auto addPredicates = [&](const auto& predicates) {
         if (predicates.isEmpty()) {
@@ -428,9 +432,11 @@ void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other
         }
 
         for (auto&& pred : predicates) {
-            // If 'pred' is an $and, add its children directly to the new top-level $and to avoid
-            // nesting $and's. Otherwise, add 'pred' itself as a child.
-            if (pred.fieldNameStringData() == "$and") {
+            // For 'joinPred' == $and: If 'pred' is an $and, add its children directly to the new
+            // top-level $and to avoid nesting $and's. For 'joinPred' == $or: If 'pred' is a $or,
+            // add its children directly to the new top-level $or to avoid nesting $or's. Otherwise,
+            // add 'pred' itself as a child.
+            if (pred.fieldNameStringData() == joinPred) {
                 for (auto& child : pred.Array()) {
                     arrBob.append(child);
                 }

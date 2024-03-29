@@ -1942,6 +1942,19 @@ TEST(ApplyRenamesToExpression, ShouldApplyBasicRenamesForAMatchWithExpr) {
     ASSERT_BSONOBJ_EQ(renamedExpr->serialize(), fromjson("{$expr: {$eq: ['$d.b', '$e']}}"));
 }
 
+TEST(ApplyRenamesToExpression, ShouldApplyDottedRenamesForAMatch) {
+    BSONObj matchPredicate = fromjson("{x: 2}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"x", "subDocument.x"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_TRUE(renamedExpr);
+
+    ASSERT_BSONOBJ_EQ(renamedExpr->serialize(), fromjson("{'subDocument.x': {$eq: 2}}"));
+}
+
 TEST(ApplyRenamesToExpression, ShouldApplyDottedRenamesForAMatchWithExpr) {
     BSONObj matchPredicate = fromjson("{$expr: {$lt: ['$a.b.c', '$d.e.f']}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

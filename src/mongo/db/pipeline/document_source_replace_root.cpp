@@ -29,25 +29,36 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
+#include <iterator>
 #include <memory>
+#include <string>
 
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_expr.h"
+#include "mongo/db/matcher/match_expression_dependencies.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_replace_root_gen.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
+using namespace fmt::literals;
 
 Document ReplaceRootTransformation::applyTransformation(const Document& input) const {
     // Extract subdocument in the form of a Value.
@@ -65,6 +76,117 @@ Document ReplaceRootTransformation::applyTransformation(const Document& input) c
     MutableDocument newDoc(newRoot.getDocument());
     newDoc.copyMetaDataFrom(input);
     return newDoc.freeze();
+}
+
+boost::optional<std::string> ReplaceRootTransformation::unnestsPath() const {
+    // Ensure that expressionFieldPath exists and has a field path longer than 1 before we unnest.
+    // We don't want to unnest for {$replacewith: "$$ROOT"}, which has a field length of 1.
+    if (const ExpressionFieldPath* const expressionFieldPath =
+            dynamic_cast<ExpressionFieldPath*>(getExpression().get());
+        expressionFieldPath && expressionFieldPath->getFieldPath().getPathLength() > 1) {
+        return expressionFieldPath->getFieldPathWithoutCurrentPrefix().fullPath();
+    } else {
+        return boost::none;
+    }
+}
+
+boost::intrusive_ptr<DocumentSourceMatch> ReplaceRootTransformation::createTypeNEObjectPredicate(
+    const std::string& expression, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // This produces {$expr: ... }
+    auto matchExpr = std::make_unique<ExprMatchExpression>(
+        // This produces {$ne: ... }
+        make_intrusive<ExpressionCompare>(
+            expCtx.get(),
+            ExpressionCompare::CmpOp::NE,
+            // This produces [...]
+            makeVector<boost::intrusive_ptr<Expression>>(
+                // This produces {$type: ... }
+                make_intrusive<ExpressionType>(
+                    expCtx.get(),
+                    makeVector<boost::intrusive_ptr<Expression>>(
+                        // This produces "$expression"
+                        ExpressionFieldPath::createPathFromString(
+                            expCtx.get(), expression, expCtx->variablesParseState))),
+                // This produces {$const: "object"}
+                ExpressionConstant::create(expCtx.get(), Value("object"_sd)))),
+        expCtx);
+
+    BSONObjBuilder bob;
+    matchExpr->serialize(&bob);
+    return DocumentSourceMatch::create(bob.obj(), expCtx);
+}
+
+void ReplaceRootTransformation::reportRenames(const MatchExpression* expr,
+                                              const std::string& prefixPath,
+                                              StringMap<std::string>& renames) {
+    DepsTracker deps = {};
+    match_expression::addDependencies(expr, &deps);
+    for (const auto& path : deps.fields) {
+        // Only record renames for top level paths.
+        const auto oldPathTopLevelField = FieldPath::extractFirstFieldFromDottedPath(path);
+        renames.emplace(
+            std::make_pair(oldPathTopLevelField, "{}.{}"_format(prefixPath, oldPathTopLevelField)));
+    }
+}
+
+bool ReplaceRootTransformation::pushDotRenamedMatchBefore(Pipeline::SourceContainer::iterator itr,
+                                                          Pipeline::SourceContainer* container) {
+    // Attempt to push match stage before replaceRoot/replaceWith stage.
+    const auto prospectiveMatch = dynamic_cast<DocumentSourceMatch*>(std::next(itr)->get());
+    const auto unnestedPath = unnestsPath();
+
+    if (prospectiveMatch && unnestedPath) {
+        // If we reach this point, we know:
+        // 1) The current stage is a ReplaceRoot stage whose transformation represents the unnesting
+        // of a field path (length > 1).
+        // 2) The stage after us is a match. For a replaceRoot stage that unnests a field path, we
+        // will attempt to prepend the field path to subpaths in a copy of the match stage's
+        // MatchExpression.
+        //
+        // Ex: For the pipeline [{$replaceWith: {"$subDocument"}}, {$match: {x: 2}}], we make a copy
+        // of the original match expression and transform it to {$match: {"subDocument.x": 2}}. If
+        // the entire ME is eligible, we return a new match stage with the prepended ME.
+        MatchExpression* expr = prospectiveMatch->getMatchExpression();
+        auto& prefixPath = unnestedPath.get();
+        StringMap<std::string> renames;
+
+        // We will apply renames to the match stage and perform the swap if the match
+        // expression is eligible.
+        reportRenames(expr, prefixPath, renames);
+        // Report renames in ReplaceRoot stage,
+        auto modPaths = getModifiedPaths();
+        modPaths = {
+            DocumentSource::GetModPathsReturn::Type::kFiniteSet, {prefixPath}, std::move(renames)};
+
+        // Translate predicate statements based on the replace root stage renames.
+        auto splitMatchForReplaceRoot =
+            DocumentSourceMatch::splitMatchByModifiedFields(prospectiveMatch, modPaths);
+
+        if (splitMatchForReplaceRoot.first) {
+            // Join with "type != object" condition. This is to ensure that cases which would have
+            // resulted in an error before the optimization are not 'optimized' to cases which do
+            // not error. Optimizations should not change the behavior.
+            splitMatchForReplaceRoot.first->joinMatchWith(
+                createTypeNEObjectPredicate(prefixPath, _expCtx), "$or"_sd);
+
+            // Swap the eligible portion of the match stage with the replaceRoot stage. std::swap is
+            // used here as it performs reassignment of what the iterators point to in O(1) for
+            // non-array inputs.
+            *std::next(itr) = std::move(splitMatchForReplaceRoot.first);
+            std::swap(*itr, *std::next(itr));
+
+            if (splitMatchForReplaceRoot.second) {
+                // itr now points to the pushed down, eligible portion of the original match stage.
+                // Insert the remaining portion after the replaceRoot stage.
+                container->insert(std::next(std::next(itr)),
+                                  std::move(splitMatchForReplaceRoot.second));
+            }
+
+            return true;
+        }
+    }
+
+    return false;
 }
 
 REGISTER_DOCUMENT_SOURCE(replaceRoot,

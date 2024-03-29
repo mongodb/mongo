@@ -979,7 +979,7 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
         _matchSrc = nextMatch;
     } else {
         // We have already absorbed a $match. We need to join it with 'dependent'.
-        _matchSrc->joinMatchWith(nextMatch);
+        _matchSrc->joinMatchWith(nextMatch, "$and"_sd);
     }
 
     // Remove the original $match.

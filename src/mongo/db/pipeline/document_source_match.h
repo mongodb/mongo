@@ -168,10 +168,11 @@ public:
     }
 
     /**
-     * Combines the filter in this $match with the filter of 'other' using a $and, updating this
-     * match in place.
+     * Combines the filter in this $match with the filter of 'other' using a specified join
+     * predicate, updating this match in place. Currently, the join predicate can be "$and" or
+     * "$or".
      */
-    void joinMatchWith(boost::intrusive_ptr<DocumentSourceMatch> other);
+    void joinMatchWith(boost::intrusive_ptr<DocumentSourceMatch> other, StringData joinPred);
 
 
     bool hasQuery() const override;
