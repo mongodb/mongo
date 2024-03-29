@@ -32,6 +32,8 @@ export const logQueries = {
     },
     duringInitialSyncQuery:
         {severity: "warning", "msg": "cannot execute dbcheck due to ongoing initial sync"},
+    duringStableRecovery:
+        {severity: "warning", "msg": "cannot execute dbcheck due to ongoing stable recovering"},
     errorQuery: {"severity": "error"},
     warningQuery: {"severity": "warning"},
     infoOrErrorQuery:

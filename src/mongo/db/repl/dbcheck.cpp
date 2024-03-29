@@ -80,6 +80,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(SleepDbCheckInBatch);
+MONGO_FAIL_POINT_DEFINE(hangAfterGeneratingHashForExtraIndexKeysCheck);
 
 namespace {
 
@@ -881,6 +882,14 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
 
                     uassertStatusOK(hasher->hashForExtraIndexKeysCheck(
                         opCtx, collection.get(), firstKS.getValueCopy(), lastKS.getValueCopy()));
+                    if (MONGO_unlikely(
+                            hangAfterGeneratingHashForExtraIndexKeysCheck.shouldFail())) {
+                        LOGV2_DEBUG(3083200,
+                                    3,
+                                    "Hanging due to hangAfterGeneratingHashForExtraIndexKeysCheck "
+                                    "failpoint");
+                        hangAfterGeneratingHashForExtraIndexKeysCheck.pauseWhileSet(opCtx);
+                    }
                     break;
                 }
                 case mongo::DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck:
@@ -990,7 +999,6 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
     const IDLParserContext ctx(
         "o", false /*apiStrict*/, auth::ValidatedTenancyScope::get(opCtx), entry.getTid());
     auto skipDbCheck = mode != OplogApplication::Mode::kSecondary;
-    auto severity = skipDbCheck ? SeverityEnum::Warning : SeverityEnum::Info;
     std::string oplogApplicationMode;
     if (mode == OplogApplication::Mode::kInitialSync) {
         oplogApplicationMode = "initial sync";
@@ -1075,7 +1083,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             auto healthLogEntry = mongo::dbCheckHealthLogEntry(
                 boost::none /*nss*/,
                 boost::none /*collectionUUID*/,
-                severity,
+                skipDbCheck ? SeverityEnum::Warning : SeverityEnum::Info,
                 skipDbCheck ? "cannot execute dbcheck due to ongoing " + oplogApplicationMode : "",
                 ScopeEnum::Cluster,
                 type,
