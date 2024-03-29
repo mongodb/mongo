@@ -16,7 +16,7 @@
  * ]
  */
 
-const conn = MongoRunner.runMongod({setParameter: {timeseriesLargeMeasurementThreshold: 1}});
+const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 const coll = db.getCollection(jsTestName());
 const bucketColl = db.getCollection("system.buckets." + jsTestName());
@@ -59,7 +59,9 @@ jsTestLog("Testing single inserts");
 resetCollection();
 
 for (let i = 0; i < numMeasurements; i++) {
-    const doc = {_id: i, [timeFieldName]: ISODate(), value: "a".repeat(measurementValueLength)};
+    // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
+    const value = (i % 2 == 0 ? "a" : "b");
+    const doc = {_id: i, [timeFieldName]: ISODate(), value: value.repeat(measurementValueLength)};
     assert.commandWorked(coll.insert(doc));
 }
 checkAverageBucketSize();
@@ -69,7 +71,9 @@ resetCollection();
 
 let batch = [];
 for (let i = 0; i < numMeasurements; i++) {
-    const doc = {_id: i, [timeFieldName]: ISODate(), value: "a".repeat(measurementValueLength)};
+    // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
+    const value = (i % 2 == 0 ? "a" : "b");
+    const doc = {_id: i, [timeFieldName]: ISODate(), value: value.repeat(measurementValueLength)};
     batch.push(doc);
 }
 assert.commandWorked(coll.insertMany(batch), {ordered: false});

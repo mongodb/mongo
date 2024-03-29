@@ -26,7 +26,7 @@ TimeseriesTest.run((insert) => {
     // The measurement data should not take up all of the 'bucketMaxSizeKB' limit because we need to
     // leave room for the control.min and control.max summaries (two measurements worth of data). We
     // need to fit two measurements within this limit to trigger compression if enabled.
-    const largeValue = 'x'.repeat(((bucketMaxSizeKB - 1) / 4) * 1024);
+    const largeValueSize = ((bucketMaxSizeKB - 1) / 4) * 1024;
 
     const runTest = function(numDocsPerInsert) {
         const coll = db.getCollection(collNamePrefix + numDocsPerInsert);
@@ -39,7 +39,10 @@ TimeseriesTest.run((insert) => {
 
         let docs = [];
         for (let i = 0; i < numDocs; i++) {
-            docs.push({_id: i, [timeFieldName]: ISODate(), x: largeValue});
+            // Strings greater than 16 bytes are not compressed unless they are equal to the
+            // previous.
+            const value = (i % 2 == 0 ? "a" : "b");
+            docs.push({_id: i, [timeFieldName]: ISODate(), x: value.repeat(largeValueSize)});
             if ((i + 1) % numDocsPerInsert === 0) {
                 assert.commandWorked(insert(coll, docs), 'failed to insert docs: ' + tojson(docs));
                 docs = [];
@@ -52,8 +55,11 @@ TimeseriesTest.run((insert) => {
         for (let i = 0; i < numDocs; i++) {
             const viewDoc = viewDocs[i];
             assert.eq(i, viewDoc._id, 'unexpected _id in doc: ' + i + ': ' + tojson(viewDoc));
-            assert.eq(
-                largeValue, viewDoc.x, 'unexpected field x in doc: ' + i + ': ' + tojson(viewDoc));
+
+            const value = (i % 2 == 0 ? "a" : "b");
+            assert.eq(value.repeat(largeValueSize),
+                      viewDoc.x,
+                      'unexpected field x in doc: ' + i + ': ' + tojson(viewDoc));
         }
 
         // Check bucket collection.
@@ -66,17 +72,26 @@ TimeseriesTest.run((insert) => {
         assert.eq(0,
                   bucketDocs[0].control.min._id,
                   'invalid control.min for _id in first bucket: ' + tojson(bucketDocs[0].control));
-        assert.eq(largeValue,
+        assert.eq("a".repeat(largeValueSize),
                   bucketDocs[0].control.min.x,
                   'invalid control.min for x in first bucket: ' + tojson(bucketDocs[0].control));
         assert.eq(1,
                   bucketDocs[0].control.max._id,
                   'invalid control.max for _id in first bucket: ' + tojson(bucketDocs[0].control));
-        assert.eq(largeValue,
+        assert.eq("b".repeat(largeValueSize),
                   bucketDocs[0].control.max.x,
                   'invalid control.max for x in first bucket: ' + tojson(bucketDocs[0].control));
-        assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
-               'expected first bucket to be compressed: ' + tojson(bucketDocs));
+        if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+            assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
+                   'expected first bucket to be compressed: ' + tojson(bucketDocs));
+        } else {
+            // Because the strings remain uncompressed, the bucket doesn't get compressed when
+            // closed due to size as it would not be any smaller.
+            assert.eq(1, coll.stats().timeseries.numUncompressedBuckets);
+            assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
+                      bucketDocs[0].control.version,
+                      'expected first bucket to be uncompressed: ' + tojson(bucketDocs));
+        }
 
         assert(!bucketDocs[0].control.hasOwnProperty("closed"),
                'unexpected control.closed in first bucket: ' + tojson(bucketDocs));
@@ -85,13 +100,13 @@ TimeseriesTest.run((insert) => {
         assert.eq(numDocs - 1,
                   bucketDocs[1].control.min._id,
                   'invalid control.min for _id in second bucket: ' + tojson(bucketDocs[1].control));
-        assert.eq(largeValue,
+        assert.eq("a".repeat(largeValueSize),
                   bucketDocs[1].control.min.x,
                   'invalid control.min for x in second bucket: ' + tojson(bucketDocs[1].control));
         assert.eq(numDocs - 1,
                   bucketDocs[1].control.max._id,
                   'invalid control.max for _id in second bucket: ' + tojson(bucketDocs[1].control));
-        assert.eq(largeValue,
+        assert.eq("a".repeat(largeValueSize),
                   bucketDocs[1].control.max.x,
                   'invalid control.max for x in second bucket: ' + tojson(bucketDocs[1].control));
         assert.eq(TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)

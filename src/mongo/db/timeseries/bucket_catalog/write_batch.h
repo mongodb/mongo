@@ -60,6 +60,25 @@ struct CommitInfo {
     boost::optional<OID> electionId;
 };
 
+struct Sizes {
+    // Contains the verified size for:
+    // - The meta, control, and field names for previously unaccounted fields in a Bucket.
+    // - Data fields after intermediate().
+    int32_t uncommittedVerifiedSize = 0;
+
+    // The estimated size of uncommitted data fields being inserted into a Bucket.
+    int32_t uncommittedMeasurementEstimate = 0;
+
+    int32_t total() const {
+        return uncommittedVerifiedSize + uncommittedMeasurementEstimate;
+    }
+
+    void operator+=(const Sizes& other) {
+        uncommittedVerifiedSize += other.uncommittedVerifiedSize;
+        uncommittedMeasurementEstimate += other.uncommittedMeasurementEstimate;
+    }
+};
+
 /**
  * The basic unit of work for a bucket. Each insert will return a shared_ptr to a WriteBatch.
  * When a writer is finished with all their insertions, they should then take steps to ensure
@@ -112,6 +131,11 @@ struct WriteBatch {
     SharedPromise<CommitInfo> promise;
 
     ExecutionStatsController stats;
+
+    // Marginal numbers for this batch only. Uncommitted is a rough estimate of data in this batch,
+    // using 0 for anything under threshold, and uncompressed size for anything over threshold.
+    // Committed is 0 until it is populated by intermediate as the delta for committing this batch.
+    Sizes sizes;
 
     StringMap<std::size_t> newFieldNamesToBeInserted;  // Value is hash of string key
 

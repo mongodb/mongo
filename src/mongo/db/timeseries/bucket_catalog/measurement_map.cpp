@@ -84,9 +84,8 @@ void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
 }
 
 std::vector<std::pair<StringData, TrackedBSONColumnBuilder::BinaryDiff>>
-MeasurementMap::intermediate(int32_t& compressedSize) {
-    // Remove the old compressed size.
-    compressedSize -= _compressedSize;
+MeasurementMap::intermediate(int32_t& compressedSizeDelta) {
+    int32_t previousCompressedSize = _compressedSize;
     _compressedSize = 0;
 
     std::vector<std::pair<StringData, TrackedBSONColumnBuilder::BinaryDiff>> intermediates;
@@ -99,7 +98,7 @@ MeasurementMap::intermediate(int32_t& compressedSize) {
             {StringData(entry.first.c_str(), entry.first.size()), std::move(diff)});
     }
 
-    compressedSize += _compressedSize;
+    compressedSizeDelta = _compressedSize - previousCompressedSize;
     return intermediates;
 }
 

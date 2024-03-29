@@ -73,11 +73,13 @@ const initializeBuckets = function(numOfBuckets = 1) {
     // Insert 9 large measurements into same bucket (mapping to meta1) resulting in a bucket of size
     // ~11.5 MB (right under the largest size of buckets we allow which is 12 MB).
     for (let i = 0; i < defaultBucketMinCount - 1; i++) {
+        // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
+        const value = (i % 2 == 0 ? "a" : "b");
         const doc = {
             _id: i,
             [timeFieldName]: ISODate(),
             [metaFieldName]: meta1,
-            value: "a".repeat(measurementValueLength)
+            value: value.repeat(measurementValueLength)
         };
         assert.commandWorked(coll.insert(doc));
     }
@@ -125,11 +127,13 @@ const initializeBuckets = function(numOfBuckets = 1) {
     // closing the bucket due to the minimum count, so we expect to close the oversized bucket and
     // create another bucket.
     for (let i = 0; i < defaultBucketMinCount; i++) {
+        // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
+        const value = (i % 2 == 0 ? "a" : "b");
         const doc = {
             _id: i,
             [timeFieldName]: ISODate(),
             [metaFieldName]: meta2,
-            value: "b".repeat(measurementValueLength)
+            value: value.repeat(measurementValueLength)
         };
         assert.commandWorked(coll.insert(doc));
     }
@@ -169,11 +173,13 @@ const initializeBuckets = function(numOfBuckets = 1) {
     // closed yet. We generate a cardinality equal to 'bucketCount'.
     initializeBuckets(bucketCount - 1);
     for (let i = 0; i < 3; i++) {
+        // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
+        const value = (i % 2 == 0 ? "a" : "b");
         const doc = {
             _id: i,
             [timeFieldName]: ISODate(),
             [metaFieldName]: meta,
-            value: "a".repeat(measurementValueLength)
+            value: value.repeat(measurementValueLength)
         };
         assert.commandWorked(coll.insert(doc));
     }

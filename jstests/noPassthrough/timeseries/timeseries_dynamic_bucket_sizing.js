@@ -30,10 +30,7 @@ const replSet = new ReplSetTest({
     nodes: 1,
     nodeOptions: {wiredTigerCacheSizeGB: minWiredTigerCacheSizeGB},
 });
-replSet.startSet({
-    setParameter:
-        {timeseriesBucketMaxSize: defaultBucketMaxSize, timeseriesLargeMeasurementThreshold: 1}
-});
+replSet.startSet({setParameter: {timeseriesBucketMaxSize: defaultBucketMaxSize}});
 replSet.initiate();
 
 const db = replSet.getPrimary().getDB(jsTestName());
@@ -58,11 +55,14 @@ const initializeBucketsPastMinCount = function(numOfBuckets = 1) {
     let bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < numOfBuckets; i++) {
         for (let j = 0; j < minBucketCount; ++j) {
+            // Strings greater than 16 bytes are not compressed unless they are equal to the
+            // previous.
+            const value = (j % 2 == 0 ? "a" : "b");
             const doc = {
                 _id: '' + i + j,
                 [timeFieldName]: timestamp,
                 [metaFieldName]: i,
-                value: "a".repeat(1000)
+                value: value.repeat(1000)
             };
             bulk.insert(doc);
         }
@@ -92,8 +92,14 @@ assert.eq(timeseriesStats.bucketCount, belowCardinalityThreshold, formatStatsLog
 // bucket size (137KB).
 let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < belowCardinalityThreshold; i++) {
-    bulk.insert(
-        {_id: '00' + i, [timeFieldName]: timestamp, [metaFieldName]: i, value: "a".repeat(120000)});
+    // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
+    const value = (i % 2 == 0 ? "a" : "b");
+    bulk.insert({
+        _id: '00' + i,
+        [timeFieldName]: timestamp,
+        [metaFieldName]: i,
+        value: value.repeat(120000)
+    });
 }
 
 assert.commandWorked(bulk.execute());
@@ -140,8 +146,14 @@ assert.eq(bucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
 // due to cache pressure but none due to size.
 bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < aboveCardinalityThreshold; i++) {
-    bulk.insert(
-        {_id: '00' + i, [timeFieldName]: timestamp, [metaFieldName]: i, value: "a".repeat(80000)});
+    // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
+    const value = (i % 2 == 0 ? "a" : "b");
+    bulk.insert({
+        _id: '00' + i,
+        [timeFieldName]: timestamp,
+        [metaFieldName]: i,
+        value: value.repeat(80000)
+    });
 }
 assert.commandWorked(bulk.execute());
 
@@ -152,6 +164,10 @@ compressedBuckets = timeseriesStats.numCompressedBuckets;
 
 // We expect 'bucketsClosedDueToSize' to be 0.
 assert.eq(bucketsClosedDueToSize, 0, formatStatsLog(timeseriesStats));
+assert.eq(timeseriesStats.numBucketsClosedDueToSchemaChange, 0, formatStatsLog(timeseriesStats));
+assert.eq(timeseriesStats.numBucketsClosedDueToTimeForward, 0, formatStatsLog(timeseriesStats));
+assert.eq(timeseriesStats.numBucketsClosedDueToTimeBackward, 0, formatStatsLog(timeseriesStats));
+assert.eq(timeseriesStats.numBucketsClosedDueToMemoryThreshold, 0, formatStatsLog(timeseriesStats));
 
 // Previously, the bucket max size was 128KB, but under cache pressure using
 // 'aboveCardinalityThreshold', the max size drops to roughly ~55KB. Therfore, all of the buckets

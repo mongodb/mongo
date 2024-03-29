@@ -629,8 +629,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     CreationInfo& info,
     Bucket& existingBucket) {
     Bucket::NewFieldNames newFieldNamesToBeInserted;
-    int32_t sizeToBeAdded = 0;
-    bool crossedLargeMeasurementThreshold = false;
+    Sizes sizesToBeAdded;
 
     bool isNewlyOpenedBucket = (existingBucket.size == 0);
     std::reference_wrapper<Bucket> bucketToUse{existingBucket};
@@ -642,8 +641,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                                         existingBucket,
                                                         catalog.numberOfActiveBuckets.load(),
                                                         newFieldNamesToBeInserted,
-                                                        sizeToBeAdded,
-                                                        crossedLargeMeasurementThreshold,
+                                                        sizesToBeAdded,
                                                         mode);
         if ((action == RolloverAction::kSoftClose || action == RolloverAction::kArchive) &&
             mode == AllowBucketCreation::kNo) {
@@ -664,8 +662,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                            doc,
                                            info.options.getMetaField(),
                                            newFieldNamesToBeInserted,
-                                           sizeToBeAdded,
-                                           crossedLargeMeasurementThreshold);
+                                           sizesToBeAdded);
     }
 
     auto batch = activeBatch(
@@ -678,8 +675,9 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     }
 
     bucket.numMeasurements++;
-    bucket.size += sizeToBeAdded;
-    bucket.crossedLargeMeasurementThreshold = crossedLargeMeasurementThreshold;
+    batch->sizes.uncommittedMeasurementEstimate += sizesToBeAdded.uncommittedMeasurementEstimate;
+    bucket.size +=
+        sizesToBeAdded.uncommittedVerifiedSize + sizesToBeAdded.uncommittedMeasurementEstimate;
     if (isNewlyOpenedBucket) {
         if (info.openedDuetoMetadata) {
             batch->openedDueToMetadata = true;
@@ -1209,8 +1207,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     Bucket& bucket,
     uint32_t numberOfActiveBuckets,
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
-    int32_t& sizeToBeAdded,
-    bool& crossedLargeMeasurementThreshold,
+    Sizes& sizesToBeAdded,
     AllowBucketCreation mode) {
     // If the mode is enabled to create new buckets, then we should update stats for soft closures
     // accordingly. If we specify the mode to not allow bucket creation, it means we are not sure if
@@ -1262,13 +1259,12 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
                                        doc,
                                        info.options.getMetaField(),
                                        newFieldNamesToBeInserted,
-                                       sizeToBeAdded,
-                                       crossedLargeMeasurementThreshold);
-    if (bucket.size + sizeToBeAdded > effectiveMaxSize) {
+                                       sizesToBeAdded);
+    if (bucket.size + sizesToBeAdded.total() > effectiveMaxSize) {
         bool keepBucketOpenForLargeMeasurements =
             bucket.numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount);
         if (keepBucketOpenForLargeMeasurements) {
-            if (bucket.size + sizeToBeAdded > absoluteMaxSize) {
+            if (bucket.size + sizesToBeAdded.total() > absoluteMaxSize) {
                 if (absoluteMaxSize != Bucket::kLargeMeasurementsMaxBucketSize) {
                     info.stats.incNumBucketsClosedDueToCachePressure();
                     return {RolloverAction::kHardClose, RolloverReason::kCachePressure};

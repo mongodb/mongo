@@ -26,7 +26,7 @@ assert.commandWorked(db.createCollection(jsTestName(), {timeseries: {timeField: 
 const bucketColl = db.getCollection("system.buckets." + jsTestName());
 
 const measurementLength = 1 * 1024;  // 1KB
-const numMeasurements = 123;  // The number of measurements before the bucket rolls over due to size
+const numMeasurements = 121;  // The number of measurements before the bucket rolls over due to size
 for (let i = 0; i < numMeasurements; i++) {
     // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
     const value = (i % 2 == 0 ? "a" : "b");
@@ -39,14 +39,11 @@ for (let i = 0; i < numMeasurements; i++) {
 }
 
 let buckets = bucketColl.find().toArray();
-jsTestLog(buckets);
-// TODO(SERVER-88689): Re-enable
-// assert.eq(1, buckets.length);
-assert.eq(2, buckets.length);
+assert.eq(1, buckets.length);
 assert.eq(0, buckets[0].control.min._id);
-assert.eq(121, buckets[0].control.max._id);
+assert.eq(120, buckets[0].control.max._id);
 
-const timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
+let timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
 jsTestLog("Bucket size: " + timeseriesStats.avgBucketSize);
 
 const timeseriesBucketMaxSize = (() => {
@@ -55,18 +52,31 @@ const timeseriesBucketMaxSize = (() => {
     return res.timeseriesBucketMaxSize;
 })();
 
-// The bucket size will be slightly over the bucket max size as the change in compression size is
-// computed after inserting the measurements into the bucket.
-// assert.gt(timeseriesStats.avgBucketSize, timeseriesBucketMaxSize);
-assert.lte(timeseriesStats.avgBucketSize, timeseriesBucketMaxSize * 1.01);
+assert.eq(1, timeseriesStats.bucketCount);
+assert.eq(1, timeseriesStats.numBucketInserts);
+assert.eq(0, timeseriesStats.numBucketsClosedDueToSize);
+assert.eq(120, timeseriesStats.numBucketUpdates);
+assert.eq(121, timeseriesStats.numCommits);
+assert.eq(121, timeseriesStats.numMeasurementsCommitted);
+assert.eq(0, timeseriesStats.numBucketsFrozen);
+assert.lte(timeseriesStats.avgBucketSize, timeseriesBucketMaxSize);
 
 // Inserting an additional measurement will open a second bucket.
 assert.commandWorked(coll.insert({
-    _id: 123,
+    _id: 121,
     [timeFieldName]: ISODate("2024-03-11T00:00:00.000Z"),
     value: "c".repeat(measurementLength)
 }));
 buckets = bucketColl.find().toArray();
 assert.eq(2, buckets.length);
+
+timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
+assert.eq(2, timeseriesStats.bucketCount);
+assert.eq(2, timeseriesStats.numBucketInserts);
+assert.eq(1, timeseriesStats.numBucketsClosedDueToSize);
+assert.eq(120, timeseriesStats.numBucketUpdates);
+assert.eq(122, timeseriesStats.numCommits);
+assert.eq(122, timeseriesStats.numMeasurementsCommitted);
+assert.eq(0, timeseriesStats.numBucketsFrozen);
 
 MongoRunner.stopMongod(conn);

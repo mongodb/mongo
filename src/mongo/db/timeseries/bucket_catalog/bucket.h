@@ -213,8 +213,7 @@ void calculateBucketFieldsAndSizeChange(TrackingContext&,
                                         const BSONObj& doc,
                                         boost::optional<StringData> metaField,
                                         Bucket::NewFieldNames& newFieldNamesToBeInserted,
-                                        int32_t& sizeToBeAdded,
-                                        bool& crossedLargeMeasurementThreshold);
+                                        Sizes& sizesToBeAdded);
 
 /**
  * Return a pointer to the current, open batch for the operation. Opens a new batch if none exists.

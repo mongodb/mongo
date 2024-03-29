@@ -421,7 +421,10 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
         BSONObjBuilder newDataFieldsBuilder;
         BSONObjBuilder updatedDataFieldsBuilder;
 
-        auto intermediates = batch->measurementMap.intermediate(batch->size);
+        int32_t compressedSizeDelta;
+        auto intermediates = batch->measurementMap.intermediate(compressedSizeDelta);
+        batch->sizes.uncommittedVerifiedSize = compressedSizeDelta;
+
         for (const auto& [fieldName, diff] : intermediates) {
             if (batch->newFieldNamesToBeInserted.count(fieldName)) {
                 // Insert new column.
@@ -978,7 +981,9 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
         for (const auto& measurement : sortedMeasurements) {
             batch->measurementMap.insertOne(measurement.dataFields);
         }
-        auto intermediates = batch->measurementMap.intermediate(batch->size);
+        int32_t compressedSizeDelta;
+        auto intermediates = batch->measurementMap.intermediate(compressedSizeDelta);
+        batch->sizes.uncommittedVerifiedSize = compressedSizeDelta;
         bucketToInsert =
             makeTimeseriesInsertCompressedBucketDocument(batch, metadata, intermediates);
 

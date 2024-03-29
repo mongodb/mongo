@@ -125,15 +125,13 @@ server_parameters:
         redact: false
 
     "timeseriesLargeMeasurementThreshold":
-        description: "When a measurement larger than the threshold (in bytes) is being inserted into
-                      a bucket, we use the measurements uncompressed size towards the bucket size
-                      limit. Once the threshold is crossed for a bucket, all incoming measurements
-                      into that bucket use the uncompressed size. When set to 0 (the default), the
-                      threshold is computed as (12MB / timeseriesBucketMaxCount)."
+        description: "When an element in a measurement is larger than the threshold (in bytes) when
+                      being inserted into a bucket, we use the element's uncompressed size towards
+                      the bucket size limit."
         set_at: [ startup, runtime ]
         cpp_vartype: "AtomicWord<int>"
         cpp_varname: "gTimeseriesLargeMeasurementThreshold"
-        default: 0
+        default: 32
         validator: {gte: 0}
         redact: false
 

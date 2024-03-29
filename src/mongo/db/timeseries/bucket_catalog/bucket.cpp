@@ -99,8 +99,7 @@ void calculateBucketFieldsAndSizeChange(TrackingContext& trackingContext,
                                         const BSONObj& doc,
                                         boost::optional<StringData> metaField,
                                         Bucket::NewFieldNames& newFieldNamesToBeInserted,
-                                        int32_t& sizeToBeAdded,
-                                        bool& crossedLargeMeasurementThreshold) {
+                                        Sizes& sizesToBeAdded) {
     // BSON size for an object with an empty object field where field name is empty string.
     // We can use this as an offset to know the size when we have real field names.
     static constexpr int emptyObjSize = 12;
@@ -108,21 +107,14 @@ void calculateBucketFieldsAndSizeChange(TrackingContext& trackingContext,
     dassert(emptyObjSize == BSON("" << BSONObj()).objsize());
 
     newFieldNamesToBeInserted.clear();
-    sizeToBeAdded = 0;
-    crossedLargeMeasurementThreshold = bucket.crossedLargeMeasurementThreshold;
-    int32_t elementSizeToBeAdded = 0;
+    sizesToBeAdded.uncommittedVerifiedSize = 0;
+    sizesToBeAdded.uncommittedMeasurementEstimate = 0;
+
     auto numMeasurementsFieldLength = numDigits(bucket.numMeasurements);
 
     // When a measurement larger than the threshold (in bytes) is being inserted into a bucket, we
-    // use the measurements uncompressed size towards the bucket size limit. Once the threshold is
-    // crossed for a bucket, all incoming measurements into that bucket use the uncompressed size.
-    // When set to 0 (the default), the threshold is computed as (12MB / (timeseriesBucketMaxCount
-    // +2)). +2 to account for min/max.
-    const int32_t largeMeasurementThresholdSetting = gTimeseriesLargeMeasurementThreshold.load();
-    const int32_t largeMeasurementThreshold =
-        (largeMeasurementThresholdSetting == 0
-             ? Bucket::kLargeMeasurementsMaxBucketSize / (gTimeseriesBucketMaxCount + 2)
-             : largeMeasurementThresholdSetting);
+    // use the measurements uncompressed size towards the bucket size limit.
+    const int32_t largeMeasurementThreshold = gTimeseriesLargeMeasurementThreshold.load();
 
     for (const auto& elem : doc) {
         auto fieldName = elem.fieldNameStringData();
@@ -143,12 +135,12 @@ void calculateBucketFieldsAndSizeChange(TrackingContext& trackingContext,
             // isn't already pending a commit from another batch.
             if (!bucket.uncommittedFieldNames.contains(hashedKey)) {
                 // Add the size of an empty object with that field name.
-                sizeToBeAdded += emptyObjSize + fieldName.size();
+                sizesToBeAdded.uncommittedVerifiedSize += emptyObjSize + fieldName.size();
 
                 // The control.min and control.max summaries don't have any information for
                 // this new field name yet. Add two measurements worth of data to account
                 // for this. As this is the first measurement for this field, min == max.
-                sizeToBeAdded += elem.size() * 2;
+                sizesToBeAdded.uncommittedVerifiedSize += elem.size() * 2;
             }
         }
 
@@ -157,19 +149,10 @@ void calculateBucketFieldsAndSizeChange(TrackingContext& trackingContext,
         // terminator whereas the stringified position does not.
         const int32_t elementSize =
             elem.size() - elem.fieldNameSize() + numMeasurementsFieldLength + 1;
-        elementSizeToBeAdded += elementSize;
 
-        if (!bucket.usingAlwaysCompressedBuckets || crossedLargeMeasurementThreshold) {
-            continue;
+        if (!bucket.usingAlwaysCompressedBuckets || elementSize > largeMeasurementThreshold) {
+            sizesToBeAdded.uncommittedMeasurementEstimate += elementSize;
         }
-
-        if (elementSize > largeMeasurementThreshold) {
-            crossedLargeMeasurementThreshold = true;
-        }
-    }
-
-    if (!bucket.usingAlwaysCompressedBuckets || crossedLargeMeasurementThreshold) {
-        sizeToBeAdded += elementSizeToBeAdded;
     }
 }
 

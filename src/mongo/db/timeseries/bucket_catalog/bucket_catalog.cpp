@@ -119,7 +119,6 @@ void prepareWriteBatchForCommit(TrackingContext& trackingContext,
     // See corollary in finish().
     batch.measurementMap = std::move(bucket.measurementMap);
     batch.bucketIsSortedByTime = bucket.bucketIsSortedByTime;
-    batch.size = bucket.size;
     batch.generateCompressedDiff = bucket.usingAlwaysCompressedBuckets;
 }
 
@@ -578,13 +577,10 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
         // See corollary in prepareWriteBatchForCommit().
         bucket->bucketIsSortedByTime = batch->bucketIsSortedByTime;
 
-        // When this threshold is crossed, we use the uncompressed size towards the bucket size
-        // limit for all incoming measurements. So there's no need to update the bucket size with
-        // the compressed measurement sizes.
-        if (!bucket->crossedLargeMeasurementThreshold) {
-            bucket->size = batch->size;
+        if (bucket->usingAlwaysCompressedBuckets) {
+            bucket->size -= batch->sizes.uncommittedMeasurementEstimate;
+            bucket->size += batch->sizes.uncommittedVerifiedSize;
         }
-
         bucket->measurementMap = std::move(batch->measurementMap);
         bucket->preparedBatch.reset();
     }

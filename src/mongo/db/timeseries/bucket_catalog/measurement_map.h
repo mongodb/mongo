@@ -71,7 +71,7 @@ public:
      * internally as well as the one passed in.
      */
     std::vector<std::pair<StringData, TrackedBSONColumnBuilder::BinaryDiff>> intermediate(
-        int32_t& compressedSize);
+        int32_t& compressedSizeDelta);
 
     /**
      * Returns the timestamp of the last measurement in the time column.
@@ -97,7 +97,7 @@ private:
 
     // The size of the compressed binary data across all builders since the last call to
     // intermediate().
-    size_t _compressedSize{0};
+    int32_t _compressedSize{0};
 };
 
 }  // namespace mongo::timeseries::bucket_catalog
