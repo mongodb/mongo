@@ -73,7 +73,7 @@ private:
     void onStartup(OperationContext* opCtx) override {}
     void onSetCurrentConfig(OperationContext* opCtx) override {}
     void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) override;
-    void onShutdown() override {}
+    void onShutdown() override;
     void onStepUpBegin(OperationContext* opCtx, long long term) override;
     void onStepUpComplete(OperationContext* opCtx, long long term) override {}
     void onStepDown() override;
@@ -144,6 +144,8 @@ private:
     Queue _queue;
 
     ServiceContext* _serviceContext;
+
+    Atomic<bool> _shutdownInitiated{false};
 };
 
 }  // namespace

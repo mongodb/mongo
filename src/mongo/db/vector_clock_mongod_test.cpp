@@ -49,6 +49,8 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_mock.h"
+#include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -316,6 +318,24 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
     ASSERT_EQ(afterTime2.configTime(), VectorClock::kInitialComponentTime);
     ASSERT_EQ(afterTime3.topologyTime(), VectorClock::kInitialComponentTime);
+}
+
+class VectorClockMongoDDurableTest : public ShardServerTestFixture {
+protected:
+    VectorClockMongoDDurableTest()
+        : ShardServerTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+};
+
+TEST_F(VectorClockMongoDDurableTest, DurableTimeDoesNotHangAfterShutdown) {
+    auto sc = getServiceContext();
+    auto vc = VectorClockMutable::get(sc);
+    auto opCtx = Client::getCurrent()->getOperationContext();
+
+    ReplicaSetAwareServiceRegistry::get(sc).onShutdown();
+    shutdownExecutorPool();
+
+    ASSERT_THROWS_CODE(
+        vc->waitForDurable().get(opCtx), DBException, ErrorCodes::ShutdownInProgress);
 }
 
 }  // namespace
