@@ -624,8 +624,8 @@ functions:
         content_type: application/json
         display_name: clang_tidy_fixes.json
 
-  "send benchmark results":
-  - command: perf.send
+  "send benchmark results": &send_benchmark_results
+    command: perf.send
     display_name: "send benchmark results"
     params:
       aws_key: ${aws_key}
@@ -1078,6 +1078,43 @@ functions:
   - *sign_macos_dev_binaries
   - *multiversion_exclude_tags_generate
   - *execute_resmoke_tests
+    # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
+    # directly actionable. We use type=setup rather than type=system or type=test for this command
+  # because we don't intend for any human to look at this failure.
+  - *check_run_tests_infrastructure_failure
+  - *check_resmoke_failure
+
+  "run benchmark tests":
+  - *f_expansions_write
+  - *configure_evergreen_api_credentials
+  - *determine_task_timeout
+  - *update_task_timeout_expansions
+  - *f_expansions_write
+  - *update_task_timeout
+  - *f_expansions_write
+  - command: expansions.update
+    params:
+      env:
+        CEDAR_USER: ${cedar_user}
+        CEDAR_API_KEY: ${cedar_api_key}
+      updates:
+      - key: aws_key_remote
+        value: ${mongodatafiles_aws_key}
+      - key: aws_profile_remote
+        value: mongodata_aws
+      - key: aws_secret_remote
+        value: ${mongodatafiles_aws_secret}
+  - *f_expansions_write
+  - *set_up_remote_credentials
+  - *f_expansions_write
+  - *determine_resmoke_jobs
+  - *update_resmoke_jobs_expansions
+  - *f_expansions_write
+  - *configure_evergreen_api_credentials
+  - *sign_macos_dev_binaries
+  - *multiversion_exclude_tags_generate
+  - *execute_resmoke_tests
+  - *send_benchmark_results
     # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
     # directly actionable. We use type=setup rather than type=system or type=test for this command
   # because we don't intend for any human to look at this failure.

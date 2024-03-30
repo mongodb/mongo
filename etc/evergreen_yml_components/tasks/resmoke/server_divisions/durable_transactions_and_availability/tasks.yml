@@ -54,12 +54,10 @@ variables:
   - name: compile_upload_benchmarks
   commands:
   - func: "do benchmark setup"
-  - func: "run tests"
+  - func: "run benchmark tests"
     vars:
       resmoke_args: --help
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
-    vars:
       suite: benchmark_suite
 
 # THIS HAS COPIES IN
@@ -120,11 +118,10 @@ tasks:
   tags: ["assigned_to_jira_team_server_repl", "experimental", "benchmarks"]
   commands:
     - func: "do benchmark setup"
-    - func: "run tests"
+    - func: "run benchmark tests"
       vars:
         suite: benchmarks_replication
         resmoke_jobs_max: 1
-    - func: "send benchmark results"
 
 - <<: *gen_task_template
   name: bulk_write_causally_consistent_jscore_passthrough_gen

@@ -54,12 +54,10 @@ variables:
   - name: compile_upload_benchmarks
   commands:
   - func: "do benchmark setup"
-  - func: "run tests"
+  - func: "run benchmark tests"
     vars:
       resmoke_args: --help
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
-    vars:
       suite: benchmark_suite
 
 # THIS HAS COPIES IN
@@ -202,53 +200,43 @@ tasks:
   tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
-  - func: "run tests"
+  - func: "run benchmark tests"
     vars:
       suite: benchmarks_namespace_string
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - <<: *benchmark_template
   name: benchmarks_orphaned_first_half
   tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
-  - func: "run tests"
+  - func: "run benchmark tests"
     vars:
       suite: benchmarks_first_half
       exec_timeout_secs: 21600 # 6 hour timeout.
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
-    vars:
-      suite: benchmarks_first_half
 
 - <<: *benchmark_template
   name: benchmarks_orphaned_second_half
   tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
-  - func: "run tests"
+  - func: "run benchmark tests"
     vars:
       suite: benchmarks_second_half
       exec_timeout_secs: 21600 # 6 hour timeout.
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
-    vars:
-      suite: benchmarks_second_half
 
 - <<: *benchmark_template
   name: benchmarks_sep
   tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks_sep"]
   commands:
   - func: "do benchmark setup"
-  - func: "run tests"
+  - func: "run benchmark tests"
     vars:
       suite: benchmarks_sep
       exec_timeout_secs: 21600 # 6 hour timeout.
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
-    vars:
-      suite: benchmarks_sep
 
 - <<: *gen_task_template
   name: causally_consistent_hedged_reads_jscore_passthrough_gen
@@ -1081,22 +1069,20 @@ tasks:
   tags: ["assigned_to_jira_team_server_cluster_scalability", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
-  - func: "run tests"
+  - func: "run benchmark tests"
     vars:
       suite: benchmarks_sharding
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - <<: *benchmark_template
   name: benchmarks_bsoncolumn
   tags: ["assigned_to_jira_team_server_cluster_scalability", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
-  - func: "run tests"
+  - func: "run benchmark tests"
     vars:
       suite: benchmarks_bsoncolumn
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - <<: *jstestfuzz_template
   name: move_collection_fuzzer_gen

@@ -317,7 +317,8 @@ class TestRunner(Subcommand):
         if task is None:
             for current_task in evg_conf.tasks:
                 func = current_task.find_func_command("run tests") \
-                    or current_task.find_func_command("generate resmoke tasks")
+                    or current_task.find_func_command("generate resmoke tasks") \
+                    or current_task.find_func_command("run benchmark tests")
                 if func and get_dict_value(func, ["vars", "suite"]) == suite_name:
                     task = current_task
                     break

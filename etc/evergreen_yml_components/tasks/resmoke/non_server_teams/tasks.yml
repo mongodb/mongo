@@ -73,12 +73,10 @@ variables:
   - name: compile_upload_benchmarks
   commands:
   - func: "do benchmark setup"
-  - func: "run tests"
+  - func: "run benchmark tests"
     vars:
       resmoke_args: --help
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
-    vars:
       suite: benchmark_suite
 
 
@@ -219,12 +217,11 @@ tasks:
   tags: ["assigned_to_jira_team_streams", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
-  - func: "run tests"
+  - func: "run benchmark tests"
     vars:
       suites: benchmarks_streams
       exec_timeout_secs: 18000  # 5 hour timeout.
       resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - <<: *task_template
   name: streams
