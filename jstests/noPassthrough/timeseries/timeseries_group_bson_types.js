@@ -30,7 +30,7 @@ if (assert.commandWorked(scalarDb.adminCommand({getParameter: 1, internalQueryFr
 const scalarColl = scalarDb.timeseries_group_bson_types;
 const bpColl = bpDb.timeseries_group_bson_types;
 
-const timeFieldName = 't';
+const timeFieldName = 'time';
 const metaFieldName = 'meta';
 
 scalarColl.drop();
@@ -60,7 +60,7 @@ leafsMinusUndefined.push([[{a: 1}, {a: 2}], [{a: 3}, {a: 4}]]);
 // Push different types of data. Different meta fields, different permutations of leafs data in data
 // fields.
 const tsData = [];
-for (const meta of leafsMinusUndefined + generateMetaVals()) {
+for (const meta of leafsMinusUndefined.concat(generateMetaVals())) {
     let time = 0;
     for (const data of leafsMinusUndefined) {
         tsData.push({
@@ -101,8 +101,12 @@ for (const data1 of leafsMinusUndefined) {
     }
 }
 
-scalarColl.insert(tsData);
-bpColl.insert(tsData);
+assert.commandWorked(scalarColl.insert(tsData));
+assert.commandWorked(bpColl.insert(tsData));
+
+function isNumberDecimal(num) {
+    return (num + "").startsWith('NumberDecimal');
+}
 
 function compareScalarAndBlockProcessing(test, allowDiskUse) {
     let scalarFailed = false;
@@ -160,9 +164,19 @@ function compareScalarAndBlockProcessing(test, allowDiskUse) {
         assert.eq(scalarKeys, bpKeys);
 
         for (const key of scalarKeys) {
+            const debugInfo = {name: test.name, resultIndex: i};
             const scalarField = scalarResults[i][key];
             const bpField = bpResults[i][key];
-            assert.eq(scalarField, bpField, {name: test.name, index: i})
+            // If the values are NumberDecimal, we have to call .equals().
+            const scalarIsDec = isNumberDecimal(scalarField);
+            const bpIsDec = isNumberDecimal(bpField);
+            if (scalarIsDec && !bpIsDec) {
+                assert(scalarField.equals(NumberDecimal(bpField)), debugInfo);
+            } else if (!scalarIsDec && bpIsDec) {
+                assert(bpField.equals(NumberDecimal(scalarField)), debugInfo);
+            } else {
+                assert.eq(scalarField, bpField, debugInfo);
+            }
         }
     }
 }

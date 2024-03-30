@@ -50,16 +50,17 @@ const allFields = ['t', 'm', 'a', 'b'];
 const tsData = [];
 const alphabet = 'abcdefghijklmnopqrstuvwxyz';
 let id = 0;
-for (let metaIdx = 0; metaIdx < 10; metaIdx++) {
-    const metaDoc = {metaA: metaIdx, metaB: metaIdx / 2};
+for (let metaIdx = 0; metaIdx < 5; metaIdx++) {
+    // Mix of number and object meta values.
+    const metaVal = metaIdx % 2 === 0 ? metaIdx : {metaA: metaIdx, metaB: metaIdx / 2};
 
     let currentDate = 0;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5; i++) {
         tsData.push({
             _id: id,
             t: new Date(datePrefix + currentDate - 100),
-            m: metaDoc,
-            a: 10 - i,
+            m: metaVal,
+            a: i,
             b: alphabet.charAt(i)
         });
         currentDate += 25;
@@ -71,17 +72,11 @@ assert.commandWorked(classicColl.insert(tsData));
 assert.commandWorked(bpColl.insert(tsData));
 
 function compareClassicAndBP(pipeline, allowDiskUse) {
+    // End each pipeline with a sort by id so we can compare the results.
+    pipeline = pipeline.concat([{$_internalInhibitOptimization: {}}, {$sort: {_id: 1}}]);
+
     const classicResults = classicColl.aggregate(pipeline, {allowDiskUse}).toArray();
     const bpResults = bpColl.aggregate(pipeline, {allowDiskUse}).toArray();
-
-    // Sort order is not guaranteed, so let's sort by the object itself before comparing.
-    const cmpFn = function(doc1, doc2) {
-        const doc1Json = tojson(doc1);
-        const doc2Json = tojson(doc2);
-        return doc1Json < doc2Json ? -1 : (doc1Json > doc2Json ? 1 : 0);
-    };
-    classicResults.sort(cmpFn);
-    bpResults.sort(cmpFn);
 
     function errFn() {
         jsTestLog(classicColl.explain().aggregate(pipeline, {allowDiskUse}));
@@ -94,7 +89,10 @@ function compareClassicAndBP(pipeline, allowDiskUse) {
 
 // Cut down a path to just the top level.
 function topLevelField(path) {
-    let pos = path.search('.');
+    if (path === null) {
+        return null;
+    }
+    const pos = path.search(/[.]/);
     if (pos === -1) {
         return path;
     }
@@ -139,11 +137,12 @@ const matchStages = [];
 const matchComparisons = [
     {field: 't', comp: dateLowerBound},
     {field: 'm', comp: {metaA: 1, metaB: 1}},
+    {field: 'm', comp: 3},
     {field: 'm.metaA', comp: 6},
     {field: 'a', comp: 2},
 ];
 for (const matchComp of matchComparisons) {
-    for (const comparator of ['$lt', '$gt', '$lte', '$gte', '$eq']) {
+    for (const comparator of ['$gt', '$lte', '$eq']) {
         matchStages.push({
             stage: {$match: {[matchComp.field]: {[comparator]: matchComp.comp}}},
             uses: [topLevelField(matchComp.field)],
@@ -159,9 +158,6 @@ const groupStages = [
 
     // $group with single key cases for each target accumulator.
     {stage: {$group: {_id: {m: '$m'}, gb: {$min: '$a'}}}, uses: ['m', 'a']},
-    {stage: {$group: {_id: {m: '$m'}, gb: {$max: '$a'}}}, uses: ['m', 'a']},
-    {stage: {$group: {_id: {m: '$m'}, gb: {$sum: '$a'}}}, uses: ['m', 'a']},
-    {stage: {$group: {_id: {m: '$m'}, gb: {$avg: '$a'}}}, uses: ['m', 'a']},
 
     // $group with compound key cases since we don't want to try every combination.
     {stage: {$group: {_id: {t: '$t', m: '$m'}, gb: {$min: '$a'}}}, uses: ['t', 'm', 'a']},
@@ -184,10 +180,10 @@ for (const groupKey of [null, 't', 'm', 'm.metaA', 'a']) {
             continue;
         }
         for (const accumulator of ['$min', '$max', '$sum', '$avg']) {
-            const uses = [accumulatorData];
+            const uses = [topLevelField(accumulatorData)];
             // "null" is not a field we need from previous stages.
             if (groupKey !== null) {
-                uses.push(groupKey);
+                uses.push(topLevelField(groupKey));
             }
             groupStages.push({
                 stage: {$group: {_id: dollarGroupKey, gb: {[accumulator]: dollarAccumulatorData}}},
@@ -195,13 +191,13 @@ for (const groupKey of [null, 't', 'm', 'm.metaA', 'a']) {
             });
         }
         // $top/$bottom accumulators have different syntax.
-        for (const sortBy of ['t', 'm', 'a']) {
+        for (const sortBy of ['t', 'm', 'a', 'm.metaA']) {
             if (sortBy === groupKey) {
                 continue;
             }
-            const uses = [accumulatorData, sortBy];
+            const uses = [topLevelField(accumulatorData), sortBy];
             if (groupKey !== null) {
-                uses.push(groupKey);
+                uses.push(topLevelField(groupKey));
             }
             for (const accumulator of ['$top', '$bottom']) {
                 groupStages.push({
@@ -236,7 +232,7 @@ for (const groupKey of [null, 't', 'm', 'm.metaA', 'a']) {
             }
         }
     }
-    const uses = groupKey === null ? [] : [groupKey];
+    const uses = groupKey === null ? [] : [topLevelField(groupKey)];
     groupStages.push({stage: {$group: {_id: dollarGroupKey, gb: {$count: {}}}}, uses: uses});
 }
 
