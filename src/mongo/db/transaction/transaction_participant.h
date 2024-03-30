@@ -78,7 +78,6 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/logv2/attribute_storage.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
@@ -298,7 +297,7 @@ public:
         OperationContext* _opCtx;
     };  // class SideTransactionBlock
 
-    using CommittedStatementTimestampMap = stdx::unordered_map<StmtId, repl::OpTime>;
+    using CommittedStatementTimestampMap = absl::flat_hash_map<StmtId, repl::OpTime>;
 
     static const BSONObj kDeadEndSentinel;
 
