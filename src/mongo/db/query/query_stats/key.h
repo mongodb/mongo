@@ -121,6 +121,10 @@ struct UniversalKeyComponents {
     // is not set through that code path.
     query_shape::CollectionType _collectionType;
 
+    // The tenant id associated with the collection targeted by the query if '_hasField.tenantId' is
+    // set.
+    const TenantId _tenantId;
+
     // This anonymous struct represents the presence of the member variables as C++ bit fields.
     // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
     struct HasField {
@@ -131,6 +135,7 @@ struct UniversalKeyComponents {
         bool writeConcern : 1 = false;
         bool readConcern : 1 = false;
         bool maxTimeMS : 1 = false;
+        bool tenantId : 1 = false;
     } _hasField;
 };
 
@@ -191,7 +196,8 @@ H AbslHashValue(H h, const UniversalKeyComponents::HasField& hasField) {
                       hasField.readPreference,
                       hasField.writeConcern,
                       hasField.readConcern,
-                      hasField.maxTimeMS);
+                      hasField.maxTimeMS,
+                      hasField.tenantId);
 }
 
 

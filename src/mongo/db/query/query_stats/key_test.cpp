@@ -135,7 +135,8 @@ TEST_F(UniversalKeyTest, SizeOfUniversalComponents) {
 
     const auto minimumUniversalKeyComponentSize = sizeof(std::unique_ptr<query_shape::Shape>) +
         (6 * sizeof(BSONObj)) + sizeof(std::unique_ptr<APIParameters>) + sizeof(BSONElement) +
-        sizeof(query_shape::CollectionType) + sizeof(unsigned long) + 1 /*HasField*/;
+        sizeof(query_shape::CollectionType) + sizeof(TenantId) + sizeof(unsigned long) +
+        1 /*HasField*/;
     ASSERT_GTE(sizeof(UniversalKeyComponents), minimumUniversalKeyComponentSize);
     ASSERT_LTE(sizeof(UniversalKeyComponents), minimumUniversalKeyComponentSize + 8 /*padding*/);
 

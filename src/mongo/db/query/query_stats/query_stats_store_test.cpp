@@ -832,8 +832,10 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
     // Note that this ExpressionContext will not have the let variables defined - we expect the
     // 'makeQueryStatsKey' call to do that.
     auto opCtx = makeOperationContext();
+    auto tenantId = "010203040506070809AABBCC"_sd;
     auto fcr = std::make_unique<FindCommandRequest>(
-        NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest("testDB.testColl")));
+        NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest(
+            TenantId::parseFromString(tenantId), "testDB.testColl")));
     fcr->setLet(BSON("var" << 2));
     fcr->setFilter(fromjson("{$expr: [{$eq: ['$a', '$$var']}]}"));
     fcr->setProjection(fromjson("{varIs: '$$var'}"));
@@ -867,6 +869,7 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
                     "_id": true
                 }
             },
+            "tenantId": "010203040506070809aabbcc",
             "collectionType": "collection"
         })",
         hmacApplied);
@@ -898,6 +901,7 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
                     "HASH<_id>": true
                 }
             },
+            "tenantId": "HASH<010203040506070809aabbcc>",
             "collectionType": "collection"
         })",
         hmacApplied);

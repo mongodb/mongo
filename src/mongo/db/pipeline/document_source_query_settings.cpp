@@ -58,10 +58,7 @@ BSONObj createDebugQueryShape(const BSONObj& representativeQuery,
     // representative query.
     const auto representativeInfo =
         query_settings::createRepresentativeInfo(representativeQuery, opCtx, tenantId);
-    // Erase the nested 'tenantId' so that information doesn't get leaked to the user.
-    MutableDocument mutableDocument(Document{representativeInfo.serializedQueryShape});
-    mutableDocument.setNestedField("cmdNs.tenantId", Value());
-    return mutableDocument.freeze().toBson();
+    return representativeInfo.serializedQueryShape;
 }
 
 DocumentSource::GetNextResult createResult(OperationContext* opCtx,

@@ -84,10 +84,8 @@ BSONObj extractMinOrMaxShape(BSONObj obj, const SerializationOptions& opts) {
 void appendNamespaceShape(BSONObjBuilder& bob,
                           const NamespaceString& nss,
                           const SerializationOptions& opts) {
-    if (nss.tenantId()) {
-        bob.append("tenantId", opts.serializeIdentifier(nss.tenantId().value().toString()));
-    }
-    // We do not want to include the tenantId as prefix of 'db' because the tenantid is added above.
+    // We do not want to include the tenantId as prefix of 'db' because the tenant id is not
+    // included into query shape.
     bob.append("db", opts.serializeIdentifier(nss.dbName().serializeWithoutTenantPrefix_UNSAFE()));
     bob.append("coll", opts.serializeIdentifier(nss.coll()));
 }

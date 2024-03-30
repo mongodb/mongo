@@ -69,6 +69,19 @@ BSONObj shapifyReadPreference(boost::optional<BSONObj> readPreference) {
     return builder.obj();
 }
 
+/**
+ * Returns a tenant id from given query shape 'queryShape' if one exists.
+ */
+boost::optional<TenantId> getTenantId(const query_shape::Shape* queryShape) {
+    if (!queryShape) {
+        return boost::none;
+    }
+    return queryShape->nssOrUUID.dbName().tenantId();
+}
+
+// Tenant id value that is used when there is no tenant, i.e. the query is executed in
+// non-multi-tenant mode. Initialized to zeros.
+static const TenantId kNotSetTenantId{OID{}};
 }  // namespace
 
 UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shape> queryShape,
@@ -93,13 +106,17 @@ UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shap
       _clientMetaDataHash(clientMetadata ? clientMetadata->hashWithoutMongosInfo()
                                          : simpleHash(BSONObj())),
       _collectionType(collectionType),
-      _hasField{.clientMetaData = bool(clientMetadata),
-                .comment = bool(commentObj),
-                .hint = bool(hint),
-                .readPreference = bool(readPreference),
-                .writeConcern = bool(writeConcern),
-                .readConcern = bool(readConcern),
-                .maxTimeMS = maxTimeMS} {
+      _tenantId{getTenantId(_queryShape.get()).value_or(kNotSetTenantId)},
+      _hasField{
+          .clientMetaData = bool(clientMetadata),
+          .comment = bool(commentObj),
+          .hint = bool(hint),
+          .readPreference = bool(readPreference),
+          .writeConcern = bool(writeConcern),
+          .readConcern = bool(readConcern),
+          .maxTimeMS = maxTimeMS,
+          .tenantId = getTenantId(_queryShape.get()).has_value(),
+      } {
     tassert(7973600, "shape must not be null", _queryShape);
 }
 
@@ -162,6 +179,10 @@ void UniversalKeyComponents::appendTo(BSONObjBuilder& bob, const SerializationOp
 
     if (const auto& apiDeprecationErrors = _apiParams->getAPIDeprecationErrors()) {
         bob.append("apiDeprecationErrors", apiDeprecationErrors.value());
+    }
+
+    if (_hasField.tenantId) {
+        bob.append("tenantId"_sd, opts.serializeIdentifier(_tenantId.toString()));
     }
 
     if (_hasField.readPreference) {
