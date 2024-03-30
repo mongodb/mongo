@@ -117,12 +117,10 @@ SharedSemiFuture<ShardingState::RecoveredClusterRole> ShardingState::awaitCluste
 }
 
 boost::optional<ClusterRole> ShardingState::pollClusterRole() const {
-    stdx::unique_lock<Latch> ul(_mutex);
     if (!_future.isReady())
         return boost::none;
 
-    const auto& role = uassertStatusOK(_future.getNoThrow());
-    return role.role;
+    return _future.get().role;
 }
 
 bool ShardingState::enabled() const {
@@ -143,12 +141,10 @@ void ShardingState::assertCanAcceptShardedCommands() const {
 }
 
 ShardId ShardingState::shardId() const {
-    stdx::unique_lock<Latch> ul(_mutex);
     if (!_future.isReady())
         return ShardId();
 
-    const auto& role = _future.get();
-    return role.shardId;
+    return _future.get().shardId;
 }
 
 OID ShardingState::clusterId() const {
