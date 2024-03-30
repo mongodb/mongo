@@ -126,6 +126,13 @@ PlanState TsBucketToCellBlockStage::getNext() {
     // case it yields as the state will be completely overwritten after the getNext() call.
     disableSlotAccess();
 
+    // Before throwing away the TSBlocks we currently hold onto, count how many of them were
+    // decompressed.
+    for (size_t i = 0; i < _tsBlockStorage.size(); ++i) {
+        _specificStats.numStorageBlocks++;
+        _specificStats.numStorageBlocksDecompressed += _tsBlockStorage[i]->decompressed();
+    }
+
     for (auto& acc : _blocksOutAccessor) {
         acc.reset();
     }
@@ -137,6 +144,8 @@ PlanState TsBucketToCellBlockStage::getNext() {
     state = trackPlanState(state);
 
     initCellBlocks();
+
+    _specificStats.numCellBlocksProduced += _blocksOutAccessor.size();
 
     return state;
 }
@@ -152,11 +161,22 @@ std::unique_ptr<PlanStageStats> TsBucketToCellBlockStage::getStats(bool includeD
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
 
     ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendNumber("numCellBlocksProduced",
+                         static_cast<long long>(_specificStats.numCellBlocksProduced));
+        bob.appendNumber("numStorageBlocks",
+                         static_cast<long long>(_specificStats.numStorageBlocks));
+        bob.appendNumber("numStorageBlocksDecompressed",
+                         static_cast<long long>(_specificStats.numStorageBlocksDecompressed));
+
+        ret->debugInfo = bob.obj();
+    }
     return ret;
 }
 
 const SpecificStats* TsBucketToCellBlockStage::getSpecificStats() const {
-    return nullptr;
+    return &_specificStats;
 }
 
 std::vector<DebugPrinter::Block> TsBucketToCellBlockStage::debugPrint() const {

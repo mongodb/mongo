@@ -173,6 +173,11 @@ public:
     }
     boost::optional<bool> tryHasArray() const override;
 
+    // Whether this TS block was decompressed. This is not a method on the block API.
+    bool decompressed() const {
+        return static_cast<bool>(_decompressedBlock);
+    }
+
 private:
     /**
      * Returns the BinData for this TsBlock, if present. It's illegal to call this for TsBlocks

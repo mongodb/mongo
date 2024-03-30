@@ -93,5 +93,7 @@ private:
     value::OwnedValueAccessor _bitmapOutAccessor;
 
     std::vector<std::unique_ptr<value::TsBlock>> _tsBlockStorage;
+
+    TsBucketToBlockStats _specificStats;
 };
 }  // namespace mongo::sbe

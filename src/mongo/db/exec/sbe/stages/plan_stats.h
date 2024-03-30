@@ -472,6 +472,28 @@ struct SearchStats : public SpecificStats {
     long long batchNum{0};
 };
 
+struct TsBucketToBlockStats final : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<TsBucketToBlockStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const final {
+        return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    size_t numStorageBlocksDecompressed = 0;
+    size_t numStorageBlocks = 0;
+    size_t numCellBlocksProduced = 0;
+};
+
 /**
  * Calculates the total number of physical reads in the given plan stats tree. If a stage can do
  * a physical read (e.g. COLLSCAN or IXSCAN), then its 'numReads' stats is added to the total.
