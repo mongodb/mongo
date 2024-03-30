@@ -1568,6 +1568,12 @@ buildvariants:
     - name: tsbs-query-optimizations
     - name: tsbs-expression-query
     - name: dbcheck
+    - name: mixed_workloads_genny_rate_limited_high_value
+    - name: load_test_high_value
+    - name: majority_reads10_k_threads_high_value
+    - name: large_indexed_ins_high_value
+    - name: expressive_queries_high_value
+    - name: time_series_sort_high_value
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-notls.arm.aws.2023-11
