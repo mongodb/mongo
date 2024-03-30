@@ -9,6 +9,7 @@
  * ]
  */
 
+import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     getReplicaSetURL,
@@ -203,7 +204,7 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
 
 {
     jsTest.log("Running tests for a serverless replica set bootstrapped as a single-shard cluster");
-    // For serverless, commands against user collections require the "$tenant" field and auth.
+    // For serverless, commands against user collections require the unsigned token and auth.
     const keyFile = "jstests/libs/key1";
     const tenantId = ObjectId();
     const vtsKey = "secret";
@@ -241,14 +242,15 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
         privileges: [{resource: {db: "config", collection: ""}, actions: ["find"]}],
         tenantId
     };
-    const testUser =
-        {userName: "testUser", password: "testUserPwd", roles: [testRole.name], tenantId};
-    testUser.securityToken =
-        _createSecurityToken({user: testUser.userName, db: authDbName, tenant: tenantId}, vtsKey);
-    assert.commandWorked(adminDB.runCommand(makeCreateRoleCmdObj(testRole)));
-    assert.commandWorked(adminDB.runCommand(makeCreateUserCmdObj(testUser)));
+    const testUser = {userName: "testUser", password: "testUserPwd", roles: [testRole.name]};
+    const unsignedToken = _createTenantToken({tenant: tenantId});
+    assert.commandWorked(
+        runCommandWithSecurityToken(unsignedToken, adminDB, makeCreateRoleCmdObj(testRole)));
+    assert.commandWorked(
+        runCommandWithSecurityToken(unsignedToken, adminDB, makeCreateUserCmdObj(testUser)));
     adminDB.logout();
 
-    primary._setSecurityToken(testUser.securityToken);
+    primary._setSecurityToken(
+        _createSecurityToken({user: testUser.userName, db: authDbName, tenant: tenantId}, vtsKey));
     runTests(primary /* shard0Primary */, tearDownFunc, true /* isMultitenant */);
 }

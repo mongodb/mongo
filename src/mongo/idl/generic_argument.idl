@@ -159,10 +159,6 @@ structs:
             mayBypassWriteBlocking:
                 type: IDLAnyType
                 forward_to_shards: true
-            $tenant:
-                type: IDLAnyType
-                cpp_name: "dollarTenant"
-                forward_to_shards: true
             expectPrefix:
                 type: bool
                 forward_to_shards: false

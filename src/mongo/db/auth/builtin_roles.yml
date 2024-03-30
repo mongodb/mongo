@@ -616,7 +616,7 @@ roles:
                   - validate
             - matchType: cluster
               actions:
-                  - useTenant # Specify {$tenant:...} on commands
+                  - useTenant # Specify tenant id with unsigned security token on commands
             - matchType: exact_namespace
               db: 'config'
               collection: 'system.preimages'

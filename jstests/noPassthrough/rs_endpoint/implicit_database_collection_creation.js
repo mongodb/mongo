@@ -16,6 +16,7 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     assertShardingMetadataForUnshardedCollectionDoesNotExist,
@@ -370,7 +371,7 @@ function getReplicaSetRestartOptions(maintenanceMode, setParameterOpts) {
 
 {
     jsTest.log("Running tests for a serverless replica set bootstrapped as a single-shard cluster");
-    // For serverless, commands against user collections require the "$tenant" field and auth.
+    // For serverless, commands against user collections require the unsigned token and auth.
     const keyFile = "jstests/libs/key1";
     const tenantId = ObjectId();
     const vtsKey = "secret";
@@ -402,20 +403,21 @@ function getReplicaSetRestartOptions(maintenanceMode, setParameterOpts) {
     const testRole = {
         name: "testRole",
         roles: ["readWriteAnyDatabase"],
-        privileges: [{resource: {db: "config", collection: ""}, actions: ["find"]}],
-        tenantId
+        privileges: [{resource: {db: "config", collection: ""}, actions: ["find"]}]
     };
     const testUser =
         {userName: "testUser", password: "testUserPwd", roles: [testRole.name], tenantId};
-    testUser.securityToken =
-        _createSecurityToken({user: testUser.userName, db: authDbName, tenant: tenantId}, vtsKey);
-    assert.commandWorked(adminDB.runCommand(makeCreateRoleCmdObj(testRole)));
-    assert.commandWorked(adminDB.runCommand(makeCreateUserCmdObj(testUser)));
+    const unsignedToken = _createTenantToken({tenant: tenantId});
+    assert.commandWorked(
+        runCommandWithSecurityToken(unsignedToken, adminDB, makeCreateRoleCmdObj(testRole)));
+    assert.commandWorked(
+        runCommandWithSecurityToken(unsignedToken, adminDB, makeCreateUserCmdObj(testUser)));
     adminDB.logout();
 
     const getShard0PrimaryFunc = () => {
         const primary = rst.getPrimary();
-        primary._setSecurityToken(testUser.securityToken);
+        primary._setSecurityToken(_createSecurityToken(
+            {user: testUser.userName, db: authDbName, tenant: tenantId}, vtsKey));
         return primary;
     };
     const restartFunc = (maintenanceMode) => {

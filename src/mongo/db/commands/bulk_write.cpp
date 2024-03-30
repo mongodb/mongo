@@ -1419,7 +1419,7 @@ public:
                                    bulk_write::SummaryFields summaryFields) {
             auto reqObj = unparsedRequest().body;
             const NamespaceString cursorNss =
-                NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
+                NamespaceString::makeBulkWriteNSS(req.getDbName().tenantId());
 
             if (replies.size() == 0 || bulk_write_common::isUnacknowledgedBulkWrite(opCtx)) {
                 // Skip cursor creation and return the simplest reply.

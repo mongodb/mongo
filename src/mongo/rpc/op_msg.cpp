@@ -251,7 +251,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
 #endif
     if (gMultitenancySupport) {
         msg.validatedTenancyScope =
-            auth::ValidatedTenancyScopeFactory::parse(client, msg.body, securityToken);
+            auth::ValidatedTenancyScopeFactory::parse(client, securityToken);
     }
 
     return msg;
@@ -268,14 +268,6 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
             redact(hexdump(message.singleData().view2ptr(),
                            std::min(static_cast<size_t>(message.size()), kHexDumpMaxSize - 1))));
     throw;
-}
-
-boost::optional<TenantId> parseDollarTenant(const BSONObj& body) {
-    if (auto tenant = body.getField("$tenant")) {
-        return TenantId::parseFromBSON(tenant);
-    } else {
-        return boost::none;
-    }
 }
 
 DatabaseName OpMsgRequest::parseDbName() const {
@@ -298,61 +290,6 @@ SerializationContext OpMsgRequest::getSerializationContext() const {
         serializationCtx.setPrefixState(validatedTenancyScope->isFromAtlasProxy());
     }
     return serializationCtx;
-}
-
-
-bool appendDollarTenant(BSONObjBuilder& builder,
-                        const TenantId& tenant,
-                        boost::optional<TenantId> existingDollarTenant = boost::none) {
-    if (existingDollarTenant) {
-        massert(8423373,
-                str::stream() << "Unable to set TenantId '" << tenant
-                              << "' on OpMsgRequest as it already has "
-                              << existingDollarTenant->toString(),
-                tenant == existingDollarTenant.value());
-        return true;
-    }
-
-    if (gMultitenancySupport) {
-        tenant.serializeToBSON("$tenant", &builder);
-        return true;
-    }
-    return false;
-}
-
-BSONObj appendDollarDbAndTenant(const DatabaseName& dbName,
-                                BSONObj body,
-                                const SerializationContext& sc,
-                                const bool hasVts,
-                                const BSONObj& extraFields = {}) {
-    auto existingDollarTenant = parseDollarTenant(body);
-    BSONObjBuilder builder(std::move(body));
-    builder.appendElements(extraFields);
-
-    // Recreate each of the fields according to the sc when copying the body from an existing
-    // request.
-    if (!hasVts && dbName.tenantId()) {
-        appendDollarTenant(builder, dbName.tenantId().value(), existingDollarTenant);
-    }
-    builder.append("$db", DatabaseNameUtil::serialize(dbName, sc));
-    if (sc.getPrefix() == SerializationContext::Prefix::IncludePrefix) {
-        builder.append("expectPrefix",
-                       sc.getPrefix() == SerializationContext::Prefix::IncludePrefix);
-    }
-
-    return builder.obj();
-}
-
-void OpMsgRequest::setDollarTenant(const TenantId& tenant) {
-    massert(8423372,
-            str::stream() << "Should not set dollar tenant " << tenant
-                          << " on the validated OpMsgRequest.",
-            !validatedTenancyScope);
-
-    auto dollarTenant = parseDollarTenant(body);
-    BSONObjBuilder bodyBuilder(std::move(body));
-    appendDollarTenant(bodyBuilder, tenant, dollarTenant);
-    body = bodyBuilder.obj();
 }
 
 namespace {
@@ -392,14 +329,20 @@ OpMsgRequest OpMsgRequestBuilder::create(
     const BSONObj& extraFields) {
     validateExtraFields(dbName, body, extraFields);
 
-    const SerializationContext sc = validatedTenancyScope != boost::none
-        ? SerializationContext::stateCommandRequest(validatedTenancyScope->hasTenantId(),
-                                                    validatedTenancyScope->isFromAtlasProxy())
-        : SerializationContext::stateCommandRequest();
-
     OpMsgRequest request;
     const bool hasValidVts = validatedTenancyScope && validatedTenancyScope->isValid();
-    request.body = appendDollarDbAndTenant(dbName, std::move(body), sc, hasValidVts, extraFields);
+    request.body = [&]() {
+        BSONObjBuilder builder(std::move(body));
+        builder.appendElements(extraFields);
+
+        const SerializationContext sc = hasValidVts
+            ? SerializationContext::stateCommandRequest(validatedTenancyScope->hasTenantId(),
+                                                        validatedTenancyScope->isFromAtlasProxy())
+            : SerializationContext::stateCommandRequest();
+        builder.append("$db", DatabaseNameUtil::serialize(dbName, sc));
+        return builder.obj();
+    }();
+
     if (hasValidVts) {
         request.validatedTenancyScope = std::move(validatedTenancyScope);
     }

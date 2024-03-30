@@ -41,17 +41,12 @@ class ValidatedTenancyScopeFactory {
 public:
     /**
      * Parse the provided command {body} and {securityToken}.
-     * 1. If a `"$tenant"` field is found in {body}, and the connection
-     * is authorized for cluster{useTenant}, a simple Tenant-only VTS will be returned.
-     * 2. If an unsigned {securityToken} is provided, we delegate to parseUnsignedToken().
-     * 3. If a signed {securityToken} is provided, we delegate to parseToken().
+     * 1. If an unsigned {securityToken} is provided, we delegate to parseUnsignedToken().
+     * 2. If a signed {securityToken} is provided, we delegate to parseToken().
      *
-     * Note that specifying both `"$tenant"` in {body} and a non-empty {securityToken} is an error.
      * If neither is provided, this method returns `boost::none`.
      */
-    static boost::optional<ValidatedTenancyScope> parse(Client* client,
-                                                        BSONObj body,
-                                                        StringData securityToken);
+    static boost::optional<ValidatedTenancyScope> parse(Client* client, StringData securityToken);
 
     /**
      * Creates an HS256 signed token based on a pre-shared symmetric key.

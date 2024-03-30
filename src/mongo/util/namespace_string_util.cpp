@@ -106,7 +106,7 @@ std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
 
 std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
                                                       const SerializationContext& context) {
-    // tenantId came from either a $tenant field or security token.
+    // tenantId came from the security token.
     switch (context.getPrefix()) {
         case SerializationContext::Prefix::ExcludePrefix:
             return ns.toString();
@@ -190,13 +190,13 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
             case SerializationContext::Prefix::IncludePrefix: {
                 auto nss = parseFromStringExpectTenantIdInMultitenancyMode(db, coll);
                 massert(8423385,
-                        str::stream() << "TenantId from $tenant or security token present as '"
-                                      << tenantId->toString()
-                                      << "' with expectPrefix field set but without a prefix set",
+                        str::stream()
+                            << "TenantId from security token present as '" << tenantId->toString()
+                            << "' with expectPrefix field set but without a prefix set",
                         nss.tenantId());
                 massert(8423381,
                         str::stream()
-                            << "TenantId from $tenant or security token must match prefixed "
+                            << "TenantId from security token must match prefixed "
                                "tenantId: "
                             << tenantId->toString() << " prefix " << nss.tenantId()->toString(),
                         tenantId.value() == nss.tenantId());

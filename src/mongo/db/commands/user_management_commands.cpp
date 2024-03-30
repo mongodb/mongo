@@ -2638,7 +2638,7 @@ void CmdMergeAuthzCollections::Invocation::typedRun(OperationContext* opCtx) {
         [&] { AuthorizationManager::get(opCtx->getService())->invalidateUserCache(); });
     const auto db = cmd.getDb();
     const bool drop = cmd.getDrop();
-    const auto tenantId = cmd.getDollarTenant();
+    const auto tenantId = cmd.getDbName().tenantId();
 
     if (!tempUsersColl.empty()) {
         _processUsers(opCtx, authzManager, tempUsersColl, db, drop, tenantId);

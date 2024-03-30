@@ -54,7 +54,7 @@ export var EncryptedClient = class {
             clientSideFLEOptions.keyVaultNamespace = "admin" +
                 "." + dbName + ".keystore";
             shell = Mongo(connectionString, clientSideFLEOptions);
-            // auth is needed when using $tenant.
+            // auth is needed when using unsigned security token.
             assert(shell.getDB('admin').auth(userName, adminPwd));
         } else {
             shell = Mongo(connectionString, clientSideFLEOptions);
@@ -223,9 +223,9 @@ export var EncryptedClient = class {
 
         function countDocuments(sessionDB, name) {
             // FLE2 tests are testing transactions and using the count command is not supported.
-            // For the purpose of testing NTDI and `$tenant` we are going to simply use the count
-            // command since we are not testing any transaction. Otherwise fall back to use
-            // aggregation.
+            // For the purpose of testing NTDI and unsigned security token we are going to simply
+            // use the count command since we are not testing any transaction. Otherwise fall back
+            // to use aggregation.
             return sessionDB.getCollection(name).countDocuments({});
         }
 

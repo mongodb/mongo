@@ -446,9 +446,7 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_Multitenant) {
         NamespaceString::createNamespaceString_forTest(kTestTenantId, kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
     auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
-        auth::ValidatedTenancyScope::get(opCtx.get()),
-        ns.dbName(),
-        incrementCmd.toBSON(BSON("$tenantId" << *ns.tenantId())));
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }

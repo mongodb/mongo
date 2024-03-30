@@ -4058,7 +4058,8 @@ BSONObj EncryptionInformationHelpers::encryptionInformationSerialize(
     EncryptionInformation ei;
     ei.setType(kEncryptionInformationSchemaVersion);
 
-    // Do not include tenant id in nss in the schema as the command request has "$tenant".
+    // Do not include tenant id in nss in the schema as the command request has unsigned security
+    // token.
     ei.setSchema(BSON(nss.serializeWithoutTenantPrefix_UNSAFE() << encryptedFields));
 
     return ei.toBSON();
@@ -4068,7 +4069,8 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
     const NamespaceString& nss, const EncryptionInformation& ei) {
     BSONObj schema = ei.getSchema();
 
-    // Do not include tenant id in nss in the schema as the command request has "$tenant".
+    // Do not include tenant id in nss in the schema as the command request has unsigned security
+    // token.
     auto element = schema.getField(nss.serializeWithoutTenantPrefix_UNSAFE());
 
     uassert(6371205,

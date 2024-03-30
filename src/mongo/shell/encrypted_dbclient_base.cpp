@@ -819,8 +819,7 @@ DBClientBase* EncryptedDBClientBase::getRawConnection() {
 
 BSONObj EncryptedDBClientBase::doFindOne(OpMsgRequest& req) {
     // We directly "call" the server so we have fine grained control over how ValidatedTenancyScope
-    // and $tenant is handled.
-    //
+    // is handled.
     Client* client = &cc();
 
     auto msg = req.serialize();

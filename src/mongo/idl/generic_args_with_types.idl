@@ -214,11 +214,6 @@ structs:
                 type: bool
                 forward_to_shards: true
                 optional: true
-            $tenant:
-                type: tenant_id
-                cpp_name: "dollarTenant"
-                forward_to_shards: true
-                optional: true
             requestGossipRoutingCache:
                 type: array<namespacestring>
                 forward_to_shards: false

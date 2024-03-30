@@ -1520,7 +1520,7 @@ void BulkWriteOp::noteChildBatchError(const TargetedWriteBatch& targetedBatch,
     // Treat an error to get a batch response as failures of the contained write(s).
     const int numErrors = _clientRequest.getOrdered() ? 1 : targetedBatch.getWrites().size();
     auto emulatedReply =
-        createEmulatedErrorReply(status, numErrors, _clientRequest.getDollarTenant());
+        createEmulatedErrorReply(status, numErrors, _clientRequest.getDbName().tenantId());
 
     // This error isn't actually specific to any namespaces and so we do not want to track it.
     noteChildBatchResponse(targetedBatch,
@@ -1849,7 +1849,6 @@ int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {
     request.setNsInfo(nsInfo);
 
     request.setDbName(_clientRequest.getDbName());
-    request.setDollarTenant(_clientRequest.getDollarTenant());
     request.setLet(_clientRequest.getLet());
     // We'll account for the size to store each individual op as we add them, so just put an empty
     // vector as a placeholder for the array. This will ensure we properly count the size of the

@@ -1,6 +1,8 @@
 // Test passing security token with op messages.
 // @tags: [requires_replication, requires_sharding]
 
+import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
+
 const tenantID = ObjectId();
 const kLogLevelForToken = 5;
 const kAcceptedSecurityTokenID = 5838100;
@@ -38,10 +40,10 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
     assert(baseAdmin.auth('baseuser', 'pwd'));
 
     // Create a tenant-local user.
-    const createUserCmd =
-        {createUser: 'user1', "$tenant": tenantID, pwd: 'pwd', roles: ['readWriteAnyDatabase']};
+    const createUserCmd = {createUser: 'user1', pwd: 'pwd', roles: ['readWriteAnyDatabase']};
+    const unsignedToken = _createTenantToken({tenant: tenantID});
     if (multitenancyEnabled) {
-        assert.commandWorked(admin.runCommand(createUserCmd));
+        assert.commandWorked(runCommandWithSecurityToken(unsignedToken, admin, createUserCmd));
 
         // Confirm the user exists on the tenant authz collection only, and not the global
         // collection.
@@ -50,26 +52,17 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
                   'user1 should not exist on global users collection');
 
         const countUserCmd = {count: "system.users", query: {user: 'user1'}};
-        const countUserViaBody = Object.assign({}, countUserCmd, {"$tenant": tenantID});
-
-        // Count using {"$tenant":...} param in body.
-        const usersCountDollar = assert.commandWorked(admin.runCommand(countUserViaBody));
-        assert.eq(usersCountDollar.n, 1, 'user1 should exist on tenant users collection');
 
         // Count again using unsigned tenant token.
-        conn._setSecurityToken(_createTenantToken({tenant: tenantID}));
-        const usersCountToken = assert.commandWorked(admin.runCommand(countUserCmd));
+        const usersCountToken =
+            assert.commandWorked(runCommandWithSecurityToken(unsignedToken, admin, countUserCmd));
         assert.eq(usersCountToken.n, 1, 'user1 should exist on tenant users collection');
-        conn._setSecurityToken(undefined);
 
         // Users without `useTenant` should not be able to use unsigned tenant tokens.
-        baseConn._setSecurityToken(_createTenantToken({tenant: tenantID}));
-        assert.commandFailed(baseAdmin.runCommand(countUserCmd));
-        baseConn._setSecurityToken(undefined);
+        assert.commandFailed(runCommandWithSecurityToken(unsignedToken, baseAdmin, countUserCmd));
     } else {
-        conn._setSecurityToken(_createTenantToken({tenant: tenantID}));
-        assert.commandFailedWithCode(admin.runCommand({ping: 1}), ErrorCodes.Unauthorized);
-        conn._setSecurityToken(undefined);
+        assert.commandFailedWithCode(runCommandWithSecurityToken(unsignedToken, admin, {ping: 1}),
+                                     ErrorCodes.Unauthorized);
     }
 
     if (rst) {

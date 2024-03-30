@@ -247,38 +247,18 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::parseToken(Client* client,
 }
 
 boost::optional<ValidatedTenancyScope> ValidatedTenancyScopeFactory::parse(
-    Client* client, BSONObj body, StringData securityToken) {
+    Client* client, StringData securityToken) {
 
     if (!gMultitenancySupport) {
         return boost::none;
     }
 
-    auto dollarTenantElem = body["$tenant"_sd];
-
-    uassert(6545800,
-            "Cannot pass $tenant id if also passing securityToken",
-            dollarTenantElem.eoo() || securityToken.empty());
-    uassert(ErrorCodes::OperationFailed,
-            "Cannot process $tenant id when no client is available",
-            dollarTenantElem.eoo() || client);
-
     // TODO SERVER-66822: Re-enable this uassert.
     // uassert(ErrorCodes::Unauthorized,
-    //         "Multitenancy is enabled, $tenant id or securityToken is required.",
-    //         dollarTenantElem || opMsg.securityToken.nFields() > 0);
+    //         "Multitenancy is enabled, securityToken is required.",
+    //         opMsg.securityToken.nFields() > 0);
 
-    if (dollarTenantElem) {
-        auto as = AuthorizationSession::get(client);
-        // The useTenant action type allows the action of impersonating any tenant, so we check
-        // against the cluster resource with the current authenticated user's tenant ID rather than
-        // the specific tenant ID being impersonated.
-        uassert(
-            ErrorCodes::Unauthorized,
-            "'$tenant' may only be specified with the useTenant action type",
-            as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(as->getUserTenantId()), ActionType::useTenant));
-        return ValidatedTenancyScope(TenantId::parseFromBSON(dollarTenantElem));
-    } else if (!securityToken.empty()) {
+    if (!securityToken.empty()) {
         // Unsigned tenantId provided via highly privileged connection will respect tenantId field
         // only.
         if (securityToken.ends_with('.')) {

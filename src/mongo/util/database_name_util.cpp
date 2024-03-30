@@ -50,6 +50,7 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
 std::string DatabaseNameUtil::serialize(const DatabaseName& dbName,
                                         const SerializationContext& context) {
     if (!gMultitenancySupport)
@@ -82,7 +83,7 @@ std::string DatabaseNameUtil::serializeForStorage(const DatabaseName& dbName) {
 
 std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
                                                    const SerializationContext& context) {
-    // tenantId came from either a $tenant field or security token.
+    // tenantId came from a security token.
     switch (context.getPrefix()) {
         case SerializationContext::Prefix::ExcludePrefix:
             return dbName.toString();
@@ -178,7 +179,7 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
     // we only get here if we are processing a Command Request.  We disregard the feature flag in
     // this case, essentially letting the request dictate the state of the feature.
 
-    // We received a tenantId from $tenant or the security token.
+    // We received a tenantId from the security token.
     if (tenantId != boost::none) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix: {
@@ -192,17 +193,14 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
 
                 uassert(
                     8423386,
-                    str::stream()
-                        << "TenantId supplied by $tenant or security token as '"
-                        << tenantId->toString()
-                        << "' but prefixed tenantId also required given expectPrefix is set true",
+                    "TenantId supplied by security token as '{}' but prefixed tenantId also required given expectPrefix is set true"_format(
+                        tenantId->toString()),
                     dbName.tenantId());
                 uassert(
                     8423384,
-                    str::stream()
-                        << "TenantId from $tenant or security token must match prefixed tenantId: "
-                        << tenantId->toString() << " prefix " << dbName.tenantId()->toString(),
-                    tenantId.value() == dbName.tenantId());
+                    "TenantId from security token must match prefixed tenantId: {} prefix {}"_format(
+                        tenantId->toString(), dbName.tenantId()->toString()),
+                    tenantId == dbName.tenantId());
                 return dbName;
             }
             default:

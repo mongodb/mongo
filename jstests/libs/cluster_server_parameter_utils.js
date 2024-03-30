@@ -133,14 +133,6 @@ export function considerParameter(paramName, conn) {
         validateStandalone(cp);
 }
 
-export function tenantCommand(command, tenantId) {
-    if (tenantId === undefined) {
-        return command;
-    } else {
-        return Object.assign({}, command, {"$tenant": tenantId});
-    }
-}
-
 // Set the log level for get/setClusterParameter logging to appear.
 export function setupNode(conn) {
     const adminDB = conn.getDB('admin');

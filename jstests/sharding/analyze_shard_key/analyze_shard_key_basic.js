@@ -3,7 +3,6 @@
  *
  * @tags: [requires_fcv_70]
  */
-import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const setParameterOpts = {
@@ -15,8 +14,7 @@ const dbNameBase = "testDb";
 // collection must have for the command to not fail to generate split points.
 const numDocs = 10 * setParameterOpts.analyzeShardKeyNumRanges;
 
-function testNonExistingCollection(testCases, tenantId) {
-    const dbName = tenantId ? (tenantId + "-" + dbNameBase) : dbNameBase;
+function testNonExistingCollection(testCases, dbName = dbNameBase) {
     const collName = "testCollNonExisting";
     const ns = dbName + "." + collName;
     const candidateKey = {candidateKey: 1};
@@ -25,9 +23,6 @@ function testNonExistingCollection(testCases, tenantId) {
         jsTest.log(`Running analyzeShardKey command against a non-existing collection: ${
             tojson(testCase)}`);
         const cmdObj = {analyzeShardKey: ns, key: candidateKey};
-        if (tenantId) {
-            cmdObj.$tenant = tenantId;
-        }
         const res = testCase.conn.adminCommand(cmdObj);
         // If the command is not supported, it should fail even before the collection validation
         // step. That is, it should fail with an IllegalOperation error instead of a
@@ -289,7 +284,6 @@ if (!TestData.auth) {
     rst.initiate();
     const primary = rst.getPrimary();
     const adminDb = primary.getDB("admin");
-    const tenantId = ObjectId();
 
     // Prepare an authenticated user for testing.
     // Must be authenticated as a user with ActionType::useTenant in order to use security token
@@ -298,8 +292,8 @@ if (!TestData.auth) {
     assert(adminDb.auth("admin", "pwd"));
 
     // The analyzeShardKey command is not supported in multitenancy.
-    const testCases = [{conn: adminDb, isSupported: false}];
-    testNonExistingCollection(testCases, tenantId);
+    const testCases = [{conn: adminDb.getMongo(), isSupported: false}];
+    testNonExistingCollection(testCases, "admin");
     rst.stopSet();
 }
 

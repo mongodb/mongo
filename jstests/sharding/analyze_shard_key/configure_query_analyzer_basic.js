@@ -9,8 +9,7 @@ TestData.testingDiagnosticsEnabled = false;
 
 const dbNameBase = "testDb";
 
-function testNonExistingCollection(testCases, tenantId) {
-    const dbName = tenantId ? (tenantId + "-" + dbNameBase) : dbNameBase;
+function testNonExistingCollection(testCases, dbName = dbNameBase) {
     const collName = "testCollNonExisting";
     const ns = dbName + "." + collName;
 
@@ -18,9 +17,6 @@ function testNonExistingCollection(testCases, tenantId) {
         jsTest.log(`Running configureQueryAnalyzer command against an non-existing collection: ${
             tojson({testCase, ns})}`);
         const cmdObj = {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1};
-        if (tenantId) {
-            cmdObj.$tenant = tenantId;
-        }
         const res = testCase.conn.adminCommand(cmdObj);
         const expectedErrorCode =
             testCase.expectedErrorCode ? testCase.expectedErrorCode : ErrorCodes.NamespaceNotFound;
@@ -204,7 +200,6 @@ if (!TestData.auth) {
     rst.initiate();
     const primary = rst.getPrimary();
     const adminDb = primary.getDB("admin");
-    const tenantId = ObjectId();
 
     // Prepare an authenticated user for testing.
     // Must be authenticated as a user with ActionType::useTenant in order to use security token
@@ -216,7 +211,7 @@ if (!TestData.auth) {
     const testCases = [];
     testCases.push(Object.assign(
         {conn: primary, isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation}));
-    testNonExistingCollection(testCases, tenantId);
+    testNonExistingCollection(testCases, "admin");
 
     rst.stopSet();
 }

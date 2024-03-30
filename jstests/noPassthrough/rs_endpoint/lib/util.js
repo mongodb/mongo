@@ -143,16 +143,10 @@ export function makeCreateUserCmdObj(user) {
         pwd: user.password,
         roles: user.roles,
     };
-    if (user.tenantId) {
-        cmdObj["$tenant"] = user.tenantId;
-    }
     return cmdObj;
 }
 
 export function makeCreateRoleCmdObj(role) {
     const cmdObj = {createRole: role.name, roles: role.roles, privileges: role.privileges};
-    if (role.tenantId) {
-        cmdObj["$tenant"] = role.tenantId;
-    }
     return cmdObj;
 }

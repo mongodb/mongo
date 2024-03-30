@@ -1,6 +1,8 @@
 // Test role restrictions when using security tokens.
 // @tags: [requires_replication, featureFlagSecurityToken]
 
+import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
+
 const tenantID = ObjectId();
 const kVTSKey = 'secret';
 
@@ -8,7 +10,8 @@ function runTest(conn, rst = undefined) {
     const admin = conn.getDB('admin');
     const external = conn.getDB('$external');
 
-    // Must be authenticated as a user with ActionType::useTenant in order to use $tenant
+    // Must be authenticated as a user with ActionType::useTenant in order to use unsigned security
+    // token.
     assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
     assert(admin.auth('admin', 'pwd'));
 
@@ -18,9 +21,10 @@ function runTest(conn, rst = undefined) {
         readWriteUser: {roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]},
         clusterAdminUser: {roles: [{role: 'clusterAdmin', db: 'admin'}], prohibited: true},
     };
+    const unsignedToken = _createTenantToken({tenant: tenantID});
     Object.keys(users).forEach(
-        (user) => assert.commandWorked(external.runCommand(
-            {createUser: user, '$tenant': tenantID, roles: users[user].roles})));
+        (user) => assert.commandWorked(runCommandWithSecurityToken(
+            unsignedToken, external, {createUser: user, roles: users[user].roles})));
     if (rst) {
         rst.awaitReplication();
     }

@@ -110,7 +110,6 @@ public:
 
     static std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations(
         OperationContext* opCtx, TenantId tenantId) {
-        OID tenantOid = OID::parse(tenantId.toString()).getValue();
         NamespaceSpec ns;
         ns.setDb(DatabaseNameUtil::deserialize(tenantId, kDbName, kSerializationContext));
         ns.setColl(kCollName);
@@ -118,10 +117,10 @@ public:
         QuerySettings settings;
         settings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
         settings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a_1")})}});
-        QueryInstance queryA = BSON("find" << kCollName << "$db" << kDbName << "filter"
-                                           << BSON("a" << 2) << "$tenant" << tenantOid);
-        QueryInstance queryB = BSON("find" << kCollName << "$db" << kDbName << "filter"
-                                           << BSON("a" << BSONNULL) << "$tenant" << tenantOid);
+        QueryInstance queryA =
+            BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << 2));
+        QueryInstance queryB =
+            BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << BSONNULL));
         return {makeQueryShapeConfiguration(settings, queryA, opCtx, tenantId),
                 makeQueryShapeConfiguration(settings, queryB, opCtx, tenantId)};
     }

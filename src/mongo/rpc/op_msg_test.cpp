@@ -1153,11 +1153,6 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
         vts, DatabaseName::createDatabaseName_forTest(tenantId, dbString), body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
-
-    // Received an expectPrefix=true in the request body.
-    ASSERT_EQ(msg.body.getField("expectPrefix").eoo(), false);
-    ASSERT_TRUE(msg.body.getField("expectPrefix").isBoolean());
-    ASSERT_EQ(msg.body.getField("expectPrefix").boolean(), true);
     ASSERT_EQ(msg.parseDbName().toStringWithTenantId_forTest(), dbStringWithTid);
 }
 

@@ -2,17 +2,18 @@
 // non-tenanted user to access tenant collections.
 // @tags: [requires_replication, serverless, featureFlagSecurityToken]
 
-import {tenantCommand} from "jstests/libs/cluster_server_parameter_utils.js";
+import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
 
 const tenantId1 = ObjectId();
 const tenantId2 = ObjectId();
+const unsignedToken1 = _createTenantToken({tenant: tenantId1});
 const kVTSKey = 'secret';
 
 // List of tests. Each test specifies a role which the created user should have, whether we
 // should be testing with a tenant ID, and the list of authorization checks to run and their
 // expected result. isTenantedUser tests have a shorter list of authz checks to run because we can't
-// pass $tenant and the security token on the same request, so we are limited to tests which
-// pass no tenant ID.
+// pass unsigned security token and signed security token on the same request, so we are limited to
+// tests which pass no tenant ID.
 const testsToRun = [
     // Role specifying a specific namespace should allow user to write to that exact namespace
     // with their own tenant ID and nothing else
@@ -167,18 +168,15 @@ function runTests(conn) {
         roles: [],
         privileges: [{resource: {db: "admin", collection: ""}, actions: ['insert', 'find']}]
     }));
-    assert.commandWorked(admin.runCommand({
+    assert.commandWorked(runCommandWithSecurityToken(unsignedToken1, admin, {
         createRole: 'readWriteTenantTestFooRole',
         roles: [],
         privileges: [{resource: {db: "admin", collection: "foo"}, actions: ['insert', 'find']}],
-        '$tenant': tenantId1
-
     }));
-    assert.commandWorked(admin.runCommand({
+    assert.commandWorked(runCommandWithSecurityToken(unsignedToken1, admin, {
         createRole: 'readWriteTenantTestDBRole',
         roles: [],
         privileges: [{resource: {db: "admin", collection: ""}, actions: ['insert', 'find']}],
-        '$tenant': tenantId1
     }));
     assert.commandWorked(admin.runCommand({
         createRole: 'readWriteAnyRole',
@@ -186,11 +184,10 @@ function runTests(conn) {
         privileges: [{resource: {anyResource: true}, actions: ['insert', 'find']}],
     }));
 
-    assert.commandWorked(admin.runCommand({
+    assert.commandWorked(runCommandWithSecurityToken(unsignedToken1, admin, {
         createRole: 'readWriteTenantAnyRole',
         roles: [],
         privileges: [{resource: {anyResource: true}, actions: ['insert', 'find']}],
-        '$tenant': tenantId1
     }));
 
     for (let i = 0; i < testsToRun.length; i++) {
@@ -199,8 +196,8 @@ function runTests(conn) {
                    ", tenant = " + (test.isTenantedUser ? "true" : "false"));
         const username = 'testUser' + i.toString();
         let role = test.role;
-        // Unless skipUseTenant is set, we want to always allow non-tenanted users to pass $tenant,
-        // so for non-tenanted users, give them a special subrole with useTenant
+        // Unless skipUseTenant is set, we want to always allow non-tenanted users to pass unsigned
+        // token, so for non-tenanted users, give them a special subrole with useTenant
         if (!test.isTenantedUser && !test.skipUseTenant) {
             jsTest.log("Creating role with useTenant for this test");
             role = username + "-role";
@@ -214,9 +211,11 @@ function runTests(conn) {
         // Create a user for this test, with the given role and tenant ID.
         let createUserCmd = {createUser: username, pwd: 'pwd', roles: [role]};
         if (test.isTenantedUser) {
-            createUserCmd['$tenant'] = tenantId1;
+            assert.commandWorked(runCommandWithSecurityToken(unsignedToken1, admin, createUserCmd));
+        } else {
+            assert.commandWorked(admin.runCommand(createUserCmd));
         }
-        assert.commandWorked(admin.runCommand(createUserCmd));
+
         admin.logout();
 
         // We use security token to auth tenant users, and the mongo.auth method to auth non-tenant
@@ -235,16 +234,17 @@ function runTests(conn) {
             // Test a find and insert operation on each collection; whether they work should match
             // our expectation.
             if (shouldWork) {
-                assert.commandWorked(db.runCommand(tenantCommand({find: nss.coll}, nss.tenant)));
-                assert.commandWorked(db.runCommand(
-                    tenantCommand({insert: nss.coll, documents: [{a: username}]}, nss.tenant)));
+                assert.commandWorked(db.runCommand({find: nss.coll}, nss.tenant));
+                assert.commandWorked(db.runCommand({insert: nss.coll, documents: [{a: username}]}));
             } else {
+                const unsignedToken =
+                    nss.tenant ? _createTenantToken({tenant: nss.tenant}) : undefined;
                 assert.commandFailedWithCode(
-                    db.runCommand(tenantCommand({find: nss.coll}, nss.tenant)),
+                    runCommandWithSecurityToken(unsignedToken, db, {find: nss.coll}),
                     [ErrorCodes.Unauthorized]);
                 assert.commandFailedWithCode(
-                    db.runCommand(
-                        tenantCommand({insert: nss.coll, documents: [{a: username}]}, nss.tenant)),
+                    runCommandWithSecurityToken(
+                        unsignedToken, db, {insert: nss.coll, documents: [{a: username}]}),
                     [ErrorCodes.Unauthorized]);
             }
         }

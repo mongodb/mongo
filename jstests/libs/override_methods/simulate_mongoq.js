@@ -3,6 +3,7 @@
  * connection, so that the requests send by client will pass the tenant information to server
  * through the security token.
  */
+import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {
     getTenantIdForDatabase,
@@ -17,7 +18,7 @@ function prepareTenantUser(userName, tenantId) {
     let assertResponse = (res) => {
         if (res.ok === 1) {
             assert.commandWorked(res);
-            print('Create a user "root" with the useTenant privilege successfully.');
+            print(`Create a user "${userName}" with the useTenant privilege successfully.`);
         } else {
             // If 'username' already exists, then attempts to create a user with the same name
             // will fail with error code 51003.
@@ -36,9 +37,9 @@ function prepareTenantUser(userName, tenantId) {
 
     // Create a user for tenant for setting security token on connections.
     print(`Create a tenant user "${userName}", tenant:  ${tenantId}`);
-    res = db.getSiblingDB('$external').runCommand({
+    const unsignedToken = _createTenantToken({tenant: tenantId});
+    res = runCommandWithSecurityToken(unsignedToken, db.getSiblingDB('$external'), {
         createUser: userName,
-        '$tenant': tenantId,
         roles:
             [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
     });
@@ -127,7 +128,7 @@ function isAllowedWithSignedSecurityToken(cmdName) {
 
 // Override the runCommand to inject security token and check for the response has the right nss and
 // db name.
-function runCommandWithSecurityToken(
+function runCommandForMongoq(
     conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
     const useSignedSecurityToken = !!TestData.useSignedSecurityToken;
     const tenantId = getTenantIdForDatabase(dbName);
@@ -169,4 +170,4 @@ if (TestData.useSignedSecurityToken) {
 createSecurityToken(kUserName, kTenantId);
 
 OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/simulate_mongoq.js");
-OverrideHelpers.overrideRunCommand(runCommandWithSecurityToken);
+OverrideHelpers.overrideRunCommand(runCommandForMongoq);

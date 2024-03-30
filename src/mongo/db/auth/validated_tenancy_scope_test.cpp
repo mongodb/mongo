@@ -135,10 +135,8 @@ void assertIdenticalVTS(const ValidatedTenancyScope& a, const ValidatedTenancySc
 
 TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportOffWithoutTenantOK) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
-    auto body = BSON("$db"
-                     << "foo");
 
-    auto validated = ValidatedTenancyScopeFactory::parse(client.get(), body, {});
+    auto validated = ValidatedTenancyScopeFactory::parse(client.get(), {});
     ASSERT_TRUE(validated == boost::none);
 }
 
@@ -149,11 +147,10 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithSecurityTokenOK)
                                                           "secret");
 
     const TenantId kTenantId(OID::gen());
-    auto body = BSON("ping" << 1);
     UserName user("user", "admin", kTenantId);
     auto token = makeSecurityToken(user);
 
-    auto validated = ValidatedTenancyScopeFactory::parse(client.get(), body, token);
+    auto validated = ValidatedTenancyScopeFactory::parse(client.get(), token);
     ASSERT_TRUE(validated != boost::none);
     ASSERT_TRUE(validated->hasTenantId());
     ASSERT_TRUE(validated->tenantId() == kTenantId);
@@ -166,7 +163,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithSecurityTokenOK)
 //     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 //     auto body = BSON("ping" << 1);
 //     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
-//     ASSERT_THROWS_CODE(ValidatedTenancyScopeFactory::parse(client.get(), body, {}), DBException,
+//     ASSERT_THROWS_CODE(ValidatedTenancyScopeFactory::parse(client.get(), {}), DBException,
 //     ErrorCodes::Unauthorized);
 // }
 
@@ -177,7 +174,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, NoScopeKey) {
     UserName user("user", "admin", TenantId(OID::gen()));
     auto token = makeSecurityToken(user);
     ASSERT_THROWS_CODE_AND_WHAT(
-        ValidatedTenancyScopeFactory::parse(client.get(), {}, token),
+        ValidatedTenancyScopeFactory::parse(client.get(), token),
         DBException,
         ErrorCodes::OperationFailed,
         "Unable to validate test tokens when testOnlyValidatedTenancyScopeKey is not provided");
@@ -191,7 +188,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, WrongScopeKey) {
 
     UserName user("user", "admin", TenantId(OID::gen()));
     auto token = makeSecurityToken(user);
-    ASSERT_THROWS_CODE_AND_WHAT(ValidatedTenancyScopeFactory::parse(client.get(), {}, token),
+    ASSERT_THROWS_CODE_AND_WHAT(ValidatedTenancyScopeFactory::parse(client.get(), token),
                                 DBException,
                                 ErrorCodes::Unauthorized,
                                 "Token signature invalid");
@@ -205,17 +202,16 @@ TEST_F(ValidatedTenancyScopeTestFixture, SecurityTokenDoesNotExpectPrefix) {
 
     auto kOid = OID::gen();
     const TenantId kTenantId(kOid);
-    auto body = BSON("ping" << 1);
     UserName user("user", "admin", kTenantId);
     auto token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kDefault);
-    auto validated = ValidatedTenancyScopeFactory::parse(client.get(), body, token);
+    auto validated = ValidatedTenancyScopeFactory::parse(client.get(), token);
 
     ASSERT_TRUE(validated->tenantId() == kTenantId);
     ASSERT_FALSE(validated->isFromAtlasProxy());
 
     token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
     ASSERT_THROWS_CODE(
-        ValidatedTenancyScopeFactory::parse(client.get(), body, token), DBException, 8154400);
+        ValidatedTenancyScopeFactory::parse(client.get(), token), DBException, 8154400);
 }
 
 TEST_F(ValidatedTenancyScopeTestFixture, SecurityTokenHasPrefixExpectPrefix) {
@@ -226,17 +222,16 @@ TEST_F(ValidatedTenancyScopeTestFixture, SecurityTokenHasPrefixExpectPrefix) {
 
     auto kOid = OID::gen();
     const TenantId kTenantId(kOid);
-    auto body = BSON("ping" << 1);
     UserName user("user", "admin", kTenantId);
     auto token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
-    auto validated = ValidatedTenancyScopeFactory::parse(client.get(), body, token);
+    auto validated = ValidatedTenancyScopeFactory::parse(client.get(), token);
 
     ASSERT_TRUE(validated->tenantId() == kTenantId);
     ASSERT_TRUE(validated->isFromAtlasProxy());
 
     token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kDefault);
     ASSERT_THROWS_CODE(
-        ValidatedTenancyScopeFactory::parse(client.get(), body, token), DBException, 8154400);
+        ValidatedTenancyScopeFactory::parse(client.get(), token), DBException, 8154400);
 }
 
 TEST_F(ValidatedTenancyScopeTestFixture, VTSCreateFromOriginalToken) {
@@ -246,13 +241,12 @@ TEST_F(ValidatedTenancyScopeTestFixture, VTSCreateFromOriginalToken) {
                                                           "secret");
 
     const TenantId kTenantId(OID::gen());
-    const auto body = BSON("ping" << 1);
     UserName user("user", "admin", kTenantId);
     const auto token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
-    const auto vts = ValidatedTenancyScopeFactory::parse(client.get(), body, token);
+    const auto vts = ValidatedTenancyScopeFactory::parse(client.get(), token);
 
     // check that a VTS created from another VTS token are equal.
-    auto copyVts = ValidatedTenancyScopeFactory::parse(client.get(), {}, vts->getOriginalToken());
+    auto copyVts = ValidatedTenancyScopeFactory::parse(client.get(), vts->getOriginalToken());
     assertIdenticalVTS(*vts, *copyVts);
 }
 
@@ -266,7 +260,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, VTSCreateWithInnerRequestTag) {
     ASSERT_FALSE(vts.getOriginalToken().empty());
     ASSERT_FALSE(vts.isFromAtlasProxy());
     ASSERT_EQUALS(vts.tenantId(), kTenantId);
-    ASSERT(ValidatedTenancyScopeFactory::parse(client.get(), {}, vts.getOriginalToken()));
+    ASSERT(ValidatedTenancyScopeFactory::parse(client.get(), vts.getOriginalToken()));
 }
 
 TEST(ValidatedTenancyScopeTest, VTSKNotRequired) {

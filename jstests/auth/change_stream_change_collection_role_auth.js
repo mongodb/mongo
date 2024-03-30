@@ -10,12 +10,13 @@
  *  requires_fcv_62,
  * ]
  */
-import {tenantCommand} from "jstests/libs/cluster_server_parameter_utils.js";
+import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
 
 const kPassword = "password";
 const kVTSKey = 'secret';
 const kKeyFile = "jstests/libs/key1";
 const kTenantId = ObjectId();
+const kToken = _createTenantToken({tenant: kTenantId});
 
 // Start a replica-set test with one-node and authentication enabled.
 const replSetTest = new ReplSetTest({
@@ -156,7 +157,8 @@ function createUsers() {
             assert.commandWorked(primary.getDB(user.db).runCommand(
                 {createUser: userName, pwd: kPassword, roles: user.roles}));
         } else {
-            // Must be authenticated as a user with ActionType::useTenant in order to use '$tenant'.
+            // Must be authenticated as a user with ActionType::useTenant in order to use unsigned
+            // security token.
             const adminDb = login("root");
             let createUserCommand = {createUser: userName, roles: user.roles};
             if (user.privileges !== undefined) {
@@ -169,11 +171,11 @@ function createUsers() {
                     roles: []
                 };
                 assert.commandWorked(
-                    adminDb.runCommand(tenantCommand(createRoleForUserCommand, kTenantId)));
+                    runCommandWithSecurityToken(kToken, adminDb, createRoleForUserCommand));
                 createUserCommand.roles.push({role: userRoleName, db: 'admin'});
             }
-            assert.commandWorked(adminDb.getSiblingDB("$external")
-                                     .runCommand(tenantCommand(createUserCommand, kTenantId)));
+            assert.commandWorked(runCommandWithSecurityToken(
+                kToken, adminDb.getSiblingDB("$external"), createUserCommand));
             adminDb.logout();
         }
 
@@ -218,38 +220,38 @@ const changeCollectionName = "system.change_collection";
 // Helper to verify if the logged-in user is authorized to issue 'find' command.
 // The parameter 'authDb' is the authentication db for the user, and 'numDocs' determines the
 // least number of documents to be retrieved.
-function findChangeCollectionDoc(authDb, tenantId, numDocs = 1) {
+function findChangeCollectionDoc(authDb, token, numDocs = 1) {
     const configDB = authDb.getSiblingDB("config");
     let command = {find: changeCollectionName, filter: {_id: 0}};
-    const result = assert.commandWorked(configDB.runCommand(tenantCommand(command, tenantId)));
+    const result = assert.commandWorked(runCommandWithSecurityToken(token, configDB, command));
     assert.eq(result.cursor.firstBatch.length, numDocs, result);
 }
 
 // Helper to verify if the logged-in user is authorized to issue 'insert' command.
 // The parameter 'authDb' is the authentication db for the user.
-function insertChangeCollectionDoc(authDb, tenantId) {
+function insertChangeCollectionDoc(authDb, token) {
     const configDB = authDb.getSiblingDB("config");
     let command = {insert: changeCollectionName, documents: [{_id: 0}]};
-    assert.commandWorked(configDB.runCommand(tenantCommand(command, tenantId)));
-    findChangeCollectionDoc(authDb, tenantId, 1 /* numDocs */);
+    assert.commandWorked(runCommandWithSecurityToken(token, configDB, command));
+    findChangeCollectionDoc(authDb, token, 1 /* numDocs */);
 }
 
 // Helper to verify if the logged-in user is authorized to issue 'update' command.
 // The parameter 'authDb' is the authentication db for the user.
-function updateChangeCollectionDoc(authDb, tenantId) {
+function updateChangeCollectionDoc(authDb, token) {
     const configDB = authDb.getSiblingDB("config");
     let command = {update: changeCollectionName, updates: [{q: {_id: 0}, u: {$set: {x: 0}}}]};
-    assert.commandWorked(configDB.runCommand(tenantCommand(command, tenantId)));
-    findChangeCollectionDoc(authDb, tenantId, 1 /* numDocs */);
+    assert.commandWorked(runCommandWithSecurityToken(token, configDB, command));
+    findChangeCollectionDoc(authDb, token, 1 /* numDocs */);
 }
 
 // Helper to verify if the logged-in user is authorized to issue 'remove' command.
 // The parameter 'authDb' is the authentication db for the user.
-function removeChangeCollectionDoc(authDb, tenantId) {
+function removeChangeCollectionDoc(authDb, token) {
     const configDB = authDb.getSiblingDB("config");
     let command = {delete: changeCollectionName, deletes: [{q: {_id: 0}, limit: 1}]};
-    assert.commandWorked(configDB.runCommand(tenantCommand(command, tenantId)));
-    findChangeCollectionDoc(authDb, tenantId, 0 /* numDocs */);
+    assert.commandWorked(runCommandWithSecurityToken(token, configDB, command));
+    findChangeCollectionDoc(authDb, token, 0 /* numDocs */);
 }
 
 createUsers();
@@ -260,7 +262,7 @@ createUsers();
 
     // Enable change streams to ensure the creation of change collections.
     assert.commandWorked(
-        adminDb.runCommand(tenantCommand({setChangeStreamState: 1, enabled: true}, kTenantId)));
+        runCommandWithSecurityToken(kToken, adminDb, {setChangeStreamState: 1, enabled: true}));
 
     // And logout.
     testPrimary.logout();
@@ -288,8 +290,8 @@ createUsers();
     assert.eq(result.cursor.firstBatch.length, 0, result);
 
     // Check that Change Collection was created in the tenant.
-    result = assert.commandWorked(configDB.runCommand(
-        tenantCommand({listCollections: 1, filter: {name: changeCollectionName}}, kTenantId)));
+    result = assert.commandWorked(runCommandWithSecurityToken(
+        kToken, configDB, {listCollections: 1, filter: {name: changeCollectionName}}));
     assert.eq(result.cursor.firstBatch.length, 1, result);
 
     rootDB.logout();
@@ -300,22 +302,22 @@ for (const userName of Object.keys(users)) {
     const userDB = login(userName);
     // If the user is NOT a tenant user (without any associated tenant), we need to specify on
     // which tenant we are acting; otherwise the tenant of the user will be used.
-    const tenantId = !users[userName].isTenantUser ? kTenantId : undefined;
+    const token = !users[userName].isTenantUser ? kToken : tokenConn._securityToken;
 
     for (const [op, isAuthorized] of Object.entries(users[userName]['testPrivileges'])) {
         let opFunc;
         switch (op) {
             case 'insert':
-                opFunc = insertChangeCollectionDoc.bind(null, userDB, tenantId);
+                opFunc = insertChangeCollectionDoc.bind(null, userDB, token);
                 break;
             case 'find':
-                opFunc = findChangeCollectionDoc.bind(null, userDB, tenantId);
+                opFunc = findChangeCollectionDoc.bind(null, userDB, token);
                 break;
             case 'update':
-                opFunc = updateChangeCollectionDoc.bind(null, userDB, tenantId);
+                opFunc = updateChangeCollectionDoc.bind(null, userDB, token);
                 break;
             case 'remove':
-                opFunc = removeChangeCollectionDoc.bind(null, userDB, tenantId);
+                opFunc = removeChangeCollectionDoc.bind(null, userDB, token);
                 break;
             default:
                 assert(false);

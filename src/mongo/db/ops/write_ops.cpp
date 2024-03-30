@@ -581,13 +581,6 @@ int getInsertHeaderSizeEstimate(const InsertCommandRequest& insertReq) {
 
     size += InsertCommandRequest::kCommandName.size() + kPerElementOverhead +
         insertReq.getNamespace().size() + 1 /* ns string null terminator */;
-
-    // Handle $tenant. Note that $tenant is injected as a hidden field into all IDL commands, unlike
-    // other passthrough fields.
-    if (auto tenant = insertReq.getDollarTenant(); tenant.has_value()) {
-        size += InsertCommandRequest::kDollarTenantFieldName.size() + OID::kOIDSize +
-            kPerElementOverhead;
-    }
     return size;
 }
 
@@ -599,13 +592,6 @@ int getUpdateHeaderSizeEstimate(const UpdateCommandRequest& updateReq) {
 
     size += write_ops::UpdateCommandRequest::kUpdatesFieldName.size() + kPerElementOverhead +
         static_cast<int>(BSONObj::kMinBSONLength);
-
-    // Handle $tenant. Note that $tenant is injected as a hidden field into all IDL commands, unlike
-    // other passthrough fields.
-    if (auto tenant = updateReq.getDollarTenant(); tenant.has_value()) {
-        size += UpdateCommandRequest::kDollarTenantFieldName.size() + OID::kOIDSize +
-            kPerElementOverhead;
-    }
 
     // Handle legacy runtime constants.
     if (auto runtimeConstants = updateReq.getLegacyRuntimeConstants();
@@ -629,13 +615,6 @@ int getDeleteHeaderSizeEstimate(const DeleteCommandRequest& deleteReq) {
 
     size += write_ops::DeleteCommandRequest::kDeletesFieldName.size() + kPerElementOverhead +
         static_cast<int>(BSONObj::kMinBSONLength);
-
-    // Handle $tenant. Note that $tenant is injected as a hidden field into all IDL commands, unlike
-    // other passthrough fields.
-    if (auto tenant = deleteReq.getDollarTenant(); tenant.has_value()) {
-        size += DeleteCommandRequest::kDollarTenantFieldName.size() + OID::kOIDSize +
-            kPerElementOverhead;
-    }
 
     // Handle legacy runtime constants.
     if (auto runtimeConstants = deleteReq.getLegacyRuntimeConstants();

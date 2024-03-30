@@ -1,6 +1,3 @@
-
-import {tenantCommand} from "jstests/libs/cluster_server_parameter_utils.js";
-
 const dbName = "admin";
 const conn = db.getMongo();
 
@@ -15,9 +12,8 @@ function createAndSetSecurityToken(kTenantId) {
 
 function runCommandWithResponseCheck() {
     const db = conn.getDB(dbName);
-    assert.commandWorked(db.runCommand(tenantCommand({setChangeStreamState: 1, enabled: true})));
-    const changeStreamObj =
-        assert.commandWorked(db.runCommand(tenantCommand({getChangeStreamState: 1})));
+    assert.commandWorked(db.runCommand({setChangeStreamState: 1, enabled: true}));
+    const changeStreamObj = assert.commandWorked(db.runCommand({getChangeStreamState: 1}));
     assert.eq(changeStreamObj.enabled, true);
 }
 

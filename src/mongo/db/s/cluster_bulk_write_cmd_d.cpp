@@ -44,11 +44,11 @@ struct ClusterBulkWriteCmdD {
     static void doCheckAuthorization(AuthorizationSession* authzSession,
                                      bool bypass,
                                      const BulkWriteCommandRequest& op) {
-        uassert(
-            ErrorCodes::Unauthorized,
-            "Unauthorized",
-            authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(op.getDollarTenant()), ActionType::internal));
+        uassert(ErrorCodes::Unauthorized,
+                "Unauthorized",
+                authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(op.getDbName().tenantId()),
+                    ActionType::internal));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {

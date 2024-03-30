@@ -214,7 +214,7 @@ public:
             auto reqObj = unparsedRequest.body;
             auto& [replyItems, summaryFields, wcErrors, retriedStmtIds, _] = replyInfo;
             const NamespaceString cursorNss =
-                NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
+                NamespaceString::makeBulkWriteNSS(req.getDbName().tenantId());
 
             if (bulk_write_common::isUnacknowledgedBulkWrite(opCtx)) {
                 // Skip cursor creation and return the simplest reply.

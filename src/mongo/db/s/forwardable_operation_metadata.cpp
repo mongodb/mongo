@@ -102,8 +102,7 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
     boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope = boost::none;
     const auto originalToken = getValidatedTenancyScopeToken();
     if (originalToken != boost::none && !originalToken->empty()) {
-        validatedTenancyScope =
-            auth::ValidatedTenancyScopeFactory::parse(client, {}, *originalToken);
+        validatedTenancyScope = auth::ValidatedTenancyScopeFactory::parse(client, *originalToken);
     }
     auth::ValidatedTenancyScope::set(opCtx, validatedTenancyScope);
 }

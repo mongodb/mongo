@@ -221,8 +221,6 @@ struct OpMsgRequest : public OpMsg {
         return body.firstElementFieldName();
     }
 
-    void setDollarTenant(const TenantId& tenant);
-
     SerializationContext getSerializationContext() const;
 
     // DO NOT ADD MEMBERS!  Since this type is essentially a strong typedef (see the class comment),
