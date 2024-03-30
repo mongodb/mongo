@@ -3,6 +3,9 @@
  * demonstrates that unlike the classic multiplanner, the SBE multiplanner's end condition is by
  * default not proportional to the size of the collection.
  *
+ * TODO SERVER-83887 This entire test can be deleted when we remove the "Classic runtime planning
+ * for SBE" feature flag.
+ *
  * @tags: [
  *   # This test assumes that SBE is being used for most queries.
  *   featureFlagSbeFull,

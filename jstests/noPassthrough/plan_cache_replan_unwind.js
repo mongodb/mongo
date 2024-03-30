@@ -14,6 +14,8 @@ const coll = db.plan_cache_replan_unwind;
 coll.drop();
 
 const sbeEnabled = checkSbeFullyEnabled(db);
+// TODO SERVER-83887: Delete this block when "featureFlagClassicRuntimePlanningForSbe" is
+// deleted.
 if (sbeEnabled && !FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
     jsTestLog("Skipping test since SBE without featureFlagClassicRuntimePlanningForSbe " +
               "doesn't handle $unwind and replanning correctly");

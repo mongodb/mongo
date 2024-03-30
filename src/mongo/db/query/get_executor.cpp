@@ -794,8 +794,9 @@ private:
 
 /**
  * A helper class to prepare an SBE PlanStage tree for execution. This is not used when
- * featureFlagClassicRuntimePlanningForSbe is enabled. Can be deleted if we delete SBE runtime
- * planners.
+ * featureFlagClassicRuntimePlanningForSbe is enabled.
+ *
+ * TODO SERVER-88047 This class can be deleted when we delete the SBE runtime planners.
  */
 class SlotBasedPrepareExecutionHelper final
     : public PrepareExecutionHelper<sbe::PlanCacheKey, SlotBasedPrepareExecutionResult> {

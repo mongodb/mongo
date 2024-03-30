@@ -1,6 +1,9 @@
 /**
  * Tests the serverStatus and FTDC metrics for multi planner execution (both classic and SBE).
  *
+ * TODO SERVER-83887 This test has some logic to handle the SBE multiplanner vs Classic multiplanner
+ * differently; this can be simplified once the feature flag is removed.
+ *
  * @tags: [featureFlagSbeFull]
  */
 

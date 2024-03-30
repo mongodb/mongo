@@ -124,7 +124,7 @@ feature_flags:
                     plan selection for queries that use SBE. When disabled, the SBE multi-planner
                     and subplanner are used instead."
       cpp_varname: gFeatureFlagClassicRuntimePlanningForSbe
-      default: false
+      default: true
       shouldBeFCVGated: false
 
     featureFlagBinDataConvert:

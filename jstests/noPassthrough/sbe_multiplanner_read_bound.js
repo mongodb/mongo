@@ -3,6 +3,9 @@
  * the max read bound to 0 because that will effectively disable the trial run tracking for that
  * metric. See SERVER-79088 for more details.
  *
+ * TODO SERVER-83887 This entire test can be deleted when we remove the "Classic runtime planning
+ * for SBE" feature flag.
+ *
  * @tags: [
  *    # This test assumes that SBE is being used for most queries.
  *    featureFlagSbeFull,

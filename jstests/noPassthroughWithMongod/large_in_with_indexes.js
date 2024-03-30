@@ -4,8 +4,9 @@ import {getPlanStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
-// The SBE multi planner chooses the wrong index. Remove this check when SBE runtime planners
-// are deleted.
+// The SBE multi planner chooses the wrong index.
+//
+// TODO SERVER-83887 Remove this block once the feature flag is removed.
 if (checkSbeFullyEnabled(db) &&
     !FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
     jsTestLog("Skipping test since SBE is enabled without classic runtime planning for SBE.");
