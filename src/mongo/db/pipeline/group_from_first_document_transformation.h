@@ -96,6 +96,9 @@ public:
 
     void optimize() final;
 
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
     Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
                                      const SerializationOptions& options = {}) const final;
 
