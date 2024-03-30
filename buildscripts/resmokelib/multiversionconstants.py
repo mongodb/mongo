@@ -1,103 +1,29 @@
 """FCV and Server binary version constants used for multiversion testing."""
-import os
-import shutil
-from subprocess import DEVNULL, STDOUT, CalledProcessError, call, check_output
-import http
-import requests
-from retry import retry
-
 import structlog
-import buildscripts.resmokelib.config as _config
 
 from buildscripts.resmokelib.multiversion.multiversion_service import (
-    MongoReleases, MongoVersion, MultiversionService, MONGO_VERSION_YAML, RELEASES_YAML)
-from buildscripts.resmokelib.multiversionsetupconstants import \
-    USE_EXISTING_RELEASES_FILE
+    MongoReleases, MongoVersion, MultiversionService, MONGO_VERSION_YAML, in_git_root_dir,
+    get_mongo_git_version)
 
 LAST_LTS = "last_lts"
 LAST_CONTINUOUS = "last_continuous"
-
-RELEASES_LOCAL_FILE = os.path.join("src", "mongo", "util", "version", "releases.yml")
-# We use the "releases.yml" file from "master" because it is guaranteed to be up-to-date
-# with the latest EOL versions. If a "last-continuous" version is EOL, we don't include
-# it in the multiversion config and therefore don't test against it.
-MASTER_RELEASES_REMOTE_FILE = "https://raw.githubusercontent.com/mongodb/mongo/master/src/mongo/util/version/releases.yml"
 
 LOGGER = structlog.getLogger(__name__)
 
 
 def generate_mongo_version_file():
     """Generate the mongo version data file. Should only be called in the root of the mongo directory."""
-    try:
-        res = check_output("git describe", shell=True, text=True)
-    except CalledProcessError as exp:
-        raise ChildProcessError("Failed to run git describe to get the latest tag") from exp
+    version = get_mongo_git_version()
 
     # Write the current MONGO_VERSION to a data file.
     with open(MONGO_VERSION_YAML, 'w') as mongo_version_fh:
-        # E.g. res = 'r5.1.0-alpha-597-g8c345c6693\n'
-        res = res[1:]  # Remove the leading "r" character.
-        mongo_version_fh.write("mongo_version: " + res)
-
-
-@retry(tries=5, delay=3)
-def get_releases_file_from_remote():
-    """Get the latest releases.yml from github."""
-    try:
-        with open(RELEASES_YAML, "wb") as file:
-            response = requests.get(MASTER_RELEASES_REMOTE_FILE)
-            if response.status_code != http.HTTPStatus.OK:
-                raise RuntimeError("Http response for releases yml file was not 200 but was " +
-                                   response.status_code)
-            file.write(response.content)
-        LOGGER.info(f"Got releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
-    except Exception as exc:
-        LOGGER.warning(f"Could not get releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
-        raise exc
-
-
-def get_releases_file_locally_or_fallback_to_remote():
-    """Get the latest releases.yml locally or fallback to getting it from github."""
-    if os.path.exists(RELEASES_LOCAL_FILE):
-        LOGGER.info(f"Found releases.yml file locally: {RELEASES_LOCAL_FILE}")
-        shutil.copyfile(RELEASES_LOCAL_FILE, RELEASES_YAML)
-    else:
-        LOGGER.warning(f"Could not find releases.yml file locally: {RELEASES_LOCAL_FILE}")
-        get_releases_file_from_remote()
-
-
-def generate_releases_file():
-    """Generate the releases constants file."""
-    if _config.EVERGREEN_TASK_ID:
-        get_releases_file_from_remote()
-    else:
-        get_releases_file_locally_or_fallback_to_remote()
-
-
-def in_git_root_dir():
-    """Return True if we are in the root of a git directory."""
-    if call(["git", "branch"], stderr=STDOUT, stdout=DEVNULL) != 0:
-        # We are not in a git directory.
-        return False
-
-    git_root_dir = check_output("git rev-parse --show-toplevel", shell=True, text=True).strip()
-    # Always use forward slash for the cwd path to resolve inconsistent formatting with Windows.
-    curr_dir = os.getcwd().replace("\\", "/")
-    return git_root_dir == curr_dir
+        mongo_version_fh.write("mongo_version: " + version)
 
 
 if in_git_root_dir():
     generate_mongo_version_file()
 else:
     LOGGER.info("Skipping generating mongo version file since we're not in the root of a git repo")
-
-# Avoiding regenerating the releases file if this flag is set. Should only be set if there are
-# multiple processes attempting to set up multiversion concurrently.
-if not USE_EXISTING_RELEASES_FILE:
-    generate_releases_file()
-else:
-    LOGGER.info(
-        "Skipping generating releases file since the --useExistingReleasesFile flag has been set")
 
 
 def evg_project_str(version):
@@ -106,8 +32,8 @@ def evg_project_str(version):
 
 
 multiversion_service = MultiversionService(
-    mongo_version=MongoVersion.from_yaml_file(MONGO_VERSION_YAML),
-    mongo_releases=MongoReleases.from_yaml_file(RELEASES_YAML),
+    mongo_version=MongoVersion.generate(),
+    mongo_releases=MongoReleases.generate(),
 )
 
 version_constants = multiversion_service.calculate_version_constants()

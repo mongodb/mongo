@@ -11,10 +11,10 @@ import os.path
 import random
 import subprocess
 import sys
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Optional
 
 import buildscripts.resmokelib.testing.tags as _tags
-from buildscripts.resmokelib import config
+from buildscripts.resmokelib import config, multiversionconstants
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.utils import globstar
@@ -438,6 +438,9 @@ class _SelectorConfig(object):
         exclude_with_any_tags = self.__merge_lists(exclude_with_any_tags,
                                                    config.EXCLUDE_WITH_ANY_TAGS)
 
+        if exclude_with_any_tags and "requires_fcv_tag_latest" in exclude_with_any_tags:
+            exclude_with_any_tags.add(multiversionconstants.REQUIRES_FCV_TAG_LATEST)
+
         # This is functionally similar to `include_tags` but contains a list of tags rather
         # than an expression.
         include_with_all_tags = config.INCLUDE_TAGS
@@ -447,7 +450,7 @@ class _SelectorConfig(object):
             include_with_all_tags)
 
     @staticmethod
-    def __merge_lists(list_a, list_b):
+    def __merge_lists(list_a: Optional[list], list_b: Optional[list]) -> Optional[set]:
         if list_a or list_b:
             if list_a is None:
                 return set(list_b)

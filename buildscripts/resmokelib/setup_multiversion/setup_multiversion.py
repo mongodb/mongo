@@ -22,7 +22,6 @@ import yaml
 
 from requests.exceptions import HTTPError
 
-from buildscripts.resmokelib import multiversionsetupconstants
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.setup_multiversion import config, download, github_conn
 from buildscripts.resmokelib.utils import evergreen_conn, is_windows
@@ -462,9 +461,6 @@ class SetupMultiversionPlugin(PluginInterface):
                                             da=args.download_artifacts,
                                             dv=args.download_python_venv)
 
-        if args.use_existing_releases_file:
-            multiversionsetupconstants.USE_EXISTING_RELEASES_FILE = True
-
         return SetupMultiversion(
             install_dir=args.install_dir, link_dir=args.link_dir, mv_platform=args.platform,
             edition=args.edition, architecture=args.architecture, use_latest=args.use_latest,
@@ -540,11 +536,6 @@ class SetupMultiversionPlugin(PluginInterface):
         parser.add_argument(
             "-rp", "--require-push", dest="require_push", action="store_true", default=False,
             help="Require the push task to be successful for assets to be downloaded")
-        # Hidden flag that determines if we should generate a new releases yaml file. This flag
-        # should be set to True if we are invoking setup_multiversion multiple times in parallel,
-        # to prevent multiple processes from modifying the releases yaml file simultaneously.
-        parser.add_argument("--useExistingReleasesFile", dest="use_existing_releases_file",
-                            action="store_true", default=False, help=argparse.SUPPRESS)
         # Hidden flag to write out the Evergreen versions of the downloaded binaries.
         parser.add_argument("--evgVersionsFile", dest="evg_versions_file", default=None,
                             help=argparse.SUPPRESS)
