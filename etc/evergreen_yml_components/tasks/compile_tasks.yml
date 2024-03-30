@@ -506,6 +506,7 @@ tasks:
       source_dir: "src"
       include:
       - ".resmoke_mongo_version.yml"
+      - ".resmoke_mongo_release_values.yml"
       - "patch_test_tags.tgz"
       - "./build/**.gcno"
       - "./etc/*san.suppressions"

@@ -251,16 +251,3 @@ but with those changes backported to the older branches the multiversion tests s
 In order to temporarily disable the test from running in multiversion it can be added to the
 [etc/backports_required_for_multiversion_tests.yml](https://github.com/mongodb/mongo/blob/fcdfe29cee066278b94ea2749456fc433cc398c6/etc/backports_required_for_multiversion_tests.yml#L1-L19).
 Please follow the instructions described in the file.
-
-### Automatically excluding the latest fcv in your suite
-
-Some fcv upgrade/downgrade suites require excluding the latest `requires_fcv_xx` tag.
-You may use the `requires_fcv_tag_latest` tag as a constant that gets converted to the latest `requires_fcv_xx` tag.
-
-```yaml
-selector:
-    roots:
-        - example_jstest1.js
-    exclude_with_any_tags:
-        - requires_fcv_tag_latest
-```

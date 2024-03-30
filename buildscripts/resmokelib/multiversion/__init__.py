@@ -55,8 +55,8 @@ class MultiversionConfigSubcommand(Subcommand):
         """Discover the current multiversion configuration."""
         from buildscripts.resmokelib import multiversionconstants
         multiversion_service = MultiversionService(
-            mongo_version=MongoVersion.generate(),
-            mongo_releases=MongoReleases.generate(),
+            mongo_version=MongoVersion.from_yaml_file(multiversionconstants.MONGO_VERSION_YAML),
+            mongo_releases=MongoReleases.from_yaml_file(multiversionconstants.RELEASES_YAML),
         )
         version_constants = multiversion_service.calculate_version_constants()
         return MultiversionConfig(

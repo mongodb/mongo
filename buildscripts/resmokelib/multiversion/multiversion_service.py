@@ -1,79 +1,20 @@
 """A service for working with multiversion testing."""
 from __future__ import annotations
-import http
-import os
 
 import re
 from bisect import bisect_left, bisect_right
-from subprocess import DEVNULL, STDOUT, CalledProcessError, call, check_output
 from typing import List, NamedTuple, Optional
 
 from packaging.version import Version
 from pydantic import BaseModel, Field
-import requests
-import retry
 import structlog
 import yaml
-import buildscripts.resmokelib.config as _config
 
 # These values must match the include paths for artifacts.tgz in evergreen.yml.
 MONGO_VERSION_YAML = ".resmoke_mongo_version.yml"
+RELEASES_YAML = ".resmoke_mongo_release_values.yml"
 VERSION_RE = re.compile(r'^[0-9]+\.[0-9]+')
 LOGGER = structlog.getLogger(__name__)
-RELEASES_LOCAL_FILE = os.path.join("src", "mongo", "util", "version", "releases.yml")
-# We use the "releases.yml" file from "master" because it is guaranteed to be up-to-date
-# with the latest EOL versions. If a "last-continuous" version is EOL, we don't include
-# it in the multiversion config and therefore don't test against it.
-MASTER_RELEASES_REMOTE_FILE = "https://raw.githubusercontent.com/mongodb/mongo/master/src/mongo/util/version/releases.yml"
-
-
-def get_mongo_git_version():
-    """Generate the mongo git description. Should only be called in the root of the mongo directory."""
-    try:
-        res = check_output("git describe", shell=True, text=True)
-    except CalledProcessError as exp:
-        raise ChildProcessError("Failed to run git describe to get the latest tag") from exp
-
-    # E.g. res = 'r5.1.0-alpha-597-g8c345c6693\n'
-    return res[1:]  # Remove the leading "r" character.
-
-
-@retry.retry(tries=5, delay=3)
-def get_releases_file_from_remote():
-    """Get the latest releases.yml from github."""
-    try:
-        response = requests.get(MASTER_RELEASES_REMOTE_FILE)
-        if response.status_code != http.HTTPStatus.OK:
-            raise RuntimeError("Http response for releases yml file was not 200 but was " +
-                               response.status_code)
-        LOGGER.info(f"Got releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
-        return response.content
-    except Exception as exc:
-        LOGGER.warning(f"Could not get releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
-        raise exc
-
-
-def get_releases_file_locally_or_fallback_to_remote():
-    """Get the latest releases.yml locally or fallback to getting it from github."""
-    if os.path.exists(RELEASES_LOCAL_FILE):
-        LOGGER.info(f"Found releases.yml file locally: {RELEASES_LOCAL_FILE}")
-        with open(RELEASES_LOCAL_FILE, 'r') as file:
-            return file.read()
-    else:
-        LOGGER.warning(f"Could not find releases.yml file locally: {RELEASES_LOCAL_FILE}")
-        return get_releases_file_from_remote()
-
-
-def in_git_root_dir():
-    """Return True if we are in the root of a git directory."""
-    if call(["git", "branch"], stderr=STDOUT, stdout=DEVNULL) != 0:
-        # We are not in a git directory.
-        return False
-
-    git_root_dir = check_output("git rev-parse --show-toplevel", shell=True, text=True).strip()
-    # Always use forward slash for the cwd path to resolve inconsistent formatting with Windows.
-    curr_dir = os.getcwd().replace("\\", "/")
-    return git_root_dir == curr_dir
 
 
 def tag_str(version: Version) -> str:
@@ -174,13 +115,15 @@ class MongoVersion(BaseModel):
     mongo_version: str
 
     @classmethod
-    def generate(cls) -> MongoReleases:
-        if in_git_root_dir():
-            return cls(mongo_version=get_mongo_git_version())
+    def from_yaml_file(cls, yaml_file: str) -> MongoVersion:
+        """
+        Read the mongo version from the given yaml file.
 
-        with open(MONGO_VERSION_YAML, 'r') as file:
-            mongo_version_object = yaml.safe_load(file)
-            return cls(mongo_version=mongo_version_object["mongo_version"])
+        :param yaml_file: Path to yaml file.
+        :return: MongoVersion read from file.
+        """
+        mongo_version_yml_file = open(yaml_file, 'r')
+        return cls(**yaml.safe_load(mongo_version_yml_file))
 
     def get_version(self) -> Version:
         """Get the Version representation of the mongo version being tested."""
@@ -209,22 +152,22 @@ class MongoReleases(BaseModel):
                                                              alias="generateFCVLowerBoundOverride")
 
     @classmethod
-    def generate(cls) -> MongoReleases:
+    def from_yaml_file(cls, yaml_file: str) -> MongoReleases:
         """
-        Read the mongo release information.
+        Read the mongo release information from the given yaml file.
 
-        :return: MongoReleases parsed mongo release versions
+        :param yaml_file: Path to yaml file.
+        :return: MongoReleases read from file.
         """
 
-        if _config.EVERGREEN_TASK_ID:
-            yaml_contents = get_releases_file_from_remote()
-        else:
-            yaml_contents = get_releases_file_locally_or_fallback_to_remote()
+        with open(yaml_file, 'r') as mongo_releases_file:
+            yaml_contents = mongo_releases_file.read()
         safe_load_result = yaml.safe_load(yaml_contents)
         try:
             return cls(**safe_load_result)
         except:
-            LOGGER.info("MongoReleases.generate() failed\n"
+            LOGGER.info("MongoReleases.from_yaml_file() failed\n"
+                        f"yaml_file = {yaml_file}\n"
                         f"yaml_contents = {yaml_contents}\n"
                         f"safe_load_result = {safe_load_result}")
             raise
