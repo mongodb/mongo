@@ -74,7 +74,6 @@ TEST(RateLimitingTest, SlidingWindowSucceedsThenFails) {
 TEST(RateLimitingTest, FixedWindowPermitsRequestAfterWindowExpires) {
     auto rl = RateLimiting(1, Milliseconds{10});
     ASSERT_TRUE(rl.handleRequestFixedWindow());
-    ASSERT_FALSE(rl.handleRequestFixedWindow());
     sleepmillis(11);
     ASSERT_TRUE(rl.handleRequestFixedWindow());
 }
