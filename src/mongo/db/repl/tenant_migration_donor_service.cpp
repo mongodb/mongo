@@ -479,6 +479,11 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     return bob.obj();
 }
 
+TenantMigrationDonorDocument TenantMigrationDonorService::Instance::getStateDoc() const {
+    stdx::lock_guard lk(_mutex);
+    return _stateDoc;
+}
+
 void TenantMigrationDonorService::Instance::checkIfOptionsConflict(const BSONObj& options) const {
     auto stateDoc = tenant_migration_access_blocker::parseDonorStateDocument(options);
 
@@ -503,7 +508,7 @@ void TenantMigrationDonorService::Instance::checkIfOptionsConflict(const BSONObj
         uasserted(ErrorCodes::ConflictingOperationInProgress,
                   str::stream() << "Found active migration for migrationId \""
                                 << _migrationUuid.toBSON() << "\" with different options "
-                                << tenant_migration_util::redactStateDoc(_stateDoc.toBSON()));
+                                << tenant_migration_util::redactStateDoc(getStateDoc().toBSON()));
     }
 }
 

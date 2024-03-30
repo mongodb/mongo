@@ -185,6 +185,11 @@ public:
             return _protocol;
         }
 
+        /**
+         * Returns the instance state document.
+         */
+        TenantMigrationDonorDocument getStateDoc() const;
+
     private:
         const NamespaceString _stateDocumentsNS = NamespaceString::kTenantMigrationDonorsNamespace;
 
