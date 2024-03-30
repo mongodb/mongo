@@ -1750,6 +1750,94 @@ export function blockProcessingTestCases(timeFieldName,
             usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
+            name: "GroupByIfNullAlwaysNull",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {
+                    $group: {
+                        _id: {gb: {$ifNull: ['$x', '$z', null]}, series: metaDotSeries},
+                        a: {$sum: "$y"}
+                    }
+                },
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByIfNullDifferentFinalType",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {
+                    $group: {
+                        _id:
+                            {gb: {$ifNull: ["$x", "$z", NumberDecimal(37)]}, series: metaDotSeries},
+                        a: {$sum: "$y"}
+                    }
+                },
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByIfNullNeverNull",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {
+                    $group: {
+                        _id: {gb: {$ifNull: ["$p", "$q", "$z"]}, series: metaDotSeries},
+                        a: {$max: "$x"}
+                    }
+                },
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByAccumulateIfNullSum",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: {gb: metaDotRegion}, a: {$sum: {$ifNull: ["$z", "$y", "$p"]}}}},
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByAccumulateIfNullMinMax",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {
+                    $group: {
+                        _id: {gb: metaDotRegion},
+                        a: {$min: {$ifNull: ["$z", 6]}},
+                        b: {$max: {$ifNull: ["$y", "$missing", -4]}}
+                    }
+                },
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByAccumulateIfNullManyArgs",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {
+                    $group: {
+                        _id: {gb: metaDotRegion},
+                        a: {
+                            $min: {
+                                $ifNull: [
+                                    "$z",
+                                    "$missing1",
+                                    null,
+                                    "$missing2",
+                                    "$missing3",
+                                    "$y",
+                                    "$missing1",
+                                    [1, 2, 3]
+                                ]
+                            }
+                        },
+                    }
+                },
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
             name: "GroupByMetaNonExistent",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
