@@ -250,6 +250,8 @@ std::pair<bool, boost::optional<BSONObj>> handleWouldChangeOwningShardErrorRetry
         if (writeConcernDetail && !writeConcernDetail->toStatus().isOK())
             processWCErrorFn(std::move(writeConcernDetail));
     } catch (DBException& e) {
+        updatedShardKey = false;
+        upsertedId = boost::none;
         if (e.code() == ErrorCodes::DuplicateKey &&
             e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id")) {
             e.addContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext);
