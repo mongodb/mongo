@@ -772,42 +772,6 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
 }
 
 /**
- * Creates additional pipelines if needed to serve the aggregation. This includes additional
- * pipelines for exchange optimization and search commands that generate metadata. Returns
- * a vector of all pipelines needed for the query, including the original one.
- *
- * Takes ownership of the original, passed in, pipeline.
- */
-std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createAdditionalPipelinesIfNeeded(
-    const AggregateCommandRequest& request,
-    const LiteParsedPipeline& liteParsedPipeline,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    const std::function<void(void)>& resetContextFn) {
-
-    std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
-    auto expCtx = pipeline->getContext();
-
-    // Exchange is not allowed to be specified if there is a $search stage.
-    if (search_helpers::isSearchPipeline(pipeline.get())) {
-        // Release locks early, before we generate the search pipeline, so that we don't hold them
-        // during network calls to mongot. This is fine for search pipelines since they are not
-        // reading any local (lock-protected) data in the main pipeline.
-        resetContextFn();
-        pipelines.push_back(std::move(pipeline));
-
-        if (auto metadataPipe = search_helpers::generateMetadataPipelineAndAttachCursorsForSearch(
-                expCtx->opCtx, expCtx, request, pipelines.back().get(), expCtx->uuid)) {
-            pipelines.push_back(std::move(metadataPipe));
-        }
-    } else {
-        // Takes ownership of 'pipeline'.
-        pipelines = createExchangePipelinesIfNeeded(
-            request, liteParsedPipeline.getInvolvedNamespaces(), std::move(pipeline));
-    }
-    return pipelines;
-}
-
-/**
  * Performs validations related to API versioning, time-series stages, and general command
  * validation.
  * Throws UserAssertion if any of the validations fails
@@ -858,13 +822,29 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
         // have gotten from find command.
         execs.emplace_back(std::move(executor));
     } else {
-        search_helpers::prepareSearchForTopLevelPipeline(pipeline.get());
         // Complete creation of the initial $cursor stage, if needed.
         PipelineD::attachInnerQueryExecutorToPipeline(
             collections, attachCallback, std::move(executor), pipeline.get());
 
-        auto pipelines = createAdditionalPipelinesIfNeeded(
-            request, liteParsedPipeline, std::move(pipeline), resetContextFn);
+        std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
+        // Any pipeline that relies on calls to mongot requires additional setup.
+        if (search_helpers::isMongotPipeline(pipeline.get())) {
+            // Release locks early, before we generate the search pipeline, so that we don't hold
+            // them during network calls to mongot. This is fine for search pipelines since they are
+            // not reading any local (lock-protected) data in the main pipeline.
+            resetContextFn();
+            pipelines.push_back(std::move(pipeline));
+
+            if (auto metadataPipe = search_helpers::prepareSearchForTopLevelPipelineLegacyExecutor(
+                    expCtx->opCtx, expCtx, request, pipelines.back().get(), expCtx->uuid)) {
+                pipelines.push_back(std::move(metadataPipe));
+            }
+        } else {
+            // Takes ownership of 'pipeline'.
+            pipelines = createExchangePipelinesIfNeeded(
+                request, liteParsedPipeline.getInvolvedNamespaces(), std::move(pipeline));
+        }
+
         for (auto&& pipelineIt : pipelines) {
             // There are separate ExpressionContexts for each exchange pipeline, so make sure to
             // pass the pipeline's ExpressionContext to the plan executor factory.

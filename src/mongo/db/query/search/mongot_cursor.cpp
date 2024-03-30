@@ -63,9 +63,9 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
     const boost::optional<UUID>& uuid,
     const boost::optional<ExplainOptions::Verbosity>& explain,
     const BSONObj& query,
-    const boost::optional<long long> docsRequested,
-    const bool requiresSearchSequenceToken = false,
-    const boost::optional<int> protocolVersion = boost::none) {
+    const boost::optional<int> protocolVersion = boost::none,
+    const boost::optional<long long> docsRequested = boost::none,
+    const bool requiresSearchSequenceToken = false) {
     BSONObjBuilder cmdBob;
     cmdBob.append(kSearchField, nss.coll());
     uassert(
@@ -153,7 +153,7 @@ std::vector<executor::TaskExecutorCursor> establishCursors(
     return cursors;
 }
 
-std::vector<executor::TaskExecutorCursor> establishSearchCursors(
+std::vector<executor::TaskExecutorCursor> establishCursorsForSearchStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& query,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
@@ -168,19 +168,42 @@ std::vector<executor::TaskExecutorCursor> establishSearchCursors(
         return {};
     }
 
+    bool prefetchNextBatch = !docsRequested.has_value();
     return establishCursors(expCtx,
                             getRemoteCommandRequestForSearchQuery(expCtx->opCtx,
                                                                   expCtx->ns,
                                                                   expCtx->uuid,
                                                                   expCtx->explain,
                                                                   query,
+                                                                  protocolVersion,
                                                                   docsRequested,
-                                                                  requiresSearchSequenceToken,
-                                                                  protocolVersion),
+                                                                  requiresSearchSequenceToken),
                             taskExecutor,
-                            !docsRequested.has_value(),
+                            prefetchNextBatch,
                             augmentGetMore,
                             std::move(yieldPolicy));
+}
+
+std::vector<executor::TaskExecutorCursor> establishCursorsForSearchMetaStage(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const BSONObj& query,
+    std::shared_ptr<executor::TaskExecutor> taskExecutor,
+    const boost::optional<int>& protocolVersion,
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
+    // UUID is required for mongot queries. If not present, no results for the query as the
+    // collection has not been created yet.
+    if (!expCtx->uuid) {
+        return {};
+    }
+
+    return establishCursors(
+        expCtx,
+        getRemoteCommandRequestForSearchQuery(
+            expCtx->opCtx, expCtx->ns, expCtx->uuid, expCtx->explain, query, protocolVersion),
+        taskExecutor,
+        /*preFetchNextBatch*/ false,
+        /*augmentGetMore*/ nullptr,
+        std::move(yieldPolicy));
 }
 
 
@@ -214,7 +237,7 @@ BSONObj getSearchExplainResponse(const ExpressionContext* expCtx,
                                  const BSONObj& query,
                                  executor::TaskExecutor* taskExecutor) {
     const auto request = getRemoteCommandRequestForSearchQuery(
-        expCtx->opCtx, expCtx->ns, expCtx->uuid, expCtx->explain, query, boost::none);
+        expCtx->opCtx, expCtx->ns, expCtx->uuid, expCtx->explain, query);
     return getExplainResponse(expCtx, request, taskExecutor);
 }
 

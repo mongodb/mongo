@@ -77,7 +77,7 @@ std::vector<executor::TaskExecutorCursor> establishCursors(
  * Run the given search query against mongot and build one cursor object for each
  * cursor returned from mongot.
  */
-std::vector<executor::TaskExecutorCursor> establishSearchCursors(
+std::vector<executor::TaskExecutorCursor> establishCursorsForSearchStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& query,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
@@ -85,6 +85,17 @@ std::vector<executor::TaskExecutorCursor> establishSearchCursors(
     std::function<void(BSONObjBuilder& bob)> augmentGetMore = nullptr,
     const boost::optional<int>& protocolVersion = boost::none,
     bool requiresSearchSequenceToken = false,
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr);
+
+/**
+ * Parallel to establishCursorsForSearchStage() but limited to the arguments expected for
+ * $searchMeta.
+ */
+std::vector<executor::TaskExecutorCursor> establishCursorsForSearchMetaStage(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const BSONObj& query,
+    std::shared_ptr<executor::TaskExecutor> taskExecutor,
+    const boost::optional<int>& protocolVersion = boost::none,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr);
 
 /**

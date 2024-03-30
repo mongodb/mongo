@@ -1388,10 +1388,10 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
 
     if (!expCtx->explain) {
         if (search_helpers::isSearchPipeline(pipeline)) {
-            search_helpers::establishSearchQueryCursors(
-                expCtx, searchStage, std::move(yieldPolicy));
+            search_helpers::establishSearchCursorsSBE(expCtx, searchStage, std::move(yieldPolicy));
         } else if (search_helpers::isSearchMetaPipeline(pipeline)) {
-            search_helpers::establishSearchMetaCursor(expCtx, searchStage, std::move(yieldPolicy));
+            search_helpers::establishSearchMetaCursorSBE(
+                expCtx, searchStage, std::move(yieldPolicy));
         } else {
             tasserted(7856008, "Not search pipeline in buildInnerQueryExecutorSearch");
         }

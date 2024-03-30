@@ -81,6 +81,12 @@ bool isSearchPipeline(const Pipeline* pipeline);
 bool isSearchMetaPipeline(const Pipeline* pipeline);
 
 /**
+ * Check if this is a search-related pipeline, specifically that the front of the pipeline is a
+ * stage that will rely on calls to mongot.
+ */
+bool isMongotPipeline(const Pipeline* pipeline);
+
+/**
  * Check if this is a $search stage.
  */
 bool isSearchStage(DocumentSource* stage);
@@ -89,6 +95,11 @@ bool isSearchStage(DocumentSource* stage);
  * Check if this is a $searchMeta stage.
  */
 bool isSearchMetaStage(DocumentSource* stage);
+
+/**
+ * Check if this is a search-related stage that will rely on calls to mongot.
+ */
+bool isMongotStage(DocumentSource* stage);
 
 /**
  * Asserts that $$SEARCH_META is accessed correctly; that is, it is set by a prior stage, and is
@@ -108,53 +119,42 @@ void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline
 /**
  * This method works on preparation for $search in top level pipeline, or inner pipeline that is
  * dispatched to shards. Nothing is done if first stage in the pipeline is not $search, and this
- * method should only be invoked for the DocumentSource-based implementation.
+ * method should only be invoked for the DocumentSource-based implementation (legacy executor).
  * The preparation works includes:
  * 1. Desugars $search stage into $_internalSearchMongotRemote and $_internalSearchIdLookup
  * stages.
- * 2. injects shard filterer for $_internalSearchIdLookup stage on shard only.
- *
- * This function is only called for preparing the pipeline for execution in the classic engine,
- * since $search in SBE is not desugared.
- */
-void prepareSearchForTopLevelPipeline(Pipeline* pipeline);
-
-/**
- * This method works on preparation for $search in nested pipeline, e.g. sub-pipeline of
- * $lookup, for local read. Nothing is done if first stage in the pipeline is not $search, and
- * this method should only be invoked for the DocumentSource-based implementation.
- * The preparation works desugars $search stage into $_internalSearchMongotRemote and
- * $_internalSearchIdLookup stages.
- *
- * This function is only called for preparing the pipeline for execution in the classic engine,
- * since $search in SBE is not desugared.
- */
-void prepareSearchForNestedPipeline(Pipeline* pipeline);
-
-/**
- * Check to see if in the current environment an additional pipeline needs to be run by the
- * aggregation command to generate metadata results. Either returns the additional pipeline
- * or nullptr if no pipeline is necessary.
- *
- * Also retrieves search cursors from mongot and attaches them to their relevant search and metadata
+ * 2. Injects shard filterer for $_internalSearchIdLookup stage on shard only.
+ * 3. Checks to see if in the current environment an additional pipeline needs to be run to generate
+ * metadata results.
+ * 4. Establishes search cursors with mongot and attaches them to their relevant search and metadata
  * stages.
  *
  * This can modify the passed in pipeline but does not take ownership of it.
+ *
+ * Returns the additional pipline used for metadata, or nullptr if no pipeline is necessary.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineAndAttachCursorsForSearch(
+std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegacyExecutor(
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const AggregateCommandRequest& request,
     Pipeline* origPipeline,
     boost::optional<UUID> uuid);
 
+/**
+ * This method works on preparation for $search in nested pipeline, e.g. sub-pipeline of
+ * $lookup, for local read. Nothing is done if first stage in the pipeline is not $search, and
+ * this method should only be invoked for the DocumentSource-based implementation (legacy executor).
+ * The preparation works desugars $search stage into $_internalSearchMongotRemote and
+ * $_internalSearchIdLookup stages.
+ */
+void prepareSearchForNestedPipelineLegacyExecutor(Pipeline* pipeline);
 
 /**
- * Executes the cursor for $search query.
+ * Establishes the cursor for $search queries run in SBE.
  */
-void establishSearchQueryCursors(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                 DocumentSource* stage,
-                                 std::unique_ptr<PlanYieldPolicy>);
+void establishSearchCursorsSBE(boost::intrusive_ptr<ExpressionContext> expCtx,
+                               DocumentSource* stage,
+                               std::unique_ptr<PlanYieldPolicy>);
 
 /**
  * Encode $search/$searchMeta to SBE plan cache.
@@ -164,11 +164,11 @@ bool encodeSearchForSbeCache(const boost::intrusive_ptr<ExpressionContext>& expC
                              DocumentSource* ds,
                              BufBuilder* bufBuilder);
 /**
- * Executes the metadata cursor for $search query.
+ * Establishes the metadata cursor for $search queries run in SBE.
  */
-void establishSearchMetaCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               DocumentSource* stage,
-                               std::unique_ptr<PlanYieldPolicy>);
+void establishSearchMetaCursorSBE(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  DocumentSource* stage,
+                                  std::unique_ptr<PlanYieldPolicy>);
 
 boost::optional<executor::TaskExecutorCursor> getSearchMetadataCursor(DocumentSource* ds);
 

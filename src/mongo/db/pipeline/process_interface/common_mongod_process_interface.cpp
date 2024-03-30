@@ -486,7 +486,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     if (!skipRequiresInputDocSourceCheck && firstStage &&
         !(*firstStage)->constraints().requiresInputDocSource) {
         // There's no need to attach a cursor here.
-        search_helpers::prepareSearchForNestedPipeline(pipeline.get());
+        search_helpers::prepareSearchForNestedPipelineLegacyExecutor(pipeline.get());
         return pipeline;
     }
 

@@ -57,7 +57,7 @@ MONGO_FAIL_POINT_DEFINE(searchReturnEofImmediately);
 
 namespace search_helpers {
 namespace {
-void prepareSearchPipeline(Pipeline* pipeline, bool applyShardFilter) {
+void prepareSearchPipelineLegacyExecutor(Pipeline* pipeline, bool applyShardFilter) {
     auto searchStage = pipeline->popFrontWithName(DocumentSourceSearch::kStageName);
     auto& sources = pipeline->getSources();
     if (searchStage) {
@@ -213,14 +213,125 @@ parseMongotResponseCursors(std::vector<executor::TaskExecutorCursor> cursors) {
 }
 }  // namespace
 
-std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineAndAttachCursorsForSearch(
+InternalSearchMongotRemoteSpec planShardedSearch(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& searchRequest) {
+    // Mongos issues the 'planShardedSearch' command rather than 'search' in order to:
+    // * Create the merging pipeline.
+    // * Get a sortSpec.
+    const auto cmdObj = [&]() {
+        PlanShardedSearchSpec cmd(std::string(expCtx->ns.coll()) /* planShardedSearch */,
+                                  searchRequest /* query */);
+
+        if (expCtx->explain) {
+            cmd.setExplain(BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->explain)));
+        }
+
+        // Add the searchFeatures field.
+        cmd.setSearchFeatures(
+            BSON(SearchFeatures_serializer(SearchFeaturesEnum::kShardedSort) << 1));
+
+        return cmd.toBSON();
+    }();
+    // Send the planShardedSearch to the remote, retrying on network errors.
+    auto response = mongot_cursor::runSearchCommandWithRetries(expCtx, cmdObj);
+
+    InternalSearchMongotRemoteSpec remoteSpec(searchRequest.getOwned(),
+                                              response.data["protocolVersion"_sd].Int());
+    auto parsedPipeline = mongo::Pipeline::parseFromArray(response.data["metaPipeline"], expCtx);
+    remoteSpec.setMergingPipeline(parsedPipeline->serializeToBson());
+    if (response.data.hasElement("sortSpec")) {
+        remoteSpec.setSortSpec(response.data["sortSpec"].Obj().getOwned());
+    }
+
+    return remoteSpec;
+}
+
+bool hasReferenceToSearchMeta(const DocumentSource& ds) {
+    std::set<Variables::Id> refs;
+    ds.addVariableRefs(&refs);
+    return Variables::hasVariableReferenceTo(refs,
+                                             std::set<Variables::Id>{Variables::kSearchMetaId});
+}
+
+bool isSearchPipeline(const Pipeline* pipeline) {
+    if (!pipeline || pipeline->getSources().empty()) {
+        return false;
+    }
+    return isSearchStage(pipeline->peekFront());
+}
+
+bool isSearchMetaPipeline(const Pipeline* pipeline) {
+    if (!pipeline || pipeline->getSources().empty()) {
+        return false;
+    }
+    return isSearchMetaStage(pipeline->peekFront());
+}
+
+bool isMongotPipeline(const Pipeline* pipeline) {
+    if (!pipeline || pipeline->getSources().empty()) {
+        return false;
+    }
+    return isMongotStage(pipeline->peekFront());
+}
+
+/** Because 'DocumentSourceSearchMeta' inherits from 'DocumentSourceInternalSearchMongotRemote',
+ *  to make sure a DocumentSource is a $search stage and not $searchMeta check it is either:
+ *    - a 'DocumentSourceSearch'.
+ *    - a 'DocumentSourceInternalSearchMongotRemote' and not a 'DocumentSourceSearchMeta'.
+ */
+bool isSearchStage(DocumentSource* stage) {
+    return stage &&
+        (dynamic_cast<mongo::DocumentSourceSearch*>(stage) ||
+         (dynamic_cast<mongo::DocumentSourceInternalSearchMongotRemote*>(stage) &&
+          !dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage)));
+}
+
+bool isSearchMetaStage(DocumentSource* stage) {
+    return stage && dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage);
+}
+
+bool isMongotStage(DocumentSource* stage) {
+    return stage &&
+        (dynamic_cast<mongo::DocumentSourceSearch*>(stage) ||
+         dynamic_cast<mongo::DocumentSourceInternalSearchMongotRemote*>(stage) ||
+         dynamic_cast<mongo::DocumentSourceVectorSearch*>(stage));
+}
+
+void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline,
+                                 ExpressionContext* expCtx) {
+    if (pipeline.empty()) {
+        return;
+    }
+
+    // If we already validated this pipeline on mongos, no need to do it again on a shard. Check
+    // for $mergeCursors because we could be on a shard doing the merge and only want to validate if
+    // we have the whole pipeline.
+    bool alreadyValidated = !expCtx->inMongos && expCtx->needsMerge;
+    if (!alreadyValidated ||
+        pipeline.front()->getSourceName() != DocumentSourceMergeCursors::kStageName) {
+        assertSearchMetaAccessValidHelper({&pipeline});
+    }
+}
+
+void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline,
+                                 const Pipeline::SourceContainer& mergePipeline,
+                                 ExpressionContext* expCtx) {
+    assertSearchMetaAccessValidHelper({&shardsPipeline, &mergePipeline});
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegacyExecutor(
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const AggregateCommandRequest& request,
     Pipeline* origPipeline,
     boost::optional<UUID> uuid) {
+    // First, desuguar $search, and inject shard filterer.
+    prepareSearchPipelineLegacyExecutor(origPipeline, true);
+
     if (expCtx->explain || !isSearchPipeline(origPipeline)) {
         // $search doesn't return documents or metadata from explain regardless of the verbosity.
+        // $searchMeta or $vectorSearch pipelines won't need an additional pipeline since they
+        // only need one cursor.
         return nullptr;
     }
 
@@ -254,7 +365,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineAndAttachCurs
     }
 
     // The search stage has not yet established its cursor on mongoT. Establish the cursor for it.
-    auto cursors = mongot_cursor::establishSearchCursors(
+    auto cursors = mongot_cursor::establishCursorsForSearchStage(
         expCtx,
         origSearchStage->getSearchQuery(),
         origSearchStage->getTaskExecutor(),
@@ -323,122 +434,28 @@ std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineAndAttachCurs
     return newPipeline;
 }
 
-InternalSearchMongotRemoteSpec planShardedSearch(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& searchRequest) {
-    // Mongos issues the 'planShardedSearch' command rather than 'search' in order to:
-    // * Create the merging pipeline.
-    // * Get a sortSpec.
-    const auto cmdObj = [&]() {
-        PlanShardedSearchSpec cmd(std::string(expCtx->ns.coll()) /* planShardedSearch */,
-                                  searchRequest /* query */);
-
-        if (expCtx->explain) {
-            cmd.setExplain(BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->explain)));
-        }
-
-        // Add the searchFeatures field.
-        cmd.setSearchFeatures(
-            BSON(SearchFeatures_serializer(SearchFeaturesEnum::kShardedSort) << 1));
-
-        return cmd.toBSON();
-    }();
-    // Send the planShardedSearch to the remote, retrying on network errors.
-    auto response = mongot_cursor::runSearchCommandWithRetries(expCtx, cmdObj);
-
-    InternalSearchMongotRemoteSpec remoteSpec(searchRequest.getOwned(),
-                                              response.data["protocolVersion"_sd].Int());
-    auto parsedPipeline = mongo::Pipeline::parseFromArray(response.data["metaPipeline"], expCtx);
-    remoteSpec.setMergingPipeline(parsedPipeline->serializeToBson());
-    if (response.data.hasElement("sortSpec")) {
-        remoteSpec.setSortSpec(response.data["sortSpec"].Obj().getOwned());
-    }
-
-    return remoteSpec;
+void prepareSearchForNestedPipelineLegacyExecutor(Pipeline* pipeline) {
+    prepareSearchPipelineLegacyExecutor(pipeline, false);
 }
 
-bool hasReferenceToSearchMeta(const DocumentSource& ds) {
-    std::set<Variables::Id> refs;
-    ds.addVariableRefs(&refs);
-    return Variables::hasVariableReferenceTo(refs,
-                                             std::set<Variables::Id>{Variables::kSearchMetaId});
-}
-
-bool isSearchPipeline(const Pipeline* pipeline) {
-    if (!pipeline || pipeline->getSources().empty()) {
-        return false;
-    }
-    return isSearchStage(pipeline->peekFront());
-}
-
-bool isSearchMetaPipeline(const Pipeline* pipeline) {
-    if (!pipeline || pipeline->getSources().empty()) {
-        return false;
-    }
-    return isSearchMetaStage(pipeline->peekFront());
-}
-
-/** Because 'DocumentSourceSearchMeta' inherits from 'DocumentSourceInternalSearchMongotRemote',
- *  to make sure a DocumentSource is a $search stage and not $searchMeta check it is either:
- *    - a 'DocumentSourceSearch'.
- *    - a 'DocumentSourceInternalSearchMongotRemote' and not a 'DocumentSourceSearchMeta'.
- */
-bool isSearchStage(DocumentSource* stage) {
-    return stage &&
-        (dynamic_cast<mongo::DocumentSourceSearch*>(stage) ||
-         (dynamic_cast<mongo::DocumentSourceInternalSearchMongotRemote*>(stage) &&
-          !dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage)));
-}
-
-bool isSearchMetaStage(DocumentSource* stage) {
-    return stage && dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage);
-}
-
-void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline,
-                                 ExpressionContext* expCtx) {
-    if (pipeline.empty()) {
-        return;
-    }
-
-    // If we already validated this pipeline on mongos, no need to do it again on a shard. Check
-    // mergeCursors because we could be on a shard doing the merge.
-    if ((expCtx->inMongos || !expCtx->needsMerge) &&
-        pipeline.front()->getSourceName() != DocumentSourceMergeCursors::kStageName) {
-        assertSearchMetaAccessValidHelper({&pipeline});
-    }
-}
-
-void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline,
-                                 const Pipeline::SourceContainer& mergePipeline,
-                                 ExpressionContext* expCtx) {
-    assertSearchMetaAccessValidHelper({&shardsPipeline, &mergePipeline});
-}
-
-void prepareSearchForTopLevelPipeline(Pipeline* pipeline) {
-    prepareSearchPipeline(pipeline, true);
-}
-
-void prepareSearchForNestedPipeline(Pipeline* pipeline) {
-    prepareSearchPipeline(pipeline, false);
-}
-
-void establishSearchQueryCursors(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                 DocumentSource* stage,
-                                 std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
+void establishSearchCursorsSBE(boost::intrusive_ptr<ExpressionContext> expCtx,
+                               DocumentSource* stage,
+                               std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
     if (!expCtx->uuid || !isSearchStage(stage) ||
         MONGO_unlikely(searchReturnEofImmediately.shouldFail())) {
         return;
     }
     auto searchStage = dynamic_cast<mongo::DocumentSourceSearch*>(stage);
     auto executor = executor::getMongotTaskExecutor(expCtx->opCtx->getServiceContext());
-    auto cursors =
-        mongot_cursor::establishSearchCursors(expCtx,
-                                              searchStage->getSearchQuery(),
-                                              executor,
-                                              searchStage->getLimit(),
-                                              nullptr,
-                                              searchStage->getIntermediateResultsProtocolVersion(),
-                                              searchStage->getSearchPaginationFlag(),
-                                              std::move(yieldPolicy));
+    auto cursors = mongot_cursor::establishCursorsForSearchStage(
+        expCtx,
+        searchStage->getSearchQuery(),
+        executor,
+        searchStage->getLimit(),
+        nullptr,
+        searchStage->getIntermediateResultsProtocolVersion(),
+        searchStage->getSearchPaginationFlag(),
+        std::move(yieldPolicy));
 
     auto [documentCursor, metaCursor] = parseMongotResponseCursors(std::move(cursors));
 
@@ -457,9 +474,9 @@ void establishSearchQueryCursors(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
 }
 
-void establishSearchMetaCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               DocumentSource* stage,
-                               std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
+void establishSearchMetaCursorSBE(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  DocumentSource* stage,
+                                  std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
     if (!expCtx->uuid || !isSearchMetaStage(stage) ||
         MONGO_unlikely(searchReturnEofImmediately.shouldFail())) {
         return;
@@ -467,15 +484,12 @@ void establishSearchMetaCursor(const boost::intrusive_ptr<ExpressionContext>& ex
 
     auto searchStage = dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage);
     auto executor = executor::getMongotTaskExecutor(expCtx->opCtx->getServiceContext());
-    auto cursors =
-        mongot_cursor::establishSearchCursors(expCtx,
-                                              searchStage->getSearchQuery(),
-                                              executor,
-                                              boost::none,
-                                              nullptr,
-                                              searchStage->getIntermediateResultsProtocolVersion(),
-                                              false /* requiresSearchSequenceToken */,
-                                              std::move(yieldPolicy));
+    auto cursors = mongot_cursor::establishCursorsForSearchMetaStage(
+        expCtx,
+        searchStage->getSearchQuery(),
+        executor,
+        searchStage->getIntermediateResultsProtocolVersion(),
+        std::move(yieldPolicy));
 
     auto [documentCursor, metaCursor] = parseMongotResponseCursors(std::move(cursors));
 
