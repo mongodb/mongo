@@ -34,6 +34,7 @@
 #include <cstddef>
 #include <memory>
 
+#include "mongo/base/compare_numbers.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/column_op.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -50,17 +51,22 @@ public:
     DeblockedTagVals() {}
 
     // 'tags' and 'vals' point to an array of 'count' elements respectively.
-    DeblockedTagVals(size_t count, const TypeTags* tags, const Value* vals)
-        : _count(count), _tags(tags), _vals(vals) {
+    DeblockedTagVals(size_t count,
+                     const TypeTags* tags,
+                     const Value* vals,
+                     TypeTags tag = TypeTags::Nothing,
+                     bool isDense = false)
+        : _count(count), _tags(tags), _vals(vals), _tag(tag), _isDense(isDense) {
         tassert(7949501, "Values must exist", count > 0 || (tags == nullptr && vals == nullptr));
     }
     DeblockedTagVals& operator=(const DeblockedTagVals& other) {
         _count = other._count;
         _tags = other._tags;
         _vals = other._vals;
+        _tag = other._tag;
+        _isDense = other._isDense;
         return *this;
     }
-
 
     std::pair<TypeTags, Value> operator[](size_t idx) const {
         return {_tags[idx], _vals[idx]};
@@ -90,10 +96,20 @@ public:
         return _vals;
     }
 
+    TypeTags tag() const {
+        return _tag;
+    }
+
+    bool isDense() const {
+        return _isDense;
+    }
+
 private:
     size_t _count = 0;
     const TypeTags* _tags = nullptr;
     const Value* _vals = nullptr;
+    TypeTags _tag = TypeTags::Nothing;
+    bool _isDense = false;
 };
 
 // Bitset representation used to indicate present or missing values. DynamicBitset from
@@ -123,9 +139,15 @@ struct DeblockedTagValStorage {
     }
 
     DeblockedTagValStorage(DeblockedTagValStorage&& other)
-        : tags(std::move(other.tags)), vals(std::move(other.vals)), owned(other.owned) {
+        : tags(std::move(other.tags)),
+          vals(std::move(other.vals)),
+          tag(other.tag),
+          isDense(other.isDense),
+          owned(other.owned) {
         other.tags = {};
         other.vals = {};
+        other.tag = TypeTags::Nothing;
+        other.isDense = false;
         other.owned = false;
     }
 
@@ -154,6 +176,8 @@ struct DeblockedTagValStorage {
 
             other.tags = {};
             other.vals = {};
+            other.tag = TypeTags::Nothing;
+            other.isDense = false;
             other.owned = false;
         }
         return *this;
@@ -165,6 +189,8 @@ struct DeblockedTagValStorage {
 
     std::vector<TypeTags> tags;
     std::vector<Value> vals;
+    TypeTags tag{TypeTags::Nothing};
+    bool isDense{false};
     bool owned{false};
 };
 
@@ -312,6 +338,18 @@ struct ValueBlock {
         return boost::none;
     }
 
+    virtual boost::optional<size_t> argMin() {
+        return boost::none;
+    }
+
+    virtual boost::optional<size_t> argMax() {
+        return boost::none;
+    }
+
+    // This function should never be used in loops or otherwise used repeatedly and should only be
+    // used when you *really* need to only access a single value.
+    virtual std::pair<value::TypeTags, value::Value> at(size_t idx);
+
     /*
      * Returns whether the block has any element of the given type, if it can be determined in
      * O(1), otherwise returns boost::none.
@@ -375,9 +413,11 @@ public:
             storage->vals.clear();
             storage->tags.resize(_count, _tag);
             storage->vals.resize(_count, _val);
+            storage->tag = _tag;
+            storage->isDense = _tag != TypeTags::Nothing;
         }
 
-        return {_count, storage->tags.data(), storage->vals.data()};
+        return {_count, storage->tags.data(), storage->vals.data(), storage->tag, storage->isDense};
     }
 
     boost::optional<size_t> tryCount() const override {
@@ -435,6 +475,11 @@ public:
             return boost::none;
         }
         return value::bitcastTo<bool>(_val);
+    }
+
+    std::pair<value::TypeTags, value::Value> at(size_t idx) override {
+        invariant(idx < _count);
+        return {_tag, _val};
     }
 
 private:
@@ -508,7 +553,7 @@ public:
     }
 
     DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) override {
-        return {_vals.size(), _tags.data(), _vals.data()};
+        return {_vals.size(), _tags.data(), _vals.data(), TypeTags::Nothing, _isDense};
     }
 
     std::unique_ptr<ValueBlock> clone() const override {
@@ -638,7 +683,7 @@ public:
     }
 
     boost::optional<bool> tryDense() const override {
-        return _presentBitset.all();
+        return _vals.size() == _presentBitset.size();
     }
 
     // getVector should be used in favor of this function if possible.
@@ -646,9 +691,11 @@ public:
         if (!storage) {
             storage = DeblockedTagValStorage{};
         }
+        storage->tag = TypeTag;
+        storage->isDense = *tryDense();
 
         // Fast path for dense case.
-        if (_presentBitset.all()) {
+        if (*tryDense()) {
             storage->tags.resize(_vals.size(), TypeTag);
             return {_presentBitset.size(), storage->tags.data(), _vals.data()};
         }
@@ -667,7 +714,11 @@ public:
             }
         }
 
-        return {storage->tags.size(), storage->tags.data(), storage->vals.data()};
+        return {storage->tags.size(),
+                storage->tags.data(),
+                storage->vals.data(),
+                storage->tag,
+                storage->isDense};
     }
 
     std::unique_ptr<ValueBlock> clone() const override {
@@ -721,6 +772,14 @@ public:
         }
         return true;
     }
+
+    template <class Cmp>
+    boost::optional<size_t> argMinMaxImpl(Cmp cmp = {});
+
+    boost::optional<size_t> argMin() override;
+    boost::optional<size_t> argMax() override;
+
+    std::pair<value::TypeTags, value::Value> at(size_t idx) override;
 
     const std::vector<Value>& getVector() const {
         return _vals;

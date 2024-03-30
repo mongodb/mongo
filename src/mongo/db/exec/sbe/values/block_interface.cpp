@@ -68,8 +68,11 @@ void DeblockedTagValStorage::copyValuesFrom(const DeblockedTagValStorage& other)
 void DeblockedTagValStorage::release() {
     if (owned) {
         owned = false;
-        for (size_t i = 0; i < tags.size(); ++i) {
-            releaseValue(tags[i], vals[i]);
+        // Only need to release values if we don't know the type or know they aren't shallow.
+        if (tag == TypeTags::Nothing || !isShallowType(tag)) {
+            for (size_t i = 0; i < tags.size(); ++i) {
+                releaseValue(tags[i], vals[i]);
+            }
         }
     }
 }
@@ -420,6 +423,79 @@ std::unique_ptr<ValueBlock> ValueBlock::exists() {
     }
     return std::make_unique<BoolBlock>(std::move(vals));
 }
+
+template <typename T, class Cmp>
+size_t cmpImpl(value::Value lhs, value::Value rhs, size_t lhsIdx, size_t rhsIdx, const Cmp& cmp) {
+    if constexpr (std::is_same_v<T, double>) {
+        // Capture MQL double comparison semantics.
+        return cmp(compareDoubles(value::bitcastTo<T>(lhs), value::bitcastTo<T>(rhs)), 0) ? lhsIdx
+                                                                                          : rhsIdx;
+    } else {
+        return cmp(value::bitcastTo<T>(lhs), value::bitcastTo<T>(rhs)) ? lhsIdx : rhsIdx;
+    }
+}
+
+template <typename T, value::TypeTags TypeTag>
+template <typename Cmp>
+boost::optional<size_t> HomogeneousBlock<T, TypeTag>::argMinMaxImpl(Cmp cmp) {
+    size_t bestIdx = 0;
+    if (_vals.empty()) {
+        return boost::none;
+    } else if (*tryDense()) {
+        for (size_t i = bestIdx; i < _vals.size(); ++i) {
+            bestIdx = cmpImpl<T>(_vals[i], _vals[bestIdx], i, bestIdx, cmp);
+        }
+    } else {
+        // This is currently only used for sort keys which should never have Nothings so we will
+        // just return boost::none if the block is not dense.
+        return boost::none;
+    }
+    return bestIdx;
+}
+
+template <typename T, TypeTags TypeTag>
+boost::optional<size_t> HomogeneousBlock<T, TypeTag>::argMin() {
+    return argMinMaxImpl<std::less<>>();
+}
+
+template boost::optional<size_t> Int32Block::argMin();
+template boost::optional<size_t> Int64Block::argMin();
+template boost::optional<size_t> DateBlock::argMin();
+template boost::optional<size_t> DoubleBlock::argMin();
+template boost::optional<size_t> BoolBlock::argMin();
+
+template <typename T, TypeTags TypeTag>
+boost::optional<size_t> HomogeneousBlock<T, TypeTag>::argMax() {
+    return argMinMaxImpl<std::greater<>>();
+}
+
+template boost::optional<size_t> Int32Block::argMax();
+template boost::optional<size_t> Int64Block::argMax();
+template boost::optional<size_t> DateBlock::argMax();
+template boost::optional<size_t> DoubleBlock::argMax();
+template boost::optional<size_t> BoolBlock::argMax();
+
+std::pair<value::TypeTags, value::Value> ValueBlock::at(size_t idx) {
+    auto deblocked = extract();
+    invariant(idx < deblocked.count());
+    return deblocked[idx];
+}
+
+template <typename T, value::TypeTags TypeTag>
+std::pair<value::TypeTags, value::Value> HomogeneousBlock<T, TypeTag>::at(size_t idx) {
+    invariant(idx < count());
+    // Avoid extracting if possible.
+    if (*tryDense()) {
+        return {TypeTag, _vals[idx]};
+    }
+    return ValueBlock::at(idx);
+}
+
+template std::pair<value::TypeTags, value::Value> Int32Block::at(size_t idx);
+template std::pair<value::TypeTags, value::Value> Int64Block::at(size_t idx);
+template std::pair<value::TypeTags, value::Value> DateBlock::at(size_t idx);
+template std::pair<value::TypeTags, value::Value> DoubleBlock::at(size_t idx);
+template std::pair<value::TypeTags, value::Value> BoolBlock::at(size_t idx);
 
 void HeterogeneousBlock::push_back(TypeTags t, Value v) {
     constexpr auto maxSizeT = std::numeric_limits<size_t>::max();

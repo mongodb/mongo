@@ -381,6 +381,20 @@ std::string printTagAndVal(TypeTags tag, Value value);                // debuggi
 std::string printTagAndVal(const std::pair<TypeTags, Value>& value);  // debugging function
 
 /**
+ * Performs a three-way comparison for any type that has < and == operators. Additionally,
+ * guarantees that the result will be exactlty -1, 0, or 1, which is important, because not all
+ * comparison functions make that guarantee.
+ *
+ * The StringData::compare(basic_string_view s) function, for example, only promises that it
+ * will return a value less than 0 in the case that 'this' is less than 's,' whereas we want to
+ * return exactly -1.
+ */
+template <typename T>
+int32_t compareHelper(const T lhs, const T rhs) noexcept {
+    return lhs < rhs ? -1 : (lhs == rhs ? 0 : 1);
+}
+
+/**
  * Three ways value comparison (aka spaceship operator).
  */
 std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,

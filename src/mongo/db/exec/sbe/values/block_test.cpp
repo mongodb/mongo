@@ -29,6 +29,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson_block.h"
@@ -667,70 +668,6 @@ TEST_F(ValueBlockTest, MonoBlockMap) {
     }
 }
 
-class TestBlock : public value::ValueBlock {
-public:
-    TestBlock() = default;
-    TestBlock(const TestBlock& o) : value::ValueBlock(o) {
-        _vals.resize(o._vals.size(), Value{0u});
-        _tags.resize(o._tags.size(), TypeTags::Nothing);
-        for (size_t i = 0; i < o._vals.size(); ++i) {
-            auto [copyTag, copyVal] = copyValue(o._tags[i], o._vals[i]);
-            _vals[i] = copyVal;
-            _tags[i] = copyTag;
-        }
-    }
-    TestBlock(TestBlock&& o)
-        : value::ValueBlock(std::move(o)), _vals(std::move(o._vals)), _tags(std::move(o._tags)) {
-        o._vals = {};
-        o._tags = {};
-    }
-    ~TestBlock() override {
-        for (size_t i = 0; i < _vals.size(); ++i) {
-            releaseValue(_tags[i], _vals[i]);
-        }
-    }
-
-    void push_back(TypeTags t, Value v) {
-        _vals.push_back(v);
-        _tags.push_back(t);
-    }
-    boost::optional<size_t> tryCount() const override {
-        return _vals.size();
-    }
-    value::DeblockedTagVals deblock(
-        boost::optional<value::DeblockedTagValStorage>& storage) override {
-        return {_vals.size(), _tags.data(), _vals.data()};
-    }
-    std::unique_ptr<value::ValueBlock> clone() const override {
-        return std::make_unique<TestBlock>(*this);
-    }
-
-    std::pair<value::TypeTags, value::Value> tryMin() const override {
-        if (_minVal) {
-            return *_minVal;
-        }
-        return value::ValueBlock::tryMin();
-    }
-    std::pair<value::TypeTags, value::Value> tryMax() const override {
-        if (_maxVal) {
-            return *_maxVal;
-        }
-        return value::ValueBlock::tryMax();
-    }
-
-    void setMin(value::TypeTags tag, value::Value val) {
-        _minVal.emplace(tag, val);
-    }
-    void setMax(value::TypeTags tag, value::Value val) {
-        _maxVal.emplace(tag, val);
-    }
-
-private:
-    std::vector<Value> _vals;
-    std::vector<TypeTags> _tags;
-    boost::optional<std::pair<value::TypeTags, value::Value>> _minVal, _maxVal;
-};
-
 // Test ValueBlock::defaultMapImpl().
 TEST_F(ValueBlockTest, TestBlockMap) {
     auto block = std::make_unique<TestBlock>();
@@ -929,6 +866,131 @@ TEST_F(ValueBlockTest, DoubleBlockTokenize) {
 
     std::vector<size_t> expIdxs{0, 1, 2, 0, 0, 2, 3, 1, 2};
     ASSERT_EQ(outIdxs, expIdxs);
+}
+
+template <typename BlockType, typename T>
+std::unique_ptr<BlockType> makeArgMinMaxBlock(
+    bool inclNothing = false, std::unique_ptr<BlockType> block = std::make_unique<BlockType>()) {
+    if (inclNothing) {
+        block->pushNothing();
+        block->pushNothing();
+    }
+    block->push_back(static_cast<T>(1));
+    block->push_back(static_cast<T>(-1));
+    if (inclNothing) {
+        block->pushNothing();
+    }
+    block->push_back(static_cast<T>(-3));
+    block->push_back(static_cast<T>(4));
+    block->push_back(static_cast<T>(-2));
+    if (inclNothing) {
+        block->pushNothing();
+    }
+
+    return std::move(block);
+}
+
+TEST_F(ValueBlockTest, ArgMinMaxGetAt) {
+    {
+        auto block = makeArgMinMaxBlock<value::Int32Block, int32_t>();
+        ASSERT_EQ(block->argMin(), boost::optional<size_t>(2));
+        ASSERT_EQ(block->argMax(), boost::optional<size_t>(3));
+
+        block->push_back(std::numeric_limits<int32_t>::max());
+        block->push_back(std::numeric_limits<int32_t>::min());
+        ASSERT_EQ(block->argMin(), boost::optional<size_t>(6));
+        ASSERT_EQ(block->argMax(), boost::optional<size_t>(5));
+
+        auto blockWNothing = makeArgMinMaxBlock<value::Int32Block, int32_t>(true /* inclNothing */);
+        ASSERT_EQ(blockWNothing->argMin(), boost::none);
+        ASSERT_EQ(blockWNothing->argMax(), boost::none);
+    }
+
+    {
+        auto block = makeArgMinMaxBlock<value::DoubleBlock, double>();
+        ASSERT_EQ(block->argMin(), boost::optional<size_t>(2));
+        ASSERT_EQ(block->argMax(), boost::optional<size_t>(3));
+
+        block->push_back(std::numeric_limits<double>::max());
+        // std::numeric_limits<double>::min() returns the smallest positive finite value.
+        block->push_back(std::numeric_limits<double>::lowest());
+        ASSERT_EQ(block->argMin(), boost::optional<size_t>(6));
+        ASSERT_EQ(block->argMax(), boost::optional<size_t>(5));
+
+        block->push_back(-1 * std::numeric_limits<double>::infinity());
+        block->push_back(std::numeric_limits<double>::infinity());
+        ASSERT_EQ(block->argMin(), boost::optional<size_t>(7));
+        ASSERT_EQ(block->argMax(), boost::optional<size_t>(8));
+
+        auto tempBlockWLHSNaN = std::make_unique<value::DoubleBlock>();
+        tempBlockWLHSNaN->push_back(std::numeric_limits<double>::quiet_NaN());
+        auto blockWLHSNaN = makeArgMinMaxBlock<value::DoubleBlock, double>(
+            false /* inclNothing */, std::move(tempBlockWLHSNaN));
+        ASSERT_EQ(blockWLHSNaN->argMin(), boost::optional<size_t>(0));
+        ASSERT_EQ(blockWLHSNaN->argMax(), boost::optional<size_t>(4));
+
+        auto blockWRHSNaN = makeArgMinMaxBlock<value::DoubleBlock, double>();
+        blockWRHSNaN->push_back(std::numeric_limits<double>::signaling_NaN());
+        ASSERT_EQ(blockWRHSNaN->argMin(), boost::optional<size_t>(5));
+        ASSERT_EQ(blockWRHSNaN->argMax(), boost::optional<size_t>(3));
+    }
+
+    {
+        auto block = std::make_unique<value::Int64Block>();
+        block->pushNothing();
+        block->pushNothing();
+        block->pushNothing();
+        ASSERT_EQ(block->argMin(), boost::none);
+        ASSERT_EQ(block->argMax(), boost::none);
+    }
+
+    {
+        auto block = std::make_unique<value::Int64Block>();
+        block->push_back(static_cast<int64_t>(10));
+        block->push_back(static_cast<int64_t>(20));
+        block->push_back(static_cast<int64_t>(30));
+
+        // Dense homogeneous blocks access _vals directly.
+        ASSERT_THAT(
+            block->at(0),
+            ValueEq(std::pair{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10)}));
+        ASSERT_THAT(
+            block->at(1),
+            ValueEq(std::pair{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(20)}));
+        ASSERT_THAT(
+            block->at(2),
+            ValueEq(std::pair{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(30)}));
+
+        // Homogeneous blocks with Nothings call ValueBlock::getAt() which extracts first.
+        block->pushNothing();
+        block->pushNothing();
+        ASSERT_EQ(block->at(3).first, value::TypeTags::Nothing);
+        ASSERT_EQ(block->at(4).first, value::TypeTags::Nothing);
+    }
+
+    {
+        auto bools = std::make_unique<value::BoolBlock>();
+        bools->push_back(true);
+        bools->push_back(false);
+        ASSERT_EQ(bools->argMin(), boost::optional<size_t>(1));
+        ASSERT_EQ(bools->argMax(), boost::optional<size_t>(0));
+
+        auto boolsWNothing = std::make_unique<value::BoolBlock>();
+        boolsWNothing->pushNothing();
+        boolsWNothing->push_back(false);
+        boolsWNothing->pushNothing();
+        boolsWNothing->push_back(true);
+        boolsWNothing->pushNothing();
+        ASSERT_EQ(boolsWNothing->argMin(), boost::none);
+        ASSERT_EQ(boolsWNothing->argMax(), boost::none);
+    }
+
+    {
+        auto monoblock = std::make_unique<value::MonoBlock>(
+            5, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+        ASSERT_EQ(monoblock->argMin(), boost::none);
+        ASSERT_EQ(monoblock->argMax(), boost::none);
+    }
 }
 
 }  // namespace mongo::sbe

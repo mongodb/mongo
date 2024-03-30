@@ -945,6 +945,8 @@ std::unique_ptr<PlanStageStats> BlockHashAggStage::getStats(bool includeDebugInf
             }
         }
 
+        bob.append("blockDataInSlots", _blockDataInSlotIds.begin(), _blockDataInSlotIds.end());
+
         bob.append(
             "accumulatorDataSlots", _accumulatorDataSlotIds.begin(), _accumulatorDataSlotIds.end());
 
@@ -1045,6 +1047,20 @@ std::vector<DebugPrinter::Block> BlockHashAggStage::debugPrint() const {
             first = false;
         }
         ret.emplace_back("`]");
+    }
+
+    {
+        bool first = true;
+        ret.emplace_back(DebugPrinter::Block("[`"));
+        for (auto slot : _blockDataInSlotIds) {
+            if (!first) {
+                ret.emplace_back(DebugPrinter::Block("`,"));
+            }
+
+            DebugPrinter::addIdentifier(ret, slot);
+            first = false;
+        }
+        ret.emplace_back(DebugPrinter::Block("`]"));
     }
 
     {

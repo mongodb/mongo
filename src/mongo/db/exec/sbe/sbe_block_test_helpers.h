@@ -125,12 +125,9 @@ static void release2dValueVector(const std::vector<TypedValues>& vals) {
 
 template <typename T>
 static std::vector<T> makeNumbers(int magnitude = 1, bool multipleNaNs = true) {
+    static_assert(!std::is_same_v<T, bool>,
+                  "These values don't make sense for a vector of booleans");
     std::vector<T> nums;
-    if (std::is_same_v<T, bool>) {
-        nums.push_back(false);
-        nums.push_back(true);
-        return nums;
-    }
     if (std::is_same_v<T, double>) {
         nums.push_back(std::numeric_limits<double>::quiet_NaN());
         if (multipleNaNs) {
@@ -142,7 +139,7 @@ static std::vector<T> makeNumbers(int magnitude = 1, bool multipleNaNs = true) {
     nums.push_back(-1 * magnitude);
     nums.push_back(0);
     nums.push_back(1 * magnitude);
-    nums.push_back(std::numeric_limits<T>::min());
+    nums.push_back(std::numeric_limits<T>::lowest());
     nums.push_back(std::numeric_limits<T>::max());
     return nums;
 }
@@ -151,9 +148,14 @@ template <typename BlockType, typename T>
 static std::unique_ptr<BlockType> makeTestHomogeneousBlock(bool inclNothing = true,
                                                            bool multipleNaNs = true) {
     std::unique_ptr<BlockType> homogeneousTestBlock = std::make_unique<BlockType>();
-    auto nums = makeNumbers<T>(1, multipleNaNs);
-    for (auto num : nums) {
-        homogeneousTestBlock->push_back(value::bitcastFrom<T>(num));
+    if constexpr (std::is_same_v<BlockType, value::BoolBlock>) {
+        homogeneousTestBlock->push_back(value::bitcastFrom<bool>(false));
+        homogeneousTestBlock->push_back(value::bitcastFrom<bool>(true));
+    } else {
+        auto nums = makeNumbers<T>(1, multipleNaNs);
+        for (auto num : nums) {
+            homogeneousTestBlock->push_back(value::bitcastFrom<T>(num));
+        }
     }
     if (inclNothing) {
         homogeneousTestBlock->pushNothing();
@@ -215,4 +217,84 @@ static TypedValues makeInterestingValues() {
 
     return vals;
 }
+
+// IsExtractable = false is used to test optimizations that let us avoid calling extract() on a
+// block for various reasons. If we try to call extract() on TestBlockBase<false> a uassert will
+// fail.
+template <bool IsExtractable>
+class TestBlockBase : public value::ValueBlock {
+public:
+    TestBlockBase() = default;
+    TestBlockBase(const TestBlockBase& o) : value::ValueBlock(o) {
+        _vals.resize(o._vals.size(), value::Value{0u});
+        _tags.resize(o._tags.size(), value::TypeTags::Nothing);
+        for (size_t i = 0; i < o._vals.size(); ++i) {
+            auto [copyTag, copyVal] = value::copyValue(o._tags[i], o._vals[i]);
+            _vals[i] = copyVal;
+            _tags[i] = copyTag;
+        }
+    }
+    TestBlockBase(TestBlockBase&& o)
+        : value::ValueBlock(std::move(o)), _vals(std::move(o._vals)), _tags(std::move(o._tags)) {
+        o._vals = {};
+        o._tags = {};
+    }
+    ~TestBlockBase() override {
+        for (size_t i = 0; i < _vals.size(); ++i) {
+            value::releaseValue(_tags[i], _vals[i]);
+        }
+    }
+
+    void push_back(value::TypeTags t, value::Value v) {
+        _vals.push_back(v);
+        _tags.push_back(t);
+    }
+    void push_back(std::pair<value::TypeTags, value::Value> tv) {
+        push_back(tv.first, tv.second);
+    }
+    boost::optional<size_t> tryCount() const override {
+        return _vals.size();
+    }
+    value::DeblockedTagVals deblock(
+        boost::optional<value::DeblockedTagValStorage>& storage) override {
+        uassert(8776400, "Cannot call extract on an UnextractableTestBlock", IsExtractable);
+        return {_vals.size(), _tags.data(), _vals.data()};
+    }
+    std::unique_ptr<value::ValueBlock> clone() const override {
+        return std::make_unique<TestBlockBase>(*this);
+    }
+
+    std::pair<value::TypeTags, value::Value> tryMin() const override {
+        if (_minVal) {
+            return *_minVal;
+        }
+        return value::ValueBlock::tryMin();
+    }
+    std::pair<value::TypeTags, value::Value> tryMax() const override {
+        if (_maxVal) {
+            return *_maxVal;
+        }
+        return value::ValueBlock::tryMax();
+    }
+    std::pair<value::TypeTags, value::Value> at(size_t idx) override {
+        invariant(idx < _vals.size());
+        return {_tags[idx], _vals[idx]};
+    }
+
+    void setMin(value::TypeTags tag, value::Value val) {
+        _minVal.emplace(tag, val);
+    }
+    void setMax(value::TypeTags tag, value::Value val) {
+        _maxVal.emplace(tag, val);
+    }
+
+private:
+    std::vector<value::TypeTags> _tags;
+    std::vector<value::Value> _vals;
+    boost::optional<std::pair<value::TypeTags, value::Value>> _minVal, _maxVal;
+};
+
+using TestBlock = TestBlockBase<true /* IsExtractable */>;
+using UnextractableTestBlock = TestBlockBase<false /* IsExtractable */>;
+
 }  // namespace mongo::sbe
