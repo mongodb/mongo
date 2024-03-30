@@ -2593,6 +2593,11 @@ if get_option('ninja') == 'disabled' and link_model.startswith("dynamic"):
             abilink(env)
 
     if env.get('TAPI'):
+        # TAPI is less useful when running with Bazel + Remote Execution. Disable since the initial implementation
+        # of the build system with Bazel will not support it.
+        # TODO(SERVER-88612): Remove fatal error we decide to implement TAPI support in Bazel
+        env.FatalError("TAPI is not supported with the hybrid build system.")
+
         tapilink = Tool('tapilink')
         if tapilink.exists(env):
             tapilink(env)
