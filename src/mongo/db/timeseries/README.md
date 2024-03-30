@@ -42,7 +42,7 @@ Uncompressed bucket (version 1):
         min: {
             <time field>: <time of first measurement in this bucket, rounded down based on granularity>,
             <field0>: <minimum value of 'field0' across all measurements>,
-            <field1>: <maximum value of 'field1' across all measurements>,
+            <field1>: <minimum value of 'field1' across all measurements>,
             ...
         },
         max: {
@@ -83,7 +83,8 @@ have more elements than the timefield.
 
 There are two types of compressed buckets, version 2 and version 3. They differ only in that the
 entries in the data field of version 2 buckets are sorted on the time field, whereas this is not
-enforced for version 3 buckets.
+enforced for version 3 buckets. Buckets with version 2 are perferred over version 3 for improved
+read/query performance. Version 3 buckets are created as necessary to retain high write performance.
 
 Compressed bucket (version 2 and version 3):
 
@@ -96,7 +97,7 @@ Compressed bucket (version 2 and version 3):
         min: {
             <time field>: <time of first measurement in this bucket, rounded down based on granularity>,
             <field0>: <minimum value of 'field0' across all measurements>,
-            <field1>: <maximum value of 'field1' across all measurements>,
+            <field1>: <minimum value of 'field1' across all measurements>,
             ...
         },
         max: {
@@ -139,12 +140,13 @@ at least one out-of-order measurement). Queries can also be less performant on V
 cannot rely on the fact that V3 buckets have their measurements in order by time.
 
 New V1 buckets will no longer be created in 8.0+, but existing V1 buckets from upgrades will
-continue to be supported. Closed V1 buckets can be re-opened, and will be compressed when more
-measurements are inserted into them.
+continue to be supported. Closed V1 buckets can be reopened, and will be compressed when more
+measurements are inserted into them. Specifically, the bucket will be compressed as v2 the
+[moment it is reopened](https://github.com/mongodb/mongo/blob/4ccd7e74075ac8a9685981570b575acf74efe350/src/mongo/db/timeseries/timeseries_write_util.cpp#L721), and the insert [will then operate](https://github.com/mongodb/mongo/blob/4ccd7e74075ac8a9685981570b575acf74efe350/src/mongo/db/timeseries/timeseries_write_util.cpp#L1075-L1081) on a compressed bucket.
 
 ### BSONColumnBuilder
 
-Each V2 and V3 bucket has a MeasurementMap, which is a map from each data field (excluding the meta field) in a bucket
+Each V2 and V3 bucket has a `MeasurementMap`, which is a map from each data field (excluding the meta field) in a bucket
 to a corresponding BSONColumnBuilder for that field. For example, if a bucket has a timefield `time`,
 there will be a mapping (`time` -> BSONColumnnBuilder for the BSONColumn of time data).
 

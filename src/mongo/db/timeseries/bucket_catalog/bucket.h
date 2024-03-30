@@ -64,6 +64,9 @@ namespace mongo::timeseries::bucket_catalog {
  * The in-memory representation of a time-series bucket document. Maintains all the information
  * needed to add additional measurements, but does not generally store the full contents of the
  * document that have already been committed to disk.
+ *
+ * The order of members of this struct have been optimized for memory alignment, and therefore
+ * a low memory footprint. Take extra care if modifying the order or adding or removing fields.
  */
 struct Bucket {
 private:

@@ -228,7 +228,7 @@ BSONObj getErrorLabels(OperationContext* opCtx,
                        const repl::OpTime& lastOpAfterRun) {
     if (MONGO_unlikely(errorLabelsOverride(opCtx))) {
         // This command was failed by a failCommand failpoint. Thus, we return the errorLabels
-        // specified in the failpoint to supress any other error labels that would otherwise be
+        // specified in the failpoint to suppress any other error labels that would otherwise be
         // returned by the ErrorLabelBuilder.
         if (errorLabelsOverride(opCtx).value().isEmpty()) {
             return BSONObj();

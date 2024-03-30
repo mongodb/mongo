@@ -142,7 +142,8 @@ UpdateResult performUpdate(OperationContext* opCtx,
 
 /**
  * Executes a delete, supports returning the deleted document. the returned document is placed into
- * docFound (if applicable). Should be called in a writeConflictRetry loop.
+ * docFound (if applicable). Should be called in a writeConflictRetry loop. Returns the number of
+ * documents deleted as a long long to conform to OpDebug interface.
  */
 long long performDelete(OperationContext* opCtx,
                         const NamespaceString& nss,

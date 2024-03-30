@@ -2415,13 +2415,13 @@ void compressUncompressedBucketOnReopen(OperationContext* opCtx,
 
 
 /**
- * Attempts to perform bucket compression on time-series bucket. It will surpress any error caused
+ * Attempts to perform bucket compression on time-series bucket. It will suppress any error caused
  * by the write and silently leave the bucket uncompressed when any type of error is encountered.
  */
 void tryPerformTimeseriesBucketCompression(OperationContext* opCtx,
                                            const write_ops::InsertCommandRequest& request,
                                            timeseries::bucket_catalog::ClosedBucket& closedBucket) {
-    // Buckets with just a single measurement is not worth compressing.
+    // A bucket with just a single measurement is not worth compressing.
     if (closedBucket.numMeasurements.has_value() && closedBucket.numMeasurements.value() <= 1) {
         return;
     }
@@ -2845,6 +2845,11 @@ void getTimeseriesBatchResultsNoTenantMigration(
                                                             docsToRetry);
 }
 
+/**
+ * Stages writes to the system.buckets collection, which may have the side effect of reopening an
+ * existing bucket to put the measurement(s) into as well as closing buckets. Returns info about the
+ * write which is needed for committing the write.
+ */
 std::tuple<UUID, TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */>
 insertIntoBucketCatalog(OperationContext* opCtx,
                         const write_ops::InsertCommandRequest& request,
@@ -2984,6 +2989,11 @@ insertIntoBucketCatalog(OperationContext* opCtx,
         bucketsColl->uuid(), std::move(batches), std::move(stmtIds), request.getDocuments().size()};
 }
 
+/**
+ * Writes to the underlying system.buckets collection as a series of ordered time-series inserts.
+ * Returns true on success, false otherwise, filling out errors as appropriate on failure as well
+ * as containsRetry which is used at a higher layer to report a retry count metric.
+ */
 bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
                                               const write_ops::InsertCommandRequest& request,
                                               std::vector<write_ops::WriteError>* errors,

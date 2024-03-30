@@ -88,6 +88,9 @@ struct Sizes {
  * it means another writer is in the process of committing. The writer can proceed to do other
  * work (like commit another batch), and when they have no other work to do, they can wait for
  * this batch to be committed by executing the blocking operation getWriteBatchResult().
+ *
+ * The order of members of this struct have been optimized for memory alignment, and therefore
+ * a low memory footprint. Take extra care if modifying the order or adding or removing fields.
  */
 struct WriteBatch {
     WriteBatch() = delete;
@@ -104,7 +107,9 @@ struct WriteBatch {
 
     // Whether the measurements in the bucket are sorted by timestamp or not.
     // True by default, if a v2 buckets gets promoted to v3 this is set to false.
-    // It should not be used for v1 buckets.
+    // It should not be used for v1 buckets. v2 buckets are preferred over v3 for improved
+    // read/query performance, v3 buckets get created as necessary to retain higher write
+    // performance.
     bool bucketIsSortedByTime = true;
 
     bool openedDueToMetadata =
@@ -169,7 +174,7 @@ bool isWriteBatchFinished(const WriteBatch& batch);
 /**
  * Attempts to claim the right to commit a batch. If it returns true, rights are
  * granted. If it returns false, rights are revoked, and the caller should get the result
- * of the batch with getResult(). Non-blocking.
+ * of the batch with getWriteBatchResult(). Non-blocking.
  */
 bool claimWriteBatchCommitRights(WriteBatch& batch);
 
