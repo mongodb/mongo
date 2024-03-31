@@ -32,8 +32,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
 #include "mongo/util/tcmalloc_set_parameter.h"
 
@@ -333,6 +335,50 @@ TEST(ReleaseRate, SetFromStringTest) {
 TEST(SamplingRate, EnsureProfileSamplingRateIsZero) {
     ASSERT_EQ(tcmalloc::MallocExtension::GetProfileSamplingRate(), 0);
 }
+
+ServerStatusSection* getSection(StringData name) {
+    auto section = std::find_if(ServerStatusSectionRegistry::instance()->begin(),
+                                ServerStatusSectionRegistry::instance()->end(),
+                                [&](auto& kvp) { return kvp.first == name; });
+
+    ASSERT_NE(section, ServerStatusSectionRegistry::instance()->end());
+
+    return section->second.get();
+}
+
+// Verify that the tcmalloc cpu cache total is 1 GB.
+// The cache size is set in cpu_cache.cc
+TEST(GoogleTcmalloc, VerifyCacheSize) {
+    // This test requires per cpu caches
+    if (!tcmalloc::MallocExtension::PerCpuCachesActive()) {
+        std::cout << "Skipping test because Per Cpu Cache is not active" << std::endl;
+        return;
+    }
+
+    auto memLimitBytes = ProcessInfo::getMemSizeMB() * 1024 * 1024;
+    int64_t targetSize = 1024ULL * 1024 * 1024;
+    if (memLimitBytes < (4ULL * 1024 * 1024 * 1024)) {
+        targetSize = memLimitBytes / 4;
+    }
+
+    // Grab the tcmalloc cache sizes via server status
+    // This avoids directly including cpu_cache.h which includes logging.h which has ASSERT macros
+    // which conflict with MongoDB's ASSERTs.
+    auto section = getSection("tcmalloc"_sd);
+    auto config = BSON("tcmalloc" << 2);
+    auto metrics = section->generateSection(nullptr, config.firstElement());
+
+    auto cpuCache = metrics["tcmalloc"]["cpuCache"].Obj();
+    int64_t tcmallocCapacity = 0;
+    for (const auto arrEl : cpuCache) {
+        tcmallocCapacity += arrEl["capacity"].safeNumberLong();
+    }
+
+    // Account for some truncation when dividing 1GB by number of cores
+    ASSERT_APPROX_EQUAL(tcmallocCapacity, targetSize, 1024 * 10);
+}
+
 #endif
+
 }  // namespace
 }  // namespace mongo

@@ -61,6 +61,11 @@ namespace tcmalloc {
 namespace tcmalloc_internal {
 class CpuCachePeer;
 
+/////////////////////////////////////////////////
+/////// MONGO_SPECIFIC_CHANGE
+unsigned long long getMongoMaxCpuCacheSize(size_t numCpus);
+/////////////////////////////////////////////////
+
 namespace cpu_cache_internal {
 template <class CpuCache>
 struct DrainHandler;
@@ -931,6 +936,19 @@ inline void CpuCache<Forwarder>::Activate() {
       sizeof(ResizeInfo) * num_cpus, std::align_val_t{alignof(ResizeInfo)}));
 
   auto max_cache_size = CacheLimit();
+
+////////////////////////////////////////////////////////////
+//////// START MONGO HACK
+
+  // Override the default of kMaxCpuCacheSize unless something else was chosen.
+  // Note that this code activates via static intializers
+  //
+  if (max_cache_size == kMaxCpuCacheSize) {
+    max_cache_size = getMongoMaxCpuCacheSize(num_cpus);
+  }
+
+//////// END MONGO HACK
+////////////////////////////////////////////////////////////
 
   for (int cpu = 0; cpu < num_cpus; ++cpu) {
     new (&resize_[cpu]) ResizeInfo();

@@ -404,6 +404,7 @@ if tcmallocAttrs:
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/db/server_base',
             '$BUILD_DIR/mongo/db/service_context',
+            'tcmalloc_server_status',
             'tcmalloc_set_parameter',
         ],
     )
@@ -441,10 +442,6 @@ if tcmallocAttrs:
             '$BUILD_DIR/mongo/db/server_base',
             'tcmalloc_set_parameter',
         ],
-        LIBDEPS_DEPENDENTS=[
-            '$BUILD_DIR/mongo/db/mongod_initializers',
-            '$BUILD_DIR/mongo/s/mongos_initializers',
-        ],
     )
 
     tcmspEnv.CppUnitTest(
@@ -453,7 +450,10 @@ if tcmallocAttrs:
             'tcmalloc_set_parameter_test.cpp',
         ],
         LIBDEPS=[
+            '$BUILD_DIR/mongo/db/commands/server_status_core',
             '$BUILD_DIR/mongo/db/server_base',
+            'processinfo',
+            'tcmalloc_server_status',
             'tcmalloc_set_parameter',
         ],
     )
