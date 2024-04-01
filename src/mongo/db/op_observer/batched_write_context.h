@@ -41,7 +41,8 @@ namespace mongo {
 /**
  * This class is a decoration on the OperationContext holding context of writes that are logically
  * related with each other. It can be used to stage writes belonging to the same WriteUnitOfWork or
- * multi-document transaction. Currently only supports batching deletes in a WriteUnitOfWork.
+ * multi-document transaction. Currently only supports batching a single type of operation, which
+ * must be 'insert' or 'delete' in a WriteUnitOfWork.
  */
 class BatchedWriteContext {
 public:
