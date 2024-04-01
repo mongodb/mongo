@@ -2300,3 +2300,53 @@ buildvariants:
   - name: push
   - name: .crypt
   - name: .publish_crypt
+
+- name: amazon-linux2-arm64-try-sbe-engine
+  display_name: Amazon Linux 2 arm64 Query Patch Only (trySbeEngine)
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter.
+  run_on:
+  - amazon2-arm64-small
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: aarch64-enterprise-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    test_flags: >-
+      --mongodSetParameters="{featureFlagSbeFull: true}"
+      --excludeWithAnyTags=resource_intensive,incompatible_with_amazon_linux,sbe_incompatible
+    has_packages: true
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise
+    multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
+    multiversion_skip_install_for_40: "true"
+    packager_script: packager_enterprise.py
+    packager_arch: aarch64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    large_distro_name: amazon2-arm64-large
+  tasks:
+  - name: compile_and_archive_dist_test_then_package_TG
+    distros:
+    - amazon2-arm64-large
+  - name: aggregation_mongos_passthrough
+  - name: aggregation_sharded_collections_passthrough
+  - name: aggregation_one_shard_sharded_collections
+  - name: aggregation
+  - name: aggregation_disabled_optimization
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: jsCore
+    distros:
+    - amazon2-arm64-large
+  - name: replica_sets_jscore_passthrough_gen
+  - name: sharded_collections_jscore_passthrough_gen
+  - name: sharding_jscore_passthrough
+  - name: burn_in_tests_gen
+  - name: concurrency_gen
+  - name: concurrency_replication_gen
+  - name: concurrency_sharded_replication_gen

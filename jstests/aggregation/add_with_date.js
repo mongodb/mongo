@@ -1,9 +1,15 @@
+// @tags: [do_not_wrap_aggregations_in_facets,]
 (function() {
 "use strict";
-load("jstests/libs/sbe_assert_error_override.js");
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+// TODO BACKPORT-19405, BACKPORT-19406: SBE and classic have different behaviors documented in this
+// test. These are unified by the SERVER tickets of the mentioned backports.
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const coll = db.getSiblingDB(jsTestName()).coll;
 coll.drop();
+
+const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 function getResultOfExpression(expr) {
     const resultArray = coll.aggregate({$project: {computed: expr}}).toArray();
@@ -62,10 +68,22 @@ assert.eq(ISODate("2019-01-30T07:30:10.957Z"),
           getResultOfExpression({$add: ["$int32Val", "$dateVal"]}));
 
 // Addition with a date and multiple values of differing data types.
-assert.eq(ISODate("2019-01-30T07:30:12.597Z"),
-          getResultOfExpression({$add: ["$dateVal", "$decimalVal", "$doubleVal", "$int64Val"]}));
-assert.eq(ISODate("2019-01-30T07:30:12.597Z"),
-          getResultOfExpression({$add: ["$decimalVal", "$dateVal", "$doubleVal", "$int64Val"]}));
+// SBE uses doubleDoubleSum for $add whereas classic does not.
+if (isSbeEnabled) {
+    assert.eq(
+        ISODate("2019-01-30T07:30:12.596Z"),
+        getResultOfExpression({$add: ["$dateVal", "$decimalVal", "$doubleVal", "$int64Val"]}));
+    assert.eq(
+        ISODate("2019-01-30T07:30:12.596Z"),
+        getResultOfExpression({$add: ["$decimalVal", "$dateVal", "$doubleVal", "$int64Val"]}));
+} else {
+    assert.eq(
+        ISODate("2019-01-30T07:30:12.597Z"),
+        getResultOfExpression({$add: ["$dateVal", "$decimalVal", "$doubleVal", "$int64Val"]}));
+    assert.eq(
+        ISODate("2019-01-30T07:30:12.597Z"),
+        getResultOfExpression({$add: ["$decimalVal", "$dateVal", "$doubleVal", "$int64Val"]}));
+}
 assert.eq(ISODate("2019-01-30T07:30:12.596Z"),
           getResultOfExpression({$add: ["$decimalVal", "$doubleVal", "$int64Val", "$dateVal"]}));
 // The result of an addition must remain in the range of int64_t in order to convert back to a Date;
@@ -86,14 +104,26 @@ assert.throwsWithCode(
     ErrorCodes.Overflow);
 
 // An overflow into the domain of Decimal128 results in an overflow exception.
-assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}),
-                      ErrorCodes.Overflow);
-assert.throwsWithCode(
-    () => getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}),
-    ErrorCodes.Overflow);
-assert.throwsWithCode(
-    () => getResultOfExpression({$add: ["$dateVal", "$overflowDouble", "$overflowDecimal"]}),
-    ErrorCodes.Overflow);
+// SBE overflows to return nan, whereas classic throws.
+if (isSbeEnabled) {
+    // One quirk of date addition semantics is that an overflow into the domain of Decimal128 is not
+    // fatal and instead results in an invalid "NaN" Date value.
+    const nanDate = new Date("");
+    assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}));
+    assert.eq(nanDate,
+              getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}));
+    assert.eq(nanDate,
+              getResultOfExpression({$add: ["$dateVal", "$overflowDouble", "$overflowDecimal"]}));
+} else {
+    assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}),
+                          ErrorCodes.Overflow);
+    assert.throwsWithCode(
+        () => getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}),
+        ErrorCodes.Overflow);
+    assert.throwsWithCode(
+        () => getResultOfExpression({$add: ["$dateVal", "$overflowDouble", "$overflowDecimal"]}),
+        ErrorCodes.Overflow);
+}
 
 // Adding a double-typed NaN to a date value.
 assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$nanDouble"]}),
@@ -103,20 +133,31 @@ assert.throwsWithCode(() => getResultOfExpression({$add: ["$nanDouble", "$dateVa
                       ErrorCodes.Overflow);
 
 // An NaN Decimal128 added to date results in an overflow exception.
-assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$nanDecimal"]}),
-                      ErrorCodes.Overflow);
-assert.throwsWithCode(() => getResultOfExpression({$add: ["$nanDecimal", "$dateVal"]}),
-                      ErrorCodes.Overflow);
-
+// SBE overflows to return NaN, whereas classic throws.
+if (isSbeEnabled) {
+    const nanDate = new Date("");
+    assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$nanDecimal"]}));
+    assert.eq(nanDate, getResultOfExpression({$add: ["$nanDecimal", "$dateVal"]}));
+} else {
+    assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$nanDecimal"]}),
+                          ErrorCodes.Overflow);
+    assert.throwsWithCode(() => getResultOfExpression({$add: ["$nanDecimal", "$dateVal"]}),
+                          ErrorCodes.Overflow);
+}
 // Addition with a date, a double-typed NaN, and a third value.
 assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$doubleVal", "$nanDouble"]}),
                       ErrorCodes.Overflow);
 
 // Addition with a date, and both types of NaN.
-assert.throwsWithCode(
-    () => getResultOfExpression({$add: ["$dateVal", "$nanDouble", "$nanDecimal"]}),
-    ErrorCodes.Overflow);
-
+// SBE returns NaN if it's a value in $add, whereas classic throws.
+if (isSbeEnabled) {
+    const nanDate = new Date("");
+    assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$nanDouble", "$nanDecimal"]}));
+} else {
+    assert.throwsWithCode(
+        () => getResultOfExpression({$add: ["$dateVal", "$nanDouble", "$nanDecimal"]}),
+        ErrorCodes.Overflow);
+}
 // Throw error when there're two or more date in $add.
 assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", 1, "$dateVal"]}), 4974202);
 

@@ -4,7 +4,8 @@
  * @tags: [
  *   # Queries on mongoS may not request or provide a resume token.
  *   assumes_against_mongod_not_mongos,
- *   requires_fcv_60
+ *   requires_fcv_60,
+ *   sbe_incompatible,
  * ]
  */
 

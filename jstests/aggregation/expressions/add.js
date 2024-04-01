@@ -2,11 +2,16 @@
 "use strict";
 load("jstests/aggregation/extras/utils.js");        // For assertErrorCode and assertErrMsgContains.
 load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+// TODO BACKPORT-19405, BACKPORT-19406: SBE and classic have different behaviors documented in this
+// test. These are unified by the SERVER tickets of the mentioned backports.
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 // In SERVER-63012, translation of $add expression into sbe now defaults the translation of $add
 // with no operands to a zero integer constant.
 const coll = db.add_coll;
 coll.drop();
+
+const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 assert.commandWorked(coll.insert({x: 1}));
 let result = coll.aggregate([{$project: {y: {$add: []}}}]).toArray();
@@ -43,8 +48,14 @@ assert.commandWorked(coll.insert(doc));
 
 let addResult = coll.aggregate([{$project: {add: {$add: queryArr}}}]).toArray();
 let sumResult = coll.aggregate([{$project: {sum: {$sum: queryArr}}}]).toArray();
-assert.neq(addResult[0]["add"], sumResult[0]["sum"]);
-assert.eq(addResult[0]["add"], arr.reduce((a, b) => a + b));
+
+// SBE uses doubleDoubleSum for $add and $sum, whereas classic uses it for only $sum.
+if (isSbeEnabled) {
+    assert.eq(addResult[0]["add"], sumResult[0]["sum"]);
+} else {
+    assert.neq(addResult[0]["add"], sumResult[0]["sum"]);
+    assert.eq(addResult[0]["add"], arr.reduce((a, b) => a + b));
+}
 
 assert.eq(true, coll.drop());
 // Doubles are rounded to int64 when added to Date
@@ -64,9 +75,21 @@ assert.commandWorked(
 
 let result1 =
     coll.aggregate([{$project: {sum: {$add: ["$lhs", "$rhs"]}}}, {$sort: {_id: 1}}]).toArray();
-assert.eq(result1[0].sum, new Date(1683794065003));
+
+// SBE uses doubleDoubleSum for $add whereas classic does not.
+if (isSbeEnabled) {
+    assert.eq(result1[0].sum, new Date(1683794065002));
+} else {
+    assert.eq(result1[0].sum, new Date(1683794065003));
+}
 assert.eq(result1[1].sum, new Date(1683794065003));
-assert.eq(result1[2].sum, new Date(1683794065004));
+
+// SBE uses doubleDoubleSum for $add whereas classic does not.
+if (isSbeEnabled) {
+    assert.eq(result1[2].sum, new Date(1683794065003));
+} else {
+    assert.eq(result1[2].sum, new Date(1683794065004));
+}
 assert.eq(result1[3].sum, new Date(1683794065004));
 assert.eq(result1[4].sum, new Date(1683794065003));
 assert.eq(result1[5].sum, new Date(1683794065004));
@@ -89,5 +112,10 @@ pipeline = [{$project: {res: {$add: [new Date(10), "$veryBigPositiveDouble"]}}}]
 assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
 
 pipeline = [{$project: {res: {$add: [new Date(10), "$veryBigPositiveDecimal"]}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
+if (isSbeEnabled) {
+    assert.commandWorked(
+        coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
+} else {
+    assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
+}
 }());

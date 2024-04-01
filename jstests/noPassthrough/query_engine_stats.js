@@ -1,6 +1,8 @@
 /**
  * Tests that the query engine used is recorded correctly in the logs, system.profile, and
  * serverStatus.
+ * # This test spins up it's own mongod configurations.
+ * @tags: [sbe_incompatible, ]
  */
 
 (function() {

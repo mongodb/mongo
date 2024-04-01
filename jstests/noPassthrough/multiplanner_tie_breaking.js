@@ -3,6 +3,8 @@
  * Plans in tests only tie on classic engine, not SBE.
  *
  * @tags: [
+ *   # Specifically tests classic engine logic.
+ *   sbe_incompatible,
  *   cqf_incompatible,
  * ]
  */
