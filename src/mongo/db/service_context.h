@@ -54,9 +54,9 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/lock_free_read_list.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/hierarchical_acquisition.h"
@@ -368,43 +368,35 @@ public:
         virtual void onDestroyOperationContext(OperationContext* opCtx) = 0;
     };
 
-    using ClientSet = stdx::unordered_set<Client*>;
+    using ClientList = LockFreeReadList<Client*>;
+    using ClientMap = stdx::unordered_map<Client*, typename ClientList::Entry*>;
 
     /**
      * Cursor for enumerating the live Client objects belonging to a ServiceContext.
-     *
-     * Lifetimes of this type are synchronized with client creation and destruction.
+     * This is just a wrapper, so prefer using `makeClientsCursor` instead.
      */
     class LockedClientsCursor {
     public:
         /**
          * Constructs a cursor for enumerating the clients of "service", blocking "service" from
-         * creating or destroying Client objects until this instance is destroyed.
+         * destroying the Client object actively referenced by the cursor.
          */
-        explicit LockedClientsCursor(ServiceContext* service) : _svcCtxLock(service) {
-            _setup(_svcCtxLock);
-        }
-
-        /**
-         * Allows constructing a cursor while holding the service context mutex. Always use the
-         * other constructor, unless constructing the cursor in a scope where service context mutex
-         * is already being held (e.g. by the caller).
-         */
-        explicit LockedClientsCursor(ServiceContextLock& svcCtxLock) {
-            _setup(svcCtxLock);
-        }
+        explicit LockedClientsCursor(ServiceContext* svcCtx)
+            : _cursor(svcCtx->makeClientsCursor()) {}
 
         /**
          * Returns the next client in the enumeration, or nullptr if there are no more clients.
          */
-        Client* next();
+        Client* next() {
+            if (std::exchange(_mustGetNext, true)) {
+                _cursor.next();
+            }
+            return _cursor ? _cursor.value() : nullptr;
+        }
 
     private:
-        void _setup(ServiceContextLock&);
-
-        ServiceContextLock _svcCtxLock;
-        ClientSet::const_iterator _curr;
-        ClientSet::const_iterator _end;
+        ClientList::Cursor _cursor;
+        bool _mustGetNext = false;
     };
 
     /**
@@ -762,6 +754,10 @@ public:
      */
     Service* getService() const;
 
+    ClientList::Cursor makeClientsCursor() const {
+        return _clientsList.getCursor();
+    }
+
     /**
      * This is for internal use by `ServiceContextLock`. Avoid using it directly to lock
      * `ServiceContext` as it will block normal server operations.
@@ -828,7 +824,8 @@ private:
      * Vector of registered observers.
      */
     std::vector<ClientObserverHolder> _clientObservers;
-    ClientSet _clients;
+    ClientMap _clients;
+    ClientList _clientsList;
 
     /**
      * The registered OpObserver.
@@ -934,12 +931,8 @@ public:
      */
     class LockedClientsCursor {
     public:
-        /**
-         * Constructs a cursor for enumerating the clients of "service", blocking its parent
-         * ServiceContext from creating or destroying Client objects until this instance is
-         * destroyed.
-         */
-        explicit LockedClientsCursor(Service* service);
+        explicit LockedClientsCursor(Service* service)
+            : _service(service), _cursor(service->getServiceContext()) {}
 
         /**
          * Returns the next client in the enumeration, or nullptr if there are no more clients.
@@ -947,8 +940,8 @@ public:
         ClientLock next();
 
     private:
-        ServiceContext::LockedClientsCursor _serviceCtxCursor;
         Service* _service;
+        ServiceContext::LockedClientsCursor _cursor;
     };
 
 private:

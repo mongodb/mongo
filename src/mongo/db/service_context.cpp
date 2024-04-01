@@ -149,7 +149,7 @@ ServiceContext::ServiceContext()
 
 ServiceContext::~ServiceContext() {
     stdx::lock_guard<Latch> lk(_mutex);
-    for (const auto& client : _clients) {
+    for (const auto& [client, _] : _clients) {
         LOGV2_ERROR(23828,
                     "Non-empty client list when destroying service context",
                     "client"_attr = client->desc(),
@@ -229,9 +229,10 @@ ServiceContext::UniqueClient ServiceContext::makeClientForService(
     std::string desc, std::shared_ptr<transport::Session> session, Service* service) {
     std::unique_ptr<Client> client(new Client(std::move(desc), service, std::move(session)));
     onCreate(client.get(), _clientObservers);
+    auto entry = _clientsList.add(client.get());
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        invariant(_clients.insert(client.get()).second);
+        invariant(_clients.insert({client.get(), entry}).second);
     }
     return UniqueClient(client.release());
 }
@@ -277,13 +278,18 @@ void ServiceContext::setTransportLayerManager(
 }
 
 void ServiceContext::ClientDeleter::operator()(Client* client) const {
-    ServiceContext* const service = client->getServiceContext();
-    OperationIdManager::get(service).eraseClientFromMap(client);
-    {
-        stdx::lock_guard<Latch> lk(service->_mutex);
-        invariant(service->_clients.erase(client));
-    }
-    onDestroy(client, service->_clientObservers);
+    ServiceContext* const svcCtx = client->getServiceContext();
+    OperationIdManager::get(svcCtx).eraseClientFromMap(client);
+    auto entry = [&] {
+        stdx::lock_guard lk(svcCtx->_mutex);
+        auto it = svcCtx->_clients.find(client);
+        invariant(it != svcCtx->_clients.end(), "Cannot find client in the list of clients!");
+        auto entry = it->second;
+        svcCtx->_clients.erase(it);
+        return entry;
+    }();
+    svcCtx->_clientsList.remove(entry);
+    onDestroy(client, svcCtx->_clientObservers);
     delete client;
 }
 
@@ -355,31 +361,16 @@ void ServiceContext::registerClientObserver(std::unique_ptr<ClientObserver> obse
     _clientObservers.emplace_back(std::move(observer));
 }
 
-void ServiceContext::LockedClientsCursor::_setup(ServiceContextLock& lockedSvcCtx) {
-    _curr = lockedSvcCtx->_clients.cbegin();
-    _end = lockedSvcCtx->_clients.cend();
-}
-
-Client* ServiceContext::LockedClientsCursor::next() {
-    if (_curr == _end)
-        return nullptr;
-    Client* result = *_curr;
-    ++_curr;
-    return result;
-}
-
 /**
  * TODO SERVER-85991 Once the _clients field in ServiceContext is moved to Service, change the
  * implementation here to just iterate over the _clients list directly.
  */
-Service::LockedClientsCursor::LockedClientsCursor(Service* service)
-    : _serviceCtxCursor(service->getServiceContext()), _service(service) {}
-
 ClientLock Service::LockedClientsCursor::next() {
-    for (Client* client; (client = _serviceCtxCursor.next());) {
-        ClientLock lc(client);
-        if (lc->getService() == _service)
-            return lc;
+    while (auto client = _cursor.next()) {
+        ClientLock lk(client);
+        if (lk->getService() == _service) {
+            return lk;
+        }
     }
     return {};
 }
@@ -392,7 +383,7 @@ void ServiceContext::setKillAllOperations(const std::set<std::string>& excludedC
     auto opsKilled = 0;
 
     // Interrupt all active operations
-    for (auto&& client : _clients) {
+    for (auto& [client, _] : _clients) {
         ClientLock lk(client);
 
         // Do not kill operations from the excluded clients.
