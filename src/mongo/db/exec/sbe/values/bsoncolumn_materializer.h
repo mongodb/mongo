@@ -35,8 +35,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 
 
-namespace mongo::sbe {
-namespace bsoncolumn {
+namespace mongo::sbe::bsoncolumn {
 using ElementStorage = mongo::bsoncolumn::ElementStorage;
 
 /**
@@ -265,54 +264,4 @@ struct SBEPath {
     // Path request which consists of a combination of Get{x}, Traverse{}, and ends with Id{}.
     value::CellBlock::PathRequest _pathRequest;
 };
-}  // namespace bsoncolumn
-
-namespace value {
-/**
- * Block type that owns its data in an intrusive_ptr<ElementStorage>, and provides a view of SBE
- * tags/vals which point into the ElementStorage. This allows us to decompress into an
- * ElementStorage and use the associated SBE values directly, without an extra copy.
- */
-class ElementStorageValueBlock final : public ValueBlock {
-public:
-    ElementStorageValueBlock() = default;
-    ElementStorageValueBlock(const ElementStorageValueBlock& o) = delete;
-    ElementStorageValueBlock(ElementStorageValueBlock&& o) = delete;
-
-    /**
-     * Constructor which takes a storage buffer along with 'tags' and 'vals' which point into the
-     * storage buffer. The storage buffer is responsible for freeing the values. That is,
-     * releaseValue() will not be called on the tags/vals.
-     */
-    ElementStorageValueBlock(boost::intrusive_ptr<mongo::bsoncolumn::ElementStorage> storage,
-                             std::vector<TypeTags> tags,
-                             std::vector<Value> vals)
-        : _storage(std::move(storage)), _vals(std::move(vals)), _tags(std::move(tags)) {}
-
-    size_t size() const {
-        return _tags.size();
-    }
-
-    boost::optional<size_t> tryCount() const override {
-        return _vals.size();
-    }
-
-    DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) override {
-        return {_vals.size(), _tags.data(), _vals.data()};
-    }
-
-    std::unique_ptr<ValueBlock> clone() const override {
-        return std::make_unique<ElementStorageValueBlock>(_storage, _tags, _vals);
-    }
-
-private:
-    // Storage for the values.
-    boost::intrusive_ptr<mongo::bsoncolumn::ElementStorage> _storage;
-
-    // The values stored in these vectors are pointers into '_storage', which is responsible for
-    // freeing them.
-    std::vector<Value> _vals;
-    std::vector<TypeTags> _tags;
-};
-}  // namespace value
-}  // namespace mongo::sbe
+}  // namespace mongo::sbe::bsoncolumn
