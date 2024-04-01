@@ -40,6 +40,45 @@ static constexpr StringData kNormalString = "normal"_sd;
 static constexpr StringData kExemptString = "exempt"_sd;
 }  // namespace
 
+AdmissionContext::AdmissionContext(const AdmissionContext& other)
+    : _admissions(other._admissions.load()),
+      _priority(other._priority.load()),
+      _totalTimeQueuedMicros(other._totalTimeQueuedMicros.load()),
+      _startQueueingTime(other._startQueueingTime.load()) {}
+
+AdmissionContext& AdmissionContext::operator=(const AdmissionContext& other) {
+    _admissions.store(other._admissions.load());
+    _priority.store(other._priority.load());
+    _totalTimeQueuedMicros.store(other._totalTimeQueuedMicros.load());
+    _startQueueingTime.store(other._startQueueingTime.load());
+    return *this;
+}
+
+Microseconds AdmissionContext::totalTimeQueuedMicros() const {
+    return Microseconds{_totalTimeQueuedMicros.loadRelaxed()};
+}
+
+boost::optional<TickSource::Tick> AdmissionContext::startQueueingTime() const {
+    TickSource::Tick startQueueingTime = _startQueueingTime.loadRelaxed();
+    if (startQueueingTime == kNotQueueing) {
+        return boost::none;
+    }
+
+    return startQueueingTime;
+}
+
+int AdmissionContext::getAdmissions() const {
+    return _admissions.loadRelaxed();
+}
+
+AdmissionContext::Priority AdmissionContext::getPriority() const {
+    return _priority.loadRelaxed();
+}
+
+void AdmissionContext::recordAdmission() {
+    _admissions.fetchAndAdd(1);
+}
+
 ScopedAdmissionPriorityBase::ScopedAdmissionPriorityBase(OperationContext* opCtx,
                                                          AdmissionContext& admCtx,
                                                          AdmissionContext::Priority priority)
@@ -49,14 +88,11 @@ ScopedAdmissionPriorityBase::ScopedAdmissionPriorityBase(OperationContext* opCtx
             "operation",
             _originalPriority != AdmissionContext::Priority::kExempt ||
                 priority == AdmissionContext::Priority::kExempt);
-
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    _admCtx->_priority = priority;
+    _admCtx->_priority.store(priority);
 }
 
 ScopedAdmissionPriorityBase::~ScopedAdmissionPriorityBase() {
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    _admCtx->_priority = _originalPriority;
+    _admCtx->_priority.store(_originalPriority);
 }
 
 StringData toString(AdmissionContext::Priority priority) {
@@ -70,4 +106,19 @@ StringData toString(AdmissionContext::Priority priority) {
     }
     MONGO_UNREACHABLE;
 }
+
+WaitingForAdmissionGuard::WaitingForAdmissionGuard(AdmissionContext* admCtx, TickSource* tickSource)
+    : _admCtx(admCtx), _tickSource(tickSource) {
+    invariant(_admCtx->_startQueueingTime.swap(_tickSource->getTicks()) ==
+              AdmissionContext::kNotQueueing);
+}
+
+WaitingForAdmissionGuard::~WaitingForAdmissionGuard() {
+    auto startQueueingTime = _admCtx->_startQueueingTime.loadRelaxed();
+    invariant(startQueueingTime != AdmissionContext::kNotQueueing);
+    _admCtx->_totalTimeQueuedMicros.fetchAndAdd(durationCount<Microseconds>(
+        _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - startQueueingTime)));
+    _admCtx->_startQueueingTime.store(AdmissionContext::kNotQueueing);
+}
+
 }  // namespace mongo

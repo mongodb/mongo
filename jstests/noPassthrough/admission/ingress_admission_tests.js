@@ -58,7 +58,14 @@ function testCurrentOp(conn, db, collName) {
         if (op == null) {
             return false;
         }
-        return op.waitingForIngressAdmission;
+
+        const blockedAtIngressQueue = op.currentQueue && op.currentQueue.name === 'ingress';
+        if (blockedAtIngressQueue) {
+            // while here, also assert that current queue dwell time is reflect in the total
+            assert.gte(op.queues.ingress.totalTimeQueuedMicros, op.currentQueue.timeQueuedMicros);
+        }
+
+        return blockedAtIngressQueue;
     });
 
     // make sure the operation hangs after it was admitted
@@ -74,7 +81,16 @@ function testCurrentOp(conn, db, collName) {
         if (op == null) {
             return false;
         }
-        return !op.waitingForIngressAdmission;
+
+        const notCurrentlyQueued = op.currentQueue == null;
+        if (notCurrentlyQueued) {
+            // while here, validate that the operation was admitted and `currentQueue` is null
+            assert.gte(op.queues.ingress.admissions, 1);
+            assert.gte(op.queues.execution.admissions, 1);
+            assert(op.currentQueue == null, 'expected no current queue');
+        }
+
+        return notCurrentlyQueued;
     });
 
     fp.off();
@@ -118,12 +134,14 @@ function testSlowQueryLog(conn, db, collName) {
     parallelShell();
     db.setProfilingLevel(0, 100);
 
-    // verify that the reported ingress admission wait time is at least kDelayMicros
-    let log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
-    let line = findMatchingLogLine(log, {id: 51803, command: "count"});
+    // verify that the reported ingress admission wait time is at least kDelayMillis
+    const log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
+    const line = findMatchingLogLine(log, {id: 51803, command: "count"});
     assert.neq(line, null);
-    let entry = JSON.parse(line);
-    assert.gt(entry.attr.ingressAdmissionDurationMicros, kDelayMicros);
+    const entry = JSON.parse(line);
+    assert.eq(entry.attr.queues.ingress.admissions, 1);
+    assert.gte(entry.attr.queues.ingress.totalTimeQueuedMicros, kDelayMicros);
+    assert(entry.attr.currentQueue == null, 'expected no current queue in slow query logs');
 }
 
 /**

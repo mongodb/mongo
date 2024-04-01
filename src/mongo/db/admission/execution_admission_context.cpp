@@ -46,7 +46,7 @@ void ExecutionAdmissionContext::copyTo(
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     if (newPriority) {
         ExecutionAdmissionContext newContext(*this);
-        newContext._priority = *newPriority;
+        newContext._priority.store(*newPriority);
         contextDecoration(opCtx) = newContext;
         return;
     }

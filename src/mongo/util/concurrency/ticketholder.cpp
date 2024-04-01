@@ -35,7 +35,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/scopeguard.h"
@@ -154,7 +153,6 @@ boost::optional<Ticket> TicketHolder::waitForTicketUntil(Interruptible& interrup
     queueStats.totalAddedQueue.fetchAndAddRelaxed(1);
     ON_BLOCK_EXIT([&, startWaitTime = tickSource->getTicks()] {
         auto waitDelta = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startWaitTime);
-        admCtx->recordTimeQueued(waitDelta);
         queueStats.totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta.count());
         queueStats.totalRemovedQueue.fetchAndAddRelaxed(1);
     });
@@ -164,6 +162,7 @@ boost::optional<Ticket> TicketHolder::waitForTicketUntil(Interruptible& interrup
         queueStats.totalCanceled.fetchAndAddRelaxed(1);
     });
 
+    WaitingForAdmissionGuard waitForAdmission(admCtx, _serviceContext->getTickSource());
     auto ticket = _waitForTicketUntilImpl(interruptible, admCtx, until);
 
     if (ticket) {
