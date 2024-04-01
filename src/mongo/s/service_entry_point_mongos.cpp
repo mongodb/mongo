@@ -82,26 +82,24 @@
 
 namespace mongo {
 
-// Allows for decomposing `handleRequest` into parts and simplifies composing the future-chain.
-struct HandleRequest : public std::enable_shared_from_this<HandleRequest> {
-    struct CommandOpRunner;
-
+// Allows for decomposing `handleRequest` into parts and simplifies its execution.
+struct HandleRequest {
     HandleRequest(OperationContext* opCtx, const Message& message)
-        : rec(std::make_shared<RequestExecutionContext>(opCtx, message)),
+        : rec(opCtx, message),
           op(message.operation()),
           msgId(message.header().getId()),
-          nsString(getNamespaceString(rec->getDbMessage())) {}
+          nsString(getNamespaceString(rec.getDbMessage())) {}
 
     // Prepares the environment for handling the request.
     void setupEnvironment();
 
-    // Returns a future that does the heavy lifting of running client commands.
-    Future<DbResponse> handleRequest();
+    // Performs the heavy lifting of running client commands.
+    DbResponse handleRequest();
 
-    // Runs on successful execution of the future returned by `handleRequest`.
+    // Runs on successful execution of `handleRequest`.
     void onSuccess(const DbResponse&);
 
-    // Returns a future-chain to handle the request and prepare the response.
+    // Returns a ready future-chain that handled the request and prepared the response.
     Future<DbResponse> run();
 
     static NamespaceString getNamespaceString(const DbMessage& dbmsg) {
@@ -111,7 +109,7 @@ struct HandleRequest : public std::enable_shared_from_this<HandleRequest> {
             boost::none, dbmsg.getns(), SerializationContext::stateDefault());
     }
 
-    const std::shared_ptr<RequestExecutionContext> rec;
+    RequestExecutionContext rec;
     const NetworkOp op;
     const int32_t msgId;
     const NamespaceString nsString;
@@ -121,7 +119,7 @@ struct HandleRequest : public std::enable_shared_from_this<HandleRequest> {
 
 void HandleRequest::setupEnvironment() {
     using namespace fmt::literals;
-    auto opCtx = rec->getOpCtx();
+    auto opCtx = rec.getOpCtx();
 
     // This exception will not be returned to the caller, but will be logged and will close the
     // connection
@@ -139,27 +137,17 @@ void HandleRequest::setupEnvironment() {
     CurOp::get(opCtx)->ensureStarted();
 }
 
-struct HandleRequest::CommandOpRunner {
-    explicit CommandOpRunner(std::shared_ptr<HandleRequest> hr) : hr(std::move(hr)) {}
-    Future<DbResponse> run() {
-        return Strategy::clientCommand(hr->rec);
-    }
-    const std::shared_ptr<HandleRequest> hr;
-};
-
-Future<DbResponse> HandleRequest::handleRequest() {
+DbResponse HandleRequest::handleRequest() {
     switch (op) {
         case dbQuery:
             if (!nsString.isCommand()) {
-                return Future<DbResponse>::makeReady(
-                    makeErrorResponseToUnsupportedOpQuery("OP_QUERY is no longer supported"));
+                return makeErrorResponseToUnsupportedOpQuery("OP_QUERY is no longer supported");
             }
             [[fallthrough]];  // It's a query containing a command
         case dbMsg:
-            return std::make_unique<CommandOpRunner>(shared_from_this())->run();
+            return Strategy::clientCommand(&rec);
         case dbGetMore: {
-            return Future<DbResponse>::makeReady(
-                makeErrorResponseToUnsupportedOpQuery("OP_GET_MORE is no longer supported"));
+            return makeErrorResponseToUnsupportedOpQuery("OP_GET_MORE is no longer supported");
         }
         case dbKillCursors:
             uasserted(5745707, "OP_KILL_CURSORS is no longer supported");
@@ -176,7 +164,7 @@ Future<DbResponse> HandleRequest::handleRequest() {
 }
 
 void HandleRequest::onSuccess(const DbResponse& dbResponse) {
-    auto opCtx = rec->getOpCtx();
+    auto opCtx = rec.getOpCtx();
     const auto currentOp = CurOp::get(opCtx);
 
     // Mark the op as complete, populate the response length, and log it if appropriate.
@@ -199,24 +187,22 @@ void HandleRequest::onSuccess(const DbResponse& dbResponse) {
 }
 
 Future<DbResponse> HandleRequest::run() {
-    auto fp = makePromiseFuture<void>();
-    auto future = std::move(fp.future)
-                      .then([this, anchor = shared_from_this()] { setupEnvironment(); })
-                      .then([this, anchor = shared_from_this()] { return handleRequest(); })
-                      .tap([this, anchor = shared_from_this()](const DbResponse& dbResponse) {
-                          onSuccess(dbResponse);
-                      })
-                      .tapError([](Status status) {
-                          LOGV2(4879803, "Failed to handle request", "error"_attr = redact(status));
-                      });
-    fp.promise.emplaceValue();
-    return future;
+    try {
+        setupEnvironment();
+        auto dbResponse = handleRequest();
+        onSuccess(dbResponse);
+        return dbResponse;
+    } catch (const DBException& ex) {
+        auto status = ex.toStatus();
+        LOGV2(4879803, "Failed to handle request", "error"_attr = redact(status));
+        return status;
+    }
 }
 
 Future<DbResponse> ServiceEntryPointMongos::handleRequestImpl(OperationContext* opCtx,
                                                               const Message& message) noexcept {
-    auto hr = std::make_shared<HandleRequest>(opCtx, message);
-    return hr->run();
+    auto hr = HandleRequest(opCtx, message);
+    return hr.run();
 }
 
 Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,

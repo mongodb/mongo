@@ -161,8 +161,8 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
     }
 
     AlternativeClientRegion acr(client);
-    auto rec = std::make_shared<RequestExecutionContext>(opCtx.get(), opMsgRequest.serialize());
-    return Strategy::clientCommand(std::move(rec)).get();
+    auto rec = RequestExecutionContext(opCtx.get(), opMsgRequest.serialize());
+    return Strategy::clientCommand(&rec);
 }
 
 DbResponse ClusterCommandTestFixture::runCommandSuccessful(BSONObj cmd, bool isTargeted) {
