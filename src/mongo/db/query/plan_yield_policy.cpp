@@ -56,7 +56,8 @@ PlanYieldPolicy::PlanYieldPolicy(OperationContext* opCtx,
     : _policy(getPolicyOverrideForOperation(opCtx, policy)),
       _yieldable(yieldable),
       _callbacks(std::move(callbacks)),
-      _elapsedTracker(cs, yieldIterations, yieldPeriod) {
+      _elapsedTracker(cs, yieldIterations, yieldPeriod),
+      _fastClock(opCtx->getServiceContext()->getFastClockSource()) {
     visit(OverloadedVisitor{[&](const Yieldable* collectionPtr) {
                                 invariant(!collectionPtr || collectionPtr->yieldable() ||
                                           policy == YieldPolicy::WRITE_CONFLICT_RETRY_ONLY ||
@@ -68,6 +69,13 @@ PlanYieldPolicy::PlanYieldPolicy(OperationContext* opCtx,
                                 // CollectionAcquisitions are always yieldable.
                             }},
           _yieldable);
+
+    // If 'internalQueryExecYieldIterations' is the default value, we will only reply on time period
+    // to check for yielding, so we can avoid do the check for every iteration instead do the check
+    // every half of the period.
+    _yieldIntervalMs = internalQueryExecYieldIterations.load() == -1
+        ? internalQueryExecYieldPeriodMS.load() / 2
+        : -1;
 }
 
 PlanYieldPolicy::YieldPolicy PlanYieldPolicy::getPolicyOverrideForOperation(
@@ -94,7 +102,7 @@ PlanYieldPolicy::YieldPolicy PlanYieldPolicy::getPolicyOverrideForOperation(
     return desired;
 }
 
-bool PlanYieldPolicy::shouldYieldOrInterrupt(OperationContext* opCtx) {
+bool PlanYieldPolicy::doShouldYieldOrInterrupt(OperationContext* opCtx) {
     if (_policy == YieldPolicy::INTERRUPT_ONLY) {
         return _elapsedTracker.intervalHasElapsed();
     }

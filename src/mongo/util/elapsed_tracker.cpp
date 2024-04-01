@@ -42,7 +42,7 @@ ElapsedTracker::ElapsedTracker(ClockSource* cs,
       _last(cs->now()) {}
 
 bool ElapsedTracker::intervalHasElapsed() {
-    if (++_pings >= _hitsBetweenMarks) {
+    if (_hitsBetweenMarks >= 0 && ++_pings >= _hitsBetweenMarks) {
         _pings = 0;
         _last = _clock->now();
         return true;
