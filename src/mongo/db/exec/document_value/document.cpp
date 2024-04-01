@@ -66,25 +66,28 @@ void assertFieldPathLengthOK(const std::vector<Position>& path) {
             path.size() < BSONDepth::getMaxAllowableDepth());
 }
 
-std::variant<BSONElement, Value, Document::TraversesArrayTag, std::monostate>
-getNestedFieldHelperBSON(BSONElement elt, const FieldPath& fp, size_t level) {
+/**
+ * Returns the BSONElement for path 'fp' and current nesting level.
+ *
+ * Returns EOO if the path does not exist or boost::none if an array is encountered along the path
+ * (but not at the end of the path).
+ */
+boost::optional<BSONElement> getNestedFieldHelperBSON(BSONElement elt,
+                                                      const FieldPath& fp,
+                                                      size_t level) {
     if (level == fp.getPathLength()) {
-        if (elt.ok()) {
-            return elt;
-        } else {
-            return std::monostate{};
-        }
+        return elt;
     }
 
     if (elt.type() == BSONType::Array) {
-        return Document::TraversesArrayTag{};
+        return boost::none;
     } else if (elt.type() == BSONType::Object) {
         auto subFieldElt = elt.embeddedObject()[fp.getFieldName(level)];
         return getNestedFieldHelperBSON(subFieldElt, fp, level + 1);
     }
 
     // The path continues "past" a scalar, and therefore does not exist.
-    return std::monostate{};
+    return BSONElement();
 }
 }  // namespace
 
@@ -670,42 +673,56 @@ MutableValue MutableDocument::getNestedField(const vector<Position>& positions) 
 }
 
 
-std::variant<BSONElement, Value, Document::TraversesArrayTag, std::monostate>
-Document::getNestedFieldNonCachingHelper(const FieldPath& dottedField, size_t level) const {
+boost::optional<Value> Document::getNestedScalarFieldNonCachingHelper(const FieldPath& dottedField,
+                                                                      size_t level) const {
     if (!_storage) {
-        return std::monostate{};
+        return Value();
     }
 
     StringData fieldName = dottedField.getFieldName(level);
-    auto bsonEltOrValue = _storage->getFieldNonCaching(fieldName);
 
-    if (holds_alternative<BSONElement>(bsonEltOrValue)) {
-        return getNestedFieldHelperBSON(get<BSONElement>(bsonEltOrValue), dottedField, level + 1);
-    }
+    // In many cases, the cache is empty and we can skip straight to reading from the backing BSON.
+    if (isModified()) {
+        if (auto val = _storage->getFieldCacheOnly(fieldName); !val.missing()) {
+            // Whether landing on an array (level + 1 == dottedField.getPathLength) or traversing an
+            // array, return boost::none.
+            if (val.getType() == BSONType::Array)
+                return boost::none;
 
-    const Value& val = get<Value>(bsonEltOrValue);
+            if (level + 1 == dottedField.getPathLength()) {
+                return val;
+            }
 
-    if (level + 1 == dottedField.getPathLength()) {
-        if (val.missing()) {
-            return std::monostate{};
-        } else {
-            return val;
+            if (val.getType() == BSONType::Object) {
+                return val.getDocument().getNestedScalarFieldNonCachingHelper(dottedField,
+                                                                              level + 1);
+            }
         }
     }
 
-    if (val.getType() == BSONType::Array) {
-        return Document::TraversesArrayTag{};
-    } else if (val.getType() == BSONType::Object) {
-        return val.getDocument().getNestedFieldNonCachingHelper(dottedField, level + 1);
+    // Either the value does not exist in the cache or the cache is empty so the above block is
+    // skipped, now check the backing BSON.
+    if (auto bsonElt = _storage->getFieldBsonOnly(fieldName); !bsonElt.eoo()) {
+        auto maybeBsonElt = getNestedFieldHelperBSON(bsonElt, dottedField, level + 1);
+        // Take care to avoid needlessly constructing a Value. There are 4 possible states for
+        // 'maybeBsonElt':
+        // 1. Scalar BSONElement --> coerce to Value and return it.
+        // 2. Array BSONElement --> return boost::none per this function's contract.
+        // 3. BSONElement::eoo --> path does not exist, so return an empty Value via
+        // Value(BSONElement::eoo).
+        // 4. boost::none --> encountered an array along the path, return boost::none.
+        if (maybeBsonElt && maybeBsonElt->type() != BSONType::Array)
+            return Value(*maybeBsonElt);
+        return boost::none;
     }
 
-    // The path extends beyond a scalar, so it does not exist.
-    return std::monostate{};
+    // Path does not exist.
+    return Value();
 }
 
-std::variant<BSONElement, Value, Document::TraversesArrayTag, std::monostate>
-Document::getNestedFieldNonCaching(const FieldPath& dottedField) const {
-    return getNestedFieldNonCachingHelper(dottedField, 0);
+boost::optional<Value> Document::getNestedScalarFieldNonCaching(
+    const FieldPath& dottedField) const {
+    return getNestedScalarFieldNonCachingHelper(dottedField, 0);
 }
 
 static Value getNestedFieldHelper(const Document& doc,

@@ -276,36 +276,10 @@ boost::optional<Value> SortKeyGenerator::extractKeyPart(
     Value plainKey;
     if (patternPart.fieldPath) {
         invariant(!patternPart.expression);
-        auto keyVariant = doc.getNestedFieldNonCaching(*patternPart.fieldPath);
-
-        auto key = visit(
-            OverloadedVisitor{
-                // In this case, the document has an array along the path given. This means the
-                // document is ineligible for taking the fast path for index key generation.
-                [](Document::TraversesArrayTag) -> boost::optional<Value> { return boost::none; },
-                // In this case the field was already in the cache (or may not have existed).
-                [](const Value& val) -> boost::optional<Value> {
-                    // The document may have an array at the given path.
-                    if (val.getType() == BSONType::Array) {
-                        return boost::none;
-                    }
-                    return val;
-                },
-                // In this case the field was in the backing BSON, and not in the cache.
-                [](BSONElement elt) -> boost::optional<Value> {
-                    // The document may have an array at the given path.
-                    if (elt.type() == BSONType::Array) {
-                        return boost::none;
-                    }
-                    return Value(elt);
-                },
-                [](std::monostate none) -> boost::optional<Value> { return Value(); },
-            },
-            keyVariant);
-
-        if (!key) {
+        auto key = doc.getNestedScalarFieldNonCaching(*patternPart.fieldPath);
+        if (!key)
             return boost::none;
-        }
+
         plainKey = std::move(*key);
     } else {
         invariant(patternPart.expression);

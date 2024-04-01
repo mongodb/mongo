@@ -9,6 +9,8 @@ env.Benchmark(
     source='key_gen_bm.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/query/sort_pattern',
         'index_access_method',
     ],
 )

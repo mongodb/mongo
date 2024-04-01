@@ -183,19 +183,12 @@ public:
     Value getNestedField(const FieldPath& path, std::vector<Position>* positions = nullptr) const;
 
     /**
-     * Returns field at given path as either BSONElement or Value, depending on how it is
-     * stored. If an array is encountered in the middle of the path the TraversesArrayTag is
-     * returned.
+     * Returns field at given path coerced to a Value. If an array is encountered in the middle of
+     * the path or at the leaf then boost::none is returned.
      *
-     * It is possible, however, for the returned BSONElement/Value to be an array if the given path
-     * ends with an array. For example, the document {a: {b:[1,2]}} and the path "a.b" will return
-     * a BSONElement or Value for the array [1, 2].
-     *
-     * If the field is not found, std::monostate is returned.
+     * If the field is not found, an empty Value() is returned.
      */
-    struct TraversesArrayTag {};
-    std::variant<BSONElement, Value, TraversesArrayTag, std::monostate> getNestedFieldNonCaching(
-        const FieldPath& dottedField) const;
+    boost::optional<Value> getNestedScalarFieldNonCaching(const FieldPath& dottedField) const;
 
     // Number of fields in this document. Exp. runtime O(n).
     size_t computeSize() const {
@@ -440,8 +433,8 @@ private:
         return (_storage ? *_storage : DocumentStorage::emptyDoc());
     }
 
-    std::variant<BSONElement, Value, TraversesArrayTag, std::monostate>
-    getNestedFieldNonCachingHelper(const FieldPath& dottedField, size_t level) const;
+    boost::optional<Value> getNestedScalarFieldNonCachingHelper(const FieldPath& dottedField,
+                                                                size_t level) const;
 
     boost::intrusive_ptr<const DocumentStorage> _storage;
 };

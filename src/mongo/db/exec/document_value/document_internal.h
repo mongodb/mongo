@@ -447,23 +447,26 @@ public:
     }
 
     /**
-     * Given a field name either return a Value if the field resides in the cache, or a BSONElement
-     * if the field resides in the backing BSON.
+     * Retrieves the given field from the cache. Returns an empty Value if the field does not exist.
      */
-    std::variant<BSONElement, Value> getFieldNonCaching(StringData name) const {
+    Value getFieldCacheOnly(StringData name) const {
         Position pos = findField(name, LookupPolicy::kCacheOnly);
         if (pos.found()) {
-            return {getField(pos).val};
+            return getField(pos).val;
         }
+        return Value();
+    }
 
+    /**
+     * Retrieves the given field from the backing BSON. Returns an EOO if the field does not exist.
+     */
+    BSONElement getFieldBsonOnly(StringData name) const {
         for (auto&& bsonElement : _bson) {
             if (name == bsonElement.fieldNameStringData()) {
-                return {bsonElement};
+                return bsonElement;
             }
         }
-
-        // Field not found. Return EOO Value.
-        return {Value()};
+        return BSONElement();
     }
 
     /// Adds a new field with missing Value at the end of the document
