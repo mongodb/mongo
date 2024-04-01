@@ -322,6 +322,8 @@ namespace {
 // written in timestamp order, so we defer optime assignment until the oplog is about to be
 // written. Multidocument transactions should not generate opTimes because they are
 // generated at the time of commit.
+//
+// The "begin" and "end" iterators must remain valid until the active WriteUnitOfWork resolves.
 void acquireOplogSlotsForInserts(OperationContext* opCtx,
                                  const CollectionAcquisition& collection,
                                  std::vector<InsertStatement>::iterator begin,
@@ -338,6 +340,13 @@ void acquireOplogSlotsForInserts(OperationContext* opCtx,
         it->oplogSlot = *slot++;
     }
 
+    // If we abort this WriteUnitOfWork, we must make sure we never attempt to use these reserved
+    // oplog slots again.
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback([begin, end](OperationContext* opCtx) {
+        for (auto it = begin; it != end; it++) {
+            it->oplogSlot = OplogSlot();
+        }
+    });
     hangAndFailAfterDocumentInsertsReserveOpTimes.executeIf(
         [&](const BSONObj& data) {
             hangAndFailAfterDocumentInsertsReserveOpTimes.pauseWhileSet(opCtx);
