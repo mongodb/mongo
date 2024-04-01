@@ -4539,6 +4539,207 @@ public:
     }
 };
 
+/**
+ * Validate detects duplicate keys in a secondary unique index {a: 1} when the index is
+ * on a clustered collection.
+ * Two cases are tested:
+ * 1. The false negative case: when validate says there isn't a uniqueness
+ * violation even though there is one.
+ * 2. The false positive case: when validate says there is a uniqueness
+ * violation even though there isn't one.
+ *
+ * False negative case:
+ * Suppose we have two documents {_id: "1000000000", a: 1} and {_id: "1000000000", a: 1}
+ * that live in a collection. Since they have the same value for field 'a', they violate
+ * the uniqueness constraint of the index.
+ * The key strings for index {a: 1} for the two docs look something like this.
+ * They map from the value of 'a' in the document to the recordId.
+ * Buffer for keystring1: 1,1000000000
+ * Buffer for keystring2: 1,2000000000
+ *
+ * When we compareWithoutRecordIdLong(), we chop off only the number of
+ * bytes used in a long before making the comparison in the buffer. Since a long
+ * is 8 bytes, we cut 8 characters off.
+ * Truncated buffer 1: 1,10
+ * Truncated buffer 2: 1,20
+ *
+ * And we can see that the two truncated buffers above still aren't equal. But instead,
+ * if we used compareWithoutRecordIdStr(), we first figure out how many bytes we need
+ * to chop to exclude the recordId, and that way only the index entry value is compared.
+ * Now the unique index violation can be detected, as both the truncated buffers are
+ * equal.
+ * Truncated buffer 1: 1
+ * Truncated buffer 2: 1
+ *
+ * False positive case:
+ * Suppose we have two documents {_id: "1", a: 10000001} and {_id: "2", a: 10000002}.
+ * Clearly they don't violate any constraints. However it is possible, if we truncate
+ * more bytes than necessary, that we will end up truncating some of the bytes of the
+ * field 'a'. For example,
+ * Pre-truncation:
+ * Buffer for keystring1: 10000001,1
+ * Buffer for keystring2: 10000002,2
+ * Post-truncation:
+ * Buffer for keystring1: 10000
+ * Buffer for keystring2: 10000
+ * This can lead to a false positive uniqueness violation.
+ */
+template <bool falsePositiveCase>
+class ValidateDuplicateKeyOnClusteredCollection : public ValidateBase {
+public:
+    ValidateDuplicateKeyOnClusteredCollection()
+        : ValidateBase(/*full=*/true, /*background=*/false, /*clustered=*/true) {}
+
+    void run() {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
+            return;
+        }
+
+        SharedBufferFragmentBuilder pooledBuilder(
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
+
+        lockDb(MODE_X);
+        ASSERT(coll());
+
+        // Create a unique index on {a: 1}
+        const auto indexName = "a";
+        const auto indexKey = BSON("a" << 1);
+        auto status = dbtests::createIndexFromSpec(
+            &_opCtx,
+            coll()->ns().ns_forTest(),
+            BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
+                        << "unique" << true));
+        ASSERT_OK(status);
+
+
+        // Insert documents.
+        auto firstDoc = BSON("_id"
+                             << "1000000000000"
+                             << "a" << 1);
+        auto secondDoc = BSON("_id"
+                              << "2000000000000"
+                              << "a" << 1);
+        if (falsePositiveCase) {
+            firstDoc = BSON("_id"
+                            << "1"
+                            << "a" << 10000001);
+            secondDoc = BSON("_id"
+                             << "2"
+                             << "a" << 10000002);
+        }
+        OpDebug* const nullOpDebug = nullptr;
+        lockDb(MODE_X);
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(collection_internal::insertDocument(
+                &_opCtx, coll(), InsertStatement(firstDoc), nullOpDebug, true));
+            if (falsePositiveCase) {
+                ASSERT_OK(collection_internal::insertDocument(
+                    &_opCtx, coll(), InsertStatement(secondDoc), nullOpDebug, true));
+            }
+            wunit.commit();
+        }
+        releaseDb();
+        ensureValidateWorked();
+
+        // Insert a document with a duplicate key for "a".
+        if (!falsePositiveCase) {
+            lockDb(MODE_X);
+
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
+
+            InsertDeleteOptions options;
+            options.dupsAllowed = true;
+
+            WriteUnitOfWork wunit(&_opCtx);
+
+            // Insert a record and its keys separately. We do this to bypass duplicate constraint
+            // checking. Inserting a record and all of its keys ensures that validation fails
+            // because there are duplicate keys, and not just because there are keys without
+            // corresponding records.
+            auto swRecordId =
+                coll()->getRecordStore()->insertRecord(&_opCtx,
+                                                       record_id_helpers::keyForObj(secondDoc),
+                                                       secondDoc.objdata(),
+                                                       secondDoc.objsize(),
+                                                       Timestamp());
+            ASSERT_OK(swRecordId);
+            wunit.commit();
+
+            // Insert the key on "a".
+            {
+                auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+                auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                auto iam = entry->accessMethod()->asSortedData();
+                auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
+
+                KeyStringSet keys;
+                iam->getKeys(&_opCtx,
+                             coll(),
+                             entry,
+                             pooledBuilder,
+                             secondDoc,
+                             InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             &keys,
+                             nullptr,
+                             nullptr,
+                             swRecordId.getValue());
+                ASSERT_EQ(1, keys.size());
+
+                {
+                    WriteUnitOfWork wunit(&_opCtx);
+
+                    int64_t numInserted;
+                    auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
+                        &_opCtx,
+                        coll(),
+                        entry,
+                        {keys.begin(), keys.end()},
+                        {},
+                        MultikeyPaths{},
+                        options,
+                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                            return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
+                        },
+                        &numInserted);
+
+                    ASSERT_EQUALS(numInserted, 1);
+                    ASSERT_OK(insertStatus);
+
+                    wunit.commit();
+                }
+
+                ASSERT_NOT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
+            }
+
+            releaseDb();
+        }
+
+        ValidateResults results = runValidate();
+
+        ScopeGuard dumpOnErrorGuard([&] {
+            StorageDebugUtil::printValidateResults(results);
+            StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
+        });
+
+        if (falsePositiveCase) {
+            ASSERT(results.valid) << "Validation failed when it should have worked.";
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+        } else {
+            ASSERT_FALSE(results.valid) << "Validation worked when it should have failed.";
+            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+        }
+        ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
+        ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+        ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+
+        dumpOnErrorGuard.dismiss();
+    }
+};
+
 class ValidateRepairOnClusteredCollection : public ValidateBase {
 public:
     ValidateRepairOnClusteredCollection()
@@ -4836,6 +5037,9 @@ public:
 
     void setupTests() override {
         // TODO SERVER-83593: re-enable background validation tests.
+
+        add<ValidateDuplicateKeyOnClusteredCollection<true /*falsePositiveCase*/>>();
+        add<ValidateDuplicateKeyOnClusteredCollection<false /*falsePositiveCase*/>>();
 
         // Add tests for both full validate and non-full validate.
         add<ValidateIdIndexCount<true, false>>();
