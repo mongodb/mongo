@@ -320,6 +320,16 @@ private:
     void _initNextIdIfNeeded(OperationContext* opCtx);
 
     /**
+     * Updates the in-memory largest known RecordId field to ensure that recordIds
+     * are not reused. Takes in a 'largestSeen', which is the largest recordId that has been seen
+     * by the caller. The in-memory value is updated only if the provided new value is larger.
+     *
+     * TODO (SERVER-88375): Remove all code related to the record store having to keep track
+     * of the largest recordId seen.
+     */
+    void _updateLargestRecordId(OperationContext* opCtx, long long largestSeen);
+
+    /**
      * Adjusts the record count and data size metadata for this record store. The function consults
      * the SizeRecoveryState to determine whether or not to actually change the size metadata if the
      * server is undergoing recovery.

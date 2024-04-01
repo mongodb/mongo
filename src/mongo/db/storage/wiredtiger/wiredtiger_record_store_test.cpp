@@ -1463,5 +1463,68 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
     ASSERT_EQ(0, rs->dataSize(ctx.get()));
 }
 
+// Makes sure that when records are inserted with provided recordIds, the
+// WiredTigerRecordStore correctly keeps track of the largest recordId it
+// has seen in the in-memory variable.
+// TODO (SERVER-88375): Revise / delete this test after the recordId tracking
+// problem has been properly solved.
+TEST(WiredTigerRecordStoreTest, LargestRecordIdSeenIsCorrectWhenGivenRecordIds) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    std::vector<RecordId> reservedRids;
+    RecordId rid;
+
+    ServiceContext::UniqueOperationContext ctx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(ctx.get(), MODE_IX);
+
+    {
+        // Insert a single record with recordId 7.
+        WriteUnitOfWork uow(ctx.get());
+        rid = rs->insertRecord(ctx.get(), RecordId(7), "a", 2, Timestamp()).getValue();
+        uow.commit();
+    }
+
+    // The next recordId reserved is higher than 7.
+    rs->reserveRecordIds(ctx.get(), &reservedRids, 1);
+    ASSERT_GT(reservedRids[0].getLong(), RecordId(7).getLong());
+    ASSERT_EQ(1, rs->numRecords(ctx.get()));
+
+    // Insert a few records at once, where the recordIds are not in order. And ensure that
+    // we still reserve recordIds from the right point afterwards.
+    std::vector<Record> recordsToInsert;
+    std::vector<Timestamp> timestamps{Timestamp(), Timestamp()};
+    recordsToInsert.push_back(Record{RecordId(14), RecordData()});
+    recordsToInsert.push_back(Record{RecordId(13), RecordData()});
+    {
+        WriteUnitOfWork uow(ctx.get());
+        ASSERT_OK(rs->insertRecords(ctx.get(), &recordsToInsert, timestamps));
+        uow.commit();
+    }
+
+    // The next recordId reserved is higher than 14.
+    reservedRids.clear();
+    rs->reserveRecordIds(ctx.get(), &reservedRids, 1);
+    ASSERT_GT(reservedRids[0].getLong(), RecordId(14).getLong());
+    ASSERT_EQ(3, rs->numRecords(ctx.get()));
+
+    // Insert a few records at once, where the recordIds are in order. And ensure that
+    // we still reserve recordIds from the right point afterwards.
+    recordsToInsert.clear();
+    recordsToInsert.push_back(Record{RecordId(19), RecordData()});
+    recordsToInsert.push_back(Record{RecordId(20), RecordData()});
+    {
+        WriteUnitOfWork uow(ctx.get());
+        ASSERT_OK(rs->insertRecords(ctx.get(), &recordsToInsert, timestamps));
+        uow.commit();
+    }
+
+    // The next recordId reserved is higher than 20.
+    reservedRids.clear();
+    rs->reserveRecordIds(ctx.get(), &reservedRids, 1);
+    ASSERT_GT(reservedRids[0].getLong(), RecordId(20).getLong());
+    ASSERT_EQ(5, rs->numRecords(ctx.get()));
+}
+
 }  // namespace
 }  // namespace mongo
