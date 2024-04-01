@@ -453,6 +453,18 @@ var {
                         }
                         continue;
                     }
+
+                    if (res.hasOwnProperty("errorLabels") &&
+                        res.errorLabels.includes("RetryableWriteError")) {
+                        if (jsTest.options().logRetryAttempts) {
+                            jsTest.log(
+                                "Retrying " + cmdName +
+                                " with original command request: " + tojson(cmdObj) +
+                                " due to RetryableWriteError label, subsequent retries remaining: " +
+                                numRetries);
+                        }
+                        continue;
+                    }
                 }
 
                 return res;

@@ -1456,6 +1456,12 @@ tasks:
       jstestfuzz_vars: --opType unshardCollection --inPlace yes --numDonors 3 --electionMech stepup --electionRole donor --electionRole recipient --useEsModules
       suite: resharding_fuzzer
 
+- <<: *gen_task_template
+  name: replica_sets_configsvr_param_jscore_passthrough_gen
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "replica_sets", "common", "san", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+
 ################################################
 #           Catalog & Routing tasks            #
 ################################################
