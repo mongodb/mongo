@@ -1521,9 +1521,15 @@ private:
             // also isn't null.  This will cause the TransactionParticipant to consider the
             // transaction history truncated.  The fallbackOpObserver handles keeping the
             // in-memory session catalog up to date.
+            //
+            // OpTime(Timestamp(1,0), kInitialTerm) won't appear in the oplog because we never write
+            // anything with an inc of 0.  It isn't null because secs is non-zero.  And the term has
+            // to be something valid because we disallow queries of kUninitializedTerm.
+            repl::OpTime neverWrittenOpTime(Timestamp(1, 0), repl::OpTime::kInitialTerm);
+            dassert(!neverWrittenOpTime.isNull());
             entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
                 BSON("$set" << BSON(SessionTxnRecord::kLastWriteOpTimeFieldName
-                                    << repl::OpTime::max()))));
+                                    << neverWrittenOpTime))));
             entry.setMulti(true);
             return entry;
         }()});
