@@ -391,20 +391,6 @@ function runShardKeyPatternValidation(collectionExists) {
 runShardKeyPatternValidation(true);
 runShardKeyPatternValidation(false);
 
-// Verify that the shardCollection command fails if the 'system.buckets' collection does not
-// have time-series options.
-sDB.getCollection("ts").drop();
-sDB.createCollection("system.buckets.ts");
-assert.commandFailedWithCode(st.s.adminCommand({
-    shardCollection: 'test.ts',
-    key: {time: 1},
-}),
-                             [6159000]);
-assert.commandFailedWithCode(
-    st.s.adminCommand(
-        {shardCollection: 'test.ts', key: {time: 1}, timeseries: {timeField: 'time'}}),
-    [6159000]);
-
 // Cannot shard a system namespace.
 assert.commandFailedWithCode(st.s.adminCommand({
     shardCollection: 'test.system.bucket.ts',

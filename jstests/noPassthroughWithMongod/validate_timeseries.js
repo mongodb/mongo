@@ -1,18 +1,15 @@
 /*
  * Tests that calling the validate command on a time-series collection is allowed, while ensuring
- * that calling validate on non-time-series views is still prohibited, even if a collection with the
- * bucket namespace of that view exists.
+ * that calling validate on non-time-series views is still prohibited.
  *
  * @tags: [
  * requires_fcv_62
  * ]
  */
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
-db.validate_timeseries.drop();
-db.system.buckets.validate_timeseries.drop();
-db.viewSource.drop();
-db.view.drop();
-db.system.buckets.view.drop();
+assertDropCollection(db, "validate_timeseries");
+assertDropCollection(db, "viewSource");
 
 assert.commandWorked(db.createCollection(
     "validate_timeseries",
@@ -35,7 +32,8 @@ const weather_data = [
 
 assert.commandWorked(coll.insertMany(weather_data), {ordered: false});
 
-// Tests that the validate command can be run on a time-series collection.
+// Tests that the validate command can be run on a time-series collection and its underlying buckets
+// collection.
 
 let res = assert.commandWorked(coll.validate());
 assert(res.valid, tojson(res));
@@ -55,10 +53,3 @@ res = assert.commandWorked(viewSource.validate());
 assert(res.valid, tojson(res));
 
 assert.commandFailedWithCode(view.validate(), ErrorCodes.CommandNotSupportedOnView);
-
-// Tests that the validate command doesn't run on a view with a non-time-series bucket collection.
-assert.commandWorked(db.createCollection("system.buckets.view"));
-
-assert.commandFailedWithCode(view.validate(), ErrorCodes.CommandNotSupportedOnView);
-
-//

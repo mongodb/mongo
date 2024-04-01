@@ -1,3 +1,5 @@
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+
 // Tests renaming the system.buckets collection.
 // Set up the test database.
 const dbName = "test";
@@ -10,7 +12,8 @@ function renameBucketsCollection(adminDB, username, shouldSucceed) {
     assert.eq(1, adminDB.auth("admin", "admin"));
 
     const testDB = adminDB.getSiblingDB(dbName);
-
+    assertDropCollection(testDB, bucketsCollName);
+    assertDropCollection(testDB, targetBucketsCollName);
     testDB[bucketsCollName].drop();
     testDB[targetBucketsCollName].drop();
 
