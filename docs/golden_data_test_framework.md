@@ -308,7 +308,7 @@ $> diff -ruN --unidirectional-new-file --color=always <expected_root> <actual_ro
 
 ## Find the outputs of tests that failed.
 
-Parse logs and find the the expected and actual outputs for each failed test.
+Parse logs and find the expected and actual outputs for each failed test.
 
 **Example: (linux/macOS)**
 
