@@ -59,6 +59,10 @@ else
   extra_args="$extra_args --release"
 fi
 
+if [ "${project}" = "mongo-release" ]; then
+  extra_args="$extra_args BAZEL_BUILD_ENABLED=0"
+fi
+
 extra_args="$extra_args SPLIT_DWARF=0 GDB_INDEX=0 ENABLE_OOM_RETRY=1 BAZEL_INTEGRATION_DEBUG=1"
 
 echo "Setting evergreen tmp dir to $TMPDIR"
