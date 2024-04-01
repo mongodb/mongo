@@ -432,8 +432,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterAttachesTxnMetadata) {
                                               << kInMemoryLogicalTime.asTimestamp())
                                       << "shardVersion" << expectedShardVersion.toBSON()
                                       << "databaseVersion" << expectedDatabaseVersion.toBSON()
-                                      << "startOrContinueTransaction" << true << "coordinator"
-                                      << true << "autocommit" << false << "txnNumber" << txnNum);
+                                      << "startOrContinueTransaction" << true << "autocommit"
+                                      << false << "txnNumber" << txnNum);
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                         shard1,
                                                         BSON("insert"
@@ -514,8 +514,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterCannotCommit) {
                                   << BSON("level"
                                           << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
-                                  << "startOrContinueTransaction" << true << "coordinator" << true
-                                  << "autocommit" << false << "txnNumber" << txnNum);
+                                  << "startOrContinueTransaction" << true << "autocommit" << false
+                                  << "txnNumber" << txnNum);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -555,8 +555,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterCannotAbort) {
                                   << BSON("level"
                                           << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
-                                  << "startOrContinueTransaction" << true << "coordinator" << true
-                                  << "autocommit" << false << "txnNumber" << txnNum);
+                                  << "startOrContinueTransaction" << true << "autocommit" << false
+                                  << "txnNumber" << txnNum);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -593,8 +593,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterCannotImplicitlyAbort) 
                                   << BSON("level"
                                           << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
-                                  << "startOrContinueTransaction" << true << "coordinator" << true
-                                  << "autocommit" << false << "txnNumber" << txnNum);
+                                  << "startOrContinueTransaction" << true << "autocommit" << false
+                                  << "txnNumber" << txnNum);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -644,8 +644,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartOrContinueWithMatchingReadC
                                               << kInMemoryLogicalTime.asTimestamp())
                                       << "shardVersion" << expectedShardVersion.toBSON()
                                       << "databaseVersion" << expectedDatabaseVersion.toBSON()
-                                      << "startOrContinueTransaction" << true << "coordinator"
-                                      << true << "autocommit" << false << "txnNumber" << txnNum);
+                                      << "startOrContinueTransaction" << true << "autocommit"
+                                      << false << "txnNumber" << txnNum);
         auto newCmd =
             txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                               shard1,
@@ -761,8 +761,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartOrContinueWithSnapshotRCSet
                                   << BSON("level"
                                           << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
-                                  << "startOrContinueTransaction" << true << "coordinator" << true
-                                  << "autocommit" << false << "txnNumber" << txnNum);
+                                  << "startOrContinueTransaction" << true << "autocommit" << false
+                                  << "txnNumber" << txnNum);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -1373,6 +1373,32 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
         ASSERT(txnRouter.getCoordinatorId());
         ASSERT_EQ(*txnRouter.getCoordinatorId(), shard2);
     }
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, NoCoordinatorOnSubRouter) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(
+        readConcernArgs.initialize(BSON("insert"
+                                        << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                                        << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                                << kInMemoryLogicalTime.asTimestamp()
+                                                << repl::ReadConcernArgs::kLevelFieldName
+                                                << "snapshot"))));
+    repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+
+    ASSERT_FALSE(txnRouter.getCoordinatorId());
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    auto& participant = *txnRouter.getParticipant(shard1);
+    ASSERT(!participant.isCoordinator);
+    ASSERT(!txnRouter.getCoordinatorId());
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardDoesNotGetSetForReadOnlyTransaction) {

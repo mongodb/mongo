@@ -930,9 +930,10 @@ TransactionRouter::Participant& TransactionRouter::Router::_createParticipant(
 
     auto& os = o();
 
-    // The first participant is chosen as the coordinator.
+    // The first participant is chosen as the coordinator. A sub-router does not need to pick a
+    // coordinator, as only a parent router will ever attempt to coordinate a commit.
     auto isFirstParticipant = os.participants.empty();
-    if (isFirstParticipant) {
+    if (isFirstParticipant && !o().subRouter) {
         invariant(!os.coordinatorId);
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).coordinatorId = shard.toString();
@@ -952,12 +953,12 @@ TransactionRouter::Participant& TransactionRouter::Router::_createParticipant(
         isInternalSessionForRetryableWrite(_sessionId())};
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    auto resultPair =
-        o(lk).participants.try_emplace(shard.toString(),
-                                       TransactionRouter::Participant(isFirstParticipant,
-                                                                      p().latestStmtId,
-                                                                      Participant::ReadOnly::kUnset,
-                                                                      std::move(sharedOptions)));
+    auto resultPair = o(lk).participants.try_emplace(
+        shard.toString(),
+        TransactionRouter::Participant(isFirstParticipant && !o().subRouter,
+                                       p().latestStmtId,
+                                       Participant::ReadOnly::kUnset,
+                                       std::move(sharedOptions)));
 
     return resultPair.first->second;
 }
@@ -1061,9 +1062,14 @@ void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCt
         return;
     }
 
-    // If participants were created by an earlier command, the coordinator must be one of them.
-    invariant(o().coordinatorId);
-    invariant(o().participants.count(*o().coordinatorId) == 1);
+    if (!o().subRouter) {
+        // If participants were created by an earlier command, the coordinator must be one of them.
+        invariant(o().coordinatorId);
+        invariant(o().participants.count(*o().coordinatorId) == 1);
+    } else {
+        // A sub-router does not pick a coordinator.
+        invariant(!o().coordinatorId);
+    }
 }
 
 bool TransactionRouter::Router::canContinueOnStaleShardOrDbError(StringData cmdName,
