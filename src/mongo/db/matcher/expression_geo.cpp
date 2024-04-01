@@ -269,11 +269,7 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
         if (fieldName == kGeometryField) {
             if (e.isABSONObj()) {
                 BSONObj embeddedObj = e.embeddedObject();
-                // TODO SERVER-86141: $geoNear queries don't do a type check on the type of the
-                // geometry provided into the query. This is different than the behaviour we see for
-                // other GeoExpressions that use a GeometryContainer. GeoNear is a special case that
-                // only ever has type 'Point', however it may be a good idea to consider removing
-                // this silent acceptance of invalid "type" in the long term.
+                // TODO SERVER-86141: Refactor geoParsing.
                 Status status = GeoParser::parseQueryPoint(e, centroid.get());
                 if (!status.isOK()) {
                     return Status(ErrorCodes::BadValue,

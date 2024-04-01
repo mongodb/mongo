@@ -20,7 +20,7 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
     }],
     cursor: {}
 }),
-                             8459800);
+                             ErrorCodes.BadValue);
 
 // Verify that the 'type' field of a geoNear query must be a string.
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
@@ -34,7 +34,7 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
     }],
     cursor: {}
 }),
-                             2);
+                             ErrorCodes.BadValue);
 
 assert.commandFailedWithCode(coll.runCommand("find", {
     find: coll.getName(),
@@ -48,7 +48,7 @@ assert.commandFailedWithCode(coll.runCommand("find", {
         }
     }
 }),
-                             8459800);
+                             ErrorCodes.BadValue);
 
 // Verify that the 'type' field of a crs object must be a valid type.
 assert.commandFailedWithCode(coll.runCommand("find", {
@@ -67,7 +67,7 @@ assert.commandFailedWithCode(coll.runCommand("find", {
         }
     }
 }),
-                             2);
+                             ErrorCodes.BadValue);
 
 // Verify that the 'type' field of a crs object must be a string.
 assert.commandFailedWithCode(coll.runCommand("find", {
@@ -86,4 +86,19 @@ assert.commandFailedWithCode(coll.runCommand("find", {
         }
     }
 }),
-                             2);
+                             ErrorCodes.BadValue);
+
+// Verify that incorrect 'type' field (i.e not a Point) of a geoJson object throws a BAD_VALUE
+// error.
+assert.commandFailedWithCode(coll.runCommand("aggregate", {
+    pipeline: [{
+        $geoNear: {
+            near: {type: "LineString", coordinates: [0, 0]},
+            distanceField: "randomDistance",
+            spherical: true,
+            query: {str: "random"},
+        }
+    }],
+    cursor: {}
+}),
+                             ErrorCodes.BadValue);

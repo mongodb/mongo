@@ -92,6 +92,10 @@ std::unique_ptr<GeoNearMatchExpression> makeGeoNearMatchExpression(const BSONObj
     return gne;
 }
 
+void assertGeoNearParseReturnsError(const BSONObj& locQuery) {
+    std::unique_ptr<GeoNearExpression> nq(new GeoNearExpression);
+    ASSERT_EQUALS(ErrorCodes::BadValue, nq->parseFrom(locQuery));
+}
 
 /**
  * A bunch of cases in which a geo expression is equivalent() to both itself or to another
@@ -508,6 +512,17 @@ TEST(ExpressionGeoTest, RoundTripSerializeGeoExpressions) {
     assertRepresentativeGeoNearShapeIsStable(
         fromjson("{$geoNear: { $geometry: {coordinates: [0, 10]}}}"),
         fromjson("{$geoNear: { $geometry: {coordinates: [1, 1]}}}"));
+
+    // $geometry operator in $geoNear should accept only Point type.
+    assertRepresentativeGeoNearShapeIsStable(
+        fromjson(R"({$geoNear: { $geometry: {"type": "Point", "coordinates": [0, 10]}}})"),
+        fromjson(R"({$geoNear: { $geometry: {"type": "Point", coordinates: [1, 1]}}})"));
+    assertGeoNearParseReturnsError(
+        fromjson(R"({$geoNear: { $geometry: {"type": "LineString", "coordinates": [0, 10]}}})"));
+    assertGeoNearParseReturnsError(fromjson(
+        R"({$geoNear: { $geometry: {"type": "LineString", "coordinates": [[1, 2], [3, 4]]}}})"));
+    assertGeoNearParseReturnsError(fromjson(
+        R"({$geoNear: { $geometry: {"type": "MultiPoint", "coordinates": [[0, 0], [1, 1]]}}})"));
 
     // Test scenario with $nearSphere without $geometry and no type specified
     assertRepresentativeGeoNearShapeIsStable(fromjson(R"({"$nearSphere":{"coordinates":[0,0]}})"),

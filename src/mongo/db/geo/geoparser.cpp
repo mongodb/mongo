@@ -505,7 +505,12 @@ Status GeoParser::parseLegacyPolygon(const BSONObj& obj, PolygonWithCRS* out) {
 // { "type": "Point", "coordinates": [100.0, 0.0] }
 Status GeoParser::parseGeoJSONPoint(const BSONObj& obj, PointWithCRS* out) {
     if (obj.hasField(GEOJSON_TYPE)) {
-        GeoParser::assertValidGeoJSONType(obj);
+        // GeoJSON Point must explicitly specify the type as "Point".
+        auto typeVal = GeoParser::parseGeoJSONType(obj);
+        if (GeoParser::GEOJSON_POINT != typeVal) {
+            return BAD_VALUE("Expected geojson geometry with type Point, but got type "
+                             << GeoParser::geoJSONTypeEnumToString(typeVal));
+        }
     }
 
     Status status = Status::OK();
@@ -844,6 +849,7 @@ GeoParser::GeoJSONType GeoParser::parseGeoJSONType(const BSONObj& obj) {
     return geoJSONTypeStringToEnum(type.checkAndGetStringData());
 }
 
+// TODO: SERVER-86141 audit if this method is needed else remove.
 void GeoParser::assertValidGeoJSONType(const BSONObj& obj) {
     BSONElement type = dps::extractElementAtPath(obj, GEOJSON_TYPE);
     uassert(8459801,
