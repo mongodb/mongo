@@ -1337,7 +1337,6 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     }
     lk.unlock();
 
-    _externalState->onDrainComplete(opCtx);
     ReplicaSetAwareServiceRegistry::get(_service).onStepUpBegin(opCtx, termWhenBufferIsEmpty);
 
     if (MONGO_unlikely(hangBeforeRSTLOnDrainComplete.shouldFail())) {
@@ -1362,6 +1361,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
         return;
     }
     _applierState = ApplierState::Stopped;
+    _externalState->onDrainComplete(opCtx);
 
     invariant(_getMemberState_inlock().primary());
     invariant(!_readWriteAbility->canAcceptNonLocalWrites(opCtx));
