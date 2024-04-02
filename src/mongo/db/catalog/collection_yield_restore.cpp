@@ -30,6 +30,7 @@
 #include "mongo/db/catalog/collection_yield_restore.h"
 
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/direct_connection_util.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/snapshot_helper.h"
 
@@ -49,6 +50,9 @@ const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opC
     invariant(!_nss.isEmpty());
     // Confirm that we are holding the neccessary collection level lock.
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS));
+
+    // Check if this operation is a direct connection and if it is authorized to be one.
+    direct_connection_util::checkDirectShardOperationAllowed(opCtx, _nss.dbName());
 
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);

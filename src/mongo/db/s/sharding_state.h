@@ -34,6 +34,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
@@ -105,6 +106,14 @@ public:
     OID clusterId();
 
     /**
+     * Returns the severity the direct shard operation warnings should be logged at. This is
+     * determined by the amount of time that has passed since the last warning was logged.
+     */
+    logv2::LogSeverity directConnectionLogSeverity() {
+        return _directConnectionLogSuppressor();
+    }
+
+    /**
      * For testing only. This is a workaround for the fact that it is not possible to get a clean
      * ServiceContext in between test executions. Because of this, tests which require that they get
      * started with a clean (uninitialized) ShardingState must invoke this in their tearDown method.
@@ -158,6 +167,10 @@ private:
 
     // Only valid if _initializationState is kError. Contains the reason for initialization failure.
     Status _initializationStatus{ErrorCodes::InternalError, "Uninitialized value"};
+
+    // Log severity suppressor for direct connection checks
+    logv2::SeveritySuppressor _directConnectionLogSuppressor{
+        Hours{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
 };
 
 }  // namespace mongo

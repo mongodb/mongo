@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/direct_connection_util.h"
 #include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -765,6 +766,10 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
         }
     }
 
+    // Recheck if this operation is a direct connection and if it is authorized to be one after
+    // acquiring collection locks.
+    direct_connection_util::checkDirectShardOperationAllowed(opCtx, _resolvedNss.dbName());
+
     const auto receivedShardVersion{
         OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
     if (receivedShardVersion) {
@@ -1261,12 +1266,21 @@ const Collection* AutoGetCollectionForReadLockFreePITCatalog::_restoreFromYield(
         auto catalogStateForNamespace = acquireCatalogStateForNamespace(
             opCtx, nsOrUUID, readConcernArgs, callerExpectedToConflict, _options);
 
+        // Check if this operation is a direct connection and if it is authorized to be one after
+        // acquiring the snapshot.
+        direct_connection_util::checkDirectShardOperationAllowed(opCtx, _resolvedDbName);
+
         _resolvedNss = catalogStateForNamespace.resolvedNss;
         _view = catalogStateForNamespace.view;
         _catalogStasher.stash(std::move(catalogStateForNamespace.catalog));
 
         return catalogStateForNamespace.collection;
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // In the case that direct connections have been disallowed during the yield, it is possible
+        // that the collection has been moved and therefore appears to have been dropped locally. In
+        // this case, we should still inform the user that direct connections are no longer allowed.
+        direct_connection_util::checkDirectShardOperationAllowed(opCtx, _resolvedDbName);
+
         // Calls to CollectionCatalog::resolveNamespaceStringOrUUID (called from
         // acquireCatalogStateForNamespace) will result in a NamespaceNotFound error if the
         // collection corresponding to the UUID passed as a parameter no longer exists. This can
@@ -1364,6 +1378,10 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
                 return _restoreFromYield(opCtx, std::move(uuid));
             });
     }
+
+    // Check if this operation is a direct connection and if it is authorized to be one after
+    // acquiring the snapshot.
+    direct_connection_util::checkDirectShardOperationAllowed(opCtx, nsOrUUID.dbName());
 
     auto scopedCss = CollectionShardingState::acquire(opCtx, _resolvedNss);
     scopedCss->checkShardVersionOrThrow(opCtx);
@@ -1634,6 +1652,10 @@ AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
         []() {},
         /* SetSecondaryState */
         [](bool isAnySecondaryNamespaceAViewOrSharded) {});
+
+    // Check if this operation is a direct connection and if it is authorized to be one after
+    // acquiring the snapshot.
+    direct_connection_util::checkDirectShardOperationAllowed(opCtx, dbName);
 }
 
 AutoGetDbForReadMaybeLockFree::AutoGetDbForReadMaybeLockFree(OperationContext* opCtx,

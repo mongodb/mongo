@@ -7,6 +7,8 @@
 (function() {
 'use strict';
 
+load("jstests/libs/feature_flag_util.js");
+
 // Create a new sharded cluster for testing and enable auth.
 const st = new ShardingTest({name: jsTestName(), keyFile: "jstests/libs/key1", shards: 1});
 
@@ -15,6 +17,9 @@ const shardAdminDB = shardConn.getDB("admin");
 const shardAdminTestDB = shardConn.getDB("test");
 const userConn = new Mongo(st.shard0.host);
 const userTestDB = userConn.getDB("test");
+
+shardAdminDB.createUser({user: "admin", pwd: 'x', roles: ["root"]});
+assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
 
 function getUnauthorizedDirectWritesCount() {
     return assert.commandWorked(shardAdminDB.runCommand({serverStatus: 1}))
@@ -25,8 +30,6 @@ function getUnauthorizedDirectWritesCount() {
 jsTest.log("Running tests with only one shard.");
 {
     // Direct writes to collections with root priviledge should be authorized.
-    shardAdminDB.createUser({user: "admin", pwd: 'x', roles: ["root"]});
-    assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
     assert.commandWorked(shardAdminTestDB.getCollection("coll").insert({value: 1}));
     assert.eq(getUnauthorizedDirectWritesCount(), 0);
 
@@ -66,9 +69,10 @@ jsTest.log("Running tests with two shards.");
     shardAdminTestDB.createUser({user: "user", pwd: "y", roles: ["readWrite"]});
     assert(userTestDB.auth("user", "y"), "Authentication failed");
     assert.commandWorked(userTestDB.getCollection("coll").insert({value: 4}));
-    assert.eq(getUnauthorizedDirectWritesCount(), 1);
+    // TODO (SERVER-89891) Change the counter to 1 once warnings are not duplicated
+    assert.eq(getUnauthorizedDirectWritesCount(), 2);
     userTestDB.logout();
-    assert.eq(getUnauthorizedDirectWritesCount(), 1);
+    assert.eq(getUnauthorizedDirectWritesCount(), 2);
 
     // Direct writes with just read/write and direct operations should be authorized.
     shardAdminDB.createUser(
@@ -77,14 +81,14 @@ jsTest.log("Running tests with two shards.");
     let shardUserWithDirectWritesTestDB = userConn.getDB("test");
     assert(shardUserWithDirectWritesAdminDB.auth("user2", "z"), "Authentication failed");
     assert.commandWorked(shardUserWithDirectWritesTestDB.getCollection("coll").insert({value: 5}));
-    assert.eq(getUnauthorizedDirectWritesCount(), 1);
+    assert.eq(getUnauthorizedDirectWritesCount(), 2);
 
     // Logout should always be authorized and drop user from admin should be authorized.
     shardUserWithDirectWritesAdminDB.logout();
     shardAdminTestDB.dropUser("user");
     shardAdminTestDB.dropUser("user2");
     mongosAdminUser.logout();
-    assert.eq(getUnauthorizedDirectWritesCount(), 1);
+    assert.eq(getUnauthorizedDirectWritesCount(), 2);
     // shardAdminDB is used to check the direct writes count, so log it out last.
     shardAdminDB.logout();
 }

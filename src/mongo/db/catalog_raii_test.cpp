@@ -72,6 +72,7 @@ public:
 
 private:
     void setUp() override;
+    FailPointEnableBlock _skipDirectConnectionChecks{"skipDirectConnectionChecks"};
 };
 
 void CatalogRAIITestFixture::setUp() {

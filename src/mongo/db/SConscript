@@ -875,6 +875,7 @@ env.Library(
         'catalog/collection_uuid_mismatch.cpp',
         'catalog/collection_yield_restore.cpp',
         'db_raii.cpp',
+        'direct_connection_util.cpp',
     ],
     LIBDEPS=[
         'catalog/collection_catalog',

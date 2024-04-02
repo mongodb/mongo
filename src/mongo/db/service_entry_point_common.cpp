@@ -753,10 +753,6 @@ private:
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
     bool _refreshedCatalogCache = false;
-    // Keep a static variable to track the last time a warning about direct shard connections was
-    // logged.
-    static Mutex _staticMutex;
-    static Date_t _lastDirectConnectionWarningTime;
 };
 
 class RunCommandImpl {
@@ -1466,9 +1462,6 @@ Future<void> RunCommandAndWaitForWriteConcern::_checkWriteConcern() {
     return Status::OK();
 }
 
-Mutex ExecCommandDatabase::_staticMutex = MONGO_MAKE_LATCH("DirectShardConnectionTimer");
-Date_t ExecCommandDatabase::_lastDirectConnectionWarningTime = Date_t();
-
 void ExecCommandDatabase::_initiateCommand() {
     auto opCtx = _execContext->getOpCtx();
     auto& request = _execContext->getRequest();
@@ -1743,55 +1736,6 @@ void ExecCommandDatabase::_initiateCommand() {
 
     // Once API params and txn state are set on opCtx, enforce the "requireApiVersion" setting.
     enforceRequireAPIVersion(opCtx, command);
-
-    // Check that the client has the directShardOperations role if this is a direct operation to a
-    // shard.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (command->requiresAuth() && ShardingState::get(opCtx)->enabled() &&
-        fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gCheckForDirectShardOperations.isEnabled(fcvSnapshot)) {
-        bool clusterHasTwoOrMoreShards = [&]() {
-            if (feature_flags::gClusterCardinalityParameter.isEnabled(fcvSnapshot)) {
-                auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-                auto* clusterCardinalityParam =
-                    clusterParameters
-                        ->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
-                            "shardedClusterCardinalityForDirectConns");
-                return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
-            }
-            return false;
-        }();
-        if (clusterHasTwoOrMoreShards && !command->shouldSkipDirectConnectionChecks()) {
-            const bool authIsEnabled = AuthorizationManager::get(opCtx->getServiceContext()) &&
-                AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled();
-
-            const bool hasDirectShardOperations = !authIsEnabled ||
-                ((AuthorizationSession::get(opCtx->getClient()) != nullptr &&
-                  AuthorizationSession::get(opCtx->getClient())
-                      ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                         ActionType::issueDirectShardOperations)));
-
-            if (!hasDirectShardOperations) {
-                bool timeUpdated = false;
-                auto currentTime = opCtx->getServiceContext()->getFastClockSource()->now();
-                {
-                    stdx::lock_guard<Latch> lk(_staticMutex);
-                    if ((currentTime - _lastDirectConnectionWarningTime) > Hours(1)) {
-                        _lastDirectConnectionWarningTime = currentTime;
-                        timeUpdated = true;
-                    }
-                }
-                if (timeUpdated) {
-                    LOGV2_WARNING(
-                        7553700,
-                        "Command should not be run via a direct connection to a shard without the "
-                        "directShardOperations role. Please connect via a router.",
-                        "command"_attr = request.getCommandName());
-                }
-                ShardingStatistics::get(opCtx).unauthorizedDirectShardOperations.addAndFetch(1);
-            }
-        }
-    }
 
     if (!opCtx->getClient()->isInDirectClient() &&
         readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
