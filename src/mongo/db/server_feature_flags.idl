@@ -175,8 +175,3 @@ feature_flags:
         cpp_varname: gFeatureFlagDefaultReadMaxTimeMS
         default: false
         shouldBeFCVGated: true
-    featureFlagPeriodicServerParameterSampling:
-        description: "Feature flag to enable periodic FTDC sampling of server parameters"
-        cpp_varname: gFeatureFlagPeriodicServerParameterSampling
-        default: false
-        shouldBeFCVGated: false
