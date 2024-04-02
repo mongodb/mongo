@@ -2397,3 +2397,12 @@ buildvariants:
       cron: *high-value-workload-cron
     - name: array_traversal_high_value
     - name: mongos_workloads
+
+- name: renew-ssl-cert
+  display_name: Renew SSL Cert
+  cron: "0 0 * * 4" # 00:00 on Thursday
+  modules: *perf_modules
+  run_on: # Certbot with route53 plugin is installed on Ubuntu 20.04
+    - "ubuntu2004-small"
+  tasks:
+    - name: renew_ssl_cert
