@@ -338,7 +338,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_multi_stmt_txn_passthrough_with_replica_set_endpoint
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "requires_all_feature_flags", "common", "sharding", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "replica_set_endpoint", "requires_all_feature_flags"]
   depends_on:
   - name: change_streams
   commands:
@@ -425,7 +425,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_whole_cluster_passthrough_with_replica_set_endpoint
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "requires_all_feature_flags", "common", "sharding", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "replica_set_endpoint", "requires_all_feature_flags"]
   depends_on:
   - name: change_streams
   commands:
@@ -452,7 +452,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_whole_db_passthrough_with_replica_set_endpoint
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "requires_all_feature_flags", "common", "sharding", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "replica_set_endpoint", "requires_all_feature_flags"]
   depends_on:
   - name: change_streams
   commands:
@@ -470,7 +470,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_with_replica_set_endpoint
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "requires_all_feature_flags", "common", "sharding", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "replica_set_endpoint", "requires_all_feature_flags"]
   depends_on:
   - name: change_streams
   commands:
