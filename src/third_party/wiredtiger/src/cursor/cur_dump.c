@@ -426,6 +426,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
     WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_DUMP);
 
     session = (WT_SESSION_IMPL *)child->session;
+    WT_ASSERT_ALWAYS(session, owner == NULL, "%s", "owner is not NULL");
 
     WT_RET(__wt_calloc_one(session, &cdump));
     cursor = (WT_CURSOR *)cdump;
