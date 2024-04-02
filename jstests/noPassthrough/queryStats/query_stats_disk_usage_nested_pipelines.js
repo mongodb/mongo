@@ -2,9 +2,7 @@
  * Test that query stats are collected from data bearing nodes for aggregate queries involving
  * stages with nested piplines such as $lookup, $unionWith, and $facet.
  *
- * @tags: [
- * featureFlagQueryStatsDataBearingNodes,
- * ]
+ * @tags: [requires_fcv_80]
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

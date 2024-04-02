@@ -2,9 +2,7 @@
  * Test that query stats are collected from data bearing nodes for aggregate queries involving
  * recursively nested pipelines (e.g., a $lookup into a $unionWith).
  *
- * @tags: [
- * featureFlagQueryStatsDataBearingNodes,
- * ]
+ * @tags: [requires_fcv_80]
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
