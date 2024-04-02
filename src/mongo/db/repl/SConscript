@@ -1853,7 +1853,6 @@ if wiredtiger:
             'oplog_writer_batcher_test.cpp',
             'oplog_writer_impl_test.cpp',
             'optime_extract_test.cpp',
-            'optime_list_test.cpp',
             'primary_only_service_test.cpp',
             'primary_only_service_util_test.cpp',
             'read_concern_args_test.cpp',
@@ -2375,12 +2374,5 @@ env.Benchmark(
         'replication_recovery',
         'replmocks',
         'storage_interface_impl',
-    ],
-)
-
-env.Benchmark(
-    target='optime_list_bm',
-    source=[
-        'optime_list_bm.cpp',
     ],
 )
