@@ -75,6 +75,7 @@ Examples:
 
 ```bash
 $ hexparse WT WiredTiger.wt | less -S
+$ hexparse -hexdump2 WT WiredTiger.wt | less -S
 $ hexparse WT-log WT_TEST.test_checkpoint/WiredTigerLog.0000000001 | less -S
 ```
 
