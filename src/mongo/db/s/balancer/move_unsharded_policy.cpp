@@ -249,6 +249,15 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
                                         chunkToMove,
                                         ForceJumbo::kDoNotForce,
                                         boost::none));
+
+        // Remove source and destination shards from the available shards set to not use them again
+        // on the same balancer round.
+        tassert(8701800,
+                "Source shard does not exist in available shards",
+                availableShards->erase(sourceShardId));
+        tassert(8701801,
+                "Target shard does not exist in available shards",
+                availableShards->erase(*destinationShardId));
     }
 
     return result;
