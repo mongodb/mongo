@@ -187,8 +187,10 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     exit 0
   elif [ $resmoke_exit_code = 0 ]; then
     # On success delete core files.
+    set +o errexit
     core_files=$(/usr/bin/find -H .. \( -name "*.core" -o -name "*.mdmp" \) 2> /dev/null)
     rm -rf $core_files
+    set -o errexit
   fi
 
   exit $resmoke_exit_code
