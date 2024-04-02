@@ -115,7 +115,8 @@ DEF_OPT_AS_UINT32(max_idle_table_cycle, 0,
   "setting.")
 DEF_OPT_AS_BOOL(max_idle_table_cycle_fatal, 0,
   "print warning (false) or abort (true) of max_idle_table_cycle failure.")
-DEF_OPT_AS_BOOL(index, 0, "Whether to create an index on the value field.")
+DEF_OPT_AS_BOOL(index, 0, "Whether to create a WiredTiger index on the value field.")
+DEF_OPT_AS_BOOL(index_like_table, 0, "Add an index-like modification to another shared table.")
 DEF_OPT_AS_BOOL(insert_rmw, 0, "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
 DEF_OPT_AS_BOOL(log_partial, 0, "perform partial logging on first table only.")
@@ -190,8 +191,8 @@ DEF_OPT_AS_STRING(threads, "",
   "operations done by each worker thread; If a throttle value is provided each thread will do a "
   "maximum of that number of operations per second; multiple workload configurations may be "
   "specified per threads configuration; for example, a more complex threads configuration might be "
-  "'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))' which would create 2 threads "
-  "doing nothing but reads and 8 threads each doing 50% inserts and 25% reads and updates.  "
+  "'threads=((count=2,reads=1),(count=8,reads=1,inserts=2,updates=1))' which would create 2 "
+  "threads doing only reads and 8 threads each doing 50% inserts and 25% reads and updates. "
   "Allowed configuration values are 'count', 'throttle', 'inserts', 'reads', 'read_range', "
   "'modify', 'modify_delta', 'modify_distribute', 'modify_force_update', 'updates', "
   "'update_delta', 'truncate', 'truncate_pct' and 'truncate_count'. There are also behavior "
