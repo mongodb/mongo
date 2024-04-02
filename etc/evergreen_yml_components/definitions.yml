@@ -353,7 +353,7 @@ functions:
     command: keyval.inc
     display_name: "get buildnumber"
     params:
-      key: "${build_variant}_master"
+      key: "${build_variant}_v8.0"
       destination: "builder_num"
 
   "run diskstats": &run_diskstats
