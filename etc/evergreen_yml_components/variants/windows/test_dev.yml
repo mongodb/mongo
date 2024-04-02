@@ -27,7 +27,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &windows_expansions
   compile_variant: *windows_compile_variant_name
-  burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
+  burn_in_tests_build_variant: enterprise-windows-required
   exe: ".exe"
   content_type: application/zip
   python: '/cygdrive/c/python/python310/python.exe'
@@ -84,7 +84,7 @@ buildvariants:
 
 - &enterprise-windows-template
   <<: *windows_compile_variant_dependency
-  name: &enterprise-windows-suggested enterprise-windows-suggested
+  name: &enterprise-windows-required enterprise-windows-required
   display_name: "! Enterprise Windows"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
