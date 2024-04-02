@@ -1754,8 +1754,8 @@ void ExecCommandDatabase::_initiateCommand() {
         globalOpCounters.gotQuery();
     }
 
-    auto requestOrDefaultMaxTimeMS =
-        getRequestOrDefaultMaxTimeMS(opCtx, _requestArgs.getMaxTimeMS(), command);
+    auto requestOrDefaultMaxTimeMS = getRequestOrDefaultMaxTimeMS(
+        opCtx, _requestArgs.getMaxTimeMS(), getInvocation()->isReadOperation());
     if (requestOrDefaultMaxTimeMS || _requestArgs.getMaxTimeMSOpOnly()) {
         // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
         // the OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a

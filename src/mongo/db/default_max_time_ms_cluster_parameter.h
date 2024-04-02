@@ -42,5 +42,7 @@ static constexpr auto kDefaultMaxTimeMSClusterParameterName = "defaultMaxTimeMS"
  * used.
  */
 boost::optional<Milliseconds> getRequestOrDefaultMaxTimeMS(
-    OperationContext* opCtx, const boost::optional<IDLAnyType>& requestMaxTimeMS, Command* command);
+    OperationContext* opCtx,
+    const boost::optional<IDLAnyType>& requestMaxTimeMS,
+    bool isReadOperation);
 }  // namespace mongo

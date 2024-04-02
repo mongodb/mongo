@@ -934,6 +934,10 @@ public:
         return false;
     }
 
+    virtual bool isReadOperation() const {
+        return _definition->getReadWriteType() == Command::ReadWriteType::kRead;
+    }
+
     /**
      * The command definition that this invocation runs.
      * Note: nonvirtual.

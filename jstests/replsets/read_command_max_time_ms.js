@@ -6,7 +6,7 @@
  *   uses_transactions,
  *   featureFlagDefaultReadMaxTimeMS,
  *   # Uses $where operator
-//   requires_scripting,
+ *   requires_scripting,
  * ]
  */
 

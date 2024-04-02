@@ -32,10 +32,11 @@
 #include "mongo/db/default_max_time_ms_cluster_parameter_gen.h"
 
 namespace mongo {
+
 boost::optional<Milliseconds> getRequestOrDefaultMaxTimeMS(
     OperationContext* opCtx,
     const boost::optional<mongo::IDLAnyType>& requestMaxTimeMS,
-    Command* command) {
+    bool isReadOperation) {
     // Always uses the user-defined value if it's passed in.
     if (requestMaxTimeMS) {
         return Milliseconds{uassertStatusOK(parseMaxTimeMS(requestMaxTimeMS->getElement()))};
@@ -47,9 +48,8 @@ boost::optional<Milliseconds> getRequestOrDefaultMaxTimeMS(
     }
     // Next uses the default maxTimeMS cluster parameter if the command is a read operation.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (fcvSnapshot.isVersionInitialized() &&
-        gFeatureFlagDefaultReadMaxTimeMS.isEnabled(fcvSnapshot) &&
-        command->getReadWriteType() == Command::ReadWriteType::kRead) {
+    if (isReadOperation && fcvSnapshot.isVersionInitialized() &&
+        gFeatureFlagDefaultReadMaxTimeMS.isEnabled(fcvSnapshot)) {
         auto defaultReadMaxTimeMS = [&]() {
             auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
             auto* defaultMaxTimeMSParam =
