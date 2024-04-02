@@ -164,7 +164,9 @@ __wt_block_addr_invalid(
 #endif
 
     /* Check if the address is past the end of the file. */
-    return (objectid == block->objectid && offset + size > block->size ? EINVAL : 0);
+    if (objectid == block->objectid && offset + size > block->size)
+        WT_RET_MSG(session, EINVAL, "address is past the end of the file");
+    return (0);
 }
 
 /*
