@@ -104,15 +104,13 @@ spellchk()
     # Make sure custom spellings are sorted.
     custom_spellings=../src/docs/spell.ok
 
-    # We need to remove the required header first.
-    sed -i '/personal_ws-1.1 en 200/d' $custom_spellings
-    if ! sort -c $custom_spellings; then
+    # We need to remove the required header before sorting.
+    ASPELL_HEADER="personal_ws-1.1 en 200"
+    (echo "$ASPELL_HEADER"; sed -e "/$ASPELL_HEADER/d" $custom_spellings | sort -u) > $t2
+    if ! cmp -s $custom_spellings $t2; then
         echo "Sorting $custom_spellings ..."
-        sort -u -o $custom_spellings $custom_spellings
+        mv $t2 $custom_spellings
     fi
-
-    # Add the header back.
-    sed -i '1 i\personal_ws-1.1 en 200' $custom_spellings
 
     (cd ../src/docs &&
     # - Separate quoted newlines "line\nline" so "nline" is not reported.
