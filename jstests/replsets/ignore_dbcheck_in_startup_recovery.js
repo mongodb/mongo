@@ -9,6 +9,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
     checkHealthLog,
+    checkHealthLogGTE,
     logQueries,
     resetAndInsert,
     runDbCheck
@@ -82,10 +83,12 @@ const secondaryHealthLog = secondary.getDB("local").system.healthlog;
 // Check that the start and batch entries are warning logs since the node skips dbcheck during
 // startup recovery. Because of the failpoint on secondary, it will only have 1 batch entry before
 // it hangs. So there will not be a stop entry.
-checkHealthLog(secondaryHealthLog, logQueries.duringStableRecovery, 2);
+// After PM-3489, it is possible that the secondary applied more batch entries because the secondary
+// could still fetch and persist oplogs while the oplog applier is hanging.
+checkHealthLogGTE(secondaryHealthLog, logQueries.duringStableRecovery, 2);
 // Check that the initial sync node does not have other info or error/warning entries.
 checkHealthLog(secondaryHealthLog, logQueries.infoBatchQuery, 0);
-checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 2);
+checkHealthLogGTE(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 2);
 
 // Check that the primary logged an error health log entry for each document with missing index key.
 checkHealthLog(primaryHealthLog, logQueries.recordNotFoundQuery, nDocs);
