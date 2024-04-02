@@ -309,7 +309,7 @@ TEST_F(FindCmdShapeTest, FindCommandShapeSHA256Hash) {
     // Hexadecimal form of the SHA256 hash value of the template "find" command produced by
     // 'makeTemplateFindCommandRequest()'.
     const std::string templateHashValue{
-        "BFC747604CE59A4865F7298E12A913762EABA3E6DDB94C273EC4A11878AF1A76"};
+        "5B498C8F35D92BCDD67A5192F37FFAACF2CA0BA49C68219C2088DE13F2BB2FFF"};
 
     // Verify value of the SHA256 hash of the "find" command shape - it must not change over
     // versions, and should not depend on the execution platform.

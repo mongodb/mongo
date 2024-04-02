@@ -1232,8 +1232,12 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                     "locale": "simple"
                 },
                 "let": {
-                    "HASH<var1>": "?",
-                    "HASH<var2>": "?"
+                    "HASH<var1>": {
+                        "$const": "?"
+                    },
+                    "HASH<var2>": {
+                        "$const": "?"
+                    }
                 },
                 "command": "aggregate",
                 "pipeline": [
@@ -1267,7 +1271,9 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                                 "$first": "$HASH<d>.HASH<e>"
                             },
                             "HASH<f>": {
-                                "$sum": 1
+                                "$sum": {
+                                    "$const": 1
+                                }
                             }
                         }
                     },

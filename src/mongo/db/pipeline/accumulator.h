@@ -151,15 +151,6 @@ public:
         invariant(ec);
         invariant(ec->getValue().nullish());
 
-        // We want to wrap constant expressions in order to avoid re-parsing issues in cases where
-        // an array is being passed through a $literal, e.g. $push: {$literal: [1, a]}. Removing
-        // the wrapper would cause the query to error out since accumulators are unary operators.
-        ExpressionConstant const* argumentConst = dynamic_cast<ExpressionConstant*>(argument.get());
-        if (argumentConst) {
-            return DOC(getOpName() << argumentConst->serializeConstant(
-                           options, argumentConst->getValue(), true));
-        }
-
         return DOC(getOpName() << argument->serialize(options));
     }
 

@@ -283,6 +283,50 @@ TEST_F(ExpressionNaryTest, SerializationToBsonArr) {
                       BSON_ARRAY(_notAssociativeNorCommutative->serialize()));
 }
 
+TEST_F(ExpressionNaryTest, RedactsCorrectlyWithConstantArguments) {
+    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(5)));
+    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(10)));
+    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(15)));
+
+    SerializationOptions opts;
+
+    // The default shape should wrap the constants in $const.
+    ASSERT_BSONOBJ_EQ(
+        BSON("foo" << BSON("$testable" << BSON_ARRAY(BSON("$const" << 5) << BSON("$const" << 10)
+                                                                         << BSON("$const" << 15)))),
+        BSON("foo" << _notAssociativeNorCommutative->serialize(opts)));
+
+    // The representative shape should be an array of raw constants (i.e. not wrapped in $const).
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    ASSERT_BSONOBJ_EQ(BSON("foo" << BSON("$testable" << BSON_ARRAY(1 << 1 << 1))),
+                      BSON("foo" << _notAssociativeNorCommutative->serialize(opts)));
+}
+
+TEST_F(ExpressionNaryTest, RedactsCorrectlyWithMixedArguments) {
+    VariablesParseState vps = expCtx.variablesParseState;
+    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(5)));
+    _notAssociativeNorCommutative->addOperand(
+        Expression::parseExpression(&expCtx, BSON("$sum" << BSON_ARRAY(1 << 2)), vps));
+    _notAssociativeNorCommutative->addOperand(ExpressionFieldPath::parse(&expCtx, "$b", vps));
+
+    SerializationOptions opts;
+
+    // The default shape should wrap the constants in $const.
+    ASSERT_BSONOBJ_EQ(BSON("foo" << BSON("$testable" << BSON_ARRAY(
+                                             BSON("$const" << 5)
+                                             << BSON("$sum" << BSON_ARRAY(BSON("$const" << 1)
+                                                                          << BSON("$const" << 2)))
+                                             << "$b"))),
+                      BSON("foo" << _notAssociativeNorCommutative->serialize(opts)));
+
+    // The representative shape should not wrap the constant in $const.
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    ASSERT_BSONOBJ_EQ(BSON("foo" << BSON("$testable" << BSON_ARRAY(
+                                             1 << BSON("$sum" << BSON_ARRAY(1 << 1)) << "$b"))),
+                      BSON("foo" << _notAssociativeNorCommutative->serialize(opts)));
+}
+
+
 // Verify that the internal operands are optimized
 TEST_F(ExpressionNaryTest, InternalOperandOptimizationIsDone) {
     BSONArray spec = BSON_ARRAY(BSON("$and" << BSONArray()) << "$abc");
