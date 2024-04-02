@@ -35,7 +35,9 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_mock.h"
+#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -56,6 +58,9 @@ protected:
         : ShardingMongodTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
 
     void setUp() override {
+        // Ensure that this node is neither "config server" nor "shard server".
+        serverGlobalParams.clusterRole = ClusterRole::None;
+
         ShardingMongodTestFixture::setUp();
 
         auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>(
@@ -294,6 +299,24 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
     ASSERT_EQ(afterTime2.configTime(), VectorClock::kInitialComponentTime);
     ASSERT_EQ(afterTime3.topologyTime(), VectorClock::kInitialComponentTime);
+}
+
+class VectorClockMongoDDurableTest : public ShardServerTestFixture {
+protected:
+    VectorClockMongoDDurableTest()
+        : ShardServerTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+};
+
+TEST_F(VectorClockMongoDDurableTest, DurableTimeDoesNotHangAfterShutdown) {
+    auto sc = getServiceContext();
+    auto vc = VectorClockMutable::get(sc);
+    auto opCtx = Client::getCurrent()->getOperationContext();
+
+    ReplicaSetAwareServiceRegistry::get(sc).onShutdown();
+    shutdownExecutorPool();
+
+    ASSERT_THROWS_CODE(
+        vc->waitForDurable().get(opCtx), DBException, ErrorCodes::ShutdownInProgress);
 }
 
 }  // namespace

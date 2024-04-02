@@ -99,7 +99,7 @@ private:
     void onStartup(OperationContext* opCtx) override {}
     void onSetCurrentConfig(OperationContext* opCtx) override {}
     void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) override;
-    void onShutdown() override {}
+    void onShutdown() override;
     void onStepUpBegin(OperationContext* opCtx, long long term) override;
     void onStepUpComplete(OperationContext* opCtx, long long term) override {}
     void onStepDown() override;
@@ -169,6 +169,8 @@ private:
     Queue _queue;
 
     ServiceContext* _serviceContext;
+
+    AtomicWord<bool> _shutdownInitiated{false};
 };
 
 const auto vectorClockMongoDDecoration =
@@ -246,6 +248,16 @@ void VectorClockMongoD::onInitialDataAvailable(OperationContext* opCtx,
     }
 }
 
+void VectorClockMongoD::onShutdown() {
+    stdx::lock_guard lg(_mutex);
+    _shutdownInitiated.store(true);
+    for (auto& [_, promise] : _queue) {
+        promise->setError(
+            Status(ErrorCodes::ShutdownInProgress, "Not persisting vector clock due to shutdown"));
+    }
+    _queue.clear();
+}
+
 void VectorClockMongoD::onBecomeArbiter() {
     // The node has become an arbiter, hence will not need logical clock for external operations.
     _disable();
@@ -311,8 +323,15 @@ VectorClock::VectorTime VectorClockMongoD::recoverDirect(OperationContext* opCtx
 
 SharedSemiFuture<void> VectorClockMongoD::_enqueueWaiterAndScheduleLoopIfNeeded(
     stdx::unique_lock<Mutex> ul, VectorTime time) {
+    if (_shutdownInitiated.load()) {
+        return Future<void>().makeReady(
+            Status(ErrorCodes::ShutdownInProgress, "Not persisting vector clock due to shutdown"));
+    }
+
     auto [it, unusedEmplaced] =
         _queue.try_emplace({std::move(time)}, std::make_unique<SharedPromise<void>>());
+
+    auto future = it->second->getFuture();
 
     if (!_loopScheduled) {
         _loopScheduled = true;
@@ -326,14 +345,38 @@ SharedSemiFuture<void> VectorClockMongoD::_enqueueWaiterAndScheduleLoopIfNeeded(
             }));
     }
 
-    return it->second->getFuture();
+    return future;
 }
 
 Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError() {
+    if (_shutdownInitiated.load()) {
+        return Future<void>::makeReady(
+            Status(ErrorCodes::ShutdownInProgress, "Not persisting vector clock due to shutdown"));
+    }
+
+    // This lambda is only called from the .then and .onError functions.
+    // The only possible way we can lock the mutex if the _shutdownInitiated is true when the
+    // setting of _shutdownInitiated runs parallel with the .then or .onError.
+    // That means the .then or .onError is already scheduled when the onShutdown happens.
+    // Since the threadpool stops later then the onShutdown, the already scheduled tasks will run
+    // on different thread, so it is safe to lock the mutex here.
+    const auto checkShutdownStatusAndLockMutex =
+        [this, _ = shared_from_this()]() -> boost::optional<stdx::unique_lock<Mutex>> {
+        if (_shutdownInitiated.load()) {
+            return boost::none;
+        }
+        return stdx::unique_lock(_mutex);
+    };
+
     auto [p, f] = makePromiseFuture<VectorTime>();
     auto future = std::move(f)
-                      .then([this, _ = shared_from_this()](VectorTime newDurableTime) {
-                          stdx::unique_lock ul(_mutex);
+                      .then([this, _ = shared_from_this(), checkShutdownStatusAndLockMutex](
+                                VectorTime newDurableTime) {
+                          auto ul = checkShutdownStatusAndLockMutex();
+                          if (!ul) {
+                              return;
+                          }
+
                           _durableTime.emplace(newDurableTime);
 
                           ComparableVectorTime time{*_durableTime};
@@ -345,24 +388,34 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError() {
                               promises.emplace_back(std::move(it->second));
                               it = _queue.erase(it);
                           }
-                          ul.unlock();
+                          ul->unlock();
 
                           for (auto& p : promises)
                               p->emplaceValue();
                       })
-                      .onError([this, _ = shared_from_this()](Status status) {
-                          stdx::unique_lock ul(_mutex);
+                      .onError([this, _ = shared_from_this(), checkShutdownStatusAndLockMutex](
+                                   Status status) {
+                          auto ul = checkShutdownStatusAndLockMutex();
+                          if (!ul) {
+                              return;
+                          }
+
                           std::vector<Queue::value_type::second_type> promises;
                           for (auto it = _queue.begin(); it != _queue.end();) {
                               promises.emplace_back(std::move(it->second));
                               it = _queue.erase(it);
                           }
-                          ul.unlock();
+                          ul->unlock();
 
                           for (auto& p : promises)
                               p->setError(status);
                       })
                       .onCompletion([this, _ = shared_from_this()](auto) {
+                          if (_shutdownInitiated.load()) {
+                              return Future<void>::makeReady(
+                                  Status(ErrorCodes::ShutdownInProgress,
+                                         "Not persisting vector clock due to shutdown"));
+                          }
                           {
                               stdx::lock_guard lg(_mutex);
                               if (_queue.empty()) {
@@ -415,9 +468,9 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError() {
 
             return vectorTime;
         })
-        .getAsync([promise = std::move(p)](StatusWith<VectorTime> swResult) mutable {
-            promise.setFrom(std::move(swResult));
-        });
+        .getAsync(
+            [this, _ = shared_from_this(), promise = std::move(p)](
+                StatusWith<VectorTime> swResult) mutable { promise.setFrom(std::move(swResult)); });
 
     return future;
 }
