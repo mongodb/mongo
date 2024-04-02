@@ -459,11 +459,11 @@ Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(
     Status status, const CancellationToken& stepdownToken) {
     _metrics->onStateTransition(_donorCtx.getState(), boost::none);
 
-    // Destroy metrics early so it's lifetime will not be tied to the lifetime of this state
-    // machine. This is because we have future callbacks copy shared pointers to this state machine
-    // that causes it to live longer than expected and potentially overlap with a newer instance
-    // when stepping up.
-    _metrics.reset();
+    // Unregister metrics early so the cumulative metrics do not continue to track these
+    // metrics for the lifetime of this state machine. We have future callbacks copy shared pointers
+    // to this state machine that causes it to live longer than expected, and can potentially
+    // overlap with a newer instance when stepping up.
+    _metrics->deregisterMetrics();
 
     if (!status.isOK()) {
         // If the stepdownToken was triggered, it takes priority in order to make sure that
