@@ -94,6 +94,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
 
@@ -1397,6 +1398,29 @@ Sorter<Key, Value>::File::~File() {
     }
 
     if (_keep) {
+        auto sync = [](auto handle) -> bool {
+#ifdef _WIN32
+            return FlushFileBuffers(handle) != 0;
+#else
+            return fsync(handle) == 0;
+#endif
+        };
+        if (_file.is_open() && !sync(_file->handle())) {
+            auto error = lastSystemError();
+            LOGV2_WARNING(
+                8664800,
+                "Failed to sync sorter file to disk",
+                "error"_attr = error.value(),
+                "message"_attr =
+                    [error] {
+                        try {
+                            return errorMessage(error);
+                        } catch (...) {
+                            return std::string{};
+                        }
+                    }(),
+                "file"_attr = _path.filename().string());
+        }
         return;
     }
 

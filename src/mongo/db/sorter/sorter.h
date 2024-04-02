@@ -30,13 +30,14 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
+#include <boost/iostreams/device/file_descriptor.hpp>
+#include <boost/iostreams/stream.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <exception>
-#include <fstream>  // IWYU pragma: keep
 #include <functional>
 #include <iterator>
 #include <memory>
@@ -372,7 +373,7 @@ public:
         void _ensureOpenForWriting();
 
         boost::filesystem::path _path;
-        std::fstream _file;
+        boost::iostreams::stream<boost::iostreams::file_descriptor> _file;
 
         // The current offset of the end of the file if there may be unflushed data, or -1 if the
         // file either has not yet been opened or has been flushed.
