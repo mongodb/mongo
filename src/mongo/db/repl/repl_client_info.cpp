@@ -30,7 +30,6 @@
 
 #include <utility>
 
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -83,19 +82,19 @@ void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
 
         // On the other hand, if a transaction is a no-op and we are using speculative majority read
         // concern, there is risk of a transaction reading data that might not have yet been
-        // majority commited, and later waiting for write concern on a lastApplied which is older
+        // majority committed and later waiting for write concern on a lastApplied which is older
         // than the timestamp to which the read corresponds. This is possible due to the fact
         // that lastApplied is advanced in an onCommit hook AFTER commiting writes (and making them
         // visible), leaving a small window of time where a concurrent transaction might
         // speculatively read local data, and then wait on a lastApplied which has yet to be
         // advanced.
 
-        // Multi-doc transactions perform a no-op write on commit time and advance the lastOp. So it
+        // Multi-doc transactions perform a no-op write on commit time and advance the lastOp, so it
         // is no longer necessary for transactions to update the client's lastOp (calling
         // setLastOpToSystemLastOpTime).
 
         // Non-transaction operations resulting in no-op suffer from the same issue as transactions,
-        // but there is no built-in mechanism to advance the lastOp and client's lastOp has to be
+        // but there is no built-in mechanism to advance the lastOp, and client's lastOp has to be
         // updated.
 
         // Due to this, the lastOp has to be updated directly from the oplog's top entry instead of
@@ -108,14 +107,14 @@ void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
         if (status.isOK()) {
             systemOpTime = latestWriteOpTimeSW.getValue();
         } else {
-            // Fall back to use my lastAppliedOpTime if we failed to get the latest OpTime from
+            // Fall back to use my lastWrittenOpTime if we failed to get the latest OpTime from
             // storage. In most cases, it is safe to ignore errors because if
             // getLatestWriteOpTime returns an error, we cannot use the same opCtx to wait for
             // writeConcern anyways. But getLastError from the same client could use a different
             // opCtx to wait for the lastOp. So this is a best effort attempt to set the lastOp
-            // to the in-memory lastAppliedOpTime (which could be lagged). And this is a known
+            // to the in-memory lastWrittenOpTime (which could be lagged). And this is a known
             // bug in getLastError.
-            systemOpTime = replCoord->getMyLastAppliedOpTime();
+            systemOpTime = replCoord->getMyLastWrittenOpTime();
             if (status == ErrorCodes::OplogOperationUnsupported ||
                 status == ErrorCodes::NamespaceNotFound ||
                 status == ErrorCodes::CollectionIsEmpty || ErrorCodes::isNotPrimaryError(status)) {
@@ -124,9 +123,9 @@ void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
                 // use lastAppliedOpTime as last OpTime.
                 status = Status::OK();
             }
-            // We will continue trying to set client's lastOp to lastAppliedOpTime as a best-effort
+            // We will continue trying to set client's lastOp to lastWrittenOpTime as a best-effort
             // alternative to getLatestWriteOpTime. And we will then throw after setting client's
-            // lastOp if getLatestWriteOpTime has failed with a error code other than the ones
+            // lastOp if getLatestWriteOpTime has failed with an error code other than the ones
             // above.
         }
 
