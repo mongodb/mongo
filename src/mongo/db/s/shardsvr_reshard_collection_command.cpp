@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/db/s/reshard_collection_coordinator_document_gen.h"
+#include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/service_context.h"
@@ -96,8 +97,21 @@ public:
                                                           opCtx->getWriteConcern());
 
             if (request().getProvenance() == ProvenanceEnum::kMoveCollection) {
-                // TODO SERVER-xyz to be open under PM-3670: re-evalutate the need to track the
-                // collection before calling into moveCollection
+                bool clusterHasTwoOrMoreShards = [&]() {
+                    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+                    auto* clusterCardinalityParam =
+                        clusterParameters
+                            ->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
+                                "shardedClusterCardinalityForDirectConns");
+                    return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
+                }();
+
+                uassert(ErrorCodes::IllegalOperation,
+                        "Cannot move a collection until a second shard has been successfully added",
+                        clusterHasTwoOrMoreShards);
+
+                // TODO (SERVER-88623): re-evalutate the need to track the collection before calling
+                // into moveCollection
                 ShardsvrCreateCollectionRequest trackCollectionRequest;
                 trackCollectionRequest.setUnsplittable(true);
                 trackCollectionRequest.setRegisterExistingCollectionInGlobalCatalog(true);

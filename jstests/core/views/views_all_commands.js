@@ -567,7 +567,7 @@ let viewsCommandTests = {
     },
     moveCollection: {
         command: {moveCollection: "test.view", toShard: "move_collection-rs"},
-        expectedErrorCode: [ErrorCodes.NamespaceNotFound],
+        expectedErrorCode: [ErrorCodes.NamespaceNotFound, ErrorCodes.IllegalOperation],
         skipStandalone: true,
         expectFailure: true,
         isAdminCommand: true,

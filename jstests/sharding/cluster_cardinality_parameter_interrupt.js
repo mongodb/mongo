@@ -2,6 +2,13 @@
  * Tests that the cluster parameter "shardedClusterCardinalityForDirectConns" has the correct value
  * after the addShard command is interrupted before the cluster parameter is updated but the
  * addShard command is retried after that.
+ *
+ * Additionally check that moveCollection is properly disallowed while the cluster parameter has yet
+ * to be updated by the addShard command.
+ *
+ * @tags: [
+ *   requires_fcv_80
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -11,6 +18,11 @@ import {
 } from "jstests/sharding/libs/cluster_cardinality_parameter_util.js";
 
 const st = new ShardingTest({shards: 1});
+
+// Create a collection to be used later on in the test.
+const dbName = 'test';
+const collName = 'foo';
+assert.commandWorked(st.s.getDB(dbName).createCollection(collName));
 
 jsTest.log("Checking the cluster parameter while the cluster contains one shard");
 // There is only one shard in the cluster, so the cluster parameter should be false.
@@ -49,6 +61,11 @@ checkClusterParameter(st.configRS, false);
 checkClusterParameter(st.rs0, false);
 checkClusterParameter(shard1Rst, false);
 
+jsTest.log("Ensure that collections cannot be moved yet even though the second shard is visible");
+assert.commandFailedWithCode(
+    st.s.adminCommand({moveCollection: dbName + "." + collName, toShard: shard1Rst.name}),
+    ErrorCodes.IllegalOperation);
+
 jsTest.log("Retry the addShard command");
 assert.commandWorked(st.s.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 
@@ -58,5 +75,9 @@ checkClusterParameter(st.configRS, true);
 checkClusterParameter(st.rs0, true);
 checkClusterParameter(shard1Rst, true);
 
-shard1Rst.stopSet();
+jsTest.log("Check that moveCollection is now allowed");
+assert.commandWorked(
+    st.s.adminCommand({moveCollection: dbName + '.' + collName, toShard: shard1Rst.name}));
+
 st.stop();
+shard1Rst.stopSet();
