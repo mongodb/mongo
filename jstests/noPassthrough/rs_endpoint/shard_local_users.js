@@ -5,9 +5,9 @@
  * serverless so the cluster cannot become multi-shard.
  *
  * @tags: [
- *   requires_fcv_70,
+ *   requires_fcv_73,
  *   featureFlagEmbeddedRouter,
- *   featureFlagCheckForDirectShardOperations,
+ *   featureFlagFailOnDirectShardOperations,
  *   requires_persistence
  * ]
  */
@@ -65,13 +65,7 @@ function runTests(shard0Primary, tearDownFunc) {
 
     // Add a second shard to the cluster.
     const shard1Name = "shard1-" + extractUUIDFromObject(UUID());
-    const shard1Rst = new ReplSetTest({
-        name: shard1Name,
-        nodes: 2,
-        keyFile,
-        nodeOptions:
-            {setParameter: {'failpoint.enforceDirectShardOperationsCheck': "{'mode':'alwaysOn'}"}}
-    });
+    const shard1Rst = new ReplSetTest({name: shard1Name, nodes: 2, keyFile});
     shard1Rst.startSet({shardsvr: ""});
     shard1Rst.initiate();
     const shard1Primary = shard1Rst.getPrimary();
@@ -218,7 +212,6 @@ function runTests(shard0Primary, tearDownFunc) {
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
             featureFlagReplicaSetEndpoint: true,
-            'failpoint.enforceDirectShardOperationsCheck': "{'mode':'alwaysOn'}"
         },
         keyFile
     });
@@ -236,7 +229,6 @@ function runTests(shard0Primary, tearDownFunc) {
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
                 featureFlagReplicaSetEndpoint: true,
-                'failpoint.enforceDirectShardOperationsCheck': "{'mode':'alwaysOn'}"
             }
         },
         useAutoBootstrapProcedure: true,
@@ -259,7 +251,6 @@ function runTests(shard0Primary, tearDownFunc) {
             nodes: 2,
             setParameter: {
                 featureFlagReplicaSetEndpoint: true,
-                'failpoint.enforceDirectShardOperationsCheck': "{'mode':'alwaysOn'}"
             }
         },
         configShard: true,
