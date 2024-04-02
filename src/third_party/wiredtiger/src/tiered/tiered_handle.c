@@ -224,7 +224,7 @@ __tiered_create_local(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     WT_ERR(__wt_scr_alloc(session, 1024, &build));
     __wt_config_init(session, &cparser, config);
     while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
-        if (!WT_STRING_MATCH("checkpoint", ck.str, ck.len)) {
+        if (!WT_CONFIG_LIT_MATCH("checkpoint", ck)) {
             /* Preserve any quotation marks during the copy. */
             WT_CONFIG_PRESERVE_QUOTES(session, &cv);
             /* Append the entry to the new buffer. */

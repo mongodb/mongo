@@ -21,12 +21,12 @@ __tiered_confchk(
 
     *nstoragep = NULL;
 
-    if (name->len == 0 || WT_STRING_MATCH("none", name->str, name->len))
+    if (name->len == 0 || WT_CONFIG_LIT_MATCH("none", *name))
         return (0);
 
     conn = S2C(session);
     TAILQ_FOREACH (nstorage, &conn->storagesrcqh, q)
-        if (WT_STRING_MATCH(nstorage->name, name->str, name->len)) {
+        if (WT_CONFIG_MATCH(nstorage->name, *name)) {
             *nstoragep = nstorage;
             return (0);
         }
@@ -115,8 +115,8 @@ __wt_tiered_bucket_config(
     hash = __wt_hash_city64(bucket.str, bucket.len);
     hash_bucket = hash & (conn->hash_size - 1);
     TAILQ_FOREACH (bstorage, &nstorage->buckethashqh[hash_bucket], q) {
-        if (WT_STRING_MATCH(bstorage->bucket, bucket.str, bucket.len) &&
-          (WT_STRING_MATCH(bstorage->bucket_prefix, prefix.str, prefix.len))) {
+        if (WT_CONFIG_MATCH(bstorage->bucket, bucket) &&
+          (WT_CONFIG_MATCH(bstorage->bucket_prefix, prefix))) {
             *bstoragep = bstorage;
             goto done;
         }

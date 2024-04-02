@@ -417,7 +417,7 @@ __curindex_bound(WT_CURSOR *cursor, const char *config)
     WT_ERR(__wt_config_gets(session, cfg, "action", &cval));
 
     /* When setting bounds, we need to check that the key is set. */
-    if (WT_STRING_MATCH("set", cval.str, cval.len)) {
+    if (WT_CONFIG_LIT_MATCH("set", cval)) {
         WT_ERR(__cursor_checkkey(cursor));
 
         /* Point the public cursor to the key in the child. */
@@ -440,7 +440,7 @@ __curindex_bound(WT_CURSOR *cursor, const char *config)
      *  1. If the set bound is lower and it is not inclusive.
      *  2. If the set bound is upper and it is inclusive.
      */
-    if (WT_STRING_MATCH("lower", cval.str, cval.len) && !inclusive) {
+    if (WT_CONFIG_LIT_MATCH("lower", cval) && !inclusive) {
         /*
          * In the case that we can't increment the lower bound, it means we have reached the max
          * possible key for the lower bound. This is a very tricky case since there isn't a trivial
@@ -456,7 +456,7 @@ __curindex_bound(WT_CURSOR *cursor, const char *config)
         }
     }
 
-    if (WT_STRING_MATCH("upper", cval.str, cval.len) && inclusive) {
+    if (WT_CONFIG_LIT_MATCH("upper", cval) && inclusive) {
         /*
          * In the case that we can't increment the upper bound, it means we have reached the max
          * possible key for the upper bound. In that case we can just clear upper bound.

@@ -281,7 +281,7 @@ __wt_btree_config_encryptor(
     WT_RET(__wt_config_gets(session, cfg, "encryption.name", &cval));
     if (cval.len == 0)
         *kencryptorp = S2C(session)->kencryptor;
-    else if (WT_STRING_MATCH("none", cval.str, cval.len))
+    else if (WT_CONFIG_LIT_MATCH("none", cval))
         *kencryptorp = NULL;
     else {
         WT_RET(__wt_config_gets_none(session, cfg, "encryption.keyid", &keyid));
@@ -332,7 +332,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     /* Validate file types and check the data format plan. */
     WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
     WT_RET(__wt_struct_confchk(session, &cval));
-    if (WT_STRING_MATCH("r", cval.str, cval.len))
+    if (WT_CONFIG_LIT_MATCH("r", cval))
         btree->type = BTREE_COL_VAR;
     else
         btree->type = BTREE_ROW;
@@ -441,11 +441,11 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
 
     /* Checksums */
     WT_RET(__wt_config_gets(session, cfg, "checksum", &cval));
-    if (WT_STRING_MATCH("on", cval.str, cval.len))
+    if (WT_CONFIG_LIT_MATCH("on", cval))
         btree->checksum = CKSUM_ON;
-    else if (WT_STRING_MATCH("off", cval.str, cval.len))
+    else if (WT_CONFIG_LIT_MATCH("off", cval))
         btree->checksum = CKSUM_OFF;
-    else if (WT_STRING_MATCH("uncompressed", cval.str, cval.len))
+    else if (WT_CONFIG_LIT_MATCH("uncompressed", cval))
         btree->checksum = CKSUM_UNCOMPRESSED;
     else
         btree->checksum = CKSUM_UNENCRYPTED;

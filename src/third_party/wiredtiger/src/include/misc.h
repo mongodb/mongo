@@ -349,18 +349,33 @@ FLD_AREALLSET(uint64_t field, uint64_t mask)
 #define WT_STREQ(s, cs) (sizeof(cs) == 2 ? (s)[0] == (cs)[0] && (s)[1] == '\0' : strcmp(s, cs) == 0)
 
 /*
- * Check if a non-empty string matches a byte sequence of len bytes. The macro expects both strings
- * to be of non-zero length in order to be a match. The bytes argument does not need to be
- * null-terminated. Similar to other string related functions, this is not expected to work on NULL
- * values.
+ * Check if a literal string matches the length and content of the supplied bytes/len pair. The
+ * bytes argument does not need to be null-terminated, and it may be null if the supplied length is
+ * zero. Note this macro works differently than the standard strncmp function. When strncmp is given
+ * a zero length it returns true. When this macro is given a zero length it returns false, unless
+ * the literal string is also zero length.
+ */
+#define WT_STRING_LIT_MATCH(str, bytes, len) \
+    ((len) == strlen("" str "") && strncmp(str, bytes, len) == 0)
+
+/*
+ * Identical to WT_STRING_LIT_MATCH, except that this works with non-literal strings. It is slightly
+ * slower, so WT_STRING_LIT_MATCH is always preferred for literal strings.
  */
 #define WT_STRING_MATCH(str, bytes, len) __wt_string_match(str, bytes, len)
 
 static WT_INLINE bool
 __wt_string_match(const char *str, const char *bytes, size_t len)
 {
-    return (len == 0 || (strncmp(str, bytes, len) == 0 && str[len] == '\0'));
+    return (strncmp(str, bytes, len) == 0 && str[len] == '\0');
 }
+
+/*
+ * CONFIG versions of the WT_STRING_LIT_MATCH and WT_STRING_MATCH macros. These are convenient when
+ * matching WT_CONFIG_ITEMs.
+ */
+#define WT_CONFIG_LIT_MATCH(s, cval) WT_STRING_LIT_MATCH(s, (cval).str, (cval).len)
+#define WT_CONFIG_MATCH(s, cval) WT_STRING_MATCH(s, (cval).str, (cval).len)
 
 /*
  * Macro that produces a string literal that isn't wrapped in quotes, to avoid tripping up spell

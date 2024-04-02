@@ -69,7 +69,7 @@ __config_check_search(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *checks, u
      */
     if (entries == 0) {
         for (indx = 0; checks[indx].name != NULL; indx++)
-            if (WT_STRING_MATCH(checks[indx].name, item->str, item->len)) {
+            if (WT_CONFIG_MATCH(checks[indx].name, *item)) {
                 *resultp = &checks[indx];
                 return (0);
             }
@@ -126,7 +126,7 @@ __wt_config_get_choice(const char **choices, WT_CONFIG_ITEM *item)
 
     found = false;
     for (choice = choices; *choice != NULL; ++choice)
-        if (WT_STRING_MATCH(*choice, item->str, item->len)) {
+        if (WT_CONFIG_MATCH(*choice, *item)) {
             found = true;
             break;
         }

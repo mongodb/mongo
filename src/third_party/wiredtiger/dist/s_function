@@ -134,6 +134,18 @@ for f in "$@"; do
         }
     }
 
+    # WT_STRING_MATCH or WT_CONFIG_MATCH with a literal string.
+    {
+        echo "$fp" |
+        egrep 'WT_(STRING|CONFIG)_MATCH *\( *"' |
+        sed 's/:.*//' > $t-8
+        test -s $t-8 && {
+            echo "$f: WT_{STRING|CONFIG}_MATCH used with a literal string," \
+                "use WT_{STRING|CONFIG}_LIT_MATCH."
+            sed 's/^/function @ line:/' < $t-8
+        }
+    }
+
     wait
 done
 

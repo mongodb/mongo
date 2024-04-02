@@ -210,7 +210,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
     block->allocsize = allocsize;
 
     WT_ERR(__wt_config_gets(session, cfg, "block_allocation", &cval));
-    block->allocfirst = WT_STRING_MATCH("first", cval.str, cval.len) ? 1 : 0;
+    block->allocfirst = WT_CONFIG_LIT_MATCH("first", cval) ? 1 : 0;
 
     /* Configuration: optional OS buffer cache maximum size. */
     WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
@@ -230,9 +230,9 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
      */
     flags = 0;
     WT_ERR(__wt_config_gets(session, cfg, "access_pattern_hint", &cval));
-    if (WT_STRING_MATCH("random", cval.str, cval.len))
+    if (WT_CONFIG_LIT_MATCH("random", cval))
         LF_SET(WT_FS_OPEN_ACCESS_RAND);
-    else if (WT_STRING_MATCH("sequential", cval.str, cval.len))
+    else if (WT_CONFIG_LIT_MATCH("sequential", cval))
         LF_SET(WT_FS_OPEN_ACCESS_SEQ);
 
     if (fixed)

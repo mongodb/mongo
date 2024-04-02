@@ -763,10 +763,9 @@ __wt_blkcache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
           WT_BLKCACHE_HASHSIZE_MIN, WT_BLKCACHE_HASHSIZE_MAX);
 
     WT_RET(__wt_config_gets(session, cfg, "block_cache.type", &cval));
-    if (WT_STRING_MATCH("dram", cval.str, cval.len) || WT_STRING_MATCH("DRAM", cval.str, cval.len))
+    if (WT_CONFIG_LIT_MATCH("dram", cval) || WT_CONFIG_LIT_MATCH("DRAM", cval))
         cache_type = WT_BLKCACHE_DRAM;
-    else if (WT_STRING_MATCH("nvram", cval.str, cval.len) ||
-      WT_STRING_MATCH("NVRAM", cval.str, cval.len)) {
+    else if (WT_CONFIG_LIT_MATCH("nvram", cval) || WT_CONFIG_LIT_MATCH("NVRAM", cval)) {
 #ifdef ENABLE_MEMKIND
         cache_type = WT_BLKCACHE_NVRAM;
         WT_RET(__wt_config_gets(session, cfg, "block_cache.nvram_path", &cval));

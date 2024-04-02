@@ -59,7 +59,7 @@ __curbackup_incr_blkmod(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_CURSOR_BAC
         /*
          * First see if we have information for this source identifier.
          */
-        if (WT_STRING_MATCH(cb->incr_src->id_str, k.str, k.len) == 0)
+        if (WT_CONFIG_MATCH(cb->incr_src->id_str, k) == 0)
             continue;
 
         /*
