@@ -253,7 +253,7 @@ StringData IDLParserContext::checkAndAssertCollectionName(const BSONElement& ele
         return collectionlessAggregateCursorCol;
     }
 
-    uassert(ErrorCodes::BadValue,
+    uassert(ErrorCodes::TypeMismatch,
             str::stream() << "collection name has invalid type " << typeName(element.type()),
             element.canonicalType() == canonicalizeBSONType(mongo::String));
 

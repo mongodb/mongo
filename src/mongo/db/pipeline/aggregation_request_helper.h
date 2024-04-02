@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -79,47 +80,22 @@ static constexpr long long kDefaultBatchSize = 101;
  * If we are parsing a request for an explained aggregation with an explain verbosity provided,
  * then 'explainVerbosity' contains this information. In this case, 'cmdObj' may not itself
  * contain the explain specifier. Otherwise, 'explainVerbosity' should be boost::none.
+ *
+ * Callers must provide the validated tenancy scope (if any) to ensure that any namespaces
+ * deserialized from the aggregation request properly account for the tenant ID.
  */
 AggregateCommandRequest parseFromBSON(
-    OperationContext* opCtx,
-    NamespaceString nss,
     const BSONObj& cmdObj,
+    const boost::optional<auth::ValidatedTenancyScope>& vts,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     bool apiStrict,
     const SerializationContext& serializationContext = SerializationContext());
 
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
-    NamespaceString nss,
     const BSONObj& cmdObj,
+    const boost::optional<auth::ValidatedTenancyScope>& vts = boost::none,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
-    bool apiStrict = false,
-    const SerializationContext& serializationContext = SerializationContext());
-
-/**
- * Convenience overload which constructs the request's NamespaceString from the given database
- * name and command object.
- */
-AggregateCommandRequest parseFromBSON(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    bool apiStrict,
-    const SerializationContext& serializationContext = SerializationContext());
-
-StatusWith<AggregateCommandRequest> parseFromBSONForTests(
-    const DatabaseName& dbName,
-    const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
-    bool apiStrict = false,
-    const SerializationContext& serializationContext = SerializationContext());
-
-/*
- * The first field in 'cmdObj' must be a string representing a valid collection name, or the
- * number 1. In the latter case, returns a reserved namespace that does not represent a user
- * collection. See 'NamespaceString::makeCollectionlessAggregateNSS()'.
- */
-NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj);
+    bool apiStrict = false);
 
 /**
  * Serializes the options to a Document. Note that this serialization includes the original

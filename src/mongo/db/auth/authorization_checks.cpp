@@ -43,6 +43,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/database_name.h"
@@ -74,11 +75,10 @@ Status checkAuthForCreateOrModifyView(OperationContext* opCtx,
     }
 
     auto request = aggregation_request_helper::parseFromBSON(
-        opCtx,
-        viewNs,
         BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline << "cursor" << BSONObj()
                          << "$db"
                          << DatabaseNameUtil::serialize(viewOnNs.dbName(), serializationContext)),
+        auth::ValidatedTenancyScope::get(opCtx),
         boost::none,
         false,
         serializationContext);

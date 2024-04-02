@@ -120,6 +120,8 @@ public:
     // database.
     static constexpr StringData kGlobalIndexCollectionPrefix = "globalIndex."_sd;
 
+    // Collection name that is used for { aggregate: 1, ... } style aggregations.
+    static constexpr auto kCollectionlessAggregateCollection = "$cmd.aggregate"_sd;
 
     // Prefix for the temporary collection used by the $out stage.
     static constexpr StringData kOutTmpCollectionPrefix = "tmp.agg_out."_sd;

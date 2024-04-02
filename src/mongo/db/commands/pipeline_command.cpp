@@ -114,9 +114,8 @@ public:
         SerializationContext serializationCtx = opMsgRequest.getSerializationContext();
 
         const auto aggregationRequest = aggregation_request_helper::parseFromBSON(
-            opCtx,
-            opMsgRequest.parseDbName(),
             opMsgRequest.body,
+            opMsgRequest.validatedTenancyScope,
             explainVerbosity,
             APIParameters::get(opCtx).getAPIStrict().value_or(false),
             serializationCtx);

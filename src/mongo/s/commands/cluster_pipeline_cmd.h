@@ -74,8 +74,7 @@ public:
         const OpMsgRequest& opMsgRequest,
         boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
         const auto aggregationRequest =
-            Impl::parseAggregationRequest(opCtx,
-                                          opMsgRequest,
+            Impl::parseAggregationRequest(opMsgRequest,
                                           explainVerbosity,
                                           APIParameters::get(opCtx).getAPIStrict().value_or(false));
 

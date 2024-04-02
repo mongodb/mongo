@@ -398,11 +398,12 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
     $_externalDataSources: [{
         collName: "coll",
         dataSources: [{url: "file://EDSCTest_SimpleScanMultiBatchAggRequestPipe", storageType: "pipe", fileType: "bson"}]
-    }]
+    }],
+    $db: "external_data_source"
 }
     )");
 
-    auto swAggReq = aggregation_request_helper::parseFromBSONForTests(kDatabaseName, aggCmdObj);
+    auto swAggReq = aggregation_request_helper::parseFromBSONForTests(aggCmdObj);
     ASSERT_OK(swAggReq.getStatus());
     auto swCursor = DBClientCursor::fromAggregationRequest(
         &client, swAggReq.getValue(), /*secondaryOk*/ false, /*useExhaust*/ false);
@@ -421,7 +422,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // multi-batch result for an aggregation request.
-    verifyExplainAggCommand(client, aggCmdObj);
+    verifyExplainAggCommand(client, swAggReq.getValue().toBSON({}));
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
@@ -459,11 +460,12 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
     $_externalDataSources: [{
         collName: "coll",
         dataSources: [{url: "file://EDSCTest_SimpleMatchAggRequestPipe", storageType: "pipe", fileType: "bson"}]
-    }]
+    }],
+    $db: "external_data_source"
 }
     )");
 
-    auto swAggReq = aggregation_request_helper::parseFromBSONForTests(kDatabaseName, aggCmdObj);
+    auto swAggReq = aggregation_request_helper::parseFromBSONForTests(aggCmdObj);
     ASSERT_OK(swAggReq.getStatus());
     auto swCursor = DBClientCursor::fromAggregationRequest(
         &client, swAggReq.getValue(), /*secondaryOk*/ false, /*useExhaust*/ false);
@@ -480,7 +482,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, aggCmdObj);
+    verifyExplainAggCommand(client, swAggReq.getValue().toBSON({}));
 }
 
 TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
@@ -585,11 +587,12 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggR
     }, {
         collName: "coll2",
         dataSources: [{url: "file://EDSCTest_SimpleScanAndUnionWithMultipleSourcesAggRequestPipe2", storageType: "pipe", fileType: "bson"}]
-    }]
+    }],
+    $db: "external_data_source"
 }
     )");
 
-    auto swAggReq = aggregation_request_helper::parseFromBSONForTests(kDatabaseName, aggCmdObj);
+    auto swAggReq = aggregation_request_helper::parseFromBSONForTests(aggCmdObj);
     ASSERT_OK(swAggReq.getStatus());
     auto swCursor = DBClientCursor::fromAggregationRequest(
         &client, swAggReq.getValue(), /*secondaryOk*/ false, /*useExhaust*/ false);
@@ -607,7 +610,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggR
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, aggCmdObj);
+    verifyExplainAggCommand(client, swAggReq.getValue().toBSON({}));
 }
 
 TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
@@ -668,7 +671,8 @@ TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
     $_externalDataSources: [{
         collName: "coll",
         dataSources: [{url: "file://EDSCTest_GroupAggRequestPipe", storageType: "pipe", fileType: "bson"}]
-    }]
+    }],
+    $db: "external_data_source"
 }
     )");
     std::vector<BSONObj> expectedRes = {
@@ -689,7 +693,7 @@ TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
             })"),
     };
 
-    auto swAggReq = aggregation_request_helper::parseFromBSONForTests(kDatabaseName, aggCmdObj);
+    auto swAggReq = aggregation_request_helper::parseFromBSONForTests(aggCmdObj);
     ASSERT_OK(swAggReq.getStatus());
     auto swCursor = DBClientCursor::fromAggregationRequest(
         &client, swAggReq.getValue(), /*secondaryOk*/ false, /*useExhaust*/ false);
@@ -711,7 +715,7 @@ TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, aggCmdObj);
+    verifyExplainAggCommand(client, swAggReq.getValue().toBSON({}));
 }
 
 TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
@@ -774,7 +778,8 @@ TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
     }, {
         collName: "coll2",
         dataSources: [{url: "file://EDSCTest_LookupAggRequestPipe2", storageType: "pipe", fileType: "bson"}]
-    }]
+    }],
+    $db: "external_database_name"
 }
     )");
     std::vector<BSONObj> expectedRes = {
@@ -798,7 +803,7 @@ TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
             })"),
     };
 
-    auto swAggReq = aggregation_request_helper::parseFromBSONForTests(kDatabaseName, aggCmdObj);
+    auto swAggReq = aggregation_request_helper::parseFromBSONForTests(aggCmdObj);
     ASSERT_OK(swAggReq.getStatus());
     auto swCursor = DBClientCursor::fromAggregationRequest(
         &client, swAggReq.getValue(), /*secondaryOk*/ false, /*useExhaust*/ false);
@@ -820,7 +825,7 @@ TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, aggCmdObj);
+    verifyExplainAggCommand(client, swAggReq.getValue().toBSON({}));
 }
 }  // namespace
 }  // namespace mongo

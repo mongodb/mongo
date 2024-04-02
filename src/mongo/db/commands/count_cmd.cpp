@@ -245,9 +245,8 @@ public:
                                                           viewAggregation.getValue())
                                   .body;
             auto viewAggRequest = aggregation_request_helper::parseFromBSON(
-                opCtx,
-                nss,
                 viewAggCmd,
+                opMsgRequest.validatedTenancyScope,
                 verbosity,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false),
                 serializationCtx);

@@ -116,13 +116,14 @@ protected:
      */
     Status testRunAggregateEarlyExit(const BSONObj& inputBson) {
         BSONObjBuilder result;
-        NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
         auto client = getServiceContext()->getService()->makeClient("ClusterCmdClient");
         auto opCtx = client->makeOperationContext();
-        auto request = aggregation_request_helper::parseFromBSONForTests(nss, inputBson);
+        auto request = aggregation_request_helper::parseFromBSONForTests(inputBson);
         if (request.getStatus() != Status::OK()) {
             return request.getStatus();
         }
+
+        auto nss = request.getValue().getNamespace();
         return ClusterAggregate::runAggregate(opCtx.get(),
                                               ClusterAggregate::Namespaces{nss, nss},
                                               request.getValue(),

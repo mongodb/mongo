@@ -637,8 +637,8 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     // recreated it with different epoch and chunks.
     onFindCommand([&](const RemoteCommandRequest& request) {
         const auto opMsg = static_cast<OpMsgRequest>(request);
-        const auto aggRequest = unittest::assertGet(
-            aggregation_request_helper::parseFromBSONForTests(kNss, opMsg.body));
+        const auto aggRequest =
+            unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(opMsg.body));
         const auto& pipeline = aggRequest.getPipeline();
 
         ASSERT_BSONOBJ_EQ(
@@ -676,8 +676,8 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     ChunkVersion newVersion({newEpoch, newTimestamp}, {5, 0});
     onFindCommand([&](const RemoteCommandRequest& request) {
         const auto opMsg = static_cast<OpMsgRequest>(request);
-        const auto aggRequest = unittest::assertGet(
-            aggregation_request_helper::parseFromBSONForTests(kNss, opMsg.body));
+        const auto aggRequest =
+            unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(opMsg.body));
         const auto& pipeline = aggRequest.getPipeline();
 
         ASSERT_BSONOBJ_EQ(
@@ -750,8 +750,8 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
     // Return collection with a different epoch and a set of chunks, which represent a split
     onFindCommand([&](const RemoteCommandRequest& request) {
         const auto opMsg = static_cast<OpMsgRequest>(request);
-        const auto aggRequest = unittest::assertGet(
-            aggregation_request_helper::parseFromBSONForTests(kNss, opMsg.body));
+        const auto aggRequest =
+            unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(opMsg.body));
         const auto& pipeline = aggRequest.getPipeline();
 
         ASSERT_BSONOBJ_EQ(
@@ -815,8 +815,8 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
     // Return set of chunks, which represent a split
     onFindCommand([&](const RemoteCommandRequest& request) {
         const auto opMsg = static_cast<OpMsgRequest>(request);
-        const auto aggRequest = unittest::assertGet(
-            aggregation_request_helper::parseFromBSONForTests(kNss, opMsg.body));
+        const auto aggRequest =
+            unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(opMsg.body));
         const auto& pipeline = aggRequest.getPipeline();
 
         ASSERT_BSONOBJ_EQ(

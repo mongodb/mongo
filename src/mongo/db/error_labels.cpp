@@ -144,8 +144,6 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
     const auto cmdObj = (_commandName == "aggregate" ? CurOp::get(_opCtx)->opDescription()
                                                      : CurOp::get(_opCtx)->originatingCommand());
 
-    // Get the namespace string from CurOp. We will need it to build the LiteParsedPipeline.
-    const auto& nss = CurOp::get(_opCtx)->getNSS();
     const auto vts = auth::ValidatedTenancyScope::get(_opCtx);
     auto sc = vts != boost::none
         ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
@@ -154,10 +152,10 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
     bool apiStrict = APIParameters::get(_opCtx).getAPIStrict().value_or(false);
     // Do enough parsing to confirm that this is a well-formed pipeline with a $changeStream.
     const auto swLitePipe =
-        [this, &nss, &cmdObj, apiStrict, &sc]() -> StatusWith<LiteParsedPipeline> {
+        [this, &vts, &cmdObj, apiStrict, &sc]() -> StatusWith<LiteParsedPipeline> {
         try {
-            auto aggRequest = aggregation_request_helper::parseFromBSON(
-                _opCtx, nss, cmdObj, boost::none, apiStrict, sc);
+            auto aggRequest =
+                aggregation_request_helper::parseFromBSON(cmdObj, vts, boost::none, apiStrict, sc);
             return LiteParsedPipeline(aggRequest);
         } catch (const DBException& ex) {
             return ex.toStatus();

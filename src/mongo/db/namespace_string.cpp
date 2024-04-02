@@ -46,7 +46,6 @@ namespace {
 
 constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
 constexpr auto bulkWriteCursorCol = "$cmd.bulkWrite"_sd;
-constexpr auto collectionlessAggregateCursorCol = "$cmd.aggregate"_sd;
 constexpr auto dropPendingNSPrefix = "system.drop."_sd;
 
 constexpr auto fle2Prefix = "enxcol_."_sd;
@@ -77,7 +76,7 @@ bool NamespaceString::isListCollectionsCursorNS() const {
 }
 
 bool NamespaceString::isCollectionlessAggregateNS() const {
-    return coll() == collectionlessAggregateCursorCol;
+    return coll() == kCollectionlessAggregateCollection;
 }
 
 bool NamespaceString::isLegalClientSystemNS() const {
@@ -203,7 +202,7 @@ NamespaceString NamespaceString::makeLocalCollection(StringData collName) {
 }
 
 NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const DatabaseName& dbName) {
-    NamespaceString nss(dbName, collectionlessAggregateCursorCol);
+    NamespaceString nss(dbName, kCollectionlessAggregateCollection);
     dassert(nss.isValid());
     dassert(nss.isCollectionlessAggregateNS());
     return nss;

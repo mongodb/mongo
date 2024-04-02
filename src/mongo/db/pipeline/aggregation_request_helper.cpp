@@ -45,6 +45,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/api_parameters.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -52,12 +54,12 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -66,75 +68,32 @@ namespace aggregation_request_helper {
 /**
  * Validate the aggregate command object.
  */
-void validate(OperationContext* opCtx,
-              const BSONObj& cmdObj,
+void validate(const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity);
 
-AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
-                                      const DatabaseName& dbName,
-                                      const BSONObj& cmdObj,
-                                      boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                      bool apiStrict,
-                                      const SerializationContext& serializationContext) {
-    return parseFromBSON(
-        opCtx, parseNs(dbName, cmdObj), cmdObj, explainVerbosity, apiStrict, serializationContext);
-}
-
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
-    NamespaceString nss,
     const BSONObj& cmdObj,
+    const boost::optional<auth::ValidatedTenancyScope>& vts,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    bool apiStrict,
-    const SerializationContext& serializationContext) {
+    bool apiStrict) {
     try {
         return parseFromBSON(
-            /*opCtx=*/nullptr, nss, cmdObj, explainVerbosity, apiStrict, serializationContext);
+            cmdObj, vts, explainVerbosity, apiStrict, SerializationContext::stateDefault());
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }
 }
 
-StatusWith<AggregateCommandRequest> parseFromBSONForTests(
-    const DatabaseName& dbName,
-    const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    bool apiStrict,
-    const SerializationContext& serializationContext) {
-    try {
-        return parseFromBSON(
-            /*opCtx=*/nullptr, dbName, cmdObj, explainVerbosity, apiStrict, serializationContext);
-    } catch (const AssertionException&) {
-        return exceptionToStatus();
-    }
-}
-
-AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
-                                      NamespaceString nss,
-                                      const BSONObj& cmdObj,
+AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
+                                      const boost::optional<auth::ValidatedTenancyScope>& vts,
                                       boost::optional<ExplainOptions::Verbosity> explainVerbosity,
                                       bool apiStrict,
                                       const SerializationContext& serializationContext) {
-
-    // if the command object lacks field 'aggregate' or '$db', we will use the namespace in 'nss'.
-    bool cmdObjChanged = false;
-    auto cmdObjBob = BSONObjBuilder{BSON(AggregateCommandRequest::kCommandName << nss.coll())};
-    if (!cmdObj.hasField(AggregateCommandRequest::kCommandName) ||
-        !cmdObj.hasField(AggregateCommandRequest::kDbNameFieldName)) {
-        cmdObjBob.append("$db", DatabaseNameUtil::serialize(nss.dbName(), serializationContext));
-        cmdObjBob.appendElementsUnique(cmdObj);
-        cmdObjChanged = true;
-    }
-
-    AggregateCommandRequest request(nss);
-    const auto tenantId = nss.tenantId();
-    const auto vts = tenantId
-        ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
-              *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
-        : boost::none;
-    request = AggregateCommandRequest::parse(
-        IDLParserContext("aggregate", apiStrict, vts, tenantId, serializationContext),
-        cmdObjChanged ? cmdObjBob.obj() : cmdObj);
+    auto tenantId = vts.has_value() ? boost::make_optional(vts->tenantId()) : boost::none;
+    auto request = AggregateCommandRequest::parse(
+        IDLParserContext("aggregate", apiStrict, vts, std::move(tenantId), serializationContext),
+        cmdObj);
 
     if (explainVerbosity) {
         uassert(ErrorCodes::FailedToParse,
@@ -144,36 +103,8 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
         request.setExplain(explainVerbosity);
     }
 
-    validate(opCtx, cmdObj, nss, explainVerbosity);
+    validate(cmdObj, request.getNamespace(), explainVerbosity);
     return request;
-}
-
-NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) {
-    auto firstElement = cmdObj.firstElement();
-
-    if (firstElement.isNumber()) {
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Invalid command format: the '"
-                              << firstElement.fieldNameStringData()
-                              << "' field must specify a collection name or 1",
-                firstElement.number() == 1);
-        return NamespaceString::makeCollectionlessAggregateNSS(dbName);
-    } else {
-        uassert(ErrorCodes::TypeMismatch,
-                str::stream() << "collection name has invalid type: "
-                              << typeName(firstElement.type()),
-                firstElement.type() == BSONType::String);
-
-        NamespaceString nss(
-            NamespaceStringUtil::deserialize(dbName, firstElement.valueStringData()));
-
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
-                              << "'",
-                nss.isValid() && !nss.isCollectionlessAggregateNS());
-
-        return nss;
-    }
 }
 
 BSONObj serializeToCommandObj(const AggregateCommandRequest& request) {
@@ -184,8 +115,7 @@ Document serializeToCommandDoc(const AggregateCommandRequest& request) {
     return Document(request.toBSON(BSONObj()).getOwned());
 }
 
-void validate(OperationContext* opCtx,
-              const BSONObj& cmdObj,
+void validate(const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
     bool hasCursorElem = cmdObj.hasField(AggregateCommandRequest::kCursorFieldName);
@@ -194,6 +124,12 @@ void validate(OperationContext* opCtx,
         (hasExplainElem && cmdObj[AggregateCommandRequest::kExplainFieldName].Bool());
     bool hasFromMongosElem = cmdObj.hasField(AggregateCommandRequest::kFromMongosFieldName);
     bool hasNeedsMergeElem = cmdObj.hasField(AggregateCommandRequest::kNeedsMergeFieldName);
+
+    uassert(ErrorCodes::InvalidNamespace,
+            fmt::format("Invalid collection name specified '{}'",
+                        cmdObj.firstElement().valueStringDataSafe()),
+            cmdObj.firstElement().valueStringDataSafe() !=
+                NamespaceString::kCollectionlessAggregateCollection);
 
     // 'hasExplainElem' implies an aggregate command-level explain option, which does not require
     // a cursor argument.

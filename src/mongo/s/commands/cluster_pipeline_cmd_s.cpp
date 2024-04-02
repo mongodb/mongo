@@ -80,12 +80,11 @@ struct ClusterPipelineCommandS {
     }
 
     static AggregateCommandRequest parseAggregationRequest(
-        OperationContext* opCtx,
         const OpMsgRequest& opMsgRequest,
         boost::optional<ExplainOptions::Verbosity> explainVerbosity,
         bool apiStrict) {
         return aggregation_request_helper::parseFromBSON(
-            opCtx, opMsgRequest.parseDbName(), opMsgRequest.body, explainVerbosity, apiStrict);
+            opMsgRequest.body, opMsgRequest.validatedTenancyScope, explainVerbosity, apiStrict);
     }
 };
 MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandS>).forRouter();

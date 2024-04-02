@@ -23,8 +23,12 @@ assert.commandFailedWithCode(explainDB.runCommand({explain: {find: uuid}}),
                              ErrorCodes.InvalidNamespace);
 
 // Do similar for other commands.
-assert.commandFailedWithCode(explainDB.runCommand({explain: {aggregate: uuid, cursor: {}}}),
-                             ErrorCodes.TypeMismatch);
+
+// aggregate doesn't support specifying UUIDs for the command argument at all, so it fails with a
+// different error.
+assert.commandFailedWithCode(
+    explainDB.runCommand({explain: {aggregate: uuid, cursor: {}, pipeline: []}}),
+    [ErrorCodes.BadValue, ErrorCodes.TypeMismatch]);
 
 assert.commandFailedWithCode(explainDB.runCommand({explain: {count: uuid}}),
                              ErrorCodes.InvalidNamespace);

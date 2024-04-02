@@ -84,6 +84,16 @@ public:
     void assertSecurityToken(const ResourcePattern& resource, ActionType action);
     void assertNotAuthorized(const ResourcePattern& resource, ActionType action);
 
+    static boost::optional<auth::ValidatedTenancyScope> makeVTS(const NamespaceString& nss) {
+        if (auto tenantId = nss.tenantId()) {
+            return auth::ValidatedTenancyScopeFactory::create(
+                *tenantId,
+                auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
+        }
+        return boost::none;
+    }
+
     AggregateCommandRequest buildAggReq(const NamespaceString& nss, const BSONArray& pipeline);
 
     AggregateCommandRequest buildAggReq(const NamespaceString& nss,
@@ -118,6 +128,5 @@ protected:
     AuthorizationManager* authzManager;
     std::unique_ptr<AuthorizationSessionForTest> authzSession;
     BSONObj credentials;
-    SerializationContext _sc;
 };
 }  // namespace mongo

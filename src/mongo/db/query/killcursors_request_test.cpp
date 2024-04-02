@@ -74,8 +74,9 @@ TEST(KillCursorsRequestTest, parseFirstFieldNotString) {
     auto bsonObj =
         BSON("killCursors" << 99 << "cursors" << BSON_ARRAY(CursorId(123) << CursorId(456)) << "$db"
                            << "db");
-    ASSERT_THROWS_CODE(
-        KillCursorsCommandRequest::parse(ctxt, bsonObj), AssertionException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(KillCursorsCommandRequest::parse(ctxt, bsonObj),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST(KillCursorsRequestTest, parseInvalidNamespace) {

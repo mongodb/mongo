@@ -33,6 +33,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/query/count_command_as_aggregation_command.h"
@@ -161,14 +162,12 @@ public:
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
             auto aggCmdOnView =
                 uassertStatusOK(countCommandAsAggregationCommand(countRequest, nss));
-            auto aggCmdOnViewObj =
-                OpMsgRequestBuilder::create(
-                    auth::ValidatedTenancyScope::get(opCtx), dbName, aggCmdOnView)
-                    .body;
+            const boost::optional<auth::ValidatedTenancyScope>& vts =
+                auth::ValidatedTenancyScope::get(opCtx);
+            auto aggCmdOnViewObj = OpMsgRequestBuilder::create(vts, dbName, aggCmdOnView).body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
-                opCtx,
-                nss,
                 aggCmdOnViewObj,
+                vts,
                 boost::none,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
 
@@ -286,14 +285,13 @@ public:
                 return aggCmdOnView.getStatus();
             }
 
+            const boost::optional<auth::ValidatedTenancyScope>& vts =
+                auth::ValidatedTenancyScope::get(opCtx);
             auto aggCmdOnViewObj =
-                OpMsgRequestBuilder::create(
-                    auth::ValidatedTenancyScope::get(opCtx), nss.dbName(), aggCmdOnView.getValue())
-                    .body;
+                OpMsgRequestBuilder::create(vts, nss.dbName(), aggCmdOnView.getValue()).body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
-                opCtx,
-                nss,
                 aggCmdOnViewObj,
+                vts,
                 verbosity,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
 
