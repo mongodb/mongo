@@ -218,6 +218,23 @@ static TypedValues makeInterestingValues() {
     return vals;
 }
 
+static void assertBlockEq(value::TypeTags blockTag,
+                          value::Value blockVal,
+                          const std::vector<std::pair<value::TypeTags, value::Value>>& expected) {
+    ASSERT_EQ(blockTag, value::TypeTags::valueBlock);
+    auto* block = value::bitcastTo<value::ValueBlock*>(blockVal);
+    auto extracted = block->extract();
+    ASSERT_EQ(expected.size(), extracted.count());
+
+    for (size_t i = 0; i < extracted.count(); ++i) {
+        auto [t, v] = value::compareValue(
+            extracted.tags()[i], extracted.vals()[i], expected[i].first, expected[i].second);
+        ASSERT_EQ(t, value::TypeTags::NumberInt32) << extracted;
+        ASSERT_EQ(value::bitcastTo<int32_t>(v), 0)
+            << "Got " << extracted[i] << " expected " << expected[i] << " full extracted output "
+            << extracted;
+    }
+}
 // IsExtractable = false is used to test optimizations that let us avoid calling extract() on a
 // block for various reasons. If we try to call extract() on TestBlockBase<false> a uassert will
 // fail.

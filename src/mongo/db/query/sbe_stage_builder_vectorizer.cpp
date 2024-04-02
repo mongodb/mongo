@@ -759,6 +759,20 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
                     args.back().sourceCell};
         }
 
+        if (arity == 3 && op.name() == "fillType" &&
+            TypeSignature::kBlockType.isSubset(args.front().typeSignature)) {
+            optimizer::ABTVector functionArgs;
+            functionArgs.reserve(arity);
+            for (auto& functionArg : args) {
+                functionArgs.emplace_back(std::move(*functionArg.expr));
+            }
+
+            return {makeABTFunction("valueBlockFillType"_sd, std::move(functionArgs)),
+                    TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                        .include(TypeSignature::kNothingType),
+                    args.front().sourceCell};
+        }
+
         static const stdx::unordered_map<std::string, uint32_t> kTypeMask = {
             {"isNumber",
              getBSONTypeMask(BSONType::NumberInt) | getBSONTypeMask(BSONType::NumberLong) |

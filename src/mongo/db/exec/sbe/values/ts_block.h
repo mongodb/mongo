@@ -130,6 +130,10 @@ public:
 
     std::unique_ptr<ValueBlock> fillEmpty(TypeTags fillTag, Value fillVal) override;
 
+    std::unique_ptr<ValueBlock> fillType(uint32_t typeMask,
+                                         TypeTags fillTag,
+                                         Value fillVal) override;
+
     // Returns true if none of the values in this block are arrays or objects. Returns false if
     // any _may_ be arrays or objects.
     bool hasNoObjsOrArrays() const {

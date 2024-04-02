@@ -52,6 +52,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
+#include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/column_op.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -637,6 +638,8 @@ enum class Builtin : uint16_t {
     setToArray,
     arrayToObject,
 
+    fillType,
+
     aggFirstNNeedsMoreInput,
     aggFirstN,
     aggFirstNMerge,
@@ -716,7 +719,6 @@ enum class Builtin : uint16_t {
     aggRemovableBottomNRemove,
     aggRemovableBottomNFinalize,
 
-
     // Additional one-byte builtins go here.
 
     // Start of 2 byte builtins.
@@ -725,6 +727,7 @@ enum class Builtin : uint16_t {
     valueBlockIsTimezone,
     valueBlockFillEmpty,
     valueBlockFillEmptyBlock,
+    valueBlockFillType,
     valueBlockAggMin,
     valueBlockAggMax,
     valueBlockAggCount,
@@ -1787,6 +1790,9 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAddToSetCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetToArray(ArityType arity);
+
+    FastTuple<bool, value::TypeTags, value::Value> builtinFillType(ArityType arity);
+
     FastTuple<bool, value::TypeTags, value::Value> builtinConvertSimpleSumToDoubleDoubleSum(
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
@@ -2049,11 +2055,13 @@ private:
         ArityType arity);
 
     // Block builtins
+
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockExists(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockTypeMatch(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockIsTimezone(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmpty(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmptyBlock(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillType(ArityType arity);
     template <bool less>
     FastTuple<bool, value::TypeTags, value::Value> valueBlockMinMaxImpl(
         value::ValueBlock* inputBlock, value::ValueBlock* bitsetBlock);

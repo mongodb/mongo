@@ -316,6 +316,15 @@ struct ValueBlock {
     virtual std::unique_ptr<ValueBlock> fillEmpty(TypeTags fillTag, Value fillVal);
 
     /**
+     * Returns a block where all values that match the BSON type mask are replaced with (fillTag,
+     * fillVal) or nullptr if no values would be modified. Nothings will always be unchanged
+     * (fillType with an input of Nothing always results in Nothing).
+     */
+    virtual std::unique_ptr<ValueBlock> fillType(uint32_t typeMask,
+                                                 TypeTags fillTag,
+                                                 Value fillVal);
+
+    /**
      * Returns a block of booleans, where non-Nothing values in the block are mapped to true, and
      * Nothings are mapped to false.
      */
@@ -381,6 +390,8 @@ inline constexpr bool validHomogeneousType(TypeTags tag) {
  */
 class MonoBlock final : public ValueBlock {
 public:
+    static std::unique_ptr<MonoBlock> makeNothingBlock(size_t ct);
+
     MonoBlock(size_t count, TypeTags tag, Value val) : _count(count) {
         std::tie(_tag, _val) = copyValue(tag, val);
     }
@@ -449,6 +460,10 @@ public:
         }
         return std::make_unique<MonoBlock>(_count, fillTag, fillVal);
     }
+
+    std::unique_ptr<ValueBlock> fillType(uint32_t typeMask,
+                                         TypeTags fillTag,
+                                         Value fillVal) override;
 
     std::unique_ptr<ValueBlock> exists() override {
         return std::make_unique<MonoBlock>(
@@ -636,14 +651,9 @@ public:
         }
     }
 
-    HomogeneousBlock(std::vector<Value> input, HomogeneousBlockBitset bitset) {
-        if constexpr (validHomogeneousType(TypeTag)) {
-            _vals.resize(input.size());
-            for (size_t i = 0; i < input.size(); ++i) {
-                _vals[i] = input[i];
-            }
-            _presentBitset = bitset;
-        } else {
+    HomogeneousBlock(std::vector<Value> input, HomogeneousBlockBitset bitset)
+        : _vals(std::move(input)), _presentBitset(std::move(bitset)) {
+        if constexpr (!validHomogeneousType(TypeTag)) {
             // The !std::is_same<T,T> is always false and will trigger a compile failure if this
             // branch is taken. If this branch is not taken, it will get discarded.
             static_assert(!std::is_same<T, T>::value, "Not supported for deep types");
@@ -730,6 +740,10 @@ public:
     TokenizedBlock tokenize() override;
 
     std::unique_ptr<ValueBlock> fillEmpty(TypeTags fillTag, Value fillVal) override;
+
+    std::unique_ptr<ValueBlock> fillType(uint32_t typeMask,
+                                         TypeTags fillTag,
+                                         Value fillVal) override;
 
     std::unique_ptr<ValueBlock> exists() override {
         if (_presentBitset.all()) {

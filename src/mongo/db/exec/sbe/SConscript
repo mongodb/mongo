@@ -248,6 +248,7 @@ env.CppUnitTest(
         'expressions/sbe_trunc_builtin_test.cpp',
         'expressions/sbe_ts_second_ts_increment_test.cpp',
         'expressions/sbe_variable_test.cpp',
+        'expressions/sbe_fill_type_test.cpp',
         'sbe_agg_project_test.cpp',
         'sbe_block_hashagg_test.cpp',
         'sbe_block_stages_test.cpp',

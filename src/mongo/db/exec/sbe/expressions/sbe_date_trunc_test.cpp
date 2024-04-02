@@ -39,6 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"

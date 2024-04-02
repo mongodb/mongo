@@ -67,24 +67,6 @@ public:
         assertBlockEq(tag, val, tvPairs);
     }
 
-    void assertBlockEq(value::TypeTags blockTag,
-                       value::Value blockVal,
-                       const std::vector<std::pair<value::TypeTags, value::Value>>& expected) {
-        ASSERT_EQ(blockTag, value::TypeTags::valueBlock);
-        auto* block = value::bitcastTo<value::ValueBlock*>(blockVal);
-        auto extracted = block->extract();
-        ASSERT_EQ(expected.size(), extracted.count());
-
-        for (size_t i = 0; i < extracted.count(); ++i) {
-            auto [t, v] = value::compareValue(
-                extracted.tags()[i], extracted.vals()[i], expected[i].first, expected[i].second);
-            ASSERT_EQ(t, value::TypeTags::NumberInt32) << extracted;
-            ASSERT_EQ(value::bitcastTo<int32_t>(v), 0)
-                << "Got " << extracted[i] << " expected " << expected[i]
-                << " full extracted output " << extracted;
-        }
-    }
-
     void testFoldF(std::vector<std::pair<value::TypeTags, value::Value>> vals,
                    std::vector<int32_t> filterPosInfo,
                    std::vector<bool> expectedResult);
@@ -134,6 +116,40 @@ public:
         }
 
         return std::pair{andRes, orRes};
+    }
+
+    // Represents the inputs and expected output for one FillType test case. All data in this struct
+    // should be considered unowned.
+    struct FillTypeTest {
+        value::ValueBlock* inputBlock;
+        TypedValue typeMask;
+        TypedValue fill;
+        TypedValues expected;
+    };
+
+    void runFillTypeTest(FillTypeTest testCase) {
+        value::ViewOfValueAccessor blockAccessor;
+        auto blockSlot = bindAccessor(&blockAccessor);
+        value::ViewOfValueAccessor typeMaskAccessor;
+        auto typeMaskSlot = bindAccessor(&typeMaskAccessor);
+        value::ViewOfValueAccessor fillAccessor;
+        auto fillSlot = bindAccessor(&fillAccessor);
+
+        auto fillTypeExpr = sbe::makeE<sbe::EFunction>("valueBlockFillType",
+                                                       sbe::makeEs(makeE<EVariable>(blockSlot),
+                                                                   makeE<EVariable>(typeMaskSlot),
+                                                                   makeE<EVariable>(fillSlot)));
+        auto compiledExpr = compileExpression(*fillTypeExpr);
+
+        blockAccessor.reset(value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(testCase.inputBlock));
+        typeMaskAccessor.reset(testCase.typeMask.first, testCase.typeMask.second);
+        fillAccessor.reset(testCase.fill.first, testCase.fill.second);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockEq(runTag, runVal, testCase.expected);
     }
 };
 
@@ -749,6 +765,161 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
 
         assertBlockEq(
             runTag, runVal, std::vector{std::pair(fillTag, fillVal), std::pair(fillTag, fillVal)});
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, BlockFillTypeTest) {
+    auto fill = makeObject(BSON("a"
+                                << "replacement for arrays"));
+    value::ValueGuard fillGuard{fill.first, fill.second};
+
+    value::HeterogeneousBlock block;
+    block.push_back(value::makeNewString("First string"_sd));
+    block.push_back(makeNothing());
+    block.push_back(value::makeNewString("Second string"_sd));
+    block.push_back(makeArray(BSON_ARRAY(1 << 2 << 3)));
+    block.push_back(value::makeNewString("Third string"_sd));
+    block.push_back(makeArray(BSON_ARRAY(4 << 5 << 6)));
+    block.push_back(value::makeNewString("tinystr"_sd));  // Stored as shallow StringSmall type
+
+    auto extracted = block.extract();
+
+    {
+        auto typeMask = makeInt32(getBSONTypeMask(BSONType::Array));
+
+        runFillTypeTest(FillTypeTest{
+            .inputBlock = &block,
+            .typeMask = typeMask,
+            .fill = fill,
+            .expected = TypedValues{
+                extracted[0], extracted[1], extracted[2], fill, extracted[4], fill, extracted[6]}});
+    }
+
+    {
+        // A type mask that isnt a NumberInt32 will return a block of Nothings.
+        auto typeMask = makeDouble(1.0);
+
+        runFillTypeTest(FillTypeTest{.inputBlock = &block,
+                                     .typeMask = typeMask,
+                                     .fill = fill,
+                                     .expected = TypedValues{makeNothing(),
+                                                             makeNothing(),
+                                                             makeNothing(),
+                                                             makeNothing(),
+                                                             makeNothing(),
+                                                             makeNothing(),
+                                                             makeNothing()}});
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, BlockFillTypeMonoHomogeneousTest) {
+    value::Int32Block block;
+    block.push_back(42);
+    block.push_back(43);
+    block.push_back(44);
+    block.pushNothing();
+    block.push_back(46);
+
+    auto extracted = block.extract();
+
+    {
+        auto fill = makeDecimal("1234.5678");
+        value::ValueGuard fillGuard{fill.first, fill.second};
+
+        auto typeMask = makeInt32(getBSONTypeMask(BSONType::NumberDouble));
+
+        runFillTypeTest(FillTypeTest{
+            .inputBlock = &block,
+            .typeMask = typeMask,
+            .fill = fill,
+            .expected =
+                TypedValues{extracted[0], extracted[1], extracted[2], extracted[3], extracted[4]}});
+    }
+
+    {
+        // Block matches the type mask and fillTag is the same as the block type.
+        auto fill = makeInt32(10);
+
+        auto typeMask = makeInt32(getBSONTypeMask(BSONType::NumberInt));
+
+        {
+            // Input block has Nothing.
+            runFillTypeTest(
+                FillTypeTest{.inputBlock = &block,
+                             .typeMask = typeMask,
+                             .fill = fill,
+                             .expected = TypedValues{fill, fill, fill, extracted[3], fill}});
+        }
+
+        {
+            // Input block is dense.
+            value::Int32Block denseBlock{std::vector<value::Value>{value::bitcastFrom<int32_t>(1),
+                                                                   value::bitcastFrom<int32_t>(2),
+                                                                   value::bitcastFrom<int32_t>(3)}};
+
+            {
+                runFillTypeTest(FillTypeTest{.inputBlock = &denseBlock,
+                                             .typeMask = typeMask,
+                                             .fill = fill,
+                                             .expected = TypedValues{fill, fill, fill}});
+            }
+
+            {
+                // Fill with Nothing.
+                fill = makeNothing();
+
+                runFillTypeTest(FillTypeTest{.inputBlock = &denseBlock,
+                                             .typeMask = typeMask,
+                                             .fill = fill,
+                                             .expected = TypedValues{fill, fill, fill}});
+            }
+        }
+    }
+
+    {
+        // Block matches the type mask and fillTag is different than the block type so fall back
+        // to ValueBlock::fillType().
+        auto fill = makeDecimal("1234.5678");
+        value::ValueGuard fillGuard{fill.first, fill.second};
+
+        auto typeMask = makeInt32(getBSONTypeMask(BSONType::NumberInt));
+
+        runFillTypeTest(
+            FillTypeTest{.inputBlock = &block,
+                         .typeMask = typeMask,
+                         .fill = fill,
+                         .expected = TypedValues{fill, fill, fill, extracted[3], fill}});
+    }
+
+    {
+        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
+        value::ValueGuard blockInputGuard(blockTag, blockVal);
+
+        value::MonoBlock monoBlock(2, blockTag, blockVal);
+        auto extracted = monoBlock.extract();
+
+        auto fill = makeDecimal("1234.5678");
+        value::ValueGuard fillGuard{fill.first, fill.second};
+
+        {
+            // MonoBlock that doesn't match the type mask.
+            auto typeMask = makeInt32(getBSONTypeMask(BSONType::Array));
+
+            runFillTypeTest(FillTypeTest{.inputBlock = &monoBlock,
+                                         .typeMask = typeMask,
+                                         .fill = fill,
+                                         .expected = TypedValues{extracted[0], extracted[1]}});
+        }
+
+        {
+            // MonoBlock that matches the type mask.
+            auto typeMask = makeInt32(getBSONTypeMask(BSONType::String));
+
+            runFillTypeTest(FillTypeTest{.inputBlock = &monoBlock,
+                                         .typeMask = typeMask,
+                                         .fill = fill,
+                                         .expected = TypedValues{fill, fill}});
+        }
     }
 }
 

@@ -291,13 +291,11 @@ namespace {
 SbExpr nullMissingUndefinedToNothing(SbExpr arg, StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    auto frameId = state.frameIdGenerator->generate();
-    auto binds = SbExpr::makeSeq(std::move(arg));
-    auto var = SbVar(frameId, 0);
-
-    auto e = b.makeIf(b.generateNullMissingOrUndefined(var), b.makeNothingConstant(), var);
-
-    return b.makeLet(frameId, std::move(binds), std::move(e));
+    return b.makeFunction("fillType",
+                          std::move(arg),
+                          b.makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
+                                              getBSONTypeMask(BSONType::Undefined)),
+                          b.makeNothingConstant());
 }
 
 /**

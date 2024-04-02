@@ -66,4 +66,10 @@ inline uint32_t getBSONTypeMask(BSONType t) noexcept {
     }
 }
 
+const uint32_t kNumberMask = getBSONTypeMask(BSONType::NumberInt) |
+    getBSONTypeMask(BSONType::NumberLong) | getBSONTypeMask(BSONType::NumberDouble) |
+    getBSONTypeMask(BSONType::NumberDecimal);
+
+const uint32_t kDateMask = getBSONTypeMask(BSONType::Date);
+
 }  // namespace mongo

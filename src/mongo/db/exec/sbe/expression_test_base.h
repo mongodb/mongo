@@ -194,25 +194,6 @@ protected:
         ASSERT_EQUALS(resultTag, sbe::value::TypeTags::Nothing);
     }
 
-    void assertBlockEq(value::TypeTags blockTag,
-                       value::Value blockVal,
-                       const std::vector<std::pair<value::TypeTags, value::Value>>& expected) {
-        ASSERT_EQ(blockTag, value::TypeTags::valueBlock);
-        auto* block = value::bitcastTo<value::ValueBlock*>(blockVal);
-        auto extracted = block->extract();
-        ASSERT_EQ(expected.size(), extracted.count());
-
-        for (size_t i = 0; i < extracted.count(); ++i) {
-            auto [t, v] = value::compareValue(
-                extracted.tags()[i], extracted.vals()[i], expected[i].first, expected[i].second);
-            // ASSERT_EQ(t, value::TypeTags::NumberInt32) << extracted;
-            // ASSERT_EQ(value::bitcastTo<int32_t>(v), 0)
-            ASSERT_THAT((std::pair{t, v}), ValueEq(std::pair{value::TypeTags::NumberInt32, 0}))
-                << "Got " << extracted[i] << " expected " << expected[i] << " full extracted output"
-                << extracted;
-        }
-    }
-
     static std::pair<value::TypeTags, value::Value> makeEmptyState(
         size_t maxSize, int32_t memLimit = std::numeric_limits<int32_t>::max()) {
         auto [stateTag, stateVal] = value::makeNewArray();

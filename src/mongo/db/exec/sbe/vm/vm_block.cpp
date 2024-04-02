@@ -103,11 +103,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockTypeMa
 
     auto [typeMaskOwned, typeMaskTag, typeMaskVal] = getFromStack(1);
     if (typeMaskTag != value::TypeTags::NumberInt32) {
-        auto nothingBlock =
-            std::make_unique<value::MonoBlock>(valueBlockIn->count(), value::TypeTags::Nothing, 0);
         return {true,
                 value::TypeTags::valueBlock,
-                value::bitcastFrom<value::ValueBlock*>(nothingBlock.release())};
+                value::bitcastFrom<value::ValueBlock*>(
+                    value::MonoBlock::makeNothingBlock(valueBlockIn->count()).release())};
     }
 
     auto typeMask = static_cast<uint32_t>(value::bitcastTo<int32_t>(typeMaskVal));
@@ -263,6 +262,44 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
 
     return {
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
+}
+
+/**
+ * Implementation of the valueBlockFillType builtin. This instruction takes a block a BSON type
+ * mask, and an SBE value, and produces a new block where all values that match the type mask are
+ * replaced with the SBE value. Any Nothings in the input will be preserved as Nothings in the
+ * output regardless of what the type mask is.
+ */
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillType(
+    ArityType arity) {
+    invariant(arity == 3);
+    auto [fillOwned, fillTag, fillVal] = getFromStack(2);
+
+    auto [typeMaskOwned, typeMaskTag, typeMaskVal] = getFromStack(1);
+
+    auto [blockOwned, blockTag, blockVal] = getFromStack(0);
+    tassert(8872900,
+            "Expected argument to be of valueBlock type",
+            blockTag == value::TypeTags::valueBlock);
+    auto* block = value::bitcastTo<value::ValueBlock*>(blockVal);
+
+    if (typeMaskTag != value::TypeTags::NumberInt32) {
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(
+                    value::MonoBlock::makeNothingBlock(block->count()).release())};
+    }
+    uint32_t typeMask = static_cast<uint32_t>(value::bitcastTo<int32_t>(typeMaskVal));
+
+    auto out = block->fillType(typeMask, fillTag, fillVal);
+    if (!out) {
+        // Input block didn't have any non-Nothing values that matched the type mask so we can
+        // return it unmodified.
+        return moveFromStack(0);
+    }
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
 }
 
 template <bool less>

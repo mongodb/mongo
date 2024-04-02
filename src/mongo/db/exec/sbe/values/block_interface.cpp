@@ -211,6 +211,10 @@ TokenizedBlock ValueBlock::tokenize() {
     return {std::make_unique<HeterogeneousBlock>(std::move(tokenTags), std::move(tokenVals)), idxs};
 }
 
+std::unique_ptr<MonoBlock> MonoBlock::makeNothingBlock(size_t ct) {
+    return std::make_unique<value::MonoBlock>(ct, value::TypeTags::Nothing, value::Value{0u});
+}
+
 TokenizedBlock MonoBlock::tokenize() {
     std::vector<TypeTags> tokenTags;
     std::vector<Value> tokenVals;
@@ -410,6 +414,72 @@ template std::unique_ptr<ValueBlock> Int64Block::fillEmpty(TypeTags fillTag, Val
 template std::unique_ptr<ValueBlock> DateBlock::fillEmpty(TypeTags fillTag, Value fillVal);
 template std::unique_ptr<ValueBlock> DoubleBlock::fillEmpty(TypeTags fillTag, Value fillVal);
 template std::unique_ptr<ValueBlock> BoolBlock::fillEmpty(TypeTags fillTag, Value fillVal);
+
+std::unique_ptr<ValueBlock> ValueBlock::fillType(uint32_t typeMask,
+                                                 TypeTags fillTag,
+                                                 Value fillVal) {
+    auto deblocked = extract();
+    std::vector<TypeTags> tags(deblocked.count());
+    std::vector<Value> vals(deblocked.count());
+    for (size_t i = 0; i < deblocked.count(); ++i) {
+        // For Nothing values, we will always take the else branch.
+        if (static_cast<bool>(getBSONTypeMask(deblocked.tags()[i]) & typeMask)) {
+            auto [tag, val] = value::copyValue(fillTag, fillVal);
+            tags[i] = tag;
+            vals[i] = val;
+        } else {
+            auto [tag, val] = value::copyValue(deblocked.tags()[i], deblocked.vals()[i]);
+            tags[i] = tag;
+            vals[i] = val;
+        }
+    }
+
+    return std::make_unique<HeterogeneousBlock>(std::move(tags), std::move(vals));
+}
+
+std::unique_ptr<ValueBlock> MonoBlock::fillType(uint32_t typeMask,
+                                                TypeTags fillTag,
+                                                Value fillVal) {
+    if (static_cast<bool>(getBSONTypeMask(_tag) & typeMask)) {
+        return std::make_unique<MonoBlock>(_count, fillTag, fillVal);
+    }
+    return nullptr;
+}
+
+template <typename T, value::TypeTags TypeTag>
+std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::fillType(uint32_t typeMask,
+                                                                   TypeTags fillTag,
+                                                                   Value fillVal) {
+    if (static_cast<bool>(getBSONTypeMask(TypeTag) & typeMask)) {
+        if (*tryDense() || fillTag == value::TypeTags::Nothing) {
+            return std::make_unique<MonoBlock>(count(), fillTag, fillVal);
+        } else if (fillTag == TypeTag) {
+            // We also know that fillTag must be shallow since HomogeneousBlocks can only store
+            // shallow types.
+            std::vector<Value> vals(_vals.size(), fillVal);
+            return std::make_unique<HomogeneousBlock<T, TypeTag>>(std::move(vals), _presentBitset);
+        } else {
+            return ValueBlock::fillType(typeMask, fillTag, fillVal);
+        }
+    }
+    return nullptr;
+}
+
+template std::unique_ptr<ValueBlock> Int32Block::fillType(uint32_t typeMask,
+                                                          TypeTags fillTag,
+                                                          Value fillVal);
+template std::unique_ptr<ValueBlock> Int64Block::fillType(uint32_t typeMask,
+                                                          TypeTags fillTag,
+                                                          Value fillVal);
+template std::unique_ptr<ValueBlock> DateBlock::fillType(uint32_t typeMask,
+                                                         TypeTags fillTag,
+                                                         Value fillVal);
+template std::unique_ptr<ValueBlock> DoubleBlock::fillType(uint32_t typeMask,
+                                                           TypeTags fillTag,
+                                                           Value fillVal);
+template std::unique_ptr<ValueBlock> BoolBlock::fillType(uint32_t typeMask,
+                                                         TypeTags fillTag,
+                                                         Value fillVal);
 
 std::unique_ptr<ValueBlock> ValueBlock::exists() {
     if (tryDense().get_value_or(false) && tryCount()) {

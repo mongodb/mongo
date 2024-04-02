@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/values/ts_block.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <tuple>
@@ -44,6 +43,7 @@
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
+#include "mongo/db/query/bson_typemask.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/util/itoa.h"
@@ -547,6 +547,25 @@ std::unique_ptr<ValueBlock> TsBlock::fillEmpty(TypeTags fillTag, Value fillVal) 
     return _decompressedBlock->fillEmpty(fillTag, fillVal);
 }
 
+std::unique_ptr<ValueBlock> TsBlock::fillType(uint32_t typeMask, TypeTags fillTag, Value fillVal) {
+    if (static_cast<bool>(getBSONTypeMask(_controlMin.first) & kNumberMask) &&
+        static_cast<bool>(getBSONTypeMask(_controlMax.first) & kNumberMask) &&
+        !static_cast<bool>(kNumberMask & typeMask)) {
+        // The control min and max tags are both numbers, and the target typeMask doesn't cover
+        // numbers which are in the same canonical type bracket (see canonicalizeBSONType()). Even
+        // though the block could have Nothings, fillType on Nothing always returns Nothing.
+        return nullptr;
+    } else if (static_cast<bool>(getBSONTypeMask(_controlMin.first) & kDateMask) &&
+               _controlMin.first == _controlMax.first && !static_cast<bool>(kDateMask & typeMask)) {
+        // The control min and max tags are both dates and the target typeMask doesn't cover Dates.
+        // Since Dates are in their own canonical type bracket (see canonicalizeBSONType()) and
+        // fillType on Nothing returns Nothing, we can return the block unchanged without having to
+        // extract.
+        return nullptr;
+    }
+
+    return ValueBlock::fillType(typeMask, fillTag, fillVal);
+}
 
 ValueBlock& TsCellBlockForTopLevelField::getValueBlock() {
     return *_unownedTsBlock;

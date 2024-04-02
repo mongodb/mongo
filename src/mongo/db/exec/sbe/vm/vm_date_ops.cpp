@@ -324,17 +324,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateAdd(ArityTyp
 
 namespace {
 
-/**
- * Used to return a MonoBlock of Nothings. Used when builtinValueBlockDateTrunc receives invalid
- * parameters.
- */
-FastTuple<bool, value::TypeTags, value::Value> makeNothingBlock(value::ValueBlock* valueBlockIn) {
-    auto out = std::make_unique<value::MonoBlock>(
-        valueBlockIn->count(), value::TypeTags::Nothing, value::Value{0u});
-    return {
-        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
-}
-
 struct DateTruncFunctor {
     DateTruncFunctor(TimeUnit unit, int64_t binSize, TimeZone timeZone, DayOfWeek startOfWeek)
         : _unit(unit), _binSize(binSize), _timeZone(timeZone), _startOfWeek(startOfWeek) {
@@ -466,6 +455,15 @@ struct DateAddFunctor {
 
 static const auto dateAddOp =
     value::makeColumnOpWithParams<ColumnOpType::kMonotonic, DateAddFunctor>();
+}  // namespace
+
+namespace {
+FastTuple<bool, value::TypeTags, value::Value> makeNothingBlock(value::ValueBlock* block) {
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(
+                value::MonoBlock::makeNothingBlock(block->count()).release())};
+}
 }  // namespace
 
 /**
