@@ -211,12 +211,8 @@ ShardEndpoint targetUnshardedCollection(const NamespaceString& nss,
     invariant(!cri.cm.isSharded());
     if (cri.cm.hasRoutingTable()) {
         // Target the only shard that owns this collection.
-        std::set<ShardId> shardsOwningChunks;
-        cri.cm.getAllShardIds(&shardsOwningChunks);
-        invariant(shardsOwningChunks.size() == 1);
-        return ShardEndpoint(*shardsOwningChunks.begin(),
-                             cri.getShardVersion(*shardsOwningChunks.begin()),
-                             boost::none);
+        const auto shardId = cri.cm.getMinKeyShardIdWithSimpleCollation();
+        return ShardEndpoint(shardId, cri.getShardVersion(shardId), boost::none);
     } else {
         // Target the db-primary shard. Attach 'dbVersion: X, shardVersion: UNSHARDED'.
         // TODO (SERVER-51070): Remove the boost::none when the config server can support
