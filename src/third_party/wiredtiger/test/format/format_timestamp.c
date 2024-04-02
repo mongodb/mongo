@@ -123,7 +123,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
          * allows two runs that finish with stable timestamps in the same ballpark to be compared.
          */
         if (stable_timestamp > 10 * WT_THOUSAND)
-            oldest_timestamp = stable_timestamp - 10 * WT_THOUSAND;
+            oldest_timestamp = WT_MAX(stable_timestamp - 10 * WT_THOUSAND, g.oldest_timestamp);
         else
             oldest_timestamp = stable_timestamp / 2;
     } else if (!final) {

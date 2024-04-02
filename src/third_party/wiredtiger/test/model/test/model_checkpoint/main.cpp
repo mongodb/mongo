@@ -284,8 +284,10 @@ test_checkpoint_wt(void)
     wt_model_ckpt_assert(table, uri, "ckpt3", key2);
     wt_model_ckpt_assert(table, uri, "ckpt3", key3);
 
-    /* Test moving the stable timestamp backwards - this should fail silently. */
-    wt_model_set_stable_timestamp_both(50);
+    /*
+     * Test assigning the stable timestamp the same value again - this should not have any effect.
+     */
+    wt_model_set_stable_timestamp_both(60);
     testutil_assert(database.stable_timestamp() == wt_get_stable_timestamp(conn));
     wt_model_ckpt_create_both("ckpt4");
     wt_model_ckpt_assert(table, uri, "ckpt4", key1);
