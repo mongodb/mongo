@@ -714,7 +714,7 @@ restart:
     while (i < WT_SLOT_POOL) {
         save_i = i;
         slot = &log->slot_pool[i++];
-        if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
+        if (__wt_atomic_loadiv64(&slot->slot_state) != WT_LOG_SLOT_WRITTEN)
             continue;
         written[written_i].slot_index = save_i;
         WT_ASSIGN_LSN(&written[written_i++].lsn, &slot->slot_release_lsn);
