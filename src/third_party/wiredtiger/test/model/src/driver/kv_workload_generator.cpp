@@ -59,6 +59,9 @@ kv_workload_generator_spec::kv_workload_generator_spec()
     restart = 0.002;
     set_stable_timestamp = 0.2;
 
+    remove_existing = 0.9;
+    update_existing = 0.1;
+
     prepared_transaction = 0.25;
     use_set_commit_timestamp = 0.25;
     nonprepared_transaction_rollback = 0.1;
@@ -74,6 +77,29 @@ kv_workload_generator::kv_workload_generator(kv_workload_generator_spec spec, ui
     : _workload_ptr(std::make_shared<kv_workload>()), _workload(*(_workload_ptr.get())),
       _last_table_id(0), _last_txn_id(0), _random(seed), _spec(spec)
 {
+}
+
+/*
+ * table_context::choose_existing_key --
+ *     Randomly select an existing key.
+ */
+data_value
+kv_workload_generator::table_context::choose_existing_key(random &r)
+{
+    if (_keys.empty())
+        throw std::runtime_error("The table is empty");
+
+    /*
+     * For now, just pick a key at random. We may add weights based on number of operations per key
+     * in the future.
+     */
+    size_t index = r.next_index(_keys.size());
+
+    auto iter = _keys.begin();
+    std::advance(iter, index);
+    assert(iter != _keys.end());
+
+    return iter->first;
 }
 
 /*
@@ -396,14 +422,16 @@ kv_workload_generator::generate_transaction(size_t seq_no)
             probability_case(_spec.insert)
             {
                 table_context_ptr table = choose_table(txn_ptr);
-                data_value key = generate_key(table);
+                data_value key = generate_key(table, op_category::update);
                 data_value value = generate_value(table);
+                table->update_key(key);
                 txn << operation::insert(table->id(), txn_id, key, value);
             }
             probability_case(_spec.remove)
             {
                 table_context_ptr table = choose_table(txn_ptr);
-                data_value key = generate_key(table);
+                data_value key = generate_key(table, op_category::remove);
+                table->remove_key(key);
                 txn << operation::remove(table->id(), txn_id, key);
             }
             probability_case(_spec.set_commit_timestamp)
@@ -418,6 +446,7 @@ kv_workload_generator::generate_transaction(size_t seq_no)
                 data_value stop = generate_key(table);
                 if (start > stop)
                     std::swap(start, stop);
+                table->remove_key_range(start, stop);
                 txn << operation::truncate(table->id(), txn_id, start, stop);
             }
         }
@@ -583,6 +612,37 @@ kv_workload_generator::run()
         if (s->next_operation_index >= s->sequence->size())
             t.complete_one(s);
     }
+}
+
+/*
+ * kv_workload_generator::generate_key --
+ *     Generate a key.
+ */
+data_value
+kv_workload_generator::generate_key(table_context_ptr table, op_category op)
+{
+    /* Get the probability of choosing an existing key. */
+    float p_existing = 0;
+    switch (op) {
+    case op_category::none:
+        p_existing = 0;
+        break;
+
+    case op_category::remove:
+        p_existing = _spec.remove_existing;
+        break;
+
+    case op_category::update:
+        p_existing = _spec.update_existing;
+        break;
+    }
+
+    /* See if we should get an existing key. */
+    if (!table->empty() && _random.next_float() < p_existing)
+        return table->choose_existing_key(_random);
+
+    /* Otherwise generate a random key. It's okay if the key already exists. */
+    return random_data_value(table->key_format());
 }
 
 /*
