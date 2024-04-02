@@ -97,25 +97,32 @@ testFn(aUnwind, numExpectedResults, bUnwind, numExpectedResults, expectedCacheEn
 if (sbeEnabled) {
     // In classic runtime planning for SBE, we should stop trial run if inefficient plan produces
     // too much data to stash.
-    const hugeString = Array(1024 * 1024 + 1).toString();  // 10MB of ','
+    const hugeString = Array(1024 * 1024 + 1).toString();  // 1MB of ','
     const foreignColl = db.plan_cache_replan_unwind_foreign;
-    assert.commandWorked(foreignColl.insertOne({_id: 0, str: hugeString}));
+    assert.commandWorked(foreignColl.createIndex({lookupId: 1}));
+    const foreignDoc = {lookupId: 0, str: hugeString};
+    for (let i = 0; i < 200; ++i) {
+        assert.commandWorked(foreignColl.insertOne(foreignDoc));
+    }
 
-    const lookup = [
-        {$lookup: {from: foreignColl.getName(), localField: "arr", foreignField: "_id", as: "data"}}
+    assert.commandWorked(coll.updateMany({}, {$set: {lookupId: 0}}));
+
+    const lookupUnwind = [
+        { $lookup: { from: foreignColl.getName(), localField: "lookupId", foreignField: "lookupId", as: "data" } },
+        { $unwind: "$data" }
     ];
 
     setUpActiveCacheEntry(coll,
-                          aUnwind.concat(lookup),
+                          aIndexPredicate.concat(lookupUnwind),
                           2 /*cacheEntryVersion*/,
                           "a_1" /*cachedIndexName*/,
                           getAssertCount(numExpectedResults));
-    assert.eq(numExpectedResults, coll.aggregate(bUnwind.concat(lookup)).itcount());
+    assert.eq(numExpectedResults, coll.aggregate(bIndexPredicate.concat(lookupUnwind)).itcount());
     // Assert that replanning did not get triggered (a plan using the {a: 1} index is still in the
     // cache) due to the amount of data that had to get stashed during the trial period growing too
     // large
     assertCacheUsage(coll,
-                     bUnwind.concat(lookup),
+                     bIndexPredicate.concat(lookupUnwind),
                      false /*multiPlanning*/,
                      2 /*cacheEntryVersion*/,
                      true /*cacheEntryIsActive*/,

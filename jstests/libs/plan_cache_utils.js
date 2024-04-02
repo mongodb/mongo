@@ -51,7 +51,7 @@ export function assertCacheUsage(coll,
         const explainKey = explain.hasOwnProperty("queryPlanner")
             ? explain.queryPlanner.planCacheKey
             : explain.stages[0].$cursor.queryPlanner.planCacheKey;
-        assert.eq(explainKey, entry.planCacheKey);
+        assert.eq(explainKey, entry.planCacheKey, {explain: explain, cacheEntry: entry});
     }
     if (cacheEntryVersion === 2) {
         assert(entry.cachedPlan.stages.includes(cachedIndexName), entry);
