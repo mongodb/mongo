@@ -214,6 +214,11 @@ selector:
   # Does not support tojson of command objects.
   - jstests/core/**/SERVER-23626.js
 
+  # Skip time-series tests which need special handling to not fail validate.
+  # Currently, the validate hook is run before migration reaches the recipient kConsistent stage
+  # which is fine for regular collections, but will show as corruption for system.buckets collections.
+  - jstests/core/timeseries/*.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # These tests run getMore commands which are not supported in the tenant migration passthrough.

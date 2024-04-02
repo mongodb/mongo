@@ -106,6 +106,12 @@ selector:
   - jstests/core/**/verify_update_mods.js
   - jstests/core/views/invalid_system_views.js
   - jstests/core/views/views_all_commands.js
+
+  # Skip time-series tests which need special handling to not fail validate.
+  # Currently, the validate hook is run before migration reaches the recipient kConsistent stage
+  # which is fine for regular collections, but will show as corruption for system.buckets collections.
+  - jstests/core/timeseries/*.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # These tests run getMore commands which are not supported in the tenant migration passthrough.
