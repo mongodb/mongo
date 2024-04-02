@@ -73,6 +73,11 @@ bool ReplicaSetEndpointShardingState::isConfigShardForTest() {
     return _isConfigShard;
 }
 
+void ReplicaSetEndpointShardingState::setIsReplicaSetMember(bool value) {
+    stdx::unique_lock wLock(_mutex);  // NOLINT
+    _isReplicaSetMember = value;
+}
+
 bool ReplicaSetEndpointShardingState::supportsReplicaSetEndpoint() {
     if (!isFeatureFlagEnabled()) {
         return false;
@@ -88,7 +93,7 @@ bool ReplicaSetEndpointShardingState::supportsReplicaSetEndpoint() {
     }
 
     std::shared_lock rLock(_mutex);  // NOLINT
-    return _isConfigShard;
+    return _isReplicaSetMember && _isConfigShard;
 }
 
 bool isFeatureFlagEnabled() {

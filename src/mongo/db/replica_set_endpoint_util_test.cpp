@@ -72,7 +72,9 @@ protected:
         Grid::get(getServiceContext())->setShardingInitialized();
         serverGlobalParams.clusterRole = {
             ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
-        ReplicaSetEndpointShardingState::get(getServiceContext())->setIsConfigShard(true);
+        auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
+        shardingState->setIsConfigShard(true);
+        shardingState->setIsReplicaSetMember(true);
         setHasTwoOrShardsClusterParameter(false);
         ASSERT_FALSE(getHasTwoOrShardsClusterParameter());
 
@@ -127,6 +129,14 @@ TEST_F(ReplicaSetEndpointUtilTest, IsReplicaSetEndpointClient_NotIsConfigShard) 
 
     std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
     auto client = getServiceContext()->getService()->makeClient("NotIsConfigShard", session);
+    ASSERT_FALSE(isReplicaSetEndpointClient(client.get()));
+}
+
+TEST_F(ReplicaSetEndpointUtilTest, IsReplicaSetEndpointClient_NotIsReplicaSetMember) {
+    ReplicaSetEndpointShardingState::get(getServiceContext())->setIsReplicaSetMember(false);
+
+    std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
+    auto client = getServiceContext()->getService()->makeClient("NotIsReplicaSetMember", session);
     ASSERT_FALSE(isReplicaSetEndpointClient(client.get()));
 }
 
@@ -501,6 +511,20 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_NotIsConfigShard) {
     auto client = getServiceContext()->getService()->makeClient("NotIsConfigShard", session);
     auto opCtx = client->makeOperationContext();
     ReplicaSetEndpointShardingState::get(opCtx.get())->setIsConfigShard(false);
+
+    auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
+    commands_test_example::ExampleIncrement incrementCmd(ns, 0);
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
+
+    ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
+}
+
+TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_NotIsReplicaSetMember) {
+    std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
+    auto client = getServiceContext()->getService()->makeClient("NotIsReplicaSetMember", session);
+    auto opCtx = client->makeOperationContext();
+    ReplicaSetEndpointShardingState::get(opCtx.get())->setIsReplicaSetMember(false);
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);

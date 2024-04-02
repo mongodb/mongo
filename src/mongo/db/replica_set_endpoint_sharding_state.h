@@ -59,6 +59,11 @@ public:
     bool isConfigShardForTest();
 
     /**
+     * Sets '_isReplicaSetMember' to true or false.
+     */
+    void setIsReplicaSetMember(bool value);
+
+    /**
      * Returns true if this mongod supports replica set endpoint, meaning it is part of
      * a single-shard cluster consisting of config shard with router role.
      */
@@ -68,7 +73,10 @@ private:
     mutable std::shared_mutex _mutex;  // NOLINT
 
     // Set to true if this mongod belongs to a config shard.
-    bool _isConfigShard;
+    bool _isConfigShard = false;
+
+    // Set to true if this mongod is part of a replica set.
+    bool _isReplicaSetMember = false;
 };
 
 /**
