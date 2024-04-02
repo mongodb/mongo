@@ -76,7 +76,6 @@ BSONObj buildSample(
 
     if (multiservice) {
         serviceBuilder = std::make_unique<BSONObjBuilder>(sampleBuilder.subobjStart("common"));
-        serviceBuilder->appendDate("start", kDate);
         endLevelBuilder = serviceBuilder.get();
     }
 
@@ -97,9 +96,6 @@ BSONObj buildSample(
         subBob.appendDate("end", kDate);
     }
 
-    if (multiservice) {
-        serviceBuilder->appendDate("end", kDate);
-    }
     serviceBuilder.reset(nullptr);
     sampleBuilder.appendDate("end", kDate);
     return sampleBuilder.obj();
@@ -176,12 +172,6 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_BasicDeltas) {
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result.value(), deltaDoc);
     ASSERT_EQ(compressor.getDeltaCount(), 2);
-
-    // Test no changes
-    for (size_t i = 0; i < 2; i++) {
-        result = compressor.addSample(sampleDoc);
-        ASSERT(!result);
-    }
 
     // Alter multiple field values in field1 and field2, then call addSample
     changedElements.clear();
@@ -310,12 +300,6 @@ TEST(FTDCMetadataCompressorTest, TestReconstruction) {
 
                 if (multiservice) {
                     // go one more level deeper
-                    if (deltaLvl2Element.type() != BSONType::Object) {
-                        ASSERT_FALSE(currentLvl2Element.isType(BSONType::Object));
-                        ASSERT_OK(currentLvl2Element.setValueBSONElement(deltaLvl2Element));
-                        continue;
-                    }
-
                     ASSERT(currentLvl2Element.isType(BSONType::Object));
                     BSONObjIterator deltaLvl3Itr(deltaLvl2Element.Obj());
                     while (deltaLvl3Itr.more()) {
