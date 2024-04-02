@@ -29,6 +29,7 @@
 
 #include <cstdint>
 
+#include "mongo/util/assert_util.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/timer.h"
@@ -49,7 +50,7 @@ Timer::Timer(TickSource* tickSource)
     reset();
 }
 
-long long Timer::now() const {
+long long Timer::_now() const {
     return _tickSource->getTicks();
 }
 
