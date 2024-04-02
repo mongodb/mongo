@@ -87,7 +87,7 @@ void BM_SingleIndex(benchmark::State& state) {
     auto filter = BSON("a" << 1);
     auto cq = getCanonicalQuery({.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
-    plannerParams.indices = {createIndexEntry(BSON("a" << 1))};
+    plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1))};
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }
@@ -97,8 +97,8 @@ void BM_MultipleIndexes(benchmark::State& state) {
     auto filter = BSON("a" << 1 << "b" << 1);
     auto cq = getCanonicalQuery({.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
-    plannerParams.indices = {createIndexEntry(BSON("a" << 1)),
-                             createIndexEntry(BSON("a" << 1 << "b" << 1))};
+    plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1)),
+                                                createIndexEntry(BSON("a" << 1 << "b" << 1))};
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }
@@ -122,8 +122,8 @@ void BM_LargeIn(benchmark::State& state) {
     auto filter = bob.obj();
     auto cq = getCanonicalQuery({.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
-    plannerParams.indices = {createIndexEntry(BSON("a" << 1 << "b" << 1)),
-                             createIndexEntry(BSON("a" << 1))};
+    plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1 << "b" << 1)),
+                                                createIndexEntry(BSON("a" << 1))};
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }
@@ -142,8 +142,8 @@ void BM_IndexedContainedOrFilter(benchmark::State& state) {
                                          << BSON("b" << 6 << "c" << 6)));
     auto cq = getCanonicalQuery({.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
-    plannerParams.indices = {createIndexEntry(BSON("a" << 1 << "b" << 1)),
-                             createIndexEntry(BSON("a" << 1 << "c" << 1))};
+    plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1 << "b" << 1)),
+                                                createIndexEntry(BSON("a" << 1 << "c" << 1))};
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }
@@ -158,13 +158,13 @@ void BM_IndexIntersection(benchmark::State& state) {
     auto filter = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1 << "f" << 1);
     auto cq = getCanonicalQuery({.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
-    plannerParams.options = QueryPlannerParams::Options::INDEX_INTERSECTION;
-    plannerParams.indices = {createIndexEntry(BSON("a" << 1)),
-                             createIndexEntry(BSON("b" << 1)),
-                             createIndexEntry(BSON("c" << 1)),
-                             createIndexEntry(BSON("d" << 1)),
-                             createIndexEntry(BSON("e" << 1)),
-                             createIndexEntry(BSON("f" << 1))};
+    plannerParams.mainCollectionInfo.options = QueryPlannerParams::Options::INDEX_INTERSECTION;
+    plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1)),
+                                                createIndexEntry(BSON("b" << 1)),
+                                                createIndexEntry(BSON("c" << 1)),
+                                                createIndexEntry(BSON("d" << 1)),
+                                                createIndexEntry(BSON("e" << 1)),
+                                                createIndexEntry(BSON("f" << 1))};
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }
@@ -186,7 +186,7 @@ void BM_IndexDedupping(benchmark::State& state) {
     auto cq = getCanonicalQuery({.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     // 64 indexes each prefixed with 'foo' field.
-    plannerParams.indices = create64FooPrefixedIndexes();
+    plannerParams.mainCollectionInfo.indexes = create64FooPrefixedIndexes();
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }
@@ -200,7 +200,7 @@ void BM_ManyIndexes(benchmark::State& state) {
     auto cq = getCanonicalQuery({.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     // 64 indexes each prefixed with 'foo' field.
-    plannerParams.indices = create64FooPrefixedIndexes();
+    plannerParams.mainCollectionInfo.indexes = create64FooPrefixedIndexes();
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }
@@ -213,11 +213,11 @@ void BM_IndexSatisfiesSort(benchmark::State& state) {
     auto cq = getCanonicalQuery({.filter = filter, .sort = sort});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
     // Several indexes which can satisfy the sort
-    plannerParams.indices = {createIndexEntry(BSON("b" << 1)),
-                             createIndexEntry(BSON("b" << 1 << "c" << 1)),
-                             createIndexEntry(BSON("b" << 1 << "d" << 1)),
-                             createIndexEntry(BSON("b" << 1 << "e" << 1)),
-                             createIndexEntry(BSON("b" << 1 << "f" << 1))};
+    plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("b" << 1)),
+                                                createIndexEntry(BSON("b" << 1 << "c" << 1)),
+                                                createIndexEntry(BSON("b" << 1 << "d" << 1)),
+                                                createIndexEntry(BSON("b" << 1 << "e" << 1)),
+                                                createIndexEntry(BSON("b" << 1 << "f" << 1))};
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }
@@ -228,9 +228,10 @@ void BM_ShardFilter(benchmark::State& state) {
     auto filter = BSON("a" << 1);
     auto cq = getCanonicalQuery({.filter = filter});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
-    plannerParams.options = QueryPlannerParams::Options::INCLUDE_SHARD_FILTER;
+    plannerParams.mainCollectionInfo.options = QueryPlannerParams::Options::INCLUDE_SHARD_FILTER;
     plannerParams.shardKey = BSON("b" << 1);
-    plannerParams.indices = {createIndexEntry(BSON("a" << 1)), createIndexEntry(BSON("b" << 1))};
+    plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1)),
+                                                createIndexEntry(BSON("b" << 1))};
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }
@@ -242,8 +243,8 @@ void BM_CoveredPlan(benchmark::State& state) {
     auto proj = BSON("_id" << 0 << "b" << 1);
     auto cq = getCanonicalQuery({.filter = filter, .proj = proj});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
-    plannerParams.indices = {createIndexEntry(BSON("a" << 1 << "b" << 1)),
-                             createIndexEntry(BSON("a" << 1))};
+    plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1 << "b" << 1)),
+                                                createIndexEntry(BSON("a" << 1))};
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }
@@ -255,7 +256,8 @@ void BM_HintedPlan(benchmark::State& state) {
     auto hint = BSON("a" << 1);
     auto cq = getCanonicalQuery({.filter = filter, .hint = hint});
     QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
-    plannerParams.indices = {createIndexEntry(BSON("a" << 1)), createIndexEntry(BSON("b" << 1))};
+    plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1)),
+                                                createIndexEntry(BSON("b" << 1))};
     for (auto _ : state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }

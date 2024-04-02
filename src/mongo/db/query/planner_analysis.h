@@ -164,18 +164,17 @@ public:
      * - A nested loop join is chosen in all other cases.
      */
     static std::pair<EqLookupNode::LookupStrategy, boost::optional<IndexEntry>>
-    determineLookupStrategy(
-        const NamespaceString& foreignCollName,
-        const std::string& foreignField,
-        const std::map<NamespaceString, SecondaryCollectionInfo>& collectionsInfo,
-        bool allowDiskUse,
-        const CollatorInterface* collator);
+    determineLookupStrategy(const NamespaceString& foreignCollName,
+                            const std::string& foreignField,
+                            const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
+                            bool allowDiskUse,
+                            const CollatorInterface* collator);
 
     /**
      * Checks if the foreign collection is eligible for the hash join algorithm. We conservatively
      * choose the hash join algorithm for cases when the hash table is unlikely to spill to disk.
      */
-    static bool isEligibleForHashJoin(const SecondaryCollectionInfo& foreignCollInfo);
+    static bool isEligibleForHashJoin(const CollectionInfo& foreignCollInfo);
 };
 
 }  // namespace mongo

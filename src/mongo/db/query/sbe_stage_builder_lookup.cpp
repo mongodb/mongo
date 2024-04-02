@@ -1291,7 +1291,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                           boost::none /* seekRecordIdSlot */,
                                           boost::none /* minRecordIdSlot */,
                                           boost::none /* maxRecordIdSlot */,
-                                          // TODO SERVER-86400 Pass the 'collscanDirection' for
+                                          // TODO SERVER-88628 Pass the 'collscanDirection' for
                                           // the'QueryPlannerParams::CollectionInfo' here.
                                           true /* forward */,
                                           _yieldPolicy,

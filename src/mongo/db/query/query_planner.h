@@ -107,7 +107,7 @@ public:
     static std::unique_ptr<QuerySolution> extendWithAggPipeline(
         CanonicalQuery& query,
         std::unique_ptr<QuerySolution>&& solution,
-        const std::map<NamespaceString, SecondaryCollectionInfo>& secondaryCollInfos);
+        const std::map<NamespaceString, CollectionInfo>& secondaryCollInfos);
 
     /**
      * Returns the list of possible query solutions for the provided 'query' for multi-planning.

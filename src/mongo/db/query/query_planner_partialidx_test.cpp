@@ -52,7 +52,7 @@ namespace {
 const static NamespaceString kNs = NamespaceString::createNamespaceString_forTest("db.dummyNs");
 
 TEST_F(QueryPlannerTest, PartialIndexEq) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -69,7 +69,7 @@ TEST_F(QueryPlannerTest, PartialIndexEq) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexNot) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -85,7 +85,7 @@ TEST_F(QueryPlannerTest, PartialIndexNot) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexElemMatchObj) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{'a.b': {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{'a.b': 1}"), filterExpr.get());
@@ -99,7 +99,7 @@ TEST_F(QueryPlannerTest, PartialIndexElemMatchObj) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexElemMatchObjContainingOr) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{'a.b': {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{'a.b': 1}"), filterExpr.get());
@@ -110,7 +110,7 @@ TEST_F(QueryPlannerTest, PartialIndexElemMatchObjContainingOr) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexElemMatchObjWithBadSubobjectFilter) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{b: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{'a.b': 1}"), filterExpr.get());
@@ -123,7 +123,7 @@ TEST_F(QueryPlannerTest, PartialIndexElemMatchObjWithBadSubobjectFilter) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexAndSingleAssignment) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{f: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -140,7 +140,7 @@ TEST_F(QueryPlannerTest, PartialIndexAndSingleAssignment) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexAndMultipleAssignments) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{f: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -157,7 +157,7 @@ TEST_F(QueryPlannerTest, PartialIndexAndMultipleAssignments) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexOr) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -176,7 +176,7 @@ TEST_F(QueryPlannerTest, PartialIndexOr) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexOrContainingAnd) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{f: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -196,7 +196,7 @@ TEST_F(QueryPlannerTest, PartialIndexOrContainingAnd) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexOrContainingAndMultipleAssignments) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -234,7 +234,7 @@ TEST_F(QueryPlannerTest, PartialIndexOrContainingAndMultipleAssignments) {
 
 
 TEST_F(QueryPlannerTest, PartialIndexAndContainingOrContainingAnd) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{f: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -254,7 +254,7 @@ TEST_F(QueryPlannerTest, PartialIndexAndContainingOrContainingAnd) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexAndContainingOrContainingAndSatisfyingPredOutside) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{f: {$gt: 0}, g: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -275,7 +275,7 @@ TEST_F(QueryPlannerTest, PartialIndexAndContainingOrContainingAndSatisfyingPredO
 }
 
 TEST_F(QueryPlannerTest, PartialIndexOrContainingAndContainingOr) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -297,7 +297,7 @@ TEST_F(QueryPlannerTest, PartialIndexOrContainingAndContainingOr) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexProvidingSort) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{f: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -314,7 +314,7 @@ TEST_F(QueryPlannerTest, PartialIndexProvidingSort) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexOrContainingNot) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -327,7 +327,7 @@ TEST_F(QueryPlannerTest, PartialIndexOrContainingNot) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexMultipleSameAnd) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObjA(fromjson("{f: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExprA = parseMatchExpression(filterObjA);
     addIndex(fromjson("{a: 1}"), filterExprA.get());
@@ -358,7 +358,7 @@ TEST_F(QueryPlannerTest, PartialIndexMultipleSameAnd) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexMultipleSameAndCompoundSharedPrefix) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{f: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1, b: 1}"), filterExpr.get());
@@ -382,7 +382,7 @@ TEST_F(QueryPlannerTest, PartialIndexMultipleSameAndCompoundSharedPrefix) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexMultipleSameOr) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObjA(fromjson("{f: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExprA = parseMatchExpression(filterObjA);
     addIndex(fromjson("{a: 1}"), filterExprA.get());
@@ -409,7 +409,7 @@ TEST_F(QueryPlannerTest, PartialIndexMultipleSameOr) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexAndCompoundIndex) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{f: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1, b: 1}"), filterExpr.get());
@@ -427,7 +427,7 @@ TEST_F(QueryPlannerTest, PartialIndexAndCompoundIndex) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexOrCompoundIndex) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{f: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1, b: 1}"), filterExpr.get());
@@ -447,7 +447,7 @@ TEST_F(QueryPlannerTest, PartialIndexOrCompoundIndex) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexNor) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{f: {$gt: 0}}"));
     std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -461,7 +461,7 @@ TEST_F(QueryPlannerTest, PartialIndexNor) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexStringComparisonMatchingCollators) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 'cba'}}"));
 
     auto expCtxForPartialFilter = make_intrusive<ExpressionContext>(
@@ -486,7 +486,7 @@ TEST_F(QueryPlannerTest, PartialIndexStringComparisonMatchingCollators) {
 }
 
 TEST_F(QueryPlannerTest, PartialIndexNoStringComparisonNonMatchingCollators) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 0}}"));
 
     auto expCtxForPartialFilter = make_intrusive<ExpressionContext>(
@@ -506,7 +506,7 @@ TEST_F(QueryPlannerTest, PartialIndexNoStringComparisonNonMatchingCollators) {
 }
 
 TEST_F(QueryPlannerTest, InternalExprEqCannotUsePartialIndex) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gte: 0}}"));
     auto filterExpr = parseMatchExpression(filterObj);
     addIndex(fromjson("{a: 1}"), filterExpr.get());
@@ -516,7 +516,7 @@ TEST_F(QueryPlannerTest, InternalExprEqCannotUsePartialIndex) {
 }
 
 TEST_F(QueryPlannerTest, MultipleOverlappingPartialIndexes) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
 
     // Create two partial indexes with an overlapping range on the same key pattern.
     BSONObj minus5To5 = fromjson("{a: {$gte: -5, $lte: 5}}");
@@ -524,9 +524,9 @@ TEST_F(QueryPlannerTest, MultipleOverlappingPartialIndexes) {
     std::unique_ptr<MatchExpression> minus5To5Filter = parseMatchExpression(minus5To5);
     std::unique_ptr<MatchExpression> gte0Filter = parseMatchExpression(gte0);
     addIndex(fromjson("{a: 1}"), minus5To5Filter.get());
-    params.indices.back().identifier = CoreIndexInfo::Identifier{"minus5To5"};
+    params.mainCollectionInfo.indexes.back().identifier = CoreIndexInfo::Identifier{"minus5To5"};
     addIndex(fromjson("{a: 1}"), gte0Filter.get());
-    params.indices.back().identifier = CoreIndexInfo::Identifier{"gte0"};
+    params.mainCollectionInfo.indexes.back().identifier = CoreIndexInfo::Identifier{"gte0"};
 
     // Test that both indexes are eligible when the query falls within the intersecting range.
     runQuery(fromjson("{a: 1}"));

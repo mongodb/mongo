@@ -278,8 +278,7 @@ void QueryPlannerParams::applyQuerySettingsNaturalHintsForCollection(
     const CanonicalQuery& canonicalQuery,
     const CollectionPtr& collection,
     const std::vector<mongo::IndexHint>& allowedIndexes,
-    std::vector<IndexEntry>& indexes) {
-    // TODO SERVER-86400: Add support for $natural hints on secondary collections.
+    CollectionInfo& collectionInfo) {
     bool forwardAllowed = false;
     bool backwardAllowed = false;
     for (const auto& allowedIndex : allowedIndexes) {
@@ -327,17 +326,18 @@ void QueryPlannerParams::applyQuerySettingsNaturalHintsForCollection(
 
     if (!forwardAllowed && !backwardAllowed) {
         // No '$natural' or cluster key hint present. Ensure that table scans are forbidden.
-        options |= QueryPlannerParams::Options::NO_TABLE_SCAN;
+        collectionInfo.options |= QueryPlannerParams::Options::NO_TABLE_SCAN;
     } else {
         // At least one direction is allowed. Clear out the 'NO_TABLE_SCAN' flag if it exists,
         // as query settings should have a higher precedence over server parameters.
-        options &= ~QueryPlannerParams::Options::NO_TABLE_SCAN;
+        collectionInfo.options &= ~QueryPlannerParams::Options::NO_TABLE_SCAN;
 
         // Enforce the scan direction if needed.
         const bool bothDirectionsAllowed = forwardAllowed && backwardAllowed;
         if (!bothDirectionsAllowed) {
-            collscanDirection = forwardAllowed ? NaturalOrderHint::Direction::kForward
-                                               : NaturalOrderHint::Direction::kBackward;
+            collectionInfo.collscanDirection = forwardAllowed
+                ? NaturalOrderHint::Direction::kForward
+                : NaturalOrderHint::Direction::kBackward;
         }
     }
 }
@@ -347,7 +347,7 @@ void QueryPlannerParams::applyQuerySettingsForCollection(
     const CollectionPtr& collection,
     const std::variant<std::vector<mongo::query_settings::IndexHintSpec>,
                        mongo::query_settings::IndexHintSpec>& indexHintSpecs,
-    std::vector<IndexEntry>& indexes) {
+    CollectionInfo& collectionInfo) {
     // Retrieving the allowed indexes for the given collection.
     auto getHintNamespace = [](const auto& hint) {
         return NamespaceStringUtil::deserialize(*hint.getNs().getDb(), *hint.getNs().getColl());
@@ -380,9 +380,10 @@ void QueryPlannerParams::applyQuerySettingsForCollection(
         return;
     }
 
-    applyQuerySettingsIndexHintsForCollection(canonicalQuery, collection, allowedIndexes, indexes);
+    applyQuerySettingsIndexHintsForCollection(
+        canonicalQuery, collection, allowedIndexes, collectionInfo.indexes);
     applyQuerySettingsNaturalHintsForCollection(
-        canonicalQuery, collection, allowedIndexes, indexes);
+        canonicalQuery, collection, allowedIndexes, collectionInfo);
 
     querySettingsApplied = true;
 }
@@ -416,7 +417,7 @@ void QueryPlannerParams::applyIndexFilters(const CanonicalQuery& canonicalQuery,
     // Also, signal to planner that application hint should be ignored.
     if (boost::optional<AllowedIndicesFilter> allowedIndicesFilter =
             querySettings.getAllowedIndicesFilter(canonicalQuery)) {
-        filterAllowedIndexEntries(*allowedIndicesFilter, indices);
+        filterAllowedIndexEntries(*allowedIndicesFilter, mainCollectionInfo.indexes);
         indexFiltersApplied = true;
 
         static Rarely sampler;
@@ -434,10 +435,10 @@ void QueryPlannerParams::applyQuerySettingsOrIndexFiltersForMainCollection(
     // If 'querySettings' has no index hints specified, then there are no settings to be applied
     // to this query.
     auto indexHintSpecs = canonicalQuery.getExpCtx()->getQuerySettings().getIndexHints();
-    const bool shouldIgnoreQuerySettings = options & IGNORE_QUERY_SETTINGS;
+    const bool shouldIgnoreQuerySettings = mainCollectionInfo.options & IGNORE_QUERY_SETTINGS;
     if (indexHintSpecs && !shouldIgnoreQuerySettings) {
         applyQuerySettingsForCollection(
-            canonicalQuery, collections.getMainCollection(), *indexHintSpecs, indices);
+            canonicalQuery, collections.getMainCollection(), *indexHintSpecs, mainCollectionInfo);
     }
 
     // Try to apply index filters only if query settings were not applied.
@@ -455,7 +456,7 @@ void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
     }
     auto fillOutSecondaryInfo = [&](const NamespaceString& nss,
                                     const CollectionPtr& secondaryColl) {
-        auto secondaryInfo = SecondaryCollectionInfo();
+        auto secondaryInfo = CollectionInfo{.options = providedOptions};
         if (secondaryColl) {
             fillOutIndexEntries(opCtx,
                                 canonicalQuery,
@@ -481,15 +482,15 @@ void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
     }
 
     auto indexHintSpecs = canonicalQuery.getExpCtx()->getQuerySettings().getIndexHints();
-    const bool shouldIgnoreQuerySettings = options & IGNORE_QUERY_SETTINGS;
+    const bool shouldIgnoreQuerySettings = mainCollectionInfo.options & IGNORE_QUERY_SETTINGS;
     if (!indexHintSpecs || shouldIgnoreQuerySettings) {
         return;
     }
 
     for (const auto& [name, coll] : collections.getSecondaryCollections()) {
         if (coll) {
-            applyQuerySettingsForCollection(
-                canonicalQuery, coll, *indexHintSpecs, secondaryCollectionsInfo[name].indexes);
+            auto& collInfo = secondaryCollectionsInfo[name];
+            applyQuerySettingsForCollection(canonicalQuery, coll, *indexHintSpecs, collInfo);
         }
     }
 }
@@ -508,25 +509,25 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
         bool ignore =
             canonicalQuery.getQueryObj().isEmpty() || nss.isSystem() || nss.isOnInternalDb();
         if (!ignore) {
-            options |= QueryPlannerParams::NO_TABLE_SCAN;
+            mainCollectionInfo.options |= QueryPlannerParams::NO_TABLE_SCAN;
         }
     }
 
     if (internalQueryPlannerEnableIndexIntersection.load()) {
-        options |= QueryPlannerParams::INDEX_INTERSECTION;
+        mainCollectionInfo.options |= QueryPlannerParams::INDEX_INTERSECTION;
     }
 
     if (internalQueryEnumerationPreferLockstepOrEnumeration.load()) {
-        options |= QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
+        mainCollectionInfo.options |= QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     }
 
     if (internalQueryPlannerGenerateCoveredWholeIndexScans.load()) {
-        options |= QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+        mainCollectionInfo.options |= QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     }
 
     if (shouldWaitForOplogVisibility(
             opCtx, mainColl, canonicalQuery.getFindCommandRequest().getTailable())) {
-        options |= QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
+        mainCollectionInfo.options |= QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
     }
 
     // _id queries can skip checking the catalog for indices since they will always use the _id
@@ -537,16 +538,20 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     }
 
     // If it's not NULL, we may have indices. Access the catalog and fill out IndexEntry(s)
-    fillOutIndexEntries(opCtx, canonicalQuery, mainColl, indices, columnStoreIndexes);
+    fillOutIndexEntries(opCtx,
+                        canonicalQuery,
+                        mainColl,
+                        mainCollectionInfo.indexes,
+                        mainCollectionInfo.columnIndexes);
     applyQuerySettingsOrIndexFiltersForMainCollection(canonicalQuery, collections);
 
     fillOutPlannerCollectionInfo(opCtx,
                                  mainColl,
-                                 &collectionStats,
+                                 &mainCollectionInfo.stats,
                                  // Only include the full size stats when there's a CSI.
-                                 !columnStoreIndexes.empty());
+                                 !mainCollectionInfo.columnIndexes.empty());
 
-    if (!columnStoreIndexes.empty()) {
+    if (!mainCollectionInfo.columnIndexes.empty()) {
         // Only fill this out when a CSI is present.
         const auto kMB = 1024 * 1024;
         availableMemoryBytes = static_cast<long long>(ProcessInfo::getMemSizeMB()) * kMB;
@@ -634,13 +639,13 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
 }  // namespace
 
 QueryPlannerParams::QueryPlannerParams(QueryPlannerParams::ArgsForDistinct&& distinctArgs) {
-    options = QueryPlannerParams::NO_TABLE_SCAN | distinctArgs.plannerOptions;
+    mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN | distinctArgs.plannerOptions;
 
     if (!distinctArgs.collections.hasMainCollection()) {
         return;
     }
 
-    indices = getIndexEntriesForDistinct(distinctArgs);
+    mainCollectionInfo.indexes = getIndexEntriesForDistinct(distinctArgs);
     const auto& canonicalQuery = *distinctArgs.canonicalDistinct.getQuery();
     applyQuerySettingsOrIndexFiltersForMainCollection(canonicalQuery, distinctArgs.collections);
 
@@ -649,7 +654,8 @@ QueryPlannerParams::QueryPlannerParams(QueryPlannerParams::ArgsForDistinct&& dis
     // plannerParams.indices.
     const BSONObj& hint = canonicalQuery.getFindCommandRequest().getHint();
     if (!indexFiltersApplied && !querySettingsApplied && !hint.isEmpty()) {
-        indices = QueryPlannerIXSelect::findIndexesByHint(hint, indices);
+        mainCollectionInfo.indexes =
+            QueryPlannerIXSelect::findIndexesByHint(hint, mainCollectionInfo.indexes);
     }
 }
 

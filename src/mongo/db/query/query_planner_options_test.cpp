@@ -411,7 +411,7 @@ TEST_F(QueryPlannerTest, HintInvalid) {
 //
 
 TEST_F(QueryPlannerTest, ShardFilterCollScan) {
-    params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("a" << 1);
     addIndex(BSON("a" << 1));
 
@@ -424,7 +424,7 @@ TEST_F(QueryPlannerTest, ShardFilterCollScan) {
 }
 
 TEST_F(QueryPlannerTest, ShardFilterBasicIndex) {
-    params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("a" << 1);
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
@@ -439,7 +439,7 @@ TEST_F(QueryPlannerTest, ShardFilterBasicIndex) {
 }
 
 TEST_F(QueryPlannerTest, ShardFilterBasicCovered) {
-    params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("a" << 1);
     addIndex(BSON("a" << 1));
 
@@ -453,7 +453,7 @@ TEST_F(QueryPlannerTest, ShardFilterBasicCovered) {
 }
 
 TEST_F(QueryPlannerTest, ShardFilterBasicProjCovered) {
-    params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("a" << 1);
     addIndex(BSON("a" << 1));
 
@@ -467,7 +467,7 @@ TEST_F(QueryPlannerTest, ShardFilterBasicProjCovered) {
 }
 
 TEST_F(QueryPlannerTest, ShardFilterCompoundProjCovered) {
-    params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("a" << 1 << "b" << 1);
     addIndex(BSON("a" << 1 << "b" << 1));
 
@@ -481,7 +481,7 @@ TEST_F(QueryPlannerTest, ShardFilterCompoundProjCovered) {
 }
 
 TEST_F(QueryPlannerTest, ShardFilterNestedProjCovered) {
-    params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("a" << 1 << "b.c" << 1);
     addIndex(BSON("a" << 1 << "b.c" << 1));
 
@@ -495,7 +495,7 @@ TEST_F(QueryPlannerTest, ShardFilterNestedProjCovered) {
 }
 
 TEST_F(QueryPlannerTest, ShardFilterHashProjNotCovered) {
-    params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("a"
                            << "hashed");
     addIndex(BSON("a"
@@ -512,7 +512,7 @@ TEST_F(QueryPlannerTest, ShardFilterHashProjNotCovered) {
 }
 
 TEST_F(QueryPlannerTest, ShardFilterKeyPrefixIndexCovered) {
-    params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("a" << 1);
     addIndex(BSON("a" << 1 << "b" << 1 << "_id" << 1));
 
@@ -526,7 +526,7 @@ TEST_F(QueryPlannerTest, ShardFilterKeyPrefixIndexCovered) {
 }
 
 TEST_F(QueryPlannerTest, ShardFilterNoIndexNotCovered) {
-    params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("a"
                            << "hashed");
     addIndex(BSON("b" << 1));
@@ -542,8 +542,8 @@ TEST_F(QueryPlannerTest, ShardFilterNoIndexNotCovered) {
 }
 
 TEST_F(QueryPlannerTest, CannotTrimIxisectParam) {
-    params.options = QueryPlannerParams::INDEX_INTERSECTION;
-    params.options |= QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options |= QueryPlannerParams::NO_TABLE_SCAN;
 
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
@@ -564,8 +564,8 @@ TEST_F(QueryPlannerTest, CannotTrimIxisectParam) {
 }
 
 TEST_F(QueryPlannerTest, CannotTrimIxisectParamBeneathOr) {
-    params.options = QueryPlannerParams::INDEX_INTERSECTION;
-    params.options |= QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options |= QueryPlannerParams::NO_TABLE_SCAN;
 
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
@@ -598,8 +598,8 @@ TEST_F(QueryPlannerTest, CannotTrimIxisectParamBeneathOr) {
 }
 
 TEST_F(QueryPlannerTest, CannotTrimIxisectAndHashWithOrChild) {
-    params.options = QueryPlannerParams::INDEX_INTERSECTION;
-    params.options |= QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options |= QueryPlannerParams::NO_TABLE_SCAN;
 
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
@@ -629,8 +629,8 @@ TEST_F(QueryPlannerTest, CannotTrimIxisectAndHashWithOrChild) {
 }
 
 TEST_F(QueryPlannerTest, CannotTrimIxisectParamSelfIntersection) {
-    params.options = QueryPlannerParams::INDEX_INTERSECTION;
-    params.options |= QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options |= QueryPlannerParams::NO_TABLE_SCAN;
 
     // true means multikey
     addIndex(BSON("a" << 1), true);
@@ -661,8 +661,8 @@ TEST_F(QueryPlannerTest, CannotTrimIxisectParamSelfIntersection) {
 // If a lookup against a unique index is available as a possible plan, then the planner
 // should not generate other possibilities.
 TEST_F(QueryPlannerTest, UniqueIndexLookup) {
-    params.options = QueryPlannerParams::INDEX_INTERSECTION;
-    params.options |= QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options |= QueryPlannerParams::NO_TABLE_SCAN;
 
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1),
@@ -679,7 +679,7 @@ TEST_F(QueryPlannerTest, UniqueIndexLookup) {
 }
 
 TEST_F(QueryPlannerTest, HintOnNonUniqueIndex) {
-    params.options = QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options = QueryPlannerParams::INDEX_INTERSECTION;
 
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1),
@@ -696,7 +696,7 @@ TEST_F(QueryPlannerTest, HintOnNonUniqueIndex) {
 }
 
 TEST_F(QueryPlannerTest, UniqueIndexLookupBelowOr) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
 
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
@@ -722,7 +722,7 @@ TEST_F(QueryPlannerTest, UniqueIndexLookupBelowOr) {
 }
 
 TEST_F(QueryPlannerTest, UniqueIndexLookupBelowOrBelowAnd) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
 
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
@@ -750,7 +750,7 @@ TEST_F(QueryPlannerTest, UniqueIndexLookupBelowOrBelowAnd) {
 }
 
 TEST_F(QueryPlannerTest, CoveredOrUniqueIndexLookup) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
 
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1),

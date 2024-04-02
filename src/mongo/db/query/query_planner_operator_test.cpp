@@ -73,7 +73,7 @@ TEST_F(QueryPlannerTest, EqualityIndexScanWithTrailingFields) {
 }
 
 TEST_F(QueryPlannerTest, ExprEqCanUseIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("a" << 1));
     runQuery(fromjson("{$expr: {$eq: ['$a', 1]}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
@@ -94,7 +94,7 @@ TEST_F(QueryPlannerTest, ExprEqCannotUseMultikeyFieldOfIndex) {
 // Test that when a $expr predicate is ANDed with an index-eligible predicate, an imprecise
 // $_internalExpr predicate is pushed into the IXSCAN bounds, to filter out results before fetching.
 TEST_F(QueryPlannerTest, ExprQueryOnMultiKeyIndexPushesImpreciseFilterToIxscan) {
-    params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("a" << 1 << "b" << 1), false /* multikey */);
     runQuery(fromjson("{$and: [{a: 123}, {$expr: {$eq: ['$b', 456]}}]}"));
 
@@ -108,7 +108,7 @@ TEST_F(QueryPlannerTest, ExprQueryOnMultiKeyIndexPushesImpreciseFilterToIxscan) 
 }
 
 TEST_F(QueryPlannerTest, MustFetchWhenIndexKeyRequiredToCoverSortIsMultikey) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
 
     // 'b' is multikey.
     MultikeyPaths multikeyPaths{{}, {0U}};
@@ -126,7 +126,7 @@ TEST_F(QueryPlannerTest, MustFetchWhenIndexKeyRequiredToCoverSortIsMultikey) {
 }
 
 TEST_F(QueryPlannerTest, CoveredWhenMultikeyIndexComponentIsNotRequiredByQuery) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
 
     // 'c' is multikey.
     MultikeyPaths multikeyPaths{{}, {}, {0U}};
@@ -144,7 +144,7 @@ TEST_F(QueryPlannerTest, CoveredWhenMultikeyIndexComponentIsNotRequiredByQuery) 
 }
 
 TEST_F(QueryPlannerTest, CoveredWhenQueryOnNonMultikeyDottedPath) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
 
     addIndex(BSON("a" << 1 << "b.c" << 1));
 
@@ -160,7 +160,7 @@ TEST_F(QueryPlannerTest, CoveredWhenQueryOnNonMultikeyDottedPath) {
 }
 
 TEST_F(QueryPlannerTest, MustFetchWhenFilterNonEmptyButMissingLeadingField) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("a" << 1 << "b" << 1));
 
     runQueryAsCommand(
@@ -176,7 +176,7 @@ TEST_F(QueryPlannerTest, MustFetchWhenFilterNonEmptyButMissingLeadingField) {
 }
 
 TEST_F(QueryPlannerTest, MustFetchWhenIndexKeyRequiredtoCoverProjectIsMultikey) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     // 'b' is multikey.
     MultikeyPaths multikeyPaths{{}, {0U}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
@@ -192,7 +192,7 @@ TEST_F(QueryPlannerTest, MustFetchWhenIndexKeyRequiredtoCoverProjectIsMultikey) 
 }
 
 TEST_F(QueryPlannerTest, CoveredWhenKeysAreNotMultikey) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     // 'b' is multikey.
     MultikeyPaths multikeyPaths{{}, {0U}, {}};
     addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1), multikeyPaths);
@@ -210,7 +210,7 @@ TEST_F(QueryPlannerTest, CoveredWhenKeysAreNotMultikey) {
 }
 
 TEST_F(QueryPlannerTest, CanProduceCoveredSortPlanWhenSortOrderDifferentThanIndexKeyOrder) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"));
 
     runQueryAsCommand(
@@ -234,7 +234,7 @@ TEST_F(QueryPlannerTest, EqCanUseHashedIndexWithRegex) {
 }
 
 TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("a"
                   << "hashed"));
     runQuery(fromjson("{$expr: {$eq: ['$a', 1]}}"));
@@ -245,7 +245,7 @@ TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndex) {
 }
 
 TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndexWithRegex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("a"
                   << "hashed"));
     runQuery(fromjson("{$expr: {$eq: ['$a', /abc/]}}"));
@@ -750,7 +750,7 @@ TEST_F(QueryPlannerTest, BasicSortBooleanIndexKeyPattern) {
 
 // SERVER-14070
 TEST_F(QueryPlannerTest, CompoundIndexWithEqualityPredicatesProvidesSort) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuerySortProj(fromjson("{a: 1, b: 1}"), fromjson("{b: 1}"), BSONObj());
 
@@ -1454,7 +1454,7 @@ TEST_F(QueryPlannerTest, NinWithNullCantUseMultikeyIndex) {
 }
 
 TEST_F(QueryPlannerTest, FetchAfterSortWhenOnlyProjectNeedsDocuments) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"));
 
     runQueryAsCommand(

@@ -78,11 +78,11 @@ protected:
 
         // We're interested in testing plans that use a columnar index, so don't generate collection
         // scans.
-        params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+        params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
 
         // Initialize some made up collection stats but disable the column scan knobs by default.
-        params.collectionStats.noOfRecords = 12345;
-        params.collectionStats.approximateDataSizeBytes = 100000;
+        params.mainCollectionInfo.stats.noOfRecords = 12345;
+        params.mainCollectionInfo.stats.approximateDataSizeBytes = 100000;
         internalQueryColumnScanMinCollectionSizeBytes.store(0);
         internalQueryColumnScanMinAvgDocSizeBytes.store(0);
         internalQueryColumnScanMinNumColumnFilters.store(0);
@@ -111,17 +111,18 @@ protected:
                                                      BSONObj keyPattern = kKeyPattern,
                                                      MatchExpression* partialFilterExpr = nullptr,
                                                      CollatorInterface* collator = nullptr) {
-        params.columnStoreIndexes.emplace_back(keyPattern,
-                                               IndexType::INDEX_COLUMN,
-                                               IndexDescriptor::kLatestIndexVersion,
-                                               false /* sparse */,
-                                               false /* unique */,
-                                               IndexEntry::Identifier{indexName.toString()},
-                                               partialFilterExpr,
-                                               collator,
-                                               proj ? proj : &_defaultPathProj);
+        params.mainCollectionInfo.columnIndexes.emplace_back(
+            keyPattern,
+            IndexType::INDEX_COLUMN,
+            IndexDescriptor::kLatestIndexVersion,
+            false /* sparse */,
+            false /* unique */,
+            IndexEntry::Identifier{indexName.toString()},
+            partialFilterExpr,
+            collator,
+            proj ? proj : &_defaultPathProj);
         if (genPerColFilter) {
-            params.options |= QueryPlannerParams::GENERATE_PER_COLUMN_FILTERS;
+            params.mainCollectionInfo.options |= QueryPlannerParams::GENERATE_PER_COLUMN_FILTERS;
         }
     }
 
@@ -141,12 +142,12 @@ protected:
     }
 
     double collectionSizeBytes() {
-        return params.collectionStats.approximateDataSizeBytes;
+        return params.mainCollectionInfo.stats.approximateDataSizeBytes;
     }
 
     double avgDocumentSizeBytes() {
-        return static_cast<double>(params.collectionStats.approximateDataSizeBytes) /
-            params.collectionStats.noOfRecords;
+        return static_cast<double>(params.mainCollectionInfo.stats.approximateDataSizeBytes) /
+            params.mainCollectionInfo.stats.noOfRecords;
     }
 
 private:
@@ -931,7 +932,7 @@ TEST_F(QueryPlannerColumnarTest, ExtraFieldsNotPermittedWhenApplyingExclusionPro
 
 TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsIncluded) {
     addColumnStoreIndexAndEnableFilterSplitting();
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("sk1" << 1 << "sk2.nested" << 1);
 
     runQuerySortProj(BSON("name"
@@ -960,7 +961,7 @@ TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsIncluded) {
 
 TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsCountTowardsFieldLimit) {
     addColumnStoreIndexAndEnableFilterSplitting();
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("sk1" << 1 << "sk2.nested" << 1);
 
     // Lower the upper bound on number of fields for COLUMN_SCAN eligibility. This should cause us
@@ -1258,7 +1259,7 @@ TEST_F(QueryPlannerColumnarTest, ColumnIndexForCountIncludesShardFilter) {
     setIsCountLike();
     addColumnStoreIndexAndEnableFilterSplitting();
 
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("sk1" << 1 << "sk2.nested" << 1);
 
     runQuerySortProj(BSONObj(), BSONObj(), BSONObj());
@@ -1317,8 +1318,8 @@ TEST_F(QueryPlannerColumnarTest, PlanningHeuristics_NotMet) {
     params.availableMemoryBytes = 10 * 1024;
 
     // Update the collection's stats to just below the expected defaults.
-    params.collectionStats.approximateDataSizeBytes = params.availableMemoryBytes - 1;
-    params.collectionStats.noOfRecords =
+    params.mainCollectionInfo.stats.approximateDataSizeBytes = params.availableMemoryBytes - 1;
+    params.mainCollectionInfo.stats.noOfRecords =
         collectionSizeBytes() / internalQueryColumnScanMinAvgDocSizeBytes.load() + 1;
 
     runQuerySortProj(BSON("a" << 1), BSONObj(), BSON("a" << 1));
@@ -1332,8 +1333,8 @@ TEST_F(QueryPlannerColumnarTest, PlanningHeuristics_AvgDocSizeLargeEnough) {
     resetPlannerHeuristics();
     params.availableMemoryBytes = 10 * 1024;
 
-    params.collectionStats.approximateDataSizeBytes = params.availableMemoryBytes - 1;
-    params.collectionStats.noOfRecords =
+    params.mainCollectionInfo.stats.approximateDataSizeBytes = params.availableMemoryBytes - 1;
+    params.mainCollectionInfo.stats.noOfRecords =
         collectionSizeBytes() / internalQueryColumnScanMinAvgDocSizeBytes.load();
 
     runQuerySortProj(BSON("a" << 1), BSONObj(), BSON("a" << 1));
@@ -1353,8 +1354,8 @@ TEST_F(QueryPlannerColumnarTest, PlanningHeuristics_CollectionLargeEnough) {
     resetPlannerHeuristics();
     params.availableMemoryBytes = 10 * 1024;
 
-    params.collectionStats.approximateDataSizeBytes = params.availableMemoryBytes;
-    params.collectionStats.noOfRecords =
+    params.mainCollectionInfo.stats.approximateDataSizeBytes = params.availableMemoryBytes;
+    params.mainCollectionInfo.stats.noOfRecords =
         collectionSizeBytes() / internalQueryColumnScanMinAvgDocSizeBytes.load() + 1;
 
     runQuerySortProj(BSON("a" << 1), BSONObj(), BSON("a" << 1));
@@ -1374,8 +1375,8 @@ TEST_F(QueryPlannerColumnarTest, PlanningHeuristics_EnoughColumnFilters) {
     resetPlannerHeuristics();
     params.availableMemoryBytes = 10 * 1024;
 
-    params.collectionStats.approximateDataSizeBytes = params.availableMemoryBytes - 1;
-    params.collectionStats.noOfRecords =
+    params.mainCollectionInfo.stats.approximateDataSizeBytes = params.availableMemoryBytes - 1;
+    params.mainCollectionInfo.stats.noOfRecords =
         collectionSizeBytes() / internalQueryColumnScanMinAvgDocSizeBytes.load() + 1;
 
     runQuerySortProj(
@@ -1398,8 +1399,8 @@ TEST_F(QueryPlannerColumnarTest, PlanningHeuristics_EmptyCollection) {
     internalQueryColumnScanMinAvgDocSizeBytes.store(1);
     internalQueryColumnScanMinNumColumnFilters.store(1);
     // Update the collection's stats to be zero/empty.
-    params.collectionStats.noOfRecords = 0;
-    params.collectionStats.approximateDataSizeBytes = 0;
+    params.mainCollectionInfo.stats.noOfRecords = 0;
+    params.mainCollectionInfo.stats.approximateDataSizeBytes = 0;
 
     runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1));
 

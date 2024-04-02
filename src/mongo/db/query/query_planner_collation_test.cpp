@@ -201,7 +201,7 @@ TEST_F(QueryPlannerTest, NotWithStringBoundsCannotBeCoveredWithCollator) {
 TEST_F(QueryPlannerTest, ExistsTrueCannotBeCoveredWithSparseIndexAndCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     addIndex(fromjson("{a: 1}"), &collator);
-    params.indices.back().sparse = true;
+    params.mainCollectionInfo.indexes.back().sparse = true;
 
     runQueryAsCommand(fromjson(
         "{find: 'testns', filter: {a: {$exists: true}}, projection: {_id: 0, a: 1}, collation: "
@@ -761,7 +761,7 @@ TEST_F(QueryPlannerTest,
  * key entry when generating the sort key.
  */
 TEST_F(QueryPlannerTest, MustFetchAfterIDXScanWhenQueryHasSameNonSimpleCollationAsIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     addIndex(fromjson("{a: 1, b: 1}"), &collator);
 

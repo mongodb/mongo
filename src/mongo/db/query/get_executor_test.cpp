@@ -131,12 +131,12 @@ protected:
         //
         // // Fill out planner params, which applies the index filters.
         // QueryPlannerParams plannerParams;
-        // plannerParams.indices = indexes;
+        // plannerParams.mainCollection.indexes = indexes;
         // plannerParams.applyQuerySettingsOrIndexFilters(*cq.get(),
         //                                                MultipleCollectionAccessor(collectionPtr),
         //                                                true /* shouldIgnoreQuerySettings */);
-        // ASSERT_EQ(expectedFilteredNames.size(), plannerParams.indices.size());
-        // for (const auto& indexEntry : plannerParams.indices) {
+        // ASSERT_EQ(expectedFilteredNames.size(), plannerParams.mainCollection.indexes.size());
+        // for (const auto& indexEntry : plannerParams.mainCollection.indexes) {
         //     ASSERT_TRUE(expectedFilteredNames.find(indexEntry.identifier.catalogName) !=
         //                 expectedFilteredNames.end());
         // }

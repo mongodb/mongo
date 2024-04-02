@@ -77,8 +77,8 @@ protected:
 
     const NamespaceString kSecondaryNamespace =
         NamespaceString::createNamespaceString_forTest("test.other");
-    const std::map<NamespaceString, SecondaryCollectionInfo> secondaryCollMap{
-        {kSecondaryNamespace, SecondaryCollectionInfo()}};
+    const std::map<NamespaceString, CollectionInfo> secondaryCollMap{
+        {kSecondaryNamespace, CollectionInfo()}};
 };
 
 TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleGroup) {

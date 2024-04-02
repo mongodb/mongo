@@ -1215,7 +1215,7 @@ boost::optional<ScopedCollectionFilter> getScopedCollectionFilter(
     const MultipleCollectionAccessor& collections,
     const QueryPlannerParams& plannerParams) {
     // TODO SERVER-87016: don't need sharding filter if it's equality on shard key.
-    if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+    if (plannerParams.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
         auto collFilter = collections.getMainCollectionPtrOrAcquisition().getShardingFilter(opCtx);
         invariant(collFilter,
                   "Attempting to use shard filter when there's no shard filter available for "
@@ -2318,9 +2318,12 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(
         // The direction of the index doesn't matter in this case.
         size_t distinctNodeIndex = 0;
         auto collator = canonicalQuery.getCollator();
-        if (getDistinctNodeIndex(
-                plannerParams.indices, canonicalDistinct.getKey(), collator, &distinctNodeIndex)) {
-            auto dn = std::make_unique<DistinctNode>(plannerParams.indices[distinctNodeIndex]);
+        if (getDistinctNodeIndex(plannerParams.mainCollectionInfo.indexes,
+                                 canonicalDistinct.getKey(),
+                                 collator,
+                                 &distinctNodeIndex)) {
+            auto dn = std::make_unique<DistinctNode>(
+                plannerParams.mainCollectionInfo.indexes[distinctNodeIndex]);
             dn->direction = 1;
             IndexBoundsBuilder::allValuesBounds(
                 dn->index.keyPattern, &dn->bounds, dn->index.collator != nullptr);
@@ -2329,7 +2332,7 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(
 
             // An index with a non-simple collation requires a FETCH stage.
             std::unique_ptr<QuerySolutionNode> solnRoot = std::move(dn);
-            if (plannerParams.indices[distinctNodeIndex].collator) {
+            if (plannerParams.mainCollectionInfo.indexes[distinctNodeIndex].collator) {
                 if (!solnRoot->fetched()) {
                     auto fetch = std::make_unique<FetchNode>();
                     fetch->children.push_back(std::move(solnRoot));
@@ -2357,8 +2360,8 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(
         auto multiPlanSolns = QueryPlanner::plan(canonicalQuery, plannerParams);
         if (multiPlanSolns.isOK()) {
             auto& solutions = multiPlanSolns.getValue();
-            const bool strictDistinctOnly =
-                (plannerParams.options & QueryPlannerParams::STRICT_DISTINCT_ONLY);
+            const bool strictDistinctOnly = (plannerParams.mainCollectionInfo.options &
+                                             QueryPlannerParams::STRICT_DISTINCT_ONLY);
 
             for (size_t i = 0; i < solutions.size(); ++i) {
                 if (turnIxscanIntoDistinctIxscan(solutions[i].get(),
@@ -2403,7 +2406,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
         });
 
         // Can't create a DISTINCT_SCAN stage if no suitable indexes are present.
-        if (plannerParams.indices.empty()) {
+        if (plannerParams.mainCollectionInfo.indexes.empty()) {
             return nullptr;
         }
         return createDistinctScanSolution(

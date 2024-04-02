@@ -113,6 +113,13 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
     qstests.assertQuerySettingsIndexAndLookupJoinApplications(
         aggregateCmd, mainNs, secondaryNs, isSecondaryCollAView);
 
+    if (!isSecondaryCollAView) {
+        qstests.testAggregateQuerySettingsNaturalHintEquiJoinStrategy(
+            aggregateCmd, mainNs, secondaryNs);
+        qstests.testAggregateQuerySettingsNaturalHintDirectionWhenSecondaryHinted(
+            aggregateCmd, mainNs, secondaryNs);
+    }
+
     // Ensure query settings ignore cursor hints when being set on main collection.
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
     if (checkSbeRestrictedOrFullyEnabled(db) && !isSecondaryCollAView) {
@@ -130,7 +137,7 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
     // query settings being set.
     // NOTE: The fallback is not tested when hinting secondary collections, as instead of fallback,
     // hash join or nlj will be used.
-    // TODO: SERVER-86400 Add support for $natural hints on secondary collections.
+    // TODO: SERVER-88629 Add support for $natural hints on secondary collections.
     qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
 
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
@@ -224,21 +231,29 @@ function testAggregateQuerySettingsApplicationWithGraphLookup(collOrViewName,
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);
 }
 
-testAggregateQuerySettingsApplicationWithoutSecondaryCollections(coll.getName());
-testAggregateQuerySettingsApplicationWithoutSecondaryCollections(viewName);
+// Execute each provided test case for each combination of collection/view for main/secondary
+// collections.
+function instantiateTestCases(...testCases) {
+    for (const testCase of testCases) {
+        testCase(coll.getName(), secondaryColl.getName(), false);
+        testCase(viewName, secondaryColl.getName(), false);
+        testCase(coll.getName(), secondaryViewName, true);
+        testCase(viewName, secondaryViewName, true);
+    }
+}
 
-testAggregateQuerySettingsApplicationWithGraphLookup(coll.getName(), secondaryColl.getName());
-testAggregateQuerySettingsApplicationWithGraphLookup(viewName, secondaryColl.getName());
-testAggregateQuerySettingsApplicationWithGraphLookup(coll.getName(), secondaryViewName);
-testAggregateQuerySettingsApplicationWithGraphLookup(viewName, secondaryViewName);
+// Execute each provided test case for collection/view for main collection, and collection only for
+// secondary collection.
+function instantiateTestCasesNoSecondaryView(...testCases) {
+    for (const testCase of testCases) {
+        testCase(coll.getName(), secondaryColl.getName(), false);
+        testCase(viewName, secondaryColl.getName(), false);
+    }
+}
 
-testAggregateQuerySettingsApplicationWithLookupEquiJoin(
-    coll.getName(), secondaryColl.getName(), false);
-testAggregateQuerySettingsApplicationWithLookupEquiJoin(viewName, secondaryColl.getName(), false);
-testAggregateQuerySettingsApplicationWithLookupEquiJoin(coll.getName(), secondaryViewName, true);
-testAggregateQuerySettingsApplicationWithLookupEquiJoin(viewName, secondaryViewName, true);
+instantiateTestCases(testAggregateQuerySettingsApplicationWithLookupEquiJoin,
+                     testAggregateQuerySettingsApplicationWithLookupPipeline,
+                     testAggregateQuerySettingsApplicationWithGraphLookup);
 
-testAggregateQuerySettingsApplicationWithLookupPipeline(coll.getName(), secondaryColl.getName());
-testAggregateQuerySettingsApplicationWithLookupPipeline(viewName, secondaryColl.getName());
-testAggregateQuerySettingsApplicationWithLookupPipeline(coll.getName(), secondaryViewName);
-testAggregateQuerySettingsApplicationWithLookupPipeline(viewName, secondaryViewName);
+instantiateTestCasesNoSecondaryView(
+    testAggregateQuerySettingsApplicationWithoutSecondaryCollections);

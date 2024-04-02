@@ -54,7 +54,7 @@ protected:
 
         // We're interested in testing plans that use a hashed index, so don't generate collection
         // scans.
-        params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+        params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     }
 
     /**
@@ -457,7 +457,7 @@ TEST_F(QueryPlannerHashedTest, CompoundHashedShardKeyWhenIndexAndShardKeyBothPro
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("x" << 1 << "y"
                                << "hashed");
 
@@ -476,7 +476,7 @@ TEST_F(QueryPlannerHashedTest,
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("x" << 1 << "y"
                                << "hashed");
 
@@ -505,7 +505,7 @@ TEST_F(QueryPlannerHashedTest,
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
 
     // Can cover the query when index provides range value for a field ('z'), but the corresponding
     // shard key field is hashed.
@@ -523,7 +523,7 @@ TEST_F(QueryPlannerHashedTest,
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
 
     // Cannot cover the query when index provides hashed value for a field ('y'), but the
     // corresponding shard key field is a range field.
@@ -542,7 +542,7 @@ TEST_F(QueryPlannerHashedTest, CompoundHashedShardKeyWhenIndexDoesNotHaveAllShar
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
 
     // Cannot cover the query when one of the shard key field ('newField') is not in the index.
     params.shardKey = BSON("x" << 1 << "y"

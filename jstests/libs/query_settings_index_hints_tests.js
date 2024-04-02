@@ -58,16 +58,20 @@ export class QuerySettingsIndexHintsTests {
             plan => assert.docEq(querySettings, plan.querySettings, plan));
     }
 
-    assertIndexUse(cmd, expectedIndex, stagesExtractor) {
+    assertIndexUse(cmd, expectedIndex, stagesExtractor, expectedStrategy) {
         const explain = assert.commandWorked(db.runCommand({explain: cmd}));
         const stagesUsingIndex = stagesExtractor(explain);
-        assert.gte(stagesUsingIndex.length, 1, explain);
-        if (expectedIndex == undefined) {
-            // Don't verify index name.
-            return;
+        if (expectedIndex !== undefined) {
+            assert.gte(stagesUsingIndex.length, 1, explain);
         }
         for (const stage of stagesUsingIndex) {
-            assert.docEq(stage.keyPattern, expectedIndex, explain);
+            if (expectedIndex !== undefined) {
+                assert.docEq(stage.keyPattern, expectedIndex, explain);
+            }
+
+            if (expectedStrategy !== undefined) {
+                assert.docEq(stage.strategy, expectedStrategy, explain);
+            }
         }
     }
 
@@ -79,16 +83,16 @@ export class QuerySettingsIndexHintsTests {
         });
     }
 
-    assertLookupJoinStage(cmd, expectedIndex, isSecondaryCollAView) {
+    assertLookupJoinStage(cmd, expectedIndex, isSecondaryCollAView, expectedStrategy) {
         // $lookup stage is only pushed down to find in SBE and not in classic and only for
         // collections (not views).
         const db = this.qsutils.db;
         const expectPushDown = checkSbeRestrictedOrFullyEnabled(db) && !isSecondaryCollAView;
-        if (!expectPushDown) {
+        if (!expectPushDown && expectedIndex != undefined) {
             return this.assertLookupPipelineStage(cmd, expectedIndex);
         }
 
-        return this.assertIndexUse(cmd, expectedIndex, (explain) => {
+        this.assertIndexUse(cmd, expectedIndex, (explain) => {
             return getQueryPlanners(explain)
                 .map(getWinningPlan)
                 .flatMap(winningPlan => getPlanStages(winningPlan, "EQ_LOOKUP"))
@@ -96,7 +100,7 @@ export class QuerySettingsIndexHintsTests {
                     stage.keyPattern = stage.indexKeyPattern;
                     return stage;
                 });
-        });
+        }, expectedStrategy);
     }
 
     assertLookupPipelineStage(cmd, expectedIndex) {
@@ -181,7 +185,7 @@ export class QuerySettingsIndexHintsTests {
                                                       secondaryNs,
                                                       isSecondaryCollAView) {
         const query = this.qsutils.withoutDollarDB(querySettingsQuery);
-        for (const [mainCollIndex, secondaryCollIndex] of crossProduct(
+        for (const [mainCollIndex, secondaryCollIndex] of selfCrossProduct(
                  [this.indexA, this.indexAB])) {
             const settings = {
                 indexHints: [
@@ -218,7 +222,7 @@ export class QuerySettingsIndexHintsTests {
      */
     assertQuerySettingsIndexAndLookupPipelineApplications(querySettingsQuery, mainNs, secondaryNs) {
         const query = this.qsutils.withoutDollarDB(querySettingsQuery);
-        for (const [mainCollIndex, secondaryCollIndex] of crossProduct(
+        for (const [mainCollIndex, secondaryCollIndex] of selfCrossProduct(
                  [this.indexA, this.indexB, this.indexAB])) {
             const settings = {
                 indexHints: [
@@ -242,24 +246,31 @@ export class QuerySettingsIndexHintsTests {
      * - Only backward scans allowed.
      * - Both forward and backward scans allowed.
      */
-    assertQuerySettingsNaturalApplication(querySettingsQuery, ns) {
+    assertQuerySettingsNaturalApplication(querySettingsQuery, ns, additionalHints = []) {
         const query = this.qsutils.withoutDollarDB(querySettingsQuery);
         const naturalForwardScan = {$natural: 1};
-        const naturalForwardSettings = {indexHints: {ns, allowedIndexes: [naturalForwardScan]}};
+        const naturalForwardSettings = {
+            indexHints: [{ns, allowedIndexes: [naturalForwardScan]}, ...additionalHints]
+        };
         this.qsutils.withQuerySettings(querySettingsQuery, naturalForwardSettings, () => {
             this.assertCollScanStage(query, ["forward"]);
             this.assertQuerySettingsInCacheForCommand(query, naturalForwardSettings);
         });
 
         const naturalBackwardScan = {$natural: -1};
-        const naturalBackwardSettings = {indexHints: {ns, allowedIndexes: [naturalBackwardScan]}};
+        const naturalBackwardSettings = {
+            indexHints: [{ns, allowedIndexes: [naturalBackwardScan]}, ...additionalHints]
+        };
         this.qsutils.withQuerySettings(querySettingsQuery, naturalBackwardSettings, () => {
             this.assertCollScanStage(query, ["backward"]);
             this.assertQuerySettingsInCacheForCommand(query, naturalBackwardSettings);
         });
 
         const naturalAnyDirectionSettings = {
-            indexHints: {ns, allowedIndexes: [naturalForwardScan, naturalBackwardScan]}
+            indexHints: [
+                {ns, allowedIndexes: [naturalForwardScan, naturalBackwardScan]},
+                ...additionalHints
+            ]
         };
         this.qsutils.withQuerySettings(querySettingsQuery, naturalAnyDirectionSettings, () => {
             this.assertCollScanStage(query, ["forward", "backward"]);
@@ -345,14 +356,59 @@ export class QuerySettingsIndexHintsTests {
         assert.commandFailedWithCode(
             this.qsutils.db.runCommand({...query, querySettings: settings}), expectedErrorCodes);
     }
-}
 
-function crossProduct(list) {
-    let result = [];
-    for (let i = 0; i < list.length; i++) {
-        for (let j = 0; j < list.length; j++) {
-            result.push([list[i], list[j]]);
+    testAggregateQuerySettingsNaturalHintEquiJoinStrategy(query, mainNs, secondaryNs) {
+        // Confirm that, by default, the query can be satisfied with an IndexedLoopJoin when joining
+        // against the collection.
+        const queryNoDb = this.qsutils.withoutDollarDB(query);
+        this.assertLookupJoinStage(queryNoDb, undefined, false, "IndexedLoopJoin");
+
+        // Set query settings, hinting $natural for the secondary collection.
+        this.qsutils.withQuerySettings(
+            query, {indexHints: [{ns: secondaryNs, allowedIndexes: [{"$natural": 1}]}]}, () => {
+                // Confirm the strategy has changed - the query is no longer
+                // permitted to use the index on the secondary collection.
+                this.assertLookupJoinStage(queryNoDb, undefined, false, "HashJoin");
+            });
+
+        // Set query settings, but hinting $natural on the "main" collection. Strategy
+        this.qsutils.withQuerySettings(
+            query, {indexHints: [{ns: mainNs, allowedIndexes: [{"$natural": 1}]}]}, () => {
+                // Observe that strategy is unaffected in this case; the top level query was
+                // already a coll scan, and the query is allowed to use the index on the
+                // secondary collection.
+                this.assertLookupJoinStage(queryNoDb, undefined, false, "IndexedLoopJoin");
+            });
+    }
+
+    testAggregateQuerySettingsNaturalHintDirectionWhenSecondaryHinted(query, mainNs, secondaryNs) {
+        // Verify main collection scan direction is not affected by hint for secondary collection.
+        for (const hint
+                 of [[{"$natural": 1}], [{"$natural": -1}], [{"$natural": 1}, {"$natural": -1}]]) {
+            this.assertQuerySettingsNaturalApplication(
+                query, mainNs, [{ns: secondaryNs, allowedIndexes: hint}]);
         }
     }
-    return result;
+}
+
+function* crossProductGenerator(...lists) {
+    const [head, ...tail] = lists;
+    if (tail.length == 0) {
+        yield* head;
+        return;
+    }
+
+    for (const element of head) {
+        for (const rest of crossProductGenerator(...tail)) {
+            yield [element].concat(rest);
+        }
+    }
+}
+
+function crossProduct(...lists) {
+    return [...crossProductGenerator(...lists)];
+}
+
+function selfCrossProduct(list) {
+    return crossProduct(list, list);
 }

@@ -500,7 +500,7 @@ TEST_F(QueryPlannerTest, DontCrashTryingToPushToSingleChildIndexedOr2) {
     FailPointEnableBlock failPoint("disableMatchExpressionOptimization");
     addIndex(BSON("a" << 1 << "b" << 1));
 
-    params.options |= QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INDEX_INTERSECTION;
     runQuery(
         fromjson("{ $and : [\n"
                  "      { $and : [ { a : 2 } ] },\n"
@@ -1159,8 +1159,8 @@ TEST_F(QueryPlannerTest, InCantUseHashedIndexWithRegex) {
 }
 
 TEST_F(QueryPlannerTest, ExplodeForSortWorksWithShardingFilter) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("c" << 1);
 
     addIndex(BSON("a" << 1 << "b" << 1));
@@ -1176,8 +1176,8 @@ TEST_F(QueryPlannerTest, ExplodeForSortWorksWithShardingFilter) {
 }
 
 TEST_F(QueryPlannerTest, ExplodeRootedOrForSortWorksWithShardingFilter) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("c" << 1);
 
     addIndex(BSON("a" << 1 << "b" << 1));
@@ -1193,7 +1193,7 @@ TEST_F(QueryPlannerTest, ExplodeRootedOrForSortWorksWithShardingFilter) {
 }
 
 TEST_F(QueryPlannerTest, NoIndexDeduplicationWhenShardKeyExists) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     // If there's a shard key, we shouldn't deduplicate indexes in case one of them provides value
     // for a shard filter.
     params.shardKey = BSON("a" << 1);
@@ -1913,7 +1913,8 @@ TEST_F(QueryPlannerTest, ContainedOrCombineLeadingFieldsMoveToAnd) {
 }
 
 TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldIndexIntersection) {
-    params.options = QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("c" << 1));
 
@@ -1943,7 +1944,8 @@ TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldIndexIntersection) {
 }
 
 TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldInBothBranchesIndexIntersection) {
-    params.options = QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
 
@@ -1987,7 +1989,8 @@ TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldInBothBranchesIndexIn
 }
 
 TEST_F(QueryPlannerTest, ContainedOrNotPredicateIsLeadingFieldIndexIntersection) {
-    params.options = QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("c" << 1));
 
@@ -2021,7 +2024,8 @@ TEST_F(QueryPlannerTest, ContainedOrNotPredicateIsLeadingFieldIndexIntersection)
 }
 
 TEST_F(QueryPlannerTest, ContainedOrNotPredicateIsLeadingFieldInBothBranchesIndexIntersection) {
-    params.options = QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
 
@@ -2070,7 +2074,8 @@ TEST_F(QueryPlannerTest, ContainedOrNotPredicateIsLeadingFieldInBothBranchesInde
 }
 
 TEST_F(QueryPlannerTest, MultipleContainedOrWithIndexIntersectionEnabled) {
-    params.options = QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1 << "a" << 1));
     addIndex(BSON("c" << 1));
@@ -2423,7 +2428,7 @@ TEST_F(QueryPlannerTest, ContainedOrPushdownIndexedExpr) {
 // in a non-stable order. With the fix for SERVER-41872, PlanEnumerator ordering is stable and
 // expected to always return the same set of solutions for a given input.
 TEST_F(QueryPlannerTest, SolutionSetStableWhenOrEnumerationLimitIsReached) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("d" << 1));
     addIndex(BSON("e" << 1));
     addIndex(BSON("f" << 1));
@@ -2479,7 +2484,7 @@ TEST_F(QueryPlannerTest, SolutionSetStableWhenOrEnumerationLimitIsReached) {
 // Test that we enumerate the expected plans with the special parameter set. In this test we have
 // two branches of an $or, each with two possible indexed solutions.
 TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenTwoIndexesEach) {
-    params.options =
+    params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
@@ -2507,7 +2512,7 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenTwoIndexesEa
 }
 
 TEST_F(QueryPlannerTest, TotalPossibleLockstepOrEnumerationReachesTheOrLimit) {
-    params.options =
+    params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
@@ -2535,7 +2540,7 @@ TEST_F(QueryPlannerTest, TotalPossibleLockstepOrEnumerationReachesTheOrLimit) {
 // Test that we enumerate the expected plans with the special parameter set. In this test we have
 // two branches of an $or, each with one possible indexed solution.
 TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenOneIndexEach) {
-    params.options =
+    params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
@@ -2556,7 +2561,7 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenOneIndexEach
 // two branches of an $or, one with one possible indexed solution, the other with two possible
 // indexed solutions.
 TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenDifferentNumSolutions) {
-    params.options =
+    params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
@@ -2580,7 +2585,7 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenDifferentNum
 // cap of number of or enumerations to prove that the plans we're interested in are enumerated
 // before we hit the limit.
 TEST_F(QueryPlannerTest, NormalOrEnumerationDoesNotPrioritizeLockstepIteration) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     ASSERT_EQ(internalQueryEnumerationMaxOrSolutions.load(), 10ul);
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
@@ -2626,7 +2631,7 @@ TEST_F(QueryPlannerTest, NormalOrEnumerationDoesNotPrioritizeLockstepIteration) 
 }
 
 TEST_F(QueryPlannerTest, LockstepOrEnumerationDoesPrioritizeLockstepIteration) {
-    params.options =
+    params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     ASSERT_EQ(internalQueryEnumerationMaxOrSolutions.load(), 10ul);
     addIndex(BSON("a" << 1 << "b" << 1));
@@ -2670,7 +2675,7 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationDoesPrioritizeLockstepIteration) {
 }
 
 TEST_F(QueryPlannerTest, LockstepOrEnumerationDoesPrioritizeLockstepIterationMixedChildren) {
-    params.options =
+    params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     ASSERT_EQ(internalQueryEnumerationMaxOrSolutions.load(), 10ul);
     addIndex(BSON("a" << 1 << "b" << 1));
@@ -2810,7 +2815,7 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationApplysToEachOrInTree) {
     RAIIServerParameterControllerForTest controller(
         "internalQueryEnableBooleanExpressionsSimplifier", false);
 
-    params.options =
+    params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     ASSERT_EQ(internalQueryEnumerationMaxOrSolutions.load(), 10ul);
     addIndex(BSON("a" << 1 << "b" << 1));
@@ -2886,7 +2891,7 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationWithNestedOrWhereInnerOrHitsEnumer
     RAIIServerParameterControllerForTest maxOrPlansController(
         "internalQueryEnumerationMaxOrSolutions", 3);
 
-    params.options =
+    params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));

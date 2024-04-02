@@ -124,7 +124,7 @@ protected:
     }
 
     size_t plannerOptions() const {
-        return _plannerData.plannerParams.options;
+        return _plannerData.plannerParams.mainCollectionInfo.options;
     }
 
     boost::optional<size_t> cachedPlanHash() const {

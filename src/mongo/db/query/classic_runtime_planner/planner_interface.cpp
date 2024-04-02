@@ -74,7 +74,7 @@ const QueryPlannerParams& ClassicPlannerInterface::plannerParams() {
 }
 
 size_t ClassicPlannerInterface::plannerOptions() const {
-    return _plannerData.plannerParams.options;
+    return _plannerData.plannerParams.mainCollectionInfo.options;
 }
 
 boost::optional<size_t> ClassicPlannerInterface::cachedPlanHash() const {

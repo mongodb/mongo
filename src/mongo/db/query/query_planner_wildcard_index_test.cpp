@@ -77,7 +77,7 @@ protected:
 
         // We're interested in testing plans that use a $** index, so don't generate collection
         // scans.
-        params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+        params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     }
 
     void addWildcardIndex(BSONObj keyPattern,
@@ -98,19 +98,19 @@ protected:
 
         _proj = WildcardKeyGenerator::createProjectionExecutor(keyPattern, wildcardProjection);
 
-        params.indices.push_back({std::move(keyPattern),
-                                  IndexType::INDEX_WILDCARD,
-                                  IndexDescriptor::kLatestIndexVersion,
-                                  isMultikey,
-                                  {},  // multikeyPaths
-                                  std::move(multikeyFieldRefs),
-                                  false,  // sparse
-                                  false,  // unique
-                                  IndexEntry::Identifier{indexName},
-                                  partialFilterExpr,
-                                  std::move(infoObj),
-                                  collator,
-                                  _proj.get_ptr()});
+        params.mainCollectionInfo.indexes.push_back({std::move(keyPattern),
+                                                     IndexType::INDEX_WILDCARD,
+                                                     IndexDescriptor::kLatestIndexVersion,
+                                                     isMultikey,
+                                                     {},  // multikeyPaths
+                                                     std::move(multikeyFieldRefs),
+                                                     false,  // sparse
+                                                     false,  // unique
+                                                     IndexEntry::Identifier{indexName},
+                                                     partialFilterExpr,
+                                                     std::move(infoObj),
+                                                     collator,
+                                                     _proj.get_ptr()});
     }
 
     boost::optional<WildcardProjection> _proj;
@@ -124,13 +124,13 @@ DEATH_TEST_F(QueryPlannerWildcardTest,
              CannotExpandPreExpandedWildcardIndexEntry,
              "Tripwire assertion") {
     addWildcardIndex(BSON("$**" << 1));
-    ASSERT_EQ(params.indices.size(), 2U);
+    ASSERT_EQ(params.mainCollectionInfo.indexes.size(), 2U);
 
     // Expand the $** index and add the expanded entry to the list of available indices.
     std::vector<IndexEntry> expandedIndex;
-    wcp::expandWildcardIndexEntry(params.indices.back(), {"a"}, &expandedIndex);
+    wcp::expandWildcardIndexEntry(params.mainCollectionInfo.indexes.back(), {"a"}, &expandedIndex);
     ASSERT_EQ(expandedIndex.size(), 1U);
-    params.indices.push_back(expandedIndex.front());
+    params.mainCollectionInfo.indexes.push_back(expandedIndex.front());
 
     // Now run a query. This will tassert when the planner expands the expanded index.
     runQuery(fromjson("{a: 1}"));
@@ -633,7 +633,7 @@ TEST_F(QueryPlannerWildcardTest, DottedFieldCovering) {
 }
 
 TEST_F(QueryPlannerWildcardTest, CoveredIxscanForCountOnIndexedPath) {
-    params.options = QueryPlannerParams::DEFAULT;
+    params.mainCollectionInfo.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: 5}"));
@@ -826,7 +826,7 @@ TEST_F(QueryPlannerWildcardTest, PartialIndexWithExistsTrueFilterCanAnswerExiste
 
 TEST_F(QueryPlannerWildcardTest, WildcardIndexDoesNotParticipateInIndexIntersection) {
     // Enable both AND_SORTED and AND_HASH index intersection for this test.
-    params.options |= QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INDEX_INTERSECTION;
     internalQueryPlannerEnableHashIntersection.store(true);
 
     // Add two standard single-field indexes.
@@ -1941,7 +1941,7 @@ TEST_F(QueryPlannerWildcardTest,
 }
 
 TEST_F(QueryPlannerWildcardTest, StringComparisonWithEqualCollatorsAndWildcardIndexUsesIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
 
     CollatorInterfaceMock reverseStringCollator(CollatorInterfaceMock::MockType::kReverseString);
     addWildcardIndex(fromjson("{'$**': 1}"), {}, {}, {}, &reverseStringCollator);

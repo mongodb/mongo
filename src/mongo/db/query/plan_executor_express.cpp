@@ -45,7 +45,8 @@ boost::optional<std::string> getIndexForExpressEquality(const CanonicalQuery& cq
                                                         const QueryPlannerParams& plannerParams) {
     const auto& findCommand = cq.getFindCommandRequest();
 
-    const bool needsShardFilter = plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    const bool needsShardFilter =
+        plannerParams.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER;
     const bool hasLimitOne = (findCommand.getLimit() && findCommand.getLimit().get() == 1);
     const auto& data =
         static_cast<ComparisonMatchExpressionBase*>(cq.getPrimaryMatchExpression())->getData();
@@ -55,7 +56,7 @@ boost::optional<std::string> getIndexForExpressEquality(const CanonicalQuery& cq
     RelevantFieldIndexMap fields;
     QueryPlannerIXSelect::getFields(cq.getPrimaryMatchExpression(), &fields);
     std::vector<IndexEntry> indexes =
-        QueryPlannerIXSelect::findRelevantIndices(fields, plannerParams.indices);
+        QueryPlannerIXSelect::findRelevantIndices(fields, plannerParams.mainCollectionInfo.indexes);
 
     int numFields = -1;
     const IndexEntry* bestEntry = nullptr;

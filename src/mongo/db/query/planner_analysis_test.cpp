@@ -239,7 +239,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     ASSERT_EQ(expr->getCanSkipValidation(), false);
 
     // We should not skip validation if there is a non 2dsphere index.
-    params.indices.push_back(irrelevantIndex);
+    params.mainCollectionInfo.indexes.push_back(irrelevantIndex);
 
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
     ASSERT_EQ(expr->getCanSkipValidation(), false);
@@ -248,7 +248,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     ASSERT_EQ(expr->getCanSkipValidation(), false);
 
     // We should not skip validation if the 2dsphere index isn't on relevant field.
-    params.indices.push_back(differentFieldIndex);
+    params.mainCollectionInfo.indexes.push_back(differentFieldIndex);
 
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
     ASSERT_EQ(expr->getCanSkipValidation(), false);
@@ -258,7 +258,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
 
     // We should not skip validation if the 2dsphere index version does not support it.
 
-    params.indices.push_back(unsupportedIndex);
+    params.mainCollectionInfo.indexes.push_back(unsupportedIndex);
 
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
     ASSERT_EQ(expr->getCanSkipValidation(), false);
@@ -267,7 +267,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     ASSERT_EQ(expr->getCanSkipValidation(), false);
 
     // We should skip validation if there is a relevant 2dsphere index.
-    params.indices.push_back(relevantIndex);
+    params.mainCollectionInfo.indexes.push_back(relevantIndex);
 
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
     ASSERT_EQ(expr->getCanSkipValidation(), true);
@@ -281,10 +281,10 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     // We should skip validation if there is a relevant 2dsphere compound index.
 
     // Reset the test.
-    params.indices.clear();
+    params.mainCollectionInfo.indexes.clear();
     expr->setCanSkipValidation(false);
 
-    params.indices.push_back(compoundIndex);
+    params.mainCollectionInfo.indexes.push_back(compoundIndex);
 
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
     ASSERT_EQ(expr->getCanSkipValidation(), true);
@@ -353,7 +353,7 @@ TEST_F(QueryPlannerTest, ExprQueryHasImprecisePredicatesRemovedMix) {
 }
 
 TEST_F(QueryPlannerTest, ExprOnFetchDoesNotIncludeImpreciseFilter) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("a" << 1));
 
     // The residual predicate on b has to be applied after the fetch. Ensure that there is no

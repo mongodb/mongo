@@ -911,12 +911,12 @@ TEST_F(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
 class CachePlanSelectionTest : public unittest::Test {
 protected:
     void setUp() override {
-        params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
+        params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_COLLSCAN;
         addIndex(BSON("_id" << 1), "_id_");
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey = false) {
-        params.indices.push_back(
+        params.mainCollectionInfo.indexes.push_back(
             IndexEntry(keyPattern,
                        IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                        IndexDescriptor::kLatestIndexVersion,
@@ -933,7 +933,7 @@ protected:
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey, bool sparse) {
-        params.indices.push_back(
+        params.mainCollectionInfo.indexes.push_back(
             IndexEntry(keyPattern,
                        IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                        IndexDescriptor::kLatestIndexVersion,
@@ -964,7 +964,7 @@ protected:
                          nullptr,
                          nullptr);
         entry.collator = collator;
-        params.indices.push_back(entry);
+        params.mainCollectionInfo.indexes.push_back(entry);
     }
 
     //
@@ -1392,7 +1392,7 @@ TEST_F(CachePlanSelectionTest, AndWithinPolygonWithinCenterSphere) {
 // $** index
 TEST_F(CachePlanSelectionTest, WildcardIxScan) {
     auto entryProjExecPair = makeWildcardEntry(BSON("$**" << 1));
-    params.indices.push_back(entryProjExecPair.first);
+    params.mainCollectionInfo.indexes.push_back(entryProjExecPair.first);
 
     BSONObj query = fromjson("{a: 1, b: 1}");
     runQuery(query);
@@ -1589,7 +1589,8 @@ TEST_F(CachePlanSelectionTest, CollscanMergeSort) {
 //
 
 TEST_F(CachePlanSelectionTest, CachedPlanForCompoundMultikeyIndexCanCompoundBounds) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;
     addIndex(BSON("a" << 1 << "b" << 1), "a_1_b_1", multikey);
@@ -1605,7 +1606,8 @@ TEST_F(CachePlanSelectionTest, CachedPlanForCompoundMultikeyIndexCanCompoundBoun
 
 TEST_F(CachePlanSelectionTest,
        CachedPlanForSelfIntersectionOfMultikeyIndexPointRangesCannotIntersectBounds) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;
     addIndex(BSON("a" << 1), "a_1", multikey);
@@ -1629,7 +1631,8 @@ TEST_F(CachePlanSelectionTest,
         internalQueryPlannerEnableHashIntersection.store(oldEnableHashIntersection);
     });
     internalQueryPlannerEnableHashIntersection.store(true);
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;
     addIndex(BSON("a" << 1), "a_1", multikey);
@@ -1646,7 +1649,8 @@ TEST_F(CachePlanSelectionTest,
 
 
 TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionOfMultikeyIndexesWhenUsingElemMatch) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;
     addIndex(BSON("a.b" << 1), "a.b_1", multikey);
@@ -1670,7 +1674,8 @@ TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionWithNonMultikeyIndexCanI
         internalQueryPlannerEnableHashIntersection.store(oldEnableHashIntersection);
     });
     internalQueryPlannerEnableHashIntersection.store(true);
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;
     addIndex(BSON("a.b" << 1), "a.b_1", multikey);
@@ -1820,7 +1825,8 @@ TEST_F(CachePlanSelectionTest, ContainedOrAndIntersection) {
         internalQueryPlannerEnableHashIntersection.store(oldEnableHashIntersection);
     });
     internalQueryPlannerEnableHashIntersection.store(true);
-    params.options = QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1 << "b" << 1), "a_1_b_1");
     addIndex(BSON("c" << 1), "c_1");
     BSONObj query = fromjson("{$and: [{a: 5}, {$or: [{b: 6}, {c: 7}]}]}");

@@ -52,7 +52,7 @@ namespace {
 
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesQuery) {
-    params.options = QueryPlannerParams::DEFAULT;
+    params.mainCollectionInfo.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     addIndex(BSON("x" << 1));
     runQuery(BSON("x" << 5));
@@ -61,7 +61,7 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesQuery
 }
 
 TEST_F(QueryPlannerTest, PlannerAddsFetchToIxscanForCountWhenFetchFilterNonempty) {
-    params.options = QueryPlannerParams::DEFAULT;
+    params.mainCollectionInfo.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     addIndex(BSON("x" << 1));
     runQuery(BSON("y" << 3 << "x" << 5));
@@ -72,7 +72,7 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchToIxscanForCountWhenFetchFilterNonempty
 }
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesNullQuery) {
-    params.options = QueryPlannerParams::DEFAULT;
+    params.mainCollectionInfo.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     addIndex(BSON("x" << 1));
     runQuery(fromjson("{x: null}"));
@@ -83,7 +83,7 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesNullQ
 }
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenIndexSatisfiesNullAndOtherQuery) {
-    params.options = QueryPlannerParams::DEFAULT;
+    params.mainCollectionInfo.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     addIndex(BSON("x" << 1));
     runQuery(fromjson("{x: {$in: [null, 2]}}"));
@@ -94,7 +94,7 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenIndexSatisfiesNullAndOtherQ
 }
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanCountWhenMultikeyIndexSatisfiesNullQuery) {
-    params.options = QueryPlannerParams::DEFAULT;
+    params.mainCollectionInfo.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(fromjson("{x: 1}"), multikeyPaths);
@@ -104,7 +104,7 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanCountWhenMultikeyIndexSatisfies
 }
 
 TEST_F(QueryPlannerTest, PlannerAddsFetchWhenMultikeyIndexSatisfiesDottedNullQuery) {
-    params.options = QueryPlannerParams::DEFAULT;
+    params.mainCollectionInfo.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(fromjson("{'x.y': 1}"), multikeyPaths);
@@ -116,7 +116,7 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchWhenMultikeyIndexSatisfiesDottedNullQue
 }
 
 TEST_F(QueryPlannerTest, PlannerAddsFetchForCountWhenMultikeyIndexSatisfiesNullEmptyQuery) {
-    params.options = QueryPlannerParams::DEFAULT;
+    params.mainCollectionInfo.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(fromjson("{x: 1}"), multikeyPaths);
@@ -128,7 +128,7 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchForCountWhenMultikeyIndexSatisfiesNullE
 }
 
 TEST_F(QueryPlannerTest, PlannerAddsFetchWhenMultikeyIndexSatisfiesNullEmptyAndOtherQuery) {
-    params.options = QueryPlannerParams::DEFAULT;
+    params.mainCollectionInfo.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(fromjson("{x: 1}"), multikeyPaths);
@@ -141,7 +141,7 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchWhenMultikeyIndexSatisfiesNullEmptyAndO
 }
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenMultikeyIndexSatisfiesNullAndOtherQuery) {
-    params.options = QueryPlannerParams::DEFAULT;
+    params.mainCollectionInfo.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(fromjson("{x: 1}"), multikeyPaths);
@@ -153,7 +153,7 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenMultikeyIndexSatisfiesNullA
 }
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanFindWhenIndexSatisfiesNullQuery) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{x: 1, _id: 1}"));
     runQuerySortProj(fromjson("{x: null}}"), BSONObj(), fromjson("{_id: 1}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
@@ -164,7 +164,7 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanFindWhenIndexSatisfiesNullQuery
 }
 
 TEST_F(QueryPlannerTest, PlannerAddsFetchForFindWhenMultikeyIndexSatisfiesNullQuery) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}, MultikeyComponents{}};
     addIndex(fromjson("{x: 1, _id: 1}"), multikeyPaths);
     runQuerySortProj(fromjson("{x: null}}"), BSONObj(), fromjson("{_id: 1}}"));
@@ -175,7 +175,7 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchForFindWhenMultikeyIndexSatisfiesNullQu
 }
 
 TEST_F(QueryPlannerTest, PlannerAddsFetchFindWhenMultikeyIndexSatisfiesNullEmptyQuery) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}, MultikeyComponents{}};
     addIndex(fromjson("{x: 1, _id: 1}"), multikeyPaths);
     runQuerySortProj(fromjson("{x: {$in: [null, []]}}}"), BSONObj(), fromjson("{_id: 1}}"));
@@ -188,7 +188,7 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchFindWhenMultikeyIndexSatisfiesNullEmpty
 
 TEST_F(QueryPlannerTest,
        PlannerUsesCoveredIxscanForFindWhenMultikeyIndexSatisfiesNullAndOtherQuery) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}, MultikeyComponents{}};
     addIndex(fromjson("{x: 1, _id: 1}"), multikeyPaths);
     runQuerySortProj(fromjson("{x: {$in: [null, 2]}}}"), BSONObj(), fromjson("{_id: 1}}"));
@@ -250,7 +250,7 @@ TEST_F(QueryPlannerTest, SparseIndexForQuery) {
 }
 
 TEST_F(QueryPlannerTest, ExprEqCannotUseSparseIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1}"), false, true);
     runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
 
@@ -258,7 +258,7 @@ TEST_F(QueryPlannerTest, ExprEqCannotUseSparseIndex) {
 }
 
 TEST_F(QueryPlannerTest, ExprEqCannotUseSparseIndexForEqualityToNull) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1}"), false, true);
     runQuery(fromjson("{a: {$_internalExprEq: null}}"));
 
@@ -294,7 +294,7 @@ TEST_F(QueryPlannerTest, NegationInElemMatchDoesNotUseSparseIndex) {
 }
 
 TEST_F(QueryPlannerTest, NinListWithOnlyNullAndEmptyArrayShouldUseMultikeyIndex) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     // Use a multikey index.
     addIndex(fromjson("{a: 1}"), true);
     runQuery(fromjson("{a: { $nin: [[], null] }}"));
@@ -310,7 +310,7 @@ TEST_F(QueryPlannerTest, NinListWithOnlyNullAndEmptyArrayShouldUseMultikeyIndex)
 }
 
 TEST_F(QueryPlannerTest, NinListWithOnlyNullAndEmptyArrayShouldUseIndex) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     // Use an index which is not multikey.
     addIndex(fromjson("{a: 1}"));
     runQuery(fromjson("{a: { $nin: [[], null] }}"));
@@ -364,7 +364,7 @@ TEST_F(QueryPlannerTest, SparseIndexCannotSupportEqualsNull) {
 // without a sparse index. It is unclear whether or not a sparse index _should_ be able to support
 // these operations.
 TEST_F(QueryPlannerTest, SparseIndexCanSupportGTEOrLTENull) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("i" << 1),
              false,  // multikey
              true    // sparse
@@ -754,7 +754,7 @@ TEST_F(QueryPlannerTest, IndexBoundsOrOfNegations) {
 }
 
 TEST_F(QueryPlannerTest, BoundsTypeMinKeyMaxKey) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
 
     runQuery(fromjson("{a: {$type: -1}}"));
@@ -810,7 +810,7 @@ TEST_F(QueryPlannerTest, CompoundMultikeyBoundsNoIntersect) {
 //
 
 TEST_F(QueryPlannerTest, NoTableScanBasic) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     runInvalidQuery(BSONObj());
     assertNoSolutions();
 
@@ -826,7 +826,7 @@ TEST_F(QueryPlannerTest, NoTableScanBasic) {
 }
 
 TEST_F(QueryPlannerTest, NoTableScanOrWithAndChild) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
     runQuery(fromjson("{$or: [{a: 20}, {$and: [{a:1}, {b:7}]}]}"));
 
@@ -847,7 +847,8 @@ TEST_F(QueryPlannerTest, NoTableScanOrWithAndChild) {
 //
 
 TEST_F(QueryPlannerTest, IntersectBasicTwoPred) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     runQuery(fromjson("{a:1, b:{$gt: 1}}"));
@@ -859,7 +860,8 @@ TEST_F(QueryPlannerTest, IntersectBasicTwoPred) {
 }
 
 TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompound) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1 << "c" << 1));
     addIndex(BSON("b" << 1));
     runQuery(fromjson("{a:1, b:1, c:1}"));
@@ -873,7 +875,8 @@ TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompound) {
 
 // SERVER-12196
 TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdxOrder1) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     runQuery(fromjson("{a:1, b:1}"));
@@ -894,7 +897,8 @@ TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdxOrder1) {
 
 // SERVER-12196
 TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdxOrder2) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("b" << 1));
     addIndex(BSON("a" << 1));
     runQuery(fromjson("{a:1, b:1}"));
@@ -914,7 +918,8 @@ TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdxOrder2) {
 }
 
 TEST_F(QueryPlannerTest, IntersectManySelfIntersections) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     // True means multikey.
     addIndex(BSON("a" << 1), true);
 
@@ -937,7 +942,8 @@ TEST_F(QueryPlannerTest, IntersectManySelfIntersections) {
 }
 
 TEST_F(QueryPlannerTest, CannotIntersectSubnodes) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     addIndex(BSON("c" << 1));
@@ -959,7 +965,8 @@ TEST_F(QueryPlannerTest, CannotIntersectSubnodes) {
 }
 
 TEST_F(QueryPlannerTest, IntersectSubtreeAndPred) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     addIndex(BSON("c" << 1));
@@ -986,7 +993,8 @@ TEST_F(QueryPlannerTest, IntersectSubtreeAndPred) {
 }
 
 TEST_F(QueryPlannerTest, IntersectElemMatch) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a.b" << 1));
     addIndex(BSON("a.c" << 1));
     runQuery(fromjson("{a : {$elemMatch: {b:1, c:1}}}"));
@@ -998,7 +1006,8 @@ TEST_F(QueryPlannerTest, IntersectElemMatch) {
 }
 
 TEST_F(QueryPlannerTest, IntersectSortFromAndHash) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     runQuerySortProj(fromjson("{a: 1, b:{$gt: 1}}"), fromjson("{b:1}"), BSONObj());
@@ -1018,7 +1027,8 @@ TEST_F(QueryPlannerTest, IntersectSortFromAndHash) {
 }
 
 TEST_F(QueryPlannerTest, IntersectCanBeVeryBig) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     addIndex(BSON("c" << 1));
@@ -1041,7 +1051,8 @@ TEST_F(QueryPlannerTest, IntersectDisableAndHash) {
 
     // Turn index intersection on but disable hash-based intersection.
     internalQueryPlannerEnableHashIntersection.store(false);
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
@@ -1077,7 +1088,8 @@ TEST_F(QueryPlannerTest, IntersectDisableAndHash) {
 
 // SERVER-12825
 TEST_F(QueryPlannerTest, IntersectCompoundInsteadBasic) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     addIndex(BSON("a" << 1 << "b" << 1));
@@ -1097,7 +1109,8 @@ TEST_F(QueryPlannerTest, IntersectCompoundInsteadBasic) {
 
 // SERVER-12825
 TEST_F(QueryPlannerTest, IntersectCompoundInsteadThreeCompoundIndices) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("c" << 1 << "d" << 1));
     addIndex(BSON("a" << 1 << "c" << -1 << "b" << -1 << "d" << 1));
@@ -1117,7 +1130,8 @@ TEST_F(QueryPlannerTest, IntersectCompoundInsteadThreeCompoundIndices) {
 
 // SERVER-12825
 TEST_F(QueryPlannerTest, IntersectCompoundInsteadUnusedField) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
@@ -1137,7 +1151,8 @@ TEST_F(QueryPlannerTest, IntersectCompoundInsteadUnusedField) {
 
 // SERVER-12825
 TEST_F(QueryPlannerTest, IntersectCompoundInsteadUnusedField2) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("c" << 1 << "d" << 1));
     addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
@@ -1158,7 +1173,7 @@ TEST_F(QueryPlannerTest, IntersectCompoundInsteadUnusedField2) {
 // Make sure a top-level $or hits the limiting number
 // of solutions that we are willing to consider.
 TEST_F(QueryPlannerTest, OrEnumerationLimit) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
 
@@ -1176,7 +1191,7 @@ TEST_F(QueryPlannerTest, OrEnumerationLimit) {
 }
 
 TEST_F(QueryPlannerTest, OrEnumerationLimit2) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     addIndex(BSON("c" << 1));
@@ -1194,7 +1209,7 @@ TEST_F(QueryPlannerTest, OrEnumerationLimit2) {
 
 // SERVER-13104: test that we properly enumerate all solutions for nested $or.
 TEST_F(QueryPlannerTest, EnumerateNestedOr) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     addIndex(BSON("c" << 1));
@@ -1214,7 +1229,7 @@ TEST_F(QueryPlannerTest, EnumerateNestedOr) {
 
 // SERVER-13104: test that we properly enumerate all solutions for nested $or.
 TEST_F(QueryPlannerTest, EnumerateNestedOr2) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     addIndex(BSON("c" << 1));
@@ -1255,7 +1270,7 @@ TEST_F(QueryPlannerTest, EnumerateNestedOr2) {
 
 
 TEST_F(QueryPlannerTest, FloatingPointInKeyPattern) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
 
     addIndex(BSON("a" << -0.1));
 
@@ -1268,7 +1283,7 @@ TEST_F(QueryPlannerTest, FloatingPointInKeyPattern) {
 }
 
 TEST_F(QueryPlannerTest, KeyPatternOverflowsInt) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
 
     addIndex(BSON("a" << -2147483649LL));
 
@@ -1282,7 +1297,7 @@ TEST_F(QueryPlannerTest, KeyPatternOverflowsInt) {
 
 
 TEST_F(QueryPlannerTest, NorWithSingleChildCanUseIndexAfterComplementingBounds) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
 
     addIndex(BSON("a" << 1));
     runQuery(fromjson("{$nor: [{a: {$lt: 3}}]}"));
@@ -1317,7 +1332,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithoutProjectionUsesCollscan) {
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanIfEnabled) {
-    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
     assertNumSolutions(1);
@@ -1328,7 +1343,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanIfEnabled) {
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionDoesNotUseCoveredIxscanIfDisabled) {
-    params.options &= ~QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
     assertNumSolutions(1);
@@ -1338,7 +1353,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionDoesNotUseCoveredIxscanIfDisabl
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanOnCompoundIndexIfEnabled) {
-    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1, c: 1}}"));
     assertNumSolutions(1);
@@ -1350,7 +1365,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanOnCompoundInde
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionDoesNotUseCoveredIxscanOnCompoundIndexIfDisabled) {
-    params.options &= ~QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1, c: 1}}"));
     assertNumSolutions(1);
@@ -1360,7 +1375,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionDoesNotUseCoveredIxscanOnCompou
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionDoesNotConsiderNonHintedIndices) {
-    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}, hint: {_id: 1}}"));
     assertNumSolutions(1);
@@ -1372,7 +1387,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionDoesNotConsiderNonHintedIndices
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfNoCoveredIxscans) {
-    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {a: 1}}"));
     assertNumSolutions(1);
@@ -1383,7 +1398,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfNoCoveredIxscans)
 
 TEST_F(QueryPlannerTest,
        EmptyQueryWithProjectionUsesCoveredIxscanOnDotttedNonMultikeyIndexIfEnabled) {
-    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a.b" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, 'a.b': 1}}"));
     assertNumSolutions(1);
@@ -1395,7 +1410,7 @@ TEST_F(QueryPlannerTest,
 
 TEST_F(QueryPlannerTest,
        EmptyQueryWithProjectionDoesNotUseCoveredIxscanOnDotttedNonMultikeyIndexIfDisabled) {
-    params.options &= ~QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a.b" << 1));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, 'a.b': 1}}"));
     assertNumSolutions(1);
@@ -1405,7 +1420,7 @@ TEST_F(QueryPlannerTest,
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsMultikey) {
-    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     constexpr bool isMultikey = true;
     addIndex(BSON("a" << 1 << "b" << 1), isMultikey);
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1, b: 1}}"));
@@ -1416,7 +1431,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsMultikey) 
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsSparse) {
-    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     constexpr bool isMultikey = false;
     constexpr bool isSparse = true;
     addIndex(BSON("a" << 1), isMultikey, isSparse);
@@ -1428,7 +1443,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsSparse) {
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsPartial) {
-    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     AlwaysFalseMatchExpression matchExpr;
     addIndex(BSON("a" << 1), &matchExpr);
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
@@ -1439,7 +1454,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsPartial) {
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsText) {
-    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a"
                   << "text"));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
@@ -1450,7 +1465,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsText) {
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsGeo) {
-    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a"
                   << "2dsphere"));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
@@ -1461,7 +1476,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsGeo) {
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexCollationDiffers) {
-    params.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
+    params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     addIndex(BSON("a" << 1), &collator);
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
@@ -1473,7 +1488,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexCollationDif
 
 
 TEST_F(QueryPlannerTest, NoFetchStageWhenSingleFieldSortIsCoveredByIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"));
 
     // Sort on 'b'.
@@ -1488,7 +1503,7 @@ TEST_F(QueryPlannerTest, NoFetchStageWhenSingleFieldSortIsCoveredByIndex) {
 }
 
 TEST_F(QueryPlannerTest, NoFetchStageWhenTwoFieldAscendingSortIsCoveredByIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"));
 
     // Sort on 'b', 'a'.
@@ -1503,7 +1518,7 @@ TEST_F(QueryPlannerTest, NoFetchStageWhenTwoFieldAscendingSortIsCoveredByIndex) 
 }
 
 TEST_F(QueryPlannerTest, NoFetchStageWhenTwoFieldMixedSortOrderSortIsCoveredByIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"));
 
     // Sort on 'b', 'a' descending.
@@ -1517,7 +1532,7 @@ TEST_F(QueryPlannerTest, NoFetchStageWhenTwoFieldMixedSortOrderSortIsCoveredByIn
 }
 
 TEST_F(QueryPlannerTest, MustFetchWhenNotAllSortKeysAreCoveredByIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"));
 
     runQueryAsCommand(
@@ -1533,7 +1548,7 @@ TEST_F(QueryPlannerTest, MustFetchWhenNotAllSortKeysAreCoveredByIndex) {
 }
 
 TEST_F(QueryPlannerTest, NoFetchStageWhenProjectionUsesExpressionWithCoveredDependency) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"));
 
     runQueryAsCommand(fromjson(
@@ -1546,7 +1561,7 @@ TEST_F(QueryPlannerTest, NoFetchStageWhenProjectionUsesExpressionWithCoveredDepe
 
 TEST_F(QueryPlannerTest,
        NoFetchStageWhenProjectionAssignsExpressionWithCoveredDependencyToUnIndexedField) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"));
 
     // Assign the result of the expression to 'x' which has no index.
@@ -1559,7 +1574,7 @@ TEST_F(QueryPlannerTest,
 }
 
 TEST_F(QueryPlannerTest, AddsFetchWhenProjectionAssignsToUnindexedDottedField) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"));
 
     // Cannot be covered since 'x' may be an array.
@@ -1572,7 +1587,7 @@ TEST_F(QueryPlannerTest, AddsFetchWhenProjectionAssignsToUnindexedDottedField) {
 }
 
 TEST_F(QueryPlannerTest, NoFetchWhenProjectionAssignsToDottedIndexedNonArrayField) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1, 'b.c': 1}"));
 
     // Can be covered since 'b' and 'b.c' are known to not be multikey.
@@ -1585,7 +1600,7 @@ TEST_F(QueryPlannerTest, NoFetchWhenProjectionAssignsToDottedIndexedNonArrayFiel
 }
 
 TEST_F(QueryPlannerTest, NoFetchWhenProjectionAssignsToIndexedNonArrayField) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"));
 
     // Can be covered since 'b' is known to not be multikey.
@@ -1598,7 +1613,7 @@ TEST_F(QueryPlannerTest, NoFetchWhenProjectionAssignsToIndexedNonArrayField) {
 }
 
 TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesMultiKeyPath) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"), {{}, {0}});
 
     // Cannot be covered since 'b' is multikey.
@@ -1611,7 +1626,7 @@ TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesMultiKeyPath) {
 }
 
 TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesDottedMultiKeyPath) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"), {{}, {0}});
 
     // Cannot be covered since 'b' is multikey, meaning the result of the expression '$b.c' could
@@ -1625,7 +1640,7 @@ TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesDottedMultiKeyPath) {
 }
 
 TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesROOT) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1, b: 1}"), {{}, {0}});
 
     runQueryAsCommand(
@@ -1637,7 +1652,7 @@ TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesROOT) {
 }
 
 TEST_F(QueryPlannerTest, PlansForWholeIndexScanWithSortAreGenerated) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("a" << 1));
     addIndex(BSON("a" << 1 << "b" << 1));
 
