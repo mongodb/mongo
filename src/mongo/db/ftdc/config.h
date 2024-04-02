@@ -46,6 +46,7 @@ struct FTDCConfig {
           maxDirectorySizeBytes(kMaxDirectorySizeBytesDefault),
           maxFileSizeBytes(kMaxFileSizeBytesDefault),
           period(kPeriodMillisDefault),
+          metadataCaptureFrequency(kMetadataCaptureFrequencyDefault),
           maxSamplesPerArchiveMetricChunk(kMaxSamplesPerArchiveMetricChunkDefault),
           maxSamplesPerInterimMetricChunk(kMaxSamplesPerInterimMetricChunkDefault) {}
 
@@ -74,6 +75,15 @@ struct FTDCConfig {
     Milliseconds period;
 
     /**
+     * Period at which to collect configuration Metadata.
+     *
+     * Represents how often configuration metadata is collected relative to the overall period. For
+     * instance, if metadataCaptureFrequency is 5, then the period of configuration metadata
+     * collection is 5*period
+     */
+    std::uint64_t metadataCaptureFrequency;
+
+    /**
      * Maximum number of samples to collect in an archive metric chunk for long term storage.
      */
     std::uint32_t maxSamplesPerArchiveMetricChunk;
@@ -87,6 +97,7 @@ struct FTDCConfig {
     static const bool kEnabledDefault = true;
 
     static const std::int64_t kPeriodMillisDefault;
+    static const std::uint64_t kMetadataCaptureFrequencyDefault;
     static const std::uint64_t kMaxDirectorySizeBytesDefault = 200 * 1024 * 1024;
     static const std::uint64_t kMaxFileSizeBytesDefault = 10 * 1024 * 1024;
 

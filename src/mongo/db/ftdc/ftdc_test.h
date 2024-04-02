@@ -77,6 +77,24 @@ void ValidateDocumentList(const std::vector<BSONObj>& docs1,
                           FTDCValidationMode mode);
 
 /**
+ * Validate the documents in a file match the specified vector, in perhaps different orders.
+ *
+ * Unit Test ASSERTs if there is mismatch.
+ */
+void ValidateDocumentListContains(const boost::filesystem::path& p,
+                                  const std::vector<BSONObj>& docs,
+                                  FTDCValidationMode mode);
+
+/**
+ * Validate that two lists of documents contain the same documents, in perhaps different orders.
+ *
+ * Unit Test ASSERTs if there is mismatch.
+ */
+void ValidateDocumentListContains(const std::vector<BSONObj>& docs1,
+                                  const std::vector<BSONObj>& docs2,
+                                  FTDCValidationMode mode);
+
+/**
  * Delete a file if it exists.
  */
 void deleteFileIfNeeded(const boost::filesystem::path& p);
