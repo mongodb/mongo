@@ -128,6 +128,24 @@ void DDLLockManager::_lock(OperationContext* opCtx,
 
     try {
         locker->lock(opCtx, resId, mode, deadline);
+
+        const auto state = [this]() {
+            stdx::unique_lock<Latch> lock(_mutex);
+            return _state;
+        }();
+        if (state != State::kPrimaryAndRecovered && waitForRecovery) {
+            // We must fail if the node has become secondary while we were waiting for the lock
+            // acquisition. It is not allowed to acquire a DDL lock once `_state` has changed from
+            // `kPrimaryAndRecovered` as we may be in the middle of a DDL operation that was
+            // interrupted during a step-down, leading to undefined behavior. Note that once a DDL
+            // operation takes a DDL lock, no one else should acquire that DDL lock until the
+            // operation completes.
+            locker->unlock(resId);
+            uasserted(
+                ErrorCodes::InterruptedDueToReplStateChange,
+                "Failed to acquire DDL lock for namespace '{}' in mode {} with reason {} "
+                "because this is not the primary anymore."_format(ns, modeName(mode), reason));
+        }
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
 
         std::vector<std::string> lockHoldersArr;
