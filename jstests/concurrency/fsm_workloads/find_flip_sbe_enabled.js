@@ -6,6 +6,9 @@
  *     # Our test infrastructure prevents tests which use the 'setParameter' command from running in
  *     # stepdown suites, since parameters are local to each mongod in the replica set.
  *     does_not_support_stepdowns,
+ *     # The balancer may issue moveCollection requests, which cause concurrent index builds to be
+ *     # aborted.
+ *     assumes_balancer_off,
  * ]
  */
 export const $config = (function() {
