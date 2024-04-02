@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry_mock.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
 
@@ -81,9 +85,18 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    // Note that the inclusion policy is currently ignored for this mock implementation (all added
+    // indexes are considered).
     const IndexDescriptor* findIndexByName(
-        OperationContext*, StringData, InclusionPolicy = InclusionPolicy::kReady) const override {
-        MONGO_UNREACHABLE;
+        OperationContext*,
+        StringData name,
+        InclusionPolicy = InclusionPolicy::kReady) const override {
+        for (const auto& entry : _indexEntries) {
+            if (entry->descriptor()->indexName() == name) {
+                return entry->descriptor();
+            }
+        }
+        return nullptr;
     }
 
     const IndexDescriptor* findIndexByKeyPatternAndOptions(
@@ -144,7 +157,7 @@ public:
 
     std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared()
         const override {
-        MONGO_UNREACHABLE;
+        return {};
     }
 
     using IndexIterator = IndexCatalog::IndexIterator;
@@ -154,11 +167,20 @@ public:
             opCtx, std::make_unique<std::vector<const IndexCatalogEntry*>>());
     }
 
-    IndexCatalogEntry* createIndexEntry(OperationContext*,
-                                        Collection*,
-                                        IndexDescriptor&&,
+    IndexCatalogEntry* createIndexEntry(OperationContext* opCtx,
+                                        Collection* collection,
+                                        IndexDescriptor&& descriptor,
                                         CreateIndexEntryFlags) override {
-        MONGO_UNREACHABLE;
+        auto entry = std::make_shared<IndexCatalogEntryMock>(opCtx,
+                                                             CollectionPtr(collection),
+                                                             "" /* ident */,
+                                                             std::move(descriptor),
+                                                             false /* isFrozen */);
+
+        auto save = entry.get();
+        _indexEntries.add(std::move(entry));
+
+        return save;
     }
 
     StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext*,
@@ -291,5 +313,7 @@ public:
     static Status checkValidFilterExpressions(const MatchExpression*) {
         MONGO_UNREACHABLE;
     }
+
+    IndexCatalogEntryContainer _indexEntries;
 };
 }  // namespace mongo
