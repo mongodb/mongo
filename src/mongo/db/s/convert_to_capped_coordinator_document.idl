@@ -59,6 +59,7 @@ structs:
             phase:
                 type: ConvertToCappedCoordinatorPhase
                 default: kUnset
-            isTrackedCollection:
-                description: "Set to true at the beginning of the `kUpdateShardingCatalog` phase if the unsplittable collection entry exists in `config.collections`"
-                type: optionalBool
+            originalCollection:
+                description: "Collection entry in the sharding catalog before executing `convertToCapped`"
+                type: CollectionType
+                optional: true

@@ -36,6 +36,7 @@
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_state.h"
 
@@ -121,7 +122,7 @@ void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
                 "Can't convert to capped a collection residing outside the primary shard",
                 *(shards.begin()) == selfShardId);
 
-        _doc.setIsTrackedCollection(true);
+        _doc.setOriginalCollection(sharding_ddl_util::getCollectionFromConfigServer(opCtx, nss()));
     }
 }
 
@@ -212,24 +213,21 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                                                            : BSONObj());
                 }();
 
-                if (_doc.getIsTrackedCollection()) {
-                    if (auto optCollEntry =
-                            sharding_ddl_util::getCollectionFromConfigServer(opCtx, nss())) {
-                        // This always runs in the shard role so should use a cluster transaction to
-                        // guarantee targeting the config server
-                        const bool useClusterTransaction{true};
+                if (_doc.getOriginalCollection().has_value()) {
+                    // This always runs in the shard role so should use a cluster transaction to
+                    // guarantee targeting the config server
+                    const bool useClusterTransaction{true};
 
-                        // Delete the sharding catalog entry referring the previous incarnation
-                        sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
-                            opCtx,
-                            Grid::get(opCtx)->shardRegistry()->getConfigShard(),
-                            Grid::get(opCtx)->catalogClient(),
-                            *optCollEntry,
-                            ShardingCatalogClient::kMajorityWriteConcern,
-                            getNewSession(opCtx),
-                            useClusterTransaction,
-                            **executor);
-                    }
+                    // Delete the sharding catalog entries referring the previous incarnation
+                    sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
+                        opCtx,
+                        Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+                        Grid::get(opCtx)->catalogClient(),
+                        *_doc.getOriginalCollection(),
+                        ShardingCatalogClient::kMajorityWriteConcern,
+                        getNewSession(opCtx),
+                        useClusterTransaction,
+                        **executor);
 
                     auto createCollectionOnShardingCatalogOps = sharding_ddl_util::
                         getOperationsToCreateUnsplittableCollectionOnShardingCatalog(
@@ -243,6 +241,11 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                         **executor,
                         getNewSession(opCtx),
                         std::move(createCollectionOnShardingCatalogOps));
+
+                    // Checkpoint the configTime to ensure that, in the case of a stepdown/crash,
+                    // the new primary will start-up from a configTime that is inclusive of the
+                    // metadata changes that were committed on the sharding catalog.
+                    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
                 }
 
                 logConvertToCappedOnChangelog(
@@ -295,7 +298,9 @@ bool ConvertToCappedCoordinator::_mustAlwaysMakeProgress() {
     // If the collection was originally tracked on the sharding catalog, the coodinator must always
     // make forward progress after converting the collection to capped in order to align local and
     // sharding catalog.
-    return _doc.getIsTrackedCollection() && _doc.getPhase() >= Phase::kConvertCollectionToCapped;
+    const bool isCollectionTrackedOnTheShardingCatalog = _doc.getOriginalCollection().has_value();
+    return isCollectionTrackedOnTheShardingCatalog &&
+        _doc.getPhase() >= Phase::kConvertCollectionToCapped;
 }
 
 ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
