@@ -77,27 +77,25 @@ public:
               allowNamespaceNotFoundErrorsOnCrudOps(inputMode ==
                                                         OplogApplication::Mode::kInitialSync ||
                                                     OplogApplication::inRecovering(inputMode)),
-              skipWritesToOplog(OplogApplication::inRecovering(inputMode)),
-              skipWritesToChangeCollection(false) {}
+              skipWritesToOplog(
+                  (feature_flags::gReduceMajorityWriteLatency.isEnabled(
+                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+                   inputMode == OplogApplication::Mode::kSecondary) ||
+                  OplogApplication::inRecovering(inputMode)) {}
 
-        Options(OplogApplication::Mode inputMode,
-                bool skipWritesToOplog,
-                bool skipWritesToChangeCollection)
+        Options(OplogApplication::Mode inputMode, bool skipWritesToOplog)
             : mode(inputMode),
               allowNamespaceNotFoundErrorsOnCrudOps(inputMode ==
                                                         OplogApplication::Mode::kInitialSync ||
                                                     OplogApplication::inRecovering(inputMode)),
-              skipWritesToOplog(skipWritesToOplog),
-              skipWritesToChangeCollection(skipWritesToChangeCollection) {}
+              skipWritesToOplog(skipWritesToOplog) {}
 
         Options(OplogApplication::Mode mode,
                 bool allowNamespaceNotFoundErrorsOnCrudOps,
-                bool skipWritesToOplog,
-                bool skipWritesToChangeCollection)
+                bool skipWritesToOplog)
             : mode(mode),
               allowNamespaceNotFoundErrorsOnCrudOps(allowNamespaceNotFoundErrorsOnCrudOps),
-              skipWritesToOplog(skipWritesToOplog),
-              skipWritesToChangeCollection(skipWritesToChangeCollection) {}
+              skipWritesToOplog(skipWritesToOplog) {}
 
         // Used to determine which operations should be applied. Only initial sync will set this to
         // be something other than the null optime.
@@ -106,7 +104,6 @@ public:
         const OplogApplication::Mode mode;
         const bool allowNamespaceNotFoundErrorsOnCrudOps;
         const bool skipWritesToOplog;
-        const bool skipWritesToChangeCollection;
     };
 
     // Used to report oplog application progress.
@@ -185,12 +182,6 @@ public:
      * to the last optime of this batch, it will not be updated.
      */
     StatusWith<OpTime> applyOplogBatch(OperationContext* opCtx, std::vector<OplogEntry> ops);
-
-    virtual void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
-                                                          StorageInterface* storageInterface,
-                                                          ThreadPool* writerPool,
-                                                          const std::vector<OplogEntry>& ops,
-                                                          bool skipWritesToOplog) = 0;
 
     /**
      * Calls the OplogBatcher's getNextApplierBatch.
