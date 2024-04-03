@@ -371,7 +371,10 @@ void generateExecutionInfo(PlanExecutor* exec,
  * If 'exec' is configured for yielding, then a call to this helper could result in a yield.
  */
 void executePlan(PlanExecutor* exec) {
-    exec->executeExhaustive();
+    BSONObj obj;
+    while (exec->getNext(&obj, nullptr) == PlanExecutor::ADVANCED) {
+        // Discard the resulting documents.
+    }
 }
 
 /**

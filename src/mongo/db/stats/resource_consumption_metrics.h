@@ -97,10 +97,7 @@ public:
          * when the unit size is large. This is desired behavior, and the extent to which small
          * datums are overstated is tunable by the unit size of the implementor.
          */
-        MONGO_COMPILER_ALWAYS_INLINE void observeOne(int64_t datumBytes) {
-            _units += std::ceil(datumBytes / static_cast<float>(unitSize()));
-            _bytes += datumBytes;
-        }
+        void observeOne(int64_t datumBytes);
 
     protected:
         /**

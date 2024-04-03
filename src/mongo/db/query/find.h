@@ -53,7 +53,10 @@ class OperationContext;
  * If false, the caller should close the cursor and indicate this to the client by sending back
  * a cursor ID of 0.
  */
-bool shouldSaveCursor(OperationContext* opCtx, const CollectionPtr& collection, PlanExecutor* exec);
+bool shouldSaveCursor(OperationContext* opCtx,
+                      const CollectionPtr& collection,
+                      PlanExecutor::ExecState finalState,
+                      PlanExecutor* exec);
 
 /**
  * Similar to shouldSaveCursor(), but used in getMore to determine whether we should keep the cursor
