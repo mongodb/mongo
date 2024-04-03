@@ -105,6 +105,92 @@ void BM_arrayLookup(benchmark::State& state) {
     state.SetBytesProcessed(totalBytes);
 }
 
+
+void BM_arrayStlIterate(benchmark::State& state) {
+    BSONArrayBuilder builder;
+    auto len = state.range(0);
+    auto totalBytes = len * 0;
+    for (auto j = 0; j < len; j++)
+        builder.append(j);
+    BSONObj array = builder.done();
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        long count = 0;
+        for (auto&& e : array) {
+            ++count;
+            benchmark::DoNotOptimize(e);
+        }
+        invariant(count == len);
+        totalBytes += array.objsize();
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+void BM_arrayNonStlIterate(benchmark::State& state) {
+    BSONArrayBuilder builder;
+    auto len = state.range(0);
+    auto totalBytes = len * 0;
+    for (auto j = 0; j < len; j++)
+        builder.append(j);
+    BSONObj array = builder.done();
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        long count = 0;
+        auto it = BSONObjIterator(array);
+        while (it.more()) {
+            auto e = it.next();
+            ++count;
+            benchmark::DoNotOptimize(e);
+        }
+        invariant(count == len);
+        totalBytes += array.objsize();
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+void BM_arrayStlIterateWithSize(benchmark::State& state) {
+    BSONArrayBuilder builder;
+    auto len = state.range(0);
+    auto totalBytes = len * 0;
+    for (auto j = 0; j < len; j++)
+        builder.append(j);
+    BSONObj array = builder.done();
+    const auto emptyBSONObjSize = BSONObj().objsize();
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        long count = 0;
+        auto objBytes = 0;
+        for (auto&& e : array) {
+            objBytes += e.size();
+            ++count;
+            benchmark::DoNotOptimize(e);
+        }
+        invariant(count == len);
+        invariant(objBytes + emptyBSONObjSize == array.objsize());
+        totalBytes += array.objsize();
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+void BSONnFields(benchmark::State& state) {
+    BSONArrayBuilder builder;
+    auto len = state.range(0);
+    auto totalBytes = len * 0;
+    for (auto j = 0; j < len; j++)
+        builder.append(j);
+    BSONObj array = builder.done();
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(array.nFields());
+        totalBytes += array.objsize();
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
 void BM_bsonIteratorSortedConstruction(benchmark::State& state) {
     BSONArrayBuilder builder;
     auto len = state.range(0);
@@ -168,6 +254,10 @@ void BM_validate_contents(benchmark::State& state) {
 
 BENCHMARK(BM_arrayBuilder)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_arrayLookup)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_arrayNonStlIterate)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_arrayStlIterate)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_arrayStlIterateWithSize)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BSONnFields)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_bsonIteratorSortedConstruction)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_validate)->Ranges({{{1}, {1'000}}});
 BENCHMARK(BM_validate_contents)->Ranges({{{1}, {1'000}}});
