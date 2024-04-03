@@ -148,8 +148,12 @@ public:
     void restoreState(const RestoreContext& context) final;
     void detachFromOperationContext() final;
     void reattachToOperationContext(OperationContext* opCtx) final;
+
     ExecState getNextDocument(Document* objOut, RecordId* dlOut) final;
     ExecState getNext(BSONObj* out, RecordId* dlOut) final;
+    size_t getNextBatch(size_t batchSize, AppendBSONObjFn append) final;
+    void executeExhaustive() final;
+
     bool isEOF() final;
     long long executeCount() override;
     UpdateResult executeUpdate() override;
@@ -160,7 +164,11 @@ public:
     void markAsKilled(Status killStatus) final;
     void dispose(OperationContext* opCtx) final;
     void stashResult(const BSONObj& obj) final;
-    bool isMarkedAsKilled() const final;
+
+    MONGO_COMPILER_ALWAYS_INLINE bool isMarkedAsKilled() const final {
+        return !_killStatus.isOK();
+    }
+
     Status getKillStatus() final;
     bool isDisposed() const final;
     Timestamp getLatestOplogTimestamp() const final;
@@ -197,16 +205,10 @@ public:
 
     bool usesCollectionAcquisitions() const final;
 
-private:
-    /**
-     *  Executes the underlying PlanStage tree until it indicates EOF. Throws an exception if the
-     *  plan results in an error.
-     *
-     *  Useful for cases where the caller wishes to execute the plan and extract stats from it (e.g.
-     *  the result of a count or update) rather than returning a set of resulting documents.
-     */
-    void _executePlan();
+    // Helper class used to implement getNextBatched().
+    class GetNextWorker;
 
+private:
     ExecState _getNextImpl(Snapshotted<Document>* objOut, RecordId* dlOut);
 
     // The OperationContext that we're executing within. This can be updated if necessary by using

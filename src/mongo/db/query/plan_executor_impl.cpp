@@ -54,7 +54,9 @@
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_explainer_factory.h"
@@ -255,6 +257,41 @@ void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
     _currentState = kSaved;
 }
 
+namespace {
+/**
+ * Helper function used to determine if we need to hang before inserts.
+ */
+void hangBeforeShouldWaitForInsertsIfFailpointEnabled(PlanExecutorImpl* exec) {
+    if (MONGO_unlikely(
+            planExecutorHangBeforeShouldWaitForInserts.shouldFail([exec](const BSONObj& data) {
+                auto fpNss = NamespaceStringUtil::parseFailPointData(data, "namespace"_sd);
+                return fpNss.isEmpty() || fpNss == exec->nss();
+            }))) {
+        LOGV2(20946,
+              "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "
+              "enabled. Blocking until fail point is disabled");
+        planExecutorHangBeforeShouldWaitForInserts.pauseWhileSet();
+    }
+}
+
+/**
+ * Helper function used to construct lambda passed into yielding logic.
+ */
+void doYield(OperationContext* opCtx) {
+    // If we yielded because we encountered a sharding critical section, wait for the critical
+    // section to end before continuing. By waiting for the critical section to be exited we avoid
+    // busy spinning immediately and encountering the same critical section again. It is important
+    // that this wait happens after having released the lock hierarchy -- otherwise deadlocks could
+    // happen, or the very least, locks would be unnecessarily held while waiting.
+    const auto& shardingCriticalSection = planExecutorShardingCriticalSectionFuture(opCtx);
+    if (shardingCriticalSection) {
+        OperationShardingState::waitForCriticalSectionToComplete(opCtx, *shardingCriticalSection)
+            .ignore();
+        planExecutorShardingCriticalSectionFuture(opCtx).reset();
+    }
+}
+}  // namespace
+
 PlanExecutor::ExecState PlanExecutorImpl::getNext(BSONObj* objOut, RecordId* dlOut) {
     const auto state = getNextDocument(&_docOutput, dlOut);
     if (objOut && state == ExecState::ADVANCED) {
@@ -315,19 +352,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
         // In all cases, the actual yielding happens here.
 
         const auto whileYieldingFn = [&]() {
-            // If we yielded because we encountered a sharding critical section, wait for the
-            // critical section to end before continuing. By waiting for the critical section to be
-            // exited we avoid busy spinning immediately and encountering the same critical section
-            // again. It is important that this wait happens after having released the lock
-            // hierarchy -- otherwise deadlocks could happen, or the very least, locks would be
-            // unnecessarily held while waiting.
-            const auto& shardingCriticalSection = planExecutorShardingCriticalSectionFuture(_opCtx);
-            if (shardingCriticalSection) {
-                OperationShardingState::waitForCriticalSectionToComplete(_opCtx,
-                                                                         *shardingCriticalSection)
-                    .ignore();
-                planExecutorShardingCriticalSectionFuture(_opCtx).reset();
-            }
+            doYield(_opCtx);
         };
 
         if (_yieldPolicy->shouldYieldOrInterrupt(_opCtx)) {
@@ -429,16 +454,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             // Fall through to yield check at end of large conditional.
         } else {
             invariant(PlanStage::IS_EOF == code);
-            if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
-                    [this](const BSONObj& data) {
-                        auto fpNss = NamespaceStringUtil::parseFailPointData(data, "namespace"_sd);
-                        return fpNss.isEmpty() || fpNss == _nss;
-                    }))) {
-                LOGV2(20946,
-                      "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "
-                      "enabled. Blocking until fail point is disabled");
-                planExecutorHangBeforeShouldWaitForInserts.pauseWhileSet();
-            }
+            hangBeforeShouldWaitForInsertsIfFailpointEnabled(this);
 
             // The !notifier check is necessary because shouldWaitForInserts can return 'true' when
             // shouldListenForInserts returned 'false' (above) in the case of a deadline becoming
@@ -454,6 +470,295 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             continue;
         }
     }
+}
+
+class PlanExecutorImpl::GetNextWorker {
+public:
+    GetNextWorker(PlanExecutorImpl* exec)
+        : _exec(exec), _notifier(makeNotifier(exec)), _whileYieldingFn(makeYieldingFn(exec)) {
+        tassert(873400, "Illegal for GetNextWorker to be initialized with a null executor.", exec);
+    }
+
+    GetNextWorker() = delete;
+    GetNextWorker(GetNextWorker&) = delete;
+    ~GetNextWorker() = default;
+
+    /**
+     * Implements 'executeExhaustive()' functionality to exhaust the executor without doing anything
+     * with any output documents.
+     */
+    void exhaustDoWork() {
+        checkFailPointPlanExecAlwaysFails();
+
+        WorkingSetID id = WorkingSet::INVALID_ID;
+
+        for (;;) {
+            checkIfKilledOrMustYield();
+
+            // We don't need the BSON in this loop, so we don't go to the trouble of materializing
+            // it or doing anything with it.
+            _code = _exec->_root->work(&id);
+
+            if (MONGO_likely(_code == PlanStage::ADVANCED)) {
+                // Free WSM.
+                _exec->_workingSet->free(id);
+
+                // Reset counters on successfull calls to doWork().
+                _writeConflictsInARow = 0;
+                _tempUnavailErrorsInARow = 0;
+                continue;
+            }
+
+            if (MONGO_unlikely(shouldFinish())) {
+                break;
+            }
+        }
+    }
+
+    /**
+     * Implements 'getNextBatch()' functionality. It is illegal to call this if the GetNextWorker
+     * was initialized with a null builder/ resource counter.
+     */
+    void batchedDoWork(const size_t batchSize, const bool includeMetadata, AppendBSONObjFn append) {
+        if (batchSize == 0) {
+            return;
+        }
+
+        checkFailPointPlanExecAlwaysFails();
+
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        WorkingSetMember* member;
+
+        // Handle case where previous execution stashed a result.
+        if (!_exec->_stash.empty()) {
+            _objOut = includeMetadata ? _exec->_stash.front().toBson()
+                                      : _exec->_stash.front().toBsonWithMetaData();
+            _exec->_stash.pop_front();
+            append(_objOut, _exec->getPostBatchResumeToken(), _numResults);
+            _numResults++;
+        }
+
+        for (;;) {
+            if (MONGO_unlikely(_numResults >= batchSize)) {
+                return;
+            }
+
+            checkIfKilledOrMustYield();
+
+            if (MONGO_likely((_code = _exec->_root->work(&id)) == PlanStage::ADVANCED)) {
+                // Process working set member.
+                member = _exec->_workingSet->get(id);
+                if (MONGO_likely(member->hasObj())) {
+                    if (includeMetadata) {
+                        makeBsonWithMetadata(member->doc.value(), member);
+                    } else {
+                        _objOut = member->doc.value().toBson();
+                    }
+
+                } else if (member->keyData.size() >= 1) {
+                    if (includeMetadata) {
+                        _exec->_docOutput = Document{member->keyData[0].keyData};
+                        makeBsonWithMetadata(_exec->_docOutput, member);
+                    } else {
+                        _objOut = member->keyData[0].keyData;
+                    }
+
+                } else {
+                    _exec->_workingSet->free(id);
+                    continue;  // Try to call work() again- we didn't get what we needed.
+                }
+
+                _exec->_workingSet->free(id);
+
+                if (MONGO_unlikely(
+                        !append(_objOut, _exec->getPostBatchResumeToken(), _numResults))) {
+                    _exec->stashResult(_objOut);
+                    return;
+                }
+                _numResults++;
+
+            } else if (MONGO_unlikely(shouldFinish())) {
+                return;
+            }
+        }
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE size_t count() const {
+        return _numResults;
+    }
+
+private:
+    static std::unique_ptr<insert_listener::Notifier> makeNotifier(PlanExecutorImpl* exec) {
+        if (insert_listener::shouldListenForInserts(exec->_opCtx, exec->_cq.get())) {
+            // We always construct the insert_listener::Notifier for awaitData cursors.
+            return insert_listener::getCappedInsertNotifier(
+                exec->_opCtx, exec->_nss, exec->_yieldPolicy.get());
+        }
+        return nullptr;
+    }
+
+    static std::function<void()> makeYieldingFn(PlanExecutorImpl* exec) {
+        return [opCtx = exec->_opCtx]() {
+            return doYield(opCtx);
+        };
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE void checkIfKilledOrMustYield() {
+        if (MONGO_unlikely(_exec->isMarkedAsKilled())) {
+            uassertStatusOK(_exec->_killStatus);
+        }
+
+        // These are the conditions which can cause us to yield:
+        //   1) The yield policy's timer elapsed, or
+        //   2) some stage requested a yield, or
+        //   3) we need to yield and retry due to a WriteConflictException.
+        // In all cases, the actual yielding happens here.
+        if (MONGO_unlikely(_exec->_yieldPolicy->shouldYieldOrInterrupt(_exec->_opCtx))) {
+            uassertStatusOK(_exec->_yieldPolicy->yieldOrInterrupt(_exec->_opCtx, _whileYieldingFn));
+        }
+    }
+
+    MONGO_COMPILER_NOINLINE void handleNeedYield() {
+        invariant(shard_role_details::getRecoveryUnit(_exec->_opCtx));
+
+        if (_exec->_expCtx->getTemporarilyUnavailableException()) {
+            _exec->_expCtx->setTemporarilyUnavailableException(false);
+
+            if (!_exec->_yieldPolicy->canAutoYield()) {
+                throwTemporarilyUnavailableException(
+                    "got TemporarilyUnavailable exception on a plan that "
+                    "cannot "
+                    "auto-yield");
+            }
+
+            _tempUnavailErrorsInARow++;
+            handleTemporarilyUnavailableException(
+                _exec->_opCtx,
+                _tempUnavailErrorsInARow,
+                "plan executor",
+                NamespaceStringOrUUID(_exec->_nss),
+                ExceptionFor<ErrorCodes::TemporarilyUnavailable>(
+                    Status(ErrorCodes::TemporarilyUnavailable, "temporarily unavailable")),
+                _writeConflictsInARow);
+
+        } else {
+            // We're yielding because of a WriteConflictException.
+            if (!_exec->_yieldPolicy->canAutoYield() ||
+                MONGO_unlikely(skipWriteConflictRetries.shouldFail())) {
+                throwWriteConflictException(
+                    "Write conflict during plan execution and yielding is "
+                    "disabled.");
+            }
+
+            CurOp::get(_exec->_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+            _writeConflictsInARow++;
+            logWriteConflictAndBackoff(
+                _writeConflictsInARow, "plan execution", ""_sd, NamespaceStringOrUUID(_exec->_nss));
+        }
+
+        // Yield next time through the loop.
+        invariant(_exec->_yieldPolicy->canAutoYield());
+        _exec->_yieldPolicy->forceYield();
+    }
+
+    MONGO_COMPILER_NOINLINE void resetCounters() {
+        _writeConflictsInARow = 0;
+        _tempUnavailErrorsInARow = 0;
+    }
+
+    MONGO_COMPILER_NOINLINE bool shouldFinish() {
+        // Resetting these counters is expensive to do on the hot path, so we would rather do an
+        // extra check here to see if we've made progress since the last time we entered this block,
+        // and if so, reset the counters.
+        if (_prevNumAdvances < _numResults) {
+            resetCounters();
+            _prevNumAdvances = _numResults;
+        }
+
+        // The slow path begins here. We always retry work() unless we've hit EOF *and* we
+        // should not wait for inserts.
+        switch (_code) {
+            case PlanStage::ADVANCED: {
+                // We should never hit this clause, since we only call this logic for other enum
+                // values.
+                MONGO_UNREACHABLE_TASSERT(8723400);
+            }
+
+            case PlanStage::NEED_YIELD: {
+                handleNeedYield();
+                // Don't reset counters.
+                break;
+            }
+
+            case PlanStage::IS_EOF: {
+                hangBeforeShouldWaitForInsertsIfFailpointEnabled(_exec);
+
+                // The !notifier check is necessary because shouldWaitForInserts can
+                // return 'true' when shouldListenForInserts returned 'false'
+                // (above) in the case of a deadline becoming "unexpired" due to the
+                // system clock going backwards.
+                if (!_notifier ||
+                    !insert_listener::shouldWaitForInserts(
+                        _exec->_opCtx, _exec->_cq.get(), _exec->_yieldPolicy.get())) {
+                    // Time to exit.
+                    return true;
+                }
+
+                insert_listener::waitForInserts(
+                    _exec->_opCtx, _exec->_yieldPolicy.get(), _notifier);
+                resetCounters();
+                break;
+            }
+
+            case PlanStage::NEED_TIME: {
+                // Do nothing.
+                resetCounters();
+                break;
+            }
+
+            default: {
+                MONGO_UNREACHABLE_TASSERT(8723401);
+            }
+        }
+
+        // Retry work().
+        return false;
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE void makeBsonWithMetadata(Document& doc,
+                                                           WorkingSetMember* member) {
+        if (member->metadata()) {
+            MutableDocument md(std::move(doc));
+            md.setMetadata(member->releaseMetadata());
+            _objOut = md.freeze().toBsonWithMetaData();
+        } else {
+            _objOut = doc.toBsonWithMetaData();
+        }
+    }
+
+    // State throughout batched work. We don't own any pointers here, except for the notifier.
+    PlanExecutorImpl* _exec;
+    std::unique_ptr<insert_listener::Notifier> _notifier;
+    const std::function<void()> _whileYieldingFn;
+
+    // State for doWork() loop.
+    BSONObj _objOut;
+    size_t _numResults = 0;
+    PlanStage::StageState _code = PlanStage::StageState::ADVANCED;
+
+    // The below are incremented on every WriteConflict or TemporarilyUnavailable error
+    // accordingly, and reset to 0 on any successful call to _root->work.
+    size_t _writeConflictsInARow = 0;
+    size_t _tempUnavailErrorsInARow = 0;
+    // Used to track if we've made any progress since the last call to shouldFinish().
+    size_t _prevNumAdvances = 0;
+};
+
+size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) {
+    const bool includeMetadata = _expCtx && _expCtx->needsMerge;
+    GetNextWorker worker(this);
+    worker.batchedDoWork(batchSize, includeMetadata, append);
+    return worker.count();
 }
 
 bool PlanExecutorImpl::isEOF() {
@@ -473,33 +778,22 @@ void PlanExecutorImpl::dispose(OperationContext* opCtx) {
     _currentState = kDisposed;
 }
 
-void PlanExecutorImpl::_executePlan() {
-    invariant(_currentState == kUsable);
-    Document obj;
-    PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
-    while (PlanExecutor::ADVANCED == state) {
-        state = this->getNextDocument(&obj, nullptr);
-    }
-
-    if (isMarkedAsKilled()) {
-        uassertStatusOK(_killStatus);
-    }
-
-    invariant(!isMarkedAsKilled());
-    invariant(PlanExecutor::IS_EOF == state);
+void PlanExecutorImpl::executeExhaustive() {
+    // We don't check batch size in exhaustDoWork().
+    GetNextWorker(this).exhaustDoWork();
 }
 
 long long PlanExecutorImpl::executeCount() {
     invariant(_root->stageType() == StageType::STAGE_COUNT ||
               _root->stageType() == StageType::STAGE_RECORD_STORE_FAST_COUNT);
 
-    _executePlan();
+    executeExhaustive();
     auto countStats = static_cast<const CountStats*>(_root->getSpecificStats());
     return countStats->nCounted;
 }
 
 UpdateResult PlanExecutorImpl::executeUpdate() {
-    _executePlan();
+    executeExhaustive();
     return getUpdateResult();
 }
 
@@ -565,7 +859,7 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
 }
 
 long long PlanExecutorImpl::executeDelete() {
-    _executePlan();
+    executeExhaustive();
     return getDeleteResult();
 }
 
@@ -633,10 +927,6 @@ BatchedDeleteStats PlanExecutorImpl::getBatchedDeleteStats() {
 
 void PlanExecutorImpl::stashResult(const BSONObj& obj) {
     _stash.push_front(Document{obj.getOwned()});
-}
-
-bool PlanExecutorImpl::isMarkedAsKilled() const {
-    return !_killStatus.isOK();
 }
 
 Status PlanExecutorImpl::getKillStatus() {

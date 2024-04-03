@@ -94,7 +94,7 @@ bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, siz
         return true;
     }
 
-    return (bytesBuffered + nextDoc.objsize()) <= kMaxBytesToReturnToClientAtOnce;
+    return fitsInBatch(bytesBuffered, nextDoc.objsize());
 }
 
 void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const CanonicalQuery& cq) {

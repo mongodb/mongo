@@ -317,6 +317,33 @@ public:
     virtual ExecState getNext(BSONObj* out, RecordId* dlOut) = 0;
 
     /**
+     * This function allows the caller of an executor to specify how a batched execution should
+     * handle the next BSON object ('obj') produced by the executor. The field 'numAppended' is
+     * provided to indicate the number of results appended prior to 'obj'. On a successful call,
+     * 'pbrt' will be set to the latest postBatchResumeToken. This function returns whether or not
+     * the executor should continue appending; note that 'numAppended' is not incremented if
+     * append() returns false.
+     *
+     * See getNextBatch() below for use.
+     */
+    using AppendBSONObjFn =
+        std::function<bool(const BSONObj& obj, const BSONObj& pbrt, const size_t numAppended)>;
+
+    /**
+     * Looping version of getNext() which appends BSONObjs produced by the execution plan up to the
+     * 'batchSize', or until the provided append() function returns false. The 'pbrt' is an output
+     * parameter for storing the post-batch resume token for the last successful append(). Note that
+     * getNextBatch() will stash the current object on a failed append().
+     */
+    virtual size_t getNextBatch(size_t batchSize, AppendBSONObjFn append);
+
+    /**
+     * Looping version of getNext() which exhausts the execution plan, but does nothing with any
+     * resulting documents.
+     */
+    virtual void executeExhaustive();
+
+    /**
      * Similar to 'getNext()', but returns a Document rather than a BSONObj.
      *
      * Callers should generally prefer the BSONObj variant, since not all implementations of
