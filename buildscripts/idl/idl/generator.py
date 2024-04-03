@@ -1959,7 +1959,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         field_usage_check = _get_field_usage_checker(self._writer, struct)
         if isinstance(struct, ast.Command):
-            self._writer.write_line('BSONElement commandElement;')
+            if struct.namespace != common.COMMAND_NAMESPACE_IGNORED:
+                self._writer.write_line('BSONElement commandElement;')
             self._writer.write_line('bool firstFieldFound = false;')
             self._writer.write_empty_line()
 

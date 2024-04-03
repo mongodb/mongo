@@ -64,7 +64,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                 8295703, "BSONColumn data ended without reaching end of buffer", ptr + 1 == end);
             return;
         } else if (isUncompressedLiteralControlByte(control)) {
-            BSONElement literal(ptr, 1, -1);
+            BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});
             type = literal.type();
             ptr += literal.size();
             switch (type) {

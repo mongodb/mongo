@@ -18,6 +18,7 @@ env.CppUnitTest(
     target='bson_test',
     source=[
         'bson_field_test.cpp',
+        'bson_iterator_test.cpp',
         'bson_obj_data_type_test.cpp',
         'bson_obj_test.cpp',
         'bson_validate_test.cpp',

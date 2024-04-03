@@ -74,10 +74,6 @@ class ExtendedCanonicalV200Generator;
 class ExtendedRelaxedV200Generator;
 class LegacyStrictGenerator;
 
-typedef BSONElement be;
-typedef BSONObj bo;
-typedef BSONObjBuilder bob;
-
 /**
     BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
     'a : 3' is the first element (key+value).
@@ -281,7 +277,7 @@ public:
      * Returns the type of the element
      */
     BSONType type() const {
-        const signed char typeByte = ConstDataView(data).read<signed char>();
+        const signed char typeByte = ConstDataView(_data).read<signed char>();
         return static_cast<BSONType>(typeByte);
     }
 
@@ -310,7 +306,7 @@ public:
      * Size of the element.
      */
     int size() const {
-        return totalSize;
+        return valuesize() + 1 + fieldNameSize();
     }
 
     /**
@@ -331,14 +327,14 @@ public:
     const char* fieldName() const {
         if (eoo())
             return "";  // no fieldname for it.
-        return data + 1;
+        return _data + 1;
     }
 
     /**
      * NOTE: size includes the NULL terminator.
      */
     int fieldNameSize() const {
-        return fieldNameSize_;
+        return _fieldNameSize;
     }
 
     StringData fieldNameStringData() const {
@@ -349,13 +345,20 @@ public:
      * raw data of the element's value (so be careful).
      */
     const char* value() const {
-        return (data + fieldNameSize() + 1);
+        return _data + fieldNameSize() + 1;
     }
     /**
      * size in bytes of the element's value (when applicable).
      */
     int valuesize() const {
-        return size() - fieldNameSize() - 1;
+        auto type = static_cast<uint8_t>(*_data);
+        uint32_t mask = 1u << (type & 0x1fu);
+        int32_t size = kFixedSizes[type];
+        if (mask & kVariableSizeMask)  // These types use a 32-bit int to store their size
+            size += ConstDataView(value()).read<LittleEndian<int32_t>>();
+        if (MONGO_unlikely(!size))  // 0 means we have a regex, minkey, maxkey, or invalid element
+            return computeRegexSize(_data, fieldNameSize()) - fieldNameSize() - 1;
+        return size - 1;
     }
 
     bool isBoolean() const {
@@ -760,13 +763,8 @@ public:
     }
 
     const char* rawdata() const {
-        return data;
+        return _data;
     }
-
-    /**
-     * Constructs an empty element
-     */
-    BSONElement();
 
     /**
      * True if this element may contain subobjects.
@@ -857,45 +855,24 @@ public:
         return mongo::OID::from(start);
     }
 
-    explicit BSONElement(const char* d) : data(d) {
+    constexpr BSONElement() = default;
+
+    explicit BSONElement(const char* d) : _data(d) {
         // While we should skip the type, and add 1 for the terminating null byte, just include
-        // the type byte in the strlen call: the extra byte cancels out. As an extra bonus, this
+        // the type byte in the strlen loop: the extra byte cancels out. As an extra bonus, this
         // also handles the EOO case, where the type byte is 0.
-        uint8_t type = *d;
-        fieldNameSize_ = strlen(d);
-        totalSize = computeSize(type, d, fieldNameSize_);
+        while (*d)
+            ++d;
+        _fieldNameSize = d - _data;
     }
 
     /**
-     * Construct a BSONElement where you already know the length of the name and/or the total size
-     * of the element. fieldNameSize includes the null terminator. You may pass -1 for either or
-     * both sizes to indicate that they are unknown and should be computed.
-     */
-    BSONElement(const char* d, int fieldNameSize, int totalSize) : data(d) {
-        if (eoo()) {
-            fieldNameSize_ = 0;
-            this->totalSize = 1;
-        } else {
-            if (fieldNameSize == -1) {
-                fieldNameSize_ = strlen(d + 1 /*skip type*/) + 1 /*include NUL byte*/;
-            } else {
-                fieldNameSize_ = fieldNameSize;
-            }
-            if (totalSize == -1) {
-                this->totalSize = computeSize(*d, d, fieldNameSize_);
-            } else {
-                this->totalSize = totalSize;
-            }
-        }
-    }
-
-    /**
-     * Construct a BSONElement where you already know the length of the name and the total size
-     * of the element. fieldNameSize includes the null terminator.
+     * Construct a BSONElement where you already know the length of the name.
+     * The fieldNameSize includes the null terminator.
      */
     struct TrustedInitTag {};
-    constexpr BSONElement(const char* d, int fieldNameSize, int totSize, TrustedInitTag)
-        : data(d), fieldNameSize_(fieldNameSize), totalSize(totSize) {}
+    constexpr BSONElement(const char* d, int fieldNameSize, TrustedInitTag)
+        : _data(d), _fieldNameSize(fieldNameSize) {}
 
     std::string _asCode() const;
 
@@ -943,12 +920,63 @@ public:
     static const long long kSmallestSafeLongLongAsDouble;
 
     /**
-     * Compute the size of the encoding of the BSON object.  If bufSize is provided, it will do
-     * so in an overflow-safe manner.
+     * Compute the size of the encoding of a regex, minKey or MaxKey. Throws if the elemt is not a
+     * any of these. This function is suitable as a fallback after other known BSON types are
+     * handles, as it will try and dump extra diagnostic information in case of memory corruption.
      */
-    static int computeSize(int8_t type, const char* data, int fieldNameSize, int bufSize = 0);
+    static int computeRegexSize(const char* data, int fieldNameSize);
 
 private:
+    // This needs to be 2 elements because we check the strlen of data + 1 and GCC sees that as
+    // accessing beyond the end of a constant string, even though we always check whether the
+    // element is an eoo.
+    static constexpr const char kEooElement[2] = {'\0', '\0'};
+
+    /**
+     *  The kFixedSizes table provides the fixed size of each element type, including the type byte,
+     *  but excluding the field name and its terminating 0 byte, and excluding the variable sized
+     *  part for objects, arrays, strings, etc. Elements that are 0 may be regex/minkey/maxkey
+     *  elements, or elements with invalid types. The table is extended to 256 bytes to make it more
+     *  likely that we will error on such invalid type bytes in the case of memory corruption.
+     *  The alignas clause ensures the first part of the table fits on a single cache line, which
+     *  avoids performance changes due to memory layout.
+     */
+    static constexpr uint8_t kFixedSizes alignas(32)[256] = {
+        1,                        // 0x00 EOO
+        9,                        // 0x01 NumberDouble
+        5,                        // 0x02 String
+        1,                        // 0x03 Object
+        1,                        // 0x04 Array
+        6,                        // 0x05 BinData
+        1,                        // 0x06 Undefined
+        13,                       // 0x07 ObjectID
+        2,                        // 0x08 Bool
+        9,                        // 0x09 Date
+        1,                        // 0x0a Null
+        0,                        // 0x0b Regex
+        17,                       // 0x0c DBRef
+        5,                        // 0x0d Code
+        5,                        // 0x0e Symbol
+        1,                        // 0x0f CodeWScope
+        5,                        // 0x10 NumberInt
+        9,                        // 0x11 Timestamp
+        9,                        // 0x12 NumberLong
+        17,                       // 0x13 NumberDecimal
+        0,  0, 0, 0,              // 0x14 - 0x17 (reserved)
+        0,  0, 0, 0, 0, 0, 0, 0,  // 0x18 - 0x1f (reserved)
+    };
+    MONGO_STATIC_ASSERT(sizeof(kFixedSizes) == 256);
+
+    /**
+     * The kVariableSizeMask table provides a mask for the types that have a variable size. The mask
+     * is 1 << type, so that we can use it to check whether a type is variable size with a single
+     * bit test.
+     */
+    static constexpr uint32_t kVariableSizeMask =  // equal to 0xf03cu (61500)
+        (1u << mongo::String) | (1u << mongo::Object) | (1u << mongo::Array) |
+        (1u << mongo::BinData) | (1u << mongo::DBRef) | (1u << mongo::Code) |
+        (1u << mongo::Symbol) | (1u << mongo::CodeWScope);
+
     /**
      * This is to enable structured bindings for BSONElement, it should not be used explicitly.
      * When used in a structed binding, BSONElement behaves as-if it is a
@@ -987,10 +1015,6 @@ private:
                                  fmt::memory_buffer& buffer,
                                  size_t writeLimit) const;
 
-    const char* data;
-    int fieldNameSize_;  // internal size includes null terminator
-    int totalSize;
-
     friend class BSONObjIterator;
     friend class BSONObjStlIterator;
     friend class BSONObj;
@@ -1005,6 +1029,9 @@ private:
         }
         return *this;
     }
+
+    const char* _data = kEooElement;
+    int _fieldNameSize = 0;  // internal size includes null terminator, 0 for EOO
 };
 
 inline bool BSONElement::trueValue() const {
@@ -1296,15 +1323,6 @@ inline long long BSONElement::exactNumberLong() const {
     return uassertStatusOK(parseIntegerElementToLong());
 }
 
-inline BSONElement::BSONElement() {
-    // This needs to be 2 elements because we check the strlen of data + 1 and GCC sees that as
-    // accessing beyond the end of a constant string, even though we always check whether the
-    // element is an eoo.
-    static const char kEooElement[2] = {'\0', '\0'};
-    data = kEooElement;
-    fieldNameSize_ = 0;
-    totalSize = 1;
-}
 }  // namespace mongo
 
 // These template specializations in namespace std are required in order to support structured

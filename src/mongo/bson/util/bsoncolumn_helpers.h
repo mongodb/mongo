@@ -226,7 +226,7 @@ private:
 };
 
 struct NoopSubObjectFinisher {
-    void finish(const char* elemBytes, int fieldNameSize, int totalSize) {}
+    void finish(const char* elemBytes, int fieldNameSize) {}
     void finishMissing() {}
 };
 
@@ -325,7 +325,7 @@ public:
             if (_contiguousBlock) {
                 // If we started contiguous mode upon construction, finish the object.
                 auto [ptr, size] = _contiguousBlock->done();
-                _finisher.finish(ptr, _fieldNameSize + 1, size);
+                _finisher.finish(ptr, _fieldNameSize + 1);
             }
         }
     }
