@@ -9,7 +9,7 @@ asio_src = [
 
 env.InjectThirdParty(libraries=['boost'])
 
-env.Library(
+env.BazelLibrary(
     target="asio",
     source=asio_src,
 )

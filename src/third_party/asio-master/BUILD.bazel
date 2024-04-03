@@ -1,0 +1,17 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "asio",
+    srcs = [
+        "asio/src/asio.cpp",
+    ],
+    hdrs = glob([
+        "asio/include/**/*.hpp",
+        "asio/include/**/*.ipp",
+    ]),
+    includes = [
+        "asio/include",
+    ],
+)
