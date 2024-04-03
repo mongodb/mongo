@@ -114,6 +114,35 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
     return rawFacetPipelines;
 }
 
+/**
+ * Helper function to find the stage that violates the $facet requirement. The 'source' is not
+ * allowed either directly or because of some of the sources inside its sub-pipelines.
+ */
+std::string getStageNameNotAllowedInFacet(const DocumentSource& source,
+                                          const std::string& parentName) {
+    auto* subPipeline = source.getSubPipeline();
+    const std::string& sourceName = source.getSourceName();
+    if (!subPipeline) {
+        if (!parentName.empty()) {
+            return str::stream() << sourceName << " inside of " << parentName;
+        } else {
+            return str::stream() << sourceName;
+        }
+    } else {
+        for (const auto& substage : *subPipeline) {
+            auto stageConstraints = substage->constraints();
+            if (!stageConstraints.isAllowedInsideFacetStage()) {
+                return getStageNameNotAllowedInFacet(*substage, sourceName);
+            }
+        }
+        // If we reach this point, none of the sub-stages is violating the $facet requirement. The
+        // 'source' stage itself is not allowed.
+        return str::stream() << sourceName;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(8045600);
+}
+
 }  // namespace
 
 std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed::parse(
@@ -353,10 +382,12 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
                 auto sources = pipeline.getSources();
                 std::for_each(sources.begin(), sources.end(), [](auto& stage) {
                     auto stageConstraints = stage->constraints();
-                    uassert(40600,
-                            str::stream() << stage->getSourceName()
-                                          << " is not allowed to be used within a $facet stage",
-                            stageConstraints.isAllowedInsideFacetStage());
+                    if (!stageConstraints.isAllowedInsideFacetStage()) {
+                        uasserted(40600,
+                                  str::stream()
+                                      << getStageNameNotAllowedInFacet(*stage, "")
+                                      << " is not allowed to be used within a $facet stage");
+                    }
                     // We expect a stage within a $facet stage to have these properties.
                     invariant(stageConstraints.requiredPosition ==
                               StageConstraints::PositionRequirement::kNone);
