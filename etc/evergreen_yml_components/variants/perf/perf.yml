@@ -109,7 +109,7 @@ buildvariants:
     storageEngine: wiredTiger
     compile_variant: amazon2-arm64-compile
   run_on:
-    - rhel70-small
+    - "rhel70-perf-single"
   tasks: &1nodetasks
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
@@ -168,7 +168,7 @@ buildvariants:
     storageEngine: wiredTiger
     compile_variant: amazon2-x86-compile
   run_on:
-    - amazon2
+    - "rhel70-perf-single"
   tasks: &classic_engine_tasks
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
@@ -2207,7 +2207,7 @@ buildvariants:
     storageEngine: wiredTiger
     compile_variant: amazon2-arm64-compile
   run_on:
-    - rhel70-small
+    - "rhel70-perf-single"
   # Not using 1nodetasks because some need to be temporarily disabled.
   tasks: *1nodetasks
 
