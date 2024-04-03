@@ -1,7 +1,8 @@
 /**
  * @tags: [
  *   assumes_superuser_permissions,
- *   # TODO (SERVER-82067) re-enable on upgrade/downgrade
+ *   # TODO SERVER-88069: this test can be run in upgrade downgrade once
+ *   # createdCollectionAutomatically is removed.
  *   cannot_run_during_upgrade_downgrade,
  *   # simulate_atlas_proxy.js can't simulate req on config.transaction as tested
  *   simulate_atlas_proxy_incompatible,
@@ -43,8 +44,8 @@ const extractResult = function(obj) {
     return result;
 };
 
+// TODO SERVER-88069: remove check once createdCollectionAutomatically is removed.
 const checkImplicitCreate = function(admin, createIndexResult) {
-    // TODO SERVER-82067 remove or fix this field for track unsharded
     const isMultiversion = jsTest.options().shardMixedBinVersions ||
         jsTest.options().useRandomBinVersionsWithinReplicaSet;
     if (!isMultiversion &&
