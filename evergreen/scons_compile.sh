@@ -22,13 +22,6 @@ extra_args="$extra_args UNITTESTS_COMPILE_CONCURRENCY=${num_scons_unit_cc_jobs_a
 
 if [ "${scons_cache_scope}" = "shared" ]; then
   extra_args="$extra_args --cache-debug=scons_cache.log"
-  if [ "Windows_NT" = "$OS" ]; then
-    cyg_cachedir=$(cygpath ${scons_cache_path})
-    prune_dir=$(ls -d $cyg_cachedir/*/ | sort -R | tail -1)
-  else
-    prune_dir=$(ls -d ${scons_cache_path}/*/ | sort -R | tail -1)
-  fi
-  find $prune_dir -amin +2160 -exec bash -c "evergreen/prune_cache_file.sh {}" \; &
 fi
 
 # Conditionally enable scons time debugging

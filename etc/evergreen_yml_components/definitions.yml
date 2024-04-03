@@ -2265,19 +2265,6 @@ functions:
       permissions: public-read
       display_name: SCons cache debug log
 
-  "attach scons cache prune logs": &attach_scons_cache_prune_logs
-    command: s3.put
-    params:
-      optional: true
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/scons_cache_prune.log
-      content_type: text/plain
-      remote_file: ${project}/${build_variant}/${revision}/artifacts/scons_cache_prune.log.${build_id}-${task_name}.${execution}
-      bucket: mciuploads
-      permissions: public-read
-      display_name: SCons cache prune log
-
   "attach scons stdout logs": &attach_scons_stdout_logs
     command: s3.put
     params:
@@ -2294,7 +2281,6 @@ functions:
   "attach scons logs":
   - *attach_scons_config_logs
   - *attach_scons_cache_logs
-  - *attach_scons_cache_prune_logs
   - *attach_scons_stdout_logs
 
   "attach report":
