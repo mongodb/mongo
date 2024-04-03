@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,38 +27,17 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_registry_mongod.h"
 
 namespace mongo {
+template <typename T>
+void visit(DocsNeededBoundsContext* ctx, const T&) {
+    ctx->applyUnknownStage();
+}
 
-/**
- * A walker over a DocumentSource pipeline. See the DocumentSourceVisitorRegistry header for details
- * about why this walker does not use the typical "visitor" interface.
- */
-class DocumentSourceWalker final {
-public:
-    DocumentSourceWalker(const DocumentSourceVisitorRegistry& registry,
-                         DocumentSourceVisitorContextBase* ctx)
-        : _registry(registry), _visitorCtx(ctx) {}
-
-    /**
-     * Perform an pre-order traversal of the top-level document sources in the given pipeline (i.e.
-     * does not walk $lookup/$unionWith subpipelines).
-     */
-    void walk(const Pipeline& pipeline);
-
-    /**
-     * Same as walk(), but traverses the pipeline in reverse (back-to-front).
-     */
-    void reverseWalk(const Pipeline& pipeline);
-
-private:
-    const DocumentSourceVisitorRegistry& _registry;
-    DocumentSourceVisitorContextBase* _visitorCtx;
-};
-
+const ServiceContext::ConstructorActionRegisterer DocsNeededBoundsRegisterer{
+    "DocsNeededBoundsRegistererShardingRuntimeD", [](ServiceContext* service) {
+        registerShardingRuntimeDVisitor<DocsNeededBoundsContext>(service);
+    }};
 }  // namespace mongo

@@ -45,4 +45,16 @@ void DocumentSourceWalker::walk(const Pipeline& pipeline) {
     }
 }
 
+void DocumentSourceWalker::reverseWalk(const Pipeline& pipeline) {
+    auto sources = pipeline.getSources();
+    auto reverseItr = sources.rbegin();
+    while (reverseItr != sources.rend()) {
+        // Perform double-dispatch based on the visitor context and document source types by
+        // consulting the registry.
+        auto func = _registry.getConstVisitorFunc(*_visitorCtx, **reverseItr);
+        // Invoke the function pointer returned from the registry.
+        func(_visitorCtx, **reverseItr);
+        reverseItr++;
+    }
+}
 }  // namespace mongo

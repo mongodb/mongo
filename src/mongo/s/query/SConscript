@@ -91,6 +91,17 @@ env.Library(
 )
 
 env.Library(
+    target='mongos_docs_needed_bounds',
+    source=[
+        'document_source_visitor_docs_needed_bounds.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/pipeline/docs_needed_bounds',
+        'router_exec_stage',
+    ],
+)
+
+env.Library(
     target='async_results_merger',
     source=[
         'async_results_merger.cpp',

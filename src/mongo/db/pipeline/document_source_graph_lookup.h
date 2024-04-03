@@ -126,6 +126,18 @@ public:
         return _startWith.get();
     }
 
+    const boost::intrusive_ptr<DocumentSourceUnwind>& getUnwindSource() const {
+        return *_unwind;
+    }
+
+    /*
+     * Indicates whether this $graphLookup stage has absorbed an immediately following $unwind stage
+     * that unwinds the lookup result array.
+     */
+    bool hasUnwindSource() const {
+        return _unwind.has_value();
+    }
+
     /*
      * Returns a ref to '_startWith' that can be swapped out with a new expression.
      */
