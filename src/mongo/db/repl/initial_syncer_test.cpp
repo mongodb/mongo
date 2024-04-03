@@ -97,6 +97,7 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -3882,6 +3883,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockError) {
+    // oplog version validation is moved from oplog batcher to oplog fetcher. This test can be
+    // removed after removing the feture flag.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReduceMajorityWriteLatency", false);
+
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
@@ -3946,6 +3952,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
 TEST_F(
     InitialSyncerTest,
     InitialSyncerReturnsEmptyBatchFromGetNextApplierBatchInLockIfRsSyncApplyStopFailPointIsEnabled) {
+    // oplog version validation is moved from oplog batcher to oplog fetcher. This test can be
+    // removed after removing the feture flag.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReduceMajorityWriteLatency", false);
+
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
