@@ -9,6 +9,8 @@ assert.commandWorked(
     config.adminCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 assert.commandWorked(config.adminCommand({shardCollection: "" + coll, key: {a: 1}}));
 
+assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: coll.getFullName()}));
+
 const shard0Coll = st.shard0.getCollection(coll.getFullName());
 
 // Full shard key in save
