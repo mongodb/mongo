@@ -868,8 +868,10 @@ void logStartCreateCollection(OperationContext* opCtx,
         "collection",
         NamespaceStringUtil::serialize(originalNss, SerializationContext::stateDefault()));
     collectionDetail.append("primary", ShardingState::get(opCtx)->shardId().toString());
+    auto operationStr =
+        isUnsplittable(request) ? "createCollection.start" : "shardCollection.start";
     ShardingLogging::get(opCtx)->logChange(
-        opCtx, "shardCollection.start", originalNss, collectionDetail.obj());
+        opCtx, operationStr, originalNss, collectionDetail.obj());
 }
 
 void enterCriticalSectionsOnCoordinator(OperationContext* opCtx,
@@ -1040,7 +1042,8 @@ void logEndCreateCollection(
     const NamespaceString& originalNss,
     const boost::optional<CreateCollectionResponse>& result,
     const boost::optional<bool>& collectionEmpty,
-    const boost::optional<InitialSplitPolicy::ShardCollectionConfig>& initialChunks) {
+    const boost::optional<InitialSplitPolicy::ShardCollectionConfig>& initialChunks,
+    bool isUnsplittable) {
     BSONObjBuilder collectionDetail;
     if (result) {
         result->getCollectionUUID()->appendToBuilder(&collectionDetail, "uuid");
@@ -1051,8 +1054,9 @@ void logEndCreateCollection(
     if (initialChunks)
         collectionDetail.appendNumber("numChunks",
                                       static_cast<long long>(initialChunks->chunks.size()));
+    auto operationStr = isUnsplittable ? "createCollection.end" : "shardCollection.end";
     ShardingLogging::get(opCtx)->logChange(
-        opCtx, "shardCollection.end", originalNss, collectionDetail.obj());
+        opCtx, operationStr, originalNss, collectionDetail.obj());
 }
 
 /**
@@ -1686,7 +1690,12 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
-            logEndCreateCollection(opCtx, originalNss(), _result, _collectionEmpty, _initialChunks);
+            logEndCreateCollection(opCtx,
+                                   originalNss(),
+                                   _result,
+                                   _collectionEmpty,
+                                   _initialChunks,
+                                   _request.getUnsplittable());
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (status == ErrorCodes::RequestAlreadyFulfilled) {
@@ -1923,8 +1932,12 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 _result = std::move(response);
             }
 
-            logEndCreateCollection(
-                opCtx, originalNss(), _result, _doc.getCollectionIsEmpty(), _initialChunks);
+            logEndCreateCollection(opCtx,
+                                   originalNss(),
+                                   _result,
+                                   _doc.getCollectionIsEmpty(),
+                                   _initialChunks,
+                                   _request.getUnsplittable());
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (status == ErrorCodes::RequestAlreadyFulfilled) {
