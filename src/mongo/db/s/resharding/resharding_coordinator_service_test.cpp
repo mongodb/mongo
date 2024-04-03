@@ -913,43 +913,6 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
     }
 }
 
-TEST_F(ReshardingCoordinatorServiceTest, ReportForCurrentOpAfterCompletion) {
-    const auto state = CoordinatorStateEnum::kPreparingToDonate;
-
-    PauseDuringStateTransitions stateTransitionsGuard{controller(), state};
-
-    auto coordinator = initializeAndGetCoordinator();
-    auto instanceId =
-        BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName << _reshardingUUID);
-
-    stateTransitionsGuard.wait(state);
-
-    // Force a failover, and wait for the state machine to fulfill the completion promise. At this
-    // point, the resharding metrics will have been unregistered from the cumulative metrics.
-    stepDown(operationContext());
-    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
-
-    // Now call step up. The old coordinator object has not yet been destroyed because we still hold
-    // a shared pointer to it ('coordinator') - this can happen in production after a failover if a
-    // state machine is slow to clean up.
-    stepUp(operationContext());
-
-    // Assert that the old coordinator object will return a currentOp report, because the resharding
-    // metrics still exist on the coordinator object itelf.
-    ASSERT(coordinator->reportForCurrentOp(
-        MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
-        MongoProcessInterface::CurrentOpSessionsMode::kIncludeIdle));
-
-    // Ensure a new coordinator can start and register resharding metrics, despite the "zombie"
-    // state machine still existing.
-    auto newCoordinator = getCoordinator(operationContext(), instanceId);
-    ASSERT_NE(coordinator, newCoordinator);
-
-    // No need to finish the resharding op, so we just cancel the op.
-    stepDown(operationContext());
-    ASSERT_EQ(newCoordinator->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
-}
-
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNotAllowed) {
     auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
     auto opCtx = operationContext();

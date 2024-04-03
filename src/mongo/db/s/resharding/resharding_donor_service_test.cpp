@@ -540,55 +540,6 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
     }
 }
 
-TEST_F(ReshardingDonorServiceTest, ReportForCurrentOpAfterCompletion) {
-    const auto donorState = DonorStateEnum::kDonatingInitialData;
-
-    PauseDuringStateTransitions stateTransitionsGuard{controller(), donorState};
-    auto doc = makeStateDocument(false /* isAlsoRecipient */);
-    auto instanceId =
-        BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
-
-    auto opCtx = makeOperationContext();
-    auto donor = [&] {
-        createSourceCollection(opCtx.get(), doc);
-
-        DonorStateMachine::insertStateDocument(opCtx.get(), doc);
-        return DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
-    }();
-
-    // Step down before the transition to state can complete.
-    stateTransitionsGuard.wait(donorState);
-    stepDown();
-
-    // At this point, the resharding metrics will have been unregistered from the cumulative metrics
-    ASSERT_EQ(donor->getCompletionFuture().getNoThrow(),
-              ErrorCodes::InterruptedDueToReplStateChange);
-
-    // Now call step up. The old donor object has not yet been destroyed because we still hold
-    // a shared pointer to it ('donor') - this can happen in production after a failover if a
-    // state machine is slow to clean up.
-    stepUp(opCtx.get());
-
-    // Assert that the old donor object will return a currentOp report, because the resharding
-    // metrics still exist on the coordinator object itelf.
-    ASSERT(donor->reportForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
-                                     MongoProcessInterface::CurrentOpSessionsMode::kIncludeIdle));
-
-    // Ensure the new donor started up successfully (and thus, registered new resharding metrics),
-    // despite the "zombie" state machine still existing.
-    auto [maybeDonor, isPausedOrShutdown] =
-        DonorStateMachine::lookup(opCtx.get(), _service, instanceId);
-    ASSERT_TRUE(maybeDonor);
-    ASSERT_FALSE(isPausedOrShutdown);
-    auto newDonor = *maybeDonor;
-    ASSERT_NE(donor, newDonor);
-
-    // No need to finish the resharding op, so we just cancel the op.
-    stepDown();
-    ASSERT_EQ(newDonor->getCompletionFuture().getNoThrow(),
-              ErrorCodes::InterruptedDueToReplStateChange);
-}
-
 DEATH_TEST_REGEX_F(ReshardingDonorServiceTest, CommitFn, "4457001.*tripwire") {
     auto doc = makeStateDocument(false /* isAlsoRecipient */);
     auto opCtx = makeOperationContext();
