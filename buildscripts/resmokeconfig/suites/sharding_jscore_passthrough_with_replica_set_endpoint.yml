@@ -8,59 +8,59 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/core/**/*.js
-  - jstests/core_sharding/**/*.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
-  # These tests are run in sharded_jscore_txns.
-  - jstests/core/txns/**/*.js
-  # The following tests fail because a certain command or functionality is not supported on
-  # mongos. This command or functionality is placed in a comment next to the failing test.
-  - jstests/core/**/apitest_db.js  # serverStatus output doesn't have storageEngine.
-  - jstests/core/**/check_shard_index.js  # checkShardingIndex.
-  - jstests/core/**/collection_truncate.js  # emptycapped.
-  - jstests/core/**/compact_keeps_indexes.js  # compact.
-  - jstests/core/**/currentop.js  # uses fsync.
-  - jstests/core/**/dbhash.js  # dbhash.
-  - jstests/core/**/fsync.js  # uses fsync.
-  - jstests/core/**/geo_s2cursorlimitskip.js  # profiling.
-  - jstests/core/**/geo_update_btree2.js  # notablescan.
-  - jstests/core/**/index9.js  # "local" database.
-  - jstests/core/**/queryoptimizera.js  # "local" database.
-  - jstests/core/**/stages*.js  # stageDebug.
-  - jstests/core/**/startup_log.js  # "local" database.
-  - jstests/core/**/top.js  # top.
-  # The following tests fail because mongos behaves differently from mongod when testing certain
-  # functionality. The differences are in a comment next to the failing test.
-  - jstests/core/**/geo_2d_explain.js  # executionSuccess in different spot in explain().
-  - jstests/core/**/geo_s2explain.js  # inputStage in different spot in explain().
-  - jstests/core/**/geo_s2sparse.js  # keysPerIndex in different spot in validate().
-  - jstests/core/**/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
-  # The following tests fail because of divergent dropCollection behavior between standalones and
-  # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
-  # we expect a second drop to return status OK.
-  - jstests/core/**/explain_upsert.js
+    # These tests are run in sharded_jscore_txns.
+    - jstests/core/txns/**/*.js
+    # The following tests fail because a certain command or functionality is not supported on
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/collection_truncate.js # emptycapped.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_s2cursorlimitskip.js # profiling.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/index9.js # "local" database.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/stages*.js # stageDebug.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/top.js # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+    # The following tests fail because of divergent dropCollection behavior between standalones and
+    # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
+    # we expect a second drop to return status OK.
+    - jstests/core/**/explain_upsert.js
 
-  # The tests below are disabled because of embedded router role and replica set endpoint.
-  # TODO (SERVER-87512): Support role-aware serverStatus on mongod with router role.
-  - jstests/core/write/find_and_modify/find_and_modify_metrics.js
-  - jstests/core/write/update/update_metrics.js
-  # TODO (SERVER-75855): Support running the find command via mongos by specifying a UUID
-  # (instead of a collection name).
-  - jstests/core/commands_with_uuid.js
-  # TODO (SERVER-84091): cloneCollectionAsCapped command stops working after a replica set
-  # is bootstrapped as a sharded cluster.
-  - jstests/core/collation.js
-  # Test expects changes in metrics (rejected command count), but these are
-  # per-ClusterRole. This suite changes which role's metrics are updated.
-  - jstests/core/query/query_settings/query_settings_reject_application.js
+    # The tests below are disabled because of embedded router role and replica set endpoint.
+    # TODO (SERVER-87512): Support role-aware serverStatus on mongod with router role.
+    - jstests/core/write/find_and_modify/find_and_modify_metrics.js
+    - jstests/core/write/update/update_metrics.js
+    # TODO (SERVER-75855): Support running the find command via mongos by specifying a UUID
+    # (instead of a collection name).
+    - jstests/core/commands_with_uuid.js
+    # TODO (SERVER-84091): cloneCollectionAsCapped command stops working after a replica set
+    # is bootstrapped as a sharded cluster.
+    - jstests/core/collation.js
+    # Test expects changes in metrics (rejected command count), but these are
+    # per-ClusterRole. This suite changes which role's metrics are updated.
+    - jstests/core/query/query_settings/query_settings_reject_application.js
 
   exclude_with_any_tags:
-  - assumes_standalone_mongod
-  - assumes_against_mongod_not_mongos
-  # system.profile collection doesn't exist on mongos.
-  - requires_profiling
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
 
 executor:
   archive:
@@ -76,20 +76,20 @@ executor:
         TestData: &TestData
           testingReplicaSetEndpoint: true
   hooks:
-  # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
-  # is fsync locked and has replica set endpoint enabled.
-  # - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-    shell_options:
-      global_vars:
-        TestData: *TestData
-  - class: ValidateCollections
-  - class: CheckOrphansDeleted
-    shell_options:
-      global_vars:
-        TestData: *TestData
-  - class: CleanEveryN
-    n: 20
+    # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
+    # is fsync locked and has replica set endpoint enabled.
+    # - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData: *TestData
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+      shell_options:
+        global_vars:
+          TestData: *TestData
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: ShardedClusterFixture
     config_shard: "any"

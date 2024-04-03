@@ -26,13 +26,13 @@ Ex:
 
 ```yaml
 selector:
-    roots:
-        - jstests/aggregation/**/*.js
-    exclude_files:
-        - jstests/aggregation/extras/*.js
-        - jstests/aggregation/data/*.js
-    exclude_with_any_tags:
-        - requires_pipeline_optimization
+  roots:
+    - jstests/aggregation/**/*.js
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+  exclude_with_any_tags:
+    - requires_pipeline_optimization
 ```
 
 ### selector.roots
@@ -56,7 +56,7 @@ Ex:
 
 ```yaml
 executor:
-    archive:
+  archive:
 ---
 config:
 ---
@@ -77,9 +77,9 @@ Ex:
 
 ```yaml
 archive:
-    hooks:
-        - Hook1
-        - Hook2
+  hooks:
+    - Hook1
+    - Hook2
 ---
 tests: true
 ```
@@ -95,17 +95,17 @@ Ex:
 
 ```yaml
 config:
-    shell_options:
-        global_vars:
-            TestData:
-                defaultReadConcernLevel: null
-                enableMajorityReadConcern: ""
-        nodb: ""
-        gssapiServiceName: "mockservice"
-        eval: >-
-            var testingReplication = true;
-            load('jstests/libs/override_methods/set_read_and_write_concerns.js');
-            load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+  shell_options:
+    global_vars:
+      TestData:
+        defaultReadConcernLevel: null
+        enableMajorityReadConcern: ""
+    nodb: ""
+    gssapiServiceName: "mockservice"
+    eval: >-
+      var testingReplication = true;
+      load('jstests/libs/override_methods/set_read_and_write_concerns.js');
+      load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
 ```
 
 Above is an example of the most common `test_kind` -- `js_test`. `js_test` uses `shell_options` to
@@ -138,14 +138,14 @@ Ex:
 
 ```yaml
 hooks:
-    - class: CheckReplOplogs
-    - class: CheckReplDBHash
-    - class: ValidateCollections
-    - class: CleanEveryN
-      n: 20
-    - class: MyHook
-      param1: something
-      param2: somethingelse
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  - class: MyHook
+    param1: something
+    param2: somethingelse
 ```
 
 The hook name in the `.yml` must match its Python class name in the
@@ -164,18 +164,18 @@ Ex:
 
 ```yaml
 fixture:
-    class: ShardedClusterFixture
-    num_shards: 2
-    mongos_options:
-        bind_ip_all: ""
-        set_parameters:
-            enableTestCommands: 1
-    mongod_options:
-        bind_ip_all: ""
-        set_parameters:
-            enableTestCommands: 1
-            periodicNoopIntervalSecs: 1
-            writePeriodicNoops: true
+  class: ShardedClusterFixture
+  num_shards: 2
+  mongos_options:
+    bind_ip_all: ""
+    set_parameters:
+      enableTestCommands: 1
+  mongod_options:
+    bind_ip_all: ""
+    set_parameters:
+      enableTestCommands: 1
+      periodicNoopIntervalSecs: 1
+      writePeriodicNoops: true
 ```
 
 ## Examples

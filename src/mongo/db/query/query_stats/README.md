@@ -91,31 +91,31 @@ database. The structure of the command is as follows (note `aggregate: 1` reflec
 
 ```js
 db.adminCommand({
-    aggregate: 1,
-    pipeline: [
-        {
-            $queryStats: {
-                tranformIdentifiers: {
-                    algorithm: "hmac-sha-256",
-                    hmacKey: BinData(
-                        8,
-                        "87c4082f169d3fef0eef34dc8e23458cbb457c3sf3n2",
-                    ) /* bindata 
+  aggregate: 1,
+  pipeline: [
+    {
+      $queryStats: {
+        tranformIdentifiers: {
+          algorithm: "hmac-sha-256",
+          hmacKey: BinData(
+            8,
+            "87c4082f169d3fef0eef34dc8e23458cbb457c3sf3n2",
+          ) /* bindata 
                 subtype 8 - a new type for sensitive data */,
-                },
-            },
         },
-    ],
+      },
+    },
+  ],
 });
 ```
 
 `transformIdentifiers` is optional. If not present, we will generate the regular Query Stats Key. If
 present:
 
--   `algorithm` is required and the only currently supported option is "hmac-sha-256".
--   `hmacKey` is required
--   We will generate the [One-way Tokenized](#glossary) Query Stats Key by applying the "hmac-sha-256"
-    to the names of any field, collection, or database. Application Name field is not transformed.
+- `algorithm` is required and the only currently supported option is "hmac-sha-256".
+- `hmacKey` is required
+- We will generate the [One-way Tokenized](#glossary) Query Stats Key by applying the "hmac-sha-256"
+  to the names of any field, collection, or database. Application Name field is not transformed.
 
 The query stats store will output one document for each query stats key, which is structured in the
 following way:
@@ -136,67 +136,67 @@ following way:
 }
 ```
 
--   `key`: Query Stats Key.
--   `asOf`: UTC time when $queryStats read this entry from the store. This will not return the same
-    UTC time for each result. The data structure used for the store is partitioned, and each partition
-    will be read at a snapshot individually. You may see up to the number of partitions in unique
-    timestamps returned by one $queryStats cursor.
--   `metrics`: the metrics collected; these may be flawed due to:
-    -   Server restarts, which will reset metrics.
-    -   LRU eviction, which will reset metrics.
-    -   Rate limiting, which will skew metrics.
--   `metrics.execCount`: Number of recorded observations of this query.
--   `metrics.firstSeenTimestamp`: UTC time taken at query completion (including getMores) for the
-    first recording of this query stats store entry.
--   `metrics.lastSeenTimestamp`: UTC time taken at query completion (including getMores) for the
-    latest recording of this query stats store entry.
--   `metrics.docsReturned`: Various broken down metrics for the number of documents returned by
-    observation of this query.
--   `metrics.firstResponseExecMicros`: Estimated time spent computing and returning the first batch.
--   `metrics.totalExecMicros`: Estimated time spent computing and returning all batches, which is the
-    same as the above for single-batch queries.
--   `metrics.lastExecutionMicros`: Estimated time spent processing the latest query (akin to
-    "totalExecMicros", not "firstResponseExecMicros").
+- `key`: Query Stats Key.
+- `asOf`: UTC time when $queryStats read this entry from the store. This will not return the same
+  UTC time for each result. The data structure used for the store is partitioned, and each partition
+  will be read at a snapshot individually. You may see up to the number of partitions in unique
+  timestamps returned by one $queryStats cursor.
+- `metrics`: the metrics collected; these may be flawed due to:
+  - Server restarts, which will reset metrics.
+  - LRU eviction, which will reset metrics.
+  - Rate limiting, which will skew metrics.
+- `metrics.execCount`: Number of recorded observations of this query.
+- `metrics.firstSeenTimestamp`: UTC time taken at query completion (including getMores) for the
+  first recording of this query stats store entry.
+- `metrics.lastSeenTimestamp`: UTC time taken at query completion (including getMores) for the
+  latest recording of this query stats store entry.
+- `metrics.docsReturned`: Various broken down metrics for the number of documents returned by
+  observation of this query.
+- `metrics.firstResponseExecMicros`: Estimated time spent computing and returning the first batch.
+- `metrics.totalExecMicros`: Estimated time spent computing and returning all batches, which is the
+  same as the above for single-batch queries.
+- `metrics.lastExecutionMicros`: Estimated time spent processing the latest query (akin to
+  "totalExecMicros", not "firstResponseExecMicros").
 
 #### Permissions
 
 `$queryStats` is restricted by two privilege actions:
 
--   `queryStatsRead` privilege allows running `$queryStats` without passing the `transformIdentifiers`
-    options.
--   `queryStatsReadTransformed` allows running `$queryStats` with `transformIdentifiers` set. These
-    two privileges are included in the clusterMonitor role in Atlas.
+- `queryStatsRead` privilege allows running `$queryStats` without passing the `transformIdentifiers`
+  options.
+- `queryStatsReadTransformed` allows running `$queryStats` with `transformIdentifiers` set. These
+  two privileges are included in the clusterMonitor role in Atlas.
 
 ### Server Parameters
 
--   `internalQueryStatsCacheSize`:
+- `internalQueryStatsCacheSize`:
 
-    -   Max query stats store size, specified as a string like "4MB" or "1%". Defaults to 1% of the
-        machine's total memory.
-    -   Query stats store is a LRU cache structure with partitions, so we may be under the cap due to
-        implementation.
+  - Max query stats store size, specified as a string like "4MB" or "1%". Defaults to 1% of the
+    machine's total memory.
+  - Query stats store is a LRU cache structure with partitions, so we may be under the cap due to
+    implementation.
 
--   `internalQueryStatsRateLimit`:
+- `internalQueryStatsRateLimit`:
 
-    -   The rate limit is an integer which imposes a maximum number of recordings per second. Default is
-        0 which has the effect of disabling query stats collection. Setting the parameter to -1 means
-        there will be no rate limit.
+  - The rate limit is an integer which imposes a maximum number of recordings per second. Default is
+    0 which has the effect of disabling query stats collection. Setting the parameter to -1 means
+    there will be no rate limit.
 
--   `logComponentVerbosity.queryStats`:
-    -   Controls the logging behavior for query stats. See [Logging](#logging) for details.
+- `logComponentVerbosity.queryStats`:
+  - Controls the logging behavior for query stats. See [Logging](#logging) for details.
 
 ### Logging
 
 Setting `logComponentVerbosity.queryStats` will do the following for each level:
 
--   Level 0 (default): Nothing will be logged.
--   Level 1 or higher: Invocations of $queryStats will be logged if and only if the algorithm is
-    "hmac-sha-256". The specification of the $queryStats stage is logged, with any provided hmac key
-    redacted.
--   Level 2 or higher: Nothing extra, reserved for future use.
--   Level 3 or higher: All results of any "hmac-sha-256" $queryStats invocation are logged. Each
-    result will be its own entry and there will be one final entry that says "we finished".
--   Levels 4 and 5 do nothing extra.
+- Level 0 (default): Nothing will be logged.
+- Level 1 or higher: Invocations of $queryStats will be logged if and only if the algorithm is
+  "hmac-sha-256". The specification of the $queryStats stage is logged, with any provided hmac key
+  redacted.
+- Level 2 or higher: Nothing extra, reserved for future use.
+- Level 3 or higher: All results of any "hmac-sha-256" $queryStats invocation are logged. Each
+  result will be its own entry and there will be one final entry that says "we finished".
+- Levels 4 and 5 do nothing extra.
 
 ### Server Status Metrics
 

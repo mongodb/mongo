@@ -17,21 +17,21 @@ This is loosely based on [kubernetes](https://www.kubernetes.dev/docs/guide/owne
 ```yaml
 version: 1.0.0 # Should always be 1.0.0
 aliases:
-    # Contains the markdown-approvers alias
-    - //buildscripts/resmokelib/devprod_correctness_aliases.yml
+  # Contains the markdown-approvers alias
+  - //buildscripts/resmokelib/devprod_correctness_aliases.yml
 filters: # List of all filters
-    - "*": # Select all files (will apply recursively)
-      approvers: # Anyone on this list can approve PRs
-          - devprod-correctness # alias for a group of users
-          - IamXander # github username
-          - user.name@mongodb.com # email address
-      emeritus_approvers: # This list is just for historical reference
-          - userB
-    - "*.md":
-      approvers:
-          - markdown-approvers
+  - "*": # Select all files (will apply recursively)
+    approvers: # Anyone on this list can approve PRs
+      - devprod-correctness # alias for a group of users
+      - IamXander # github username
+      - user.name@mongodb.com # email address
+    emeritus_approvers: # This list is just for historical reference
+      - userB
+  - "*.md":
+    approvers:
+      - markdown-approvers
 options: # All options for this file
-    no_parent_owners: false # See above for no_parent_owners. Defaulted to false so this line is not needed.
+  no_parent_owners: false # See above for no_parent_owners. Defaulted to false so this line is not needed.
 ```
 
 ### Aliases Yaml File Format
@@ -45,9 +45,9 @@ options: # All options for this file
 ```yaml
 version: 1.0.0
 aliases:
-    devprod-build:
-        - IamXander # github username
-        - user.name@mongodb.com # email address
+  devprod-build:
+    - IamXander # github username
+    - user.name@mongodb.com # email address
 ```
 
 ## Filter resolution
@@ -57,14 +57,14 @@ a/b/c/OWNERS.yml
 ```yaml
 version: 1.0.0
 aliases:
-    - //aliases.yml
+  - //aliases.yml
 filters:
-    - "*.py":
-      approvers:
-          - teamC
-    - "*.md":
-      approvers:
-          - teamMD
+  - "*.py":
+    approvers:
+      - teamC
+  - "*.md":
+    approvers:
+      - teamMD
 ```
 
 a/b/OWNERS.yml
@@ -72,16 +72,16 @@ a/b/OWNERS.yml
 ```yaml
 version: 1.0.0
 aliases:
-    - //aliases.yml
+  - //aliases.yml
 filters:
-    - "*.json":
-      approvers:
-          - teamB
-    - "*.py":
-      approvers:
-          - teamPY
+  - "*.json":
+    approvers:
+      - teamB
+  - "*.py":
+    approvers:
+      - teamPY
 options:
-    no_parent_owners: true
+  no_parent_owners: true
 ```
 
 a/OWNERS.yml
@@ -89,14 +89,14 @@ a/OWNERS.yml
 ```yaml
 version: 1.0.0
 aliases:
-    - //aliases.yml
+  - //aliases.yml
 filters:
-    - "*":
-      approvers:
-          - teamA
-    - "*.yaml":
-      approvers:
-          - teamYAML
+  - "*":
+    approvers:
+      - teamA
+  - "*.yaml":
+    approvers:
+      - teamYAML
 ```
 
 ### Example 1

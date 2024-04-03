@@ -5,144 +5,23 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 variables:
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux-arm64-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
-  run_on:
-  - amazon2-arm64-large
-  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  stepback: false
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux-arm64-dynamic-compile-params # Essential set of compile parameters used for Linux dev variants.
+    run_on:
+      - amazon2-arm64-large
+    activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
+    stepback: false
 
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux-arm64-dynamic-enterprise-compile-expansions
-  scons_cache_scope: shared
-  scons_cache_mode: all
-  has_packages: false
-  compile_flags: >-
-    --ssl
-    MONGO_DISTMOD=amazon2
-    -j$(grep -c ^processor /proc/cpuinfo)
-    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    --link-model=dynamic
-    --use-diagnostic-latches=on
-
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/perf/perf.yml
-# - etc/evergreen_yml_components/variants/perf/perf_branching.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux_arm64_generic_expansions
-  multiversion_platform: amazon2
-  multiversion_edition: enterprise
-  multiversion_architecture: aarch64
-  packager_arch: aarch64
-  packager_distro: amazon2
-  repo_edition: enterprise
-  large_distro_name: amazon2-arm64-large
-  core_analyzer_distro_name: amazon2-arm64-xlarge
-  num_scons_link_jobs_available: 0.99
-
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &amazon_linux2_arm64_dynamic_compile_variant_dependency
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
-  - name: version_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  # - name: generate_buildid_to_debug_symbols_mapping
-  #   variant: amazon-linux2-arm64-dynamic-compile
-
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &amazon_linux2_arm64_dynamic_expansions
-  <<: *linux_arm64_generic_expansions
-  compile_variant: *amazon_linux2_arm64_dynamic_compile_variant_name
-
-buildvariants:
-- <<: *linux-arm64-dynamic-compile-params
-  name: &amazon-linux2-arm64-crypt-compile amazon-linux2-arm64-crypt-compile
-  display_name: "! Amazon Linux 2 arm64 Crypt Compile"
-  tags: ["bazel_check"]
-  expansions:
-    <<: *linux-arm64-dynamic-enterprise-compile-expansions
-    compile_variant: *amazon-linux2-arm64-crypt-compile
-  tasks:
-    - name: .crypt
-    - name: crypt_build_debug_and_test
-
-- <<: *linux-arm64-dynamic-compile-params
-  name: &amazon-linux2-arm64-dynamic-compile amazon-linux2-arm64-dynamic-compile
-  display_name: "! Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis"
-  tags: ["bazel_check"]
-  expansions:
-    <<: *linux-arm64-dynamic-enterprise-compile-expansions
-    clang_tidy_toolchain: v4
-    compile_variant: *amazon-linux2-arm64-dynamic-compile
-  tasks:
-    - name: compile_ninja_quick_TG
-    - name: compile_test_parallel_unittest_stream_TG
-    - name: compile_test_parallel_core_stream_TG
-    - name: compile_test_parallel_dbtest_stream_TG
-    - name: compile_integration_and_test_parallel_stream_TG
-    - name: .development_critical_single_variant !.requires_large_host
-    - name: .development_critical_single_variant .requires_large_host
-      distros:
-      - amazon2-arm64-xlarge
-    - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
-    - name: .default .requires_compile_variant !.incompatible_development_variant
-
-- &enterprise-amazon-linux2-arm64-template
-  <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
-  name: &enterprise-amazon-linux2-arm64 enterprise-amazon-linux2-arm64
-  display_name: "* Amazon Linux 2 arm64 Enterprise"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  run_on:
-    - amazon2-arm64-small
-  stepback: true
-  expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
-    <<: *amazon_linux2_arm64_dynamic_expansions
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux-arm64-dynamic-enterprise-compile-expansions
     scons_cache_scope: shared
     scons_cache_mode: all
-    has_packages: false
-    jstestfuzz_num_generated_files: 40
-    jstestfuzz_concurrent_num_files: 10
-    target_resmoke_time: 10
-    max_sub_suites: 5
-    idle_timeout_factor: 1.5
-    exec_timeout_factor: 1.5
-    test_flags: >-
-      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
-  tasks:
-  - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
-  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
-  - name: .default !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
-
-- name: &commit-queue commit-queue
-  display_name: "~ Commit Queue"
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-  tags: ["bazel_check"]
-  run_on:
-    - amazon2-arm64-small
-  stepback: false
-  expansions:
-    <<: *linux_arm64_generic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    commit_queue_alternate_cache: amazon-linux2-arm64-dynamic-compile
     has_packages: false
     compile_flags: >-
       --ssl
@@ -151,77 +30,198 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
       --use-diagnostic-latches=on
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-      -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
-    clang_tidy_toolchain: v4
-    num_scons_unit_cc_jobs_available: 0.75
-    compile_variant: *commit-queue
-  depends_on: []
-  tasks:
-  - name: compile_ninja_quick_TG
-  - name: compile_test_parallel_core_stream_TG
-    distros:
-    - amazon2-arm64-xlarge-commitqueue
-  - name: compile_test_parallel_unittest_stream_TG
-    distros:
-    - amazon2-arm64-xlarge-commitqueue
-  - name: compile_test_parallel_dbtest_stream_TG
-    distros:
-    - amazon2-arm64-xlarge-commitqueue
-  - name: .development_critical_single_variant !.requires_large_host !.clang_tidy !libdeps_graph_linting
-  - name: .development_critical .requires_large_host_commit_queue
-    distros:
-    - amazon2-arm64-large
 
-- <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
-  name: amazon-linux2-arm64-try-sbe-engine
-  display_name: "Amazon Linux 2 arm64 Enterprise Query Patch Only (trySbeEngine)"
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
-  run_on:
-  - amazon2-arm64-small
-  stepback: true
-  expansions:
-    <<: *amazon_linux2_arm64_dynamic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    has_packages: false
-    jstestfuzz_num_generated_files: 20
-    jstestfuzz_concurrent_num_files: 5
-    target_resmoke_time: 30
-    max_sub_suites: 3
-    idle_timeout_factor: 1.5
-    exec_timeout_factor: 1.5
-    test_flags: >-
-      --mongodSetParameters="{internalQueryFrameworkControl: trySbeEngine}"
-      --excludeWithAnyTags=resource_intensive
-  tasks:
-  - name: aggregation_mongos_passthrough
-  - name: aggregation_sharded_collections_passthrough
-  - name: aggregation_one_shard_sharded_collections
-  - name: aggregation
-  - name: aggregation_disabled_optimization
-  - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
-  - name: jsCore
-    distros:
-    - amazon2-arm64-large
-  - name: replica_sets_jscore_passthrough_gen
-  - name: sharded_collections_jscore_passthrough_gen
-  - name: sharding_jscore_passthrough_gen
-  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
-  - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
-  - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
-  - name: aggregation_repeat_queries
-  - name: burn_in_tests_gen
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/perf/perf.yml
+  # - etc/evergreen_yml_components/variants/perf/perf_branching.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_arm64_generic_expansions
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise
+    multiversion_architecture: aarch64
+    packager_arch: aarch64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    large_distro_name: amazon2-arm64-large
+    core_analyzer_distro_name: amazon2-arm64-xlarge
+    num_scons_link_jobs_available: 0.99
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &amazon_linux2_arm64_dynamic_compile_variant_dependency
     depends_on:
-    - name: version_burn_in_gen
-      variant: generate-tasks-for-version
-      omit_generated_tasks: true
-    - name: archive_dist_test_debug
-  - name: multiversion_gen
-  - name: .multiversion_sanity_check
-  - name: concurrency_gen
-  - name: concurrency_replication_gen
-  - name: concurrency_sharded_replication_gen
+      - name: archive_dist_test_debug
+        variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    # - name: generate_buildid_to_debug_symbols_mapping
+    #   variant: amazon-linux2-arm64-dynamic-compile
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &amazon_linux2_arm64_dynamic_expansions
+    <<: *linux_arm64_generic_expansions
+    compile_variant: *amazon_linux2_arm64_dynamic_compile_variant_name
+
+buildvariants:
+  - <<: *linux-arm64-dynamic-compile-params
+    name: &amazon-linux2-arm64-crypt-compile amazon-linux2-arm64-crypt-compile
+    display_name: "! Amazon Linux 2 arm64 Crypt Compile"
+    tags: ["bazel_check"]
+    expansions:
+      <<: *linux-arm64-dynamic-enterprise-compile-expansions
+      compile_variant: *amazon-linux2-arm64-crypt-compile
+    tasks:
+      - name: .crypt
+      - name: crypt_build_debug_and_test
+
+  - <<: *linux-arm64-dynamic-compile-params
+    name: &amazon-linux2-arm64-dynamic-compile amazon-linux2-arm64-dynamic-compile
+    display_name: "! Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis"
+    tags: ["bazel_check"]
+    expansions:
+      <<: *linux-arm64-dynamic-enterprise-compile-expansions
+      clang_tidy_toolchain: v4
+      compile_variant: *amazon-linux2-arm64-dynamic-compile
+    tasks:
+      - name: compile_ninja_quick_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_integration_and_test_parallel_stream_TG
+      - name: .development_critical_single_variant !.requires_large_host
+      - name: .development_critical_single_variant .requires_large_host
+        distros:
+          - amazon2-arm64-xlarge
+      - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
+      - name: .default .requires_compile_variant !.incompatible_development_variant
+
+  - &enterprise-amazon-linux2-arm64-template
+    <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
+    name: &enterprise-amazon-linux2-arm64 enterprise-amazon-linux2-arm64
+    display_name: "* Amazon Linux 2 arm64 Enterprise"
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - amazon2-arm64-small
+    stepback: true
+    expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
+      <<: *amazon_linux2_arm64_dynamic_expansions
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      target_resmoke_time: 10
+      max_sub_suites: 5
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+    tasks:
+      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .default !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+
+  - name: &commit-queue commit-queue
+    display_name: "~ Commit Queue"
+    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+    tags: ["bazel_check"]
+    run_on:
+      - amazon2-arm64-small
+    stepback: false
+    expansions:
+      <<: *linux_arm64_generic_expansions
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      commit_queue_alternate_cache: amazon-linux2-arm64-dynamic-compile
+      has_packages: false
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --link-model=dynamic
+        --use-diagnostic-latches=on
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+        -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+      clang_tidy_toolchain: v4
+      num_scons_unit_cc_jobs_available: 0.75
+      compile_variant: *commit-queue
+    depends_on: []
+    tasks:
+      - name: compile_ninja_quick_TG
+      - name: compile_test_parallel_core_stream_TG
+        distros:
+          - amazon2-arm64-xlarge-commitqueue
+      - name: compile_test_parallel_unittest_stream_TG
+        distros:
+          - amazon2-arm64-xlarge-commitqueue
+      - name: compile_test_parallel_dbtest_stream_TG
+        distros:
+          - amazon2-arm64-xlarge-commitqueue
+      - name: .development_critical_single_variant !.requires_large_host !.clang_tidy !libdeps_graph_linting
+      - name: .development_critical .requires_large_host_commit_queue
+        distros:
+          - amazon2-arm64-large
+
+  - <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
+    name: amazon-linux2-arm64-try-sbe-engine
+    display_name: "Amazon Linux 2 arm64 Enterprise Query Patch Only (trySbeEngine)"
+    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    run_on:
+      - amazon2-arm64-small
+    stepback: true
+    expansions:
+      <<: *amazon_linux2_arm64_dynamic_expansions
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      jstestfuzz_num_generated_files: 20
+      jstestfuzz_concurrent_num_files: 5
+      target_resmoke_time: 30
+      max_sub_suites: 3
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: >-
+        --mongodSetParameters="{internalQueryFrameworkControl: trySbeEngine}"
+        --excludeWithAnyTags=resource_intensive
+    tasks:
+      - name: aggregation_mongos_passthrough
+      - name: aggregation_sharded_collections_passthrough
+      - name: aggregation_one_shard_sharded_collections
+      - name: aggregation
+      - name: aggregation_disabled_optimization
+      - name: noPassthrough_gen
+      - name: noPassthroughWithMongod_gen
+      - name: jsCore
+        distros:
+          - amazon2-arm64-large
+      - name: replica_sets_jscore_passthrough_gen
+      - name: sharded_collections_jscore_passthrough_gen
+      - name: sharding_jscore_passthrough_gen
+      - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
+      - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
+      - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
+      - name: aggregation_repeat_queries
+      - name: burn_in_tests_gen
+        depends_on:
+          - name: version_burn_in_gen
+            variant: generate-tasks-for-version
+            omit_generated_tasks: true
+          - name: archive_dist_test_debug
+      - name: multiversion_gen
+      - name: .multiversion_sanity_check
+      - name: concurrency_gen
+      - name: concurrency_replication_gen
+      - name: concurrency_sharded_replication_gen

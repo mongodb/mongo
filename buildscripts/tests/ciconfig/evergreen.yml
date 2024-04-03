@@ -69,124 +69,122 @@ post:
       file_location: src/results.json
 
 task_groups:
-- name: tg_1
-  max_hosts: 1
-  tasks:
-  - compile
-  - passing_test
-  setup_task:
-  - func: "fetch source"
-  teardown_task:
-  - func: "debug"
-  setup_group:
-    *pre
-  teardown_group:
-  - func: "do post work"
-  timeout:
-  - func: "run timeout work"
+  - name: tg_1
+    max_hosts: 1
+    tasks:
+      - compile
+      - passing_test
+    setup_task:
+      - func: "fetch source"
+    teardown_task:
+      - func: "debug"
+    setup_group: *pre
+    teardown_group:
+      - func: "do post work"
+    timeout:
+      - func: "run timeout work"
 
 tasks:
-- name: compile
-  depends_on: []
-  commands:
-    - func: "fetch source"
-    - func: "run a task that passes"
-    - func: "run a function with an arg"
-      vars:
-        foobar: "TESTING: ONE"
-    - func: "run a function with an arg"
-      vars:
-        foobar: "TESTING: TWO"
-
-- name: passing_test
-  depends_on:
   - name: compile
-  commands:
-    - func: "fetch source"
-    - func: "run a task that passes"
-    - func: "run tests"
+    depends_on: []
+    commands:
+      - func: "fetch source"
+      - func: "run a task that passes"
+      - func: "run a function with an arg"
+        vars:
+          foobar: "TESTING: ONE"
+      - func: "run a function with an arg"
+        vars:
+          foobar: "TESTING: TWO"
 
-- name: failing_test
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch source"
-    - func: "run a task that fails"
+  - name: passing_test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch source"
+      - func: "run a task that passes"
+      - func: "run tests"
 
-- name: timeout_test
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch source"
-    - command: shell.exec
-      timeout_secs: 20
-      params:
-        working_dir: src
-        script: |
-           echo "this is going to timeout"
-           ./run.py timeout
+  - name: failing_test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch source"
+      - func: "run a task that fails"
 
-- name: no_lifecycle_task
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch source"
-    - func: "do something incompatible with test lifecycle"
-- name: resmoke_task
-  depends_on:
-  - name: compile
-  commands:
-    - func: "setup"
-    - func: "run tests"
-      vars:
-        resmoke_args: "--storageEngine=wiredTiger"
+  - name: timeout_test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch source"
+      - command: shell.exec
+        timeout_secs: 20
+        params:
+          working_dir: src
+          script: |
+            echo "this is going to timeout"
+            ./run.py timeout
 
+  - name: no_lifecycle_task
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch source"
+      - func: "do something incompatible with test lifecycle"
+  - name: resmoke_task
+    depends_on:
+      - name: compile
+    commands:
+      - func: "setup"
+      - func: "run tests"
+        vars:
+          resmoke_args: "--storageEngine=wiredTiger"
 
 modules:
-- name: render-module
-  repo: git@github.com:evergreen-ci/render.git
-  prefix: modules
-  branch: master
+  - name: render-module
+    repo: git@github.com:evergreen-ci/render.git
+    prefix: modules
+    branch: master
 
 buildvariants:
-- name: osx-108
-  display_name: OSX
-  modules: ~
-  run_on:
-  - localtestdistro
-  expansions:
-    num_jobs_available: 549
-  tasks:
-  - name: compile
-  - name: passing_test
-  - name: failing_test
-  - name: timeout_test
-- name: ubuntu
-  display_name: Ubuntu
-  batchtime: 1440
-  modules: ["render-module"]
-  run_on:
-  - ubuntu1404-test
-  expansions:
-    test_flags: "--param=value --ubuntu --enableEnterpriseTests=off"
-  tasks:
-  - name: compile
-  - name: passing_test
-  - name: failing_test
-  - name: timeout_test
-  - name: resmoke_task
-    distros:
-      - pdp-11
-- name: debian
-  display_name: "! Debian"
-  run_on:
-  - debian-stretch
-  tasks:
-  - name: resmoke_task
-- name: amazon
-  display_name: "! Amazon"
-  run_on:
-  - amazon
-  tasks:
-  - name: tg_1
-  - name: timeout_test
+  - name: osx-108
+    display_name: OSX
+    modules: ~
+    run_on:
+      - localtestdistro
+    expansions:
+      num_jobs_available: 549
+    tasks:
+      - name: compile
+      - name: passing_test
+      - name: failing_test
+      - name: timeout_test
+  - name: ubuntu
+    display_name: Ubuntu
+    batchtime: 1440
+    modules: ["render-module"]
+    run_on:
+      - ubuntu1404-test
+    expansions:
+      test_flags: "--param=value --ubuntu --enableEnterpriseTests=off"
+    tasks:
+      - name: compile
+      - name: passing_test
+      - name: failing_test
+      - name: timeout_test
+      - name: resmoke_task
+        distros:
+          - pdp-11
+  - name: debian
+    display_name: "! Debian"
+    run_on:
+      - debian-stretch
+    tasks:
+      - name: resmoke_task
+  - name: amazon
+    display_name: "! Amazon"
+    run_on:
+      - amazon
+    tasks:
+      - name: tg_1
+      - name: timeout_test

@@ -5,39 +5,39 @@ description: |
 
 selector:
   roots:
-  - jstests/core/**/*.js
-  - jstests/aggregation/**/*.js
+    - jstests/core/**/*.js
+    - jstests/aggregation/**/*.js
 
   exclude_files:
-  # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
-  - jstests/core/query/explain/explain_agg_write_concern.js
-  - jstests/aggregation/sources/out/replace_collection.js
-  - jstests/aggregation/explain_writing_aggs.js
-  # `rolesInfo` is returning unprefixed database names
-  - jstests/core/administrative/builtin_roles_external.js
-  # QueryExecutorStats assertions are hardcoded for single-node results
-  - jstests/aggregation/sources/lookup/lookup_query_stats.js
-  # failed on: The aggregate should always use the view on 'testDB', not an empty collection on 'siblingDB'
-  - jstests/aggregation/view_resolution_namespace_collision.js
+    # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
+    - jstests/core/query/explain/explain_agg_write_concern.js
+    - jstests/aggregation/sources/out/replace_collection.js
+    - jstests/aggregation/explain_writing_aggs.js
+    # `rolesInfo` is returning unprefixed database names
+    - jstests/core/administrative/builtin_roles_external.js
+    # QueryExecutorStats assertions are hardcoded for single-node results
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+    # failed on: The aggregate should always use the view on 'testDB', not an empty collection on 'siblingDB'
+    - jstests/aggregation/view_resolution_namespace_collision.js
 
   exclude_with_any_tags:
-  # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
-  - simulate_atlas_proxy_incompatible
-  # Exclude tests which we know use commands that don't support a security token.
-  - not_allowed_with_signed_security_token
-  # Exclude tests which use commands that aren't supported in Serverless.
-  - command_not_supported_in_serverless
-  # Theses tests expect replication is not enabled.
-  - assumes_standalone_mongod
-  # Capped collections are banned in Serverless.
-  - requires_capped
-  # Server side javascript (such as $where, $function, $accumulator and map-reduce) is not allowed in Serverless.
-  - requires_scripting
-  - requires_profiling
-  # Skip any tests that run with auth explicitly.
-  - requires_auth
-  # Skip any tests that use transactions
-  - uses_transactions
+    # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
+    - simulate_atlas_proxy_incompatible
+    # Exclude tests which we know use commands that don't support a security token.
+    - not_allowed_with_signed_security_token
+    # Exclude tests which use commands that aren't supported in Serverless.
+    - command_not_supported_in_serverless
+    # Theses tests expect replication is not enabled.
+    - assumes_standalone_mongod
+    # Capped collections are banned in Serverless.
+    - requires_capped
+    # Server side javascript (such as $where, $function, $accumulator and map-reduce) is not allowed in Serverless.
+    - requires_scripting
+    - requires_profiling
+    # Skip any tests that run with auth explicitly.
+    - requires_auth
+    # Skip any tests that use transactions
+    - uses_transactions
 
 executor:
   archive:
@@ -59,11 +59,11 @@ executor:
           useResponsePrefixChecking: true
           multitenancyExpectPrefix: true
   hooks:
-  - class: CheckReplOplogs
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: ReplicaSetFixture
     num_nodes: 2
@@ -74,4 +74,4 @@ executor:
         featureFlagSecurityToken: true
         logComponentVerbosity:
           command: 2
-      noscripting: ''
+      noscripting: ""

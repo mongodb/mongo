@@ -10,25 +10,25 @@ description: |
 
 selector:
   roots:
-  - jstests/aggregation/**/*.js
+    - jstests/aggregation/**/*.js
   exclude_files:
-  # Based on SERVER-81917
-  - jstests/aggregation/query_limits_test.js
+    # Based on SERVER-81917
+    - jstests/aggregation/query_limits_test.js
   exclude_with_any_tags:
-  # Running $queryStats will increment these counters which can screw up some test assertions.
-  - inspects_command_opcounters
+    # Running $queryStats will increment these counters which can screw up some test assertions.
+    - inspects_command_opcounters
 
 executor:
   archive:
     hooks:
       - ValidateCollections
   hooks:
-  # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
-  # That way the fixture restart can't cause any trouble for the other hooks.
-  - class: RunQueryStats
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
+    # That way the fixture restart can't cause any trouble for the other hooks.
+    - class: RunQueryStats
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: MongoDFixture
     mongod_options:

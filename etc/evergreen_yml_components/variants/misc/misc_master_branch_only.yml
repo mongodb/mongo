@@ -5,108 +5,108 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 buildvariants:
-- name: &enterprise-windows-build-metrics enterprise-windows-build-metrics
-  display_name: "~ Build Metrics Enterprise Windows"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  stepback: false
-  run_on:
-  - windows-vsCurrent-small
-  expansions:
-    num_scons_link_jobs_available: 0.1
-    compile_flags: >-
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
-      -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
-      --win-version-min=win10
-    python: '/cygdrive/c/python/python310/python.exe'
-  tasks:
-  - name: build_metrics_tasks_gen
+  - name: &enterprise-windows-build-metrics enterprise-windows-build-metrics
+    display_name: "~ Build Metrics Enterprise Windows"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    stepback: false
+    run_on:
+      - windows-vsCurrent-small
+    expansions:
+      num_scons_link_jobs_available: 0.1
+      compile_flags: >-
+        CPPPATH="c:/sasl/include"
+        LIBPATH="c:/sasl/lib"
+        -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
+        --win-version-min=win10
+      python: "/cygdrive/c/python/python310/python.exe"
+    tasks:
+      - name: build_metrics_tasks_gen
 
-- name: &macos-enterprise-build-metrics macos-enterprise-build-metrics
-  display_name: "~ Build Metrics Enterprise MacOS"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  stepback: false
-  run_on:
-  - macos-1100
-  expansions:
-    num_scons_link_jobs_available: 0.1
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx.vars
-  tasks:
-  - name: build_metrics_tasks_gen
+  - name: &macos-enterprise-build-metrics macos-enterprise-build-metrics
+    display_name: "~ Build Metrics Enterprise MacOS"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    stepback: false
+    run_on:
+      - macos-1100
+    expansions:
+      num_scons_link_jobs_available: 0.1
+      compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+      compile_flags: >-
+        --ssl
+        -j$(sysctl -n hw.logicalcpu)
+        --libc++
+        --variables-files=etc/scons/xcode_macosx.vars
+    tasks:
+      - name: build_metrics_tasks_gen
 
-- name: &enterprise-rhel-80-64-bit-build-metrics enterprise-rhel-80-64-bit-build-metrics
-  display_name: "~ Build Metrics Enterprise RHEL 8.0 "
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
-  stepback: false
-  run_on:
-  - rhel80-build
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-    repo_edition: enterprise
-    large_distro_name: rhel80-large
-    core_analyzer_distro_name: rhel80-xlarge
-    num_scons_link_jobs_available: 0.1
-  tasks:
-  - name: build_metrics_tasks_gen
+  - name: &enterprise-rhel-80-64-bit-build-metrics enterprise-rhel-80-64-bit-build-metrics
+    display_name: "~ Build Metrics Enterprise RHEL 8.0 "
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
+    stepback: false
+    run_on:
+      - rhel80-build
+    expansions:
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=rhel80
+        -j$(grep -c ^processor /proc/cpuinfo)
+      repo_edition: enterprise
+      large_distro_name: rhel80-large
+      core_analyzer_distro_name: rhel80-xlarge
+      num_scons_link_jobs_available: 0.1
+    tasks:
+      - name: build_metrics_tasks_gen
 
-- name: &enterprise-rhel-80-aarch64-build-metrics enterprise-rhel-80-aarch64-build-metrics
-  display_name: "~ Build Metrics Enterprise AL22 ARM"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
-  stepback: false
-  run_on:
-  - amazon2023.0-arm64-large
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel82
-      -j$(grep -c ^processor /proc/cpuinfo)
-    repo_edition: enterprise
-    large_distro_name: amazon2023.0-arm64-large
-    num_scons_link_jobs_available: 0.1
-  tasks:
-  - name: build_metrics_tasks_gen
+  - name: &enterprise-rhel-80-aarch64-build-metrics enterprise-rhel-80-aarch64-build-metrics
+    display_name: "~ Build Metrics Enterprise AL22 ARM"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
+    stepback: false
+    run_on:
+      - amazon2023.0-arm64-large
+    expansions:
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=rhel82
+        -j$(grep -c ^processor /proc/cpuinfo)
+      repo_edition: enterprise
+      large_distro_name: amazon2023.0-arm64-large
+      num_scons_link_jobs_available: 0.1
+    tasks:
+      - name: build_metrics_tasks_gen
 
-- name: &shared-scons-cache-pruning shared-scons-cache-pruning
-  display_name: "Shared SCons Cache Pruning"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu2204-small
-  stepback: false
-  tasks:
-  - name: shared_scons_cache_pruning
+  - name: &shared-scons-cache-pruning shared-scons-cache-pruning
+    display_name: "Shared SCons Cache Pruning"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubuntu2204-small
+    stepback: false
+    tasks:
+      - name: shared_scons_cache_pruning
 
-- name: &windows-shared-scons-cache-pruning windows-shared-scons-cache-pruning
-  display_name: "Windows shared SCons Cache Pruning"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - windows-vsCurrent-small
-  stepback: false
-  expansions:
-    python: '/cygdrive/c/python/python310/python.exe'
-  tasks:
-  - name: win_shared_scons_cache_pruning
+  - name: &windows-shared-scons-cache-pruning windows-shared-scons-cache-pruning
+    display_name: "Windows shared SCons Cache Pruning"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - windows-vsCurrent-small
+    stepback: false
+    expansions:
+      python: "/cygdrive/c/python/python310/python.exe"
+    tasks:
+      - name: win_shared_scons_cache_pruning
 
-- name: &stm-daily-cron stm-daily-cron
-  display_name: "* STM Daily Cron"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-small
-  expansions:
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    compile_variant: *stm-daily-cron
-  stepback: false
-  tasks:
-  - name: lint_fuzzer_sanity_all
-  - name: powercycle_sentinel
-  - name: powercycle_smoke_skip_compile_gen
-  - name: monitor_mongo_fork_10gen
-  - name: daily_task_scanner
+  - name: &stm-daily-cron stm-daily-cron
+    display_name: "* STM Daily Cron"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel80-small
+    expansions:
+      multiversion_platform: rhel80
+      multiversion_edition: enterprise
+      compile_variant: *stm-daily-cron
+    stepback: false
+    tasks:
+      - name: lint_fuzzer_sanity_all
+      - name: powercycle_sentinel
+      - name: powercycle_smoke_skip_compile_gen
+      - name: monitor_mongo_fork_10gen
+      - name: daily_task_scanner

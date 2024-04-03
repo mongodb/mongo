@@ -3,15 +3,15 @@ test_kind: benchmark_test
 selector:
   root: build/benchmarks.txt
   include_files:
-  # The trailing asterisk is for handling the .exe extension on Windows.
-  - build/install/bin/op_observer_bm*
-  - build/install/bin/oplog_application_bm*
-  - build/install/bin/oplog_applier_utils_bm*
-  - build/install/bin/oplog_entry_bm*
-  - build/install/bin/replication_consistency_markers_impl_bm*
-  - build/install/bin/oplog_write_bm*
+    # The trailing asterisk is for handling the .exe extension on Windows.
+    - build/install/bin/op_observer_bm*
+    - build/install/bin/oplog_application_bm*
+    - build/install/bin/oplog_applier_utils_bm*
+    - build/install/bin/oplog_entry_bm*
+    - build/install/bin/replication_consistency_markers_impl_bm*
+    - build/install/bin/oplog_write_bm*
 
 executor:
   config: {}
   hooks:
-  - class: GenerateAndCheckPerfResults
+    - class: GenerateAndCheckPerfResults

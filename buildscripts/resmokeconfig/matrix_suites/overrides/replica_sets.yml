@@ -2,4 +2,4 @@
   value:
     selector:
       roots:
-      - jstests/replsets/*.js
+        - jstests/replsets/*.js

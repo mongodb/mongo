@@ -12,19 +12,19 @@ rules:
   no-useless-escape: 0
   no-irregular-whitespace: 0
   no-inner-declarations: 0
-  no-unused-vars: [0, { "varsIgnorePattern": "^_", "args": "none" }]
+  no-unused-vars: [0, {"varsIgnorePattern": "^_", "args": "none"}]
   no-empty: 0
   no-redeclare: 0
   no-constant-condition: 0
   no-loss-of-precision: 0
-  no-restricted-syntax: [
-    'error',
-    {
-      message: "Invalid load call. Please convert your library to a module and import it instead.",
-      selector:
-        'CallExpression > Identifier[name="load"]'
-    }
-  ]
+  no-restricted-syntax:
+    [
+      "error",
+      {
+        message: "Invalid load call. Please convert your library to a module and import it instead.",
+        selector: 'CallExpression > Identifier[name="load"]',
+      },
+    ]
 
 globals:
   TestData: true
@@ -237,4 +237,3 @@ globals:
   helloStatePrompt: true
   _validateMemberIndex: true
   help: true
-

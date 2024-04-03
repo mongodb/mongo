@@ -66,23 +66,23 @@ The above requirements are satisfied by the following guidelines below.
 
 `mongo::sbe::PlanStage::getNext()` guidelines:
 
--   must check for interrupt or yield at least once in `getNext` method.
--   a `getNext` implementation that calls a child `getNext` method, may rely on the child to check for
-    yield or interrupt.
-    e.g.: A call to project, match, or unwind stage, when they call child `getNext` method.
--   a `getNext` implementation that does not call a child `getNext` method, must perform the yield or
-    interrupt check, if unbounded number of such calls is possible.
-    e.g.: A scan, sort, group, unwind stage, when they don't call a child `getNext` method.
--   a `getNext` implementation that performs an unbounded loop must ensure that checks for yield or
-    interrupt are regularly performed,
-    by either relying on child `getNext` method or by explicitly performing yield or interrupt check.
+- must check for interrupt or yield at least once in `getNext` method.
+- a `getNext` implementation that calls a child `getNext` method, may rely on the child to check for
+  yield or interrupt.
+  e.g.: A call to project, match, or unwind stage, when they call child `getNext` method.
+- a `getNext` implementation that does not call a child `getNext` method, must perform the yield or
+  interrupt check, if unbounded number of such calls is possible.
+  e.g.: A scan, sort, group, unwind stage, when they don't call a child `getNext` method.
+- a `getNext` implementation that performs an unbounded loop must ensure that checks for yield or
+  interrupt are regularly performed,
+  by either relying on child `getNext` method or by explicitly performing yield or interrupt check.
 
 `mongo::sbe::PlanStage::open()` and `mongo::sbe::PlanStage::close()` guidelines:
 
--   doesn't need to perform check for yield or interrupt if its execution time is bounded.
--   an `open` or `close` implementation that performs an unbounded loop must ensure that checks for
-    yield or interrupt are regularly performed, by either relying on child `getNext` method or by
-    explicitly performing the yield or interrupt check.
+- doesn't need to perform check for yield or interrupt if its execution time is bounded.
+- an `open` or `close` implementation that performs an unbounded loop must ensure that checks for
+  yield or interrupt are regularly performed, by either relying on child `getNext` method or by
+  explicitly performing the yield or interrupt check.
 
 #### Yielding and memory safety
 

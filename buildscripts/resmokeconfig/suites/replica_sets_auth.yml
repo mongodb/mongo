@@ -1,32 +1,32 @@
 # Section that is ignored by resmoke.py.
 config_variables:
-- &keyFile jstests/libs/authTestsKey
-- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &keyFile jstests/libs/authTestsKey
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
 
 test_kind: js_test
 
 selector:
   roots:
-  - jstests/replsets/*.js
-  - src/mongo/db/modules/enterprise/jstests/fcbis/*.js
+    - jstests/replsets/*.js
+    - src/mongo/db/modules/enterprise/jstests/fcbis/*.js
   exclude_files:
-  # Skip any tests that run with auth explicitly.
-  - jstests/replsets/*[aA]uth*.js
-  - jstests/replsets/advance_cluster_time.js
-  - jstests/replsets/buildindexes_false_with_system_indexes.js
-  - jstests/replsets/db_reads_while_recovering_all_commands.js
-  - jstests/replsets/disable_cluster_time_gossiping_in_unreadable_state.js
-  - jstests/replsets/emptycapped.js
-  - jstests/replsets/localhostAuthBypass.js
-  - jstests/replsets/rollback_auth.js
-  - jstests/replsets/user_management_wc.js
-  - jstests/replsets/replsetinitiate_works_with_keyfile_profile_verbose_options.js
-  # Also skip tests that require a Thread, because Threads don't inherit credentials.
-  - jstests/replsets/interrupted_batch_insert.js
-  - jstests/replsets/transactions_reaped_with_tickets_exhausted.js
-  - jstests/replsets/transactions_committed_with_tickets_exhausted.js
-  # This test disables test commands which is incompatible with this suite.
-  - jstests/replsets/test_only_repl_commands.js
+    # Skip any tests that run with auth explicitly.
+    - jstests/replsets/*[aA]uth*.js
+    - jstests/replsets/advance_cluster_time.js
+    - jstests/replsets/buildindexes_false_with_system_indexes.js
+    - jstests/replsets/db_reads_while_recovering_all_commands.js
+    - jstests/replsets/disable_cluster_time_gossiping_in_unreadable_state.js
+    - jstests/replsets/emptycapped.js
+    - jstests/replsets/localhostAuthBypass.js
+    - jstests/replsets/rollback_auth.js
+    - jstests/replsets/user_management_wc.js
+    - jstests/replsets/replsetinitiate_works_with_keyfile_profile_verbose_options.js
+    # Also skip tests that require a Thread, because Threads don't inherit credentials.
+    - jstests/replsets/interrupted_batch_insert.js
+    - jstests/replsets/transactions_reaped_with_tickets_exhausted.js
+    - jstests/replsets/transactions_committed_with_tickets_exhausted.js
+    # This test disables test commands which is incompatible with this suite.
+    - jstests/replsets/test_only_repl_commands.js
 
 executor:
   config:
@@ -38,4 +38,4 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-      nodb: ''
+      nodb: ""

@@ -5,103 +5,24 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 variables:
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux-arm64-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
-  run_on:
-  - amazon2-arm64-large
-  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  stepback: false
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux-arm64-dynamic-compile-params # Essential set of compile parameters used for Linux dev variants.
+    run_on:
+      - amazon2-arm64-large
+    activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
+    stepback: false
 
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux-arm64-dynamic-enterprise-compile-expansions
-  scons_cache_scope: shared
-  scons_cache_mode: all
-  has_packages: false
-  compile_flags: >-
-    --ssl
-    MONGO_DISTMOD=amazon2
-    -j$(grep -c ^processor /proc/cpuinfo)
-    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    --link-model=dynamic
-    --use-diagnostic-latches=on
-
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &amazon_linux2_arm64_dynamic_compile_variant_dependency
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
-  - name: version_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  # - name: generate_buildid_to_debug_symbols_mapping
-  #   variant: amazon-linux2-arm64-dynamic-compile
-
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/perf/perf.yml
-# - etc/evergreen_yml_components/variants/perf/perf_branching.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux_arm64_generic_expansions
-  multiversion_platform: amazon2
-  multiversion_edition: enterprise
-  multiversion_architecture: aarch64
-  packager_arch: aarch64
-  packager_distro: amazon2
-  repo_edition: enterprise
-  large_distro_name: amazon2-arm64-large
-  core_analyzer_distro_name: amazon2-arm64-xlarge
-  num_scons_link_jobs_available: 0.99
-
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &amazon_linux2_arm64_dynamic_expansions
-  <<: *linux_arm64_generic_expansions
-  compile_variant: *amazon_linux2_arm64_dynamic_compile_variant_name
-
-
-buildvariants:
-- <<: *linux-arm64-dynamic-compile-params
-  name: &amazon-linux2-arm64-stitch-compile amazon-linux2-arm64-stitch-compile
-  display_name: "* Amazon Linux 2 arm64 Enterprise Stitch Compile"
-  tags: ["bazel_check"]
-  expansions:
-    <<: *linux-arm64-dynamic-enterprise-compile-expansions
-    compile_variant: *amazon-linux2-arm64-stitch-compile
-  tasks:
-    - name: .stitch
-
-- <<: *linux-arm64-dynamic-compile-params
-  name: &amazon-linux2-arm64-dev-compile amazon-linux2-arm64-dev-compile
-  display_name: "* Amazon Linux 2 arm64 Enterprise Dev Compile"
-  expansions:
-    <<: *linux-arm64-dynamic-enterprise-compile-expansions
-    compile_variant: *amazon-linux2-arm64-dev-compile
-  tasks:
-    - name: scons_compile_smoke_test_TG
-    - name: ninja_compile_smoke_test_TG
-
-# Caching is purposefully disabled on this variant so we can benchmark consistent build times.
-- name: &amazon-linux2-arm64-local-compile amazon-linux2-arm64-local-compile
-  display_name: "Amazon Linux 2 arm64 Local Compile"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - amazon2-arm64-large
-  expansions:
-    scons_cache_scope: none
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux-arm64-dynamic-enterprise-compile-expansions
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=amazon2
@@ -109,273 +30,351 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
       --use-diagnostic-latches=on
-      BAZEL_FLAGS=--config=local
-    compile_variant: *amazon-linux2-arm64-local-compile
-  tasks:
-    - name: compile_test_parallel_unittest_stream_TG
-    - name: compile_test_parallel_core_stream_TG
 
-# Note that this task is currently optional;
-# This will eventually become suggested, then required.
-- name: &amazon-linux-2023-arm64-bazel-compile amazon-linux-2023-arm64-bazel-compile
-  display_name: "Amazon Linux 2023 Enterprise arm64 Bazel Compile"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - amazon2023.0-arm64-small
-  stepback: false
-  expansions:
-    compile_variant: *amazon-linux-2023-arm64-bazel-compile
-  tasks:
-    - name: compile_bazel_TG
-    - name: compile_bazel_sanitize_TG
-    - name: compile_bazel_ninja_TG
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &amazon_linux2_arm64_dynamic_compile_variant_dependency
+    depends_on:
+      - name: archive_dist_test_debug
+        variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    # - name: generate_buildid_to_debug_symbols_mapping
+    #   variant: amazon-linux2-arm64-dynamic-compile
 
-# Note that this task is currently optional;
-# This will eventually become suggested, then required.
-- name: &rhel81-ppc64le-bazel-compile rhel81-ppc64le-bazel-compile
-  display_name: "RHEL 8.1 PPC64LE Bazel Compile"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - rhel81-power8-small
-  stepback: false
-  expansions:
-    compile_variant: *rhel81-ppc64le-bazel-compile
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel81
-      -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-  tasks:
-    - name: compile_bazel_TG
-
-# Note that this task is currently optional;
-# This will eventually become suggested, then required.
-- name: &rhel83-s390x-bazel-compile rhel83-s390x-bazel-compile
-  display_name: "RHEL 8.3 S390X Bazel Compile"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - rhel83-zseries-small
-  stepback: false
-  expansions:
-    compile_variant: *rhel83-s390x-bazel-compile
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel83
-      -j3
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --linker=gold
-  tasks:
-    - name: compile_bazel_TG
-
-# This task is responsible for creating a AL2023 x86 server binary candidate for 10gen/mongot.
-# A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
-# binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests.
-- name: amazon-linux-2023-x86-mongot-integration-cron-only
-  display_name: "AL2023 x86 mongot integration tasks cron only"
-  cron: "0 */4 * * *" # Run these tasks every 4 hours
-  patchable: false
-  run_on:
-  - amazon2023.0-small
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
-    has_packages: false
-    multiversion_platform: amazon2023
-    multiversion_edition: enterprise
-    multiversion_architecture: x86_64
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: amazon2023
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    compile_variant: amazon-linux-2023-x86-mongot-integration-cron-only
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - amazon2023.0-large
-  - name: search
-  - name: search_auth
-  - name: search_pinned_connections_auth
-  - name: search_ssl
-  - name: vector_search
-  - name: vector_search_auth
-  - name: vector_search_ssl
-
-# This task is responsible for creating a AL2023 arm64 server binary candidate for 10gen/mongot.
-# A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
-# binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests.
-- name: amazon2023-arm64-mongot-integration-cron-only
-  display_name: "AL2023 arm64 mongot integration tasks cron only"
-  cron: "0 */4 * * *" # Run these tasks every 4 hours
-  patchable: false
-  run_on:
-  - amazon2023.0-arm64-small
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug"
-      --modules=
-    test_flags: >-
-      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    has_packages: false
-    multiversion_platform: amazon2023
-    multiversion_edition: enterprise
-    multiversion_architecture: aarch64
-    packager_script: packager_enterprise.py
-    packager_arch: aarch64
-    packager_distro: amazon2023
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    compile_variant: amazon2023-arm64-mongot-integration-cron-only
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - amazon2023.0-arm64-large
-  - name: search
-  - name: search_auth
-  - name: search_pinned_connections_auth
-  - name: search_ssl
-  - name: vector_search
-  - name: vector_search_auth
-  - name: vector_search_ssl
-
-# This task is responsible for creating a AL2 arm64 server binary candidate for 10gen/mongot.
-# A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
-# binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests.
-- name: amazon-linux2-arm64-mongot-integration-cron-only
-  display_name: "AL2 arm64 mongot integration tasks cron only"
-  cron: "0 */4 * * *" # Run these tasks every 4 hours
-  patchable: false
-  run_on:
-  - amazon2-arm64-small
-  stepback: true
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    has_packages: false
-    jstestfuzz_num_generated_files: 40
-    jstestfuzz_concurrent_num_files: 10
-    target_resmoke_time: 10
-    max_sub_suites: 5
-    idle_timeout_factor: 1.5
-    exec_timeout_factor: 1.5
-    compile_variant: amazon-linux2-arm64-mongot-integration-cron-only
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - amazon2-arm64-large
-  - name: search
-  - name: search_auth
-  - name: search_pinned_connections_auth
-  - name: search_ssl
-  - name: vector_search
-  - name: vector_search_auth
-  - name: vector_search_ssl
-
-# This task is responsible for creating a AL2 x86 server binary candidate for 10gen/mongot.
-# A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
-# binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests
-- name: amazon2-x86-mongot-integration-cron-only
-  display_name: "AL2 x86 mongot integration tasks cron only"
-  cron: "0 */4 * * *" # Run these tasks every 4 hours
-  patchable: false
-  run_on:
-  - amazon2-large
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
-    has_packages: false
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/perf/perf.yml
+  # - etc/evergreen_yml_components/variants/perf/perf_branching.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_arm64_generic_expansions
     multiversion_platform: amazon2
     multiversion_edition: enterprise
-    multiversion_architecture: x86_64
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
+    multiversion_architecture: aarch64
+    packager_arch: aarch64
     packager_distro: amazon2
     repo_edition: enterprise
-    scons_cache_scope: shared
-    compile_variant: amazon2-x86-mongot-integration-cron-only
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - amazon2-large
-  - name: search
-  - name: search_auth
-  - name: search_pinned_connections_auth
-  - name: search_ssl
-  - name: vector_search
-  - name: vector_search_auth
-  - name: vector_search_ssl
+    large_distro_name: amazon2-arm64-large
+    core_analyzer_distro_name: amazon2-arm64-xlarge
+    num_scons_link_jobs_available: 0.99
 
-- &enterprise-amazon-linux2-arm64-all-feature-flags-template
-  <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
-  name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
-  display_name: "! Amazon Linux 2 arm64 Enterprise (all feature flags)"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  run_on:
-    - amazon2-arm64-small
-  stepback: true
-  expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
-    <<: *amazon_linux2_arm64_dynamic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    has_packages: false
-    jstestfuzz_num_generated_files: 40
-    jstestfuzz_concurrent_num_files: 10
-    target_resmoke_time: 10
-    max_sub_suites: 5
-    idle_timeout_factor: 1.5
-    exec_timeout_factor: 1.5
-    test_flags: >-
-      --runAllFeatureFlagTests
-      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
-  tasks:
-  - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
-  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
-  - name: .default !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &amazon_linux2_arm64_dynamic_expansions
+    <<: *linux_arm64_generic_expansions
+    compile_variant: *amazon_linux2_arm64_dynamic_compile_variant_name
 
-- &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
-  <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-  name: enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
-  display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Fuzzers"
-  tasks:
-  - name: .aggfuzzer
-  - name: .change_stream_fuzzer
-  - name: .query_fuzzer
-  - name: .updatefuzzer
+buildvariants:
+  - <<: *linux-arm64-dynamic-compile-params
+    name: &amazon-linux2-arm64-stitch-compile amazon-linux2-arm64-stitch-compile
+    display_name: "* Amazon Linux 2 arm64 Enterprise Stitch Compile"
+    tags: ["bazel_check"]
+    expansions:
+      <<: *linux-arm64-dynamic-enterprise-compile-expansions
+      compile_variant: *amazon-linux2-arm64-stitch-compile
+    tasks:
+      - name: .stitch
 
-- name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
-  display_name: "! AL2023 arm64 Enterprise (SEP Benchmark)"
-  cron: "0 */4 * * *"
-  run_on:
-  - amazon2023.0-arm64-large
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    scons_cache_scope: shared
-    compile_variant: *al2023-arm64-sep-benchmark
-  tasks:
-  - name: compile_upload_benchmarks_TG
-  - name: .benchmarks_sep
+  - <<: *linux-arm64-dynamic-compile-params
+    name: &amazon-linux2-arm64-dev-compile amazon-linux2-arm64-dev-compile
+    display_name: "* Amazon Linux 2 arm64 Enterprise Dev Compile"
+    expansions:
+      <<: *linux-arm64-dynamic-enterprise-compile-expansions
+      compile_variant: *amazon-linux2-arm64-dev-compile
+    tasks:
+      - name: scons_compile_smoke_test_TG
+      - name: ninja_compile_smoke_test_TG
+
+  # Caching is purposefully disabled on this variant so we can benchmark consistent build times.
+  - name: &amazon-linux2-arm64-local-compile amazon-linux2-arm64-local-compile
+    display_name: "Amazon Linux 2 arm64 Local Compile"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - amazon2-arm64-large
+    expansions:
+      scons_cache_scope: none
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --link-model=dynamic
+        --use-diagnostic-latches=on
+        BAZEL_FLAGS=--config=local
+      compile_variant: *amazon-linux2-arm64-local-compile
+    tasks:
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_core_stream_TG
+
+  # Note that this task is currently optional;
+  # This will eventually become suggested, then required.
+  - name: &amazon-linux-2023-arm64-bazel-compile amazon-linux-2023-arm64-bazel-compile
+    display_name: "Amazon Linux 2023 Enterprise arm64 Bazel Compile"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - amazon2023.0-arm64-small
+    stepback: false
+    expansions:
+      compile_variant: *amazon-linux-2023-arm64-bazel-compile
+    tasks:
+      - name: compile_bazel_TG
+      - name: compile_bazel_sanitize_TG
+      - name: compile_bazel_ninja_TG
+
+  # Note that this task is currently optional;
+  # This will eventually become suggested, then required.
+  - name: &rhel81-ppc64le-bazel-compile rhel81-ppc64le-bazel-compile
+    display_name: "RHEL 8.1 PPC64LE Bazel Compile"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - rhel81-power8-small
+    stepback: false
+    expansions:
+      compile_variant: *rhel81-ppc64le-bazel-compile
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=rhel81
+        -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    tasks:
+      - name: compile_bazel_TG
+
+  # Note that this task is currently optional;
+  # This will eventually become suggested, then required.
+  - name: &rhel83-s390x-bazel-compile rhel83-s390x-bazel-compile
+    display_name: "RHEL 8.3 S390X Bazel Compile"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - rhel83-zseries-small
+    stepback: false
+    expansions:
+      compile_variant: *rhel83-s390x-bazel-compile
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=rhel83
+        -j3
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --linker=gold
+    tasks:
+      - name: compile_bazel_TG
+
+  # This task is responsible for creating a AL2023 x86 server binary candidate for 10gen/mongot.
+  # A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
+  # binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests.
+  - name: amazon-linux-2023-x86-mongot-integration-cron-only
+    display_name: "AL2023 x86 mongot integration tasks cron only"
+    cron: "0 */4 * * *" # Run these tasks every 4 hours
+    patchable: false
+    run_on:
+      - amazon2023.0-small
+    expansions:
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2023
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+      has_packages: false
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: x86_64
+      packager_script: packager_enterprise.py
+      packager_arch: x86_64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      compile_variant: amazon-linux-2023-x86-mongot-integration-cron-only
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - amazon2023.0-large
+      - name: search
+      - name: search_auth
+      - name: search_pinned_connections_auth
+      - name: search_ssl
+      - name: vector_search
+      - name: vector_search_auth
+      - name: vector_search_ssl
+
+  # This task is responsible for creating a AL2023 arm64 server binary candidate for 10gen/mongot.
+  # A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
+  # binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests.
+  - name: amazon2023-arm64-mongot-integration-cron-only
+    display_name: "AL2023 arm64 mongot integration tasks cron only"
+    cron: "0 */4 * * *" # Run these tasks every 4 hours
+    patchable: false
+    run_on:
+      - amazon2023.0-arm64-small
+    expansions:
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2023
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug"
+        --modules=
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      has_packages: false
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_script: packager_enterprise.py
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      compile_variant: amazon2023-arm64-mongot-integration-cron-only
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - amazon2023.0-arm64-large
+      - name: search
+      - name: search_auth
+      - name: search_pinned_connections_auth
+      - name: search_ssl
+      - name: vector_search
+      - name: vector_search_auth
+      - name: vector_search_ssl
+
+  # This task is responsible for creating a AL2 arm64 server binary candidate for 10gen/mongot.
+  # A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
+  # binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests.
+  - name: amazon-linux2-arm64-mongot-integration-cron-only
+    display_name: "AL2 arm64 mongot integration tasks cron only"
+    cron: "0 */4 * * *" # Run these tasks every 4 hours
+    patchable: false
+    run_on:
+      - amazon2-arm64-small
+    stepback: true
+    expansions:
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      target_resmoke_time: 10
+      max_sub_suites: 5
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      compile_variant: amazon-linux2-arm64-mongot-integration-cron-only
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - amazon2-arm64-large
+      - name: search
+      - name: search_auth
+      - name: search_pinned_connections_auth
+      - name: search_ssl
+      - name: vector_search
+      - name: vector_search_auth
+      - name: vector_search_ssl
+
+  # This task is responsible for creating a AL2 x86 server binary candidate for 10gen/mongot.
+  # A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
+  # binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests
+  - name: amazon2-x86-mongot-integration-cron-only
+    display_name: "AL2 x86 mongot integration tasks cron only"
+    cron: "0 */4 * * *" # Run these tasks every 4 hours
+    patchable: false
+    run_on:
+      - amazon2-large
+    expansions:
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+      has_packages: false
+      multiversion_platform: amazon2
+      multiversion_edition: enterprise
+      multiversion_architecture: x86_64
+      packager_script: packager_enterprise.py
+      packager_arch: x86_64
+      packager_distro: amazon2
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      compile_variant: amazon2-x86-mongot-integration-cron-only
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - amazon2-large
+      - name: search
+      - name: search_auth
+      - name: search_pinned_connections_auth
+      - name: search_ssl
+      - name: vector_search
+      - name: vector_search_auth
+      - name: vector_search_ssl
+
+  - &enterprise-amazon-linux2-arm64-all-feature-flags-template
+    <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
+    name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
+    display_name: "! Amazon Linux 2 arm64 Enterprise (all feature flags)"
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - amazon2-arm64-small
+    stepback: true
+    expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
+      <<: *amazon_linux2_arm64_dynamic_expansions
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      target_resmoke_time: 10
+      max_sub_suites: 5
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+    tasks:
+      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .default !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+
+  - &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
+    <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
+    display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Fuzzers"
+    tasks:
+      - name: .aggfuzzer
+      - name: .change_stream_fuzzer
+      - name: .query_fuzzer
+      - name: .updatefuzzer
+
+  - name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
+    display_name: "! AL2023 arm64 Enterprise (SEP Benchmark)"
+    cron: "0 */4 * * *"
+    run_on:
+      - amazon2023.0-arm64-large
+    expansions:
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      scons_cache_scope: shared
+      compile_variant: *al2023-arm64-sep-benchmark
+    tasks:
+      - name: compile_upload_benchmarks_TG
+      - name: .benchmarks_sep

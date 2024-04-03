@@ -2,14 +2,14 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/ocsp/*.js
+    - jstests/ocsp/*.js
 
 executor:
   config:
     shell_options:
-      nodb: ''
-      ssl: ''
+      nodb: ""
+      ssl: ""
       tlsCAFile: jstests/libs/ocsp/ca_ocsp.pem
       tlsCertificateKeyFile: jstests/libs/ocsp/client_ocsp.pem
-      sslAllowInvalidHostnames: ''
+      sslAllowInvalidHostnames: ""
       setShellParameter: ocspEnabled=true

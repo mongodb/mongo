@@ -139,11 +139,11 @@ Two or more contiguous chunks belonging to the same collection are going to be c
 
 Formally, two or more contiguous **non-jumbo** chunks are then required to fulfill the following conditions to be merged:
 
--   Have never been migrated.
+- Have never been migrated.
 
 **OR**
 
--   The last migration involving either of them has happened more than [minSnapshotHistoryWindowInSeconds](https://www.mongodb.com/docs/manual/reference/parameters/#mongodb-parameter-param.minSnapshotHistoryWindowInSeconds) ago **AND** more than [transactionLifetimeLimitSeconds](https://www.mongodb.com/docs/manual/reference/parameters/#mongodb-parameter-param.transactionLifetimeLimitSeconds) ago.
+- The last migration involving either of them has happened more than [minSnapshotHistoryWindowInSeconds](https://www.mongodb.com/docs/manual/reference/parameters/#mongodb-parameter-param.minSnapshotHistoryWindowInSeconds) ago **AND** more than [transactionLifetimeLimitSeconds](https://www.mongodb.com/docs/manual/reference/parameters/#mongodb-parameter-param.transactionLifetimeLimitSeconds) ago.
 
 #### Example
 

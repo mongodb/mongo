@@ -6,20 +6,20 @@
           global_vars:
             TestData:
               defaultReadConcernLevel: null
-              enableMajorityReadConcern: ''
+              enableMajorityReadConcern: ""
               hashTestNamesForMultitenancy: true
               tenantId: "636d957b2646ddfaf9b5e13f"
               useResponsePrefixChecking: true
       hooks:
-      - class: EnableChangeStream
-        tenant_id: "636d957b2646ddfaf9b5e13f"
+        - class: EnableChangeStream
+          tenant_id: "636d957b2646ddfaf9b5e13f"
       fixture:
         class: ReplicaSetFixture
         replset_name: "ChangeStreamMultitenantReplSet"
         mongod_options:
-          bind_ip_all: ''
+          bind_ip_all: ""
           serverless: true
-          noscripting: ''
+          noscripting: ""
           set_parameters:
             enableTestCommands: 1
             featureFlagServerlessChangeStreams: true
@@ -30,8 +30,8 @@
   value:
     executor:
       hooks:
-      - class: EnableChangeStream
-        tenant_id: "636d957b2646ddfaf9b5e13f"
+        - class: EnableChangeStream
+          tenant_id: "636d957b2646ddfaf9b5e13f"
 
 - name: shell_eval
   value:

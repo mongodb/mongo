@@ -33,15 +33,15 @@ repetition possible, and shares attribute names with other related log lines.
 The `msg` field predicates a reader's interpretation of the log line. It should
 be crafted with care and attention.
 
--   Concisely describe what the log line is reporting, providing enough
-    context necessary for interpreting attribute field names and values
--   Capitalize the first letter, as in a sentence
--   Avoid unnecessary punctuation, but punctuate between sentences if using
-    multiple sentences
--   Do not conclude with punctuation
--   You may occasionally encounter `msg` strings containing fmt-style
-    `{expr}` braces. These are legacy artifacts and should be rephrased
-    according to these guidelines.
+- Concisely describe what the log line is reporting, providing enough
+  context necessary for interpreting attribute field names and values
+- Capitalize the first letter, as in a sentence
+- Avoid unnecessary punctuation, but punctuate between sentences if using
+  multiple sentences
+- Do not conclude with punctuation
+- You may occasionally encounter `msg` strings containing fmt-style
+  `{expr}` braces. These are legacy artifacts and should be rephrased
+  according to these guidelines.
 
 ### Attributes (fields in the attr subdocument)
 
@@ -57,10 +57,10 @@ For `attr` field names, do the following:
 
 The bar for understanding should be:
 
--   Someone with reasonable understanding of mongod behavior should understand
-    immediately what is being logged
--   Someone with reasonable troubleshooting skill should be able to extract doc-
-    or code-searchable phrases to learn about what is being logged
+- Someone with reasonable understanding of mongod behavior should understand
+  immediately what is being logged
+- Someone with reasonable troubleshooting skill should be able to extract doc-
+  or code-searchable phrases to learn about what is being logged
 
 #### Precisely describe values and units
 
@@ -84,37 +84,37 @@ replacement for the "[0-9]+ms$" format of prior logs.
 
 When logging the below information, do so with these specific terms:
 
--   **namespace** - when logging a value of the form
-    "\<db name\>.\<collection name\>". Do not use "collection" or abbreviate to "ns"
--   **db** - instead of "database"
--   **error** - when an error occurs, instead of "status". Use this for objects
-    of type Status and DBException
--   **reason** - to provide rationale for an event/action when "error" isn't
-    appropriate
+- **namespace** - when logging a value of the form
+  "\<db name\>.\<collection name\>". Do not use "collection" or abbreviate to "ns"
+- **db** - instead of "database"
+- **error** - when an error occurs, instead of "status". Use this for objects
+  of type Status and DBException
+- **reason** - to provide rationale for an event/action when "error" isn't
+  appropriate
 
 ### Examples
 
--   Example 1:
+- Example 1:
 
-        LOGV2(1041, "Transition to PRIMARY complete");
+      LOGV2(1041, "Transition to PRIMARY complete");
 
-    JSON Output:
+  JSON Output:
 
-        { ... , "id": 1041, "msg": "Transition to PRIMARY complete", "attr": {} }
+      { ... , "id": 1041, "msg": "Transition to PRIMARY complete", "attr": {} }
 
--   Example 2:
+- Example 2:
 
-        LOGV2(1042, "Slow query", "duration"_attr = getDurationMillis());
+      LOGV2(1042, "Slow query", "duration"_attr = getDurationMillis());
 
-    JSON Output:
+  JSON Output:
 
-        { ..., "id": 1042, "msg": "Slow query", "attr": { "durationMillis": 1000 } }
+      { ..., "id": 1042, "msg": "Slow query", "attr": { "durationMillis": 1000 } }
 
--   For adding STL containers as dynamic attributes, see
-    [RollbackImpl::\_summarizeRollback][_summarizeRollback]
+- For adding STL containers as dynamic attributes, see
+  [RollbackImpl::\_summarizeRollback][_summarizeRollback]
 
--   For sharing a string between a log line and a status see [this section of
-    InitialSyncer::\_lastOplogEntryFetcherCallbackForStopTimestamp][ _lastOplogEntryFetcherCallbackForStopTimestamp]
+- For sharing a string between a log line and a status see [this section of
+  InitialSyncer::\_lastOplogEntryFetcherCallbackForStopTimestamp][ _lastOplogEntryFetcherCallbackForStopTimestamp]
 
 # Basic Usage
 
@@ -173,16 +173,16 @@ can use this pattern:
 
 ##### Examples
 
--   No attributes.
+- No attributes.
 
-        LOGV2(1000, "Logging event, no replacement fields is OK");
+      LOGV2(1000, "Logging event, no replacement fields is OK");
 
--   Some attributes.
+- Some attributes.
 
-        LOGV2(1002,
-              "Replication state change",
-              "from"_attr = getOldState(),
-              "to"_attr = getNewState());
+      LOGV2(1002,
+            "Replication state change",
+            "from"_attr = getOldState(),
+            "to"_attr = getNewState());
 
 ### Log Component
 
@@ -204,17 +204,17 @@ log statement.
 to different severities there are separate logging macros to be used, they all
 take paramaters like `LOGV2`:
 
--   `LOGV2_WARNING`
--   `LOGV2_ERROR`
--   `LOGV2_FATAL`
--   `LOGV2_FATAL_NOTRACE`
--   `LOGV2_FATAL_CONTINUE`
+- `LOGV2_WARNING`
+- `LOGV2_ERROR`
+- `LOGV2_FATAL`
+- `LOGV2_FATAL_NOTRACE`
+- `LOGV2_FATAL_CONTINUE`
 
 There is also variations that take `LogOptions` if needed:
 
--   `LOGV2_WARNING_OPTIONS`
--   `LOGV2_ERROR_OPTIONS`
--   `LOGV2_FATAL_OPTIONS`
+- `LOGV2_WARNING_OPTIONS`
+- `LOGV2_ERROR_OPTIONS`
+- `LOGV2_FATAL_OPTIONS`
 
 Fatal level log statements using `LOGV2_FATAL` perform `fassert` after logging,
 using the provided ID as assert id. `LOGV2_FATAL_NOTRACE` perform
@@ -307,26 +307,26 @@ statement.
 
 Many basic types have built in support:
 
--   Boolean
--   Integral types
-    -   Single `char` is logged as integer
--   Enums
-    -   Logged as their underlying integral type
--   Floating point types
-    -   `long double` is prohibited
--   String types
-    -   `std::string`
-    -   `StringData`
-    -   `const char*`
--   Duration types
-    -   Special formatting, see below
--   BSON types
-    -   `BSONObj`
-    -   `BSONArray`
-    -   `BSONElement`
--   BSON appendable types
-    -   `BSONObjBuilder::append` overload available
--   `boost::optional<T>` of any loggable type `T`
+- Boolean
+- Integral types
+  - Single `char` is logged as integer
+- Enums
+  - Logged as their underlying integral type
+- Floating point types
+  - `long double` is prohibited
+- String types
+  - `std::string`
+  - `StringData`
+  - `const char*`
+- Duration types
+  - Special formatting, see below
+- BSON types
+  - `BSONObj`
+  - `BSONArray`
+  - `BSONElement`
+- BSON appendable types
+  - `BSONObjBuilder::append` overload available
+- `boost::optional<T>` of any loggable type `T`
 
 ### User-defined types
 
@@ -336,16 +336,16 @@ that the log system can bind to.
 The system binds and uses serialization functions by looking for functions in
 the following priority order:
 
--   Structured serialization functions
-    -   `void x.serialize(BSONObjBuilder*) const` (member)
-    -   `BSONObj x.toBSON() const` (member)
-    -   `BSONArray x.toBSONArray() const` (member)
-    -   `toBSON(x)` (non-member)
--   Stringification functions
-    -   `toStringForLogging(x)` (non-member)
-    -   `x.serialize(&fmtMemoryBuffer)` (member)
-    -   `x.toString() ` (member)
-    -   `toString(x)` (non-member)
+- Structured serialization functions
+  - `void x.serialize(BSONObjBuilder*) const` (member)
+  - `BSONObj x.toBSON() const` (member)
+  - `BSONArray x.toBSONArray() const` (member)
+  - `toBSON(x)` (non-member)
+- Stringification functions
+  - `toStringForLogging(x)` (non-member)
+  - `x.serialize(&fmtMemoryBuffer)` (member)
+  - `x.toString() ` (member)
+  - `toString(x)` (non-member)
 
 Enums cannot have member functions, but they will still try to bind to the
 `toStringForLogging(e)` or `toString(e)` non-members. If neither is available,
@@ -398,8 +398,8 @@ is a JSON object where the field names are the key.
 
 Ranges is loggable via helpers to indicate what type of range it is
 
--   `seqLog(begin, end)`
--   `mapLog(begin, end)`
+- `seqLog(begin, end)`
+- `mapLog(begin, end)`
 
 seqLog indicates that it is a sequential range where the iterators point to
 loggable value directly.
@@ -409,28 +409,28 @@ the iterators point to a key-value pair.
 
 ##### Examples
 
--   Logging a sequence:
+- Logging a sequence:
 
-        std::array<int, 20> arrayOfInts = ...;
-        LOGV2(1010,
-              "Log container directly",
-              "values"_attr = arrayOfInts);
-        LOGV2(1011,
-              "Log iterator range",
-              "values"_attr = seqLog(arrayOfInts.begin(), arrayOfInts.end());
-        LOGV2(1012,
-              "Log first five elements",
-              "values"_attr = seqLog(arrayOfInts.data(), arrayOfInts.data() + 5);
+      std::array<int, 20> arrayOfInts = ...;
+      LOGV2(1010,
+            "Log container directly",
+            "values"_attr = arrayOfInts);
+      LOGV2(1011,
+            "Log iterator range",
+            "values"_attr = seqLog(arrayOfInts.begin(), arrayOfInts.end());
+      LOGV2(1012,
+            "Log first five elements",
+            "values"_attr = seqLog(arrayOfInts.data(), arrayOfInts.data() + 5);
 
--   Logging a map-like container:
+- Logging a map-like container:
 
-        StringMap<BSONObj> bsonMap = ...;
-        LOGV2(1013,
-              "Log map directly",
-              "values"_attr = bsonMap);
-        LOGV2(1014,
-              "Log map iterator range",
-              "values"_attr = mapLog(bsonMap.begin(), bsonMap.end());
+      StringMap<BSONObj> bsonMap = ...;
+      LOGV2(1013,
+            "Log map directly",
+            "values"_attr = bsonMap);
+      LOGV2(1014,
+            "Log map iterator range",
+            "values"_attr = mapLog(bsonMap.begin(), bsonMap.end());
 
 #### Containers and `uint64_t`
 
@@ -471,26 +471,26 @@ formatted as a BSON object.
 
 ##### Examples
 
--   "duration" attribute
+- "duration" attribute
 
-    C++ expression:
+  C++ expression:
 
-          "duration"_attr = Milliseconds(10)
+        "duration"_attr = Milliseconds(10)
 
-    JSON format:
+  JSON format:
 
-          "durationMillis": 10
+        "durationMillis": 10
 
--   Container of Duration objects
+- Container of Duration objects
 
-    C++ expression:
+  C++ expression:
 
-          "samples"_attr = std::vector<Nanoseconds>{Nanoseconds(200),
-                                                    Nanoseconds(400)}
+        "samples"_attr = std::vector<Nanoseconds>{Nanoseconds(200),
+                                                  Nanoseconds(400)}
 
-    JSON format:
+  JSON format:
 
-          "samples": [{"durationNanos": 200}, {"durationNanos": 400}]
+        "samples": [{"durationNanos": 200}, {"durationNanos": 400}]
 
 # Attribute naming abstraction
 

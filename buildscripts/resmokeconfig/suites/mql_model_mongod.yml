@@ -2,10 +2,10 @@ test_kind: mql_model_mongod_test
 
 selector:
   roots:
-  - mql-model/test/**/*.json
+    - mql-model/test/**/*.json
   exclude_files:
-  - mql-model/test/find/*.json
-  - mql-model/test/data/*.json
+    - mql-model/test/find/*.json
+    - mql-model/test/data/*.json
 
 executor:
   archive:
@@ -13,9 +13,9 @@ executor:
       - ValidateCollections
   config: {}
   hooks:
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: MongoDFixture
     mongod_options:

@@ -1,12 +1,12 @@
 # Build variant to generate tasks for evergreen versions.
 
 buildvariants:
-- name: generate-tasks-for-version
-  display_name: "! Generate tasks for evergreen version"
-  activate: true
-  run_on:
-  - rhel80-medium
-  tasks:
-  - name: version_gen
-  - name: version_burn_in_gen
-  - name: version_expansions_gen
+  - name: generate-tasks-for-version
+    display_name: "! Generate tasks for evergreen version"
+    activate: true
+    run_on:
+      - rhel80-medium
+    tasks:
+      - name: version_gen
+      - name: version_burn_in_gen
+      - name: version_expansions_gen

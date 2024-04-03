@@ -17,23 +17,23 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_files_include_filter:
-         - src/src/third_party/timelib/zones/timezonedb-*.zip
+          - src/src/third_party/timelib/zones/timezonedb-*.zip
         remote_file: olson_tz_db/
         bucket: downloads.mongodb.org
         permissions: public-read
         content_type: application/zip
         display_name: timezonedb.zip
 tasks:
-- name: compile
-  depends_on: []
-  commands:
-    - func: "fetch source"
-    - func: "publish"
+  - name: compile
+    depends_on: []
+    commands:
+      - func: "fetch source"
+      - func: "publish"
 
 buildvariants:
-- name: linux-64
-  display_name: Linux
-  run_on:
-  - rhel80-small
-  tasks:
-  - name: compile
+  - name: linux-64
+    display_name: Linux
+    run_on:
+      - rhel80-small
+    tasks:
+      - name: compile

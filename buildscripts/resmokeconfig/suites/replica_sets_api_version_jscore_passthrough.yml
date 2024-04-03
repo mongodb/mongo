@@ -4,18 +4,18 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/core/**/*.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
-  # This test initiates a txn with API parameters, but runs txn-continuing commands in a separate
-  # Thread object. Since those commands will not have API parameters appended, they will fail due
-  # to not matching the API parameters of the txn-initiating command.
-  - jstests/core/txns/kill_op_on_txn_expiry.js
+    # This test initiates a txn with API parameters, but runs txn-continuing commands in a separate
+    # Thread object. Since those commands will not have API parameters appended, they will fail due
+    # to not matching the API parameters of the txn-initiating command.
+    - jstests/core/txns/kill_op_on_txn_expiry.js
   exclude_with_any_tags:
-  - assumes_standalone_mongod
-  # These tests already pass in API parameters, so we avoid overwriting them.
-  - uses_api_parameters
+    - assumes_standalone_mongod
+    # These tests already pass in API parameters, so we avoid overwriting them.
+    - uses_api_parameters
 
 executor:
   archive:
@@ -29,14 +29,14 @@ executor:
         globalThis.testingReplication = true;
         await import('jstests/libs/override_methods/set_api_version.js');
   hooks:
-  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
-  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
-  # validating the entire contents of the collection.
-  - class: CheckReplOplogs
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: ReplicaSetFixture
     mongod_options:

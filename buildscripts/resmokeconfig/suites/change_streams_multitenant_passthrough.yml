@@ -2,62 +2,62 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/change_streams/**/*.js
+    - jstests/change_streams/**/*.js
   exclude_files:
-  ##
-  # TODO SERVER-68341: Implement enable/disable command for mongoQ in the serverless.
-  - jstests/change_streams/projection_fakes_internal_event.js
+    ##
+    # TODO SERVER-68341: Implement enable/disable command for mongoQ in the serverless.
+    - jstests/change_streams/projection_fakes_internal_event.js
 
-  ##
-  # TODO SERVER-70760: This test creates its own sharded cluster and uses transaction. The support
-  #                    for transaction on multi-tenancy is not fully available. Unblock this test
-  #                    after the support is available.
-  - jstests/change_streams/oplog_rewrite/change_stream_basic_match_pushdown_rewrite.js
+    ##
+    # TODO SERVER-70760: This test creates its own sharded cluster and uses transaction. The support
+    #                    for transaction on multi-tenancy is not fully available. Unblock this test
+    #                    after the support is available.
+    - jstests/change_streams/oplog_rewrite/change_stream_basic_match_pushdown_rewrite.js
 
-  ##
-  # These tests run in sharded clusters. The tenant token cannot be injected to the sharded cluster
-  # currently, as such these tests cannot work in true multitenant environment.
-  # TODO SERVER-68341: Remove these JS tests from exclusion list.
-  - jstests/change_streams/show_resharding_system_events.js
-  - jstests/change_streams/refine_collection_shard_key_event.js
-  - jstests/change_streams/projection_fakes_internal_event.js
-  - jstests/change_streams/change_streams_lookup_preimage_with_chunk_migration.js
-  - jstests/change_streams/migrate_last_chunk_from_shard_event.js
-  - jstests/change_streams/shard_collection_event.js
-  - jstests/change_streams/create_event_from_chunk_migration.js
-  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_documentKey_rewrite.js
-  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_fullDocumentBeforeChange_rewrite.js
-  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_fullDocument_rewrite.js
-  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_operation_type_rewrite.js
-  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_to_rewrite.js
-  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_updateDescription_rewrite.js
-  - jstests/change_streams/oplog_rewrite/match_pushdown_namespace_rewrite_with_expanded_events.js
-  - jstests/change_streams/oplog_rewrite/change_stream_basic_match_pushdown_rewrite.js
-  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_namespace_rewrite.js
-  - jstests/change_streams/reshard_collection_event.js
+    ##
+    # These tests run in sharded clusters. The tenant token cannot be injected to the sharded cluster
+    # currently, as such these tests cannot work in true multitenant environment.
+    # TODO SERVER-68341: Remove these JS tests from exclusion list.
+    - jstests/change_streams/show_resharding_system_events.js
+    - jstests/change_streams/refine_collection_shard_key_event.js
+    - jstests/change_streams/projection_fakes_internal_event.js
+    - jstests/change_streams/change_streams_lookup_preimage_with_chunk_migration.js
+    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+    - jstests/change_streams/shard_collection_event.js
+    - jstests/change_streams/create_event_from_chunk_migration.js
+    - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_documentKey_rewrite.js
+    - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_fullDocumentBeforeChange_rewrite.js
+    - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_fullDocument_rewrite.js
+    - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_operation_type_rewrite.js
+    - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_to_rewrite.js
+    - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_updateDescription_rewrite.js
+    - jstests/change_streams/oplog_rewrite/match_pushdown_namespace_rewrite_with_expanded_events.js
+    - jstests/change_streams/oplog_rewrite/change_stream_basic_match_pushdown_rewrite.js
+    - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_namespace_rewrite.js
+    - jstests/change_streams/reshard_collection_event.js
 
-  ##
-  # These tests issue 'applyOps' command to which tenant token cannot be injected.
-  - jstests/change_streams/apply_ops.js
-  - jstests/change_streams/lookup_pit_pre_and_post_image_in_transaction.js
+    ##
+    # These tests issue 'applyOps' command to which tenant token cannot be injected.
+    - jstests/change_streams/apply_ops.js
+    - jstests/change_streams/lookup_pit_pre_and_post_image_in_transaction.js
 
-  ##
-  # This test uses 'system' database and tenant token cannot be injected in 'system.$cmd' namespace.
-  - jstests/change_streams/global_index.js
+    ##
+    # This test uses 'system' database and tenant token cannot be injected in 'system.$cmd' namespace.
+    - jstests/change_streams/global_index.js
 
-  # Queryable encryption test requires an internal connection for the keyvault that does not
-  # inject tenant token.
-  - jstests/change_streams/queryable_encryption_change_stream.js
+    # Queryable encryption test requires an internal connection for the keyvault that does not
+    # inject tenant token.
+    - jstests/change_streams/queryable_encryption_change_stream.js
 
   exclude_with_any_tags:
-  ##
-  # The next tags correspond to the special errors thrown by the
-  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
-  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
-  # warranted.
-  ##
-  # "Cowardly refusing to override write concern of command: ..."
-  - assumes_write_concern_unchanged
+    ##
+    # The next tags correspond to the special errors thrown by the
+    # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+    # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+    # warranted.
+    ##
+    # "Cowardly refusing to override write concern of command: ..."
+    - assumes_write_concern_unchanged
 
 executor:
   archive:
@@ -69,7 +69,7 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
-          enableMajorityReadConcern: ''
+          enableMajorityReadConcern: ""
           tenantId: "636d957b2646ddfaf9b5e13f"
           hashTestNamesForMultitenancy: true
       # Enable causal consistency for change streams suites using 1 node replica sets. See
@@ -80,22 +80,22 @@ executor:
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
         await import('jstests/libs/override_methods/simulate_mongoq.js');
   hooks:
-  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
-  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
-  # validating the entire contents of the collection.
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
-  - class: EnableChangeStream
-    tenant_id: "636d957b2646ddfaf9b5e13f"
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+    - class: EnableChangeStream
+      tenant_id: "636d957b2646ddfaf9b5e13f"
   fixture:
     class: ReplicaSetFixture
     replset_name: "ChangeStreamMultitenantReplSet"
     mongod_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       serverless: true
-      noscripting: ''
+      noscripting: ""
       set_parameters:
         enableTestCommands: 1
         featureFlagServerlessChangeStreams: true

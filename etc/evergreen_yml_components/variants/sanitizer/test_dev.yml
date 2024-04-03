@@ -5,437 +5,436 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 variables:
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &generic_linux_compile_params  # Essential set of compile parameters used for Linux dev variants.
-  run_on:
-  - rhel80-xlarge
-  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  tasks:
-  - name: compile_test_parallel_core_stream_TG
-  - name: compile_test_parallel_unittest_stream_TG
-  - name: compile_test_parallel_dbtest_stream_TG
-  - name: generate_buildid_to_debug_symbols_mapping
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &generic_linux_compile_params # Essential set of compile parameters used for Linux dev variants.
+    run_on:
+      - rhel80-xlarge
+    activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: generate_buildid_to_debug_symbols_mapping
 
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &generic_linux_compile_expansions  # The most commonly used compile expansions.
-  scons_cache_scope: shared
-  scons_cache_mode: all
-  has_packages: false
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &generic_linux_compile_expansions # The most commonly used compile expansions.
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
 
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux_debug_community_compile_expansions
-  <<: *generic_linux_compile_expansions
-  compile_flags: >-
-    --dbg=on
-    --opt=on
-    -j$(grep -c ^processor /proc/cpuinfo)
-    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    --enable-http-client=on
-    --link-model=dynamic
-    --use-diagnostic-latches=on
-    --modules=
-  num_scons_link_jobs_available: 0.99
-
-- &linux_x86_dynamic_debug_compile_variant_dependency
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: &linux_x86_dynamic_debug_compile_variant_name linux-x86-dynamic-debug-compile-required
-  - name: version_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  # - name: generate_buildid_to_debug_symbols_mapping
-  #   variant: linux-x86-dynamic-debug-compile-required
-
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux_debug_aubsan_compile_variant_dependency
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: &linux_debug_aubsan_compile_variant_name linux-debug-aubsan-compile-required
-  - name: version_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  # - name: generate_buildid_to_debug_symbols_mapping
-  #   variant: linux-debug-aubsan-compile-required
-
-# If you add anything to san_options, make sure the appropriate changes are
-# also made to SConstruct.
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- aubsan_options: &aubsan_options >-
-    UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
-    LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
-    ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
-
-# If you add anything to san_options, make sure the appropriate changes are
-# also made to SConstruct.
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- ubsan_options: &ubsan_options UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
-
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &aubsan-lite-required-expansions
-  compile_variant: *linux_debug_aubsan_compile_variant_name
-  lang_environment: LANG=C
-  san_options: *aubsan_options
-  resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-  hang_analyzer_dump_core: false
-  max_sub_suites: 3
-  num_scons_link_jobs_available: 0.99
-  large_distro_name: rhel80-build
-  multiversion_platform: rhel80
-  multiversion_edition: enterprise
-  gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
-
-
-buildvariants:
-- <<: *generic_linux_compile_params
-  name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required  # TODO: replace with Sanitizer.
-  display_name: "! Linux x86 Shared Library DEBUG Compile"
-  stepback: false
-  expansions:
-    <<: *linux_debug_community_compile_expansions
-    compile_variant: *linux-x86-dynamic-debug-compile-required
-  tasks:
-  - name: compile_test_parallel_core_stream_TG
-  - name: compile_test_parallel_unittest_stream_TG
-  - name: compile_test_parallel_dbtest_stream_TG
-  - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
-
-- <<: *generic_linux_compile_params
-  name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
-  display_name: "! Linux x86 Shared Library {A,UB}SAN Enterprise Compile"
-  expansions:
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_debug_community_compile_expansions
     <<: *generic_linux_compile_expansions
-    separate_debug: off
-    san_options: *aubsan_options
     compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       --dbg=on
       --opt=on
-      --allocator=system
-      --sanitize=undefined,address
-      --ssl
       -j$(grep -c ^processor /proc/cpuinfo)
-      --link-model=dynamic
-      --use-diagnostic-latches=on
-    compile_variant: *linux-debug-aubsan-compile-required
-  tasks:
-  - name: compile_test_parallel_core_stream_TG
-  - name: compile_test_parallel_unittest_stream_TG
-  - name: compile_test_parallel_dbtest_stream_TG
-  - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
-
-- &linux-64-debug-required-template
-  <<: *linux_x86_dynamic_debug_compile_variant_dependency
-  name: &linux-64-debug-required linux-64-debug-required
-  display_name: "! Linux x86 Shared Library DEBUG"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  run_on:
-  - rhel80-medium
-  expansions:
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    test_flags: >-
-      --excludeWithAnyTags=requires_http_client
-      --enableEnterpriseTests=off
-    target_resmoke_time: 15
-    max_sub_suites: 5
-    large_distro_name: rhel80-medium
-    core_analyzer_distro_name: rhel80-xlarge
-    compile_variant: *linux_x86_dynamic_debug_compile_variant_name
-  tasks:
-  - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
-  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
-
-- &rhel80-debug-aubsan-lite-template
-  <<: *linux_debug_aubsan_compile_variant_dependency
-  name: &rhel80-debug-aubsan-lite rhel80-debug-aubsan-lite
-  display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  run_on:
-  - rhel80-build
-  expansions:
-    <<: *aubsan-lite-required-expansions
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
-  tasks:
-  - name: jsCore
-  - name: jsCore_txns
-
-- name: rhel80-asan
-  display_name: ~ ASAN RHEL 8.0
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-    - rhel80-build
-  stepback: true
-  expansions:
-    lang_environment: LANG=C
-    san_options: *aubsan_options
-    compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-      --opt=on
-      --allocator=system
-      --sanitize=address
-      --ssl
-      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --enable-http-client=on
       --link-model=dynamic
       --use-diagnostic-latches=on
       --modules=
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
-    hang_analyzer_dump_core: false
-    scons_cache_scope: shared
-    test_flags: >-
-      --excludeWithAnyTags=requires_fast_memory,corrupts_data
-      --enableEnterpriseTests=off
-    separate_debug: off
-    compile_variant: rhel80-asan
-  tasks:
-    - name: compile_test_serial_TG
-    - name: compile_test_parallel_unittest_stream_TG
-    - name: .aggfuzzer .common !.feature_flag_guarded
-    - name: .jstestfuzz !.initsync !.feature_flag_guarded
-    - name: generate_buildid_to_debug_symbols_mapping
+    num_scons_link_jobs_available: 0.99
 
-- name: rhel80-debug-asan
-  display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-build
-  stepback: false
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
+  - &linux_x86_dynamic_debug_compile_variant_dependency
+    depends_on:
+      - name: archive_dist_test_debug
+        variant: &linux_x86_dynamic_debug_compile_variant_name linux-x86-dynamic-debug-compile-required
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    # - name: generate_buildid_to_debug_symbols_mapping
+    #   variant: linux-x86-dynamic-debug-compile-required
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_debug_aubsan_compile_variant_dependency
+    depends_on:
+      - name: archive_dist_test_debug
+        variant: &linux_debug_aubsan_compile_variant_name linux-debug-aubsan-compile-required
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    # - name: generate_buildid_to_debug_symbols_mapping
+    #   variant: linux-debug-aubsan-compile-required
+
+  # If you add anything to san_options, make sure the appropriate changes are
+  # also made to SConstruct.
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - aubsan_options: &aubsan_options >-
+      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+
+  # If you add anything to san_options, make sure the appropriate changes are
+  # also made to SConstruct.
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - ubsan_options: &ubsan_options UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &aubsan-lite-required-expansions
+    compile_variant: *linux_debug_aubsan_compile_variant_name
     lang_environment: LANG=C
     san_options: *aubsan_options
-    compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-      --dbg=on
-      --opt=on
-      --allocator=system
-      --sanitize=address
-      --ssl
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --link-model=dynamic
-      --use-diagnostic-latches=on
-    test_flags: >-
-      --excludeWithAnyTags=requires_fast_memory,requires_increased_memlock_limits,corrupts_data
-      --benchmarkRepetitions=1
+    resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under {A,UB}SAN build.
+    hang_analyzer_dump_core: false
+    max_sub_suites: 3
+    num_scons_link_jobs_available: 0.99
+    large_distro_name: rhel80-build
     multiversion_platform: rhel80
     multiversion_edition: enterprise
-    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
-    hang_analyzer_dump_core: false
-    scons_cache_scope: shared
-    exec_timeout_secs: 14400 # 3 hour timeout
-    separate_debug: off
-    large_distro_name: rhel80-build
-    compile_variant: rhel80-debug-asan
-  tasks:
-  - name: compile_test_benchmark_serial_TG
-    distros:
-    - rhel80-large
-  - name: compile_test_parallel_unittest_stream_TG
-    distros:
-    - rhel80-large
-  - name: compile_integration_and_test_parallel_stream_TG
-    distros:
-    - rhel80-large
-  - name: .aggregation !.feature_flag_guarded
-  - name: .auth
-  - name: audit
-  - name: .benchmarks
-  - name: .causally_consistent !.wo_snapshot
-  - name: .change_streams
-  - name: .misc_js
-  - name: .concurrency !.no_txns !.kill_terminate !.feature_flag_guarded
-  - name: .encrypt
-  - name: external_auth
-  - name: external_auth_aws
-  - name: external_auth_oidc
-  - name: initial_sync_fuzzer_gen
-  - name: .jscore .common
-  - name: jsCore_min_batch_repeat_queries_ese_gsm
-  - name: jsCore_txns_large_txns_format
-  - name: json_schema
-  - name: .multi_shard .common
-  - name: multiversion_gen
-  - name: .multiversion_fuzzer
-  - name: .multiversion_passthrough
-  - name: .query_fuzzer !.feature_flag_guarded
-  - name: .random_multiversion_ds
-  - name: .read_write_concern
-  - name: replica_sets_large_txns_format_jscore_passthrough_gen
-  - name: .replica_sets !.multi_oplog
-  - name: .replica_sets .encrypt
-  - name: .resharding_fuzzer
-  - name: .retry
-  - name: .read_only
-  - name: .rollbackfuzzer
-  - name: .updatefuzzer
-  - name: sasl
-  - name: secondary_reads_passthrough_gen
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
-  - name: .sharding .common !.csrs !.feature_flag_guarded
-  - name: .watchdog
-  - name: .stitch
-  - name: .serverless
-  - name: unittest_shell_hang_analyzer_gen
-  - name: .updatefuzzer
-  - name: server_discovery_and_monitoring_json_test
-  - name: server_selection_json_test
-  - name: generate_buildid_to_debug_symbols_mapping
+    gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
 
-- name: rhel80-debug-ubsan
-  display_name: ~ UBSAN Enterprise RHEL 8.0 DEBUG
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - rhel80-build
-  stepback: false
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    lang_environment: LANG=C
-    san_options: *ubsan_options
-    # TODO SERVER-86610 set --allocator=tcmalloc-google
-    compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-      --dbg=on
-      --opt=on
-      --sanitize=undefined
-      --ssl
-      --allocator=tcmalloc-gperf
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --link-model=dynamic
-      --use-diagnostic-latches=on
-    test_flags: >-
-      --excludeWithAnyTags=requires_increased_memlock_limits,corrupts_data
-      --benchmarkRepetitions=1
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
-    scons_cache_scope: shared
-    separate_debug: off
-    large_distro_name: rhel80-build
-    compile_variant: rhel80-debug-ubsan
-  tasks:
-  - name: compile_test_benchmark_serial_TG
-    distros:
-    - rhel80-large
-  - name: compile_test_parallel_unittest_stream_TG
-    distros:
-    - rhel80-large
-  - name: compile_integration_and_test_parallel_stream_TG
-    distros:
-    - rhel80-large
-  - name: .aggregation !.feature_flag_guarded
-  - name: .auth
-  - name: audit
-  - name: .benchmarks
-  - name: .causally_consistent !.wo_snapshot
-  - name: .change_streams
-  - name: .misc_js
-  - name: .concurrency !.no_txns !.repl !.kill_terminate !.feature_flag_guarded
-  - name: disk_wiredtiger
-  - name: .encrypt
-  - name: initial_sync_fuzzer_gen
-  - name: .jscore .common
-  - name: jsCore_min_batch_repeat_queries_ese_gsm
-  - name: jsCore_txns_large_txns_format
-  - name: json_schema
-  - name: .multi_shard .common
-  - name: multiversion_gen
-  - name: .multiversion_fuzzer
-  - name: .multiversion_passthrough
-  - name: .random_multiversion_ds
-  - name: .read_write_concern
-  - name: replica_sets_large_txns_format_jscore_passthrough_gen
-  - name: .replica_sets !.multi_oplog
-  - name: .replica_sets .encrypt
-  - name: .resharding_fuzzer
-  - name: .retry
-  - name: .rollbackfuzzer
-  - name: .read_only
-  - name: sasl
-  - name: secondary_reads_passthrough_gen
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
-  - name: .sharding .common !.csrs !.feature_flag_guarded
-  - name: .stitch
-  - name: .updatefuzzer
-  - name: .serverless
-  - name: watchdog_wiredtiger
-  - name: server_discovery_and_monitoring_json_test
-  - name: server_selection_json_test
-  - name: generate_buildid_to_debug_symbols_mapping
+buildvariants:
+  - <<: *generic_linux_compile_params
+    name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required # TODO: replace with Sanitizer.
+    display_name: "! Linux x86 Shared Library DEBUG Compile"
+    stepback: false
+    expansions:
+      <<: *linux_debug_community_compile_expansions
+      compile_variant: *linux-x86-dynamic-debug-compile-required
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
 
-- &rhel80-debug-aubsan-lite_fuzzer-template
-  name: &rhel80-debug-aubsan-lite_fuzzer rhel80-debug-aubsan-lite_fuzzer
-  display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-build
-  stepback: false
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    lang_environment: LANG=C
-    toolchain_version: stable
-    # If you add anything to san_options, make sure the appropriate changes are
-    # also made to SConstruct.
-    san_options: *aubsan_options
-    compile_flags: >-
-      LINKFLAGS=-nostdlib++
-      LIBS=stdc++
-      --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
-      --dbg=on
-      --opt=on
-      --allocator=system
-      --sanitize=undefined,address,fuzzer
-      --ssl
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --use-diagnostic-latches=on
-    test_flags: --excludeWithAnyTags=corrupts_data
-    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    hang_analyzer_dump_core: false
-    scons_cache_scope: shared
-    separate_debug: off
-    compile_variant: *rhel80-debug-aubsan-lite_fuzzer
-  display_tasks:
-  - name: libfuzzertests!
-    execution_tasks:
-    - compile_and_archive_libfuzzertests
-    - fetch_and_run_libfuzzertests
-  tasks:
-  - name: compile_archive_and_run_libfuzzertests_TG
+  - <<: *generic_linux_compile_params
+    name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
+    display_name: "! Linux x86 Shared Library {A,UB}SAN Enterprise Compile"
+    expansions:
+      <<: *generic_linux_compile_expansions
+      separate_debug: off
+      san_options: *aubsan_options
+      compile_flags: >-
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        --dbg=on
+        --opt=on
+        --allocator=system
+        --sanitize=undefined,address
+        --ssl
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --link-model=dynamic
+        --use-diagnostic-latches=on
+      compile_variant: *linux-debug-aubsan-compile-required
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
+
+  - &linux-64-debug-required-template
+    <<: *linux_x86_dynamic_debug_compile_variant_dependency
+    name: &linux-64-debug-required linux-64-debug-required
+    display_name: "! Linux x86 Shared Library DEBUG"
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - rhel80-medium
+    expansions:
+      resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
+      test_flags: >-
+        --excludeWithAnyTags=requires_http_client
+        --enableEnterpriseTests=off
+      target_resmoke_time: 15
+      max_sub_suites: 5
+      large_distro_name: rhel80-medium
+      core_analyzer_distro_name: rhel80-xlarge
+      compile_variant: *linux_x86_dynamic_debug_compile_variant_name
+    tasks:
+      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
+      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
+
+  - &rhel80-debug-aubsan-lite-template
+    <<: *linux_debug_aubsan_compile_variant_dependency
+    name: &rhel80-debug-aubsan-lite rhel80-debug-aubsan-lite
+    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - rhel80-build
+    expansions:
+      <<: *aubsan-lite-required-expansions
+      test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    tasks:
+      - name: jsCore
+      - name: jsCore_txns
+
+  - name: rhel80-asan
+    display_name: ~ ASAN RHEL 8.0
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel80-build
+    stepback: true
+    expansions:
+      lang_environment: LANG=C
+      san_options: *aubsan_options
+      compile_flags: >-
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        --opt=on
+        --allocator=system
+        --sanitize=address
+        --ssl
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --link-model=dynamic
+        --use-diagnostic-latches=on
+        --modules=
+      multiversion_platform: rhel80
+      multiversion_edition: enterprise
+      resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under ASAN build.
+      hang_analyzer_dump_core: false
+      scons_cache_scope: shared
+      test_flags: >-
+        --excludeWithAnyTags=requires_fast_memory,corrupts_data
+        --enableEnterpriseTests=off
+      separate_debug: off
+      compile_variant: rhel80-asan
+    tasks:
+      - name: compile_test_serial_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: .aggfuzzer .common !.feature_flag_guarded
+      - name: .jstestfuzz !.initsync !.feature_flag_guarded
+      - name: generate_buildid_to_debug_symbols_mapping
+
+  - name: rhel80-debug-asan
+    display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel80-build
+    stepback: false
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      lang_environment: LANG=C
+      san_options: *aubsan_options
+      compile_flags: >-
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        --dbg=on
+        --opt=on
+        --allocator=system
+        --sanitize=address
+        --ssl
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --link-model=dynamic
+        --use-diagnostic-latches=on
+      test_flags: >-
+        --excludeWithAnyTags=requires_fast_memory,requires_increased_memlock_limits,corrupts_data
+        --benchmarkRepetitions=1
+      multiversion_platform: rhel80
+      multiversion_edition: enterprise
+      resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under ASAN build.
+      hang_analyzer_dump_core: false
+      scons_cache_scope: shared
+      exec_timeout_secs: 14400 # 3 hour timeout
+      separate_debug: off
+      large_distro_name: rhel80-build
+      compile_variant: rhel80-debug-asan
+    tasks:
+      - name: compile_test_benchmark_serial_TG
+        distros:
+          - rhel80-large
+      - name: compile_test_parallel_unittest_stream_TG
+        distros:
+          - rhel80-large
+      - name: compile_integration_and_test_parallel_stream_TG
+        distros:
+          - rhel80-large
+      - name: .aggregation !.feature_flag_guarded
+      - name: .auth
+      - name: audit
+      - name: .benchmarks
+      - name: .causally_consistent !.wo_snapshot
+      - name: .change_streams
+      - name: .misc_js
+      - name: .concurrency !.no_txns !.kill_terminate !.feature_flag_guarded
+      - name: .encrypt
+      - name: external_auth
+      - name: external_auth_aws
+      - name: external_auth_oidc
+      - name: initial_sync_fuzzer_gen
+      - name: .jscore .common
+      - name: jsCore_min_batch_repeat_queries_ese_gsm
+      - name: jsCore_txns_large_txns_format
+      - name: json_schema
+      - name: .multi_shard .common
+      - name: multiversion_gen
+      - name: .multiversion_fuzzer
+      - name: .multiversion_passthrough
+      - name: .query_fuzzer !.feature_flag_guarded
+      - name: .random_multiversion_ds
+      - name: .read_write_concern
+      - name: replica_sets_large_txns_format_jscore_passthrough_gen
+      - name: .replica_sets !.multi_oplog
+      - name: .replica_sets .encrypt
+      - name: .resharding_fuzzer
+      - name: .retry
+      - name: .read_only
+      - name: .rollbackfuzzer
+      - name: .updatefuzzer
+      - name: sasl
+      - name: secondary_reads_passthrough_gen
+      - name: session_jscore_passthrough
+      - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
+      - name: .sharding .common !.csrs !.feature_flag_guarded
+      - name: .watchdog
+      - name: .stitch
+      - name: .serverless
+      - name: unittest_shell_hang_analyzer_gen
+      - name: .updatefuzzer
+      - name: server_discovery_and_monitoring_json_test
+      - name: server_selection_json_test
+      - name: generate_buildid_to_debug_symbols_mapping
+
+  - name: rhel80-debug-ubsan
+    display_name: ~ UBSAN Enterprise RHEL 8.0 DEBUG
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - rhel80-build
+    stepback: false
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      lang_environment: LANG=C
+      san_options: *ubsan_options
+      # TODO SERVER-86610 set --allocator=tcmalloc-google
+      compile_flags: >-
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        --dbg=on
+        --opt=on
+        --sanitize=undefined
+        --ssl
+        --allocator=tcmalloc-gperf
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --link-model=dynamic
+        --use-diagnostic-latches=on
+      test_flags: >-
+        --excludeWithAnyTags=requires_increased_memlock_limits,corrupts_data
+        --benchmarkRepetitions=1
+      multiversion_platform: rhel80
+      multiversion_edition: enterprise
+      resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under UBSAN build.
+      scons_cache_scope: shared
+      separate_debug: off
+      large_distro_name: rhel80-build
+      compile_variant: rhel80-debug-ubsan
+    tasks:
+      - name: compile_test_benchmark_serial_TG
+        distros:
+          - rhel80-large
+      - name: compile_test_parallel_unittest_stream_TG
+        distros:
+          - rhel80-large
+      - name: compile_integration_and_test_parallel_stream_TG
+        distros:
+          - rhel80-large
+      - name: .aggregation !.feature_flag_guarded
+      - name: .auth
+      - name: audit
+      - name: .benchmarks
+      - name: .causally_consistent !.wo_snapshot
+      - name: .change_streams
+      - name: .misc_js
+      - name: .concurrency !.no_txns !.repl !.kill_terminate !.feature_flag_guarded
+      - name: disk_wiredtiger
+      - name: .encrypt
+      - name: initial_sync_fuzzer_gen
+      - name: .jscore .common
+      - name: jsCore_min_batch_repeat_queries_ese_gsm
+      - name: jsCore_txns_large_txns_format
+      - name: json_schema
+      - name: .multi_shard .common
+      - name: multiversion_gen
+      - name: .multiversion_fuzzer
+      - name: .multiversion_passthrough
+      - name: .random_multiversion_ds
+      - name: .read_write_concern
+      - name: replica_sets_large_txns_format_jscore_passthrough_gen
+      - name: .replica_sets !.multi_oplog
+      - name: .replica_sets .encrypt
+      - name: .resharding_fuzzer
+      - name: .retry
+      - name: .rollbackfuzzer
+      - name: .read_only
+      - name: sasl
+      - name: secondary_reads_passthrough_gen
+      - name: session_jscore_passthrough
+      - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
+      - name: .sharding .common !.csrs !.feature_flag_guarded
+      - name: .stitch
+      - name: .updatefuzzer
+      - name: .serverless
+      - name: watchdog_wiredtiger
+      - name: server_discovery_and_monitoring_json_test
+      - name: server_selection_json_test
+      - name: generate_buildid_to_debug_symbols_mapping
+
+  - &rhel80-debug-aubsan-lite_fuzzer-template
+    name: &rhel80-debug-aubsan-lite_fuzzer rhel80-debug-aubsan-lite_fuzzer
+    display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel80-build
+    stepback: false
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      lang_environment: LANG=C
+      toolchain_version: stable
+      # If you add anything to san_options, make sure the appropriate changes are
+      # also made to SConstruct.
+      san_options: *aubsan_options
+      compile_flags: >-
+        LINKFLAGS=-nostdlib++
+        LIBS=stdc++
+        --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
+        --dbg=on
+        --opt=on
+        --allocator=system
+        --sanitize=undefined,address,fuzzer
+        --ssl
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --use-diagnostic-latches=on
+      test_flags: --excludeWithAnyTags=corrupts_data
+      resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under {A,UB}SAN build.
+      hang_analyzer_dump_core: false
+      scons_cache_scope: shared
+      separate_debug: off
+      compile_variant: *rhel80-debug-aubsan-lite_fuzzer
+    display_tasks:
+      - name: libfuzzertests!
+        execution_tasks:
+          - compile_and_archive_libfuzzertests
+          - fetch_and_run_libfuzzertests
+    tasks:
+      - name: compile_archive_and_run_libfuzzertests_TG

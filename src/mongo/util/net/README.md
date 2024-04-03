@@ -2,20 +2,20 @@
 
 ## Table Of Contents
 
--   [High Level Overview](#high-level-overview)
-    -   [ASIO](#asio)
-    -   [FIPS Mode](#fips-mode)
-    -   [Authentication & Authorization](#authentication--authorization)
-    -   [The Transport Layer](#the-transport-layer)
-    -   [SNI](#sni)
--   [Protocol Theory](#protocol-theory)
-    -   [The TLS Handshake](#the-tls-handshake)
-    -   [Ciphers](#ciphers)
--   [X.509](#x509)
-    -   [Certificate Authorities](#certificate-authorities)
-    -   [Certificate Metadata](#certificate-metadata)
-    -   [Certificate Expiration and Revocation](#certificate-expiration-and-revocation)
-    -   [Member Certificates](#member-certificates)
+- [High Level Overview](#high-level-overview)
+  - [ASIO](#asio)
+  - [FIPS Mode](#fips-mode)
+  - [Authentication & Authorization](#authentication--authorization)
+  - [The Transport Layer](#the-transport-layer)
+  - [SNI](#sni)
+- [Protocol Theory](#protocol-theory)
+  - [The TLS Handshake](#the-tls-handshake)
+  - [Ciphers](#ciphers)
+- [X.509](#x509)
+  - [Certificate Authorities](#certificate-authorities)
+  - [Certificate Metadata](#certificate-metadata)
+  - [Certificate Expiration and Revocation](#certificate-expiration-and-revocation)
+  - [Member Certificates](#member-certificates)
 
 ## High Level Overview
 
@@ -28,7 +28,7 @@ There are, however, several different implementations commonly used in different
 implementations of TLS:
 
 1. [OpenSSL](https://www.openssl.org/docs/) on _Linux_
-    - OpenSSL is also available on MacOS and Windows, but we do not officially support those configurations anymore.
+   - OpenSSL is also available on MacOS and Windows, but we do not officially support those configurations anymore.
 2. [SChannel](https://docs.microsoft.com/en-us/windows-server/security/tls/tls-ssl-schannel-ssp-overview) which is made
    by Microsoft and is avialable exclusively on _Windows_.
 3. [Secure Transport](https://developer.apple.com/documentation/security/secure_transport) which is made by Apple and is
@@ -44,11 +44,11 @@ three different implementations of this interface for each implementation of TLS
 
 Every SSLManager has a set of key methods that describe the general idea of establishing a connection over TLS:
 
--   [`connect`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L193): initiates a TLS connection
--   [`accept`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L201): waits for a peer to
-    initiate a TLS connection
--   [`parseAndValidatePeerCertificate`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L268):
-    parses a certificate acquired from a peer during connection negotiation and validates it.
+- [`connect`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L193): initiates a TLS connection
+- [`accept`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L201): waits for a peer to
+  initiate a TLS connection
+- [`parseAndValidatePeerCertificate`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L268):
+  parses a certificate acquired from a peer during connection negotiation and validates it.
 
 The SSLManagers are wrappers around these TLS implementations such that they conform to our practices and standards, and
 so that all interaction with them can be done through a standard interface. Note that `connect` and `accept` are
@@ -217,12 +217,12 @@ A **Subject Alternative Name (SAN)** allows DNS names or other identifying infor
 This information is useful for contacting adminstrators of the domain, or finding other information about the domain. A
 SAN can include any combination of the following:
 
--   DNS names
--   Email addresses
--   IP addresses
--   URIs
--   Directory Names (DNs)
--   General (arbitrary) names
+- DNS names
+- Email addresses
+- IP addresses
+- URIs
+- Directory Names (DNs)
+- General (arbitrary) names
 
 A **Common Name (CN)** is allowed to _only_ contain hostnames.
 
@@ -246,8 +246,8 @@ allows certificate revocation to be checked online. OCSP is
 
 MongoDB uses two types of certificates:
 
--   **Client certificates**, which are used by clients to authenticate to a server.
--   **Member certificates**, which are used by members of a _sharder cluster_ or _replset_ to authenticate to each other.
+- **Client certificates**, which are used by clients to authenticate to a server.
+- **Member certificates**, which are used by members of a _sharder cluster_ or _replset_ to authenticate to each other.
 
 Member certificates are specified with
 [`net.tls.clusterFile`](https://docs.mongodb.com/manual/reference/configuration-options/#net.tls.clusterFile). This

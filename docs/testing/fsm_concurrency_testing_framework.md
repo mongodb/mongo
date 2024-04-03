@@ -42,19 +42,19 @@ some assertions, even when running a mixture of different workloads together.
 There are three assertion levels: `ALWAYS`, `OWN_COLL`, and `OWN_DB`. They can
 be thought of as follows:
 
--   `ALWAYS`: A statement that remains unequivocally true, regardless of what
-    another workload might be doing to the collection I was given (hint: think
-    defensively). Examples include "1 = 1" or inserting a document into a
-    collection (disregarding any unique indices).
+- `ALWAYS`: A statement that remains unequivocally true, regardless of what
+  another workload might be doing to the collection I was given (hint: think
+  defensively). Examples include "1 = 1" or inserting a document into a
+  collection (disregarding any unique indices).
 
--   `OWN_COLL`: A statement that is true only if I am the only workload operating
-    on the collection I was given. Examples include counting the number of
-    documents in a collection or updating a previously inserted document.
+- `OWN_COLL`: A statement that is true only if I am the only workload operating
+  on the collection I was given. Examples include counting the number of
+  documents in a collection or updating a previously inserted document.
 
--   `OWN_DB`: A statement that is true only if I am the only workload operating on
-    the database I was given. Examples include renaming a collection or verifying
-    that a collection is capped. The workload typically relies on the use of
-    another collection aside from the one given.
+- `OWN_DB`: A statement that is true only if I am the only workload operating on
+  the database I was given. Examples include renaming a collection or verifying
+  that a collection is capped. The workload typically relies on the use of
+  another collection aside from the one given.
 
 ## Creating your own workload
 
@@ -109,38 +109,38 @@ when things go wrong.
 
 ```javascript
 $config = (function () {
-    /* ... */
-    var states = (function () {
-        function getRand() {
-            return Random.randInt(10);
-        }
+  /* ... */
+  var states = (function () {
+    function getRand() {
+      return Random.randInt(10);
+    }
 
-        function init(db, collName) {
-            this.start = getRand() * this.tid;
-        }
+    function init(db, collName) {
+      this.start = getRand() * this.tid;
+    }
 
-        function scanGT(db, collName) {
-            db[collName].find({_id: {$gt: this.start}}).itcount();
-        }
+    function scanGT(db, collName) {
+      db[collName].find({_id: {$gt: this.start}}).itcount();
+    }
 
-        function scanLTE(db, collName) {
-            db[collName].find({_id: {$lte: this.start}}).itcount();
-        }
-
-        return {
-            init: init,
-            scanGT: scanGT,
-            scanLTE: scanLTE,
-        };
-    })();
-
-    /* ... */
+    function scanLTE(db, collName) {
+      db[collName].find({_id: {$lte: this.start}}).itcount();
+    }
 
     return {
-        /* ... */
-        states: states,
-        /* ... */
+      init: init,
+      scanGT: scanGT,
+      scanLTE: scanLTE,
     };
+  })();
+
+  /* ... */
+
+  return {
+    /* ... */
+    states: states,
+    /* ... */
+  };
 })();
 ```
 
@@ -157,18 +157,18 @@ scan states from the init state:
 
 ```javascript
 $config = (function () {
+  /* ... */
+  var transitions = {
+    init: {scanGT: 0.5, scanLTE: 0.5},
+    scanGT: {scanGT: 0.8, scanLTE: 0.2},
+    scanLTE: {scanGT: 0.2, scanLTE: 0.8},
+  };
+  /* ... */
+  return {
     /* ... */
-    var transitions = {
-        init: {scanGT: 0.5, scanLTE: 0.5},
-        scanGT: {scanGT: 0.8, scanLTE: 0.2},
-        scanLTE: {scanGT: 0.2, scanLTE: 0.8},
-    };
+    transitions: transitions,
     /* ... */
-    return {
-        /* ... */
-        transitions: transitions,
-        /* ... */
-    };
+  };
 })();
 ```
 
@@ -186,39 +186,39 @@ against the provided `db` you should use the provided
 
 ```javascript
 $config = (function () {
-    /* ... */
-    function setup(db, collName, cluster) {
-        // Workloads should NOT drop the collection db[collName], as doing so
-        // is handled by jstests/concurrency/fsm_libs/runner.js before 'setup' is called.
-        for (var i = 0; i < 1000; ++i) {
-            db[collName].insert({_id: i});
-        }
-        cluster.executeOnMongodNodes(function (db) {
-            db.adminCommand({
-                setParameter: 1,
-                internalQueryExecYieldIterations: 5,
-            });
-        });
-        cluster.executeOnMongosNodes(function (db) {
-            printjson(db.serverCmdLineOpts());
-        });
+  /* ... */
+  function setup(db, collName, cluster) {
+    // Workloads should NOT drop the collection db[collName], as doing so
+    // is handled by jstests/concurrency/fsm_libs/runner.js before 'setup' is called.
+    for (var i = 0; i < 1000; ++i) {
+      db[collName].insert({_id: i});
     }
+    cluster.executeOnMongodNodes(function (db) {
+      db.adminCommand({
+        setParameter: 1,
+        internalQueryExecYieldIterations: 5,
+      });
+    });
+    cluster.executeOnMongosNodes(function (db) {
+      printjson(db.serverCmdLineOpts());
+    });
+  }
 
-    function teardown(db, collName, cluster) {
-        cluster.executeOnMongodNodes(function (db) {
-            db.adminCommand({
-                setParameter: 1,
-                internalQueryExecYieldIterations: 128,
-            });
-        });
-    }
+  function teardown(db, collName, cluster) {
+    cluster.executeOnMongodNodes(function (db) {
+      db.adminCommand({
+        setParameter: 1,
+        internalQueryExecYieldIterations: 128,
+      });
+    });
+  }
+  /* ... */
+  return {
     /* ... */
-    return {
-        /* ... */
-        setup: setup,
-        teardown: teardown,
-        /* ... */
-    };
+    setup: setup,
+    teardown: teardown,
+    /* ... */
+  };
 })();
 ```
 
@@ -239,15 +239,15 @@ about properties being overridden by workloads other than the current one.
 
 ```javascript
 $config = (function () {
-    var data = {
-        start: 0,
-    };
+  var data = {
+    start: 0,
+  };
+  /* ... */
+  return {
     /* ... */
-    return {
-        /* ... */
-        data: data,
-        /* ... */
-    };
+    data: data,
+    /* ... */
+  };
 })();
 ```
 
@@ -361,10 +361,10 @@ is explained in the other components section below. Execution options for
 runWorkloads functions, the third argument, can contain the following options
 (some depend on the run mode):
 
--   `numSubsets` - Not available in serial mode, determines how many subsets of
-    workloads to execute in parallel mode
--   `subsetSize` - Not available in serial mode, determines how large each subset of
-    workloads executed is
+- `numSubsets` - Not available in serial mode, determines how many subsets of
+  workloads to execute in parallel mode
+- `subsetSize` - Not available in serial mode, determines how large each subset of
+  workloads executed is
 
 #### fsm_all.js
 
@@ -446,16 +446,16 @@ use of the shell's built-in cluster test helpers like `ShardingTest` and
 `ReplSetTest`. clusterOptions are passed to cluster.js for initialization.
 clusterOptions include:
 
--   `replication`: boolean, whether or not to use replication in the cluster
--   `sameCollection`: boolean, whether or not all workloads are passed the same
-    collection
--   `sameDB`: boolean, whether or not all workloads are passed the same DB
--   `setupFunctions`: object, containing at most two functions under the keys
-    'mongod' and 'mongos'. This allows you to run a function against all mongod or
-    mongos nodes in the cluster as part of the cluster initialization. Each
-    function takes a single argument, the db object against which configuration
-    can be run (will be set for each mongod/mongos)
--   `sharded`: boolean, whether or not to use sharding in the cluster
+- `replication`: boolean, whether or not to use replication in the cluster
+- `sameCollection`: boolean, whether or not all workloads are passed the same
+  collection
+- `sameDB`: boolean, whether or not all workloads are passed the same DB
+- `setupFunctions`: object, containing at most two functions under the keys
+  'mongod' and 'mongos'. This allows you to run a function against all mongod or
+  mongos nodes in the cluster as part of the cluster initialization. Each
+  function takes a single argument, the db object against which configuration
+  can be run (will be set for each mongod/mongos)
+- `sharded`: boolean, whether or not to use sharding in the cluster
 
 Note that sameCollection and sameDB can increase contention for a resource, but
 will also decrease the strength of the assertions by ruling out the use of OwnDB
@@ -463,12 +463,12 @@ and OwnColl assertions.
 
 ### Miscellaneous Execution Notes
 
--   A `CountDownLatch` (exposed through the v8-based mongo shell, as of MongoDB 3.0)
-    is used as a synchronization primitive by the ThreadManager to wait until all
-    spawned threads have finished being spawned before starting workload
-    execution.
--   If more than 20% of the threads fail while spawning, we abort the test. If
-    fewer than 20% of the threads fail while spawning we allow the non-failed
-    threads to continue with the test. The 20% threshold is somewhat arbitrary;
-    the goal is to abort if "mostly all" of the threads failed but to tolerate "a
-    few" threads failing.
+- A `CountDownLatch` (exposed through the v8-based mongo shell, as of MongoDB 3.0)
+  is used as a synchronization primitive by the ThreadManager to wait until all
+  spawned threads have finished being spawned before starting workload
+  execution.
+- If more than 20% of the threads fail while spawning, we abort the test. If
+  fewer than 20% of the threads fail while spawning we allow the non-failed
+  threads to continue with the test. The 20% threshold is somewhat arbitrary;
+  the goal is to abort if "mostly all" of the threads failed but to tolerate "a
+  few" threads failing.

@@ -5,101 +5,101 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 buildvariants:
-- name: windows
-  display_name: Windows
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - windows-vsCurrent-small
-  expansions:
-    additional_package_targets: msi
-    exe: ".exe"
-    push_path: windows
-    push_bucket: downloads.mongodb.org
-    push_name: windows
-    push_arch: x86_64
-    multiversion_platform: windows
-    multiversion_edition: base
-    content_type: application/zip
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=windows
-      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-      --win-version-min=win10
-      --modules=
-    num_scons_link_jobs_available: 0.25
-    python: '/cygdrive/c/python/python310/python.exe'
-    ext: zip
-    scons_cache_scope: shared
-    large_distro_name: windows-vsCurrent-large
-    test_flags: >-
-      --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    compile_variant: windows
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - windows-vsCurrent-xlarge
-  - name: .development_critical !.incompatible_community !.incompatible_windows
-  - name: .release_critical !.incompatible_community !.incompatible_windows !publish_packages
+  - name: windows
+    display_name: Windows
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - windows-vsCurrent-small
+    expansions:
+      additional_package_targets: msi
+      exe: ".exe"
+      push_path: windows
+      push_bucket: downloads.mongodb.org
+      push_name: windows
+      push_arch: x86_64
+      multiversion_platform: windows
+      multiversion_edition: base
+      content_type: application/zip
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=windows
+        -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+        --win-version-min=win10
+        --modules=
+      num_scons_link_jobs_available: 0.25
+      python: "/cygdrive/c/python/python310/python.exe"
+      ext: zip
+      scons_cache_scope: shared
+      large_distro_name: windows-vsCurrent-large
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      compile_variant: windows
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - windows-vsCurrent-xlarge
+      - name: .development_critical !.incompatible_community !.incompatible_windows
+      - name: .release_critical !.incompatible_community !.incompatible_windows !publish_packages
 
-- &enterprise-windows-template
-  name: &enterprise-windows enterprise-windows
-  display_name: "Enterprise Windows"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - windows-vsCurrent-small
-  expansions:
-    exe: ".exe"
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-      msi
-    content_type: application/zip
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=windows
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
-      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-      --win-version-min=win10
-    num_scons_link_jobs_available: 0.2
-    python: '/cygdrive/c/python/python310/python.exe'
-    ext: zip
-    scons_cache_scope: shared
-    multiversion_platform: windows
-    multiversion_edition: enterprise
-    jstestfuzz_num_generated_files: 35
-    target_resmoke_time: 20
-    max_sub_suites: 3
-    large_distro_name: windows-vsCurrent-large
-    push_path: windows
-    push_bucket: downloads.10gen.com
-    push_name: windows
-    push_arch: x86_64-enterprise
-    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
-    exec_timeout_secs: 14400 # 3 hour timeout
-    external_auth_jobs_max: 1
-    compile_variant: enterprise-windows
-  tasks:
-  - name: compile_test_and_package_serial_TG
-    distros:
-    - windows-vsCurrent-xxlarge
-  - name: compile_test_parallel_unittest_stream_TG
-    distros:
-    - windows-vsCurrent-xxlarge
-  - name: .development_critical !.incompatible_windows
-  - name: .release_critical !.incompatible_windows !publish_packages
+  - &enterprise-windows-template
+    name: &enterprise-windows enterprise-windows
+    display_name: "Enterprise Windows"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - windows-vsCurrent-small
+    expansions:
+      exe: ".exe"
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+        msi
+      content_type: application/zip
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=windows
+        CPPPATH="c:/sasl/include"
+        LIBPATH="c:/sasl/lib"
+        -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+        --win-version-min=win10
+      num_scons_link_jobs_available: 0.2
+      python: "/cygdrive/c/python/python310/python.exe"
+      ext: zip
+      scons_cache_scope: shared
+      multiversion_platform: windows
+      multiversion_edition: enterprise
+      jstestfuzz_num_generated_files: 35
+      target_resmoke_time: 20
+      max_sub_suites: 3
+      large_distro_name: windows-vsCurrent-large
+      push_path: windows
+      push_bucket: downloads.10gen.com
+      push_name: windows
+      push_arch: x86_64-enterprise
+      test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
+      exec_timeout_secs: 14400 # 3 hour timeout
+      external_auth_jobs_max: 1
+      compile_variant: enterprise-windows
+    tasks:
+      - name: compile_test_and_package_serial_TG
+        distros:
+          - windows-vsCurrent-xxlarge
+      - name: compile_test_parallel_unittest_stream_TG
+        distros:
+          - windows-vsCurrent-xxlarge
+      - name: .development_critical !.incompatible_windows
+      - name: .release_critical !.incompatible_windows !publish_packages
 
-# This variant is owned by the security team and is special
-# because these tests require specific distro to run on
-- <<: *enterprise-windows-template
-  name: enterprise-windows-security
-  display_name: Enterprise Windows Security
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: *enterprise-windows
-  tasks:
-  - name: external_auth_windows
-    distros:
-    - windows-2016-dc
+  # This variant is owned by the security team and is special
+  # because these tests require specific distro to run on
+  - <<: *enterprise-windows-template
+    name: enterprise-windows-security
+    display_name: Enterprise Windows Security
+    depends_on:
+      - name: archive_dist_test_debug
+        variant: *enterprise-windows
+    tasks:
+      - name: external_auth_windows
+        distros:
+          - windows-2016-dc

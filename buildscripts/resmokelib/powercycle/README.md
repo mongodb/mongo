@@ -39,12 +39,12 @@ buildscripts/resmokelib/powercycle/__init__.py
 
 ## Poweryclce main steps
 
--   [Set up EC2 instance](#set-up-ec2-instance)
--   [Run powercycle test](#run-powercycle-test)
-    -   [Resmoke powercycle run arguments](#resmoke-powercycle-run-arguments)
-    -   [Powercycle test implementation](#powercycle-test-implementation)
--   [Save diagnostics](#save-diagnostics)
--   [Remote hang analyzer (optional)](#remote-hang-analyzer-optional)
+- [Set up EC2 instance](#set-up-ec2-instance)
+- [Run powercycle test](#run-powercycle-test)
+  - [Resmoke powercycle run arguments](#resmoke-powercycle-run-arguments)
+  - [Powercycle test implementation](#powercycle-test-implementation)
+- [Save diagnostics](#save-diagnostics)
+- [Remote hang analyzer (optional)](#remote-hang-analyzer-optional)
 
 ### Set up EC2 instance
 
@@ -65,20 +65,20 @@ created by `expansions.write` command in Evergreen.
 
 It runs several operations via ssh:
 
--   create directory on the remote host
--   copy `buildscripts` and `mongoDB executables` from localhost to the remote host
--   set up python venv on the remote host
--   set up curator to collect system & process stats on the remote host
--   install [NotMyFault](https://docs.microsoft.com/en-us/sysinternals/downloads/notmyfault)
-    to crash Windows (only on Windows)
+- create directory on the remote host
+- copy `buildscripts` and `mongoDB executables` from localhost to the remote host
+- set up python venv on the remote host
+- set up curator to collect system & process stats on the remote host
+- install [NotMyFault](https://docs.microsoft.com/en-us/sysinternals/downloads/notmyfault)
+  to crash Windows (only on Windows)
 
 Remote operation via ssh implementation is located in
 `buildscripts/resmokelib/powercycle/lib/remote_operations.py`.
 The following operations are supported:
 
--   `copy_to` - copy files from the localhost to the remote host
--   `copy_from` - copy files from the remote host to the localhost
--   `shell` - runs shell command on the remote host
+- `copy_to` - copy files from the localhost to the remote host
+- `copy_from` - copy files from the remote host to the localhost
+- `shell` - runs shell command on the remote host
 
 ### Run powercycle test
 
@@ -116,42 +116,42 @@ The value of `--remoteOperation` argument is used to distinguish if we are runni
 on the localhost or on the remote host.
 `remote_handler()` function performs the following remote operations:
 
--   `noop` - do nothing
--   `crash_server` - internally crash the server
--   `kill_mongod` - kill mongod process
--   `install_mongod` - install mongod
--   `start_mongod` - start mongod process
--   `stop_mongod` - stop mongod process
--   `shutdown_mongod` - run shutdown command using mongo client
--   `rsync_data` - backups mongod data
--   `seed_docs` - seed a collection with random document values
--   `set_fcv` - run set FCV command using mongo client
--   `check_disk` - run `chkdsk` command on Windows
+- `noop` - do nothing
+- `crash_server` - internally crash the server
+- `kill_mongod` - kill mongod process
+- `install_mongod` - install mongod
+- `start_mongod` - start mongod process
+- `stop_mongod` - stop mongod process
+- `shutdown_mongod` - run shutdown command using mongo client
+- `rsync_data` - backups mongod data
+- `seed_docs` - seed a collection with random document values
+- `set_fcv` - run set FCV command using mongo client
+- `check_disk` - run `chkdsk` command on Windows
 
 When running on localhost the powercycle test loops do the following steps:
 
--   Rsync the database post-crash (starting from the 2nd loop), pre-recovery on the remote host
-    -   makes a backup before recovery
--   Start mongod on the secret port on the remote host and wait for it to recover
-    -   also sets FCV and seeds documents on the 1st loop
--   Validate canary from the localhost (starting from the 2nd loop)
-    -   uses mongo client to connect to the remote mongod
--   Validate collections from the localhost
-    -   calls resmoke to perform the validation on the remote mongod
--   Shutdown mongod on the remote host
--   Rsync the database post-recovery on the remote host
-    -   makes a backup after recovery
--   Start mongod on the standard port on the remote host
--   Start CRUD and FSM clients on the localhost
-    -   calls resmoke to run CRUD and FSM clients
--   Generate canary document from the localhost
-    -   uses mongo client to connect to the remote mongod
--   Crash the remote server or kill mongod on the remote host
-    -   most of the powercycle tasks do crashes
--   Run check disk on the remote host (on Windows)
--   Exit loop if one of these occurs:
-    -   loop number exceeded
-    -   any step fails
+- Rsync the database post-crash (starting from the 2nd loop), pre-recovery on the remote host
+  - makes a backup before recovery
+- Start mongod on the secret port on the remote host and wait for it to recover
+  - also sets FCV and seeds documents on the 1st loop
+- Validate canary from the localhost (starting from the 2nd loop)
+  - uses mongo client to connect to the remote mongod
+- Validate collections from the localhost
+  - calls resmoke to perform the validation on the remote mongod
+- Shutdown mongod on the remote host
+- Rsync the database post-recovery on the remote host
+  - makes a backup after recovery
+- Start mongod on the standard port on the remote host
+- Start CRUD and FSM clients on the localhost
+  - calls resmoke to run CRUD and FSM clients
+- Generate canary document from the localhost
+  - uses mongo client to connect to the remote mongod
+- Crash the remote server or kill mongod on the remote host
+  - most of the powercycle tasks do crashes
+- Run check disk on the remote host (on Windows)
+- Exit loop if one of these occurs:
+  - loop number exceeded
+  - any step fails
 
 `exit_handler()` function writes a report and does cleanups any time after the test run exits.
 
@@ -171,20 +171,20 @@ created by `expansions.write` command in Evergreen.
 
 It runs several operations via ssh:
 
--   `gatherRemoteEventLogs`
-    -   runs on Windows
--   `tarEC2Artifacts`
-    -   on success archives `mongod.log`
-    -   on failure additionally archives data files and all before-recovery and after-recovery backups
-    -   on failure on Windows additionally archives event logs
--   `copyEC2Artifacts`
-    -   from the remote host to the localhost
--   `copyEC2MonitorFiles`
-    -   from the remote host to the localhost
--   `gatherRemoteMongoCoredumps`
-    -   copies all mongo core dumps to a single directory
--   `copyRemoteMongoCoredumps`
-    -   from the remote host to the localhost
+- `gatherRemoteEventLogs`
+  - runs on Windows
+- `tarEC2Artifacts`
+  - on success archives `mongod.log`
+  - on failure additionally archives data files and all before-recovery and after-recovery backups
+  - on failure on Windows additionally archives event logs
+- `copyEC2Artifacts`
+  - from the remote host to the localhost
+- `copyEC2MonitorFiles`
+  - from the remote host to the localhost
+- `gatherRemoteMongoCoredumps`
+  - copies all mongo core dumps to a single directory
+- `copyRemoteMongoCoredumps`
+  - from the remote host to the localhost
 
 ### Remote hang analyzer (optional)
 

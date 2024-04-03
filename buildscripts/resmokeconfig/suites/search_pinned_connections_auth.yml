@@ -1,16 +1,16 @@
 config_variables:
-- &keyFile jstests/libs/authTestsKey
-- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &keyFile jstests/libs/authTestsKey
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
 
 test_kind: js_test
 
 selector:
   roots:
-  - jstests/with_mongot/search_mocked/*.js
-  - jstests/with_mongot/mongotmock/*.js
+    - jstests/with_mongot/search_mocked/*.js
+    - jstests/with_mongot/mongotmock/*.js
   exclude_files:
-  # Skip any tests that run with auth explicitly.
-  - jstests/with_mongot/search_mocked/auth_list_search_indexes_agg.js
+    # Skip any tests that run with auth explicitly.
+    - jstests/with_mongot/search_mocked/auth_list_search_indexes_agg.js
 
 executor:
   config:
@@ -24,4 +24,4 @@ executor:
           roleGraphInvalidationIsFatal: true
           setParameters:
             pinTaskExecCursorConns: true
-      nodb: ''
+      nodb: ""

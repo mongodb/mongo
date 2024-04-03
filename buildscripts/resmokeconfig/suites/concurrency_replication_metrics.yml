@@ -2,8 +2,8 @@ test_kind: fsm_workload_test
 
 selector:
   roots:
-  - jstests/concurrency/fsm_workloads/**/*.js
-  - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
     ##
     # Disabled due to MongoDB restrictions and/or workload restrictions
@@ -21,12 +21,12 @@ selector:
     - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
   exclude_with_any_tags:
-  - requires_sharding
+    - requires_sharding
 
 executor:
   archive:
     hooks:
-    - AggregateResourceConsumptionMetricsInBackground
+      - AggregateResourceConsumptionMetricsInBackground
     tests: true
   config: {}
   hooks:

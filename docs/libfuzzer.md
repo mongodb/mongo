@@ -39,11 +39,11 @@ lot of freedom in exactly what you choose to do. Just make sure your
 function crashes or produces an invariant when something interesting
 happens! As just a few ideas:
 
--   You might choose to call multiple implementations of a single
-    operation, and validate that they produce the same output when
-    presented the same input.
--   You could tease out individual bytes from `Data` and provide them as
-    different arguments to the function under test.
+- You might choose to call multiple implementations of a single
+  operation, and validate that they produce the same output when
+  presented the same input.
+- You could tease out individual bytes from `Data` and provide them as
+  different arguments to the function under test.
 
 Finally, your cpp file will need a SCons target. There is a method which
 defines fuzzer targets, much like how we define unittests. For example:
@@ -83,5 +83,5 @@ acquire and re-use a corpus from an earlier commit, if it can.
 
 # References
 
--   [LibFuzzer's official
-    documentation](https://llvm.org/docs/LibFuzzer.html)
+- [LibFuzzer's official
+  documentation](https://llvm.org/docs/LibFuzzer.html)

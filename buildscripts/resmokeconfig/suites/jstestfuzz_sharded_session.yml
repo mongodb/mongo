@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstestfuzz/out/*.js
+    - jstestfuzz/out/*.js
 
 executor:
   archive:
@@ -16,35 +16,35 @@ executor:
       crashOnInvalidBSONError: ""
       objcheck: ""
   hooks:
-  - class: FuzzerRestoreSettings
-  - class: CheckReplDBHash
-    shell_options:
-      global_vars:
-        TestData:
-          skipValidationOnInvalidViewDefinitions: true
-  - class: CheckMetadataConsistencyInBackground
-  - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData:
-          skipValidationOnInvalidViewDefinitions: true
-  - class: CheckRoutingTableConsistency
-    shell_options:
-      global_vars:
-        TestData:
-          mayForgeReshardingTempCollections: true
+    - class: FuzzerRestoreSettings
+    - class: CheckReplDBHash
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+    - class: CheckRoutingTableConsistency
+      shell_options:
+        global_vars:
+          TestData:
+            mayForgeReshardingTempCollections: true
   fixture:
     class: ShardedClusterFixture
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-      verbose: ''
+      verbose: ""
     mongod_options:
       set_parameters:
         disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
-      verbose: ''
+      verbose: ""
     num_rs_nodes_per_shard: 1
     num_shards: 2

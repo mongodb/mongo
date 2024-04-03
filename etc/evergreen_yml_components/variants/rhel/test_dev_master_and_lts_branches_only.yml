@@ -5,75 +5,75 @@
 # and should NOT run on a new rapid release (v7.1, v7.2 etc.) branch projects
 
 buildvariants:
-- name: enterprise-rhel-80-64-bit-inmem
-  display_name: Enterprise RHEL 8.0 (inMemory)
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-small
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    test_flags: >-
-      --storageEngine=inMemory
-      --excludeWithAnyTags=requires_persistence,requires_journaling
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=on
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    scons_cache_scope: shared
-    large_distro_name: rhel80-large
-    core_analyzer_distro_name: rhel80-xlarge
-    compile_variant: enterprise-rhel-80-64-bit-inmem
-  tasks:
-  - name: compile_test_serial_no_unittests_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_integration_and_test_no_audit_parallel_stream_TG
-    distros:
-    - rhel80-large
-  - name: .aggfuzzer .common !.feature_flag_guarded
-  - name: .aggregation !.unwind !.encrypt !.feature_flag_guarded
-  - name: audit
-  - name: .auth !.multiversion
-  - name: .causally_consistent !.wo_snapshot !.durable_history
-  - name: .change_streams
-  - name: .change_stream_fuzzer
-  - name: .misc_js
-  - name: .concurrency !.no_txns !.kill_terminate !.requires_wt !.feature_flag_guarded
-    distros:
-    - rhel80-medium  # Some workloads require a lot of memory, use a bigger machine for this suite.
-  - name: initial_sync_fuzzer_gen
-  - name: .jscore .common !.decimal
-  - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz !.initsync !.feature_flag_guarded
-  - name: .multi_shard .common
-  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: .read_write_concern !.durable_history
-  - name: replica_sets_gen
-  - name: .replica_sets .common
-  - name: .replica_sets .multi_oplog !.encrypt
-  - name: replica_sets_max_mirroring_large_txns_format_gen
-  - name: replica_sets_multi_stmt_txn_jscore_passthrough_gen
-  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: .resharding_fuzzer
-  - name: .retry
-  - name: rollback_fuzzer_gen
-  - name: sasl
-  - name: secondary_reads_passthrough_gen
-  - name: session_jscore_passthrough
-  - name: sharded_multi_stmt_txn_jscore_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
-  - name: .sharding .common !.multiversion !.csrs !.encrypt !.feature_flag_guarded
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
-  - name: .ssl
-  - name: .updatefuzzer
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: enterprise-rhel-80-64-bit-inmem
+    display_name: Enterprise RHEL 8.0 (inMemory)
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel80-small
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      test_flags: >-
+        --storageEngine=inMemory
+        --excludeWithAnyTags=requires_persistence,requires_journaling
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=rhel80
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=on
+      multiversion_platform: rhel80
+      multiversion_edition: enterprise
+      scons_cache_scope: shared
+      large_distro_name: rhel80-large
+      core_analyzer_distro_name: rhel80-xlarge
+      compile_variant: enterprise-rhel-80-64-bit-inmem
+    tasks:
+      - name: compile_test_serial_no_unittests_TG
+        distros:
+          - rhel80-xlarge
+      - name: compile_integration_and_test_no_audit_parallel_stream_TG
+        distros:
+          - rhel80-large
+      - name: .aggfuzzer .common !.feature_flag_guarded
+      - name: .aggregation !.unwind !.encrypt !.feature_flag_guarded
+      - name: audit
+      - name: .auth !.multiversion
+      - name: .causally_consistent !.wo_snapshot !.durable_history
+      - name: .change_streams
+      - name: .change_stream_fuzzer
+      - name: .misc_js
+      - name: .concurrency !.no_txns !.kill_terminate !.requires_wt !.feature_flag_guarded
+        distros:
+          - rhel80-medium # Some workloads require a lot of memory, use a bigger machine for this suite.
+      - name: initial_sync_fuzzer_gen
+      - name: .jscore .common !.decimal
+      - name: jsCore_txns_large_txns_format
+      - name: .jstestfuzz !.initsync !.feature_flag_guarded
+      - name: .multi_shard .common
+      - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+      - name: .read_write_concern !.durable_history
+      - name: replica_sets_gen
+      - name: .replica_sets .common
+      - name: .replica_sets .multi_oplog !.encrypt
+      - name: replica_sets_max_mirroring_large_txns_format_gen
+      - name: replica_sets_multi_stmt_txn_jscore_passthrough_gen
+      - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
+        distros:
+          - rhel80-medium
+      - name: .resharding_fuzzer
+      - name: .retry
+      - name: rollback_fuzzer_gen
+      - name: sasl
+      - name: secondary_reads_passthrough_gen
+      - name: session_jscore_passthrough
+      - name: sharded_multi_stmt_txn_jscore_passthrough_gen
+        distros:
+          - rhel80-medium
+      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
+      - name: .sharding .common !.multiversion !.csrs !.encrypt !.feature_flag_guarded
+      - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+      - name: .ssl
+      - name: .updatefuzzer
+      - name: generate_buildid_to_debug_symbols_mapping

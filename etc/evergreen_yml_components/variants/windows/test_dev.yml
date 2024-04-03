@@ -5,114 +5,113 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 variables:
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/windows/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &windows_compile_variant_dependency
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: &windows_compile_variant_name windows-compile-required
-  - name: version_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  # - name: generate_buildid_to_debug_symbols_mapping
-  #   variant: windows-compile-required
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/windows/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &windows_compile_variant_dependency
+    depends_on:
+      - name: archive_dist_test_debug
+        variant: &windows_compile_variant_name windows-compile-required
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    # - name: generate_buildid_to_debug_symbols_mapping
+    #   variant: windows-compile-required
 
-# THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/windows/test_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &windows_expansions
-  compile_variant: *windows_compile_variant_name
-  burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
-  exe: ".exe"
-  content_type: application/zip
-  python: '/cygdrive/c/python/python310/python.exe'
-  ext: zip
-  multiversion_platform: windows
-  multiversion_edition: enterprise
-  jstestfuzz_num_generated_files: 35
-  target_resmoke_time: 20
-  max_sub_suites: 5
-  large_distro_name: windows-vsCurrent-large
-  push_path: windows
-  push_bucket: downloads.10gen.com
-  push_name: windows
-  push_arch: x86_64-enterprise
-  test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
-  external_auth_jobs_max: 1
-
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/windows/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &windows_expansions
+    compile_variant: *windows_compile_variant_name
+    burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
+    exe: ".exe"
+    content_type: application/zip
+    python: "/cygdrive/c/python/python310/python.exe"
+    ext: zip
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    jstestfuzz_num_generated_files: 35
+    target_resmoke_time: 20
+    max_sub_suites: 5
+    large_distro_name: windows-vsCurrent-large
+    push_path: windows
+    push_bucket: downloads.10gen.com
+    push_name: windows
+    push_arch: x86_64-enterprise
+    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+    external_auth_jobs_max: 1
 
 buildvariants:
-- name: &windows-compile-required windows-compile-required
-  display_name: "! Windows Enterprise Compile"
-  tags: ["bazel_check"]
-  run_on:
-  - windows-vsCurrent-xxlarge
-  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  expansions:
-    exe: ".exe"
-    ext: zip
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-      msi
-    content_type: application/zip
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=windows
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
-      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-      --win-version-min=win10
-      --use-diagnostic-latches=on
-    num_scons_link_jobs_available: 0.3
-    python: '/cygdrive/c/python/python310/python.exe'
-    scons_cache_scope: shared
-    compile_variant: *windows-compile-required
-  tasks:
-  - name: compile_ninja_quick_TG
-  - name: compile_test_parallel_core_stream_TG
-  - name: compile_test_parallel_unittest_stream_TG
-  - name: compile_test_parallel_dbtest_stream_TG
-  - name: compile_build_tools_next_TG
-  - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.stitch
-  - name: .default .requires_compile_variant !.incompatible_development_variant
+  - name: &windows-compile-required windows-compile-required
+    display_name: "! Windows Enterprise Compile"
+    tags: ["bazel_check"]
+    run_on:
+      - windows-vsCurrent-xxlarge
+    activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
+    expansions:
+      exe: ".exe"
+      ext: zip
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+        msi
+      content_type: application/zip
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=windows
+        CPPPATH="c:/sasl/include"
+        LIBPATH="c:/sasl/lib"
+        -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+        --win-version-min=win10
+        --use-diagnostic-latches=on
+      num_scons_link_jobs_available: 0.3
+      python: "/cygdrive/c/python/python310/python.exe"
+      scons_cache_scope: shared
+      compile_variant: *windows-compile-required
+    tasks:
+      - name: compile_ninja_quick_TG
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_build_tools_next_TG
+      - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.stitch
+      - name: .default .requires_compile_variant !.incompatible_development_variant
 
-- &enterprise-windows-template
-  <<: *windows_compile_variant_dependency
-  name: &enterprise-windows-suggested enterprise-windows-suggested
-  display_name: "* Enterprise Windows"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  run_on:
-  - windows-vsCurrent-small
-  expansions:
-    <<: *windows_expansions
-  tasks:
-  - name: audit
-  - name: auth_audit_gen
-  - name: causally_consistent_jscore_txns_passthrough
-    distros:
-    - windows-vsCurrent-large
-  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
-  - name: external_auth
-  - name: external_auth_aws
-  - name: external_auth_windows
-    distros:
-    - windows-2016-dc
-  - name: .jscore .common !.sharding
-  - name: jsCore_auth
-  - name: jsCore_ese
-  - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: noPassthroughWithMongod_gen
-  - name: .replica_sets .common
-  - name: .replica_sets .multi_oplog !.gcm
-  - name: sasl
-  - name: .sharding .txns
-  - name: sharding_auth_audit_gen
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
-  - name: .timeseries_crud
+  - &enterprise-windows-template
+    <<: *windows_compile_variant_dependency
+    name: &enterprise-windows-suggested enterprise-windows-suggested
+    display_name: "* Enterprise Windows"
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - windows-vsCurrent-small
+    expansions:
+      <<: *windows_expansions
+    tasks:
+      - name: audit
+      - name: auth_audit_gen
+      - name: causally_consistent_jscore_txns_passthrough
+        distros:
+          - windows-vsCurrent-large
+      - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
+      - name: external_auth
+      - name: external_auth_aws
+      - name: external_auth_windows
+        distros:
+          - windows-2016-dc
+      - name: .jscore .common !.sharding
+      - name: jsCore_auth
+      - name: jsCore_ese
+      - name: jsCore_txns_large_txns_format
+      - name: .jstestfuzz .common !.feature_flag_guarded
+      - name: noPassthroughWithMongod_gen
+      - name: .replica_sets .common
+      - name: .replica_sets .multi_oplog !.gcm
+      - name: sasl
+      - name: .sharding .txns
+      - name: sharding_auth_audit_gen
+      - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
+      - name: .timeseries_crud

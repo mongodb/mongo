@@ -2,9 +2,9 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_gcp/*.js
+    - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_gcp/*.js
 
 executor:
   config:
     shell_options:
-      nodb: ''
+      nodb: ""

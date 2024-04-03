@@ -1,2 +1,2 @@
 net:
-    bindIp: localhost
+  bindIp: localhost

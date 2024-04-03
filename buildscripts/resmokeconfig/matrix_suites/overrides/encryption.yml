@@ -6,8 +6,8 @@
         shell_options:
           global_vars:
             TestData:
-              enableEncryption: ''
-              encryptionKeyFile: 'src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2'
+              enableEncryption: ""
+              encryptionKeyFile: "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
 
 - name: testdata_gcm
   value:
@@ -16,30 +16,30 @@
         shell_options:
           global_vars:
             TestData:
-              encryptionCipherMode: 'AES256-GCM'
+              encryptionCipherMode: "AES256-GCM"
 
 - name: mongodfixture_ese
   value:
     executor:
       fixture:
         mongod_options:
-          enableEncryption: ''
-          encryptionKeyFile: 'src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2'
+          enableEncryption: ""
+          encryptionKeyFile: "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
 
 - name: mongodfixture_gcm
   value:
     executor:
       fixture:
         mongod_options:
-          encryptionCipherMode: 'AES256-GCM'
+          encryptionCipherMode: "AES256-GCM"
 
 - name: excluded_files
   value:
     exclude_with_any_tags:
-    - does_not_support_encrypted_storage_engine
+      - does_not_support_encrypted_storage_engine
 
 # Shard merge protocol won't work with encrypted storage engines.
 - name: serverless_excluded_files
   value:
     exclude_with_any_tags:
-    - serverless
+      - serverless

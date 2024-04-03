@@ -1,4 +1,3 @@
-load("@aspect_rules_lint//format:defs.bzl", "multi_formatter_binary")
 load("@npm//:prettier/package_json.bzl", prettier = "bin")
 
 # TODO: SERVER-82329 eslint binary should almost exactly mirror prettier binary
@@ -12,8 +11,14 @@ prettier.prettier_binary(
     env = {"BAZEL_BINDIR": "."},
 )
 
-multi_formatter_binary(
+py_binary(
     name = "format",
-    markdown = ":prettier",
+    srcs = ["format.py"],
+    args = [
+        "--prettier",
+        "$(location :prettier)",
+    ],
+    data = [":prettier"],
+    main = "format.py",
     visibility = ["//visibility:public"],
 )

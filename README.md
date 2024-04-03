@@ -4,15 +4,15 @@ Welcome to MongoDB!
 
 ## Components
 
--   `mongod` - The database server.
--   `mongos` - Sharding router.
--   `mongo` - The database shell (uses interactive javascript).
+- `mongod` - The database server.
+- `mongos` - Sharding router.
+- `mongo` - The database shell (uses interactive javascript).
 
 ## Download MongoDB
 
--   https://www.mongodb.com/try/download/community
--   Using homebrew `brew tap mongodb/brew`
--   Using docker image `docker pull mongo`
+- https://www.mongodb.com/try/download/community
+- Using homebrew `brew tap mongodb/brew`
+- Using docker image `docker pull mongo`
 
 ## Building
 
@@ -65,9 +65,9 @@ This will generate RPM and Debian packages.
 
 ## Learn MongoDB
 
--   Documentation - https://docs.mongodb.com/manual/
--   Developer Center - https://www.mongodb.com/developer/
--   MongoDB University - https://learn.mongodb.com
+- Documentation - https://docs.mongodb.com/manual/
+- Developer Center - https://www.mongodb.com/developer/
+- MongoDB University - https://learn.mongodb.com
 
 ## Cloud Hosted MongoDB
 
@@ -75,13 +75,13 @@ https://www.mongodb.com/cloud/atlas
 
 ## Forums
 
--   https://mongodb.com/community/forums/
+- https://mongodb.com/community/forums/
 
-    Technical questions about using MongoDB.
+  Technical questions about using MongoDB.
 
--   https://mongodb.com/community/forums/c/server-dev
+- https://mongodb.com/community/forums/c/server-dev
 
-    Technical questions about building and developing MongoDB.
+  Technical questions about building and developing MongoDB.
 
 ## LICENSE
 

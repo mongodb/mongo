@@ -2,35 +2,35 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/change_streams/**/*.js
+    - jstests/change_streams/**/*.js
   exclude_files:
-  # TODO SERVER-68341: Implement enable/disable command for mongoQ in the serverless.
-  - jstests/change_streams/**/*.js
-  # TODO SERVER-68341: Implement enable/disable command for mongoQ in the serverless.
-  - jstests/change_streams/projection_fakes_internal_event.js
-  # TODO SERVER-68557 This test list databases that does not work in the sharded-cluster. This test
-  #                   should be unblocked after the ticket is done.
-  - jstests/change_streams/does_not_implicitly_create_database.js
+    # TODO SERVER-68341: Implement enable/disable command for mongoQ in the serverless.
+    - jstests/change_streams/**/*.js
+    # TODO SERVER-68341: Implement enable/disable command for mongoQ in the serverless.
+    - jstests/change_streams/projection_fakes_internal_event.js
+    # TODO SERVER-68557 This test list databases that does not work in the sharded-cluster. This test
+    #                   should be unblocked after the ticket is done.
+    - jstests/change_streams/does_not_implicitly_create_database.js
   exclude_with_any_tags:
-  ##
-  # The next tags correspond to the special errors thrown by the
-  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
-  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
-  # warranted.
-  ##
-  # "Cowardly refusing to override write concern of command: ..."
-  - assumes_write_concern_unchanged
-  # Exclude any that assume sharding is disabled.
-  - assumes_against_mongod_not_mongos
-  # This passthrough implicitly shards the accessed collections. Do not run tests that assume
-  # unsharded collections.
-  - assumes_unsharded_collection
-  # This passthrough implicitly shards the accessed collections. Do not run tests where collections
-  # can't be created on `getCollection` call.
-  - assumes_no_implicit_collection_creation_on_get_collection
-  # TODO SERVER-70760: The support for transaction in not fully available in multi-tenant sharded
-  #                    cluster. This tag should be removed after it is available.
-  - uses_transactions
+    ##
+    # The next tags correspond to the special errors thrown by the
+    # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+    # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+    # warranted.
+    ##
+    # "Cowardly refusing to override write concern of command: ..."
+    - assumes_write_concern_unchanged
+    # Exclude any that assume sharding is disabled.
+    - assumes_against_mongod_not_mongos
+    # This passthrough implicitly shards the accessed collections. Do not run tests that assume
+    # unsharded collections.
+    - assumes_unsharded_collection
+    # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+    # can't be created on `getCollection` call.
+    - assumes_no_implicit_collection_creation_on_get_collection
+    # TODO SERVER-70760: The support for transaction in not fully available in multi-tenant sharded
+    #                    cluster. This tag should be removed after it is available.
+    - uses_transactions
 
 executor:
   archive:
@@ -43,7 +43,7 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
-          enableMajorityReadConcern: ''
+          enableMajorityReadConcern: ""
       # Enable causal consistency for change streams suites using 1 node replica sets. See
       # change_streams.yml for detailed explanation.
       eval: >-
@@ -53,22 +53,22 @@ executor:
         await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
         await import('jstests/libs/override_methods/override_fixtures_changestream_multitenancy.js');
   hooks:
-  - class: EnableChangeStream
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: ValidateCollections
-  - class: CheckOrphansDeleted
-  - class: CleanEveryN
-    n: 20
+    - class: EnableChangeStream
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: ShardedClusterFixture
     num_shards: 2
     mongos_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
     mongod_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
         periodicNoopIntervalSecs: 1
@@ -76,6 +76,6 @@ executor:
     shard_options:
       mongod_options:
         set_parameters:
-        # TODO SERVER-68341 Pass multitenancy flags to the set_parameters.
+          # TODO SERVER-68341 Pass multitenancy flags to the set_parameters.
           featureFlagServerlessChangeStreams: true
           internalChangeStreamUseTenantIdForTesting: true

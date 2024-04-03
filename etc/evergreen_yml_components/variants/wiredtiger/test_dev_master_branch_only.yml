@@ -5,82 +5,37 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 variables:
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &generic_linux_compile_params  # Essential set of compile parameters used for Linux dev variants.
-  run_on:
-  - rhel80-xlarge
-  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  tasks:
-  - name: compile_test_parallel_core_stream_TG
-  - name: compile_test_parallel_unittest_stream_TG
-  - name: compile_test_parallel_dbtest_stream_TG
-  - name: generate_buildid_to_debug_symbols_mapping
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &generic_linux_compile_params # Essential set of compile parameters used for Linux dev variants.
+    run_on:
+      - rhel80-xlarge
+    activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: generate_buildid_to_debug_symbols_mapping
 
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
-# - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &generic_linux_compile_expansions  # The most commonly used compile expansions.
-  scons_cache_scope: shared
-  scons_cache_mode: all
-  has_packages: false
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &generic_linux_compile_expansions # The most commonly used compile expansions.
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
 
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux_debug_community_compile_expansions
-  <<: *generic_linux_compile_expansions
-  compile_flags: >-
-    --dbg=on
-    --opt=on
-    -j$(grep -c ^processor /proc/cpuinfo)
-    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    --enable-http-client=on
-    --link-model=dynamic
-    --use-diagnostic-latches=on
-    --modules=
-  num_scons_link_jobs_available: 0.99
-
-
-buildvariants:
-- <<: *generic_linux_compile_params
-  name: &linux-x86-dynamic-debug-wtdevelop-compile linux-x86-dynamic-debug-wtdevelop-compile
-  display_name: "~ Linux WiredTiger develop DEBUG Compile"
-  activate: false
-  modules:
-  - wtdevelop
-  expansions:
-    <<: *linux_debug_community_compile_expansions
-    use_wt_develop: true
-    compile_variant: *linux-x86-dynamic-debug-wtdevelop-compile
-
-- name: &linux-64-debug-wtdevelop linux-64-debug-wtdevelop
-  display_name: "~ Linux DEBUG WiredTiger develop"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  run_on:
-  - rhel80-medium
-  modules:
-  - wtdevelop
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: &linux_x86_dynamic_debug_wtdevelop_compile_variant_name linux-x86-dynamic-debug-wtdevelop-compile
-  - name: version_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  expansions:
-    use_wt_develop: true
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    large_distro_name: rhel80-medium
-    max_sub_suites: "5"
-    target_resmoke_time: "15"
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_debug_community_compile_expansions
+    <<: *generic_linux_compile_expansions
     compile_flags: >-
       --dbg=on
       --opt=on
@@ -90,103 +45,147 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
       --modules=
-    scons_cache_mode: all
-    scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
-    test_flags: >-
-      --excludeWithAnyTags=requires_http_client
-      --enableEnterpriseTests=off
-    compile_variant: *linux_x86_dynamic_debug_wtdevelop_compile_variant_name
-  tasks:
-  - name: .aggregation !.encrypt !.feature_flag_guarded
-  - name: .auth !.audit !.multiversion
-  - name: sharding_auth_gen
-  - name: .causally_consistent !.wo_snapshot
-  - name: .change_streams
-  - name: .clustered_collections
-  - name: .misc_js
-  - name: disk_wiredtiger
-  - name: .jscore .common
-  - name: jsCore_txns_large_txns_format
-  - name: json_schema
-  - name: query_golden_classic
-  - name: libunwind_tests
-  - name: .multi_shard
-  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: .ocsp
-  - name: .read_write_concern
-  - name: .replica_sets !.encrypt !.fcbis
-  - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
-  - name: replica_sets_max_mirroring_large_txns_format_gen
-  - name: .retry
-  - name: .read_only
-  - name: session_jscore_passthrough
-  - name: sharded_multi_stmt_txn_jscore_passthrough_gen
-  - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
-  - name: sharding_gen
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
 
-- name: &enterprise-windows-wtdevelop enterprise-windows-wtdevelop
-  display_name: "~ Enterprise Windows WiredTiger develop"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  run_on:
-  - windows-vsCurrent-small
-  modules:
-  - wtdevelop
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-      msi
-    exe: ".exe"
-    content_type: application/zip
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=windows
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
-      -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
-      --win-version-min=win10
-      --use-diagnostic-latches=on
-    num_scons_link_jobs_available: 0.2
-    python: '/cygdrive/c/python/python310/python.exe'
-    ext: zip
-    scons_cache_scope: shared
-    multiversion_platform: windows
-    multiversion_edition: enterprise
-    jstestfuzz_num_generated_files: 35
-    large_distro_name: windows-vsCurrent-large
-    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
-    external_auth_jobs_max: 1
-    use_wt_develop: true
-    compile_variant: *enterprise-windows-wtdevelop
-  tasks:
-  - name: compile_test_serial_TG
-    distros:
-    - windows-vsCurrent-xlarge
-  - name: compile_test_parallel_unittest_stream_TG
-    distros:
-    - windows-vsCurrent-xlarge
-  - name: burn_in_tests_gen
+buildvariants:
+  - <<: *generic_linux_compile_params
+    name: &linux-x86-dynamic-debug-wtdevelop-compile linux-x86-dynamic-debug-wtdevelop-compile
+    display_name: "~ Linux WiredTiger develop DEBUG Compile"
+    activate: false
+    modules:
+      - wtdevelop
+    expansions:
+      <<: *linux_debug_community_compile_expansions
+      use_wt_develop: true
+      compile_variant: *linux-x86-dynamic-debug-wtdevelop-compile
+
+  - name: &linux-64-debug-wtdevelop linux-64-debug-wtdevelop
+    display_name: "~ Linux DEBUG WiredTiger develop"
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - rhel80-medium
+    modules:
+      - wtdevelop
     depends_on:
-    - name: version_burn_in_gen
-      variant: generate-tasks-for-version
-      omit_generated_tasks: true
-    - name: archive_dist_test_debug
-  - name: .aggfuzzer .common !.feature_flag_guarded
-  - name: audit
-  - name: auth_audit_gen
-  - name: buildscripts_test
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.aggregation !.gcm !.feature_flag_guarded
-  - name: external_auth
-  - name: external_auth_aws
-  - name: external_auth_windows
-    distros:
-    - windows-2016-dc
-  - name: .jscore .common !.sharding
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: replica_sets_auth_gen
-  - name: sasl
-  - name: sharding_auth_audit_gen
+      - name: archive_dist_test_debug
+        variant: &linux_x86_dynamic_debug_wtdevelop_compile_variant_name linux-x86-dynamic-debug-wtdevelop-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    expansions:
+      use_wt_develop: true
+      resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
+      large_distro_name: rhel80-medium
+      max_sub_suites: "5"
+      target_resmoke_time: "15"
+      compile_flags: >-
+        --dbg=on
+        --opt=on
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --enable-http-client=on
+        --link-model=dynamic
+        --use-diagnostic-latches=on
+        --modules=
+      scons_cache_mode: all
+      scons_cache_scope: shared
+      num_scons_link_jobs_available: 0.99
+      test_flags: >-
+        --excludeWithAnyTags=requires_http_client
+        --enableEnterpriseTests=off
+      compile_variant: *linux_x86_dynamic_debug_wtdevelop_compile_variant_name
+    tasks:
+      - name: .aggregation !.encrypt !.feature_flag_guarded
+      - name: .auth !.audit !.multiversion
+      - name: sharding_auth_gen
+      - name: .causally_consistent !.wo_snapshot
+      - name: .change_streams
+      - name: .clustered_collections
+      - name: .misc_js
+      - name: disk_wiredtiger
+      - name: .jscore .common
+      - name: jsCore_txns_large_txns_format
+      - name: json_schema
+      - name: query_golden_classic
+      - name: libunwind_tests
+      - name: .multi_shard
+      - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+      - name: .ocsp
+      - name: .read_write_concern
+      - name: .replica_sets !.encrypt !.fcbis
+      - name: replica_sets_reconfig_jscore_passthrough_gen
+      - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+      - name: replica_sets_max_mirroring_large_txns_format_gen
+      - name: .retry
+      - name: .read_only
+      - name: session_jscore_passthrough
+      - name: sharded_multi_stmt_txn_jscore_passthrough_gen
+      - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
+      - name: sharding_gen
+      - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+
+  - name: &enterprise-windows-wtdevelop enterprise-windows-wtdevelop
+    display_name: "~ Enterprise Windows WiredTiger develop"
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - windows-vsCurrent-small
+    modules:
+      - wtdevelop
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+        msi
+      exe: ".exe"
+      content_type: application/zip
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=windows
+        CPPPATH="c:/sasl/include"
+        LIBPATH="c:/sasl/lib"
+        -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
+        --win-version-min=win10
+        --use-diagnostic-latches=on
+      num_scons_link_jobs_available: 0.2
+      python: "/cygdrive/c/python/python310/python.exe"
+      ext: zip
+      scons_cache_scope: shared
+      multiversion_platform: windows
+      multiversion_edition: enterprise
+      jstestfuzz_num_generated_files: 35
+      large_distro_name: windows-vsCurrent-large
+      test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+      external_auth_jobs_max: 1
+      use_wt_develop: true
+      compile_variant: *enterprise-windows-wtdevelop
+    tasks:
+      - name: compile_test_serial_TG
+        distros:
+          - windows-vsCurrent-xlarge
+      - name: compile_test_parallel_unittest_stream_TG
+        distros:
+          - windows-vsCurrent-xlarge
+      - name: burn_in_tests_gen
+        depends_on:
+          - name: version_burn_in_gen
+            variant: generate-tasks-for-version
+            omit_generated_tasks: true
+          - name: archive_dist_test_debug
+      - name: .aggfuzzer .common !.feature_flag_guarded
+      - name: audit
+      - name: auth_audit_gen
+      - name: buildscripts_test
+      - name: causally_consistent_jscore_txns_passthrough
+      - name: .encrypt !.aggregation !.gcm !.feature_flag_guarded
+      - name: external_auth
+      - name: external_auth_aws
+      - name: external_auth_windows
+        distros:
+          - windows-2016-dc
+      - name: .jscore .common !.sharding
+      - name: .jstestfuzz .common !.feature_flag_guarded
+      - name: replica_sets_auth_gen
+      - name: sasl
+      - name: sharding_auth_audit_gen

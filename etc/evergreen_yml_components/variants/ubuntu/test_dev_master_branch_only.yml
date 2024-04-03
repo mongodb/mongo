@@ -5,126 +5,125 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 variables:
-- &enterprise-ubuntu2204-64-libvoidstar-template
-  run_on:
-  - ubuntu2204-large
-  stepback: false
-  expansions: &enterprise-ubuntu2204-64-libvoidstar-expansions-template
-    multiversion_platform: ubuntu2204
-    multiversion_edition: enterprise
-    repo_edition: enterprise
-    large_distro_name: ubuntu2204-large
-    scons_cache_scope: shared
-  tasks:
-  - name: compile_and_archive_dist_test_TG
-  - name: .antithesis
-  - name: generate_buildid_to_debug_symbols_mapping
-
+  - &enterprise-ubuntu2204-64-libvoidstar-template
+    run_on:
+      - ubuntu2204-large
+    stepback: false
+    expansions: &enterprise-ubuntu2204-64-libvoidstar-expansions-template
+      multiversion_platform: ubuntu2204
+      multiversion_edition: enterprise
+      repo_edition: enterprise
+      large_distro_name: ubuntu2204-large
+      scons_cache_scope: shared
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+      - name: .antithesis
+      - name: generate_buildid_to_debug_symbols_mapping
 
 buildvariants:
-- name: &ubuntu2204-arm64-bazel-compile ubuntu2204-arm64-bazel-compile
-  display_name: "! Ubuntu 22.04 arm64 Enterprise Bazel Compile"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  tags: ["bazel_check"]
-  run_on:
-  - ubuntu2204-arm64-small
-  stepback: false
-  expansions:
-    scons_cache_scope: shared
-    compile_variant: *ubuntu2204-arm64-bazel-compile
-  tasks:
-    - name: compile_bazel_TG
-    - name: compile_bazel_sanitize_TG
-    - name: compile_bazel_ninja_TG
-    - name: bazel_workstation_TG
-      distros:
-      - ubuntu2204-arm64-large
+  - name: &ubuntu2204-arm64-bazel-compile ubuntu2204-arm64-bazel-compile
+    display_name: "! Ubuntu 22.04 arm64 Enterprise Bazel Compile"
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    tags: ["bazel_check"]
+    run_on:
+      - ubuntu2204-arm64-small
+    stepback: false
+    expansions:
+      scons_cache_scope: shared
+      compile_variant: *ubuntu2204-arm64-bazel-compile
+    tasks:
+      - name: compile_bazel_TG
+      - name: compile_bazel_sanitize_TG
+      - name: compile_bazel_ninja_TG
+      - name: bazel_workstation_TG
+        distros:
+          - ubuntu2204-arm64-large
 
-- name: &ubuntu2204-x86-64-bazel-compile ubuntu2204-x86-64-bazel-compile
-  display_name: "Ubuntu 22.04 x86_64 Enterprise Bazel Compile"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - ubuntu2204-small
-  stepback: false
-  expansions:
-    compile_variant: *ubuntu2204-x86-64-bazel-compile
-  tasks:
-    - name: compile_bazel_TG
-    - name: compile_bazel_sanitize_TG
-    - name: compile_bazel_ninja_TG
+  - name: &ubuntu2204-x86-64-bazel-compile ubuntu2204-x86-64-bazel-compile
+    display_name: "Ubuntu 22.04 x86_64 Enterprise Bazel Compile"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - ubuntu2204-small
+    stepback: false
+    expansions:
+      compile_variant: *ubuntu2204-x86-64-bazel-compile
+    tasks:
+      - name: compile_bazel_TG
+      - name: compile_bazel_sanitize_TG
+      - name: compile_bazel_ninja_TG
 
-- <<: *enterprise-ubuntu2204-64-libvoidstar-template
-  name: &enterprise-ubuntu2204-64-libvoidstar enterprise-ubuntu2204-64-libvoidstar
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  display_name: "~ Enterprise Ubuntu 22.04 w/ libvoidstar"
-  expansions:
-    <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
-    compile_variant: *enterprise-ubuntu2204-64-libvoidstar
-    # TODO SERVER-87069: reenable --use-diagnostic-latches=on
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2204
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-      CCFLAGS="-fsanitize-coverage=trace-pc-guard"
-      LIBS="voidstar"
-      --use-diagnostic-latches=off
+  - <<: *enterprise-ubuntu2204-64-libvoidstar-template
+    name: &enterprise-ubuntu2204-64-libvoidstar enterprise-ubuntu2204-64-libvoidstar
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    display_name: "~ Enterprise Ubuntu 22.04 w/ libvoidstar"
+    expansions:
+      <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
+      compile_variant: *enterprise-ubuntu2204-64-libvoidstar
+      # TODO SERVER-87069: reenable --use-diagnostic-latches=on
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=ubuntu2204
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        CCFLAGS="-fsanitize-coverage=trace-pc-guard"
+        LIBS="voidstar"
+        --use-diagnostic-latches=off
 
-- <<: *enterprise-ubuntu2204-64-libvoidstar-template
-  name: &enterprise-ubuntu2204-64-aubsan-libvoidstar enterprise-ubuntu2204-64-aubsan-libvoidstar
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  display_name: "~ {A,UB}SAN Enterprise Ubuntu 22.04 w/ libvoidstar"
-  expansions:
-    <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
-    antithesis_build_type: aubsan
-    compile_variant: *enterprise-ubuntu2204-64-aubsan-libvoidstar
-    # TODO SERVER-87069: reenable --use-diagnostic-latches=on
-    compile_flags: >-
-      --allocator=system
-      --sanitize=address,undefined
-      --ssl
-      --opt=on
-      --dbg=on
-      MONGO_DISTMOD=ubuntu2204
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-      --shared-libsan
-      --link-model=dynamic
-      CCFLAGS="-fsanitize-coverage=trace-pc-guard"
-      LIBS="voidstar"
-      --use-diagnostic-latches=off
-    san_options: >-
-      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/usr/lib/llvm-12/bin/llvm-symbolizer"
-      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:verify_asan_link_order=0"
+  - <<: *enterprise-ubuntu2204-64-libvoidstar-template
+    name: &enterprise-ubuntu2204-64-aubsan-libvoidstar enterprise-ubuntu2204-64-aubsan-libvoidstar
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    display_name: "~ {A,UB}SAN Enterprise Ubuntu 22.04 w/ libvoidstar"
+    expansions:
+      <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
+      antithesis_build_type: aubsan
+      compile_variant: *enterprise-ubuntu2204-64-aubsan-libvoidstar
+      # TODO SERVER-87069: reenable --use-diagnostic-latches=on
+      compile_flags: >-
+        --allocator=system
+        --sanitize=address,undefined
+        --ssl
+        --opt=on
+        --dbg=on
+        MONGO_DISTMOD=ubuntu2204
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        --shared-libsan
+        --link-model=dynamic
+        CCFLAGS="-fsanitize-coverage=trace-pc-guard"
+        LIBS="voidstar"
+        --use-diagnostic-latches=off
+      san_options: >-
+        UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/usr/lib/llvm-12/bin/llvm-symbolizer"
+        ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:verify_asan_link_order=0"
 
-# The v4 toolchain doesn't support the -shared-libsan option with TSAN, which is necessary for
-# libvoidstar to work. This variant can build and submit images, but they won't work with
-# the antithesis instrumentation provided by libvoidstar.
-# TODO SERVER-83727 After a toolchain upgrade, we should add -shared-libsan
-- <<: *enterprise-ubuntu2204-64-libvoidstar-template
-  name: &enterprise-ubuntu2204-64-tsan-libvoidstar enterprise-ubuntu2204-64-tsan-libvoidstar
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  display_name: "~ TSAN Enterprise Ubuntu 22.04 w/ libvoidstar"
-  expansions:
-    <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
-    antithesis_build_type: tsan
-    compile_variant: *enterprise-ubuntu2204-64-tsan-libvoidstar
-    # TODO SERVER-87069: reenable --use-diagnostic-latches=on
-    compile_flags: >-
-      --allocator=system
-      --sanitize=thread
-      --use-libunwind=off
-      --opt=on
-      --dbg=on
-      --ssl
-      MONGO_DISTMOD=ubuntu2204
-      --link-model=dynamic
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-      CCFLAGS="-fsanitize-coverage=trace-pc-guard"
-      LIBS="voidstar"
-      --use-diagnostic-latches=off
-    san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=5"
-    test_flags: >-
-      --excludeWithAnyTags=tsan_incompatible
+  # The v4 toolchain doesn't support the -shared-libsan option with TSAN, which is necessary for
+  # libvoidstar to work. This variant can build and submit images, but they won't work with
+  # the antithesis instrumentation provided by libvoidstar.
+  # TODO SERVER-83727 After a toolchain upgrade, we should add -shared-libsan
+  - <<: *enterprise-ubuntu2204-64-libvoidstar-template
+    name: &enterprise-ubuntu2204-64-tsan-libvoidstar enterprise-ubuntu2204-64-tsan-libvoidstar
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    display_name: "~ TSAN Enterprise Ubuntu 22.04 w/ libvoidstar"
+    expansions:
+      <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
+      antithesis_build_type: tsan
+      compile_variant: *enterprise-ubuntu2204-64-tsan-libvoidstar
+      # TODO SERVER-87069: reenable --use-diagnostic-latches=on
+      compile_flags: >-
+        --allocator=system
+        --sanitize=thread
+        --use-libunwind=off
+        --opt=on
+        --dbg=on
+        --ssl
+        MONGO_DISTMOD=ubuntu2204
+        --link-model=dynamic
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        CCFLAGS="-fsanitize-coverage=trace-pc-guard"
+        LIBS="voidstar"
+        --use-diagnostic-latches=off
+      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=5"
+      test_flags: >-
+        --excludeWithAnyTags=tsan_incompatible

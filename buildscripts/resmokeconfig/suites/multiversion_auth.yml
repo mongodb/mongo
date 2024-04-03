@@ -1,30 +1,30 @@
 # Section that is ignored by resmoke.py.
 config_variables:
-- &keyFile jstests/libs/authTestsKey
-- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &keyFile jstests/libs/authTestsKey
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
 
 test_kind: js_test
 
 selector:
   roots:
-  - jstests/multiVersion/**/*.js
+    - jstests/multiVersion/**/*.js
   exclude_files:
-  # Do not execute files with helper functions.
-  - jstests/multiVersion/libs/*.js
+    # Do not execute files with helper functions.
+    - jstests/multiVersion/libs/*.js
 
-  # TODO: SERVER-28104
-  - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
+    # TODO: SERVER-28104
+    - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
 
-  # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
-  # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
-  - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
+    # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
+    # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
+    - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
 
-  # Skip any tests that run with auth explicitly.
-  - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
+    # Skip any tests that run with auth explicitly.
+    - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
 
   exclude_with_any_tags:
-  - featureFlagToaster
-  - featureFlagSpoon
+    - featureFlagToaster
+    - featureFlagSpoon
 
 # Multiversion tests start their own mongod's.
 executor:
@@ -35,7 +35,7 @@ executor:
           setParameters:
             bsonTestValidationVersion: 1
           auth: true
-#          authMechanism: SCRAM-SHA-256
+          #          authMechanism: SCRAM-SHA-256
           keyFile: *keyFile
           keyFileData: *keyFileData
           # Skip enforcing this check in multiversion as time-series buckets are not always
@@ -43,7 +43,7 @@ executor:
           skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
 
       authenticationDatabase: local
-#      authenticationMechanism: SCRAM-SHA-256
+      #      authenticationMechanism: SCRAM-SHA-256
       password: *keyFileData
       username: __system
-      nodb: ''
+      nodb: ""

@@ -5,124 +5,124 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/core/**/*.js
-  - jstests/fle2/**/*.js
-  - jstests/aggregation/**/*.js
-  - src/mongo/db/modules/*/jstests/fle/**/*.js
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - jstests/aggregation/**/*.js
+    - src/mongo/db/modules/*/jstests/fle/**/*.js
   exclude_with_any_tags:
-  - assumes_standalone_mongod
-  # columnstore indexes are under development and cannot be used without enabling the feature flag
-  - featureFlagColumnstoreIndexes
-  - featureFlagFLE2CleanupCommand
-  # TODO: SERVER-71537 Remove Feature Flag for PM-412.
-  - featureFlagQuerySettings
-  # TODO: SERVER-66393 Remove Feature Flag for PM-2919.
-  - featureFlagTimeseriesUpdatesSupport
-  # TODO: SERVER-78068 Remove Feature Flag for PM-2983
-  - featureFlagRecordIdsReplicated
-  # Transactions are aborted upon fcv upgrade or downgrade.
-  - uses_transactions
-  # Exclude tests that require a specific fcv.
-  # Once SERVER-81054 is complete this is no longer needed.
-  - requires_fcv_71
-  - requires_fcv_72
-  - requires_fcv_73
-  - requires_fcv_80
-  - requires_fcv_81
-  # Exclude tests that are not compatible with upgrade/downgrade.
-  - cannot_run_during_upgrade_downgrade
+    - assumes_standalone_mongod
+    # columnstore indexes are under development and cannot be used without enabling the feature flag
+    - featureFlagColumnstoreIndexes
+    - featureFlagFLE2CleanupCommand
+    # TODO: SERVER-71537 Remove Feature Flag for PM-412.
+    - featureFlagQuerySettings
+    # TODO: SERVER-66393 Remove Feature Flag for PM-2919.
+    - featureFlagTimeseriesUpdatesSupport
+    # TODO: SERVER-78068 Remove Feature Flag for PM-2983
+    - featureFlagRecordIdsReplicated
+    # Transactions are aborted upon fcv upgrade or downgrade.
+    - uses_transactions
+    # Exclude tests that require a specific fcv.
+    # Once SERVER-81054 is complete this is no longer needed.
+    - requires_fcv_71
+    - requires_fcv_72
+    - requires_fcv_73
+    - requires_fcv_80
+    - requires_fcv_81
+    # Exclude tests that are not compatible with upgrade/downgrade.
+    - cannot_run_during_upgrade_downgrade
 
   exclude_files:
-  # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
-  # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
-  # server parameter.
-  - jstests/core/**/set_param1.js
-  # Different explain format
-  - jstests/core/**/or_to_in.js
-  # SERVER-34772 Tailable Cursors are not allowed with snapshot readconcern.
-  - jstests/core/**/awaitdata_getmore_cmd.js
-  - jstests/core/**/getmore_cmd_maxtimems.js
-  - jstests/core/**/tailable_cursor_invalidation.js
-  - jstests/core/**/tailable_getmore_batch_size.js
+    # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
+    # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
+    # server parameter.
+    - jstests/core/**/set_param1.js
+    # Different explain format
+    - jstests/core/**/or_to_in.js
+    # SERVER-34772 Tailable Cursors are not allowed with snapshot readconcern.
+    - jstests/core/**/awaitdata_getmore_cmd.js
+    - jstests/core/**/getmore_cmd_maxtimems.js
+    - jstests/core/**/tailable_cursor_invalidation.js
+    - jstests/core/**/tailable_getmore_batch_size.js
 
-  # TODO (SERVER-78220): Investigate failing api version tests in the fcv jscore passthrough suite.
-  - jstests/core/api/api_version_unstable_indexes.js
+    # TODO (SERVER-78220): Investigate failing api version tests in the fcv jscore passthrough suite.
+    - jstests/core/api/api_version_unstable_indexes.js
 
-  # TODO (SERVER-78202): Investigate failing timeseries tests in the fcv jscore passthrough suite.
-  - jstests/core/timeseries/timeseries_update.js
-  - jstests/core/timeseries/timeseries_update_concurrent.js
-  - jstests/core/timeseries/timeseries_update_one.js
-  - jstests/core/timeseries/timeseries_update_multi.js
-  - jstests/core/timeseries/timeseries_find_and_modify_update.js
-  - jstests/core/timeseries/timeseries_delete_compressed_buckets.js
-  - jstests/core/timeseries/timeseries_bucket_limit_count.js
+    # TODO (SERVER-78202): Investigate failing timeseries tests in the fcv jscore passthrough suite.
+    - jstests/core/timeseries/timeseries_update.js
+    - jstests/core/timeseries/timeseries_update_concurrent.js
+    - jstests/core/timeseries/timeseries_update_one.js
+    - jstests/core/timeseries/timeseries_update_multi.js
+    - jstests/core/timeseries/timeseries_find_and_modify_update.js
+    - jstests/core/timeseries/timeseries_delete_compressed_buckets.js
+    - jstests/core/timeseries/timeseries_bucket_limit_count.js
 
-  # These timeseries tests rely on specific bucketing behaviour that is not guaranteed across FCV
-  # upgrade/downgrade
-  # TODO SERVER-70605: remove this block.
-  - jstests/core/timeseries/bucket_granularity.js
-  - jstests/core/timeseries/timeseries_id_range.js
-  - jstests/core/timeseries/timeseries_insert_after_update.js
-  - jstests/core/timeseries/timeseries_sparse.js
-  - jstests/core/timeseries/timeseries_min_max.js
-  - jstests/core/timeseries/timeseries_simple.js
-  - jstests/core/timeseries/timeseries_collation.js
-  - jstests/core/timeseries/bucket_timestamp_rounding.js
+    # These timeseries tests rely on specific bucketing behaviour that is not guaranteed across FCV
+    # upgrade/downgrade
+    # TODO SERVER-70605: remove this block.
+    - jstests/core/timeseries/bucket_granularity.js
+    - jstests/core/timeseries/timeseries_id_range.js
+    - jstests/core/timeseries/timeseries_insert_after_update.js
+    - jstests/core/timeseries/timeseries_sparse.js
+    - jstests/core/timeseries/timeseries_min_max.js
+    - jstests/core/timeseries/timeseries_simple.js
+    - jstests/core/timeseries/timeseries_collation.js
+    - jstests/core/timeseries/bucket_timestamp_rounding.js
 
-  # These use "columnstore indexes are under development and cannot be used without enabling the feature flag"
-  - jstests/core/query/null_query_semantics.js
-  - jstests/core/query/project/projection_semantics.js
-  - jstests/core/index/hidden_index.js
+    # These use "columnstore indexes are under development and cannot be used without enabling the feature flag"
+    - jstests/core/query/null_query_semantics.js
+    - jstests/core/query/project/projection_semantics.js
+    - jstests/core/index/hidden_index.js
 
-  # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
-  - jstests/aggregation/sources/densify/internal_parse.js
-  - jstests/aggregation/api_version_stage_allowance_checks.js
+    # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
+    - jstests/aggregation/sources/densify/internal_parse.js
+    - jstests/aggregation/api_version_stage_allowance_checks.js
 
-  # TODO (SERVER-78200): The tests below sometimes hang when they run concurrently with a setFCV command.
-  - src/mongo/db/modules/*/jstests/fle/fle_admin_e2e.js
-  - src/mongo/db/modules/*/jstests/fle/fle_implicit_encryption.js
-  - src/mongo/db/modules/*/jstests/fle/fle_use_cases.js
-  - src/mongo/db/modules/*/jstests/fle/fle_drivers_integration.js
+    # TODO (SERVER-78200): The tests below sometimes hang when they run concurrently with a setFCV command.
+    - src/mongo/db/modules/*/jstests/fle/fle_admin_e2e.js
+    - src/mongo/db/modules/*/jstests/fle/fle_implicit_encryption.js
+    - src/mongo/db/modules/*/jstests/fle/fle_use_cases.js
+    - src/mongo/db/modules/*/jstests/fle/fle_drivers_integration.js
 
-  # Expected failure due to command count being not precise due to potential retry of index build.
-  - jstests/core/operation_latency_histogram.js
+    # Expected failure due to command count being not precise due to potential retry of index build.
+    - jstests/core/operation_latency_histogram.js
 
-  # Expected failures due to unexpected query execution stats from restarted operations from fcv upgrade.
-  - jstests/aggregation/sources/lookup/lookup_query_stats.js
-  - jstests/aggregation/sources/facet/facet_stats.js
-  - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
+    # Expected failures due to unexpected query execution stats from restarted operations from fcv upgrade.
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+    - jstests/aggregation/sources/facet/facet_stats.js
+    - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
 
-  # SERVER-85472: test runs an updateOne without shard key which will use an internal transaction
-  # that can be aborted by the fcv upgrade downgrade suite.
-  - jstests/aggregation/sources/unionWith/unionWith_invalid_usage.js
+    # SERVER-85472: test runs an updateOne without shard key which will use an internal transaction
+    # that can be aborted by the fcv upgrade downgrade suite.
+    - jstests/aggregation/sources/unionWith/unionWith_invalid_usage.js
 
-  # Expected failure due to interfering collMod commands acquiring a lock that the test does not expect.
-  - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
+    # Expected failure due to interfering collMod commands acquiring a lock that the test does not expect.
+    - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
 
-  # The tests below use transactions (which are aborted on fcv upgrade/downgrade) and thus are expected to fail.
-  - jstests/core/role_management_helpers.js
-  - jstests/core/roles_info.js
-  - jstests/core/views/views_all_commands.js
+    # The tests below use transactions (which are aborted on fcv upgrade/downgrade) and thus are expected to fail.
+    - jstests/core/role_management_helpers.js
+    - jstests/core/roles_info.js
+    - jstests/core/views/views_all_commands.js
 
-  # Queryable encryption uses internal transactions (which are aborted on fcv upgrade/downgrade).
-  - jstests/core/queryable_encryption/**/*.js
+    # Queryable encryption uses internal transactions (which are aborted on fcv upgrade/downgrade).
+    - jstests/core/queryable_encryption/**/*.js
 
-  # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
-  # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
-  - jstests/core/top.js
+    # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
+    # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
+    - jstests/core/top.js
 
-  # Tests that use profiling at level 2 are expecting to profile a specific command or a specific number
-  # of commands. If they profile the setFCV command, this could cause the test to fail.
-  - jstests/core/administrative/profile/profile_sampling.js
-  - jstests/core/administrative/profile/profile1.js
-  - jstests/aggregation/sources/lookup/profile_lookup.js
+    # Tests that use profiling at level 2 are expecting to profile a specific command or a specific number
+    # of commands. If they profile the setFCV command, this could cause the test to fail.
+    - jstests/core/administrative/profile/profile_sampling.js
+    - jstests/core/administrative/profile/profile1.js
+    - jstests/aggregation/sources/lookup/profile_lookup.js
 
-  # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail.
-  - jstests/core/bench_test1.js
+    # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail.
+    - jstests/core/bench_test1.js
 
-  # Bucketing behavior changes based on the timeseriesAlwaysUseCompressedBuckets feature flag.
-  - jstests/core/timeseries/timeseries_lastpoint.js
-  - jstests/core/timeseries/timeseries_reopened_bucket_insert.js
+    # Bucketing behavior changes based on the timeseriesAlwaysUseCompressedBuckets feature flag.
+    - jstests/core/timeseries/timeseries_lastpoint.js
+    - jstests/core/timeseries/timeseries_reopened_bucket_insert.js
 
 executor:
   archive:
@@ -140,18 +140,18 @@ executor:
         TestData:
           nonClusteredConfigTransactions: true
   hooks:
-  - class: CheckReplOplogs
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData:
-          # Skip enforcing this check in FCV upgrade/downgrade suites as time-series buckets are not
-          # always compressed in a downgraded FCV.
-          skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
-  - class: FCVUpgradeDowngradeInBackground
-  - class: CleanEveryN
-    n: 20
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            # Skip enforcing this check in FCV upgrade/downgrade suites as time-series buckets are not
+            # always compressed in a downgraded FCV.
+            skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
+    - class: FCVUpgradeDowngradeInBackground
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: ReplicaSetFixture
     mongod_options:

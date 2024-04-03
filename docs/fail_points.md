@@ -14,12 +14,12 @@ A fail point must first be defined using `MONGO_FAIL_POINT_DEFINE(myFailPoint)`.
 adds the fail point to a registry and allows it to be evaluated in code. There are three common
 patterns for evaluating a fail point:
 
--   Exercise a rarely used branch:
-    `if (whenPigsFly || myFailPoint.shouldFail()) { ... }`
--   Block until the fail point is unset:
-    `myFailPoint.pauseWhileSet();`
--   Use the fail point's payload to perform custom behavior:
-    `myFailPoint.execute([](const BSONObj& data) { useMyPayload(data); };`
+- Exercise a rarely used branch:
+  `if (whenPigsFly || myFailPoint.shouldFail()) { ... }`
+- Block until the fail point is unset:
+  `myFailPoint.pauseWhileSet();`
+- Use the fail point's payload to perform custom behavior:
+  `myFailPoint.execute([](const BSONObj& data) { useMyPayload(data); };`
 
 For more complete usage, see the [fail point header][fail_point] or the [fail point
 tests][fail_point_test].

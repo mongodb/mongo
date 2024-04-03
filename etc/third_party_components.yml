@@ -16,7 +16,6 @@
 # 	vulnerability_suppression: TO_DO SERVER-12345
 # 	team_owner: example
 
-
 # Description
 # component_name - string - required - Name of component in Black Duck Hub
 # homepage_url - URL - required - website where to find third party component
@@ -38,7 +37,6 @@
 # TODO - can we query JIRA to see if the tickets are closed, check DAG code
 
 components:
-
   Abseil:
     homepage_url: https://abseil.io
     open_hub_url: https://openhub.net/p/abseil
@@ -233,7 +231,8 @@ components:
     homepage_url: https://github.com/antirez/linenoise
     open_hub_url: https://www.openhub.net/p/linenoise
     release_monitoring_id: 5691
-    local_directory_path: [src/mongo/shell/linenoise.h, src/mongo/shell/linenoise.cpp]
+    local_directory_path:
+      [src/mongo/shell/linenoise.h, src/mongo/shell/linenoise.cpp]
     team_owner: "Server Tools and Methodology"
     upgrade_suppression: TODO SERVER-514767
 

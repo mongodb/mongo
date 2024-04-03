@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/enterprise/jstests/external_auth/*.js
+    - src/mongo/db/modules/enterprise/jstests/external_auth/*.js
 
 executor:
   config:
@@ -10,9 +10,9 @@ executor:
       global_vars:
         TestData:
           roleGraphInvalidationIsFatal: true
-      nodb: ''
+      nodb: ""
       gssapiServiceName: "mockservice"
       process_kwargs:
-          env_vars:
-              KRB5_TRACE: /dev/stdout
-              KRB5_CONFIG: src/mongo/db/modules/enterprise/jstests/external_auth/assets/krb5.conf
+        env_vars:
+          KRB5_TRACE: /dev/stdout
+          KRB5_CONFIG: src/mongo/db/modules/enterprise/jstests/external_auth/assets/krb5.conf

@@ -129,229 +129,229 @@ The current rules and there exemptions are listed below:
 
 1. **A 'Program' can not link a non-public dependency, it can only have LIBDEPS links.**
 
-    ###### Example
+   ###### Example
 
-    ```
-    env.Program(
-        target=’some_program’,
-        ...
-        LIBDEPS=[‘lib1’], # OK
-        LIBDEPS_PRIVATE=[‘lib2’], # This is a Program, BAD
-    )
-    ```
+   ```
+   env.Program(
+       target=’some_program’,
+       ...
+       LIBDEPS=[‘lib1’], # OK
+       LIBDEPS_PRIVATE=[‘lib2’], # This is a Program, BAD
+   )
+   ```
 
-    ###### Rationale
+   ###### Rationale
 
-    A Program can not be linked into anything else, and there for the transitiveness does not apply. A default value of LIBDEPS was selected for consistency since most Program's were already doing this at the time the rule was created.
+   A Program can not be linked into anything else, and there for the transitiveness does not apply. A default value of LIBDEPS was selected for consistency since most Program's were already doing this at the time the rule was created.
 
-    ###### Exemption
+   ###### Exemption
 
-    'lint-allow-program-links-private' on the target node
+   'lint-allow-program-links-private' on the target node
 
-    ######
+   ######
 
 2. **A 'Node' can only directly link a given library once.**
 
-    ###### Example
+   ###### Example
 
-    ```
-    env.Library(
-        target=’some_library’,
-        ...
-        LIBDEPS=[‘lib1’], # Linked once, OK
-        LIBDEPS_PRIVATE=[‘lib1’], # Also linked in LIBDEPS, BAD
-        LIBDEPS_INTERFACE=[‘lib2’, 'lib2'], # Linked twice, BAD
-    )
-    ```
+   ```
+   env.Library(
+       target=’some_library’,
+       ...
+       LIBDEPS=[‘lib1’], # Linked once, OK
+       LIBDEPS_PRIVATE=[‘lib1’], # Also linked in LIBDEPS, BAD
+       LIBDEPS_INTERFACE=[‘lib2’, 'lib2'], # Linked twice, BAD
+   )
+   ```
 
-    ###### Rationale
+   ###### Rationale
 
-    Libdeps will ignore duplicate links, so this rule is mostly for consistency and neatness in the build scripts.
+   Libdeps will ignore duplicate links, so this rule is mostly for consistency and neatness in the build scripts.
 
-    ###### Exemption
+   ###### Exemption
 
-    'lint-allow-dup-libdeps' on the target node
+   'lint-allow-dup-libdeps' on the target node
 
-    ######
+   ######
 
 3. **A 'Node' which uses LIBDEPS_DEPENDENTS or PROGDEPS_DEPENDENTS can only have LIBDEPS_PRIVATE links.**
 
-    ###### Example
+   ###### Example
 
-    ```
-    env.Library(
-        target=’some_library’,
-        ...
-        LIBDEPS_DEPENDENTS=['lib3'],
-        LIBDEPS=[‘lib1’], # LIBDEPS_DEPENDENTS is in use, BAD
-        LIBDEPS_PRIVATE=[‘lib2’], # OK
-    )
-    ```
+   ```
+   env.Library(
+       target=’some_library’,
+       ...
+       LIBDEPS_DEPENDENTS=['lib3'],
+       LIBDEPS=[‘lib1’], # LIBDEPS_DEPENDENTS is in use, BAD
+       LIBDEPS_PRIVATE=[‘lib2’], # OK
+   )
+   ```
 
-    ###### Rationale
+   ###### Rationale
 
-    The node that the library is using LIBDEPS_DEPENDENTS or PROGDEPS_DEPENDENT to inject its dependency onto should be conditional, therefore there should not be transitiveness for that dependency since it cannot be the source of any resolved symbols.
+   The node that the library is using LIBDEPS_DEPENDENTS or PROGDEPS_DEPENDENT to inject its dependency onto should be conditional, therefore there should not be transitiveness for that dependency since it cannot be the source of any resolved symbols.
 
-    ###### Exemption
+   ###### Exemption
 
-    'lint-allow-nonprivate-on-deps-dependents' on the target node
+   'lint-allow-nonprivate-on-deps-dependents' on the target node
 
-    ######
+   ######
 
 4. **A 'Node' can not link directly to a library that uses LIBDEPS_DEPENDENTS or PROGDEPS_DEPENDENTS.**
 
-    ###### Example
+   ###### Example
 
-    ```
-    env.Library(
-        target='other_library',
-        ...
-        LIBDEPS=['lib1'], # BAD, 'lib1' has LIBDEPS_DEPENDENTS
+   ```
+   env.Library(
+       target='other_library',
+       ...
+       LIBDEPS=['lib1'], # BAD, 'lib1' has LIBDEPS_DEPENDENTS
 
-    env.Library(
-        target=’lib1’,
-        ...
-        LIBDEPS_DEPENDENTS=['lib3'],
-    )
-    ```
+   env.Library(
+       target=’lib1’,
+       ...
+       LIBDEPS_DEPENDENTS=['lib3'],
+   )
+   ```
 
-    ###### Rationale
+   ###### Rationale
 
-    A library that is using LIBDEPS_DEPENDENTS or PROGDEPS_DEPENDENT should only be used for reverse dependency edges. If a node does need to link directly to a library that does have reverse dependency edges, that indicates the library should be split into two separate libraries, containing its direct dependency content and its conditional reverse dependency content.
+   A library that is using LIBDEPS_DEPENDENTS or PROGDEPS_DEPENDENT should only be used for reverse dependency edges. If a node does need to link directly to a library that does have reverse dependency edges, that indicates the library should be split into two separate libraries, containing its direct dependency content and its conditional reverse dependency content.
 
-    ###### Exemption
+   ###### Exemption
 
-    'lint-allow-bidirectional-edges' on the target node
+   'lint-allow-bidirectional-edges' on the target node
 
-    ######
+   ######
 
 5. **All libdeps environment vars must be assigned as lists.**
 
-    ###### Example
+   ###### Example
 
-    ```
-    env.Library(
-        target='some_library',
-        ...
-        LIBDEPS='lib1', # not a list, BAD
-        LIBDEPS_PRIVATE=['lib2'], # OK
-    )
-    ```
+   ```
+   env.Library(
+       target='some_library',
+       ...
+       LIBDEPS='lib1', # not a list, BAD
+       LIBDEPS_PRIVATE=['lib2'], # OK
+   )
+   ```
 
-    ###### Rationale
+   ###### Rationale
 
-    Libdeps will handle non-list environment variables, so this is more for consistency and neatness in the build scripts.
+   Libdeps will handle non-list environment variables, so this is more for consistency and neatness in the build scripts.
 
-    ###### Exemption
+   ###### Exemption
 
-    'lint-allow-nonlist-libdeps' on the target node
+   'lint-allow-nonlist-libdeps' on the target node
 
-    ######
+   ######
 
 6. **Libdeps with the tag 'lint-leaf-node-no-deps' shall not link any libdeps.**
 
-    ###### Example
+   ###### Example
 
-    ```
-    env.Library(
-        target='lib2',
-        ...
-        LIBDEPS_TAGS=[
-            'lint-leaf-node-allowed-dep'
-        ]
-    )
+   ```
+   env.Library(
+       target='lib2',
+       ...
+       LIBDEPS_TAGS=[
+           'lint-leaf-node-allowed-dep'
+       ]
+   )
 
-    env.Library(
-        target='some_library',
-        ...
-        LIBDEPS=['lib1'], # BAD, should have no LIBDEPS
-        LIBDEPS_PRIVATE=['lib2'], # OK, has exemption tag
-        LIBDEPS_TAGS=[
-            'lint-leaf-node-no-deps'
-        ]
-    )
-    ```
+   env.Library(
+       target='some_library',
+       ...
+       LIBDEPS=['lib1'], # BAD, should have no LIBDEPS
+       LIBDEPS_PRIVATE=['lib2'], # OK, has exemption tag
+       LIBDEPS_TAGS=[
+           'lint-leaf-node-no-deps'
+       ]
+   )
+   ```
 
-    ###### Rationale
+   ###### Rationale
 
-    The special tag allows certain nodes to be marked and programmatically checked that they remain lead nodes. An example use-case is when we want to make sure certain nodes never link mongodb code.
+   The special tag allows certain nodes to be marked and programmatically checked that they remain lead nodes. An example use-case is when we want to make sure certain nodes never link mongodb code.
 
-    ###### Exemption
+   ###### Exemption
 
-    'lint-leaf-node-allowed-dep' on the exempted libdep
+   'lint-leaf-node-allowed-dep' on the exempted libdep
 
-    ###### Inclusion
+   ###### Inclusion
 
-    'lint-leaf-node-no-deps' on the target node
+   'lint-leaf-node-no-deps' on the target node
 
-    ######
+   ######
 
 7. **Libdeps with the tag 'lint-no-public-deps' shall not link any libdeps.**
 
-    ###### Example
+   ###### Example
 
-    ```
-    env.Library(
-        target='lib2',
-        ...
-        LIBDEPS_TAGS=[
-            'lint-public-dep-allowed'
-        ]
-    )
+   ```
+   env.Library(
+       target='lib2',
+       ...
+       LIBDEPS_TAGS=[
+           'lint-public-dep-allowed'
+       ]
+   )
 
-    env.Library(
-        target='some_library',
-        ...
-        LIBDEPS=[
-            'lib1' # BAD
-            'lib2' # OK, has exemption tag
-        ],
-        LIBDEPS_TAGS=[
-            'lint-no-public-deps'
-        ]
-    )
-    ```
+   env.Library(
+       target='some_library',
+       ...
+       LIBDEPS=[
+           'lib1' # BAD
+           'lib2' # OK, has exemption tag
+       ],
+       LIBDEPS_TAGS=[
+           'lint-no-public-deps'
+       ]
+   )
+   ```
 
-    ###### Rationale
+   ###### Rationale
 
-    The special tag allows certain nodes to be marked and programmatically checked that they do not link publicly. Some nodes such as mongod_main have special requirements that this programmatically checks.
+   The special tag allows certain nodes to be marked and programmatically checked that they do not link publicly. Some nodes such as mongod_main have special requirements that this programmatically checks.
 
-    ###### Exemption
+   ###### Exemption
 
-    'lint-public-dep-allowed' on the exempted libdep
+   'lint-public-dep-allowed' on the exempted libdep
 
-    ###### Inclusion
+   ###### Inclusion
 
-    'lint-no-public-deps' on the target node
+   'lint-no-public-deps' on the target node
 
-    ######
+   ######
 
 8. **Libdeps shall be sorted alphabetically in LIBDEPS lists in the SCons files.**
 
-    ###### Example
+   ###### Example
 
-    ```
-    env.Library(
-        target='lib2',
-        ...
-        LIBDEPS=[
-            '$BUILD/mongo/db/d', # OK, $ comes before c
-            'c', # OK, c comes before s
-            'src/a', # BAD, s should be after b
-            'b', # BAD, b should be before c
-        ]
-    )
-    ```
+   ```
+   env.Library(
+       target='lib2',
+       ...
+       LIBDEPS=[
+           '$BUILD/mongo/db/d', # OK, $ comes before c
+           'c', # OK, c comes before s
+           'src/a', # BAD, s should be after b
+           'b', # BAD, b should be before c
+       ]
+   )
+   ```
 
-    ###### Rationale
+   ###### Rationale
 
-    Keeping the SCons files neat and ordered allows for easier Code Review diffs and generally better maintainability.
+   Keeping the SCons files neat and ordered allows for easier Code Review diffs and generally better maintainability.
 
-    ###### Exemption
+   ###### Exemption
 
-    'lint-allow-non-alphabetic' on the exempted libdep
+   'lint-allow-non-alphabetic' on the exempted libdep
 
-    ######
+   ######
 
 ##### The build-time print Option
 

@@ -2,13 +2,13 @@ test_kind: fsm_workload_test
 
 selector:
   roots:
-  - jstests/concurrency/fsm_workloads_add_remove_shards/**/*.js
+    - jstests/concurrency/fsm_workloads_add_remove_shards/**/*.js
 
   exclude_with_any_tags:
-  - requires_replication
-  # mongos has no system.profile collection.
-  - requires_profiling
-  - does_not_support_add_remove_shards
+    - requires_replication
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - does_not_support_add_remove_shards
 
 executor:
   archive:
@@ -20,14 +20,14 @@ executor:
     tests: true
   config: {}
   hooks:
-  - class: CheckShardFilteringMetadata
-  - class: CheckReplDBHashInBackground
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: CheckOrphansDeleted
-  - class: CheckRoutingTableConsistency
-  - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
-  - class: CleanupConcurrencyWorkloads
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
     # Matrix embedded router suites depend on overrides to have mongos options reflected in mongod

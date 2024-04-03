@@ -2,25 +2,25 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/change_streams/**/*.js
+    - jstests/change_streams/**/*.js
   exclude_files:
-  # Expects a change stream cursor to be open on each of 2 shards.
-  - jstests/change_streams/projection_fakes_internal_event.js
+    # Expects a change stream cursor to be open on each of 2 shards.
+    - jstests/change_streams/projection_fakes_internal_event.js
   exclude_with_any_tags:
-  ##
-  # The next tags correspond to the special errors thrown by the
-  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
-  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
-  # warranted.
-  ##
-  # "Cowardly refusing to override write concern of command: ..."
-  - assumes_write_concern_unchanged
-  # Exclude any that assume sharding is disabled
-  - assumes_against_mongod_not_mongos
-  - assumes_unsharded_collection
-  # This passthrough implicitly shards the accessed collections. Do not run tests where collections
-  # can't be created on `getCollection` call.
-  - assumes_no_implicit_collection_creation_on_get_collection
+    ##
+    # The next tags correspond to the special errors thrown by the
+    # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+    # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+    # warranted.
+    ##
+    # "Cowardly refusing to override write concern of command: ..."
+    - assumes_write_concern_unchanged
+    # Exclude any that assume sharding is disabled
+    - assumes_against_mongod_not_mongos
+    - assumes_unsharded_collection
+    # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+    # can't be created on `getCollection` call.
+    - assumes_no_implicit_collection_creation_on_get_collection
 
 executor:
   archive:
@@ -33,7 +33,7 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
-          enableMajorityReadConcern: ''
+          enableMajorityReadConcern: ""
       # Enable causal consistency for change streams suites using 1 node replica sets. See
       # change_streams.yml for detailed explanation.
       eval: >-
@@ -43,20 +43,20 @@ executor:
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
         await import('jstests/libs/override_methods/implicit_passthrough_to_shard_changestreams.js');
   hooks:
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: ValidateCollections
-  - class: CheckOrphansDeleted
-  - class: CleanEveryN
-    n: 20
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: ShardedClusterFixture
     mongos_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
     mongod_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
         writePeriodicNoops: 1

@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - buildscripts/tests/resmoke_end2end/failtestfiles/*.js
+    - buildscripts/tests/resmoke_end2end/failtestfiles/*.js
 
 executor:
   fixture:

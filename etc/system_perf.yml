@@ -32,7 +32,8 @@ variables:
   _real_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
     - name: compile
       variant: compile-amazon-linux2-arm64
-  _real_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+  _real_compile_amazon_linux2_arm64_with_mongocrypt_shlib:
+    &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
     - name: compile
       variant: compile-amazon-linux2-arm64
     - name: compile_mongocrypt_shlib
@@ -43,12 +44,14 @@ variables:
   _real_compile_al2023_arm64: &_compile_al2023_arm64
     - name: compile
       variant: compile-al2023-arm64
-  _real_compile_al2023_arm64_with_mongocrypt_shlib: &_compile_al2023_arm64_with_mongocrypt_shlib
+  _real_compile_al2023_arm64_with_mongocrypt_shlib:
+    &_compile_al2023_arm64_with_mongocrypt_shlib
     - name: compile
       variant: compile-al2023-arm64
     - name: compile_mongocrypt_shlib
       variant: compile-al2023-arm64-mongocrypt-shlib
-  _real_compile_mixed_amazon_linux2_al2023_arm64: &_compile_mixed_amazon_linux2_al2023_arm64
+  _real_compile_mixed_amazon_linux2_al2023_arm64:
+    &_compile_mixed_amazon_linux2_al2023_arm64
     - name: compile
       variant: compile-amazon-linux2-arm64
     - name: compile
@@ -386,52 +389,52 @@ functions:
       params:
         file: src/compile_expansions.yml
   get engflow creds perf:
-  - command: s3.get
-    display_name: "get engflow key"
-    params:
-      aws_key: ${engflow_key}
-      aws_secret: ${engflow_secret}
-      remote_file: engflow/engflow.key
-      bucket: serverengflow
-      local_file: "src/engflow.key"
-      # Mark as optional to allow local-mode execution to succeed.
-      optional: true
-  - command: s3.get
-    display_name: "get engflow cert"
-    params:
-      aws_key: ${engflow_key}
-      aws_secret: ${engflow_secret}
-      remote_file: engflow/engflow.cert
-      bucket: serverengflow
-      local_file: "src/engflow.cert"
-      # Mark as optional to allow local-mode execution to succeed.
-      optional: true
-  - command: shell.exec
-    params:
-      display_name: "generate evergreen engflow bazelrc"
-      shell: bash
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
+    - command: s3.get
+      display_name: "get engflow key"
+      params:
+        aws_key: ${engflow_key}
+        aws_secret: ${engflow_secret}
+        remote_file: engflow/engflow.key
+        bucket: serverengflow
+        local_file: "src/engflow.key"
+        # Mark as optional to allow local-mode execution to succeed.
+        optional: true
+    - command: s3.get
+      display_name: "get engflow cert"
+      params:
+        aws_key: ${engflow_key}
+        aws_secret: ${engflow_secret}
+        remote_file: engflow/engflow.cert
+        bucket: serverengflow
+        local_file: "src/engflow.cert"
+        # Mark as optional to allow local-mode execution to succeed.
+        optional: true
+    - command: shell.exec
+      params:
+        display_name: "generate evergreen engflow bazelrc"
+        shell: bash
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
 
-        # Pulled from evergreen/generate_evergreen_engflow_bazelrc.sh consider
-        # consolidating once prelude.sh is runnable in the perf project.
+          # Pulled from evergreen/generate_evergreen_engflow_bazelrc.sh consider
+          # consolidating once prelude.sh is runnable in the perf project.
 
-        source ./evergreen/bazel_RBE_supported.sh
+          source ./evergreen/bazel_RBE_supported.sh
 
-        if bazel_rbe_supported; then
+          if bazel_rbe_supported; then
 
-          uri="https://spruce.mongodb.com/task/${task_id}?execution=${execution}"
+            uri="https://spruce.mongodb.com/task/${task_id}?execution=${execution}"
 
-          echo "build --tls_client_certificate=./engflow.cert" > .bazelrc.evergreen_engflow_creds
-          echo "build --tls_client_key=./engflow.key" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdPipelineName=${build_variant}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdJobName=${task_name}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdUri=$uri" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=evg:project=${project}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen_engflow_creds
-        fi
+            echo "build --tls_client_certificate=./engflow.cert" > .bazelrc.evergreen_engflow_creds
+            echo "build --tls_client_key=./engflow.key" >> .bazelrc.evergreen_engflow_creds
+            echo "build --bes_keywords=engflow:CiCdPipelineName=${build_variant}" >> .bazelrc.evergreen_engflow_creds
+            echo "build --bes_keywords=engflow:CiCdJobName=${task_name}" >> .bazelrc.evergreen_engflow_creds
+            echo "build --bes_keywords=engflow:CiCdUri=$uri" >> .bazelrc.evergreen_engflow_creds
+            echo "build --bes_keywords=evg:project=${project}" >> .bazelrc.evergreen_engflow_creds
+            echo "build --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen_engflow_creds
+          fi
   compile prep old:
     # We create a virtual environment with the Python dependencies for compiling the server
     # installed.
@@ -513,76 +516,76 @@ functions:
   ###
   # Compile mongodb
   download mongo tools:
-  - command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o verbose
-        set -o errexit
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          set -o errexit
 
-        arch=$(uname -m)
-        case $arch in
-          "x86_64")
-            if [ -f /etc/os-release ]; then
-              . /etc/os-release
-              if [ "$ID" == "amzn" ]; then
-                case $VERSION_ID in
-                  "2")
-                    binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2-x86_64-100.9.4.tgz"
-                    ;;
-                  "2023")
-                    binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2023-x86_64-100.9.4.tgz"
-                    ;;
-                  *)
-                    echo "Unsupported Amazon Linux version: $VERSION_ID"
-                    exit 1
-                    ;;
-                esac
+          arch=$(uname -m)
+          case $arch in
+            "x86_64")
+              if [ -f /etc/os-release ]; then
+                . /etc/os-release
+                if [ "$ID" == "amzn" ]; then
+                  case $VERSION_ID in
+                    "2")
+                      binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2-x86_64-100.9.4.tgz"
+                      ;;
+                    "2023")
+                      binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2023-x86_64-100.9.4.tgz"
+                      ;;
+                    *)
+                      echo "Unsupported Amazon Linux version: $VERSION_ID"
+                      exit 1
+                      ;;
+                  esac
+                else
+                  echo "Unsupported Linux distribution: $ID"
+                  exit 1
+                fi
               else
-                echo "Unsupported Linux distribution: $ID"
+                echo "Unable to determine Linux distribution"
                 exit 1
               fi
-            else
-              echo "Unable to determine Linux distribution"
-              exit 1
-            fi
-            ;;
-          "aarch64")
-            if [ -f /etc/os-release ]; then
-              . /etc/os-release
-              if [ "$ID" == "amzn" ]; then
-                case $VERSION_ID in
-                  "2")
-                    binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2-aarch64-100.9.4.tgz"
-                    ;;
-                  "2023")
-                    binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2023-aarch64-100.9.4.tgz"
-                    ;;
-                  *)
-                    echo "Unsupported Amazon Linux version: $VERSION_ID"
-                    exit 1
-                    ;;
-                esac
+              ;;
+            "aarch64")
+              if [ -f /etc/os-release ]; then
+                . /etc/os-release
+                if [ "$ID" == "amzn" ]; then
+                  case $VERSION_ID in
+                    "2")
+                      binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2-aarch64-100.9.4.tgz"
+                      ;;
+                    "2023")
+                      binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2023-aarch64-100.9.4.tgz"
+                      ;;
+                    *)
+                      echo "Unsupported Amazon Linux version: $VERSION_ID"
+                      exit 1
+                      ;;
+                  esac
+                else
+                  echo "Unsupported Linux distribution: $ID"
+                  exit 1
+                fi
               else
-                echo "Unsupported Linux distribution: $ID"
+                echo "Unable to determine Linux distribution"
                 exit 1
               fi
-            else
-              echo "Unable to determine Linux distribution"
+              ;;
+            *)
+              echo "Unsupported architecture: $arch"
               exit 1
-            fi
-            ;;
-          *)
-            echo "Unsupported architecture: $arch"
-            exit 1
-            ;;
-        esac
+              ;;
+          esac
 
-        echo "Downloading and installing MongoDB tools..."
-        sudo mkdir -p mongodb/
-        wget "$binary_url" -O mongo-tools.tar.gz
-        sudo tar -xzvf mongo-tools.tar.gz -C mongodb/ --strip-components=1 "mong*/bin"
-        echo "MongoDB tools installed successfully!"
+          echo "Downloading and installing MongoDB tools..."
+          sudo mkdir -p mongodb/
+          wget "$binary_url" -O mongo-tools.tar.gz
+          sudo tar -xzvf mongo-tools.tar.gz -C mongodb/ --strip-components=1 "mong*/bin"
+          echo "MongoDB tools installed successfully!"
   compile mongo tools old:
     - command: shell.exec
       params:
@@ -693,16 +696,16 @@ functions:
       params:
         working_dir: src
         script: |
-            set -o errexit
-            set -o verbose
-            wget --quiet https://s3.amazonaws.com/mciuploads/${project}/${compile_variant}/${version_id}/binaries/mongo-${revision_order_id}.${ext|tgz}
-            tar -xvf mongo-${revision_order_id}.${ext|tgz}
-            mv ./dist-test/bin/mongo mongodb/bin
-            mv ./dist-test/bin/mongos mongodb/bin
-            mv ./dist-test/bin/mongod mongodb/bin
-            mv ./dist-test/bin/mongocryptd mongodb/bin
-            # Copy libs folder if it exists
-            [ ! -d ./dist-test/lib ] || mv ./dist-test/lib mongodb
+          set -o errexit
+          set -o verbose
+          wget --quiet https://s3.amazonaws.com/mciuploads/${project}/${compile_variant}/${version_id}/binaries/mongo-${revision_order_id}.${ext|tgz}
+          tar -xvf mongo-${revision_order_id}.${ext|tgz}
+          mv ./dist-test/bin/mongo mongodb/bin
+          mv ./dist-test/bin/mongos mongodb/bin
+          mv ./dist-test/bin/mongod mongodb/bin
+          mv ./dist-test/bin/mongocryptd mongodb/bin
+          # Copy libs folder if it exists
+          [ ! -d ./dist-test/lib ] || mv ./dist-test/lib mongodb
   download mongodb old:
     - command: shell.exec
       params:

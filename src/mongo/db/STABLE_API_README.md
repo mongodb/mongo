@@ -16,45 +16,45 @@ API versions.
 For any API version V the following changes are prohibited, and must be introduced in a new API
 version W.
 
--   Remove StableCommand (where StableCommand is some command in V).
--   Remove a documented StableCommand parameter.
--   Prohibit a formerly permitted StableCommand parameter value.
--   Remove a field from StableCommand's reply.
--   Change the type of a field in StableCommand's reply, or expand the set of types it may be.
--   Add a new value to a StableCommand reply field's enum-like fixed set of values, e.g. a new index
-    type (unless there's an opt-in mechanism besides API version).
--   Change semantics of StableCommand in a manner that may cause existing applications to misbehave.
--   Change an error code returned in a particular error scenario, if drivers rely on the code.
--   Remove a label L from an error returned in a particular error scenario which had returned an error
-    labeled with L before.
--   Prohibit any currently permitted CRUD syntax element, including but not limited to query and
-    aggregation operators, aggregation stages and expressions, and CRUD operators.
--   Remove support for a BSON type, or any other BSON format change (besides adding a type).
--   Drop support for a wire protocol message type.
--   Making the authorization requirements for StableCommand more restrictive.
--   Increase hello.minWireVersion (or decrease maxWireVersion, which we won't do).
+- Remove StableCommand (where StableCommand is some command in V).
+- Remove a documented StableCommand parameter.
+- Prohibit a formerly permitted StableCommand parameter value.
+- Remove a field from StableCommand's reply.
+- Change the type of a field in StableCommand's reply, or expand the set of types it may be.
+- Add a new value to a StableCommand reply field's enum-like fixed set of values, e.g. a new index
+  type (unless there's an opt-in mechanism besides API version).
+- Change semantics of StableCommand in a manner that may cause existing applications to misbehave.
+- Change an error code returned in a particular error scenario, if drivers rely on the code.
+- Remove a label L from an error returned in a particular error scenario which had returned an error
+  labeled with L before.
+- Prohibit any currently permitted CRUD syntax element, including but not limited to query and
+  aggregation operators, aggregation stages and expressions, and CRUD operators.
+- Remove support for a BSON type, or any other BSON format change (besides adding a type).
+- Drop support for a wire protocol message type.
+- Making the authorization requirements for StableCommand more restrictive.
+- Increase hello.minWireVersion (or decrease maxWireVersion, which we won't do).
 
 The following changes are permitted in V:
 
--   Add a command.
--   Add an optional command parameter.
--   Permit a formerly prohibited command parameter or parameter value.
--   Any change in an undocumented command parameter.
--   Change any aspect of internal sharding/replication/etc. protocols.
--   Add a command reply field.
--   Add a new error code (provided this does not break compatibility with existing drivers and
-    applications).
--   Add a label to an error.
--   Change order of fields in reply docs and sub-docs.
--   Add a CRUD syntax element.
--   Making the authorization requirements for StableCommand less restrictive.
--   Add and dropping support for an authentication mechanism. Authenticate mechanisms may need to be
-    removed due to security vulnerabilties and as such, there is no guarantee about their
-    compatibility.
--   Deprecate a behavior
--   Increase hello.maxWireVersion.
--   Any change in behaviors not in V.
--   Performance changes.
+- Add a command.
+- Add an optional command parameter.
+- Permit a formerly prohibited command parameter or parameter value.
+- Any change in an undocumented command parameter.
+- Change any aspect of internal sharding/replication/etc. protocols.
+- Add a command reply field.
+- Add a new error code (provided this does not break compatibility with existing drivers and
+  applications).
+- Add a label to an error.
+- Change order of fields in reply docs and sub-docs.
+- Add a CRUD syntax element.
+- Making the authorization requirements for StableCommand less restrictive.
+- Add and dropping support for an authentication mechanism. Authenticate mechanisms may need to be
+  removed due to security vulnerabilties and as such, there is no guarantee about their
+  compatibility.
+- Deprecate a behavior
+- Increase hello.maxWireVersion.
+- Any change in behaviors not in V.
+- Performance changes.
 
 ### Enforcing Compatibility
 

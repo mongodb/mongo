@@ -82,18 +82,18 @@ to remove the FCV check when it is no longer needed in the future.
 ```js
 // TODO SERVER-XXXXX: Remove branching once last-lts FCV is >= X.Y.
 const fcvDoc = db.adminCommand({
-    getParameter: 1,
-    featureCompatibilityVersion: 1,
+  getParameter: 1,
+  featureCompatibilityVersion: 1,
 });
 if (
-    MongoRunner.compareBinVersions(
-        fcvDoc.featureCompatibilityVersion.version,
-        "X.Y",
-    ) >= 0
+  MongoRunner.compareBinVersions(
+    fcvDoc.featureCompatibilityVersion.version,
+    "X.Y",
+  ) >= 0
 ) {
-    // code here for FCV >= X.Y
+  // code here for FCV >= X.Y
 } else {
-    // code here for FCV < X.Y
+  // code here for FCV < X.Y
 }
 ```
 
@@ -101,26 +101,26 @@ if (
 
 The FCV can be set using the `setFeatureCompatibilityVersion` admin command to one of the following:
 
--   The version of the last-LTS (Long Term Support)
-    -   Indicates to the server to use the feature set compatible with the last LTS release version.
--   The version of the last-continuous release
-    -   Indicates to the server to use the feature set compatible with the last continuous release
-        version.
--   The version of the latest(current) release
-    -   Indicates to the server to use the feature set compatible with the latest release version.
-        In a replica set configuration, this command should be run against the primary node. In a sharded
-        configuration this should be run against the mongos. The mongos will forward the command
-        to the config servers which then forward request again to shard primaries. As mongos nodes are
-        non-data bearing, they do not have an FCV.
+- The version of the last-LTS (Long Term Support)
+  - Indicates to the server to use the feature set compatible with the last LTS release version.
+- The version of the last-continuous release
+  - Indicates to the server to use the feature set compatible with the last continuous release
+    version.
+- The version of the latest(current) release
+  - Indicates to the server to use the feature set compatible with the latest release version.
+    In a replica set configuration, this command should be run against the primary node. In a sharded
+    configuration this should be run against the mongos. The mongos will forward the command
+    to the config servers which then forward request again to shard primaries. As mongos nodes are
+    non-data bearing, they do not have an FCV.
 
 Each `mongod` release will support the following upgrade/downgrade paths:
 
--   Last-Continuous → Latest
-    -   Note that we do not support downgrading to or from Last-Continuous.
--   Last-LTS ←→ Latest
--   Last-LTS → Last-Continuous
-    -   This upgrade-only transition is only possible when requested by the [config server](https://docs.mongodb.com/manual/core/sharded-cluster-config-servers/).
-    -   Additionally, the last LTS must not be equal to the last continuous release.
+- Last-Continuous → Latest
+  - Note that we do not support downgrading to or from Last-Continuous.
+- Last-LTS ←→ Latest
+- Last-LTS → Last-Continuous
+  - This upgrade-only transition is only possible when requested by the [config server](https://docs.mongodb.com/manual/core/sharded-cluster-config-servers/).
+  - Additionally, the last LTS must not be equal to the last continuous release.
 
 The command also requires a `{confirm: true}` parameter. This is so that users acknowledge that an
 FCV + binary downgrade will require support assistance. Without this parameter, the
@@ -258,25 +258,25 @@ will fail.
 1. First, the config server transitions to `kUpgradingFrom_X_To_Y` or `kDowngradingFrom_X_To_Y` (shards are still in the
    old FCV).
 2. Phase-1
-    - a. Config server [sends phase-1 command to shards](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L476).
-    - b. Shard servers transition to `kUpgradingFrom_X_To_Y` or `kDowngradingFrom_X_To_Y`.
-    - c. Shard servers do any [phase-1 tasks](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L460) (for downgrading, this would include stopping new features).
+   - a. Config server [sends phase-1 command to shards](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L476).
+   - b. Shard servers transition to `kUpgradingFrom_X_To_Y` or `kDowngradingFrom_X_To_Y`.
+   - c. Shard servers do any [phase-1 tasks](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L460) (for downgrading, this would include stopping new features).
 3. Phase-2 (throughout this phase config and shards are all in the transitional FCV)
-    - a. Config server runs `_prepareToUpgrade` or `_prepareToDowngrade`, takes the global lock,
-      and verifies user data compatibility for upgrade/downgrade.
-    - b. Config server [sends phase-2 command to shards](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L506-L507).
-    - c. Shard servers run `_prepareToUpgrade` or `_prepareToDowngrade`, takes the global lock,
-      and verifies user data compatibility for upgrade/downgrade.
+   - a. Config server runs `_prepareToUpgrade` or `_prepareToDowngrade`, takes the global lock,
+     and verifies user data compatibility for upgrade/downgrade.
+   - b. Config server [sends phase-2 command to shards](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L506-L507).
+   - c. Shard servers run `_prepareToUpgrade` or `_prepareToDowngrade`, takes the global lock,
+     and verifies user data compatibility for upgrade/downgrade.
 4. Phase-3
-    - a. Config server runs `_runUpgrade` or `_runDowngrade`. For downgrade, this means the config
-      server enters the `isCleaningServerMetadata` phase and cleans up any internal server metadata.
-    - b. Config server [sends phase-3 command to shards](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L1499).
-    - c. Shard servers run `_runUpgrade` or `_runDowngrade`. For downgrade, this means the shard
-      servers enter the `isCleaningServerMetadata` phase and cleans up any internal server metadata.
-    - d. Shards finish and enter the fully upgraded or downgraded state (on upgrade, the config
-      server would still be in the `kUpgradingFrom_X_To_Y` phase, and on downgrade the config server
-      would still be in the `isCleaningServerMetadata` phase).
-    - e. Config finishes and enters the fully upgraded or downgraded state.
+   - a. Config server runs `_runUpgrade` or `_runDowngrade`. For downgrade, this means the config
+     server enters the `isCleaningServerMetadata` phase and cleans up any internal server metadata.
+   - b. Config server [sends phase-3 command to shards](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L1499).
+   - c. Shard servers run `_runUpgrade` or `_runDowngrade`. For downgrade, this means the shard
+     servers enter the `isCleaningServerMetadata` phase and cleans up any internal server metadata.
+   - d. Shards finish and enter the fully upgraded or downgraded state (on upgrade, the config
+     server would still be in the `kUpgradingFrom_X_To_Y` phase, and on downgrade the config server
+     would still be in the `isCleaningServerMetadata` phase).
+   - e. Config finishes and enters the fully upgraded or downgraded state.
 
 Note that on downgrade, if the setFCV command fails at any point between 4a and 4e, the user will
 not be able to transition back to the original upgraded FCV, since either the config server and/or
@@ -286,63 +286,63 @@ the shard servers are in the middle of cleaning up internal server metadata.
 
 The setFCV command can only fail with these error cases:
 
--   Retryable error (such as `InterruptedDueToReplStateChange`)
-    -   The user must retry the FCV upgrade/downgrade, so the code must be idempotent and retryable.
--   `CannotDowngrade`:
-    -   The user can either remove the incompatible user data and retry the FCV downgrade, or they can upgrade the FCV back to the original FCV.
-    -   Because of this, the code in the upgrade path must be able to work if started from any point in the
-        transitional `kDowngradingFrom_X_To_Y` state.
-    -   The code in the FCV downgrade path must be idempotent and retryable.
--   `CannotUpgrade`:
-    -   The user would need to fix the incompatible user data and retry the FCV upgrade.
--   Other `uasserts`:
-    -   For example, if the user attempted to upgrade the FCV after the previous FCV downgrade failed
-        during `isCleaningServerMetadata`. In this case the user would need to retry the FCV downgrade.
--   `ManualInterventionRequired` or `fassert`:
-    -   `ManualInterventionRequired` indicates a server bug
-        but that all the data is consistent on disk and for reads/writes, and an `fassert`
-        indicates a server bug and that the data is corrupted.
-    -   `ManualInterventionRequired`
-        and `fasserts` are errors that should not occur in practice, but if they did,
-        they would turn into a Support case.
+- Retryable error (such as `InterruptedDueToReplStateChange`)
+  - The user must retry the FCV upgrade/downgrade, so the code must be idempotent and retryable.
+- `CannotDowngrade`:
+  - The user can either remove the incompatible user data and retry the FCV downgrade, or they can upgrade the FCV back to the original FCV.
+  - Because of this, the code in the upgrade path must be able to work if started from any point in the
+    transitional `kDowngradingFrom_X_To_Y` state.
+  - The code in the FCV downgrade path must be idempotent and retryable.
+- `CannotUpgrade`:
+  - The user would need to fix the incompatible user data and retry the FCV upgrade.
+- Other `uasserts`:
+  - For example, if the user attempted to upgrade the FCV after the previous FCV downgrade failed
+    during `isCleaningServerMetadata`. In this case the user would need to retry the FCV downgrade.
+- `ManualInterventionRequired` or `fassert`:
+  - `ManualInterventionRequired` indicates a server bug
+    but that all the data is consistent on disk and for reads/writes, and an `fassert`
+    indicates a server bug and that the data is corrupted.
+  - `ManualInterventionRequired`
+    and `fasserts` are errors that should not occur in practice, but if they did,
+    they would turn into a Support case.
 
 ## SetFCV Locks
 
 There are three locks used in the setFCV command:
 
--   [setFCVCommandLock](https://github.com/mongodb/mongo/blob/eb5d4ed00d889306f061428f5652431301feba8e/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L294)
-    -   This ensures that only one invocation of the setFCV command can run at a time (i.e. if you
-        ran setFCV twice in a row, the second invocation would not run until the first had completed)
--   [fcvDocumentLock](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L215)
-    -   The setFCV command takes this lock in X mode when it modifies the FCV document. This includes
-        from [fully upgraded -> downgrading](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L350),
-        [downgrading -> isCleaningServerMetadata](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L1459-L1460),
-        [isCleaningServerMetadata -> fully downgraded](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L533),
-        and vice versa.
-    -   Other operations should [take this lock in shared mode](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L594-L599)
-        if they want to ensure that the FCV state _does not change at all_ during the operation.
-        See [example](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/s/config/sharding_catalog_manager_collection_operations.cpp#L489-L490)
--   [Global lock]
-    -   The setFCV command [takes this lock in S mode and then releases it immediately](https://github.com/mongodb/mongo/blob/418028cf4dcf416d5ab87552721ed3559bce5507/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L551-L557)
-        after we are in the upgrading/downgrading state,
-        but before we transition from the upgrading/downgrading state to the fully upgraded/downgraded
-        state.
-    -   The lock creates a barrier for operations taking the global IX or X locks.
-    -   This is to ensure that the FCV does not _fully_ transition between the upgraded and downgraded
-        versions (or vice versa) during these other operations. This is because either:
-        _ The global IX/X locked operation will start after the FCV change, see the
-        upgrading/downgrading to the new FCV and act accordingly.
-        _ The global IX/X locked operation began prior to the FCV change. The operation will proceed
-        in the context of the old FCV, and will guarantee to finish before upgrade/downgrade
-        procedures begin right after this barrier
-    -   This also means that in order to make this barrier truly safe, if we want to ensure that the
-        FCV does not change during our operation, **you must take the global IX or X lock first, and
-        then check the feature flag/FCV value after that point**
+- [setFCVCommandLock](https://github.com/mongodb/mongo/blob/eb5d4ed00d889306f061428f5652431301feba8e/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L294)
+  - This ensures that only one invocation of the setFCV command can run at a time (i.e. if you
+    ran setFCV twice in a row, the second invocation would not run until the first had completed)
+- [fcvDocumentLock](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L215)
+  - The setFCV command takes this lock in X mode when it modifies the FCV document. This includes
+    from [fully upgraded -> downgrading](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L350),
+    [downgrading -> isCleaningServerMetadata](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L1459-L1460),
+    [isCleaningServerMetadata -> fully downgraded](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L533),
+    and vice versa.
+  - Other operations should [take this lock in shared mode](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L594-L599)
+    if they want to ensure that the FCV state _does not change at all_ during the operation.
+    See [example](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/s/config/sharding_catalog_manager_collection_operations.cpp#L489-L490)
+- [Global lock]
+  - The setFCV command [takes this lock in S mode and then releases it immediately](https://github.com/mongodb/mongo/blob/418028cf4dcf416d5ab87552721ed3559bce5507/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L551-L557)
+    after we are in the upgrading/downgrading state,
+    but before we transition from the upgrading/downgrading state to the fully upgraded/downgraded
+    state.
+  - The lock creates a barrier for operations taking the global IX or X locks.
+  - This is to ensure that the FCV does not _fully_ transition between the upgraded and downgraded
+    versions (or vice versa) during these other operations. This is because either:
+    _ The global IX/X locked operation will start after the FCV change, see the
+    upgrading/downgrading to the new FCV and act accordingly.
+    _ The global IX/X locked operation began prior to the FCV change. The operation will proceed
+    in the context of the old FCV, and will guarantee to finish before upgrade/downgrade
+    procedures begin right after this barrier
+  - This also means that in order to make this barrier truly safe, if we want to ensure that the
+    FCV does not change during our operation, **you must take the global IX or X lock first, and
+    then check the feature flag/FCV value after that point**
 
 _Code spelunking starting points:_
 
--   [The template file used to generate the FCV constants](https://github.com/mongodb/mongo/blob/c4d2ed3292b0e113135dd85185c27a8235ea1814/src/mongo/util/version/releases.h.tpl#L1)
--   [The `FCVTransitions` class, that determines valid FCV transitions](https://github.com/mongodb/mongo/blob/c4d2ed3292b0e113135dd85185c27a8235ea1814/src/mongo/db/commands/feature_compatibility_version.cpp#L75)
+- [The template file used to generate the FCV constants](https://github.com/mongodb/mongo/blob/c4d2ed3292b0e113135dd85185c27a8235ea1814/src/mongo/util/version/releases.h.tpl#L1)
+- [The `FCVTransitions` class, that determines valid FCV transitions](https://github.com/mongodb/mongo/blob/c4d2ed3292b0e113135dd85185c27a8235ea1814/src/mongo/db/commands/feature_compatibility_version.cpp#L75)
 
 ## Adding upgrade/downgrade related code to the setFCV command
 
@@ -382,20 +382,20 @@ We do not expect any other feature-specific work to be done in the 'start' phase
 any metadata changes as part of FCV upgrade. Any new feature specific upgrade code should be placed
 in the helper functions:
 
--   `_prepareToUpgradeActions`: for any upgrade actions that should be done before taking the global
-    lock in S mode. It is required that the code in this helper function is
-    idempotent and could be done after `_runDowngrade` even if `_runDowngrade` failed at any point.
--   `_userCollectionsWorkForUpgrade`: for any user collections uasserts (with the `CannotUpgrade` error code),
-    creations, or deletions that need to happen during the upgrade. This happens after the global lock.
-    It is required that the code in this helper function is idempotent and could be
-    done after `_runDowngrade` even if `_runDowngrade` failed at any point.
+- `_prepareToUpgradeActions`: for any upgrade actions that should be done before taking the global
+  lock in S mode. It is required that the code in this helper function is
+  idempotent and could be done after `_runDowngrade` even if `_runDowngrade` failed at any point.
+- `_userCollectionsWorkForUpgrade`: for any user collections uasserts (with the `CannotUpgrade` error code),
+  creations, or deletions that need to happen during the upgrade. This happens after the global lock.
+  It is required that the code in this helper function is idempotent and could be
+  done after `_runDowngrade` even if `_runDowngrade` failed at any point.
 
 `_runUpgrade`: \_runUpgrade performs all the metadata-changing actions of an FCV upgrade. Any new
 feature specific upgrade code should be placed in the `_runUpgrade` helper functions:
 
--   `_upgradeServerMetadata`: for updating server metadata to make sure the new features in the upgraded version
-    work for sharded and non-sharded clusters. It is required that the code in this helper function is
-    idempotent and could be done after `_runDowngrade` even if `_runDowngrade` failed at any point.
+- `_upgradeServerMetadata`: for updating server metadata to make sure the new features in the upgraded version
+  work for sharded and non-sharded clusters. It is required that the code in this helper function is
+  idempotent and could be done after `_runDowngrade` even if `_runDowngrade` failed at any point.
 
 `_finalizeUpgrade`: only for any tasks that must be done to fully complete the FCV upgrade
 AFTER the FCV document has already been updated to the UPGRADED FCV.
@@ -415,27 +415,27 @@ back to the user/client. Therefore, these tasks **must** be idempotent/retryable
 any metadata changes as part of FCV downgrade. Any new feature specific downgrade code should be
 placed in the helper functions:
 
--   `_prepareToDowngradeActions`: Any downgrade actions that should be done before taking the global
-    lock in S mode should go in this function.
--   `_userCollectionsUassertsForDowngrade`: for any checks on user data or settings that will uassert
-    with the `CannotDowngrade` code if users need to manually clean up user data or settings.
+- `_prepareToDowngradeActions`: Any downgrade actions that should be done before taking the global
+  lock in S mode should go in this function.
+- `_userCollectionsUassertsForDowngrade`: for any checks on user data or settings that will uassert
+  with the `CannotDowngrade` code if users need to manually clean up user data or settings.
 
 `_runDowngrade:` \_runDowngrade performs all the metadata-changing actions of an FCV downgrade. Any
 new feature specific downgrade code should be placed in the `_runDowngrade` helper functions:
 
--   `_internalServerCleanupForDowngrade`: for any internal server downgrade cleanup. Any code in this
-    function is required to be _idempotent_ and _retryable_ in case the node crashes or downgrade fails in a
-    way that the user has to run setFCV again. It cannot fail for a non-retryable reason since at this
-    point user data has already been cleaned up. It also must be able to be _rolled back_. This is
-    because we cannot guarantee the safety of any server metadata that is not replicated in the event of
-    a rollback. \* This function can only fail with some transient error that can be retried
-    (like `InterruptedDueToReplStateChange`), `ManualInterventionRequired`, or `fasserts`. For
-    any non-retryable error in this helper function, it should error either with an
-    uassert with `ManualInterventionRequired` as the error code (indicating a server bug
-    but that all the data is consistent on disk and for reads/writes) or with an `fassert`
-    (indicating a server bug and that the data is corrupted). `ManualInterventionRequired`
-    and `fasserts` are errors that are not expected to occur in practice, but if they did,
-    they would turn into a Support case.
+- `_internalServerCleanupForDowngrade`: for any internal server downgrade cleanup. Any code in this
+  function is required to be _idempotent_ and _retryable_ in case the node crashes or downgrade fails in a
+  way that the user has to run setFCV again. It cannot fail for a non-retryable reason since at this
+  point user data has already been cleaned up. It also must be able to be _rolled back_. This is
+  because we cannot guarantee the safety of any server metadata that is not replicated in the event of
+  a rollback. \* This function can only fail with some transient error that can be retried
+  (like `InterruptedDueToReplStateChange`), `ManualInterventionRequired`, or `fasserts`. For
+  any non-retryable error in this helper function, it should error either with an
+  uassert with `ManualInterventionRequired` as the error code (indicating a server bug
+  but that all the data is consistent on disk and for reads/writes) or with an `fassert`
+  (indicating a server bug and that the data is corrupted). `ManualInterventionRequired`
+  and `fasserts` are errors that are not expected to occur in practice, but if they did,
+  they would turn into a Support case.
 
 One common pattern for FCV downgrade is to check whether a feature needs to be cleaned up on
 downgrade because it is not enabled on the downgraded version. For example, if we are on 6.1 and are
@@ -507,11 +507,11 @@ Please see a sample `releases.h` file generated when latest is 7.0 [here](https:
 
 The logic for determining our generic FCVs is:
 
--   Latest: The FCV in the [`featureCompatibilityVersions` list](https://github.com/mongodb/mongo/blob/96ea1942d25bfc6b2ab30779590f1b8a8c6887b5/src/mongo/util/version/releases.yml#L7)
-    in `releases.yml` that is equal to the git tag.
--   Last Continuous: The highest FCV in `featureCompatibilityVersions` that is less than latest FCV.
--   Last LTS: The highest FCV in the [`longTermSupportReleases` list](https://github.com/mongodb/mongo/blob/96ea1942d25bfc6b2ab30779590f1b8a8c6887b5/src/mongo/util/version/releases.yml#L25)
-    in `releases.yml` that is less than latest FCV.
+- Latest: The FCV in the [`featureCompatibilityVersions` list](https://github.com/mongodb/mongo/blob/96ea1942d25bfc6b2ab30779590f1b8a8c6887b5/src/mongo/util/version/releases.yml#L7)
+  in `releases.yml` that is equal to the git tag.
+- Last Continuous: The highest FCV in `featureCompatibilityVersions` that is less than latest FCV.
+- Last LTS: The highest FCV in the [`longTermSupportReleases` list](https://github.com/mongodb/mongo/blob/96ea1942d25bfc6b2ab30779590f1b8a8c6887b5/src/mongo/util/version/releases.yml#L25)
+  in `releases.yml` that is less than latest FCV.
 
 ## Branch Cut and Upgrading FCVs
 
@@ -535,9 +535,9 @@ without the risk of accidentally enabling the feature for a scheduled product re
 The criteria for determining whether a feature flag can be enabled by default and released is
 largely specific to the scope and design but ideally a feature can be made available when:
 
--   There is sufficient test coverage to provide confidence that the feature works as designed.
--   Upgrade/downgrade issues have been addressed.
--   The feature does not destabilize the server as a whole while running in our CI system.
+- There is sufficient test coverage to provide confidence that the feature works as designed.
+- Upgrade/downgrade issues have been addressed.
+- The feature does not destabilize the server as a whole while running in our CI system.
 
 ## When to use Feature Flags
 
@@ -567,41 +567,41 @@ they've been released.
 
 ## Lifecycle of a feature flag
 
--   Adding the feature flag
-    -   Disabled by default. This minimizes disruption to the CI system and BB process.
-    -   This should be done concurrently with the first work ticket in the PM for the feature.
--   Enabling the feature by default
+- Adding the feature flag
+  - Disabled by default. This minimizes disruption to the CI system and BB process.
+  - This should be done concurrently with the first work ticket in the PM for the feature.
+- Enabling the feature by default
 
-    -   Feature flags with default:true must have a specific release version associated in its
-        definition.
-    -   **_We do not support disabling feature flags once they have been enabled via IDL in a release
-        build_**.
-    -   **_Feature flags must not be enabled after a branch cut if the FCV has not yet been upgraded_**.
-        This is because before FCVs are upgraded on master, we will temporarily have two builds that
-        have the same version (the newly cut branch and master). If the two builds differ on which
-        feature flags are enabled, this will lead to test failures in certain multiversion suites.
-    -   Project team should run a full patch build against all the ! builders to minimize the impact
-        on the Build Baron process.
-    -   If there are downstream teams that will break when this flag is enabled then enabling the
-        feature by default will need to wait until those teams have affirmed they have adapted their
-        product.
-    -   JS tests tagged with this feature flag should remove the `featureFlagXX` tag. The test should
-        add a `requires_fcv_yy` tag to ensure that the test will not be run in incompatible multiversion
-        configurations. (The `requires_fcv_yy` tag is enforced as of [SERVER-55858](https://jira.mongodb.org/browse/SERVER-55858)).
-        See the [Feature Flag Test Tagging](#feature-flag-test-tagging) section for more details.
-    -   After this point the feature flag is used for FCV gating to make upgrade/downgrade safe.
+  - Feature flags with default:true must have a specific release version associated in its
+    definition.
+  - **_We do not support disabling feature flags once they have been enabled via IDL in a release
+    build_**.
+  - **_Feature flags must not be enabled after a branch cut if the FCV has not yet been upgraded_**.
+    This is because before FCVs are upgraded on master, we will temporarily have two builds that
+    have the same version (the newly cut branch and master). If the two builds differ on which
+    feature flags are enabled, this will lead to test failures in certain multiversion suites.
+  - Project team should run a full patch build against all the ! builders to minimize the impact
+    on the Build Baron process.
+  - If there are downstream teams that will break when this flag is enabled then enabling the
+    feature by default will need to wait until those teams have affirmed they have adapted their
+    product.
+  - JS tests tagged with this feature flag should remove the `featureFlagXX` tag. The test should
+    add a `requires_fcv_yy` tag to ensure that the test will not be run in incompatible multiversion
+    configurations. (The `requires_fcv_yy` tag is enforced as of [SERVER-55858](https://jira.mongodb.org/browse/SERVER-55858)).
+    See the [Feature Flag Test Tagging](#feature-flag-test-tagging) section for more details.
+  - After this point the feature flag is used for FCV gating to make upgrade/downgrade safe.
 
--   Removing the feature flag
-    -   Any projects/tickets that use and enable a feature flag **_must_** leave that feature flag in
-        the codebase at least until the next major release.
-        _ For example, if a feature flag was enabled by default in 5.1, it must remain in the
-        codebase until 6.0 is branched. After that, the feature flag can be removed.
-        _ This is because the feature flag is used for FCV gating during the upgrade/downgrade
-        process. For example, if a feature is completed and the feature flag is enabled by default
-        in FCV 5.1, then from binary versions 5.1, 5.2, 5.3, and 6.0, the server could have its FCV
-        set to 5.0 during the downgrade process, where the feature is not supposed to be enabled. If
-        the feature flag was removed earlier than 6.0 then the feature would still run upon
-        downgrading the FCV to 5.0.
+- Removing the feature flag
+  - Any projects/tickets that use and enable a feature flag **_must_** leave that feature flag in
+    the codebase at least until the next major release.
+    _ For example, if a feature flag was enabled by default in 5.1, it must remain in the
+    codebase until 6.0 is branched. After that, the feature flag can be removed.
+    _ This is because the feature flag is used for FCV gating during the upgrade/downgrade
+    process. For example, if a feature is completed and the feature flag is enabled by default
+    in FCV 5.1, then from binary versions 5.1, 5.2, 5.3, and 6.0, the server could have its FCV
+    set to 5.0 during the downgrade process, where the feature is not supposed to be enabled. If
+    the feature flag was removed earlier than 6.0 then the feature would still run upon
+    downgrading the FCV to 5.0.
 
 ## Creating a Feature Flag
 
@@ -619,34 +619,34 @@ Feature flags are created by adding it to an IDL file:
 
 A feature flag has the following properties:
 
--   Server Parameter Name: featureFlag\<MyFeatureName\>
-    -   The name should not include "Use", "Allow", "Enable", or "Disable".
--   Server Parameter set_at value: [ startup ]
-    -   Feature flags should generally be settable at server startup only. This supports the use of
-        feature flags as a release/development tool and should not impose an unnecessary burden on
-        server administration.
--   C++ Type: mongo::feature_flags
-    -   This should apply to all feature flags that follow the naming convention in the previous
-        bullet.
-    -   No other type should be allowed for feature flags. For server parameters that support
-        multiple enumerated choices (for example, protocol/implementation for a command), these should
-        be declared separately. Feature flags may still be used to toggle support for a particular
-        option for the non-feature flag server parameter.
--   C++ Name: gFeatureFlagToaster
--   Default Value: false
-    -   The default value for a new feature flag should always start with false.
-    -   When the feature is fully tested and ready for release, we can change the default to true.
-        At that time, a "version" must be specified.
--   Version: string - a string for the FCV version
-    -   Required field if default is true, Must be a string acceptable to
-        FeatureCompatibilityVersionParser.
--   shouldBeFCVGated: boolean
-    -   This should usually be true in order to gate the feature flag based on the FCV.
-    -   However, some feature flags should not be FCV gated (for example, if the feature only exists
-        on mongos, which doesn't have an FCV, or if the feature doesn't have any upgrade downgrade
-        concerns and can be enabled as soon as the binary is upgraded/downgraded.
-    -   When set to false, the feature flag won't require a version parameter, so it will only be
-        gated based on whether it is enabled by default on that binary version.
+- Server Parameter Name: featureFlag\<MyFeatureName\>
+  - The name should not include "Use", "Allow", "Enable", or "Disable".
+- Server Parameter set_at value: [ startup ]
+  - Feature flags should generally be settable at server startup only. This supports the use of
+    feature flags as a release/development tool and should not impose an unnecessary burden on
+    server administration.
+- C++ Type: mongo::feature_flags
+  - This should apply to all feature flags that follow the naming convention in the previous
+    bullet.
+  - No other type should be allowed for feature flags. For server parameters that support
+    multiple enumerated choices (for example, protocol/implementation for a command), these should
+    be declared separately. Feature flags may still be used to toggle support for a particular
+    option for the non-feature flag server parameter.
+- C++ Name: gFeatureFlagToaster
+- Default Value: false
+  - The default value for a new feature flag should always start with false.
+  - When the feature is fully tested and ready for release, we can change the default to true.
+    At that time, a "version" must be specified.
+- Version: string - a string for the FCV version
+  - Required field if default is true, Must be a string acceptable to
+    FeatureCompatibilityVersionParser.
+- shouldBeFCVGated: boolean
+  - This should usually be true in order to gate the feature flag based on the FCV.
+  - However, some feature flags should not be FCV gated (for example, if the feature only exists
+    on mongos, which doesn't have an FCV, or if the feature doesn't have any upgrade downgrade
+    concerns and can be enabled as soon as the binary is upgraded/downgraded.
+  - When set to false, the feature flag won't require a version parameter, so it will only be
+    gated based on whether it is enabled by default on that binary version.
 
 To turn on a feature flag for testing when starting up a server, we would use the following command
 line (for the Toaster feature):
@@ -707,18 +707,18 @@ the server's current FCV `serverGlobalParams.featureCompatibility`. However, dur
 **_`isEnabled` will invariant if the FCV is uninitialized._**
 Because of this, each feature team should think about whether the feature could be run during initial sync, for example:
 
--   if the feature is part of initial sync itself
--   if the feature is in a background thread that runs during initial sync
--   if the feature is run in a command that is allowed during initial sync, such as `hello`, `serverStatus`,etc, or any command that returns `secondaryAllowed() == kAlways` or `kOptIn`, and returns `maintenanceOk() == true`
+- if the feature is part of initial sync itself
+- if the feature is in a background thread that runs during initial sync
+- if the feature is run in a command that is allowed during initial sync, such as `hello`, `serverStatus`,etc, or any command that returns `secondaryAllowed() == kAlways` or `kOptIn`, and returns `maintenanceOk() == true`
 
 If the feature will never run during initial sync, it's fine to continue using `isEnabled`. However, if the feature could be run during initial sync, the feature team
 should use one of these options instead:
 
--   Use `isEnabledUseLastLTSFCVWhenUninitialized`. This checks against the default last LTS FCV version if the FCV version is unset, but note that this could result in the feature not being turned on even though the FCV will be set to latest once initial sync is complete.
--   Use `isEnabledUseLatestFCVWhenUninitialized`. This instead checks against the
-    latest FCV version if the FCV version is unset, but note that this could result in the feature being turned on
-    even though the FCV has not been upgraded yet and will be set to lastLTS once initial sync is complete.
--   Write your own special logic to avoid the invariant. If there is a request for creating additional server-wide helper functions in this area, please reach out to the Replication team.
+- Use `isEnabledUseLastLTSFCVWhenUninitialized`. This checks against the default last LTS FCV version if the FCV version is unset, but note that this could result in the feature not being turned on even though the FCV will be set to latest once initial sync is complete.
+- Use `isEnabledUseLatestFCVWhenUninitialized`. This instead checks against the
+  latest FCV version if the FCV version is unset, but note that this could result in the feature being turned on
+  even though the FCV has not been upgraded yet and will be set to lastLTS once initial sync is complete.
+- Write your own special logic to avoid the invariant. If there is a request for creating additional server-wide helper functions in this area, please reach out to the Replication team.
 
 ### Additional feature flag gating guidelines
 
@@ -759,82 +759,82 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "Toaster")) {
 
 ### Feature Flag Test Tagging
 
--   When a feature flag is still disabled by default, we can still test the feature flag, as it will
-    be enabled by default for testing purposes on the Evergreen variants marked as "all feature flags".
+- When a feature flag is still disabled by default, we can still test the feature flag, as it will
+  be enabled by default for testing purposes on the Evergreen variants marked as "all feature flags".
 
--   If you have a JS test that depends on this feature flag being enabled, tag with a tag of the same
-    name as the feature flag in the format `featureFlagXX` (for example, `featureFlagToaster`). This
-    ensures that the test will only be run on the "all feature flags" variants where the feature flag is
-    enabled. This works by virtue of the feature flag being declared in the codebase with
-    `default: false` which will cause resmoke to ignore tests tagged with the feature flag unless
-    they are enabled through the input arguments.
-    _ Parallel test suite does not honor feature flag tags, due to which some tests may be
-    unexpectedly run in non-feature-flag build variants. If you want to skip such tests in
-    parallel suite, please add them to the exclusion list [here](https://github.com/mongodb/mongo/blob/eb75b6ccc62f7c8ea26a57c1b5eb96a41809396a/jstests/libs/parallelTester.js#L149).
-    _ Additionally, the featureFlagXX tags aren't considered by the jstests/core/selinux.js test.
-    If you want to skip a test, please use the `no_selinux` tag.
--   If you have a JS test that is incompatible with a feature flag being enabled, tag with a tag of
-    the same name as the feature flag appended with `_incompatible`in the format
-    `featureFlagXX_incompatible` (for example, `featureFlagToaster_incompatible`). This ensures that
-    the test will only be run when the selected feature flag is disabled.
--   Alternatively, it is fine to check the state of the feature flag in a test and skip the test
-    if the feature flag is not enabled (through `FeatureFlagUtil.isEnabled` or using the command
-    `getParameter` to query the setting for a feature flag)
+- If you have a JS test that depends on this feature flag being enabled, tag with a tag of the same
+  name as the feature flag in the format `featureFlagXX` (for example, `featureFlagToaster`). This
+  ensures that the test will only be run on the "all feature flags" variants where the feature flag is
+  enabled. This works by virtue of the feature flag being declared in the codebase with
+  `default: false` which will cause resmoke to ignore tests tagged with the feature flag unless
+  they are enabled through the input arguments.
+  _ Parallel test suite does not honor feature flag tags, due to which some tests may be
+  unexpectedly run in non-feature-flag build variants. If you want to skip such tests in
+  parallel suite, please add them to the exclusion list [here](https://github.com/mongodb/mongo/blob/eb75b6ccc62f7c8ea26a57c1b5eb96a41809396a/jstests/libs/parallelTester.js#L149).
+  _ Additionally, the featureFlagXX tags aren't considered by the jstests/core/selinux.js test.
+  If you want to skip a test, please use the `no_selinux` tag.
+- If you have a JS test that is incompatible with a feature flag being enabled, tag with a tag of
+  the same name as the feature flag appended with `_incompatible`in the format
+  `featureFlagXX_incompatible` (for example, `featureFlagToaster_incompatible`). This ensures that
+  the test will only be run when the selected feature flag is disabled.
+- Alternatively, it is fine to check the state of the feature flag in a test and skip the test
+  if the feature flag is not enabled (through `FeatureFlagUtil.isEnabled` or using the command
+  `getParameter` to query the setting for a feature flag)
 
--   Additionally, if your JS test has multiversion or FCV concerns (for example, if it is run in
-    multiversion suites such as `replica_sets_multiversion` and `sharding_multiversion`), **_you should
-    also tag the test with the appropriate_** [multiversion test tags](https://github.com/mongodb/mongo/blob/a7a2c901882367a8e4a34a97b38acafe07a45566/buildscripts/evergreen_gen_multiversion_tests.py#L55).
-    This ensures that the test will not be run in any incompatible multiversion configurations.  
-     _ For example, if your test depends on a feature that is only enabled in 6.1, tag the test
-    with `requires_fcv_61`.
-    _ If your test should not be run in any multiversion configurations, tag it with
-    `multiversion_incompatible`
--   Once the feature flag is enabled by default, you should remove the `featureFlagXX` tag from the
-    test. However, you must keep the `requires_fcv_yy` tags.
--   Test configurations that are incompatible with the feature enabled should have a comment next
-    to the tag describing exactly why the test is incompatible to minimize the chance of test
-    coverage gaps.
+- Additionally, if your JS test has multiversion or FCV concerns (for example, if it is run in
+  multiversion suites such as `replica_sets_multiversion` and `sharding_multiversion`), **_you should
+  also tag the test with the appropriate_** [multiversion test tags](https://github.com/mongodb/mongo/blob/a7a2c901882367a8e4a34a97b38acafe07a45566/buildscripts/evergreen_gen_multiversion_tests.py#L55).
+  This ensures that the test will not be run in any incompatible multiversion configurations.  
+   _ For example, if your test depends on a feature that is only enabled in 6.1, tag the test
+  with `requires_fcv_61`.
+  _ If your test should not be run in any multiversion configurations, tag it with
+  `multiversion_incompatible`
+- Once the feature flag is enabled by default, you should remove the `featureFlagXX` tag from the
+  test. However, you must keep the `requires_fcv_yy` tags.
+- Test configurations that are incompatible with the feature enabled should have a comment next
+  to the tag describing exactly why the test is incompatible to minimize the chance of test
+  coverage gaps.
 
--   If a feature flag needs to be disabled on an "all feature flags" build variant, you can add it
-    to the escape hatch here: buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
-    ([master branch link](https://github.com/mongodb/mongo/blob/master/buildscripts/resmokeconfig/fully_disabled_feature_flags.yml)).
--   It is not advisable to override the server parameter in the test (e.g. through the nodeOptions
-    parameter of a ReplSetTest configuration) because this will make it inconvenient to control the
-    feature flag through the CI configuration.
+- If a feature flag needs to be disabled on an "all feature flags" build variant, you can add it
+  to the escape hatch here: buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
+  ([master branch link](https://github.com/mongodb/mongo/blob/master/buildscripts/resmokeconfig/fully_disabled_feature_flags.yml)).
+- It is not advisable to override the server parameter in the test (e.g. through the nodeOptions
+  parameter of a ReplSetTest configuration) because this will make it inconvenient to control the
+  feature flag through the CI configuration.
 
--   --additionalFeatureFlags can be passed into resmoke.py to force enable certain feature flags.
-    The option is additive and can be specified multiple times.
+- --additionalFeatureFlags can be passed into resmoke.py to force enable certain feature flags.
+  The option is additive and can be specified multiple times.
 
--   resmoke.py suite YAMLs that set feature flags on fixtures will not override the options at the
-    build variant level. E.g. tests tagged with a certain feature flag will continue to be excluded
-    from build variants that don't run with feature flags.
+- resmoke.py suite YAMLs that set feature flags on fixtures will not override the options at the
+  build variant level. E.g. tests tagged with a certain feature flag will continue to be excluded
+  from build variants that don't run with feature flags.
 
--   The feature flag **_MUST NOT_** be enabled outside of the variants that test flag-guarded features
-    while the feature is in development or while the feature flag is still disabled by default. This
-    is necessary so that the Release team can be certain that failures outside of those variants
-    indicate bugs that will be released in the next version.
+- The feature flag **_MUST NOT_** be enabled outside of the variants that test flag-guarded features
+  while the feature is in development or while the feature flag is still disabled by default. This
+  is necessary so that the Release team can be certain that failures outside of those variants
+  indicate bugs that will be released in the next version.
 
--   Before enabling a feature flag by default, check through your open build failures to see if you
-    have any failures on the feature flag buildvariant which should be fixed first.
+- Before enabling a feature flag by default, check through your open build failures to see if you
+  have any failures on the feature flag buildvariant which should be fixed first.
 
--   If you want to test upgrade/downgrade behavior for an FCV-gated feature flag, please refer to
-    [this test](https://github.com/mongodb/mongo/blob/master/jstests/multiVersion/genericBinVersion/example_fcv_upgrade_downgrade_test.js) as an example.
+- If you want to test upgrade/downgrade behavior for an FCV-gated feature flag, please refer to
+  [this test](https://github.com/mongodb/mongo/blob/master/jstests/multiVersion/genericBinVersion/example_fcv_upgrade_downgrade_test.js) as an example.
 
 # Summary of Rules for FCV and Feature Flag Usage:
 
--   Any project or ticket that wants to introduce different behavior based on which FCV
-    the server is running **_must_** add a feature flag.
--   We should **_not_** be adding any references to FCV constants such as kVersion_6_0.
--   To make sure all generic FCV references are
-    indeed meant to exist across LTS binary versions, **_a comment containing “(Generic FCV reference):”
-    is required within 10 lines before a generic FCV reference._**
--   If you want to ensure that the FCV will not change during your operation, you must take the global
-    IX or X lock first, and then check the feature flag/FCV value after that point.
--   In a single operation, you should only check the feature flag once, as reads are non-repeatable.
--   Any projects/tickets that use and enable a feature flag **_must_** leave that feature flag in the
-    codebase at least until the next major release.
--   We do not support disabling feature flags once they have been enabled via IDL in a release build.
--   Feature flags should never be enabled in the period of time after branch cut but before FCV
-    constants have been upgraded to the next version.
--   In general, tag tests that depend on a feature flag with `featureFlagXX` and `requires_fcv_yy`
-    tags, where `yy` is the FCV that the feature flag is/will be enabled by default on.
+- Any project or ticket that wants to introduce different behavior based on which FCV
+  the server is running **_must_** add a feature flag.
+- We should **_not_** be adding any references to FCV constants such as kVersion_6_0.
+- To make sure all generic FCV references are
+  indeed meant to exist across LTS binary versions, **_a comment containing “(Generic FCV reference):”
+  is required within 10 lines before a generic FCV reference._**
+- If you want to ensure that the FCV will not change during your operation, you must take the global
+  IX or X lock first, and then check the feature flag/FCV value after that point.
+- In a single operation, you should only check the feature flag once, as reads are non-repeatable.
+- Any projects/tickets that use and enable a feature flag **_must_** leave that feature flag in the
+  codebase at least until the next major release.
+- We do not support disabling feature flags once they have been enabled via IDL in a release build.
+- Feature flags should never be enabled in the period of time after branch cut but before FCV
+  constants have been upgraded to the next version.
+- In general, tag tests that depend on a feature flag with `featureFlagXX` and `requires_fcv_yy`
+  tags, where `yy` is the FCV that the feature flag is/will be enabled by default on.

@@ -10,41 +10,41 @@ _Health Observers_ are designed for every particular check to run. Each observer
 
 ## Health Observers Parameters
 
--   healthMonitoringIntensities: main configuration for each observer. Can be set at startup and changed at runtime. Valid values:
+- healthMonitoringIntensities: main configuration for each observer. Can be set at startup and changed at runtime. Valid values:
 
-    -   off: this observer if off
-    -   critical: if the observer detects a failure, the process will crash
-    -   non-critical: if the observer detects a failure, the error will be logged and the process will not crash
+  - off: this observer if off
+  - critical: if the observer detects a failure, the process will crash
+  - non-critical: if the observer detects a failure, the error will be logged and the process will not crash
 
-    Example as startup parameter:
+  Example as startup parameter:
 
-    ```
-    mongos --setParameter "healthMonitoringIntensities={ \"values\" : [{ \"type\" : \"ldap\", \"intensity\" : \"critical\" } ]}"
-    ```
+  ```
+  mongos --setParameter "healthMonitoringIntensities={ \"values\" : [{ \"type\" : \"ldap\", \"intensity\" : \"critical\" } ]}"
+  ```
 
-    Example as runtime change command:
+  Example as runtime change command:
 
-    ```
-    db.adminCommand({ "setParameter": 1,
-      healthMonitoringIntensities: {values:
-          [{type: "ldap", intensity: "critical"}] } });
-    ```
+  ```
+  db.adminCommand({ "setParameter": 1,
+    healthMonitoringIntensities: {values:
+        [{type: "ldap", intensity: "critical"}] } });
+  ```
 
--   healthMonitoringIntervals: how often this health observer will run, in milliseconds.
+- healthMonitoringIntervals: how often this health observer will run, in milliseconds.
 
-    Example as startup parameter:
+  Example as startup parameter:
 
-    ```
-    mongos --setParameter "healthMonitoringIntervals={ \"values\" : [ { \"type\" : \"ldap\", \"interval\" : 30000 } ] }"
-    ```
+  ```
+  mongos --setParameter "healthMonitoringIntervals={ \"values\" : [ { \"type\" : \"ldap\", \"interval\" : 30000 } ] }"
+  ```
 
-    here LDAP health observer is configured to run every 30 seconds.
+  here LDAP health observer is configured to run every 30 seconds.
 
-    Example as runtime change command:
+  Example as runtime change command:
 
-    ```
-    db.adminCommand({"setParameter": 1, "healthMonitoringIntervals":{"values": [{"type":"ldap", "interval": 30000}]} });
-    ```
+  ```
+  db.adminCommand({"setParameter": 1, "healthMonitoringIntervals":{"values": [{"type":"ldap", "interval": 30000}]} });
+  ```
 
 ## LDAP Health Observer
 
@@ -56,25 +56,25 @@ To enable this observer, use the _healthMonitoringIntensities_ and _healthMonito
 
 When a failure is detected, and the observer is configured as _critical_, the server will wait for the configured interval before crashing. The interval from the failure detection and crash is configured with _activeFaultDurationSecs_ parameter:
 
--   activeFaultDurationSecs: how long to wait from the failure detection to crash, in seconds. This can be configured at startup and changed at runtime.
+- activeFaultDurationSecs: how long to wait from the failure detection to crash, in seconds. This can be configured at startup and changed at runtime.
 
-    Example:
+  Example:
 
-    ```
-    db.adminCommand({"setParameter": 1, activeFaultDurationSecs: 300});
-    ```
+  ```
+  db.adminCommand({"setParameter": 1, activeFaultDurationSecs: 300});
+  ```
 
 ## Progress Monitor
 
 _Progress Monitor_ detects that every health check is not stuck, without returning either success or failure. If a health check starts and does not complete the server will crash. This behavior could be configured with:
 
--   progressMonitor: configure the progress monitor. Values:
+- progressMonitor: configure the progress monitor. Values:
 
-    -   _interval_: how often to run the liveness check, in milliseconds
-    -   _deadline_: timeout before crashing the server if a health check is not making progress, in seconds
+  - _interval_: how often to run the liveness check, in milliseconds
+  - _deadline_: timeout before crashing the server if a health check is not making progress, in seconds
 
-    Example:
+  Example:
 
-    ```
-    mongos --setParameter "progressMonitor={ \"interval\" : 1000, \"deadline\" : 300 }"
-    ```
+  ```
+  mongos --setParameter "progressMonitor={ \"interval\" : 1000, \"deadline\" : 300 }"
+  ```

@@ -2,12 +2,12 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/disk/*.js
+    - jstests/disk/*.js
 
 executor:
   config:
     shell_options:
-      nodb: ''
+      nodb: ""
       global_vars:
         TestData:
           storageEngine: wiredTiger

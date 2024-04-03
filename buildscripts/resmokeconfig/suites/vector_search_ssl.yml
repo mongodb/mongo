@@ -2,14 +2,14 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/with_mongot/vector_search_mocked/ssl/*.js
+    - jstests/with_mongot/vector_search_mocked/ssl/*.js
 
 executor:
   config:
     shell_options:
-      nodb: ''
-      ssl: ''
-      tlsAllowInvalidHostnames: ''
-      tlsAllowInvalidCertificates: ''
+      nodb: ""
+      ssl: ""
+      tlsAllowInvalidHostnames: ""
+      tlsAllowInvalidCertificates: ""
       tlsCAFile: jstests/libs/ca.pem
       tlsCertificateKeyFile: jstests/libs/client.pem

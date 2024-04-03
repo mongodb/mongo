@@ -6,10 +6,10 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/core/**/*.js
+    - jstests/core/**/*.js
 
   exclude_with_any_tags:
-  - assumes_standalone_mongod
+    - assumes_standalone_mongod
 
 executor:
   archive:
@@ -20,9 +20,9 @@ executor:
       eval: >-
         globalThis.testingReplication = true;
   hooks:
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: ReplicaSetFixture
     mongod_options:
@@ -30,6 +30,6 @@ executor:
         enableTestCommands: 1
     num_nodes: 1
     default_read_concern:
-        level: local
+      level: local
     default_write_concern:
-        w: 1
+      w: 1

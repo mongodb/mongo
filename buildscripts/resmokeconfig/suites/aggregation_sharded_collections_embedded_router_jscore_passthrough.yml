@@ -2,35 +2,35 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/aggregation/**/*.js
+    - jstests/aggregation/**/*.js
   exclude_files:
-  - jstests/aggregation/extras/*.js
-  - jstests/aggregation/data/*.js
-  # This test makes assertions about whether aggregations will need to spill to disk, which assumes
-  # all the data is located on a single shard.
-  - jstests/aggregation/spill_to_disk.js
-  # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
-  - jstests/aggregation/match_swapping_renamed_fields.js
-  - jstests/aggregation/use_query_project_and_sort.js
-  - jstests/aggregation/use_query_projection.js
-  - jstests/aggregation/use_query_sort.js
-  # TODO: Remove when SERVER-23229 is fixed.
-  - jstests/aggregation/bugs/groupMissing.js
-  - jstests/aggregation/sources/graphLookup/variables.js
-  # TODO SERVER-87318: Remove once it is fixed.
-  - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+    # This test makes assertions about whether aggregations will need to spill to disk, which assumes
+    # all the data is located on a single shard.
+    - jstests/aggregation/spill_to_disk.js
+    # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
+    - jstests/aggregation/match_swapping_renamed_fields.js
+    - jstests/aggregation/use_query_project_and_sort.js
+    - jstests/aggregation/use_query_projection.js
+    - jstests/aggregation/use_query_sort.js
+    # TODO: Remove when SERVER-23229 is fixed.
+    - jstests/aggregation/bugs/groupMissing.js
+    - jstests/aggregation/sources/graphLookup/variables.js
+    # TODO SERVER-87318: Remove once it is fixed.
+    - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
   exclude_with_any_tags:
-  # This passthrough implicitly shards the accessed collections. Do not run tests where collections
-  # can't be created on `getCollection` call.
-  - assumes_no_implicit_collection_creation_on_get_collection
-  # Tests tagged with the following will fail because they assume collections are not sharded.
-  - assumes_against_mongod_not_mongos
-  - assumes_no_implicit_collection_creation_after_drop
-  - assumes_no_implicit_index_creation
-  - assumes_unsharded_collection
-  - cannot_create_unique_index_when_using_hashed_shard_key
-  - requires_sharding
-  - requires_profiling
+    # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+    # can't be created on `getCollection` call.
+    - assumes_no_implicit_collection_creation_on_get_collection
+    # Tests tagged with the following will fail because they assume collections are not sharded.
+    - assumes_against_mongod_not_mongos
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    - requires_sharding
+    - requires_profiling
 
   # Embedded Router Exclusions:
   # Explicit auth is not supported in embedded router mode yet.
@@ -46,12 +46,12 @@ executor:
     shell_options:
       eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
   hooks:
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: ValidateCollections
-  - class: CheckOrphansDeleted
-  - class: CleanEveryN
-    n: 20
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: ShardedClusterFixture
     mongod_options:

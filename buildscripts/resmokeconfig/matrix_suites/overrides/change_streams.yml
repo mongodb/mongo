@@ -33,17 +33,17 @@
           - CheckReplDBHash
           - ValidateCollections
       hooks:
-      - class: CheckReplDBHash
-      - class: ValidateCollections
-      - class: CleanEveryN
-        n: 20
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+        - class: CleanEveryN
+          n: 20
       fixture:
         class: ShardedClusterFixture
         # Use two shards to make sure we will only talk to the primary shard for the database and will
         # not delay changes to wait for notifications or a clock advancement from other shards.
         num_shards: 2
         mongos_options:
-          bind_ip_all: ''
+          bind_ip_all: ""
           set_parameters:
             enableTestCommands: 1
         mongod_options:
@@ -55,8 +55,8 @@
 - name: mongos_passthrough_excludes
   value:
     exclude_with_any_tags:
-    # Exclude any that assume sharding is disabled
-    - assumes_against_mongod_not_mongos
+      # Exclude any that assume sharding is disabled
+      - assumes_against_mongod_not_mongos
 
 - name: sharded_collections_passthrough
   value:
@@ -69,8 +69,8 @@
 - name: sharded_collections_passthrough_excludes
   value:
     exclude_with_any_tags:
-    - assumes_unsharded_collection
-    - assumes_no_implicit_collection_creation_on_get_collection
+      - assumes_unsharded_collection
+      - assumes_no_implicit_collection_creation_on_get_collection
 
 - name: sharded_collections_passthrough_eval
   value:
@@ -108,9 +108,9 @@
 - name: secondary_reads_excludes
   value:
     exclude_with_any_tags:
-    - assumes_read_preference_unchanged
+      - assumes_read_preference_unchanged
     exclude_files:
-    - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
+      - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
 
 - name: secondary_reads_eval
   value:

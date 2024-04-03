@@ -2,41 +2,41 @@
 
 ## Table of Contents
 
--   [High Level Overview](#high-level-overview)
--   [Authentication](#authentication)
-    -   [SASL](#sasl)
-        -   [Speculative Auth](#speculative-authentication)
-        -   [SASL Supported Mechs](#sasl-supported-mechs)
-    -   [X509 Authentication](#x509-authentication)
-    -   [Cluster Authentication](#cluster-authentication)
-        -   [X509 Intracluster Auth](#x509-intracluster-auth-and-member-certificate-rotation)
-        -   [Keyfile Intracluster Auth](#keyfile-intracluster-auth)
-    -   [Localhost Auth Bypass](#localhost-auth-bypass)
--   [Authorization](#authorization)
-    -   [AuthName](#authname) (`UserName` and `RoleName`)
-    -   [Users](#users)
-        -   [User Roles](#user-roles)
-        -   [User Credentials](#user-credentials)
-        -   [User Authentication Restrictions](#user-authentication-restrictions)
-    -   [Roles](#roles)
-        -   [Role subordinate Roles](#role-subordinate-roles)
-        -   [Role Privileges](#role-privileges)
-        -   [Role Authentication Restrictions](#role-authentication-restrictions)
-    -   [User and Role Management](#user-and-role-management)
-        -   [UMC Transactions](#umc-transactions)
-    -   [Privilege](#privilege)
-        -   [ResourcePattern](#resourcepattern)
-        -   [ActionType](#actiontype)
-    -   [Command Execution](#command-execution)
-    -   [Authorization Caching](#authorization-caching)
-    -   [Authorization Manager External State](#authorization-manager-external-state)
-    -   [Types of Authorization](#types-of-authorization)
-        -   [Local Authorization](#local-authorization)
-        -   [LDAP Authorization](#ldap-authorization)
-        -   [X.509 Authorization](#x509-authorization)
-    -   [Cursors and Operations](#cursors-and-operations)
-    -   [Contracts](#contracts)
--   [External References](#external-references)
+- [High Level Overview](#high-level-overview)
+- [Authentication](#authentication)
+  - [SASL](#sasl)
+    - [Speculative Auth](#speculative-authentication)
+    - [SASL Supported Mechs](#sasl-supported-mechs)
+  - [X509 Authentication](#x509-authentication)
+  - [Cluster Authentication](#cluster-authentication)
+    - [X509 Intracluster Auth](#x509-intracluster-auth-and-member-certificate-rotation)
+    - [Keyfile Intracluster Auth](#keyfile-intracluster-auth)
+  - [Localhost Auth Bypass](#localhost-auth-bypass)
+- [Authorization](#authorization)
+  - [AuthName](#authname) (`UserName` and `RoleName`)
+  - [Users](#users)
+    - [User Roles](#user-roles)
+    - [User Credentials](#user-credentials)
+    - [User Authentication Restrictions](#user-authentication-restrictions)
+  - [Roles](#roles)
+    - [Role subordinate Roles](#role-subordinate-roles)
+    - [Role Privileges](#role-privileges)
+    - [Role Authentication Restrictions](#role-authentication-restrictions)
+  - [User and Role Management](#user-and-role-management)
+    - [UMC Transactions](#umc-transactions)
+  - [Privilege](#privilege)
+    - [ResourcePattern](#resourcepattern)
+    - [ActionType](#actiontype)
+  - [Command Execution](#command-execution)
+  - [Authorization Caching](#authorization-caching)
+  - [Authorization Manager External State](#authorization-manager-external-state)
+  - [Types of Authorization](#types-of-authorization)
+    - [Local Authorization](#local-authorization)
+    - [LDAP Authorization](#ldap-authorization)
+    - [X.509 Authorization](#x509-authorization)
+  - [Cursors and Operations](#cursors-and-operations)
+  - [Contracts](#contracts)
+- [External References](#external-references)
 
 ## High Level Overview
 
@@ -136,60 +136,60 @@ This allows clients to proceed with authentication by choosing an appropriate me
 different named SASL mechanisms are listed below. If a mechanism can use a different storage method,
 the storage mechanism is listed as a sub-bullet below.
 
--   [**SCRAM-SHA-1**](https://tools.ietf.org/html/rfc5802)
-    -   See the section on `SCRAM-SHA-256` for details on `SCRAM`. `SCRAM-SHA-1` uses `SHA-1` for the
-        hashing algorithm.
--   [**SCRAM-SHA-256**](https://tools.ietf.org/html/rfc7677)
-    -   `SCRAM` stands for Salted Challenge Response Authentication Mechanism. `SCRAM-SHA-256` implements
-        the `SCRAM` protocol and uses `SHA-256` as a hashing algorithm to complement it. `SCRAM`
-        involves four steps, a client and server first, and a client and server final. During the client
-        first, the client sends the username for lookup. The server uses the username to retrieve the
-        relevant authentication information for the client. This generally includes the salt, StoredKey,
-        ServerKey, and iteration count. The client then computes a set of values (defined in [section
-        3](https://tools.ietf.org/html/rfc5802#section-3) of the `SCRAM` RFC), most notably the client
-        proof and the server signature. It sends the client proof (used to authenticate the client) to
-        the server, and the server then responds by sending the server proof. The hashing function used
-        to hash the client password that is stored by the server is what differentiates `SCRAM-SHA-1` vs
-        `SCRAM-SHA-256`, `SHA-1` is used in `SCRAM-SHA-1`. `SCRAM-SHA-256` is the preferred mechanism
-        over `SCRAM-SHA-1`. Note also that `SCRAM-SHA-256` performs [RFC 4013 SASLprep Unicode
-        normalization](https://tools.ietf.org/html/rfc4013) on all provided passwords before hashing,
-        while for backward compatibility reasons, `SCRAM-SHA-1` does not.
--   [**PLAIN**](https://tools.ietf.org/html/rfc4616)
-    -   The `PLAIN` mechanism involves two steps for authentication. First, the client concatenates a
-        message using the authorization id, the authentication id (also the username), and the password
-        for a user and sends it to the server. The server validates that the information is correct and
-        authenticates the user. For storage, the server hashes one copy using SHA-1 and another using
-        SHA-256 so that the password is not stored in plaintext. Even when using the PLAIN mechanism,
-        the same secrets as used for the SCRAM methods are stored and used for validation. The chief
-        difference between using PLAIN and SCRAM-SHA-256 (or SCRAM-SHA-1) is that using SCRAM provides
-        mutual authentication and avoids transmitting the password to the server. With PLAIN, it is
-        less difficult for a MitM attacker to compromise original credentials.
-    -   **With local users**
-        -   When the PLAIN mechanism is used with internal users, the user information is stored in the
-            [user
-            collection](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.cpp#L56)
-            on the database. See [authorization](#authorization) for more information.
-    -   **With Native LDAP**
-        -   When the PLAIN mechanism uses `Native LDAP`, the credential information is sent to and
-            received from LDAP when creating and authorizing a user. The mongo server sends user
-            credentials over the wire to the LDAP server and the LDAP server requests a password. The
-            mongo server sends the password in plain text and LDAP responds with whether the password is
-            correct. Here the communication with the driver and the mongod is the same, but the storage
-            mechanism for the credential information is different.
-    -   **With Cyrus SASL / saslauthd**
-        -   When using saslauthd, the mongo server communicates with a process called saslauthd running on
-            the same machine. The saslauthd process has ways of communicating with many other servers,
-            LDAP servers included. Saslauthd works in the same way as Native LDAP except that the
-            mongo process communicates using unix domain sockets.
--   [**GSSAPI**](https://tools.ietf.org/html/rfc4752)
-    -   GSSAPI is an authentication mechanism that supports [Kerberos](https://web.mit.edu/kerberos/)
-        authentication. GSSAPI is the communication method used to communicate with Kerberos servers and
-        with clients. When initializing this auth mechanism, the server tries to acquire its credential
-        information from the KDC by calling
-        [`tryAcquireServerCredential`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/sasl/mongo_gssapi.h#L36).
-        If this is not approved, the server fasserts and the mechanism is not registered. On Windows,
-        SChannel provides a `GSSAPI` library for the server to use. On other platforms, the Cyrus SASL
-        library is used to make calls to the KDC (Kerberos key distribution center).
+- [**SCRAM-SHA-1**](https://tools.ietf.org/html/rfc5802)
+  - See the section on `SCRAM-SHA-256` for details on `SCRAM`. `SCRAM-SHA-1` uses `SHA-1` for the
+    hashing algorithm.
+- [**SCRAM-SHA-256**](https://tools.ietf.org/html/rfc7677)
+  - `SCRAM` stands for Salted Challenge Response Authentication Mechanism. `SCRAM-SHA-256` implements
+    the `SCRAM` protocol and uses `SHA-256` as a hashing algorithm to complement it. `SCRAM`
+    involves four steps, a client and server first, and a client and server final. During the client
+    first, the client sends the username for lookup. The server uses the username to retrieve the
+    relevant authentication information for the client. This generally includes the salt, StoredKey,
+    ServerKey, and iteration count. The client then computes a set of values (defined in [section
+    3](https://tools.ietf.org/html/rfc5802#section-3) of the `SCRAM` RFC), most notably the client
+    proof and the server signature. It sends the client proof (used to authenticate the client) to
+    the server, and the server then responds by sending the server proof. The hashing function used
+    to hash the client password that is stored by the server is what differentiates `SCRAM-SHA-1` vs
+    `SCRAM-SHA-256`, `SHA-1` is used in `SCRAM-SHA-1`. `SCRAM-SHA-256` is the preferred mechanism
+    over `SCRAM-SHA-1`. Note also that `SCRAM-SHA-256` performs [RFC 4013 SASLprep Unicode
+    normalization](https://tools.ietf.org/html/rfc4013) on all provided passwords before hashing,
+    while for backward compatibility reasons, `SCRAM-SHA-1` does not.
+- [**PLAIN**](https://tools.ietf.org/html/rfc4616)
+  - The `PLAIN` mechanism involves two steps for authentication. First, the client concatenates a
+    message using the authorization id, the authentication id (also the username), and the password
+    for a user and sends it to the server. The server validates that the information is correct and
+    authenticates the user. For storage, the server hashes one copy using SHA-1 and another using
+    SHA-256 so that the password is not stored in plaintext. Even when using the PLAIN mechanism,
+    the same secrets as used for the SCRAM methods are stored and used for validation. The chief
+    difference between using PLAIN and SCRAM-SHA-256 (or SCRAM-SHA-1) is that using SCRAM provides
+    mutual authentication and avoids transmitting the password to the server. With PLAIN, it is
+    less difficult for a MitM attacker to compromise original credentials.
+  - **With local users**
+    - When the PLAIN mechanism is used with internal users, the user information is stored in the
+      [user
+      collection](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.cpp#L56)
+      on the database. See [authorization](#authorization) for more information.
+  - **With Native LDAP**
+    - When the PLAIN mechanism uses `Native LDAP`, the credential information is sent to and
+      received from LDAP when creating and authorizing a user. The mongo server sends user
+      credentials over the wire to the LDAP server and the LDAP server requests a password. The
+      mongo server sends the password in plain text and LDAP responds with whether the password is
+      correct. Here the communication with the driver and the mongod is the same, but the storage
+      mechanism for the credential information is different.
+  - **With Cyrus SASL / saslauthd**
+    - When using saslauthd, the mongo server communicates with a process called saslauthd running on
+      the same machine. The saslauthd process has ways of communicating with many other servers,
+      LDAP servers included. Saslauthd works in the same way as Native LDAP except that the
+      mongo process communicates using unix domain sockets.
+- [**GSSAPI**](https://tools.ietf.org/html/rfc4752)
+  - GSSAPI is an authentication mechanism that supports [Kerberos](https://web.mit.edu/kerberos/)
+    authentication. GSSAPI is the communication method used to communicate with Kerberos servers and
+    with clients. When initializing this auth mechanism, the server tries to acquire its credential
+    information from the KDC by calling
+    [`tryAcquireServerCredential`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/sasl/mongo_gssapi.h#L36).
+    If this is not approved, the server fasserts and the mechanism is not registered. On Windows,
+    SChannel provides a `GSSAPI` library for the server to use. On other platforms, the Cyrus SASL
+    library is used to make calls to the KDC (Kerberos key distribution center).
 
 The specific properties that each SASL mechanism provides is outlined in this table below.
 
@@ -373,8 +373,8 @@ and provide a set of `constexpr StringData` identifiers relating to their type.
 
 #### Serializations
 
--   `getDisplayName()` and `toString()` create a new string of the form `name@db` for use in log messages.
--   `getUnambiguousName()` creates a new string of the form `db.name` for use in generating `_id` fields for authzn documents and generating unique hashes for logical session identifiers.
+- `getDisplayName()` and `toString()` create a new string of the form `name@db` for use in log messages.
+- `getUnambiguousName()` creates a new string of the form `db.name` for use in generating `_id` fields for authzn documents and generating unique hashes for logical session identifiers.
 
 #### Multitenancy
 

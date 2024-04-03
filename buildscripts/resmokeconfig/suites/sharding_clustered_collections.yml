@@ -2,32 +2,32 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/sharding/**/*.js
+    - jstests/sharding/**/*.js
   exclude_files:
-  - jstests/sharding/**/libs/**/*.js
-  # Expects hint(_id) to yield an index scan instead of a table scan.
-  - jstests/sharding/shard2.js
-  # Expects the collection creation options not to change.
-  - jstests/sharding/move_primary_with_writes.js
-  - jstests/sharding/timeseries_user_system_buckets_sharding.js
-  # Expects to use the SBE plan cache
-  - jstests/sharding/invalidate_plan_cache_entries_when_collection_generation_changes.js
-  # TODO SERVER-85395: remove the following exclusion together with the test
-  # Expects the collection creation options not to change.
-  - jstests/sharding/shard_unsplittable_collection.js
-  # TODO SERVER-85395: remove the following exclusion together with the test
-  # Expects the collection creation options not to change.
-  - jstests/sharding/create_unsplittable_collection.js
-  # TODO SERVER-85395: remove the following exclusion together with the test
-  # Expects the collection creation options not to change.
-  - jstests/sharding/create_unsplittable_collection_on_shard.js
+    - jstests/sharding/**/libs/**/*.js
+    # Expects hint(_id) to yield an index scan instead of a table scan.
+    - jstests/sharding/shard2.js
+    # Expects the collection creation options not to change.
+    - jstests/sharding/move_primary_with_writes.js
+    - jstests/sharding/timeseries_user_system_buckets_sharding.js
+    # Expects to use the SBE plan cache
+    - jstests/sharding/invalidate_plan_cache_entries_when_collection_generation_changes.js
+    # TODO SERVER-85395: remove the following exclusion together with the test
+    # Expects the collection creation options not to change.
+    - jstests/sharding/shard_unsplittable_collection.js
+    # TODO SERVER-85395: remove the following exclusion together with the test
+    # Expects the collection creation options not to change.
+    - jstests/sharding/create_unsplittable_collection.js
+    # TODO SERVER-85395: remove the following exclusion together with the test
+    # Expects the collection creation options not to change.
+    - jstests/sharding/create_unsplittable_collection_on_shard.js
   exclude_with_any_tags:
-  - expects_explicit_underscore_id_index
+    - expects_explicit_underscore_id_index
 
 executor:
   config:
     shell_options:
-      nodb: ''
+      nodb: ""
       global_vars:
         TestData:
           setParameters:

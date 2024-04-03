@@ -3,9 +3,9 @@ test_kind: cpp_integration_test
 selector:
   root: build/integration_tests.txt
   exclude_files:
-  - build/**/mongo/client/client_dbclient_connection_integration_test* # Needs sleep command
-  - build/install/bin/client_dbclient_connection_integration_test* # Needs sleep command
-  - build/**/network_interface_ssl_test* # Requires SSL
+    - build/**/mongo/client/client_dbclient_connection_integration_test* # Needs sleep command
+    - build/install/bin/client_dbclient_connection_integration_test* # Needs sleep command
+    - build/**/network_interface_ssl_test* # Requires SSL
 
 executor:
   archive:
@@ -15,10 +15,10 @@ executor:
       - ValidateCollections
   config: {}
   hooks:
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: ValidateCollections
-  - class: CheckOrphansDeleted
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
   fixture:
     class: ShardedClusterFixture
     mongod_options:

@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/decimal/*.js
+    - jstests/decimal/*.js
 
 executor:
   archive:
@@ -10,9 +10,9 @@ executor:
       - ValidateCollections
   config: {}
   hooks:
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: MongoDFixture
     mongod_options:

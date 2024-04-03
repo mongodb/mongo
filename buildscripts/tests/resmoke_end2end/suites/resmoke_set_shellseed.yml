@@ -2,10 +2,9 @@ test_kind: js_test
 
 selector:
   roots:
-  - buildscripts/tests/resmoke_end2end/testfiles/random_with_seed.js
-
+    - buildscripts/tests/resmoke_end2end/testfiles/random_with_seed.js
 
 executor:
   config:
     shell_options:
-      nodb: ''
+      nodb: ""

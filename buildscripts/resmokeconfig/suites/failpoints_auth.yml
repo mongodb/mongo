@@ -1,13 +1,13 @@
 # Section that is ignored by resmoke.py.
 config_variables:
-- &keyFile jstests/libs/authTestsKey
-- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &keyFile jstests/libs/authTestsKey
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
 
 test_kind: js_test
 
 selector:
   roots:
-  - jstests/fail_point/*.js
+    - jstests/fail_point/*.js
 
 # Failpoint tests start their own mongod's.
 executor:
@@ -20,4 +20,4 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-      nodb: ''
+      nodb: ""

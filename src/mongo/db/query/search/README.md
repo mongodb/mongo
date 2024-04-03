@@ -10,9 +10,9 @@ Diving into the mechanics of search requires a brief rundown of [Apache Lucene](
 
 Apache Lucene is an open-source text search library, written in Java. Lucene allows users to store data in three primary ways:
 
--   inverted index: maps each term (in a set of documents) to the documents in which the term appears, in which terms are the unique words/phrases and documents are the pieces of content being indexed. Inverted indexes offer great performance for matching search terms with documents.
--   storedFields: stores all field values for one document together in a row-stride fashion. In retrieval, all field values are returned at once per document, so that loading the relevant information about a document is very fast. This is very useful for search features that are improved by row-oriented data access, like search highlighting. Search highlighting marks up the search terms and displays them within the best/most relevant sections of a document.
--   DocValues: column-oriented fields with a document-to-value mapping built at index time. As it facilitates column based data access, it's faster for aggregating field values for counts and facets.
+- inverted index: maps each term (in a set of documents) to the documents in which the term appears, in which terms are the unique words/phrases and documents are the pieces of content being indexed. Inverted indexes offer great performance for matching search terms with documents.
+- storedFields: stores all field values for one document together in a row-stride fashion. In retrieval, all field values are returned at once per document, so that loading the relevant information about a document is very fast. This is very useful for search features that are improved by row-oriented data access, like search highlighting. Search highlighting marks up the search terms and displays them within the best/most relevant sections of a document.
+- DocValues: column-oriented fields with a document-to-value mapping built at index time. As it facilitates column based data access, it's faster for aggregating field values for counts and facets.
 
 ## `mongot`
 
@@ -28,8 +28,8 @@ In order to run search queries, the user has to create a search index. Search in
 
 Search indexes can be:
 
--   Only on specified fields ("static")
--   All fields (“dynamic”)
+- Only on specified fields ("static")
+- All fields (“dynamic”)
 
 `mongot` stores the indexed data exclusively, unless the customer has opted into storing entire documents (more expensive).
 

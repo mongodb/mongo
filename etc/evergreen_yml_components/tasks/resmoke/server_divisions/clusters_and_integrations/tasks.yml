@@ -4,1914 +4,2907 @@
 #                   Variable                   #
 ################################################
 variables:
-# Used when the tests it runs depend only on mongod, mongos, the jstestshell and the tools.
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &task_template
-  name: template
-  depends_on:
-  - name: archive_dist_test_debug
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --help
-      resmoke_jobs_max: 0  # No cap on number of jobs.
+  # Used when the tests it runs depend only on mongod, mongos, the jstestshell and the tools.
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &task_template
+    name: template
+    depends_on:
+      - name: archive_dist_test_debug
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_args: --help
+          resmoke_jobs_max: 0 # No cap on number of jobs.
 
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &gen_task_template
-  name: gen_task_template
-  depends_on:
-  - name: version_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  - name: archive_dist_test_debug
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --help
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &gen_task_template
+    name: gen_task_template
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+      - name: archive_dist_test_debug
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          resmoke_args: --help
 
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &benchmark_template
-  name: benchmark_template
-  depends_on:
-  - name: compile_upload_benchmarks
-  commands:
-  - func: "do benchmark setup"
-  - func: "run benchmark tests"
-    vars:
-      resmoke_args: --help
-      resmoke_jobs_max: 1
-      suite: benchmark_suite
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &benchmark_template
+    name: benchmark_template
+    depends_on:
+      - name: compile_upload_benchmarks
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          resmoke_args: --help
+          resmoke_jobs_max: 1
+          suite: benchmark_suite
 
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &jstestfuzz_config_vars
-  is_jstestfuzz: true
-  num_files: 15
-  num_tasks: 5  # Upperbound by `max_sub_suites` specified through the variant with each task still running `num_files` files.
-  # It is error prone to require each fuzzer-related Evergreen task to need to override the
-  # resmoke_args variable. However, the resmoke_args variable must be defined as a string in the
-  # task generation configuration to satisfy mongodb/mongo-task-generator. We therefore specify an
-  # empty string for the variable to reflect there are no additional arguments provided to resmoke
-  # by default for the fuzzer-related tasks.
-  resmoke_args: ""
-  resmoke_jobs_max: 1
-  should_shuffle: false
-  continue_on_failure: false
-  # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
-  # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
-  # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
-  # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
-  timeout_secs: 1800
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &jstestfuzz_config_vars
+    is_jstestfuzz: true
+    num_files: 15
+    num_tasks: 5 # Upperbound by `max_sub_suites` specified through the variant with each task still running `num_files` files.
+    # It is error prone to require each fuzzer-related Evergreen task to need to override the
+    # resmoke_args variable. However, the resmoke_args variable must be defined as a string in the
+    # task generation configuration to satisfy mongodb/mongo-task-generator. We therefore specify an
+    # empty string for the variable to reflect there are no additional arguments provided to resmoke
+    # by default for the fuzzer-related tasks.
+    resmoke_args: ""
+    resmoke_jobs_max: 1
+    should_shuffle: false
+    continue_on_failure: false
+    # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
+    # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
+    # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
+    # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
+    timeout_secs: 1800
 
-# Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &jstestfuzz_template
-  name: jstestfuzz_template
-  exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
-  depends_on:
-  - name: version_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  - archive_dist_test_debug
-  commands:
-  - func: "generate resmoke tasks"
+  # Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &jstestfuzz_template
+    name: jstestfuzz_template
+    exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+      - archive_dist_test_debug
+    commands:
+      - func: "generate resmoke tasks"
 
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/compile_tasks.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &compile_task_group_template
-  name: compile_task_group_template
-  max_hosts: 1
-  tasks: []
-  setup_task:
-  - func: "f_expansions_write"
-  - func: "apply compile expansions"
-  - func: "f_expansions_write"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  - func: "get engflow creds"
-  teardown_task:
-  - func: "f_expansions_write"
-  - func: "attach scons logs"
-  - func: "attach report"
-  - func: "attach artifacts"
-  - func: "attach local resmoke invocation"
-  - func: "attach multiversion download links"
-  - func: "kill processes"
-  - func: "save mongo coredumps"
-  - func: "generate hang analyzer tasks"
-  - func: "save failed unittests"
-  - func: "save UndoDB recordings"
-  - func: "save unstripped dbtest"
-  - func: "save hang analyzer debugger files"
-  - func: "save disk statistics"
-  - func: "save system resource information"
-  - func: "save libfuzzertest corpora"
-  - func: "remove files"
-    vars:
-      files: >-
-        src/resmoke_error_code
-        src/build/scons/config.log
-        src/*.gcda.gcov
-        src/gcov-intermediate-files.tgz
-        src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
-        mongo-coredumps.json
-        src/dist-unittests/bin/*
-        src/dist-unittests/lib/*
-        mongo-unittests.tgz
-        src/debugger*.*
-        src/mongo-hanganalyzer.tgz
-        diskstats.tgz
-        system-resource-info.tgz
-        ${report_file|src/report.json}
-        ${archive_file|src/archive.json}
-  setup_group_can_fail_task: true
-  setup_group:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  - func: "kill processes"
-  - func: "cleanup environment"
-  # The python virtual environment is installed in ${workdir}, which is created in
-  # "set up venv".
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "f_expansions_write"
-  - func: "configure evergreen api credentials"
-  - func: "get buildnumber"
-  - func: "f_expansions_write"
-  - func: "set up credentials"
-  - func: "f_expansions_write"
-  - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
-  - func: "f_expansions_write"
-  - func: "set up win mount script"
-  - func: "f_expansions_write"
-  - func: "generate compile expansions"
-  - func: "f_expansions_write"
-  teardown_group:
-  - func: "f_expansions_write"
-  - func: "umount shared scons directory"
-  - func: "cleanup environment"
-  timeout:
-  - func: "f_expansions_write"
-  - func: "run hang analyzer"
-  - func: "wait for resmoke to shutdown"
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/compile_tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &compile_task_group_template
+    name: compile_task_group_template
+    max_hosts: 1
+    tasks: []
+    setup_task:
+      - func: "f_expansions_write"
+      - func: "apply compile expansions"
+      - func: "f_expansions_write"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+    teardown_task:
+      - func: "f_expansions_write"
+      - func: "attach scons logs"
+      - func: "attach report"
+      - func: "attach artifacts"
+      - func: "attach local resmoke invocation"
+      - func: "attach multiversion download links"
+      - func: "kill processes"
+      - func: "save mongo coredumps"
+      - func: "generate hang analyzer tasks"
+      - func: "save failed unittests"
+      - func: "save UndoDB recordings"
+      - func: "save unstripped dbtest"
+      - func: "save hang analyzer debugger files"
+      - func: "save disk statistics"
+      - func: "save system resource information"
+      - func: "save libfuzzertest corpora"
+      - func: "remove files"
+        vars:
+          files: >-
+            src/resmoke_error_code
+            src/build/scons/config.log
+            src/*.gcda.gcov
+            src/gcov-intermediate-files.tgz
+            src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
+            mongo-coredumps.json
+            src/dist-unittests/bin/*
+            src/dist-unittests/lib/*
+            mongo-unittests.tgz
+            src/debugger*.*
+            src/mongo-hanganalyzer.tgz
+            diskstats.tgz
+            system-resource-info.tgz
+            ${report_file|src/report.json}
+            ${archive_file|src/archive.json}
+    setup_group_can_fail_task: true
+    setup_group:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      # The python virtual environment is installed in ${workdir}, which is created in
+      # "set up venv".
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "f_expansions_write"
+      - func: "configure evergreen api credentials"
+      - func: "get buildnumber"
+      - func: "f_expansions_write"
+      - func: "set up credentials"
+      - func: "f_expansions_write"
+      - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+      - func: "f_expansions_write"
+      - func: "set up win mount script"
+      - func: "f_expansions_write"
+      - func: "generate compile expansions"
+      - func: "f_expansions_write"
+    teardown_group:
+      - func: "f_expansions_write"
+      - func: "umount shared scons directory"
+      - func: "cleanup environment"
+    timeout:
+      - func: "f_expansions_write"
+      - func: "run hang analyzer"
+      - func: "wait for resmoke to shutdown"
 
 ################################################
 #                    Tasks                     #
 ################################################
 tasks:
-
-################################################
-#          Service Architecture tasks          #
-################################################
-
-- <<: *benchmark_template
-  name: benchmarks_namespace
-  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run benchmark tests"
-    vars:
-      suite: benchmarks_namespace_string
-      resmoke_jobs_max: 1
-
-- <<: *benchmark_template
-  name: benchmarks_orphaned_first_half
-  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run benchmark tests"
-    vars:
-      suite: benchmarks_first_half
-      exec_timeout_secs: 21600 # 6 hour timeout.
-      resmoke_jobs_max: 1
-
-- <<: *benchmark_template
-  name: benchmarks_orphaned_second_half
-  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run benchmark tests"
-    vars:
-      suite: benchmarks_second_half
-      exec_timeout_secs: 21600 # 6 hour timeout.
-      resmoke_jobs_max: 1
-
-- <<: *benchmark_template
-  name: benchmarks_sep
-  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks_sep"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run benchmark tests"
-    vars:
-      suite: benchmarks_sep
-      exec_timeout_secs: 21600 # 6 hour timeout.
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: causally_consistent_hedged_reads_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "release_critical", "incompatible_mac", "causally_consistent", "sharding", "jscore"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: concurrency_multitenancy_with_atlas_proxy_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      suite: multitenancy_with_atlas_proxy_jscore_passthrough
-      resmoke_args: "--numClientsPerFixture=2 --useTenantClient --excludeWithAnyTags=multi_clients_incompatible"
-
-- <<: *gen_task_template
-  name: concurrency_embedded_router_causal_consistency_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "non_live_record", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_embedded_router_causal_consistency_and_balancer_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "large", "non_live_record", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_embedded_router_clusterwide_ops_add_remove_shards_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_embedded_router_local_read_write_multi_stmt_txn_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_embedded_router_local_read_write_multi_stmt_txn_with_balancer_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_embedded_router_multi_stmt_txn_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_embedded_router_multi_stmt_txn_with_balancer_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_embedded_router_replication_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_embedded_router_replication_bulk_write_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "bulk_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_embedded_router_replication_no_txns_with_balancer_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "no_txns", "large", "sharded"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: concurrency_embedded_router_replication_with_balancer
-      resmoke_args: "--excludeWithAnyTags=uses_transactions"
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_embedded_router_replication_with_balancer_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "incompatible_mac", "incompatible_ibm", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: embedded_router_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: embedded_router_jscore_passthrough_with_config_shard_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: embedded_router_jscore_passthrough_with_balancer_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "sharding", "jscore", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: aggregation_embedded_router_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: embedded_router_jscore_txns_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: embedded_router_jscore_txns_with_config_shard_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: embedded_router_sharded_collections_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: embedded_router_sharded_collections_jscore_txns_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: aggregation_sharded_collections_embedded_router_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "requires_all_feature_flags"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: embedded_router_sharded_collections_jscore_txns_with_config_shard_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *task_template
-  name: failpoints
-  tags: ["assigned_to_jira_team_server_servicearch", "release_critical", "misc_js"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: failpoints_auth
-  tags: ["assigned_to_jira_team_server_servicearch", "release_critical", "incompatible_mac", "incompatible_windows", "auth"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: integration_tests_replset
-  tags: ["assigned_to_jira_team_server_servicearch", "integration"]
-  depends_on:
-  - name: compile_integration_test
-  commands:
-  - func: "do integration_tests setup"
-  - func: "run tests"
-    vars:
-      install_dir: build/install/bin
-
-- <<: *task_template
-  name: integration_tests_replset_ssl_auth
-  tags: ["assigned_to_jira_team_server_servicearch", "integration"]
-  depends_on:
-  - name: compile_integration_test
-  commands:
-  - func: "do integration_tests setup"
-  - func: "run tests"
-    vars:
-      install_dir: build/install/bin
-
-- <<: *task_template
-  name: integration_tests_sharded
-  tags: ["assigned_to_jira_team_server_servicearch", "integration", "sharded"]
-  depends_on:
-  - name: compile_integration_test
-  commands:
-  - func: "do integration_tests setup"
-  - func: "run tests"
-    vars:
-      install_dir: build/install/bin
-
-- <<: *task_template
-  name: integration_tests_standalone
-  tags: ["assigned_to_jira_team_server_servicearch", "integration", "standalone"]
-  depends_on:
-  - name: compile_integration_test
-  commands:
-  - func: "do integration_tests setup"
-  - func: "run tests"
-    vars:
-      install_dir: build/install/bin
-
-- <<: *task_template
-  name: integration_tests_standalone_audit
-  tags: ["assigned_to_jira_team_server_servicearch", "integration", "audit"]
-  depends_on:
-  - name: compile_integration_test
-  commands:
-  - func: "do integration_tests setup"
-  - func: "run tests"
-    vars:
-      install_dir: build/install/bin
-
-- <<: *task_template
-  name: libunwind_tests
-  tags: ["assigned_to_jira_team_server_servicearch", "release_critical", "incompatible_mac", "incompatible_windows", "incompatible_ppc", "incompatible_s390x"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: libunwind
-
-- <<: *gen_task_template
-  name: multitenancy_with_atlas_proxy_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multitenancy_with_mongoq_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multitenancy_with_mongoq_unsigned_token_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *task_template
-  name: search_pinned_connections_auth
-  tags: ["assigned_to_jira_team_server_servicearch", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ppc", "incompatible_s390x"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- name: server_discovery_and_monitoring_json_test
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "requires_compile_variant"]
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
-  commands:
-  - func: "do scons setup"
-  - func: "scons compile"
-    vars:
-      targets: install-sdam-json-test
-      compiling_for_test: true
-      install_dir: build/install/bin
-  - func: "run tests"
-    vars:
-      suite: sdam_json_test
-
-- name: server_selection_json_test
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "requires_compile_variant"]
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
-  commands:
-  - func: "do scons setup"
-  - func: "scons compile"
-    vars:
-      targets: install-server-selection-json-test
-      compiling_for_test: true
-      install_dir: build/install/bin
-  - func: "run tests"
-
-- <<: *task_template
-  name: serverless
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: serverless_MTM
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: session_jscore_passthrough
-  tags: ["assigned_to_jira_team_server_servicearch", "default"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: shard_merge_causally_consistent_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_merge_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_merge_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless", "txn"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_split_causally_consistent_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_split_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_split_kill_primary_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      fallback_num_sub_suites: 10
-
-- <<: *gen_task_template
-  name: shard_split_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_split_stepdown_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_split_terminate_primary_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      fallback_num_sub_suites: 10
-
-# TODO(SERVER-88891): Delete these tenant migration suites
-# - <<: *gen_task_template
-#   name: tenant_migration_causally_consistent_jscore_passthrough_gen
-#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-#   commands:
-#   - func: "generate resmoke tasks"
-#     vars:
-#       use_large_distro: "true"
-
-# - <<: *gen_task_template
-#   name: tenant_migration_jscore_passthrough_gen
-#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-#   commands:
-#   - func: "generate resmoke tasks"
-#     vars:
-#       use_large_distro: "true"
-
-# - <<: *gen_task_template
-#   name: tenant_migration_kill_primary_jscore_passthrough_gen
-#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-#   commands:
-#   - func: "generate resmoke tasks"
-#     vars:
-#       use_large_distro: "true"
-#       fallback_num_sub_suites: 10
-
-# - <<: *gen_task_template
-#   name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
-#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless", "txn"]
-#   commands:
-#   - func: "generate resmoke tasks"
-#     vars:
-#       use_large_distro: "true"
-
-# - <<: *gen_task_template
-#   name: tenant_migration_stepdown_jscore_passthrough_gen
-#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-#   commands:
-#   - func: "generate resmoke tasks"
-#     vars:
-#       use_large_distro: "true"
-
-# - <<: *gen_task_template
-#   name: tenant_migration_terminate_primary_jscore_passthrough_gen
-#   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-#   commands:
-#   - func: "generate resmoke tasks"
-#     vars:
-#       use_large_distro: "true"
-#       fallback_num_sub_suites: 10
-
-# This is a separate task because it is only supported on Ubuntu 16.04+ which are not inmemory builders
-- <<: *task_template
-  name: watchdog_inmemory
-  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "watchdog"]
-  commands:
-  - func: "do setup"
-  - func: "do watchdog setup"
-  - func: "run tests"
-    vars:
-      suite: watchdog
-      resmoke_args: --storageEngine=inMemory
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: watchdog_wiredtiger
-  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "watchdog"]
-  commands:
-  - func: "do setup"
-  - func: "do watchdog setup"
-  - func: "run tests"
-    vars:
-      suite: watchdog
-      resmoke_jobs_max: 1
-
-################################################
-#            Server Security tasks             #
-################################################
-
-- <<: *task_template
-  name: aggregation_ese
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "aggregation", "encrypt"]
-  depends_on:
-  - name: aggregation
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: aggregation_ese_gcm
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "aggregation", "encrypt", "gcm"]
-  depends_on:
-  - name: aggregation
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: audit
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "audit", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: auth_audit_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "auth", "audit", "patch_build"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: auth_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "auth"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *task_template
-  name: client_encrypt
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "ssl", "encrypt", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: ese
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "encrypt", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: external_auth
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_ppc", "incompatible_s390x"]
-  commands:
-  - func: "f_expansions_write"
-  - func: "do setup"
-  - func: "f_expansions_write"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: ${external_auth_jobs_max|4}
-      resmoke_args: --excludeWithAnyTags=requires_domain_controller
-
-- <<: *task_template
-  name: external_auth_aws
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_ppc", "incompatible_s390x"]
-  commands:
-  - func: "f_expansions_write"
-  - func: "do setup"
-  - func: "f_expansions_write"
-  - command: subprocess.exec
-    params:
-      binary: bash
-      silent: true
-      args:
-      - "src/evergreen/external_auth_aws_setup.sh"
-  - func: "run tests"
-
-- <<: *task_template
-  name: external_auth_oidc
-  tags: ["assigned_to_jira_team_server_security", "experimental"]
-  commands:
-  - func: "f_expansions_write"
-  - func: "do setup"
-  - func: "f_expansions_write"
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/external_auth_oidc_setup.sh"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: ${external_auth_oidc_jobs_max|1}
-
-- <<: *task_template
-  name: external_auth_oidc_azure
-  tags: ["assigned_to_jira_team_server_security", "experimental"]
-  commands:
-  - func: "f_expansions_write"
-  - func: "do setup"
-  - func: "f_expansions_write"
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/external_auth_azure_setup.sh"
-  - func: "run tests"
-
-- <<: *task_template
-  name: external_auth_oidc_gcp
-  tags: ["assigned_to_jira_team_server_security", "experimental"]
-  commands:
-  - func: "f_expansions_write"
-  - func: "do setup"
-  - func: "f_expansions_write"
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/external_auth_gcp_setup.sh"
-  - func: "run tests"
-
-- <<: *task_template
-  name: external_auth_windows
-  tags: ["assigned_to_jira_team_server_security", "experimental"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: external_auth
-      resmoke_args: --includeWithAnyTags=requires_domain_controller
-
-## fetch_and_run_libfuzzertests - get input corpora from s3 and run libfuzzertests ##
-- name: fetch_and_run_libfuzzertests
-  tags: ["assigned_to_jira_team_server_security"]
-  commands:
-  - func: "fetch corpus"
-  - func: "run tests"
-    vars:
-      suite: libfuzzer
-
-- <<: *task_template
-  name: fle
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "encrypt", "patch_build"]
-  commands:
-    - func: "do setup"
-    - func: "run tests"
-      vars:
-        resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: fle2
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "encrypt", "patch_build"]
-  commands:
-    - func: "do setup"
-    - func: "run tests"
-
-- <<: *task_template
-  name: fle2_high_cardinality
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "encrypt"]
-  commands:
-    - func: "do setup"
-    - func: "run tests"
-
-- <<: *task_template
-  name: fle2_query_analysis
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "encrypt", "patch_build"]
-  commands:
-    - func: "do setup"
-    - func: "run tests"
-
-- <<: *task_template
-  name: fle2_sharding
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "encrypt", "patch_build"]
-  commands:
-    - func: "do setup"
-    - func: "run tests"
-
-- <<: *task_template
-  name: fle2_sharding_high_cardinality
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "encrypt"]
-  commands:
-    - func: "do setup"
-    - func: "run tests"
-
-- <<: *task_template
-  name: jsCore_auth
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_ppc", "incompatible_s390x", "jscore", "auth", "common"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: core_auth
-
-- <<: *task_template
-  name: jsCore_ese
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "jscore", "encrypt"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: core_ese
-
-- <<: *task_template
-  name: jsCore_min_batch_repeat_queries_ese_gsm
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "jscore", "encrypt", "gcm"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: core_min_batch_repeat_queries_ese_gsm
-
-- <<: *gen_task_template
-  name: multiversion_auth_future_git_tag_gen
-  tags: ["assigned_to_jira_team_server_security", "experimental", "auth", "multiversion", "no_multiversion_generate_tasks", "multiversion_future_git_tag"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: multiversion_auth_future_git_tag
-
-- <<: *gen_task_template
-  name: multiversion_auth_gen
-  tags: ["assigned_to_jira_team_server_security", "default", "auth", "multiversion", "no_multiversion_generate_tasks", "future_git_tag_incompatible"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *task_template
-  name: ocsp
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "ssl", "encrypt", "ocsp", "patch_build", "no_debug_mode"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: replica_sets_max_mirroring_large_txns_format_ese_gcm_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "replica_sets", "encrypt", "san", "gcm", "no_debug_mode", "multi_oplog"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: replica_sets_max_mirroring_large_txns_format_ese_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "replica_sets", "encrypt", "san", "no_debug_mode", "multi_oplog"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *task_template
-  name: sasl
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "sasl", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: sharding_auth_audit_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "sharding", "auth", "audit", "non_live_record", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_auth_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_mac", "incompatible_windows", "incompatible_ppc", "incompatible_s390x"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "sharding", "common", "encrypt", "gcm", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "sharding", "common", "encrypt", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sslSpecial_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "encrypt", "ssl", "patch_build"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: ssl_special
-
-- <<: *gen_task_template
-  name: ssl_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "encrypt", "ssl", "patch_build"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {network: 2, replication: {heartbeats: 2}}}'"
-
-- <<: *gen_task_template
-  name: ssl_linear_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "encrypt", "ssl", "patch_build"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: ssl_linear
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: ssl_x509_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "encrypt", "ssl", "patch_build"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: ssl_x509
-
-################################################
-#          Cluster Scalability tasks           #
-################################################
-
-- <<: *gen_task_template
-  name: analyze_shard_key_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "sharding"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *benchmark_template
-  name: benchmarks_sharding
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "experimental", "benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run benchmark tests"
-    vars:
-      suite: benchmarks_sharding
-      resmoke_jobs_max: 1
-
-- <<: *benchmark_template
-  name: benchmarks_bsoncolumn
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "experimental", "benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run benchmark tests"
-    vars:
-      suite: benchmarks_bsoncolumn
-      resmoke_jobs_max: 1
-
-- <<: *jstestfuzz_template
-  name: move_collection_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "requires_all_feature_flags", "require_npm", "random_name", "feature_flag_guarded"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --opType moveCollection --electionMech stepup --electionRole donor --electionRole recipient --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *gen_task_template
-  name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "multi_shard", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "multi_shard", "multi_stmt", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 0  # No cap on number of jobs.
-
-- <<: *gen_task_template
-  name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "multi_shard"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "multi_shard", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "multi_stmt"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: retryable_writes_downgrade_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "experimental", "multiversion_passthrough", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      retryable_writes_downgrade_last_lts: last_lts
-      retryable_writes_downgrade_last_continuous: last_continuous
-  - func: "generate resmoke tasks"
-    vars:
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: retryable_writes_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "retry"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: retryable_writes_jscore_stepdown_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "retry"]
-  commands:
-  - func: "generate resmoke tasks"
-
-## resharding generational fuzzer ##
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_idempotency_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no --useEsModules
-      suite: resharding_fuzzer_idempotency
-
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_inplace_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --numDonors 2 --numRecipients 2 --inPlace yes --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_merge_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --numDonors 2 --numRecipients 1 --inPlace no --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_shuffle_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_split_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --numDonors 1 --numRecipients 2 --inPlace no --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_stepup_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: >-
-        --numDonors 3 --numRecipients 3 --inPlace yes
-        --electionMech stepup --electionRole donor --electionRole recipient
-        --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *task_template
-  name: sharded_collections_causally_consistent_jscore_txns_passthrough
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "sharding", "jscore", "causally_consistent", "txns"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: sharded_collections_jscore_multiversion_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "experimental", "multiversion_passthrough", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      sharded_collections_jscore_passthrough_last_continuous_new_old_old_new: last_continuous
-      sharded_collections_jscore_passthrough_last_lts_new_old_old_new: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      suite: sharded_collections_jscore_passthrough
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: sharded_collections_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "sharding", "jscore"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharded_collections_jscore_passthrough_with_auto_bootstrap_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "sharding", "jscore"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharded_collections_jscore_passthrough_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "replica_set_endpoint", "requires_all_feature_flags"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "sharding"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *task_template
-  name: sharded_jscore_txns
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "sharding", "jscore", "txns"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: sharded_jscore_txns_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "replica_set_endpoint", "requires_all_feature_flags"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *task_template
-  name: sharded_jscore_txns_sharded_collections
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "sharding", "jscore", "txns"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: sharded_jscore_txns_sharded_collections_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "replica_set_endpoint", "requires_all_feature_flags"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *task_template
-  name: sharded_jscore_txns_without_snapshot
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "sharding", "wo_snapshot", "jscore"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: sharded_jscore_txns
-      resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
-
-- <<: *gen_task_template
-  name: sharded_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "sharding", "jscore", "multi_stmt"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharded_retryable_writes_downgrade_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "experimental", "multiversion_passthrough", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      sharded_retryable_writes_downgrade_last_continuous_new_old_old_new: last_continuous
-      sharded_retryable_writes_downgrade_last_lts_new_old_old_new: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: sharding_auto_bootstrap_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "sharding", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_csrs_continuous_config_stepdown_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "incompatible_windows", "sharding", "common", "csrs", "non_live_record"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "sharding", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_hello_failures_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "concurrency", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: sharding_jscore_multiversion_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "experimental", "multiversion_passthrough", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      sharding_jscore_passthrough_last_lts_new_old_old_new: last_lts
-      sharding_jscore_passthrough_last_continuous_new_old_old_new: last_continuous
-  - func: "generate resmoke tasks"
-    vars:
-      suite: sharding_jscore_passthrough
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: sharding_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "sharding", "jscore", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharding_jscore_passthrough_with_auto_bootstrap_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "sharding", "jscore", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharding_jscore_passthrough_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "replica_set_endpoint", "requires_all_feature_flags"]
-  commands:
-  - func: "generate resmoke tasks"
-
-# This is a subset of sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen and
-# sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen and should not be ran
-# in the same varient as them
-- <<: *gen_task_template
-  name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "incompatible_windows", "incompatible_ppc", "incompatible_s390x"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_mongos_and_mixed_shards_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "sharding", "common", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      sharding_last_lts_mongos_and_mixed_shards: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: sharding_multiversion_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "random_multiversion_ds", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      sharding_last_continuous: last_continuous
-      sharding_last_lts: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      suite: sharding
-      run_no_feature_flag_tests: "true"
-
-- <<: *jstestfuzz_template
-  name: unshard_collection_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "requires_all_feature_flags", "require_npm", "random_name", "feature_flag_guarded"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --opType unshardCollection --inPlace yes --numDonors 3 --electionMech stepup --electionRole donor --electionRole recipient --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *gen_task_template
-  name: replica_sets_configsvr_param_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "replica_sets", "common", "san", "large"]
-  commands:
-  - func: "generate resmoke tasks"
-
-################################################
-#           Catalog & Routing tasks            #
-################################################
-
-- <<: *gen_task_template
-  name: aggregation_unsplittable_collections_on_random_shard_passthrough
-  # TODO SERVER-83445 Enable on non-all-feature-flag variants.
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "unsplittable_collections"]
-  depends_on:
-  - name: aggregation
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: causally_consistent_jscore_passthrough_auth_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "causally_consistent"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: causally_consistent_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "causally_consistent"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-    # The hardcoded timeout is to overrule history-based timeout after test number increases,
-    # which could be removed after gaining enough history for the new tests.
-    vars:
-      exec_timeout_secs: 4800 # 80min
-      timeout_secs: 4800 # 80min
-
-- <<: *gen_task_template
-  name: change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-    # The hardcoded timeout is to overrule history-based timeout after test number increases,
-    # which could be removed after gaining enough history for the new tests.
-    vars:
-      exec_timeout_secs: 4800 # 80min
-      timeout_secs: 4800 # 80min
-
-- <<: *gen_task_template
-  name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: concurrency_sharded_causal_consistency_and_balancer_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "concurrency", "large", "non_live_record", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_causal_consistency_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "concurrency", "non_live_record", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_multi_stmt_txn_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "concurrency", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_multi_stmt_txn_with_balancer_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "concurrency", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "concurrency", "stepdowns", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_with_auto_bootstrap_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: sharding_jscore_passthrough_with_balancer_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "sharding", "jscore", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: concurrency_sharded_with_balancer_and_auto_bootstrap_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_with_stepdowns_and_balancer_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "concurrency", "stepdowns", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_with_stepdowns_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "concurrency", "stepdowns", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: cwrwc_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "read_write_concern", "large", "write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: cwrwc_rc_majority_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "read_write_concern"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: cwrwc_wc_majority_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "incompatible_all_feature_flags", "read_write_concern", "write", "secondary_read_after_majority_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "jscore"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "sharding"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "sharding"]
-  commands:
-  - func: "generate resmoke tasks"
-
-## jstestfuzz concurrent sharded cluster causal consistency ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_sharded_causal_consistency_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "jstestfuzz", "causal", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 5
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_causal_consistency
-      resmoke_args: --numClientsPerFixture=10
-
-## jstestfuzz concurrent sharded cluster continuous stepdown with flow control engaged ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_sharded_continuous_stepdown_flow_control_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "flow_control", "stepdowns", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 2
-      num_tasks: 1
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_continuous_stepdown
-      resmoke_args: >-
-        --flowControlTicketOverride=30
-        --numClientsPerFixture=10
-
-## jstestfuzz concurrent sharded cluster continuous stepdown ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_sharded_continuous_stepdown_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "jstestfuzz", "stepdowns", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 2
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_continuous_stepdown
-      resmoke_args: --numClientsPerFixture=10
-
-## jstestfuzz concurrent sharded cluster ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_sharded_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "jstestfuzz", "common", "sharding", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 5
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded
-      resmoke_args: --numClientsPerFixture=10
-
-## jstestfuzz concurrent sharded cluster with logical session ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_sharded_session_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "jstestfuzz", "session", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 5
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_session
-      resmoke_args: --numClientsPerFixture=10
-
-## jstestfuzz sharded cluster causal consistency ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_causal_consistency_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "jstestfuzz", "causal", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_causal_consistency
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz sharded cluster continuous stepdown with flow control engaged ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_continuous_stepdown_flow_control_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "flow_control", "stepdowns", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 2
-      num_tasks: 1
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_continuous_stepdown
-      resmoke_args: >-
-        --flowControlTicketOverride=3
-        --mongodSetParameters="{logComponentVerbosity: {command: 2}}"
-
-## jstestfuzz sharded cluster continuous stepdown ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_continuous_stepdown_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "jstestfuzz", "stepdowns", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 5
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_continuous_stepdown
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz sharded cluster ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "jstestfuzz", "common", "sharding", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz sharded multiversion cluster ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_multiversion_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "experimental", "multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      jstestfuzz_sharded_last_continuous_new_old_old_new: last_continuous
-      jstestfuzz_sharded_last_lts_new_old_old_new: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-      suite: jstestfuzz_sharded
-      npm_command: jstestfuzz
-      run_no_feature_flag_tests: "true"
-
-## jstestfuzz sharded cluster with logical session ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_session_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "jstestfuzz", "session", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_session
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz sharded cluster with replica set endpoint ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "replica_set_endpoint", "requires_all_feature_flags"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_with_replica_set_endpoint
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-- <<: *gen_task_template
-  name: sharded_causally_consistent_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "causally_consistent"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharded_causally_consistent_jscore_txns_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "sharding", "jscore", "causally_consistent", "txns"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "sharding", "wo_snapshot", "causally_consistent", "jscore"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: sharded_causally_consistent_jscore_txns_passthrough
-      resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
-
-- <<: *gen_task_template
-  name: unsplittable_collections_created_on_any_shard_jscore_passthrough_gen
-  # TODO SERVER-83445 Enable on non-all-feature-flag variants.
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "unsplittable_collections"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: unsplittable_collections_on_random_shard_jscore_txns_gen
-  # TODO SERVER-83445 Enable on non-all-feature-flag variants.
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "unsplittable_collections"]
-  commands:
-  - func: "generate resmoke tasks"
+  ################################################
+  #          Service Architecture tasks          #
+  ################################################
+
+  - <<: *benchmark_template
+    name: benchmarks_namespace
+    tags:
+      ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_namespace_string
+          resmoke_jobs_max: 1
+
+  - <<: *benchmark_template
+    name: benchmarks_orphaned_first_half
+    tags:
+      ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_first_half
+          exec_timeout_secs: 21600 # 6 hour timeout.
+          resmoke_jobs_max: 1
+
+  - <<: *benchmark_template
+    name: benchmarks_orphaned_second_half
+    tags:
+      ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_second_half
+          exec_timeout_secs: 21600 # 6 hour timeout.
+          resmoke_jobs_max: 1
+
+  - <<: *benchmark_template
+    name: benchmarks_sep
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "experimental",
+        "benchmarks_sep",
+      ]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_sep
+          exec_timeout_secs: 21600 # 6 hour timeout.
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: causally_consistent_hedged_reads_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "release_critical",
+        "incompatible_mac",
+        "causally_consistent",
+        "sharding",
+        "jscore",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: concurrency_multitenancy_with_atlas_proxy_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          suite: multitenancy_with_atlas_proxy_jscore_passthrough
+          resmoke_args: "--numClientsPerFixture=2 --useTenantClient --excludeWithAnyTags=multi_clients_incompatible"
+
+  - <<: *gen_task_template
+    name: concurrency_embedded_router_causal_consistency_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "concurrency",
+        "non_live_record",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_embedded_router_causal_consistency_and_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "concurrency",
+        "large",
+        "non_live_record",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_embedded_router_clusterwide_ops_add_remove_shards_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "concurrency",
+        "common",
+        "read_concern_maj",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_embedded_router_local_read_write_multi_stmt_txn_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "concurrency",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_embedded_router_local_read_write_multi_stmt_txn_with_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "concurrency",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_embedded_router_multi_stmt_txn_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "concurrency",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_embedded_router_multi_stmt_txn_with_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "concurrency",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_embedded_router_replication_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "concurrency",
+        "common",
+        "read_concern_maj",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_embedded_router_replication_bulk_write_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "bulk_write"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_embedded_router_replication_no_txns_with_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "concurrency",
+        "no_txns",
+        "large",
+        "sharded",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: concurrency_embedded_router_replication_with_balancer
+          resmoke_args: "--excludeWithAnyTags=uses_transactions"
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_embedded_router_replication_with_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "incompatible_mac",
+        "incompatible_ibm",
+        "concurrency",
+        "common",
+        "read_concern_maj",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: embedded_router_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: embedded_router_jscore_passthrough_with_config_shard_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: embedded_router_jscore_passthrough_with_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "sharding",
+        "jscore",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: aggregation_embedded_router_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: embedded_router_jscore_txns_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: embedded_router_jscore_txns_with_config_shard_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: embedded_router_sharded_collections_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: embedded_router_sharded_collections_jscore_txns_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: aggregation_sharded_collections_embedded_router_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: embedded_router_sharded_collections_jscore_txns_with_config_shard_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *task_template
+    name: failpoints
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "release_critical",
+        "misc_js",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: failpoints_auth
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_windows",
+        "auth",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: integration_tests_replset
+    tags: ["assigned_to_jira_team_server_servicearch", "integration"]
+    depends_on:
+      - name: compile_integration_test
+    commands:
+      - func: "do integration_tests setup"
+      - func: "run tests"
+        vars:
+          install_dir: build/install/bin
+
+  - <<: *task_template
+    name: integration_tests_replset_ssl_auth
+    tags: ["assigned_to_jira_team_server_servicearch", "integration"]
+    depends_on:
+      - name: compile_integration_test
+    commands:
+      - func: "do integration_tests setup"
+      - func: "run tests"
+        vars:
+          install_dir: build/install/bin
+
+  - <<: *task_template
+    name: integration_tests_sharded
+    tags: ["assigned_to_jira_team_server_servicearch", "integration", "sharded"]
+    depends_on:
+      - name: compile_integration_test
+    commands:
+      - func: "do integration_tests setup"
+      - func: "run tests"
+        vars:
+          install_dir: build/install/bin
+
+  - <<: *task_template
+    name: integration_tests_standalone
+    tags:
+      ["assigned_to_jira_team_server_servicearch", "integration", "standalone"]
+    depends_on:
+      - name: compile_integration_test
+    commands:
+      - func: "do integration_tests setup"
+      - func: "run tests"
+        vars:
+          install_dir: build/install/bin
+
+  - <<: *task_template
+    name: integration_tests_standalone_audit
+    tags: ["assigned_to_jira_team_server_servicearch", "integration", "audit"]
+    depends_on:
+      - name: compile_integration_test
+    commands:
+      - func: "do integration_tests setup"
+      - func: "run tests"
+        vars:
+          install_dir: build/install/bin
+
+  - <<: *task_template
+    name: libunwind_tests
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: libunwind
+
+  - <<: *gen_task_template
+    name: multitenancy_with_atlas_proxy_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: multitenancy_with_mongoq_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: multitenancy_with_mongoq_unsigned_token_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *task_template
+    name: search_pinned_connections_auth
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - name: server_discovery_and_monitoring_json_test
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "requires_compile_variant",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "do scons setup"
+      - func: "scons compile"
+        vars:
+          targets: install-sdam-json-test
+          compiling_for_test: true
+          install_dir: build/install/bin
+      - func: "run tests"
+        vars:
+          suite: sdam_json_test
+
+  - name: server_selection_json_test
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "requires_compile_variant",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "do scons setup"
+      - func: "scons compile"
+        vars:
+          targets: install-server-selection-json-test
+          compiling_for_test: true
+          install_dir: build/install/bin
+      - func: "run tests"
+
+  - <<: *task_template
+    name: serverless
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: serverless_MTM
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: session_jscore_passthrough
+    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: shard_merge_causally_consistent_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: shard_merge_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: shard_merge_multi_stmt_txn_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "serverless",
+        "txn",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: shard_split_causally_consistent_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: shard_split_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: shard_split_kill_primary_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          fallback_num_sub_suites: 10
+
+  - <<: *gen_task_template
+    name: shard_split_multi_stmt_txn_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: shard_split_stepdown_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: shard_split_terminate_primary_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "shard_split"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          fallback_num_sub_suites: 10
+
+  # TODO(SERVER-88891): Delete these tenant migration suites
+  # - <<: *gen_task_template
+  #   name: tenant_migration_causally_consistent_jscore_passthrough_gen
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+  #   commands:
+  #   - func: "generate resmoke tasks"
+  #     vars:
+  #       use_large_distro: "true"
+
+  # - <<: *gen_task_template
+  #   name: tenant_migration_jscore_passthrough_gen
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+  #   commands:
+  #   - func: "generate resmoke tasks"
+  #     vars:
+  #       use_large_distro: "true"
+
+  # - <<: *gen_task_template
+  #   name: tenant_migration_kill_primary_jscore_passthrough_gen
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+  #   commands:
+  #   - func: "generate resmoke tasks"
+  #     vars:
+  #       use_large_distro: "true"
+  #       fallback_num_sub_suites: 10
+
+  # - <<: *gen_task_template
+  #   name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless", "txn"]
+  #   commands:
+  #   - func: "generate resmoke tasks"
+  #     vars:
+  #       use_large_distro: "true"
+
+  # - <<: *gen_task_template
+  #   name: tenant_migration_stepdown_jscore_passthrough_gen
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+  #   commands:
+  #   - func: "generate resmoke tasks"
+  #     vars:
+  #       use_large_distro: "true"
+
+  # - <<: *gen_task_template
+  #   name: tenant_migration_terminate_primary_jscore_passthrough_gen
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+  #   commands:
+  #   - func: "generate resmoke tasks"
+  #     vars:
+  #       use_large_distro: "true"
+  #       fallback_num_sub_suites: 10
+
+  # This is a separate task because it is only supported on Ubuntu 16.04+ which are not inmemory builders
+  - <<: *task_template
+    name: watchdog_inmemory
+    tags:
+      ["assigned_to_jira_team_server_servicearch", "experimental", "watchdog"]
+    commands:
+      - func: "do setup"
+      - func: "do watchdog setup"
+      - func: "run tests"
+        vars:
+          suite: watchdog
+          resmoke_args: --storageEngine=inMemory
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: watchdog_wiredtiger
+    tags:
+      ["assigned_to_jira_team_server_servicearch", "experimental", "watchdog"]
+    commands:
+      - func: "do setup"
+      - func: "do watchdog setup"
+      - func: "run tests"
+        vars:
+          suite: watchdog
+          resmoke_jobs_max: 1
+
+  ################################################
+  #            Server Security tasks             #
+  ################################################
+
+  - <<: *task_template
+    name: aggregation_ese
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "aggregation",
+        "encrypt",
+      ]
+    depends_on:
+      - name: aggregation
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: aggregation_ese_gcm
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "aggregation",
+        "encrypt",
+        "gcm",
+      ]
+    depends_on:
+      - name: aggregation
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: audit
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "audit",
+        "patch_build",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: auth_audit_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "auth",
+        "audit",
+        "patch_build",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: auth_gen
+    tags: ["assigned_to_jira_team_server_security", "release_critical", "auth"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *task_template
+    name: client_encrypt
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "ssl",
+        "encrypt",
+        "patch_build",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: ese
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "encrypt",
+        "patch_build",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: external_auth
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+      ]
+    commands:
+      - func: "f_expansions_write"
+      - func: "do setup"
+      - func: "f_expansions_write"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: ${external_auth_jobs_max|4}
+          resmoke_args: --excludeWithAnyTags=requires_domain_controller
+
+  - <<: *task_template
+    name: external_auth_aws
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+      ]
+    commands:
+      - func: "f_expansions_write"
+      - func: "do setup"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          silent: true
+          args:
+            - "src/evergreen/external_auth_aws_setup.sh"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: external_auth_oidc
+    tags: ["assigned_to_jira_team_server_security", "experimental"]
+    commands:
+      - func: "f_expansions_write"
+      - func: "do setup"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/external_auth_oidc_setup.sh"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: ${external_auth_oidc_jobs_max|1}
+
+  - <<: *task_template
+    name: external_auth_oidc_azure
+    tags: ["assigned_to_jira_team_server_security", "experimental"]
+    commands:
+      - func: "f_expansions_write"
+      - func: "do setup"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/external_auth_azure_setup.sh"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: external_auth_oidc_gcp
+    tags: ["assigned_to_jira_team_server_security", "experimental"]
+    commands:
+      - func: "f_expansions_write"
+      - func: "do setup"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/external_auth_gcp_setup.sh"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: external_auth_windows
+    tags: ["assigned_to_jira_team_server_security", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: external_auth
+          resmoke_args: --includeWithAnyTags=requires_domain_controller
+
+  ## fetch_and_run_libfuzzertests - get input corpora from s3 and run libfuzzertests ##
+  - name: fetch_and_run_libfuzzertests
+    tags: ["assigned_to_jira_team_server_security"]
+    commands:
+      - func: "fetch corpus"
+      - func: "run tests"
+        vars:
+          suite: libfuzzer
+
+  - <<: *task_template
+    name: fle
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "encrypt",
+        "patch_build",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: fle2
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "encrypt",
+        "patch_build",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: fle2_high_cardinality
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "encrypt",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: fle2_query_analysis
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "encrypt",
+        "patch_build",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: fle2_sharding
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "encrypt",
+        "patch_build",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: fle2_sharding_high_cardinality
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "encrypt",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: jsCore_auth
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "jscore",
+        "auth",
+        "common",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: core_auth
+
+  - <<: *task_template
+    name: jsCore_ese
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "jscore",
+        "encrypt",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: core_ese
+
+  - <<: *task_template
+    name: jsCore_min_batch_repeat_queries_ese_gsm
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "jscore",
+        "encrypt",
+        "gcm",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: core_min_batch_repeat_queries_ese_gsm
+
+  - <<: *gen_task_template
+    name: multiversion_auth_future_git_tag_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "experimental",
+        "auth",
+        "multiversion",
+        "no_multiversion_generate_tasks",
+        "multiversion_future_git_tag",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: multiversion_auth_future_git_tag
+
+  - <<: *gen_task_template
+    name: multiversion_auth_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "default",
+        "auth",
+        "multiversion",
+        "no_multiversion_generate_tasks",
+        "future_git_tag_incompatible",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *task_template
+    name: ocsp
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "ssl",
+        "encrypt",
+        "ocsp",
+        "patch_build",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: replica_sets_max_mirroring_large_txns_format_ese_gcm_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "replica_sets",
+        "encrypt",
+        "san",
+        "gcm",
+        "no_debug_mode",
+        "multi_oplog",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: replica_sets_max_mirroring_large_txns_format_ese_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "replica_sets",
+        "encrypt",
+        "san",
+        "no_debug_mode",
+        "multi_oplog",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *task_template
+    name: sasl
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "sasl",
+        "patch_build",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: sharding_auth_audit_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "sharding",
+        "auth",
+        "audit",
+        "non_live_record",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_auth_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "sharding",
+        "common",
+        "encrypt",
+        "gcm",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "sharding",
+        "common",
+        "encrypt",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sslSpecial_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "encrypt",
+        "ssl",
+        "patch_build",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: ssl_special
+
+  - <<: *gen_task_template
+    name: ssl_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "encrypt",
+        "ssl",
+        "patch_build",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {network: 2, replication: {heartbeats: 2}}}'"
+
+  - <<: *gen_task_template
+    name: ssl_linear_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "encrypt",
+        "ssl",
+        "patch_build",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: ssl_linear
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: ssl_x509_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "encrypt",
+        "ssl",
+        "patch_build",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: ssl_x509
+
+  ################################################
+  #          Cluster Scalability tasks           #
+  ################################################
+
+  - <<: *gen_task_template
+    name: analyze_shard_key_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *benchmark_template
+    name: benchmarks_sharding
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "experimental",
+        "benchmarks",
+      ]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_sharding
+          resmoke_jobs_max: 1
+
+  - <<: *benchmark_template
+    name: benchmarks_bsoncolumn
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "experimental",
+        "benchmarks",
+      ]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_bsoncolumn
+          resmoke_jobs_max: 1
+
+  - <<: *jstestfuzz_template
+    name: move_collection_fuzzer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "requires_all_feature_flags",
+        "require_npm",
+        "random_name",
+        "feature_flag_guarded",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 5
+          npm_command: resharding-fuzzer
+          jstestfuzz_vars: --opType moveCollection --electionMech stepup --electionRole donor --electionRole recipient --useEsModules
+          suite: resharding_fuzzer
+
+  - <<: *gen_task_template
+    name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "multi_shard",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "multi_shard",
+        "multi_stmt",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 0 # No cap on number of jobs.
+
+  - <<: *gen_task_template
+    name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "multi_shard",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "multi_shard",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "multi_stmt",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: retryable_writes_downgrade_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "experimental",
+        "multiversion_passthrough",
+        "multiversion",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          retryable_writes_downgrade_last_lts: last_lts
+          retryable_writes_downgrade_last_continuous: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          run_no_feature_flag_tests: "true"
+
+  - <<: *gen_task_template
+    name: retryable_writes_jscore_passthrough_gen
+    tags:
+      ["assigned_to_jira_team_server_cluster_scalability", "default", "retry"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: retryable_writes_jscore_stepdown_passthrough_gen
+    tags:
+      ["assigned_to_jira_team_server_cluster_scalability", "default", "retry"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  ## resharding generational fuzzer ##
+  - <<: *jstestfuzz_template
+    name: resharding_fuzzer_idempotency_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "non_deterministic",
+        "resharding_fuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 5
+          npm_command: resharding-fuzzer
+          jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no --useEsModules
+          suite: resharding_fuzzer_idempotency
+
+  - <<: *jstestfuzz_template
+    name: resharding_fuzzer_inplace_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "non_deterministic",
+        "resharding_fuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 5
+          npm_command: resharding-fuzzer
+          jstestfuzz_vars: --numDonors 2 --numRecipients 2 --inPlace yes --useEsModules
+          suite: resharding_fuzzer
+
+  - <<: *jstestfuzz_template
+    name: resharding_fuzzer_merge_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "non_deterministic",
+        "resharding_fuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 5
+          npm_command: resharding-fuzzer
+          jstestfuzz_vars: --numDonors 2 --numRecipients 1 --inPlace no --useEsModules
+          suite: resharding_fuzzer
+
+  - <<: *jstestfuzz_template
+    name: resharding_fuzzer_shuffle_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "non_deterministic",
+        "resharding_fuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 5
+          npm_command: resharding-fuzzer
+          jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no --useEsModules
+          suite: resharding_fuzzer
+
+  - <<: *jstestfuzz_template
+    name: resharding_fuzzer_split_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "non_deterministic",
+        "resharding_fuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 5
+          npm_command: resharding-fuzzer
+          jstestfuzz_vars: --numDonors 1 --numRecipients 2 --inPlace no --useEsModules
+          suite: resharding_fuzzer
+
+  - <<: *jstestfuzz_template
+    name: resharding_fuzzer_stepup_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "non_deterministic",
+        "resharding_fuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 5
+          npm_command: resharding-fuzzer
+          jstestfuzz_vars: >-
+            --numDonors 3 --numRecipients 3 --inPlace yes
+            --electionMech stepup --electionRole donor --electionRole recipient
+            --useEsModules
+          suite: resharding_fuzzer
+
+  - <<: *task_template
+    name: sharded_collections_causally_consistent_jscore_txns_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "jscore",
+        "causally_consistent",
+        "txns",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: sharded_collections_jscore_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "experimental",
+        "multiversion_passthrough",
+        "multiversion",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharded_collections_jscore_passthrough_last_continuous_new_old_old_new: last_continuous
+          sharded_collections_jscore_passthrough_last_lts_new_old_old_new: last_lts
+      - func: "generate resmoke tasks"
+        vars:
+          suite: sharded_collections_jscore_passthrough
+          run_no_feature_flag_tests: "true"
+
+  - <<: *gen_task_template
+    name: sharded_collections_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "jscore",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharded_collections_jscore_passthrough_with_auto_bootstrap_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "jscore",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharded_collections_jscore_passthrough_with_replica_set_endpoint_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "replica_set_endpoint",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *task_template
+    name: sharded_jscore_txns
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "jscore",
+        "txns",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: sharded_jscore_txns_with_replica_set_endpoint_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "replica_set_endpoint",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *task_template
+    name: sharded_jscore_txns_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "jscore",
+        "txns",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: sharded_jscore_txns_sharded_collections_with_replica_set_endpoint_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "replica_set_endpoint",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *task_template
+    name: sharded_jscore_txns_without_snapshot
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "sharding",
+        "wo_snapshot",
+        "jscore",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: sharded_jscore_txns
+          resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
+
+  - <<: *gen_task_template
+    name: sharded_multi_stmt_txn_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "sharding",
+        "jscore",
+        "multi_stmt",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharded_retryable_writes_downgrade_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "experimental",
+        "multiversion_passthrough",
+        "multiversion",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharded_retryable_writes_downgrade_last_continuous_new_old_old_new: last_continuous
+          sharded_retryable_writes_downgrade_last_lts_new_old_old_new: last_lts
+      - func: "generate resmoke tasks"
+        vars:
+          run_no_feature_flag_tests: "true"
+
+  - <<: *gen_task_template
+    name: sharding_auto_bootstrap_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_csrs_continuous_config_stepdown_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_windows",
+        "sharding",
+        "common",
+        "csrs",
+        "non_live_record",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_hello_failures_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "concurrency",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: sharding_jscore_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "experimental",
+        "multiversion_passthrough",
+        "multiversion",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharding_jscore_passthrough_last_lts_new_old_old_new: last_lts
+          sharding_jscore_passthrough_last_continuous_new_old_old_new: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          suite: sharding_jscore_passthrough
+          run_no_feature_flag_tests: "true"
+
+  - <<: *gen_task_template
+    name: sharding_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "jscore",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharding_jscore_passthrough_with_auto_bootstrap_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "jscore",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharding_jscore_passthrough_with_replica_set_endpoint_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "replica_set_endpoint",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  # This is a subset of sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen and
+  # sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen and should not be ran
+  # in the same varient as them
+  - <<: *gen_task_template
+    name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_mongos_and_mixed_shards_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "sharding",
+        "common",
+        "multiversion",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharding_last_lts_mongos_and_mixed_shards: last_lts
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          run_no_feature_flag_tests: "true"
+
+  - <<: *gen_task_template
+    name: sharding_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "random_multiversion_ds",
+        "multiversion",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharding_last_continuous: last_continuous
+          sharding_last_lts: last_lts
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          suite: sharding
+          run_no_feature_flag_tests: "true"
+
+  - <<: *jstestfuzz_template
+    name: unshard_collection_fuzzer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "requires_all_feature_flags",
+        "require_npm",
+        "random_name",
+        "feature_flag_guarded",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 5
+          npm_command: resharding-fuzzer
+          jstestfuzz_vars: --opType unshardCollection --inPlace yes --numDonors 3 --electionMech stepup --electionRole donor --electionRole recipient --useEsModules
+          suite: resharding_fuzzer
+
+  - <<: *gen_task_template
+    name: replica_sets_configsvr_param_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "replica_sets",
+        "common",
+        "san",
+        "large",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  ################################################
+  #           Catalog & Routing tasks            #
+  ################################################
+
+  - <<: *gen_task_template
+    name: aggregation_unsplittable_collections_on_random_shard_passthrough
+    # TODO SERVER-83445 Enable on non-all-feature-flag variants.
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "unsplittable_collections",
+      ]
+    depends_on:
+      - name: aggregation
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: causally_consistent_jscore_passthrough_auth_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "causally_consistent",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: causally_consistent_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "causally_consistent",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+        # The hardcoded timeout is to overrule history-based timeout after test number increases,
+        # which could be removed after gaining enough history for the new tests.
+        vars:
+          exec_timeout_secs: 4800 # 80min
+          timeout_secs: 4800 # 80min
+
+  - <<: *gen_task_template
+    name: change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+        # The hardcoded timeout is to overrule history-based timeout after test number increases,
+        # which could be removed after gaining enough history for the new tests.
+        vars:
+          exec_timeout_secs: 4800 # 80min
+          timeout_secs: 4800 # 80min
+
+  - <<: *gen_task_template
+    name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_causal_consistency_and_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "concurrency",
+        "large",
+        "non_live_record",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_causal_consistency_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "concurrency",
+        "non_live_record",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "concurrency",
+        "common",
+        "read_concern_maj",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_multi_stmt_txn_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "concurrency",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_multi_stmt_txn_with_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "concurrency",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "concurrency",
+        "stepdowns",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_with_auto_bootstrap_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "concurrency",
+        "common",
+        "read_concern_maj",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: sharding_jscore_passthrough_with_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "sharding",
+        "jscore",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_with_balancer_and_auto_bootstrap_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "concurrency",
+        "common",
+        "read_concern_maj",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_with_stepdowns_and_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "concurrency",
+        "stepdowns",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_with_stepdowns_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "concurrency",
+        "stepdowns",
+        "large",
+        "sharded",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: cwrwc_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "release_critical",
+        "incompatible_mac",
+        "read_write_concern",
+        "large",
+        "write",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: cwrwc_rc_majority_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "release_critical",
+        "incompatible_mac",
+        "read_write_concern",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: cwrwc_wc_majority_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_all_feature_flags",
+        "read_write_concern",
+        "write",
+        "secondary_read_after_majority_write",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
+    tags:
+      ["assigned_to_jira_team_server_catalog_and_routing", "default", "jscore"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  ## jstestfuzz concurrent sharded cluster causal consistency ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_concurrent_sharded_causal_consistency_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "jstestfuzz",
+        "causal",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: ${jstestfuzz_concurrent_num_files|10}
+          num_tasks: 5
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded_causal_consistency
+          resmoke_args: --numClientsPerFixture=10
+
+  ## jstestfuzz concurrent sharded cluster continuous stepdown with flow control engaged ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_concurrent_sharded_continuous_stepdown_flow_control_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "non_deterministic",
+        "jstestfuzz",
+        "flow_control",
+        "stepdowns",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 2
+          num_tasks: 1
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded_continuous_stepdown
+          resmoke_args: >-
+            --flowControlTicketOverride=30
+            --numClientsPerFixture=10
+
+  ## jstestfuzz concurrent sharded cluster continuous stepdown ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_concurrent_sharded_continuous_stepdown_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "jstestfuzz",
+        "stepdowns",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: ${jstestfuzz_concurrent_num_files|10}
+          num_tasks: 2
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded_continuous_stepdown
+          resmoke_args: --numClientsPerFixture=10
+
+  ## jstestfuzz concurrent sharded cluster ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_concurrent_sharded_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "release_critical",
+        "incompatible_mac",
+        "jstestfuzz",
+        "common",
+        "sharding",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: ${jstestfuzz_concurrent_num_files|10}
+          num_tasks: 5
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded
+          resmoke_args: --numClientsPerFixture=10
+
+  ## jstestfuzz concurrent sharded cluster with logical session ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_concurrent_sharded_session_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "jstestfuzz",
+        "session",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: ${jstestfuzz_concurrent_num_files|10}
+          num_tasks: 5
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded_session
+          resmoke_args: --numClientsPerFixture=10
+
+  ## jstestfuzz sharded cluster causal consistency ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_sharded_causal_consistency_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "jstestfuzz",
+        "causal",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded_causal_consistency
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  ## jstestfuzz sharded cluster continuous stepdown with flow control engaged ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_sharded_continuous_stepdown_flow_control_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "non_deterministic",
+        "jstestfuzz",
+        "flow_control",
+        "stepdowns",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 2
+          num_tasks: 1
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded_continuous_stepdown
+          resmoke_args: >-
+            --flowControlTicketOverride=3
+            --mongodSetParameters="{logComponentVerbosity: {command: 2}}"
+
+  ## jstestfuzz sharded cluster continuous stepdown ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_sharded_continuous_stepdown_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "jstestfuzz",
+        "stepdowns",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 5
+          num_tasks: 5
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded_continuous_stepdown
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  ## jstestfuzz sharded cluster ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_sharded_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "release_critical",
+        "incompatible_mac",
+        "jstestfuzz",
+        "common",
+        "sharding",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  ## jstestfuzz sharded multiversion cluster ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_sharded_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "experimental",
+        "multiversion_fuzzer",
+        "require_npm",
+        "random_name",
+        "multiversion",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          jstestfuzz_sharded_last_continuous_new_old_old_new: last_continuous
+          jstestfuzz_sharded_last_lts_new_old_old_new: last_lts
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          suite: jstestfuzz_sharded
+          npm_command: jstestfuzz
+          run_no_feature_flag_tests: "true"
+
+  ## jstestfuzz sharded cluster with logical session ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_sharded_session_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "jstestfuzz",
+        "session",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded_session
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  ## jstestfuzz sharded cluster with replica set endpoint ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_sharded_with_replica_set_endpoint_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "replica_set_endpoint",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded_with_replica_set_endpoint
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  - <<: *gen_task_template
+    name: sharded_causally_consistent_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "causally_consistent",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharded_causally_consistent_jscore_txns_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "jscore",
+        "causally_consistent",
+        "txns",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "sharding",
+        "wo_snapshot",
+        "causally_consistent",
+        "jscore",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: sharded_causally_consistent_jscore_txns_passthrough
+          resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
+
+  - <<: *gen_task_template
+    name: unsplittable_collections_created_on_any_shard_jscore_passthrough_gen
+    # TODO SERVER-83445 Enable on non-all-feature-flag variants.
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "unsplittable_collections",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unsplittable_collections_on_random_shard_jscore_txns_gen
+    # TODO SERVER-83445 Enable on non-all-feature-flag variants.
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "unsplittable_collections",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
 
 ################################################
 #                 Task Groups                  #
 ################################################
 task_groups:
-- <<: *compile_task_group_template
-  name: compile_archive_and_run_libfuzzertests_TG
-  tasks:
-  - compile_and_archive_libfuzzertests
-  - fetch_and_run_libfuzzertests
+  - <<: *compile_task_group_template
+    name: compile_archive_and_run_libfuzzertests_TG
+    tasks:
+      - compile_and_archive_libfuzzertests
+      - fetch_and_run_libfuzzertests
 
-- <<: *compile_task_group_template
-  name: compile_integration_and_test_no_audit_parallel_stream_TG
-  tasks:
-  - compile_integration_test
-  - integration_tests_standalone
-  - integration_tests_replset
-  - integration_tests_replset_ssl_auth
-  - integration_tests_sharded
+  - <<: *compile_task_group_template
+    name: compile_integration_and_test_no_audit_parallel_stream_TG
+    tasks:
+      - compile_integration_test
+      - integration_tests_standalone
+      - integration_tests_replset
+      - integration_tests_replset_ssl_auth
+      - integration_tests_sharded
 
-- <<: *compile_task_group_template
-  name: compile_integration_and_test_parallel_stream_TG
-  tasks:
-  - compile_integration_test
-  - integration_tests_standalone
-  - integration_tests_standalone_audit
-  - integration_tests_replset
-  - integration_tests_replset_ssl_auth
-  - integration_tests_sharded
+  - <<: *compile_task_group_template
+    name: compile_integration_and_test_parallel_stream_TG
+    tasks:
+      - compile_integration_test
+      - integration_tests_standalone
+      - integration_tests_standalone_audit
+      - integration_tests_replset
+      - integration_tests_replset_ssl_auth
+      - integration_tests_sharded
 
-# SERVER-76006
-# This is a compile stream meant for non-cached and/or underpowered systems.
-# It joins most of the compile tasks together under a single host spread out
-# across different tasks.
-- <<: *compile_task_group_template
-  name: small_compile_test_and_package_serial_no_unittests_TG
-  tasks:
-  - compile_dist_test_half
-  - compile_dist_test
-  - archive_dist_test
-  - archive_dist_test_debug
-  - package
-  - compile_integration_test
-  - integration_tests_standalone
-  - integration_tests_standalone_audit
-  - integration_tests_replset
-  - integration_tests_replset_ssl_auth
-  - integration_tests_sharded
-  - compile_dbtest
-  - run_dbtest
-  - archive_dbtest
-  - compile_all_but_not_unittests
+  # SERVER-76006
+  # This is a compile stream meant for non-cached and/or underpowered systems.
+  # It joins most of the compile tasks together under a single host spread out
+  # across different tasks.
+  - <<: *compile_task_group_template
+    name: small_compile_test_and_package_serial_no_unittests_TG
+    tasks:
+      - compile_dist_test_half
+      - compile_dist_test
+      - archive_dist_test
+      - archive_dist_test_debug
+      - package
+      - compile_integration_test
+      - integration_tests_standalone
+      - integration_tests_standalone_audit
+      - integration_tests_replset
+      - integration_tests_replset_ssl_auth
+      - integration_tests_sharded
+      - compile_dbtest
+      - run_dbtest
+      - archive_dbtest
+      - compile_all_but_not_unittests

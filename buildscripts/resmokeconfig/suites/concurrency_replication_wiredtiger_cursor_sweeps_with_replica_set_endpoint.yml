@@ -8,43 +8,43 @@ test_kind: fsm_workload_test
 
 selector:
   roots:
-  - jstests/concurrency/fsm_workloads/**/*.js
-  - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
-  ##
-  # Disabled due to MongoDB restrictions and/or workload restrictions
-  ##
-  # These workloads use >100MB of data, which can overwhelm test hosts.
-  - jstests/concurrency/fsm_workloads/agg_group_external.js
-  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    ##
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+    ##
+    # These workloads use >100MB of data, which can overwhelm test hosts.
+    - jstests/concurrency/fsm_workloads/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/agg_sort_external.js
 
-  # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
-  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
+    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
 
-  # These workloads run the reIndex command, which is only allowed on a standalone node.
-  - jstests/concurrency/fsm_workloads/reindex.js
-  - jstests/concurrency/fsm_workloads/reindex_background.js
-  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+    # These workloads run the reIndex command, which is only allowed on a standalone node.
+    - jstests/concurrency/fsm_workloads/reindex.js
+    - jstests/concurrency/fsm_workloads/reindex_background.js
+    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
-  # These workloads depend on transactions which may be blocked by cursor sweeps.
-  - jstests/concurrency/fsm_workloads/auth_drop_role.js
-  - jstests/concurrency/fsm_workloads/auth_privilege_cache_miss.js
-  - jstests/concurrency/fsm_workloads/auth_privilege_consistency.js
-  - jstests/concurrency/fsm_workloads/auth_role_consistency.js
+    # These workloads depend on transactions which may be blocked by cursor sweeps.
+    - jstests/concurrency/fsm_workloads/auth_drop_role.js
+    - jstests/concurrency/fsm_workloads/auth_privilege_cache_miss.js
+    - jstests/concurrency/fsm_workloads/auth_privilege_consistency.js
+    - jstests/concurrency/fsm_workloads/auth_role_consistency.js
 
-  # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
-  # TODO (SERVER-86771): renameCollection on sharded cluster doesn't support implicitly creating
-  # the destination database.
-  - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
-  - jstests/concurrency/fsm_workloads/rename_collection_dbname_chain.js
-  # TODO: $exchange is an internal stage that is not supported via a router.
-  - jstests/concurrency/fsm_workloads/exchange_producer.js
-  # TODO (SERVER-88469): CursorEstablisher::waitForResponse() is noexcept but its code can throw an
-  # exception.
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+    # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
+    # TODO (SERVER-86771): renameCollection on sharded cluster doesn't support implicitly creating
+    # the destination database.
+    - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
+    - jstests/concurrency/fsm_workloads/rename_collection_dbname_chain.js
+    # TODO: $exchange is an internal stage that is not supported via a router.
+    - jstests/concurrency/fsm_workloads/exchange_producer.js
+    # TODO (SERVER-88469): CursorEstablisher::waitForResponse() is noexcept but its code can throw an
+    # exception.
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
   exclude_with_any_tags:
-  - requires_sharding
+    - requires_sharding
 
 executor:
   archive:
@@ -62,16 +62,16 @@ executor:
         TestData:
           testingReplicaSetEndpoint: true
   hooks:
-  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
-  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
-  # validating the entire contents of the collection.
-  - class: CheckReplDBHashInBackground
-  - class: ValidateCollectionsInBackground
-  # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
-  # is fsync locked and has replica set endpoint enabled.
-  # - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanupConcurrencyWorkloads
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
+    # is fsync locked and has replica set endpoint enabled.
+    # - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
   fixture:
     class: ReplicaSetFixture
     mongod_options:

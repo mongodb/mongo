@@ -64,6 +64,9 @@
 			"editor.formatOnSave": true,
 			"editor.defaultFormatter": "eeyore.yapf"
 		},
+		"[starlark]": {
+			"editor.defaultFormatter": "BazelBuild.vscode-bazel"
+		},
 	},
 	"extensions": {
 		"recommendations": [

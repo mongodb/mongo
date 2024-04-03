@@ -5,388 +5,388 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 buildvariants:
-- name: enterprise-ubuntu1804-64
-  display_name: Jepsen Tests on Enterprise Ubuntu 18.04
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - ubuntu1804-small
-  # TODO SERVER-86538 see if we can use --allocator=tcmalloc-google on
-  # new distributions and/or fix the current libfaketime issues
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu1804
-      --allocator=tcmalloc-gperf
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    scons_cache_scope: shared
-    large_distro_name: ubuntu1804-large
-    compile_variant: enterprise-ubuntu1804-64
-  tasks:
-  - name: compile_and_archive_dist_test_TG
-    distros:
-    - ubuntu1804-large
-  - name: .jepsen
-    distros:
-    - ubuntu1804-large
+  - name: enterprise-ubuntu1804-64
+    display_name: Jepsen Tests on Enterprise Ubuntu 18.04
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - ubuntu1804-small
+    # TODO SERVER-86538 see if we can use --allocator=tcmalloc-google on
+    # new distributions and/or fix the current libfaketime issues
+    expansions:
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=ubuntu1804
+        --allocator=tcmalloc-gperf
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      scons_cache_scope: shared
+      large_distro_name: ubuntu1804-large
+      compile_variant: enterprise-ubuntu1804-64
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+        distros:
+          - ubuntu1804-large
+      - name: .jepsen
+        distros:
+          - ubuntu1804-large
 
-- &ubuntu2204-template
-  name: &ubuntu2204 ubuntu2204
-  display_name: Ubuntu 22.04
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu2204-small
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: x86_64-ubuntu2204
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2204
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
-    test_flags: >-
-      --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    multiversion_platform: ubuntu2204
-    multiversion_edition: targeted
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: x86_64
-    packager_distro: ubuntu2204
-    repo_edition: org
-    scons_cache_scope: shared
-    large_distro_name: ubuntu2204-large
-    compile_variant: ubuntu2204
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - ubuntu2204-large
-  - name: test_packages
-    distros:
-    - ubuntu2204-large
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - &ubuntu2204-template
+    name: &ubuntu2204 ubuntu2204
+    display_name: Ubuntu 22.04
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubuntu2204-small
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_name: linux
+      push_arch: x86_64-ubuntu2204
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=ubuntu2204
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --modules=
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      multiversion_platform: ubuntu2204
+      multiversion_edition: targeted
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: x86_64
+      packager_distro: ubuntu2204
+      repo_edition: org
+      scons_cache_scope: shared
+      large_distro_name: ubuntu2204-large
+      compile_variant: ubuntu2204
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - ubuntu2204-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: .development_critical !.incompatible_community
+      - name: .release_critical !.incompatible_community
 
-- <<: *ubuntu2204-template
-  name: ubuntu2204-powercycle
-  display_name: Ubuntu 22.04 Powercycle
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: *ubuntu2204
-  tasks:
-  - name: .powercycle
+  - <<: *ubuntu2204-template
+    name: ubuntu2204-powercycle
+    display_name: Ubuntu 22.04 Powercycle
+    depends_on:
+      - name: archive_dist_test_debug
+        variant: *ubuntu2204
+    tasks:
+      - name: .powercycle
 
-- name: ubuntu2004
-  display_name: Ubuntu 20.04
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu2004-small
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: x86_64-ubuntu2004
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2004
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
-    test_flags: >-
-      --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    multiversion_platform: ubuntu2004
-    multiversion_edition: targeted
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: x86_64
-    packager_distro: ubuntu2004
-    repo_edition: org
-    scons_cache_scope: shared
-    large_distro_name: ubuntu2004-large
-    compile_variant: ubuntu2004
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - ubuntu2004-large
-  - name: test_packages
-    distros:
-    - ubuntu2204-large
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: ubuntu2004
+    display_name: Ubuntu 20.04
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubuntu2004-small
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_name: linux
+      push_arch: x86_64-ubuntu2004
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=ubuntu2004
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --modules=
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      multiversion_platform: ubuntu2004
+      multiversion_edition: targeted
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: x86_64
+      packager_distro: ubuntu2004
+      repo_edition: org
+      scons_cache_scope: shared
+      large_distro_name: ubuntu2004-large
+      compile_variant: ubuntu2004
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - ubuntu2004-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: .development_critical !.incompatible_community
+      - name: .release_critical !.incompatible_community
 
-- &enterprise-ubuntu2004-64-template
-  name: &enterprise-ubuntu2004-64 enterprise-ubuntu2004-64
-  display_name: Enterprise Ubuntu 20.04
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu2004-small
-  stepback: false
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: x86_64-enterprise-ubuntu2004
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=ubuntu2004
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
-    multiversion_platform: ubuntu2004
-    multiversion_edition: enterprise
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: ubuntu2004
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    large_distro_name: ubuntu2004-large
-    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
-    external_auth_jobs_max: 1
-    compile_variant: enterprise-ubuntu2004-64
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - ubuntu2004-large
-  - name: test_packages
-    distros:
-    - ubuntu2204-large
-  - name: .development_critical
-  - name: .release_critical
+  - &enterprise-ubuntu2004-64-template
+    name: &enterprise-ubuntu2004-64 enterprise-ubuntu2004-64
+    display_name: Enterprise Ubuntu 20.04
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubuntu2004-small
+    stepback: false
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: x86_64-enterprise-ubuntu2004
+      compile_flags: >-
+        --ssl MONGO_DISTMOD=ubuntu2004
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+      multiversion_platform: ubuntu2004
+      multiversion_edition: enterprise
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: x86_64
+      packager_distro: ubuntu2004
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      large_distro_name: ubuntu2004-large
+      # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+      external_auth_jobs_max: 1
+      compile_variant: enterprise-ubuntu2004-64
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - ubuntu2004-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: .development_critical
+      - name: .release_critical
 
-# This variant is owned by the security team and is special
-# because these tests require headless support to run
-- <<: *enterprise-ubuntu2004-64-template
-  name: enterprise-ubuntu2004-64-security
-  display_name: Enterprise Ubuntu 20.04 Security
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: *enterprise-ubuntu2004-64
-  tasks:
-  - name: external_auth_oidc
-  - name: external_auth_oidc_azure
-  - name: external_auth_oidc_gcp
+  # This variant is owned by the security team and is special
+  # because these tests require headless support to run
+  - <<: *enterprise-ubuntu2004-64-template
+    name: enterprise-ubuntu2004-64-security
+    display_name: Enterprise Ubuntu 20.04 Security
+    depends_on:
+      - name: archive_dist_test_debug
+        variant: *enterprise-ubuntu2004-64
+    tasks:
+      - name: external_auth_oidc
+      - name: external_auth_oidc_azure
+      - name: external_auth_oidc_gcp
 
-- name: enterprise-ubuntu2204-64
-  display_name: Enterprise Ubuntu 22.04
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - ubuntu2204-small
-  stepback: false
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: x86_64-enterprise-ubuntu2204
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2204
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
-    multiversion_platform: ubuntu2204
-    multiversion_edition: enterprise
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: ubuntu2204
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    large_distro_name: ubuntu2204-large
-    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
-    external_auth_jobs_max: 1
-    compile_variant: enterprise-ubuntu2204-64
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - ubuntu2204-large
-  - name: test_packages
-    distros:
-    - ubuntu2204-large
-  - name: test_packages_release
-    distros:
-    - ubuntu2204-large
-  - name: .development_critical
-  - name: .release_critical
+  - name: enterprise-ubuntu2204-64
+    display_name: Enterprise Ubuntu 22.04
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - ubuntu2204-small
+    stepback: false
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: x86_64-enterprise-ubuntu2204
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=ubuntu2204
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+      multiversion_platform: ubuntu2204
+      multiversion_edition: enterprise
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: x86_64
+      packager_distro: ubuntu2204
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      large_distro_name: ubuntu2204-large
+      # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+      external_auth_jobs_max: 1
+      compile_variant: enterprise-ubuntu2204-64
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - ubuntu2204-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: test_packages_release
+        distros:
+          - ubuntu2204-large
+      - name: .development_critical
+      - name: .release_critical
 
-- name: enterprise-ubuntu2004-arm64
-  display_name: Enterprise Ubuntu 20.04 arm64
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu2004-arm64
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: aarch64-enterprise-ubuntu2004
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=ubuntu2004
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
-    resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: arm64
-    packager_distro: ubuntu2004
-    repo_edition: enterprise
-    multiversion_platform: ubuntu2004
-    multiversion_architecture: aarch64
-    multiversion_edition: enterprise
-    scons_cache_scope: shared
-    compile_variant: enterprise-ubuntu2004-arm64
-    large_distro_name: ubuntu2004-arm64-large
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - ubuntu2004-arm64-large
-  - name: test_packages
-    distros:
-    - ubuntu1804-arm64-build
-  - name: .development_critical
-  - name: .release_critical
+  - name: enterprise-ubuntu2004-arm64
+    display_name: Enterprise Ubuntu 20.04 arm64
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubuntu2004-arm64
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: aarch64-enterprise-ubuntu2004
+      compile_flags: >-
+        --ssl MONGO_DISTMOD=ubuntu2004
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+      resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: arm64
+      packager_distro: ubuntu2004
+      repo_edition: enterprise
+      multiversion_platform: ubuntu2004
+      multiversion_architecture: aarch64
+      multiversion_edition: enterprise
+      scons_cache_scope: shared
+      compile_variant: enterprise-ubuntu2004-arm64
+      large_distro_name: ubuntu2004-arm64-large
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - ubuntu2004-arm64-large
+      - name: test_packages
+        distros:
+          - ubuntu1804-arm64-build
+      - name: .development_critical
+      - name: .release_critical
 
-- name: ubuntu2004-arm64
-  display_name: Ubuntu 20.04 arm64
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - ubuntu2004-arm64-small
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: aarch64-ubuntu2004
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2004
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
-    test_flags: >-
-      --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: arm64
-    packager_distro: ubuntu2004
-    repo_edition: org
-    multiversion_platform: ubuntu2004
-    multiversion_architecture: aarch64
-    multiversion_edition: targeted
-    scons_cache_scope: shared
-    compile_variant: ubuntu2004-arm64
-    large_distro_name: ubuntu2004-arm64-large
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - ubuntu2004-arm64-large
-  - name: test_packages
-    distros:
-    - ubuntu1804-arm64-build
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: ubuntu2004-arm64
+    display_name: Ubuntu 20.04 arm64
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - ubuntu2004-arm64-small
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_name: linux
+      push_arch: aarch64-ubuntu2004
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=ubuntu2004
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --modules=
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: arm64
+      packager_distro: ubuntu2004
+      repo_edition: org
+      multiversion_platform: ubuntu2004
+      multiversion_architecture: aarch64
+      multiversion_edition: targeted
+      scons_cache_scope: shared
+      compile_variant: ubuntu2004-arm64
+      large_distro_name: ubuntu2004-arm64-large
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - ubuntu2004-arm64-large
+      - name: test_packages
+        distros:
+          - ubuntu1804-arm64-build
+      - name: .development_critical !.incompatible_community
+      - name: .release_critical !.incompatible_community
 
-- name: enterprise-ubuntu2204-arm64
-  display_name: Enterprise Ubuntu 22.04 arm64
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu2204-arm64-small
-  expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: aarch64-enterprise-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-    resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: arm64
-    packager_distro: ubuntu2204
-    repo_edition: enterprise
-    multiversion_platform: ubuntu2204
-    multiversion_architecture: aarch64
-    multiversion_edition: enterprise
-    scons_cache_scope: shared
-    compile_variant: enterprise-ubuntu2204-arm64
-    large_distro_name: ubuntu2204-arm64-large
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - ubuntu2204-arm64-large
-  - name: test_packages
-    distros:
-    - ubuntu2204-arm64-large
-  - name: test_packages_release
-    distros:
-    - ubuntu2204-arm64-large
-  - name: .development_critical
-  - name: .release_critical
+  - name: enterprise-ubuntu2204-arm64
+    display_name: Enterprise Ubuntu 22.04 arm64
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubuntu2204-arm64-small
+    expansions:
+      additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: aarch64-enterprise-ubuntu2204
+      compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+      resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: arm64
+      packager_distro: ubuntu2204
+      repo_edition: enterprise
+      multiversion_platform: ubuntu2204
+      multiversion_architecture: aarch64
+      multiversion_edition: enterprise
+      scons_cache_scope: shared
+      compile_variant: enterprise-ubuntu2204-arm64
+      large_distro_name: ubuntu2204-arm64-large
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - ubuntu2204-arm64-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-arm64-large
+      - name: test_packages_release
+        distros:
+          - ubuntu2204-arm64-large
+      - name: .development_critical
+      - name: .release_critical
 
-- name: ubuntu2204-arm64
-  display_name: Ubuntu 22.04 arm64
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - ubuntu2204-arm64-small
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: aarch64-ubuntu2204
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=ubuntu2204
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
-    test_flags: >-
-      --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: arm64
-    packager_distro: ubuntu2204
-    repo_edition: org
-    multiversion_platform: ubuntu2204
-    multiversion_architecture: aarch64
-    multiversion_edition: targeted
-    scons_cache_scope: shared
-    compile_variant: ubuntu2204-arm64
-    large_distro_name: ubuntu2204-arm64-large
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - ubuntu2204-arm64-large
-  - name: test_packages
-    distros:
-    - ubuntu2204-arm64-large
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: ubuntu2204-arm64
+    display_name: Ubuntu 22.04 arm64
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - ubuntu2204-arm64-small
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_name: linux
+      push_arch: aarch64-ubuntu2204
+      compile_flags: >-
+        --ssl MONGO_DISTMOD=ubuntu2204
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --modules=
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: arm64
+      packager_distro: ubuntu2204
+      repo_edition: org
+      multiversion_platform: ubuntu2204
+      multiversion_architecture: aarch64
+      multiversion_edition: targeted
+      scons_cache_scope: shared
+      compile_variant: ubuntu2204-arm64
+      large_distro_name: ubuntu2204-arm64-large
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - ubuntu2204-arm64-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-arm64-large
+      - name: .development_critical !.incompatible_community
+      - name: .release_critical !.incompatible_community

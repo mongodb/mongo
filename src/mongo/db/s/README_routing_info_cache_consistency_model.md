@@ -14,12 +14,12 @@ On the other hand, two different clients creating two different sharded collecti
 
 The list below enumerates the current set of catalog objects in the routing info cache, their cardinality (how many exist in the cluster), their dependencies and the DDL coordinators which are responsible for their timelines:
 
--   ConfigData: Cardinality = 1, Coordinator = CSRS, Causally dependent on the clusterTime on the CSRS.
--   ShardsData: Cardinality = 1, Coordinator = CSRS, Causally dependent on ConfigData.
--   Database: Cardinality = NumDatabases, Coordinator = (CSRS with a hand-off to the DBPrimary after creation), Causally dependent on ShardsData.
--   Collection: Cardinality = NumCollections, Coordinator = DBPrimary, Causally dependent on Database.
--   CollectionPlacement: Cardinality = NumCollections, Coordinator = (DBPrimary with a hand-off to the Donor Shard for migrations), Causally dependent on Collection.
--   CollectionIndexes: Cardinality = NumCollections, Coordinator = DBPrimary, Causally dependent on Collection.
+- ConfigData: Cardinality = 1, Coordinator = CSRS, Causally dependent on the clusterTime on the CSRS.
+- ShardsData: Cardinality = 1, Coordinator = CSRS, Causally dependent on ConfigData.
+- Database: Cardinality = NumDatabases, Coordinator = (CSRS with a hand-off to the DBPrimary after creation), Causally dependent on ShardsData.
+- Collection: Cardinality = NumCollections, Coordinator = DBPrimary, Causally dependent on Database.
+- CollectionPlacement: Cardinality = NumCollections, Coordinator = (DBPrimary with a hand-off to the Donor Shard for migrations), Causally dependent on Collection.
+- CollectionIndexes: Cardinality = NumCollections, Coordinator = DBPrimary, Causally dependent on Collection.
 
 ## Consistency model
 
@@ -29,9 +29,9 @@ Currently, the cache exposes a view of the routing table which preserves the cau
 
 The only dependent timelines which are preserved are:
 
--   Everything dependent on ShardsData: Meaning that if a database or collection placement references shard S, then shard S will be present in the ShardRegistry
--   CollectionPlacement and Collection: Meaning that if the cache references placement version V, then it will also reference the collection description which corresponds to that placement
--   CollectionIndexes and Collection: Meaning that if the cache references index version V, then it will also reference the collection description which corresponds to that placement
+- Everything dependent on ShardsData: Meaning that if a database or collection placement references shard S, then shard S will be present in the ShardRegistry
+- CollectionPlacement and Collection: Meaning that if the cache references placement version V, then it will also reference the collection description which corresponds to that placement
+- CollectionIndexes and Collection: Meaning that if the cache references index version V, then it will also reference the collection description which corresponds to that placement
 
 For example, if the CatalogCache returns a chunk which is placed on shard S1, the same caller is guaranteed to see shard S1 in the ShardRegistry, rather than potentially get ShardNotFound. The inverse is not guaranteed: if a shard S1 is found in the ShardRegistry, there is no guarantee that any collections that have chunks on S1 will be in the CatalogCache.
 
@@ -43,26 +43,26 @@ Implementing the consistency model described in the previous section can be achi
 
 The objects and their timestamps are as follows:
 
--   ConfigData: `configTime`, which is the most recent majority timestamp on the CSRS
--   ShardData: `topologyTime`, which is an always increasing value that increments as shards are added and removed and is stored in the config.shards document
--   Database\*: `databaseTimestamp`, which is an always-increasing value that increments each time a database is created or moved
--   CollectionPlacement\*: `collectionTimestamp/epoch/majorVersion/minorVersion`, henceforth referred to as the `collectionVersion`
--   CollectionIndexes\*: `collectionTimestamp/epoch/indexVersion`, henceforth referred to as the `indexVersion`
+- ConfigData: `configTime`, which is the most recent majority timestamp on the CSRS
+- ShardData: `topologyTime`, which is an always increasing value that increments as shards are added and removed and is stored in the config.shards document
+- Database\*: `databaseTimestamp`, which is an always-increasing value that increments each time a database is created or moved
+- CollectionPlacement\*: `collectionTimestamp/epoch/majorVersion/minorVersion`, henceforth referred to as the `collectionVersion`
+- CollectionIndexes\*: `collectionTimestamp/epoch/indexVersion`, henceforth referred to as the `indexVersion`
 
 Because of the "related to" relationships explained above, there is a strict dependency between the various timestamps (please refer to the following section as well for more detail):
 
--   `configTime > topologyTime`: If a node is aware of `topologyTime`, it will be aware of the `configTime` of the write which added the new shard (please refer to the section on [object timestamps selection](#object-timestamps-selection) for more information of why the relationship is "greater-than")
--   `databaseTimestamp > topologyTime`: Topology time which includes the DBPrimary Shard (please refer to the section on [object timestamps selection](#object-timestamps-selection) for more information of why the relationship is "greater-than")
--   `collectionTimestamp > databaseTimestamp`: DatabaseTimestamp which includes the creation of that database
+- `configTime > topologyTime`: If a node is aware of `topologyTime`, it will be aware of the `configTime` of the write which added the new shard (please refer to the section on [object timestamps selection](#object-timestamps-selection) for more information of why the relationship is "greater-than")
+- `databaseTimestamp > topologyTime`: Topology time which includes the DBPrimary Shard (please refer to the section on [object timestamps selection](#object-timestamps-selection) for more information of why the relationship is "greater-than")
+- `collectionTimestamp > databaseTimestamp`: DatabaseTimestamp which includes the creation of that database
 
 Because every object in the cache depends on the `configTime` and the `topologyTime`, which are singletons in the system, these values are propagated on every communication within the cluster. Any change to the `topologyTime` informs the ShardRegistry that there is new information present on the CSRS, so that a subsequent `getShard` will refresh if necessary (i.e., if the caller asks for a DBPrimary which references a newly added shard).
 
 As a result, the process of sending of a request to a DBPrimary is as follows:
 
--   Ask for a database object from the CatalogCache
--   The CatalogCache fetches the database object from the CSRS (only if its been told that there is a more recent object in the persistent store), which implicitly fetches the `topologyTime` and the `configTime`
--   Ask for the DBPrimary shard object from the ShardRegistry
--   The ShardRegistry ensures that it has caught up at least up to the topologyTime that the fetch of the DB Primary brought and if necessary reaches to the CSRS
+- Ask for a database object from the CatalogCache
+- The CatalogCache fetches the database object from the CSRS (only if its been told that there is a more recent object in the persistent store), which implicitly fetches the `topologyTime` and the `configTime`
+- Ask for the DBPrimary shard object from the ShardRegistry
+- The ShardRegistry ensures that it has caught up at least up to the topologyTime that the fetch of the DB Primary brought and if necessary reaches to the CSRS
 
 ## Object timestamps selection
 

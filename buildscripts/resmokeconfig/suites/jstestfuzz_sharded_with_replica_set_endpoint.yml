@@ -7,7 +7,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstestfuzz/out/*.js
+    - jstestfuzz/out/*.js
 
 executor:
   archive:
@@ -29,34 +29,34 @@ executor:
       crashOnInvalidBSONError: ""
       objcheck: ""
   hooks:
-  - class: RunQueryStats
-    allow_feature_not_supported: true
-  - class: FuzzerRestoreSettings
-    shell_options:
-      global_vars:
-        TestData: *TestData
-  # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
-  # is fsync locked and has replica set endpoint enabled.
-  # - class: CheckReplDBHash
-  #   shell_options:
-  #     global_vars:
-  #       TestData:
-  #         skipValidationOnInvalidViewDefinitions: true
-  - class: CheckMetadataConsistencyInBackground
-    shell_options:
-      global_vars:
-        TestData: *TestData
-  - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData:
-          skipValidationOnInvalidViewDefinitions: true
-  - class: CheckRoutingTableConsistency
-    shell_options:
-      global_vars:
-        TestData:
-          <<: *TestData
-          mayForgeReshardingTempCollections: true
+    - class: RunQueryStats
+      allow_feature_not_supported: true
+    - class: FuzzerRestoreSettings
+      shell_options:
+        global_vars:
+          TestData: *TestData
+    # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
+    # is fsync locked and has replica set endpoint enabled.
+    # - class: CheckReplDBHash
+    #   shell_options:
+    #     global_vars:
+    #       TestData:
+    #         skipValidationOnInvalidViewDefinitions: true
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData: *TestData
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+    - class: CheckRoutingTableConsistency
+      shell_options:
+        global_vars:
+          TestData:
+            <<: *TestData
+            mayForgeReshardingTempCollections: true
   fixture:
     class: MultiShardedClusterFixture
     num_sharded_clusters: 2
@@ -71,7 +71,7 @@ executor:
         writePeriodicNoops: 1
         internalQueryStatsRateLimit: -1
         internalQueryStatsErrorsAreCommandFatal: true
-      verbose: ''
+      verbose: ""
     per_mongod_options:
       - set_parameters:
           featureFlagRouterPort: true

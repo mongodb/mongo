@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstestfuzz/out/*.js
+    - jstestfuzz/out/*.js
 
 executor:
   archive:
@@ -17,21 +17,21 @@ executor:
         TestData:
           ignoreCommandsIncompatibleWithRollback: true
   hooks:
-  - class: ContinuousStepdown
-  - class: FuzzerRestoreSettings
-  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
-  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
-  # validating the entire contents of the collection.
-  - class: CheckReplDBHash
-    shell_options:
-      global_vars:
-        TestData:
-          skipValidationOnInvalidViewDefinitions: true
-  - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData:
-          skipValidationOnInvalidViewDefinitions: true
+    - class: ContinuousStepdown
+    - class: FuzzerRestoreSettings
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplDBHash
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
   fixture:
     class: ReplicaSetFixture
     mongod_options:

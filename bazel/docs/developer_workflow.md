@@ -50,9 +50,9 @@ The divergence from SCons is that now source files have to be declared in additi
 
 The DevProd Build Team created MongoDB-specific macros for the different types of build targets you may want to specify. These include:
 
--   mongo_cc_binary
--   mongo_cc_library
--   idl_generator
+- mongo_cc_binary
+- mongo_cc_library
+- idl_generator
 
 Creating a new library is similar to the steps above for creating a new binary. A new **mongo_cc_library** definition would be created in the BUILD.bazel file.
 

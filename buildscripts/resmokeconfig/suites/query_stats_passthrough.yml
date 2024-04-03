@@ -10,30 +10,30 @@ description: |
 
 selector:
   roots:
-  - jstests/core/**/*.js
+    - jstests/core/**/*.js
   exclude_files:
-  # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests.
-  - jstests/core/txns/**/*.js
-  # Queryable encryption is not supported on standalone.
-  - jstests/core/queryable_encryption/**/*.js
-  # Query settings are not supported on standalone.
-  - jstests/core/query/query_settings/**/*.js
-  - jstests/core/timeseries/timeseries_union_with.js
+    # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests.
+    - jstests/core/txns/**/*.js
+    # Queryable encryption is not supported on standalone.
+    - jstests/core/queryable_encryption/**/*.js
+    # Query settings are not supported on standalone.
+    - jstests/core/query/query_settings/**/*.js
+    - jstests/core/timeseries/timeseries_union_with.js
   exclude_with_any_tags:
-  # Running $queryStats will increment these counters which can screw up some test assertions.
-  - inspects_command_opcounters
+    # Running $queryStats will increment these counters which can screw up some test assertions.
+    - inspects_command_opcounters
 
 executor:
   archive:
     hooks:
       - ValidateCollections
   hooks:
-  # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
-  # That way the fixture restart can't cause any trouble for the other hooks.
-  - class: RunQueryStats
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
+    # That way the fixture restart can't cause any trouble for the other hooks.
+    - class: RunQueryStats
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: MongoDFixture
     mongod_options:

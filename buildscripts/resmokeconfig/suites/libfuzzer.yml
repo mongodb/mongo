@@ -7,4 +7,4 @@ executor:
   config:
     corpus_directory_stem: corpora
   hooks:
-  - class: LibfuzzerHook
+    - class: LibfuzzerHook

@@ -2,12 +2,12 @@ test_kind: js_test
 
 selector:
   roots:
-  - buildscripts/tests/resmoke_end2end/failtestfiles/js_failure.js
+    - buildscripts/tests/resmoke_end2end/failtestfiles/js_failure.js
 
 executor:
   hooks:
-  - class: CleanEveryN
-    n: asdf
+    - class: CleanEveryN
+      n: asdf
   fixture:
     class: MongoDFixture
     mongod_options:

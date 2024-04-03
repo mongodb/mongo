@@ -2,13 +2,13 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/watchdog/*.js
+    - jstests/watchdog/*.js
 
 executor:
   config: {}
   hooks:
-  - class: CleanEveryN
-    n: 20
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: MongoDFixture
     mongod_options:

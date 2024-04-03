@@ -9,10 +9,10 @@
 test_kind: js_test
 selector:
   roots:
-  - jstests/core/txns/**/*.js
+    - jstests/core/txns/**/*.js
   exclude_with_any_tags:
-  # Transactions are not allowed to operate on capped collections.
-  - requires_capped
+    # Transactions are not allowed to operate on capped collections.
+    - requires_capped
 
 executor:
   archive:
@@ -22,11 +22,11 @@ executor:
     shell_options:
       eval: "globalThis.testingReplication = true;"
   hooks:
-  # We don't execute dbHash or oplog consistency checks since there is only a single replica set
-  # node.
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    # We don't execute dbHash or oplog consistency checks since there is only a single replica set
+    # node.
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: ReplicaSetFixture
     mongod_options:

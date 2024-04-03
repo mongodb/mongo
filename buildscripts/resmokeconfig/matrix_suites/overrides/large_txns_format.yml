@@ -12,8 +12,8 @@
 - name: excluded_files
   value:
     exclude_with_any_tags:
-    # Transactions are not allowed to operate on capped collections.
-    - requires_capped
+      # Transactions are not allowed to operate on capped collections.
+      - requires_capped
 
 - name: replica_sets_excluded_files
   value:

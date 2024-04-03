@@ -41,7 +41,6 @@
 #
 ########################################################################################################
 
-
 tests:
   ServiceEntryPointCommonBenchmarkFixture/BM_SEP_PING:
     al2023-arm64-sep-benchmark:

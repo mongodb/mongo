@@ -2,28 +2,28 @@ test_kind: fsm_workload_test
 
 selector:
   roots:
-  - jstests/concurrency/fsm_workloads/**/*.js
-  - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
-  ##
-  # Disabled due to MongoDB restrictions and/or workload restrictions
-  ##
-  # These workloads use >100MB of data, which can overwhelm test hosts.
-  - jstests/concurrency/fsm_workloads/agg_group_external.js
-  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    ##
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+    ##
+    # These workloads use >100MB of data, which can overwhelm test hosts.
+    - jstests/concurrency/fsm_workloads/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/agg_sort_external.js
 
-  # The findAndModify_update_grow.js and schema_validator_with_expr_variables.js workload can cause
-  # OOM kills on test hosts.
-  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
-  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
+    # The findAndModify_update_grow.js and schema_validator_with_expr_variables.js workload can cause
+    # OOM kills on test hosts.
+    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
 
-  # These workloads run the reIndex command, which is only allowed on a standalone node.
-  - jstests/concurrency/fsm_workloads/reindex.js
-  - jstests/concurrency/fsm_workloads/reindex_background.js
-  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+    # These workloads run the reIndex command, which is only allowed on a standalone node.
+    - jstests/concurrency/fsm_workloads/reindex.js
+    - jstests/concurrency/fsm_workloads/reindex_background.js
+    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
   exclude_with_any_tags:
-  - requires_sharding
+    - requires_sharding
 
 executor:
   archive:
@@ -36,17 +36,17 @@ executor:
     tests: true
   config: {}
   hooks:
-  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
-  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
-  # validating the entire contents of the collection.
-  #
-  # TODO SERVER-26466: Add CheckReplOplogs hook to the concurrency suite.
-  - class: RunDBCheckInBackground
-  - class: CheckReplDBHashInBackground
-  - class: ValidateCollectionsInBackground
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanupConcurrencyWorkloads
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    #
+    # TODO SERVER-26466: Add CheckReplOplogs hook to the concurrency suite.
+    - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
   fixture:
     class: ReplicaSetFixture
     mongod_options:

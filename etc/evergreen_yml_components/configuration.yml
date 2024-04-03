@@ -7,66 +7,66 @@
 #
 
 command_type: system
-exec_timeout_secs: 21600  # 6 hours.
+exec_timeout_secs: 21600 # 6 hours.
 oom_tracker: true
 pre_error_fails_task: true
 stepback: true
 
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
 parameters:
-- key: patch_compile_flags
-  description: "Additional SCons flags to be applied during scons compile invocations in this patch"
+  - key: patch_compile_flags
+    description: "Additional SCons flags to be applied during scons compile invocations in this patch"
 
-- key: future_git_tag
-  description: "Future git tag to be added. If empty, we will use the most recent git tag instead."
+  - key: future_git_tag
+    description: "Future git tag to be added. If empty, we will use the most recent git tag instead."
 
-- key: last_lts_evg_version_id
-  description: "The Evergreen Version ID of the last-lts MongoDB binaries. Only binaries from release variants are used"
+  - key: last_lts_evg_version_id
+    description: "The Evergreen Version ID of the last-lts MongoDB binaries. Only binaries from release variants are used"
 
-- key: last_continuous_evg_version_id
-  description: "The Evergreen Version ID of the last-continuous MongoDB binaries. Only binaries from release variants are used"
+  - key: last_continuous_evg_version_id
+    description: "The Evergreen Version ID of the last-continuous MongoDB binaries. Only binaries from release variants are used"
 
-- key: antithesis_image_tag
-  description: "The docker tag to use when pushing images to Antithesis"
+  - key: antithesis_image_tag
+    description: "The docker tag to use when pushing images to Antithesis"
 
-- key: build_patch_id
-  description: "Patch id of evergreen patch to pull binaries from for testing."
+  - key: build_patch_id
+    description: "Patch id of evergreen patch to pull binaries from for testing."
 
-## Cron parameters.
-- key: project_required_suggested_cron
-  value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
-  description: "Cron schedule for required and suggested variants"
-- key: project_nightly_cron
-  value: "0 4 * * *" # Every day starting at 0400 UTC
-  description: "Cron schedule for nightly variants"
-- key: project_weekly_cron
-  value: "0 4 * * 0" # Every week starting 0400 UTC Sunday
-  description: "Cron schedule for nightly variants"
+  ## Cron parameters.
+  - key: project_required_suggested_cron
+    value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
+    description: "Cron schedule for required and suggested variants"
+  - key: project_nightly_cron
+    value: "0 4 * * *" # Every day starting at 0400 UTC
+    description: "Cron schedule for nightly variants"
+  - key: project_weekly_cron
+    value: "0 4 * * 0" # Every week starting 0400 UTC Sunday
+    description: "Cron schedule for nightly variants"
 
 ## Patch Aliases
 patch_aliases:
-- alias: embedded
-  variant: '.*'
-  task: 'embedded_.*'
-- alias: query
-  variant: '^(.*query-patch-only|linux-x86-dynamic-compile-required)$'
-  task: '.*'
-- alias: required
-  variant: '^(.*-required$|linux-64-debug|enterprise-amazon-linux2-arm64-all-feature-flags|amazon-linux2-arm64-dynamic-compile|amazon-linux2-arm64-compile|amazon-linux2-arm64-crypt-compile|run-all-affected-jstests)$'
-  task: '.*'
-- alias: security
-  variant: '^(.*security-patch-only|linux-x86-dynamic-compile|windows-compile-required)$'
-  task: '.*'
+  - alias: embedded
+    variant: ".*"
+    task: "embedded_.*"
+  - alias: query
+    variant: "^(.*query-patch-only|linux-x86-dynamic-compile-required)$"
+    task: ".*"
+  - alias: required
+    variant: "^(.*-required$|linux-64-debug|enterprise-amazon-linux2-arm64-all-feature-flags|amazon-linux2-arm64-dynamic-compile|amazon-linux2-arm64-compile|amazon-linux2-arm64-crypt-compile|run-all-affected-jstests)$"
+    task: ".*"
+  - alias: security
+    variant: "^(.*security-patch-only|linux-x86-dynamic-compile|windows-compile-required)$"
+    task: ".*"
 
 commit_queue_aliases:
-- variant: "commit-queue"
-  task: "^(bazel_.*|run_.*|compile_.*|lint_.*|validate_commit_message|jsCore|version_gen_validation|resmoke_validation_tests)$"
-  variant_tags: []
-  task_tags: []
-- variant: "^(amazon-linux2-arm64-dynamic-compile|linux-x86-dynamic-compile-required)$"
-  task: "clang_tidy.*"
-  variant_tags: []
-  task_tags: []
+  - variant: "commit-queue"
+    task: "^(bazel_.*|run_.*|compile_.*|lint_.*|validate_commit_message|jsCore|version_gen_validation|resmoke_validation_tests)$"
+    variant_tags: []
+    task_tags: []
+  - variant: "^(amazon-linux2-arm64-dynamic-compile|linux-x86-dynamic-compile-required)$"
+    task: "clang_tidy.*"
+    variant_tags: []
+    task_tags: []
 
 #######################################
 #               Modules               #
@@ -74,72 +74,72 @@ commit_queue_aliases:
 # if a module is added and to be added to the manifest
 # be sure to add the module to git.get_project revisions parameter
 modules:
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
+  - name: wtdevelop
+    repo: git@github.com:wiredtiger/wiredtiger.git
+    prefix: src/third_party
+    branch: develop
 
 # Pre task steps
 pre:
-- func: "set task expansion macros"
-- func: "f_expansions_write"
+  - func: "set task expansion macros"
+  - func: "f_expansions_write"
 
 # Post task steps
 post:
-- func: "f_expansions_write"
-- func: "cleanup external auth OIDC resources"
-- func: "upload npm logs"
-- func: "attach scons logs"
-- func: "attach local resmoke invocation"
-- func: "attach bazel invocation"
-- func: "attach multiversion exclude tags"
-- func: "attach report"
-- func: "attach task errors"
-- func: "attach artifacts"
-- func: "attach multiversion download links"
-- func: "save ec2 task artifacts"
-- func: "attach wiki page"
-- func: "upload docker compose"
-- func: "upload jstestfuzz minimized output"
-- func: "upload clang tidy results"
-- func: "kill processes"
-- func: "save local client logs"
-- func: "save jepsen artifacts"
-- func: "save mongo coredumps"
-- func: "generate hang analyzer tasks"
-- func: "save failed unittests"
-- func: "save unstripped dbtest"
-- func: "save hang analyzer debugger files"
-- func: "save disk statistics"
-- func: "save system resource information"
-- func: "save UndoDB recordings"
-- func: "save libfuzzertest corpora"
-- func: "remove files"
-  vars:
-    files: >-
-      src/resmoke_error_code
-      src/build/scons/config.log
-      src/*.gcda.gcov
-      src/gcov-intermediate-files.tgz
-      src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
-      mongo-coredumps.json
-      src/dist-unittests/bin/*
-      src/dist-unittests/lib/*
-      mongo-unittests.tgz
-      src/debugger*.*
-      src/mongo-hanganalyzer.tgz
-      diskstats.tgz
-      system-resource-info.tgz
-      ${report_file|src/report.json}
-      ${archive_file|src/archive.json}
-- func: "umount shared scons directory"
-- func: "umount tmp directory"
-- func: "cleanup FUSE watchdog"
-- func: "cleanup environment"
-- func: "cleanup jepsen docker test"
+  - func: "f_expansions_write"
+  - func: "cleanup external auth OIDC resources"
+  - func: "upload npm logs"
+  - func: "attach scons logs"
+  - func: "attach local resmoke invocation"
+  - func: "attach bazel invocation"
+  - func: "attach multiversion exclude tags"
+  - func: "attach report"
+  - func: "attach task errors"
+  - func: "attach artifacts"
+  - func: "attach multiversion download links"
+  - func: "save ec2 task artifacts"
+  - func: "attach wiki page"
+  - func: "upload docker compose"
+  - func: "upload jstestfuzz minimized output"
+  - func: "upload clang tidy results"
+  - func: "kill processes"
+  - func: "save local client logs"
+  - func: "save jepsen artifacts"
+  - func: "save mongo coredumps"
+  - func: "generate hang analyzer tasks"
+  - func: "save failed unittests"
+  - func: "save unstripped dbtest"
+  - func: "save hang analyzer debugger files"
+  - func: "save disk statistics"
+  - func: "save system resource information"
+  - func: "save UndoDB recordings"
+  - func: "save libfuzzertest corpora"
+  - func: "remove files"
+    vars:
+      files: >-
+        src/resmoke_error_code
+        src/build/scons/config.log
+        src/*.gcda.gcov
+        src/gcov-intermediate-files.tgz
+        src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
+        mongo-coredumps.json
+        src/dist-unittests/bin/*
+        src/dist-unittests/lib/*
+        mongo-unittests.tgz
+        src/debugger*.*
+        src/mongo-hanganalyzer.tgz
+        diskstats.tgz
+        system-resource-info.tgz
+        ${report_file|src/report.json}
+        ${archive_file|src/archive.json}
+  - func: "umount shared scons directory"
+  - func: "umount tmp directory"
+  - func: "cleanup FUSE watchdog"
+  - func: "cleanup environment"
+  - func: "cleanup jepsen docker test"
 
 # Timeout steps
 timeout:
-- func: "f_expansions_write"
-- func: "run hang analyzer"
-- func: "wait for resmoke to shutdown"
+  - func: "f_expansions_write"
+  - func: "run hang analyzer"
+  - func: "wait for resmoke to shutdown"

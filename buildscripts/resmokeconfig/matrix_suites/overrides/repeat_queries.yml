@@ -8,8 +8,8 @@
 - name: excluded_files
   value:
     exclude_with_any_tags:
-    # Used to tag tests which cannot run in the 'repeat_queries' suites.
-    - does_not_support_repeated_reads
-    # By repeating queries when the profiler is enabled, we end up writing additional profiler entries.
-    # Most tests using profiling are not prepared for these additional profiler entries.
-    - requires_profiling
+      # Used to tag tests which cannot run in the 'repeat_queries' suites.
+      - does_not_support_repeated_reads
+      # By repeating queries when the profiler is enabled, we end up writing additional profiler entries.
+      # Most tests using profiling are not prepared for these additional profiler entries.
+      - requires_profiling

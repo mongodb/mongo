@@ -1,22 +1,22 @@
 # options passed to IWYU
 iwyu_options:
-  - '--max_line_length=100'
-  - '--no_fwd_decls'
-  - '--prefix_header_includes=add'
-  - '--transitive_includes_only'
+  - "--max_line_length=100"
+  - "--no_fwd_decls"
+  - "--prefix_header_includes=add"
+  - "--transitive_includes_only"
 
 # options passed to the fix script
 fix_options:
-  - '--blank_lines'
-  - '--nocomments'
-  - '--noreorder'
-  - '--safe_headers'
+  - "--blank_lines"
+  - "--nocomments"
+  - "--noreorder"
+  - "--safe_headers"
 
 # filename regex to swap no_include in place
 # quotes and brackets not included quotes are always assumed
 # since this is targeting IWYU added headers
 no_includes:
- - 'b.h'
+  - "b.h"
 
 # prefixes (non regex) to skip
 skip_files:
@@ -24,4 +24,4 @@ skip_files:
 # regex file paths to add keep pragma
 # include quotes are angle brackets
 keep_includes:
-- '"a.h"'
+  - '"a.h"'

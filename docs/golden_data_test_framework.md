@@ -9,91 +9,91 @@ outputs.
 
 # When to use Golden Data tests?
 
--   Code under test produces a deterministic output: That way tests can consistently succeed or fail.
--   Incremental changes to code under test or test fixture result in incremental changes to the
-    output.
--   As an alternative to ASSERT for large output comparison: Serves the same purpose, but provides
-    tools for diffing/updating.
--   The outputs can't be objectively verified (e.g. by verifying well known properties). Examples:
-    -   Verifying if sorting works, can be done by verifying that output is sorted. SHOULD NOT use
-        Golden Data tests.
-    -   Verifying that pretty printing works, MAY use Golden Data tests to verify the output, as there
-        might not be well known properties or those properties can easily change.
--   As stability/versioning/regression testing. Golden Data tests by storing recorded outputs, are
-    good candidate for preserving behavior of legacy versions or detecting undesired changes in
-    behavior, even in cases when new behavior meets other correctness criteria.
+- Code under test produces a deterministic output: That way tests can consistently succeed or fail.
+- Incremental changes to code under test or test fixture result in incremental changes to the
+  output.
+- As an alternative to ASSERT for large output comparison: Serves the same purpose, but provides
+  tools for diffing/updating.
+- The outputs can't be objectively verified (e.g. by verifying well known properties). Examples:
+  - Verifying if sorting works, can be done by verifying that output is sorted. SHOULD NOT use
+    Golden Data tests.
+  - Verifying that pretty printing works, MAY use Golden Data tests to verify the output, as there
+    might not be well known properties or those properties can easily change.
+- As stability/versioning/regression testing. Golden Data tests by storing recorded outputs, are
+  good candidate for preserving behavior of legacy versions or detecting undesired changes in
+  behavior, even in cases when new behavior meets other correctness criteria.
 
 # Best practices for working with Golden Data tests
 
--   Tests MUST produce text output that is diffable can be inspected in the pull request.
+- Tests MUST produce text output that is diffable can be inspected in the pull request.
 
--   Tests MUST produce an output that is deterministic and repeatable. Including running on different
-    platforms. Same as with ASSERT_EQ.
--   Tests SHOULD produce an output that changes incrementally in response to the incremental test or
-    code changes.
+- Tests MUST produce an output that is deterministic and repeatable. Including running on different
+  platforms. Same as with ASSERT_EQ.
+- Tests SHOULD produce an output that changes incrementally in response to the incremental test or
+  code changes.
 
--   Multiple test variations MAY be bundled into a single test. Recommended when testing same feature
-    with different inputs. This helps reviewing the outputs by grouping similar tests together, and also
-    reduces the number of output files.
+- Multiple test variations MAY be bundled into a single test. Recommended when testing same feature
+  with different inputs. This helps reviewing the outputs by grouping similar tests together, and also
+  reduces the number of output files.
 
--   Changes to test fixture or test code that affect non-trivial amount test outputs MUST BE done in
-    separate pull request from production code changes:
+- Changes to test fixture or test code that affect non-trivial amount test outputs MUST BE done in
+  separate pull request from production code changes:
 
-    -   Pull request for test code only changes can be easily reviewed, even if large number of test
-        outputs are modified. While such changes can still introduce merge conflicts, they don't introduce
-        risk of regression (if outputs were valid
-    -   Pull requests with mixed production
+  - Pull request for test code only changes can be easily reviewed, even if large number of test
+    outputs are modified. While such changes can still introduce merge conflicts, they don't introduce
+    risk of regression (if outputs were valid
+  - Pull requests with mixed production
 
--   Tests in the same suite SHOULD share the fixtures when appropriate. This reduces cost of adding
-    new tests to the suite. Changes to the fixture may only affect expected outputs from that fixtures,
-    and those output can be updated in bulk.
+- Tests in the same suite SHOULD share the fixtures when appropriate. This reduces cost of adding
+  new tests to the suite. Changes to the fixture may only affect expected outputs from that fixtures,
+  and those output can be updated in bulk.
 
--   Tests in different suites SHOULD NOT reuse/share fixtures. Changes to the fixture can affect large
-    number of expected outputs.
-    There are exceptions to that rule, and tests in different suites MAY reuse/share fixtures if:
+- Tests in different suites SHOULD NOT reuse/share fixtures. Changes to the fixture can affect large
+  number of expected outputs.
+  There are exceptions to that rule, and tests in different suites MAY reuse/share fixtures if:
 
-    -   Test fixture is considered stable and changes rarely.
-    -   Tests suites are related, either by sharing tests, or testing similar components.
-    -   Setup/teardown costs are excessive, and sharing the same instance of a fixture for performance
-        reasons can't be avoided.
+  - Test fixture is considered stable and changes rarely.
+  - Tests suites are related, either by sharing tests, or testing similar components.
+  - Setup/teardown costs are excessive, and sharing the same instance of a fixture for performance
+    reasons can't be avoided.
 
--   Tests SHOULD print both inputs and outputs of the tested code. This makes it easy for reviewers to
-    verify of the expected outputs are indeed correct by having both input and output next to each
-    other.
-    Otherwise finding the input used to produce the new output may not be practical, and might not even
-    be included in the diff.
+- Tests SHOULD print both inputs and outputs of the tested code. This makes it easy for reviewers to
+  verify of the expected outputs are indeed correct by having both input and output next to each
+  other.
+  Otherwise finding the input used to produce the new output may not be practical, and might not even
+  be included in the diff.
 
--   When resolving merge conflicts on the expected output files, one of the approaches below SHOULD be
-    used:
+- When resolving merge conflicts on the expected output files, one of the approaches below SHOULD be
+  used:
 
-    -   "Accept theirs", rerun the tests and verify new outputs. This doesn't require knowledge of
-        production/test code changes in "theirs" branch, but requires re-review and re-acceptance of c
-        hanges done by local branch.
-    -   "Accept yours", rerun the tests and verify the new outputs. This approach requires knowledge of
-        production/test code changes in "theirs" branch. However, if such changes resulted in
-        straightforward and repetitive output changes, like due to printing code change or fixture change,
-        it may be easier to verify than reinspecting local changes.
+  - "Accept theirs", rerun the tests and verify new outputs. This doesn't require knowledge of
+    production/test code changes in "theirs" branch, but requires re-review and re-acceptance of c
+    hanges done by local branch.
+  - "Accept yours", rerun the tests and verify the new outputs. This approach requires knowledge of
+    production/test code changes in "theirs" branch. However, if such changes resulted in
+    straightforward and repetitive output changes, like due to printing code change or fixture change,
+    it may be easier to verify than reinspecting local changes.
 
--   Expected test outputs SHOULD be reused across tightly-coupled test suites. The suites are
-    tightly-coupled if:
+- Expected test outputs SHOULD be reused across tightly-coupled test suites. The suites are
+  tightly-coupled if:
 
-    -   Share the same tests, inputs and fixtures.
-    -   Test similar scenarios.
-    -   Test different code paths, but changes to one of the code path is expected to be accompanied by
-        changes to the other code paths as well.
+  - Share the same tests, inputs and fixtures.
+  - Test similar scenarios.
+  - Test different code paths, but changes to one of the code path is expected to be accompanied by
+    changes to the other code paths as well.
 
-    Tests SHOULD use different test files, for legitimate and expected output differences between
-    those suites.
+  Tests SHOULD use different test files, for legitimate and expected output differences between
+  those suites.
 
-    Examples:
+  Examples:
 
-    -   Functional tests, integration tests and unit tests that test the same behavior in different
-        environments.
-    -   Versioned tests, where expected behavior is the same for majority of test inputs/scenarios.
+  - Functional tests, integration tests and unit tests that test the same behavior in different
+    environments.
+  - Versioned tests, where expected behavior is the same for majority of test inputs/scenarios.
 
--   AVOID manually modifying expected output files. Those files are considered to be auto generated.
-    Instead, run the tests and then copy the generated output as a new expected output file. See "How to
-    diff and accept new test outputs" section for instructions.
+- AVOID manually modifying expected output files. Those files are considered to be auto generated.
+  Instead, run the tests and then copy the generated output as a new expected output file. See "How to
+  diff and accept new test outputs" section for instructions.
 
 # How to use write Golden Data tests?
 
@@ -108,8 +108,8 @@ code without a need to provide deserialization/parsing code.
 When actual test output is different from expected output, test framework will fail the test, log
 both outputs and also create following files, that can be inspected later:
 
--   <output_path>/actual/<test_path> - with actual test output
--   <output_path>/expected/<test_path> - with expected test output
+- <output_path>/actual/<test_path> - with actual test output
+- <output_path>/expected/<test_path> - with expected test output
 
 ## CPP tests
 
@@ -163,8 +163,8 @@ Also see self-test:
 
 Use buildscripts/golden_test.py command line tool to manage the test outputs. This includes:
 
--   diffing all output differences of all tests in a given test run output.
--   accepting all output differences of all tests in a given test run output.
+- diffing all output differences of all tests in a given test run output.
+- accepting all output differences of all tests in a given test run output.
 
 ## Setup
 
@@ -204,15 +204,15 @@ This is the same config as that would be setup by the [Automatic Setup](#automat
 
 This config uses a unique subfolder folder for each test run. (default)
 
--   Allows diffing each test run separately.
--   Works with multiple source repos.
+- Allows diffing each test run separately.
+- Works with multiple source repos.
 
 **Instructions for Linux/macOS:**
 
 This config uses a unique subfolder folder for each test run. (default)
 
--   Allows diffing each test run separately.
--   Works with multiple source repos.
+- Allows diffing each test run separately.
+- Works with multiple source repos.
 
 Create ~/.golden_test_config.yml with following contents:
 
@@ -323,25 +323,25 @@ Golden Data test config file is a YAML file specified as:
 
 ```yaml
 outputRootPattern:
-    type: String
-    optional: true
-    description:
-        Root path patten that will be used to write expected and actual test outputs for all tests
-        in the test run.
-        If not specified a temporary folder location will be used.
-        Path pattern string may use '%' characters in the last part of the path. '%' characters in
-        the last part of the path will be replaced with random lowercase hexadecimal digits.
-    examples: /var/tmp/test_output/out-%%%%-%%%%-%%%%-%%%%
-        /var/tmp/test_output
+  type: String
+  optional: true
+  description:
+    Root path patten that will be used to write expected and actual test outputs for all tests
+    in the test run.
+    If not specified a temporary folder location will be used.
+    Path pattern string may use '%' characters in the last part of the path. '%' characters in
+    the last part of the path will be replaced with random lowercase hexadecimal digits.
+  examples: /var/tmp/test_output/out-%%%%-%%%%-%%%%-%%%%
+    /var/tmp/test_output
 
 diffCmd:
-    type: String
-    optional: true
-    description: Shell command to diff a single golden test run output.
-        {{expected}} and {{actual}} variables should be used and will be replaced  with expected and
-        actual output folder paths respectively.
-        This property is not used to decide whether the test passes or fails; it is only used to
-        display differences once we've decided that a test failed.
-    examples: git diff --no-index "{{expected}}" "{{actual}}"
-        diff -ruN --unidirectional-new-file --color=always "{{expected}}" "{{actual}}"
+  type: String
+  optional: true
+  description: Shell command to diff a single golden test run output.
+    {{expected}} and {{actual}} variables should be used and will be replaced  with expected and
+    actual output folder paths respectively.
+    This property is not used to decide whether the test passes or fails; it is only used to
+    display differences once we've decided that a test failed.
+  examples: git diff --no-index "{{expected}}" "{{actual}}"
+    diff -ruN --unidirectional-new-file --color=always "{{expected}}" "{{actual}}"
 ```

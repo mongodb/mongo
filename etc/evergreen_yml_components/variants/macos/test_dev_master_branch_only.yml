@@ -5,89 +5,89 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 buildvariants:
-# Note that this task is currently optional;
-# This will eventually become suggested, then required.
-- name: &macos-amd64-bazel-compile macos-amd64-bazel-compile
-  display_name: "MacOS AMD64 Bazel Compile"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - macos-1100
-  expansions:
-    test_flags: >-
-      --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    push_path: osx
-    push_bucket: downloads.mongodb.org
-    push_name: macos
-    push_arch: x86_64
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx_arm.vars
-      --modules=
-    resmoke_jobs_max: 6
-    compile_variant: *macos-amd64-bazel-compile
-  tasks:
-  - name: compile_bazel_macos_TG
-  - name: compile_bazel_ninja_TG
+  # Note that this task is currently optional;
+  # This will eventually become suggested, then required.
+  - name: &macos-amd64-bazel-compile macos-amd64-bazel-compile
+    display_name: "MacOS AMD64 Bazel Compile"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - macos-1100
+    expansions:
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      push_path: osx
+      push_bucket: downloads.mongodb.org
+      push_name: macos
+      push_arch: x86_64
+      compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+      compile_flags: >-
+        --ssl
+        -j$(sysctl -n hw.logicalcpu)
+        --libc++
+        --variables-files=etc/scons/xcode_macosx_arm.vars
+        --modules=
+      resmoke_jobs_max: 6
+      compile_variant: *macos-amd64-bazel-compile
+    tasks:
+      - name: compile_bazel_macos_TG
+      - name: compile_bazel_ninja_TG
 
-# Note that this task is currently optional;
-# This will eventually become suggested, then required.
-- name: &macos-arm64-bazel-compile macos-arm64-bazel-compile
-  display_name: "MacOS ARM64 Bazel Compile"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - macos-1100-arm64
-  expansions:
-    test_flags: >-
-      --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    push_path: osx
-    push_bucket: downloads.mongodb.org
-    push_name: macos
-    push_arch: arm64
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx_arm.vars
-      --modules=
-    resmoke_jobs_max: 6
-    compile_variant: *macos-arm64-bazel-compile
-  tasks:
-  - name: compile_bazel_macos_TG
-  - name: compile_bazel_ninja_TG
+  # Note that this task is currently optional;
+  # This will eventually become suggested, then required.
+  - name: &macos-arm64-bazel-compile macos-arm64-bazel-compile
+    display_name: "MacOS ARM64 Bazel Compile"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - macos-1100-arm64
+    expansions:
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      push_path: osx
+      push_bucket: downloads.mongodb.org
+      push_name: macos
+      push_arch: arm64
+      compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+      compile_flags: >-
+        --ssl
+        -j$(sysctl -n hw.logicalcpu)
+        --libc++
+        --variables-files=etc/scons/xcode_macosx_arm.vars
+        --modules=
+      resmoke_jobs_max: 6
+      compile_variant: *macos-arm64-bazel-compile
+    tasks:
+      - name: compile_bazel_macos_TG
+      - name: compile_bazel_ninja_TG
 
-- name: &enterprise-macos-arm64 enterprise-macos-arm64
-  display_name: "~ Enterprise macOS arm64"
-  run_on:
-  - macos-1100-arm64
-  tags: ["bazel_check"]
-  expansions:
-    compile_variant: *enterprise-macos-arm64
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx_arm.vars
-      --use-diagnostic-latches=on
-    resmoke_jobs_max: 6
-    num_scons_link_jobs_available: 0.99
-  tasks:
-  - name: compile_test_serial_TG
-  - name: compile_test_parallel_unittest_stream_TG
-  - name: audit
-  - name: auth_audit_gen
-  - name: fle
-  - name: fle2
-  - name: .jscore .common !.decimal !.sharding
-  - name: replica_sets_auth_gen
-  - name: sasl
-  - name: .crypt
+  - name: &enterprise-macos-arm64 enterprise-macos-arm64
+    display_name: "~ Enterprise macOS arm64"
+    run_on:
+      - macos-1100-arm64
+    tags: ["bazel_check"]
+    expansions:
+      compile_variant: *enterprise-macos-arm64
+      test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
+      compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+      compile_flags: >-
+        --ssl
+        -j$(sysctl -n hw.logicalcpu)
+        --libc++
+        --variables-files=etc/scons/xcode_macosx_arm.vars
+        --use-diagnostic-latches=on
+      resmoke_jobs_max: 6
+      num_scons_link_jobs_available: 0.99
+    tasks:
+      - name: compile_test_serial_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: audit
+      - name: auth_audit_gen
+      - name: fle
+      - name: fle2
+      - name: .jscore .common !.decimal !.sharding
+      - name: replica_sets_auth_gen
+      - name: sasl
+      - name: .crypt

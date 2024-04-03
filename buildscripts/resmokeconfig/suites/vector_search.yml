@@ -2,11 +2,11 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/with_mongot/vector_search_mocked/*.js
+    - jstests/with_mongot/vector_search_mocked/*.js
   exclude_with_any_tags:
-  - requires_auth
+    - requires_auth
 
 executor:
   config:
     shell_options:
-      nodb: ''
+      nodb: ""

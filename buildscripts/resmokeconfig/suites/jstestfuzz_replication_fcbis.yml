@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstestfuzz/out/*.js
+    - jstestfuzz/out/*.js
 
 executor:
   archive:
@@ -16,17 +16,17 @@ executor:
         TestData:
           ignoreCommandsIncompatibleWithInitialSync: true
   hooks:
-  - class: FuzzerRestoreSettings
-  - class: BackgroundInitialSync
-    n: 1
-    shell_options:
-      global_vars:
-        TestData:
-          skipValidationOnInvalidViewDefinitions: true
+    - class: FuzzerRestoreSettings
+    - class: BackgroundInitialSync
+      n: 1
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
   fixture:
     class: ReplicaSetFixture
     mongod_options:
-      verbose: ''
+      verbose: ""
       set_parameters:
         disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1

@@ -1,41 +1,41 @@
 # IDL (Interface Definition Language)
 
--   [IDL (Interface Definition Language)](#idl-interface-definition-language)
-    -   [Key Features](#key-features)
-    -   [Overview](#overview)
-    -   [Getting started](#getting-started)
-        -   [Getting Started with Commands](#getting-started-with-commands)
-    -   [The IDL file](#the-idl-file)
-    -   [Global](#global)
-    -   [Imports](#imports)
-    -   [Enums](#enums)
-        -   [String Enums](#string-enums)
-        -   [Integer Enums](#integer-enums)
-        -   [Reference](#reference)
-    -   [Types](#types)
-        -   [Type Overview](#type-overview)
-        -   [Basic Types](#basic-types)
-        -   [Custom Types](#custom-types)
-        -   [Any Types](#any-types)
-        -   [Type Reference](#type-reference)
-    -   [Structs](#structs)
-        -   [BSON Lifetime](#bson-lifetime)
-        -   [Chained Structs (aka struct reuse by composition)](#chained-structs-aka-struct-reuse-by-composition)
-        -   [Struct Reference](#struct-reference)
-        -   [Struct Fields Attribute Reference](#struct-fields-attribute-reference)
-        -   [Field Validator Reference](#field-validator-reference)
-    -   [Commands](#commands)
-        -   [Commands Reference](#commands-reference)
-        -   [Access Check Reference](#access-check-reference)
-            -   [Check or Privilege](#check-or-privilege)
-    -   [IDL Compiler Overview](#idl-compiler-overview)
-        -   [Trees](#trees)
-        -   [Passes](#passes)
-        -   [Error Handling and Recovery](#error-handling-and-recovery)
-        -   [Testing](#testing)
-        -   [Extending IDL](#extending-idl)
-        -   [Implementation Details](#implementation)
-    -   [Best Practices](#best-practices)
+- [IDL (Interface Definition Language)](#idl-interface-definition-language)
+  - [Key Features](#key-features)
+  - [Overview](#overview)
+  - [Getting started](#getting-started)
+    - [Getting Started with Commands](#getting-started-with-commands)
+  - [The IDL file](#the-idl-file)
+  - [Global](#global)
+  - [Imports](#imports)
+  - [Enums](#enums)
+    - [String Enums](#string-enums)
+    - [Integer Enums](#integer-enums)
+    - [Reference](#reference)
+  - [Types](#types)
+    - [Type Overview](#type-overview)
+    - [Basic Types](#basic-types)
+    - [Custom Types](#custom-types)
+    - [Any Types](#any-types)
+    - [Type Reference](#type-reference)
+  - [Structs](#structs)
+    - [BSON Lifetime](#bson-lifetime)
+    - [Chained Structs (aka struct reuse by composition)](#chained-structs-aka-struct-reuse-by-composition)
+    - [Struct Reference](#struct-reference)
+    - [Struct Fields Attribute Reference](#struct-fields-attribute-reference)
+    - [Field Validator Reference](#field-validator-reference)
+  - [Commands](#commands)
+    - [Commands Reference](#commands-reference)
+    - [Access Check Reference](#access-check-reference)
+      - [Check or Privilege](#check-or-privilege)
+  - [IDL Compiler Overview](#idl-compiler-overview)
+    - [Trees](#trees)
+    - [Passes](#passes)
+    - [Error Handling and Recovery](#error-handling-and-recovery)
+    - [Testing](#testing)
+    - [Extending IDL](#extending-idl)
+    - [Implementation Details](#implementation)
+  - [Best Practices](#best-practices)
 
 Interface Definition Language (IDL) is a custom Domain Specific Language (DSL) originally designed
 to generate code to meets MongoDB's needs for handling BSON. Server parameters and configuration
@@ -51,8 +51,8 @@ like XDR, ASN.1, MIDL, and Google's Protocol Buffers.
    between BSON documents and the class (aka `struct` in IDL ) using `BSONObj` and `BSONObjBuilder`
 2. Generate C++ classes that represent MongoDB BSON commands of a specific schema, and
    parse/serialize between BSON documents
-    - Commands are a subset of `struct` but understand the unique requirements of commands. Also, can
-      parse `OpMsg`'s document sequences.
+   - Commands are a subset of `struct` but understand the unique requirements of commands. Also, can
+     parse `OpMsg`'s document sequences.
 3. Parse and serialize Enums as strings or integers
 4. Declare, parse and serialize server parameters (aka setParameters)
 5. Declare, parse and serialize configuration options
@@ -96,8 +96,8 @@ Example Document:
 
 ```json
 {
-    "intField": 42,
-    "stringField": "question"
+  "intField": 42,
+  "stringField": "question"
 }
 ```
 
@@ -107,19 +107,19 @@ to represent this in IDL, write the following file:
 
 ```yaml
 global:
-    cpp_namespace: "mongo"
+  cpp_namespace: "mongo"
 
 imports:
-    - "mongo/db/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 structs:
-    example:
-        description: An example struct
-        fields:
-            intField:
-                type: int
-            stringField:
-                type: string
+  example:
+    description: An example struct
+    fields:
+      intField:
+        type: int
+      stringField:
+        type: string
 ```
 
 The next step is to actually generate code from the YAML description. To do that, add the following
@@ -173,11 +173,11 @@ private:
 
 IDL generates 5 sets of key methods.
 
--   `constructor` - a C++ constructor with only the required fields as arguments
--   `parse` - a static function that parses a BSON document to the C++ class
--   `serialize`/`toBSON` - a method that serializes the C++ class to BSON
--   `get*` - methods to value of a field after parsing
--   `set*` - methods to set a field in the C++ class before serialization
+- `constructor` - a C++ constructor with only the required fields as arguments
+- `parse` - a static function that parses a BSON document to the C++ class
+- `serialize`/`toBSON` - a method that serializes the C++ class to BSON
+- `get*` - methods to value of a field after parsing
+- `set*` - methods to set a field in the C++ class before serialization
 
 To use this class in a C++ file, write the following code:
 
@@ -218,10 +218,10 @@ Example Command:
 
 ```json
 {
-    "hasEncryptedFields": "testCollection",
-    "encryptionType": "queryableEncryption",
-    "comment": "Example command",
-    "$db": "testDB"
+  "hasEncryptedFields": "testCollection",
+  "encryptionType": "queryableEncryption",
+  "comment": "Example command",
+  "$db": "testDB"
 }
 ```
 
@@ -229,8 +229,8 @@ which has a reply
 
 ```json
 {
-    "answer": "yes",
-    "ok": 1
+  "answer": "yes",
+  "ok": 1
 }
 ```
 
@@ -240,25 +240,25 @@ to represent this in IDL, write the following file:
 
 ```yaml
 global:
-    cpp_namespace: "mongo"
+  cpp_namespace: "mongo"
 
 imports:
-    - "mongo/db/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 structs:
-    hasEncryptedFieldReply:
-        is_command_reply: true
-        fields:
-            answer:
-                type: string
+  hasEncryptedFieldReply:
+    is_command_reply: true
+    fields:
+      answer:
+        type: string
 
 commands:
-    hasEncryptedFields:
-        description: An example command
-        namespace: concatenate_with_db
-        fields:
-            encryptionType:
-                type: string
+  hasEncryptedFields:
+    description: An example command
+    namespace: concatenate_with_db
+    fields:
+      encryptionType:
+        type: string
 ```
 
 Commands have a few unique features compared to structs:
@@ -274,59 +274,59 @@ To see how to integrate a command IDL file in SCons, see the example above for s
 
 A IDL file consist of a series of top-level sections (i.e. YAML maps).
 
--   `global` - Global settings that affect code generation
--   `imports`- List of other IDL files that contain enums, types and structs this file refers to
--   `enums` - List of enums to generate code for
--   `types` - List of types which instruct IDL how deserialize/serialize primitives
--   `structs` - List of BSON documents to deserialize/serialize to C++ classes
--   `commands` - List of BSON commands used by MongoDB RPC to deserialize/serialize to C++ classes
--   `server_parameters` - See [docs/server-parameters.md](../../../docs/server-parameters.md)
--   `configs` - TODO SERVER-79135
--   `feature_flags` - TODO SERVER-79135
--   `generic_argument_lists`- List of arguments common to all commands requests - not documented
--   `generic_reply_field_lists`-Li st of arguments common to all command replies - not documented
+- `global` - Global settings that affect code generation
+- `imports`- List of other IDL files that contain enums, types and structs this file refers to
+- `enums` - List of enums to generate code for
+- `types` - List of types which instruct IDL how deserialize/serialize primitives
+- `structs` - List of BSON documents to deserialize/serialize to C++ classes
+- `commands` - List of BSON commands used by MongoDB RPC to deserialize/serialize to C++ classes
+- `server_parameters` - See [docs/server-parameters.md](../../../docs/server-parameters.md)
+- `configs` - TODO SERVER-79135
+- `feature_flags` - TODO SERVER-79135
+- `generic_argument_lists`- List of arguments common to all commands requests - not documented
+- `generic_reply_field_lists`-Li st of arguments common to all command replies - not documented
 
 ## Global
 
--   `cpp_namespace` - string - The C++ namespace for all generated classes and enums to belong to.
-    Must start with `mongo`.
--   `cpp_includes` - sequence - A list of C++ headers to include in the generated `.h` file. You
-    should not list generated IDL headers here as includes for them are automatically generated from
-    `imports`.
--   `configs` - map - A section that defines global settings for configuration options
+- `cpp_namespace` - string - The C++ namespace for all generated classes and enums to belong to.
+  Must start with `mongo`.
+- `cpp_includes` - sequence - A list of C++ headers to include in the generated `.h` file. You
+  should not list generated IDL headers here as includes for them are automatically generated from
+  `imports`.
+- `configs` - map - A section that defines global settings for configuration options
 
-    -   `source` - sequence - a subset of [`yaml`, `cli`, `ini`]
-        -   `cli` - configuration option handled by command line
-        -   `yaml` - configuration option handled by yaml config file
-        -   `ini` - configuration option handled by deprecated ini file format. Do not use for new flags.
-    -   `section` - string - Name of displayed section in `--help`
-    -   `initializer` - map
+  - `source` - sequence - a subset of [`yaml`, `cli`, `ini`]
+    - `cli` - configuration option handled by command line
+    - `yaml` - configuration option handled by yaml config file
+    - `ini` - configuration option handled by deprecated ini file format. Do not use for new flags.
+  - `section` - string - Name of displayed section in `--help`
+  - `initializer` - map
 
-        -   `register` - string - Name of generated function to add configuration options.
+    - `register` - string - Name of generated function to add configuration options.
 
-            If not provided, an anonymous MONGO*MODULE_STARTUP_OPTIONS_REGISTER initializer will be
-            declared which will automatically register the config settings named in this file at startup
-            time. This initializer will be named "idl*" followed by a string of hex digits. Currently this
-            string is the SHA1 hash of the header's filename, but this should not be used in dependency
-            rules since it may change at a later time.
+      If not provided, an anonymous MONGO*MODULE_STARTUP_OPTIONS_REGISTER initializer will be
+      declared which will automatically register the config settings named in this file at startup
+      time. This initializer will be named "idl*" followed by a string of hex digits. Currently this
+      string is the SHA1 hash of the header's filename, but this should not be used in dependency
+      rules since it may change at a later time.
 
-            If provided, all registration logic will be implemented in a public function of the form
-            Status registerName(optionenvironment::OptionSection\* options_ptr). It it up to additional
-            code to decide how and when this registration function is called.
+      If provided, all registration logic will be implemented in a public function of the form
+      Status registerName(optionenvironment::OptionSection\* options_ptr). It it up to additional
+      code to decide how and when this registration function is called.
 
-        -   `store` - string - Name of generated function to store configuration options.
+    - `store` - string - Name of generated function to store configuration options.
 
-            This behaves like `register`, but using a MONGO_STARTUP_OPTIONS_STORE initializer in the
-            not-provided case, and declaring Status storeName(const optionenvironment::Environment&
-            params) in the provided case.
+      This behaves like `register`, but using a MONGO_STARTUP_OPTIONS_STORE initializer in the
+      not-provided case, and declaring Status storeName(const optionenvironment::Environment&
+      params) in the provided case.
 
 An example for a typical global section is:
 
 ```yaml
 global:
-    cpp_namespace: "mongo"
-    cpp_includes:
-        - "mongo/idl/idl_test_types.h"
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/idl/idl_test_types.h"
 ```
 
 `mongo` is the C++ namespace for the generated code. One header is listed because the IDL types
@@ -351,7 +351,7 @@ An example for a typical `imports` section is:
 
 ```yaml
 imports:
-    - "mongo/db/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 ```
 
 _Note_: [src/mongo/db/basic_types.idl](../db/basic_types.idl) is a foundational file for IDL. This
@@ -371,12 +371,12 @@ not important. Use string enums when strings are persisted, not integers. For st
 
 ```yaml
 StringEnum:
-    description: "An example string enum"
-    type: string
-    values:
-        s0: "zero"
-        s1: "one"
-        s2: "two"
+  description: "An example string enum"
+  type: string
+  values:
+    s0: "zero"
+    s1: "one"
+    s2: "two"
 ```
 
 it generates an enum and functions to parse and serialize the enum:
@@ -400,12 +400,12 @@ the `values` map is a map of enum value names to integers.
 
 ```yaml
 IntEnum:
-    description: "An example int enum"
-    type: int
-    values:
-        s0: 0
-        s1: 2
-        s2: 4
+  description: "An example int enum"
+  type: int
+  values:
+    s0: 0
+    s1: 2
+    s2: 4
 ```
 
 it generates an enum and functions to parse and serialize the enum:
@@ -425,9 +425,9 @@ std::int32_t IntEnum_serializer(IntEnum value);
 
 Each `enum` can have the following pieces:
 
--   `description` - string - A comment to add to the generated C++
--   `type` - string - can be either `string` or `int`
--   `values` - map - a map of `enum value name` -> `enum value`
+- `description` - string - A comment to add to the generated C++
+- `type` - string - can be either `string` or `int`
+- `values` - map - a map of `enum value name` -> `enum value`
 
 Like struct.fields[], enum.values[] may be given as either a simple mapping `name: value` and indeed
 most are, but the may also map names to a dictionary of information:
@@ -497,28 +497,28 @@ Here is a basic type definition for the string type.
 
 ```yaml
 string:
-    bson_serialization_type: string
-    description: "A BSON UTF-8 string"
-    cpp_type: "std::string"
-    deserializer: "mongo::BSONElement::str"
-    is_view: false
+  bson_serialization_type: string
+  description: "A BSON UTF-8 string"
+  cpp_type: "std::string"
+  deserializer: "mongo::BSONElement::str"
+  is_view: false
 ```
 
 The five key things to note in this example:
 
--   `bson_serialization_type` - a list of types BSON generated code should check a type is before
-    calling the deserializer. In this case, IDL generated code checks if the BSON type is `string`.
--   `cpp_type` - The C++ type to store the deserialized value as. This is type of the member variable
-    in the generated C++ class when this type is instantiated in a struct.
--   `deserializer` - a method to all deserialize the type. Typically this is a function that takes
-    `BSONElement` as a parameter. The IDL generator has custom rules for `BSONElement`.
--   `serializer` - omitted in this example because `BSONObjBuilder` has builtin support for
-    `std::string`
--   `is_view` - indicates whether the type is a view or not. If the type is a view, then it's
-    possible that objects of the type will not own all of it's members. If the type is not a view,
-    then objects of the type are guaranteed to own all of it's members. This field is optional and
-    defaults to True. To reduce the size of the C++ representation of structs including this type,
-    you can specify this field as False if the type is not a view type.
+- `bson_serialization_type` - a list of types BSON generated code should check a type is before
+  calling the deserializer. In this case, IDL generated code checks if the BSON type is `string`.
+- `cpp_type` - The C++ type to store the deserialized value as. This is type of the member variable
+  in the generated C++ class when this type is instantiated in a struct.
+- `deserializer` - a method to all deserialize the type. Typically this is a function that takes
+  `BSONElement` as a parameter. The IDL generator has custom rules for `BSONElement`.
+- `serializer` - omitted in this example because `BSONObjBuilder` has builtin support for
+  `std::string`
+- `is_view` - indicates whether the type is a view or not. If the type is a view, then it's
+  possible that objects of the type will not own all of it's members. If the type is not a view,
+  then objects of the type are guaranteed to own all of it's members. This field is optional and
+  defaults to True. To reduce the size of the C++ representation of structs including this type,
+  you can specify this field as False if the type is not a view type.
 
 ### Custom Types
 
@@ -527,13 +527,13 @@ but has custom serialization rules.
 
 ```yaml
 namespacestring:
-    bson_serialization_type: string
-    description: "A MongoDB NamespaceString"
-    cpp_type: "mongo::NamespaceString"
-    serializer: ::mongo::NamespaceStringUtil::serialize
-    deserializer: ::mongo::NamespaceStringUtil::deserialize
-    deserialize_with_tenant: true
-    is_view: false
+  bson_serialization_type: string
+  description: "A MongoDB NamespaceString"
+  cpp_type: "mongo::NamespaceString"
+  serializer: ::mongo::NamespaceStringUtil::serialize
+  deserializer: ::mongo::NamespaceStringUtil::deserialize
+  deserialize_with_tenant: true
+  is_view: false
 ```
 
 The key thing to note is this example specifies that both `deserializer` and `serializer`. They are
@@ -552,45 +552,45 @@ actually writing it to the `BSONObjBuilder`.
 
 ```yaml
 IDLAnyType:
-    bson_serialization_type: any
-    description: "Holds a BSONElement of any type."
-    cpp_type: "mongo::IDLAnyType"
-    serializer: mongo::IDLAnyType::serializeToBSON
-    deserializer: mongo::IDLAnyType::parseFromBSON
-    is_view: true
+  bson_serialization_type: any
+  description: "Holds a BSONElement of any type."
+  cpp_type: "mongo::IDLAnyType"
+  serializer: mongo::IDLAnyType::serializeToBSON
+  deserializer: mongo::IDLAnyType::parseFromBSON
+  is_view: true
 ```
 
 ### Type Reference
 
--   `description` - string - A comment to add to the generated C++
--   `bson_serialization_type` - string or sequence - a list of types BSON generated code should check
-    a type is before calling the deserializer. Can also be `any`.
-    [buildscripts/idl/idl/bson.py](../../../buildscripts/idl/idl/bson.py) lists the supported types.
--   `bindata_subtype` - string - if `bson_serialization_type` is `bindata`, this is the required
-    bindata subtype. [buildscripts/idl/idl/bson.py](../../../buildscripts/idl/idl/bson.py) lists the
-    supported bindata subtypes.
--   `cpp_type` - The C++ type to store the deserialized value as. This is type of the member variable
-    in the generated C++ class when a struct/command uses this type.
-    -   `std::string` - When using `std::string`, the getters/setters using `mongo::StringData` instead
-    -   `std::vector<_>` - When using `std::vector<->`, the getters/setters using
-        `mongo::ConstDataRange` instead
--   `deserializer` - string - a method name to all deserialize the type. Typically this is a function
-    that takes `BSONElement` as a parameter. The IDL generator has custom rules for `BSONElement`. - By default, IDL assumes it is a instance methods of `cpp_type`. - If prefixed with `::`, assumes the function is a global static function - By default, the deserializer's function signature is `<function_name>(<cpp_type>)`. - For `object` types, the deserializer's function signature is `<function_name>(const BSONObj&
+- `description` - string - A comment to add to the generated C++
+- `bson_serialization_type` - string or sequence - a list of types BSON generated code should check
+  a type is before calling the deserializer. Can also be `any`.
+  [buildscripts/idl/idl/bson.py](../../../buildscripts/idl/idl/bson.py) lists the supported types.
+- `bindata_subtype` - string - if `bson_serialization_type` is `bindata`, this is the required
+  bindata subtype. [buildscripts/idl/idl/bson.py](../../../buildscripts/idl/idl/bson.py) lists the
+  supported bindata subtypes.
+- `cpp_type` - The C++ type to store the deserialized value as. This is type of the member variable
+  in the generated C++ class when a struct/command uses this type.
+  - `std::string` - When using `std::string`, the getters/setters using `mongo::StringData` instead
+  - `std::vector<_>` - When using `std::vector<->`, the getters/setters using
+    `mongo::ConstDataRange` instead
+- `deserializer` - string - a method name to all deserialize the type. Typically this is a function
+  that takes `BSONElement` as a parameter. The IDL generator has custom rules for `BSONElement`. - By default, IDL assumes it is a instance methods of `cpp_type`. - If prefixed with `::`, assumes the function is a global static function - By default, the deserializer's function signature is `<function_name>(<cpp_type>)`. - For `object` types, the deserializer's function signature is `<function_name>(const BSONObj&
 obj)` - For `any` types, the deserializer's function signature is `<function_name>(BSONElement
 element)`.
--   `serializer` - string -a method name to all serialize the type. - By default, IDL assumes it is a instance methods of `cpp_type`. - If prefixed with `::`, assumes the function is a global static function - By default, the deserializer's function signature is `<type_append> <function_name>(const
+- `serializer` - string -a method name to all serialize the type. - By default, IDL assumes it is a instance methods of `cpp_type`. - If prefixed with `::`, assumes the function is a global static function - By default, the deserializer's function signature is `<type_append> <function_name>(const
 <cpp_type>&)` where `type_append` is a type `BSONObjBuilder` understands. - For `object` types, the deserializer's function signature is `<function_name>(const BSONObj&
 obj)` - For `any` types that are not in an array, the serializer's function signature is
-    `<function_name>(StringData fieldName, BSONObjBuilder* builder)`. - For `any` types that are in an array, the serializer's function signature is
-    `<function_name>(BSONArrayBuilder* builder)`.
--   `deserialize_with_tenant` - bool - if set, adds `TenantId` as the first parameter to
-    `deserializer`
--   `internal_only` - bool - undocumented, DO NOT USE
--   `default` - string - default value for a type. A field in a struct inherits this value if a field
-    does not set a default. See struct's `default` rules for more information.
--   `is_view` - indicates whether the type is a view or not. If the type is a view, then it's
-    possible that objects of the type will not own all of it's members. If the type is not a view,
-    then objects of the type are guaranteed to own all of it's members.
+  `<function_name>(StringData fieldName, BSONObjBuilder* builder)`. - For `any` types that are in an array, the serializer's function signature is
+  `<function_name>(BSONArrayBuilder* builder)`.
+- `deserialize_with_tenant` - bool - if set, adds `TenantId` as the first parameter to
+  `deserializer`
+- `internal_only` - bool - undocumented, DO NOT USE
+- `default` - string - default value for a type. A field in a struct inherits this value if a field
+  does not set a default. See struct's `default` rules for more information.
+- `is_view` - indicates whether the type is a view or not. If the type is a view, then it's
+  possible that objects of the type will not own all of it's members. If the type is not a view,
+  then objects of the type are guaranteed to own all of it's members.
 
 ## Structs
 
@@ -614,23 +614,23 @@ field has a default, then it does not need to present in the BSON document or se
 
 ```yaml
 exampleStruct:
-    description: An example command
-    fields:
-        requiredField: int
-        optionalField:
-            description: Provide it if you want to.
-            type: bool
-            optional: true
-        defaultedField:
-            description: >-
-                Most callers should rely on 42
-                as it is the answer to the question
-                of life the universe and everything.
-            type: long
-            validator:
-                gt: 0
-                lt: 50
-            default: 42
+  description: An example command
+  fields:
+    requiredField: int
+    optionalField:
+      description: Provide it if you want to.
+      type: bool
+      optional: true
+    defaultedField:
+      description: >-
+        Most callers should rely on 42
+        as it is the answer to the question
+        of life the universe and everything.
+      type: long
+      validator:
+        gt: 0
+        lt: 50
+      default: 42
 ```
 
 This generates a C++ function with methods to parse and serialize the struct. _Note_: This code has
@@ -724,84 +724,84 @@ is not affected as this option is only syntactic sugar.
 
 ### Struct Reference
 
--   `description` - string - A comment to add to the generated C++
--   `fields` - sequence - see [fields attributes reference below](#struct-fields-attribute-reference)
--   `strict` - bool - defaults to true, a strict parser errors if a unknown field is encountered by
-    the generated parser. Persisted structs should set this to `false` to allow them to encounter
-    documents from future versions of MongoDB without throwing an error.
--   `chained_types` - mapping - undocumented
--   `chained_structs` - mapping - a list of structs to include this struct. IDL adds the chained
-    structs as member variables in the generated C++ class. IDL also adds a getter for each chained
-    struct.
--   `inline_chained_structs` - bool - if true, exposes chained struct getters as members of this
-    struct in generated code.
--   `immutable` - bool - if true, does not generate mutable getters for structs
--   `generate_comparison_operators` - bool - if true, generates support for C++ operatiors: `==`,
-    `!=`, `<`, `>`, `<=`, `>=`,
--   `non_const_getter` - bool - if true, generates mutable getters for non-struct fields
--   `cpp_validator_func` - string - name of a C++ function to call after a BSON document has been
-    deserialized. Function has signature of `void <function_name>(<struct_name>* obj)`. Method is
-    expected to thrown a C++ exception (i.e. `uassert`) if validation fails.
--   `is_command_reply` - bool - if true, marks the struct as a command reply. A struct marked a
-    `is_command_reply` generates a parser that ignores known generic or common fields across all
-    replies when parsing replies (i.e. `ok`, `errmsg`, etc)
--   `is_generic_cmd_list` - string - choice [`arg`, `reply`], if set, generates functions `bool
+- `description` - string - A comment to add to the generated C++
+- `fields` - sequence - see [fields attributes reference below](#struct-fields-attribute-reference)
+- `strict` - bool - defaults to true, a strict parser errors if a unknown field is encountered by
+  the generated parser. Persisted structs should set this to `false` to allow them to encounter
+  documents from future versions of MongoDB without throwing an error.
+- `chained_types` - mapping - undocumented
+- `chained_structs` - mapping - a list of structs to include this struct. IDL adds the chained
+  structs as member variables in the generated C++ class. IDL also adds a getter for each chained
+  struct.
+- `inline_chained_structs` - bool - if true, exposes chained struct getters as members of this
+  struct in generated code.
+- `immutable` - bool - if true, does not generate mutable getters for structs
+- `generate_comparison_operators` - bool - if true, generates support for C++ operatiors: `==`,
+  `!=`, `<`, `>`, `<=`, `>=`,
+- `non_const_getter` - bool - if true, generates mutable getters for non-struct fields
+- `cpp_validator_func` - string - name of a C++ function to call after a BSON document has been
+  deserialized. Function has signature of `void <function_name>(<struct_name>* obj)`. Method is
+  expected to thrown a C++ exception (i.e. `uassert`) if validation fails.
+- `is_command_reply` - bool - if true, marks the struct as a command reply. A struct marked a
+  `is_command_reply` generates a parser that ignores known generic or common fields across all
+  replies when parsing replies (i.e. `ok`, `errmsg`, etc)
+- `is_generic_cmd_list` - string - choice [`arg`, `reply`], if set, generates functions `bool
 hasField(StringData)` and `bool shouldForwardToShards(StringData)` for each field in the struct
--   `query_shape_component` - bool - true indicates this special serialization code will be generated
-    to serialize as a query shape
--   `unsafe_dangerous_disable_extra_field_duplicate_checks` - bool - undocumented, DO NOT USE
+- `query_shape_component` - bool - true indicates this special serialization code will be generated
+  to serialize as a query shape
+- `unsafe_dangerous_disable_extra_field_duplicate_checks` - bool - undocumented, DO NOT USE
 
 ### Struct Fields Attribute Reference
 
--   `description` - string - A comment to add to the generated C++
--   `cpp_name` - string - Optional name to use for member variable and getters/setters. Defaults to
-    `camelCase` of field name.
--   `type` - string or mapping - supports a single type, `array<type>`, or variant. Can also be
-    arrays.
-    -   string name of a type must be a `enum`, `type`, or `struct` that is defined in an IDL file or
-        imported
-    -   string can also be `array<type>` where type must be a `enum`, `type`, `struct`, or `variant`.
-        The C++ type will be `std::vector<type>` in this case
-    -   Mappings or Variants - IDL supports a variant that chooses among a set of IDL types. You can
-        have a variant of strings and structs.
-        -   Variant string support differentiates the type to choose based on the BSON type.
-        -   Variant struct support differentiates the type to choose based on the _first_ field of the
-            struct. The first field must be unique in each struct across the structs. When parsing a
-            BSON object as a variant of multiple structs, the parser assumes that the first field
-            declared in the IDL struct is always the first field in its BSON representation.
-            See `bulkWrite` for an example.
--   `ignore` - bool - true means field generates no code but is ignored by the generated deserializer.
-    Used to deprecate fields that no longer have an affect but allow strict parsers to ignore them.
--   `optional` - bool - true means the field is optional. Generated C++ type is
-    `boost::optional<type>`.
--   `default` - string - the default value of type. Types with default values are not required to be
-    found in the original document or set before serialization
--   `supports_doc_sequence` - bool - true indicates the field can be found in a `OpMsg`'s document
-    sequence. Must use the generated `<struct>::parse(OpMsgRequest)` parser to use this
--   `comparison_order` - sequence - comparison order for fields
--   `validator` - see [validator reference](#field-validator-reference)
--   `non_const_getter` - bool - true indicates it generates a mutable getter
--   `unstable` - bool - deprecated, prefer `stability` = `unstable` instead
--   `stability` - string - choice [`unstable`, `stable`] - if `unstable`, parsing the field throws a
-    field if strict api checking is enabled
--   `always_serialize` - bool - whether to always serialize optional fields even if none
--   `forward_to_shards` - bool - used by generic arg code to generate `shouldForwardToShards`, no
-    affect on BSON deserialization/serialization
--   `forward_from_shards` - bool - used by generic arg code to generate `shouldForwardFromShards`, no
-    affect on BSON deserialization/serialization
--   `query_shape` - choice of [`anonymize`, `literal`, `parameter`, `custom`] - see
-    [src/mongo/db/query/query_shape.h]
+- `description` - string - A comment to add to the generated C++
+- `cpp_name` - string - Optional name to use for member variable and getters/setters. Defaults to
+  `camelCase` of field name.
+- `type` - string or mapping - supports a single type, `array<type>`, or variant. Can also be
+  arrays.
+  - string name of a type must be a `enum`, `type`, or `struct` that is defined in an IDL file or
+    imported
+  - string can also be `array<type>` where type must be a `enum`, `type`, `struct`, or `variant`.
+    The C++ type will be `std::vector<type>` in this case
+  - Mappings or Variants - IDL supports a variant that chooses among a set of IDL types. You can
+    have a variant of strings and structs.
+    - Variant string support differentiates the type to choose based on the BSON type.
+    - Variant struct support differentiates the type to choose based on the _first_ field of the
+      struct. The first field must be unique in each struct across the structs. When parsing a
+      BSON object as a variant of multiple structs, the parser assumes that the first field
+      declared in the IDL struct is always the first field in its BSON representation.
+      See `bulkWrite` for an example.
+- `ignore` - bool - true means field generates no code but is ignored by the generated deserializer.
+  Used to deprecate fields that no longer have an affect but allow strict parsers to ignore them.
+- `optional` - bool - true means the field is optional. Generated C++ type is
+  `boost::optional<type>`.
+- `default` - string - the default value of type. Types with default values are not required to be
+  found in the original document or set before serialization
+- `supports_doc_sequence` - bool - true indicates the field can be found in a `OpMsg`'s document
+  sequence. Must use the generated `<struct>::parse(OpMsgRequest)` parser to use this
+- `comparison_order` - sequence - comparison order for fields
+- `validator` - see [validator reference](#field-validator-reference)
+- `non_const_getter` - bool - true indicates it generates a mutable getter
+- `unstable` - bool - deprecated, prefer `stability` = `unstable` instead
+- `stability` - string - choice [`unstable`, `stable`] - if `unstable`, parsing the field throws a
+  field if strict api checking is enabled
+- `always_serialize` - bool - whether to always serialize optional fields even if none
+- `forward_to_shards` - bool - used by generic arg code to generate `shouldForwardToShards`, no
+  affect on BSON deserialization/serialization
+- `forward_from_shards` - bool - used by generic arg code to generate `shouldForwardFromShards`, no
+  affect on BSON deserialization/serialization
+- `query_shape` - choice of [`anonymize`, `literal`, `parameter`, `custom`] - see
+  [src/mongo/db/query/query_shape.h]
 
 ### Field Validator Reference
 
 Validators generate functions that ensure a value during parse or set in a setter are valid.
 Comparisons are generated with C++ operators for these comparisons
 
--   `gt` - string - Validates field is greater than `string`
--   `lt` - string - Validates field is less than or equal to `string`
--   `gte` - string - Validates field is greater than `string`
--   `lte` - string - Validates field is less than or equal to `string`
--   `callback` - string - A static function to call of the shape `Status <function_name>(const
+- `gt` - string - Validates field is greater than `string`
+- `lt` - string - Validates field is less than or equal to `string`
+- `gte` - string - Validates field is greater than `string`
+- `lte` - string - Validates field is less than or equal to `string`
+- `callback` - string - A static function to call of the shape `Status <function_name>(const
 <cpp_type> value)`. For non-simple types, `value` is passed by const-reference.
 
 ## Commands
@@ -832,63 +832,63 @@ Commands can also specify their replies that they return. Replies are regular `s
 
 ### Commands Reference
 
--   `description` - [see structs](#struct-reference)
--   `chained_types` - - [see structs](#struct-reference)
--   `chained_structs` - - [see structs](#struct-reference)
--   `fields` - - [see structs](#struct-reference)
--   `cpp_name` - - [see structs](#struct-reference)
--   `strict` - - [see structs](#struct-reference)
--   `generate_comparison_operators` - [see structs](#struct-reference)
--   `inline_chained_structs` - [see structs](#struct-reference)
--   `immutable` - [see structs](#struct-reference)
--   `non_const_getter` - [see structs](#struct-reference)
--   `namespace` - string - choice of a string [`concatenate_with_db`, `concatenate_with_db_or_uuid`,
-    `ignored`, `type`]. Instructs how the value of command field should be parsed - `concatenate_with_db` - Indicates the command field is a string and should be treated as a
-    collection name. Typically used by commands that deal with collections. Automatically
-    concatenated with `$db` by the IDL parser. Adds a method `const NamespaceString getNamespace()`
-    to the generated class. - `concatenate_with_db_or_uuid` - Indicates the command field is a string or uuid, and should be
-    treated as a collection name. Typically used by commands that deal with collections.
-    Automatically concatenated with `$db` by the IDL parser. Adds a method `const
+- `description` - [see structs](#struct-reference)
+- `chained_types` - - [see structs](#struct-reference)
+- `chained_structs` - - [see structs](#struct-reference)
+- `fields` - - [see structs](#struct-reference)
+- `cpp_name` - - [see structs](#struct-reference)
+- `strict` - - [see structs](#struct-reference)
+- `generate_comparison_operators` - [see structs](#struct-reference)
+- `inline_chained_structs` - [see structs](#struct-reference)
+- `immutable` - [see structs](#struct-reference)
+- `non_const_getter` - [see structs](#struct-reference)
+- `namespace` - string - choice of a string [`concatenate_with_db`, `concatenate_with_db_or_uuid`,
+  `ignored`, `type`]. Instructs how the value of command field should be parsed - `concatenate_with_db` - Indicates the command field is a string and should be treated as a
+  collection name. Typically used by commands that deal with collections. Automatically
+  concatenated with `$db` by the IDL parser. Adds a method `const NamespaceString getNamespace()`
+  to the generated class. - `concatenate_with_db_or_uuid` - Indicates the command field is a string or uuid, and should be
+  treated as a collection name. Typically used by commands that deal with collections.
+  Automatically concatenated with `$db` by the IDL parser. Adds a method `const
 NamespaceStringOrUUID& getNamespaceOrUUID()` to the generated class. - `ignored` - Ignores the value of the command field. Used by commands that ignore their command
-    argument entirely - `type` - Indicates the command takes a custom type for the first field. `type` field must be
-    set.
--   `type` - string - name of IDL type or struct to parse the command field as
--   `command_name` - string - IDL generated parser expects the command to be named the name of YAML
-    map. This can be overwritten with `command_name`. Commands should be `camelCase`
--   `command_alias` - string - allows commands to have multiple names. DO NOT USE. Some older commands
-    have both `lowercase` and `camelCase` names.
--   `reply_type` - string - IDL struct that this command replies with. Reply struct must have
-    `is_command_reply` set
--   `api_version` - string - Typically set to the empty string `""`. Only set to a non-empty string if
-    command is part of the stable API. Generates a class name
-    `<command_name>CommandNameCmdVersion1Gen` derived from `TypedCommand` that commands should be
-    derived from.
--   `is_deprecated` - bool - indicates command is deprecated
--   `allow_global_collection_name` - bool - if true, command can accept both collect names and
-    non-collection names. Used by the `aggregate` command
--   `access_check` - mapping - see [access check reference](#access-check-reference)
+  argument entirely - `type` - Indicates the command takes a custom type for the first field. `type` field must be
+  set.
+- `type` - string - name of IDL type or struct to parse the command field as
+- `command_name` - string - IDL generated parser expects the command to be named the name of YAML
+  map. This can be overwritten with `command_name`. Commands should be `camelCase`
+- `command_alias` - string - allows commands to have multiple names. DO NOT USE. Some older commands
+  have both `lowercase` and `camelCase` names.
+- `reply_type` - string - IDL struct that this command replies with. Reply struct must have
+  `is_command_reply` set
+- `api_version` - string - Typically set to the empty string `""`. Only set to a non-empty string if
+  command is part of the stable API. Generates a class name
+  `<command_name>CommandNameCmdVersion1Gen` derived from `TypedCommand` that commands should be
+  derived from.
+- `is_deprecated` - bool - indicates command is deprecated
+- `allow_global_collection_name` - bool - if true, command can accept both collect names and
+  non-collection names. Used by the `aggregate` command
+- `access_check` - mapping - see [access check reference](#access-check-reference)
 
 ### Access Check Reference
 
 A list of privileges the command checks. Only applicable for commands that are a part of
 API Version 1. Checked at runtime when test commands are enabled.
 
--   `none` - bool - No privileges required
--   `simple` - mapping - single [check or privilege](#check-or-privilege)
--   `complex` - sequence - list of [check and/or privilege](#check-or-privilege)
+- `none` - bool - No privileges required
+- `simple` - mapping - single [check or privilege](#check-or-privilege)
+- `complex` - sequence - list of [check and/or privilege](#check-or-privilege)
 
 #### Check or Privilege
 
--   `check` - string - checks a part of the access control system like is_authenticated. See
-    [`src/mongo/db/auth/access_checks.idl`](../db/auth/access_checks.idl) for a complete list.
--   `privilege` - mapping
-    -   `resource_pattern` - string - a resource pattern to check for a given set of privileges. See
-        `MatchType` enum in [`src/mongo/db/auth/action_type.idl`](../db/auth/action_type.idl) for
-        complete list.
-    -   `action_type` - sequence - list of action types the command may check. See `ActionType` enum in
-        [`src/mongo/db/auth/action_type.idl`](../db/auth/action_type.idl) for complete list.
-    -   `agg_stage` - string - aggregation only. Name of aggregation stage. Used to appease the idl
-        compatibility checker.
+- `check` - string - checks a part of the access control system like is_authenticated. See
+  [`src/mongo/db/auth/access_checks.idl`](../db/auth/access_checks.idl) for a complete list.
+- `privilege` - mapping
+  - `resource_pattern` - string - a resource pattern to check for a given set of privileges. See
+    `MatchType` enum in [`src/mongo/db/auth/action_type.idl`](../db/auth/action_type.idl) for
+    complete list.
+  - `action_type` - sequence - list of action types the command may check. See `ActionType` enum in
+    [`src/mongo/db/auth/action_type.idl`](../db/auth/action_type.idl) for complete list.
+  - `agg_stage` - string - aggregation only. Name of aggregation stage. Used to appease the idl
+    compatibility checker.
 
 ## IDL Compiler Overview
 
@@ -1010,8 +1010,8 @@ true` is the default. 1. For persistance: For upgrade/downgrade, if a persisted 
    that `BSONObj` that it is returned from its getter. This means that once the `BSONObj` that was
    passed to `parse()` goes out of scope, the object will point to free memory. Use `object_owned`
    if this is not desired. `object_owned` incurs extra memory allocations though.
-    1. An alternative is to use either the `parseSharingOwnership` or `parseOwned` methods. These
-       methods will ensure the IDL generated class has an anchor to the `BSONObj`. See comments in
-       the generated class. It is not advisable though to use these methods during normal command
-       request processing. The network buffer that holds the inbound request is available during the
-       lifetime of the request even though IDL does not anchor the network buffer.
+   1. An alternative is to use either the `parseSharingOwnership` or `parseOwned` methods. These
+      methods will ensure the IDL generated class has an anchor to the `BSONObj`. See comments in
+      the generated class. It is not advisable though to use these methods during normal command
+      request processing. The network buffer that holds the inbound request is available during the
+      lifetime of the request even though IDL does not anchor the network buffer.

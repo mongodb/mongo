@@ -5,83 +5,83 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 buildvariants:
-- name: enterprise-suse15-64
-  display_name: Enterprise SLES 15
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - suse15-test
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: x86_64-enterprise-suse15
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=suse15
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer,requires_increased_memlock_limits
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: suse15
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
-    external_auth_jobs_max: 1
-    compile_variant: enterprise-suse15-64
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - suse15-build
-  - name: test_packages
-    distros:
-    - ubuntu2204-large
-  - name: .development_critical
-  - name: .release_critical
+  - name: enterprise-suse15-64
+    display_name: Enterprise SLES 15
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - suse15-test
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: x86_64-enterprise-suse15
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=suse15
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer,requires_increased_memlock_limits
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: x86_64
+      packager_distro: suse15
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+      external_auth_jobs_max: 1
+      compile_variant: enterprise-suse15-64
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - suse15-build
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: .development_critical
+      - name: .release_critical
 
-- name: suse15
-  display_name: SUSE 15
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - suse15-test
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: x86_64-suse15
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=suse15
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
-    test_flags: >-
-      --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    multiversion_platform: suse15
-    multiversion_edition: targeted
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: x86_64
-    packager_distro: suse15
-    repo_edition: org
-    scons_cache_scope: shared
-    large_distro_name: suse15-build
-    compile_variant: suse15
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - suse15-build
-  - name: test_packages
-    distros:
-    - ubuntu2204-large
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: suse15
+    display_name: SUSE 15
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - suse15-test
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_name: linux
+      push_arch: x86_64-suse15
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=suse15
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --modules=
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      multiversion_platform: suse15
+      multiversion_edition: targeted
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: x86_64
+      packager_distro: suse15
+      repo_edition: org
+      scons_cache_scope: shared
+      large_distro_name: suse15-build
+      compile_variant: suse15
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - suse15-build
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: .development_critical !.incompatible_community
+      - name: .release_critical !.incompatible_community

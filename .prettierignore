@@ -5,10 +5,12 @@
 *
 !*/
 
-# Do not ignore markdown
-# We are only going to do markdown file formatting for now
+# Do not ignore markdown and yaml
+# We are only going to do markdown and yaml file formatting for now
 # Hopefully we will use prettier for more file types in the future
 !*.md
+!*.yml
+!*.yaml
 
 # Ignore all template files
 # When we eventually enable prettier on javascript these files are invalid and should be ignored
@@ -16,6 +18,15 @@
 
 # Ignore .yy files since prettier seems to think these are json files
 **/*.yy
+
+# Ignored generated resmoke suites
+buildscripts/resmokeconfig/matrix_suites/generated_suites/*.yml
+
+# Ignore generated pnpm lock file
+pnpm-lock.yaml
+
+# Ignore version expansions that are created in evergreen
+version_expansions.yml
 
 # Ignore all formatting in third_party/*
 src/third_party

@@ -35,14 +35,14 @@ Task generation is performed as a 2-step process.
    `mongo-task-generator` tool. This only needs to be done once for the entire version and rerunning
    this task will result in a no-op.
 
-    The tasks will be generated in an "inactive" state. This allows us to generate all available
-    tasks, regardless of whether they are meant to be run or not. This way if we choose to run
-    additional tasks in the future, they will exist to be run.
+   The tasks will be generated in an "inactive" state. This allows us to generate all available
+   tasks, regardless of whether they are meant to be run or not. This way if we choose to run
+   additional tasks in the future, they will exist to be run.
 
-    This step will also hide all the placeholder tasks into a display task called `generator_tasks`
-    in each build variant. Once task generation is completed, the user should perform actions on
-    the generated tasks instead of the placeholder tasks, we encourage this by hiding the
-    placeholder tasks from view.
+   This step will also hide all the placeholder tasks into a display task called `generator_tasks`
+   in each build variant. Once task generation is completed, the user should perform actions on
+   the generated tasks instead of the placeholder tasks, we encourage this by hiding the
+   placeholder tasks from view.
 
 2. After the tasks have been generated, the placeholder tasks are free to run. The placeholder tasks
    simply find the task generated for them and mark it activated. Since generated tasks are

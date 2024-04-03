@@ -4,51 +4,51 @@
 
 1. Install the latest [Node.js](https://nodejs.org/en/download/) if you don't have it.
 2. Install [pkg](https://www.npmjs.com/package/pkg) with npm.
-    ```
-    npm install -g pkg
-    ```
+   ```
+   npm install -g pkg
+   ```
 3. Get [ESLint](https://github.com/eslint/eslint) source code.
-    ```
-    git clone git@github.com:eslint/eslint.git
-    ```
+   ```
+   git clone git@github.com:eslint/eslint.git
+   ```
 4. Checkout the latest version using git tag.
-    ```
-    cd eslint
-    git checkout v${version}
-    ```
+   ```
+   cd eslint
+   git checkout v${version}
+   ```
 5. Add pkg options to `package.json` file.
-    ```
-    "pkg": {
-      "scripts": [ "conf/**/*", "lib/**/*", "messages/**/*" ],
-      "targets": [ "linux-x64", "macos-x64" ]
-      # "targets": [ "linux-arm" ]
-      },
-    ```
+   ```
+   "pkg": {
+     "scripts": [ "conf/**/*", "lib/**/*", "messages/**/*" ],
+     "targets": [ "linux-x64", "macos-x64" ]
+     # "targets": [ "linux-arm" ]
+     },
+   ```
 6. Run pkg command to make ESLint executables.
-    ```
-    npm install
-    pkg .
-    ```
+   ```
+   npm install
+   pkg .
+   ```
 7. Check that executables are working.
    Copy files to somewhere in your PATH and try to run it.
 
-    Depending on your system
+   Depending on your system
 
-    ```
-    eslint-linux --help
-    ```
+   ```
+   eslint-linux --help
+   ```
 
-    or
+   or
 
-    ```
-    eslint-macos --help
-    ```
+   ```
+   eslint-macos --help
+   ```
 
-    or (if you are on arm)
+   or (if you are on arm)
 
-    ```
-    eslint --help
-    ```
+   ```
+   eslint --help
+   ```
 
 (\*) If executable fails to find some .js files there are [extra steps](#extra-steps)
 required to be done before step 6.

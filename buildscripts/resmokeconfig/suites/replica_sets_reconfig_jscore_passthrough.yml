@@ -6,36 +6,36 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/core/**/*.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
-  # Transactions do not support retryability of individual operations.
-  # TODO: Remove this once it is supported (SERVER-33952).
-  - jstests/core/txns/**/*.js
-  # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
-  # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
-  # server parameter.
-  - jstests/core/**/set_param1.js
+    # Transactions do not support retryability of individual operations.
+    # TODO: Remove this once it is supported (SERVER-33952).
+    - jstests/core/txns/**/*.js
+    # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
+    # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
+    # server parameter.
+    - jstests/core/**/set_param1.js
 
-  # These test run commands using legacy queries, which are not supported on sessions.
-  - jstests/core/**/comment_field.js
-  - jstests/core/**/exhaust.js
+    # These test run commands using legacy queries, which are not supported on sessions.
+    - jstests/core/**/comment_field.js
+    - jstests/core/**/exhaust.js
 
-  # Unacknowledged writes prohibited in an explicit session.
-  - jstests/core/**/batch_write_command_w0.js
-  - jstests/core/**/crud_api.js
+    # Unacknowledged writes prohibited in an explicit session.
+    - jstests/core/**/batch_write_command_w0.js
+    - jstests/core/**/crud_api.js
 
-  - jstests/core/**/connection_string_validation.js # Does not expect a replica set connection string.
+    - jstests/core/**/connection_string_validation.js # Does not expect a replica set connection string.
 
-  # TODO: SERVER-71487 Legacy shell does not carry over encryption information through
-  # getMores in reconfig suites.
-  - src/mongo/db/modules/*/jstests/fle2/query/*getMore*.js
+    # TODO: SERVER-71487 Legacy shell does not carry over encryption information through
+    # getMores in reconfig suites.
+    - src/mongo/db/modules/*/jstests/fle2/query/*getMore*.js
 
   exclude_with_any_tags:
-  - assumes_standalone_mongod
-  - assumes_read_preference_unchanged
-  - requires_sharding
+    - assumes_standalone_mongod
+    - assumes_read_preference_unchanged
+    - requires_sharding
 
 executor:
   archive:
@@ -59,21 +59,21 @@ executor:
             readPreference:
               mode: "primary"
   hooks:
-  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
-  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
-  # validating the entire contents of the collection.
-  - class: DoReconfigInBackground
-    shell_options:
-      nodb: ""
-  - class: CheckReplOplogs
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: DoReconfigInBackground
+      shell_options:
+        nodb: ""
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: ReplicaSetFixture
     mongod_options:
-      enableMajorityReadConcern: ''
+      enableMajorityReadConcern: ""
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:

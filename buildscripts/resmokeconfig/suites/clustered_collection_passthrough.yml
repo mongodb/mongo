@@ -4,68 +4,67 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/core/**/*.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
-
-  # Assumes the _id index is real.
-  - jstests/core/**/collmod_convert_to_ttl.js
-  - jstests/core/**/index_create_too_many.js
-  # Uses returnKey().
-  - jstests/core/**/index_diag.js
-  # Expects 'idIndex' field in the listCollections output.
-  - jstests/core/**/list_collections1.js
-  - jstests/core/**/explain_shell_helpers.js
-  - jstests/core/txns/list_collections_not_blocked_by_txn.js
-  # Assumes the collection is not clustered by default.
-  - jstests/core/timeseries/clustered_index_options.js
-  - jstests/core/timeseries/timeseries_expire_collmod.js
-  # Doesn't expect a failpoint to be enabled.
-  - jstests/core/**/set_param1.js
-  # Expects queries on _id to use IDHACK in explain.
-  - jstests/core/**/agg_hint.js
-  - jstests/core/**/explain_shell_helpers.js
-  - jstests/core/**/projection_dotted_paths.js
-  - jstests/core/**/wildcard_index_projection.js
-  - jstests/core/**/find_and_modify_pipeline_update.js
-  - jstests/core/**/update_pipeline_shell_helpers.js
-  - jstests/core/**/idhack.js
-  # Uses the unsupported 'autoIndexId' option.
-  - jstests/core/**/queryoptimizera.js
-  - jstests/core/**/index9.js
-  # Expects the collection creation options not to change.
-  - jstests/core/**/internal_rename_if_options_and_indexes_match.js
-  - jstests/core/timeseries/timeseries_user_system_buckets.js
-  # The _id index is expected to not have a 'unique' field.
-  - jstests/core/**/list_indexes.js
-  # Expects createIndex with 'clustered' option fails on a non-clustered collection.
-  - jstests/core/**/clustered_collection_create_index_clustered.js
-  # Tries to drop the clustered index.
-  - jstests/core/**/drop_index.js
-  - jstests/core/**/drop_indexes.js
-  # Expects to see IXSCAN over _id (cluster key).
-  - jstests/core/**/find_and_modify_hint.js
-  - jstests/core/**/covered_index_sort_2.js
-  # Expects duplicate key error to have _id index use specified.
-  - jstests/core/**/uniqueness.js
-  # Expects to see the usage of _id_ index by using $indexStats.
-  - jstests/core/**/index_stats.js
-  # TODO (SERVER-62707): bound collscans with regexes.
-  - jstests/core/**/index_bounds_pipe.js
-  # Expects an index on _id to cover the query.
-  - jstests/core/**/covered_index_simple_id.js
-  # TODO (SERVER-78045): $text not supported: "No query solutions"
-  - jstests/core/**/fts6.js
-  - jstests/core/**/fts_projection.js
-  # Assumes there is one collection that is not clustered.
-  - jstests/core/find_with_resume_after_param.js
-  # Asserts that queries can use the express execution path, which does not support clustered colls.
-  - jstests/core/**/express.js
+    # Assumes the _id index is real.
+    - jstests/core/**/collmod_convert_to_ttl.js
+    - jstests/core/**/index_create_too_many.js
+    # Uses returnKey().
+    - jstests/core/**/index_diag.js
+    # Expects 'idIndex' field in the listCollections output.
+    - jstests/core/**/list_collections1.js
+    - jstests/core/**/explain_shell_helpers.js
+    - jstests/core/txns/list_collections_not_blocked_by_txn.js
+    # Assumes the collection is not clustered by default.
+    - jstests/core/timeseries/clustered_index_options.js
+    - jstests/core/timeseries/timeseries_expire_collmod.js
+    # Doesn't expect a failpoint to be enabled.
+    - jstests/core/**/set_param1.js
+    # Expects queries on _id to use IDHACK in explain.
+    - jstests/core/**/agg_hint.js
+    - jstests/core/**/explain_shell_helpers.js
+    - jstests/core/**/projection_dotted_paths.js
+    - jstests/core/**/wildcard_index_projection.js
+    - jstests/core/**/find_and_modify_pipeline_update.js
+    - jstests/core/**/update_pipeline_shell_helpers.js
+    - jstests/core/**/idhack.js
+    # Uses the unsupported 'autoIndexId' option.
+    - jstests/core/**/queryoptimizera.js
+    - jstests/core/**/index9.js
+    # Expects the collection creation options not to change.
+    - jstests/core/**/internal_rename_if_options_and_indexes_match.js
+    - jstests/core/timeseries/timeseries_user_system_buckets.js
+    # The _id index is expected to not have a 'unique' field.
+    - jstests/core/**/list_indexes.js
+    # Expects createIndex with 'clustered' option fails on a non-clustered collection.
+    - jstests/core/**/clustered_collection_create_index_clustered.js
+    # Tries to drop the clustered index.
+    - jstests/core/**/drop_index.js
+    - jstests/core/**/drop_indexes.js
+    # Expects to see IXSCAN over _id (cluster key).
+    - jstests/core/**/find_and_modify_hint.js
+    - jstests/core/**/covered_index_sort_2.js
+    # Expects duplicate key error to have _id index use specified.
+    - jstests/core/**/uniqueness.js
+    # Expects to see the usage of _id_ index by using $indexStats.
+    - jstests/core/**/index_stats.js
+    # TODO (SERVER-62707): bound collscans with regexes.
+    - jstests/core/**/index_bounds_pipe.js
+    # Expects an index on _id to cover the query.
+    - jstests/core/**/covered_index_simple_id.js
+    # TODO (SERVER-78045): $text not supported: "No query solutions"
+    - jstests/core/**/fts6.js
+    - jstests/core/**/fts_projection.js
+    # Assumes there is one collection that is not clustered.
+    - jstests/core/find_with_resume_after_param.js
+    # Asserts that queries can use the express execution path, which does not support clustered colls.
+    - jstests/core/**/express.js
 
   exclude_with_any_tags:
-  - assumes_standalone_mongod
-  - expects_explicit_underscore_id_index
+    - assumes_standalone_mongod
+    - expects_explicit_underscore_id_index
 
 executor:
   archive:
@@ -74,11 +73,11 @@ executor:
       - CheckReplDBHash
       - ValidateCollections
   hooks:
-  - class: CheckReplDBHashInBackground
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   config:
     shell_options:
       eval: >-

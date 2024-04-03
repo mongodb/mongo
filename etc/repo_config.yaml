@@ -57,14 +57,12 @@ templates:
      </body>
     </html>
 
-
 repos:
-
-####################
-#
-# Community Repos:
-#
-####################
+  ####################
+  #
+  # Community Repos:
+  #
+  ####################
 
   - name: rhel70
     type: rpm
@@ -120,7 +118,6 @@ repos:
     repos:
       - yum/redhat/9/mongodb-org
       - yum/redhat/9Server/mongodb-org
-
 
   - name: amazon
     type: rpm
@@ -295,11 +292,11 @@ repos:
     repos:
       - apt/ubuntu/dists/jammy/mongodb-org
 
-####################
-#
-# Enterprise Repos:
-#
-####################
+  ####################
+  #
+  # Enterprise Repos:
+  #
+  ####################
 
   - name: rhel62
     type: rpm

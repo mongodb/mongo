@@ -7,10 +7,10 @@ to assist the user in selecting a shard key given a collection's data
 and the user's query patterns.
 It returns two kinds of metrics called `keyCharacteristics` and `readWriteDistribution`:
 
--   `keyCharacteristics` consists of metrics about the cardinality, frequency and monotonicity
-    of the shard key, calculated based on documents sampled from the collection.
--   `readWriteDistribution` consists of the metrics about query routing patterns
-    and the hotness of shard key ranges, calculated based on sampled queries.
+- `keyCharacteristics` consists of metrics about the cardinality, frequency and monotonicity
+  of the shard key, calculated based on documents sampled from the collection.
+- `readWriteDistribution` consists of the metrics about query routing patterns
+  and the hotness of shard key ranges, calculated based on sampled queries.
 
 The remainder of this document describes how queries are sampled in order to report
 `readWriteDistribution` metrics.

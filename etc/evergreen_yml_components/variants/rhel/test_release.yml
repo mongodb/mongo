@@ -5,383 +5,383 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 buildvariants:
-- name: ubi8
-  display_name: "UBI 8"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubi8
-  expansions:
-    resmoke_jobs_factor: 1
-    disable_shared_scons_cache: true
-    compile_flags: >-
-      MONGO_DISTMOD=rhel80
-      --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
-    tooltags: ""
-    build_mongoreplay: true
-    test_flags: >-
-      --excludeWithAnyTags=requires_os_access,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    compile_variant: ubi8
-  tasks:
-  - name: compile_and_archive_dist_test_TG
-    distros:
-    - rhel80-large
-  - name: jsCore
-  - name: sharding_gen
-  - name: replica_sets_gen
-  - name: generate_buildid_to_debug_symbols_mapping
-    distros:
-    - rhel80-large
+  - name: ubi8
+    display_name: "UBI 8"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubi8
+    expansions:
+      resmoke_jobs_factor: 1
+      disable_shared_scons_cache: true
+      compile_flags: >-
+        MONGO_DISTMOD=rhel80
+        --opt=on
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --modules=
+      tooltags: ""
+      build_mongoreplay: true
+      test_flags: >-
+        --excludeWithAnyTags=requires_os_access,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      compile_variant: ubi8
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+        distros:
+          - rhel80-large
+      - name: jsCore
+      - name: sharding_gen
+      - name: replica_sets_gen
+      - name: generate_buildid_to_debug_symbols_mapping
+        distros:
+          - rhel80-large
 
-- name: rhel80
-  display_name: RHEL 8.0
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-build
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: x86_64-rhel80
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
-    test_flags: >-
-      --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    multiversion_platform: rhel80
-    multiversion_edition: targeted
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: x86_64
-    packager_distro: rhel80
-    repo_edition: org
-    scons_cache_scope: shared
-    large_distro_name: rhel80-build
-    compile_variant: rhel80
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - rhel80-build
-  - name: test_packages
-    distros:
-    - ubuntu2204-large
-  - name: selinux_rhel8_org
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: rhel80
+    display_name: RHEL 8.0
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel80-build
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_name: linux
+      push_arch: x86_64-rhel80
+      compile_flags: >-
+        --ssl MONGO_DISTMOD=rhel80
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --modules=
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      multiversion_platform: rhel80
+      multiversion_edition: targeted
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: x86_64
+      packager_distro: rhel80
+      repo_edition: org
+      scons_cache_scope: shared
+      large_distro_name: rhel80-build
+      compile_variant: rhel80
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - rhel80-build
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: selinux_rhel8_org
+      - name: .development_critical !.incompatible_community
+      - name: .release_critical !.incompatible_community
 
-- name: enterprise-rhel-80-64-bit
-  display_name: "Enterprise RHEL 8.0"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-expansions
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: x86_64-enterprise-rhel80
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CFLAGS="-fno-gnu-unique"
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: rhel80
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    jstestfuzz_num_generated_files: 40
-    jstestfuzz_concurrent_num_files: 10
-    target_resmoke_time: 10
-    max_sub_suites: 3
-    large_distro_name: rhel80-medium
-    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
-    external_auth_jobs_max: 1
-    compile_variant: enterprise-rhel-80-64-bit
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - rhel80-large
-  - name: compile_integration_and_test_parallel_stream_TG
-    distros:
-    - rhel80-large
-  - name: test_packages
-    distros:
-    - ubuntu2204-large
-  - name: selinux_rhel8_enterprise
-  - name: .development_critical
-  - name: .release_critical
+  - name: enterprise-rhel-80-64-bit
+    display_name: "Enterprise RHEL 8.0"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel80-small
+    expansions: &enterprise-rhel-80-64-bit-expansions
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: x86_64-enterprise-rhel80
+      compile_flags: >-
+        --ssl MONGO_DISTMOD=rhel80
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CFLAGS="-fno-gnu-unique"
+      multiversion_platform: rhel80
+      multiversion_edition: enterprise
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: x86_64
+      packager_distro: rhel80
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      target_resmoke_time: 10
+      max_sub_suites: 3
+      large_distro_name: rhel80-medium
+      # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+      external_auth_jobs_max: 1
+      compile_variant: enterprise-rhel-80-64-bit
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - rhel80-large
+      - name: compile_integration_and_test_parallel_stream_TG
+        distros:
+          - rhel80-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: selinux_rhel8_enterprise
+      - name: .development_critical
+      - name: .release_critical
 
-- name: rhel-82-arm64
-  display_name: RHEL 8.2 arm64
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - rhel82-arm64-small
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: aarch64-rhel82
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=rhel82
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
-    test_flags: >-
-      --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: aarch64
-    packager_distro: rhel82
-    repo_edition: org
-    scons_cache_scope: shared
-    large_distro_name: rhel82-arm64-large
-    compile_variant: rhel-82-arm64
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - rhel82-arm64-large
-  - name: test_packages
-    distros:
-    - ubuntu1804-arm64-build
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: rhel-82-arm64
+    display_name: RHEL 8.2 arm64
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - rhel82-arm64-small
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_name: linux
+      push_arch: aarch64-rhel82
+      compile_flags: >-
+        --ssl MONGO_DISTMOD=rhel82
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --modules=
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: aarch64
+      packager_distro: rhel82
+      repo_edition: org
+      scons_cache_scope: shared
+      large_distro_name: rhel82-arm64-large
+      compile_variant: rhel-82-arm64
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - rhel82-arm64-large
+      - name: test_packages
+        distros:
+          - ubuntu1804-arm64-build
+      - name: .development_critical !.incompatible_community
+      - name: .release_critical !.incompatible_community
 
-- name: enterprise-rhel-82-arm64
-  display_name: "Enterprise RHEL 8.2 arm64"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel82-arm64-small
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: aarch64-enterprise-rhel82
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=rhel82
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-      -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: aarch64
-    packager_distro: rhel82
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
-    external_auth_jobs_max: 1
-    compile_variant: enterprise-rhel-82-arm64
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - rhel82-arm64-large
-  - name: test_packages
-    distros:
-    - ubuntu1804-arm64-build
-  - name: .development_critical
-  - name: .release_critical
+  - name: enterprise-rhel-82-arm64
+    display_name: "Enterprise RHEL 8.2 arm64"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel82-arm64-small
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: aarch64-enterprise-rhel82
+      compile_flags: >-
+        --ssl MONGO_DISTMOD=rhel82
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+        -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: aarch64
+      packager_distro: rhel82
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+      external_auth_jobs_max: 1
+      compile_variant: enterprise-rhel-82-arm64
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - rhel82-arm64-large
+      - name: test_packages
+        distros:
+          - ubuntu1804-arm64-build
+      - name: .development_critical
+      - name: .release_critical
 
-- name: rhel90
-  display_name: RHEL 9.0
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - rhel90-build
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: x86_64-rhel90
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=rhel90
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
-    test_flags: >-
-      --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    multiversion_platform: rhel90
-    multiversion_edition: targeted
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: x86_64
-    packager_distro: rhel90
-    repo_edition: org
-    scons_cache_scope: shared
-    large_distro_name: rhel90-build
-    compile_variant: rhel90
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - rhel90-build
-  - name: test_packages
-    distros:
-    - ubuntu2204-large
-  - name: selinux_rhel9_org
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: rhel90
+    display_name: RHEL 9.0
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - rhel90-build
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_name: linux
+      push_arch: x86_64-rhel90
+      compile_flags: >-
+        --ssl MONGO_DISTMOD=rhel90
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --modules=
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      multiversion_platform: rhel90
+      multiversion_edition: targeted
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: x86_64
+      packager_distro: rhel90
+      repo_edition: org
+      scons_cache_scope: shared
+      large_distro_name: rhel90-build
+      compile_variant: rhel90
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - rhel90-build
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: selinux_rhel9_org
+      - name: .development_critical !.incompatible_community
+      - name: .release_critical !.incompatible_community
 
-- name: enterprise-rhel-90-64-bit
-  display_name: "Enterprise RHEL 9.0"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel90-small
-  expansions: &enterprise-rhel-90-64-bit-expansions
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: x86_64-enterprise-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-    multiversion_platform: rhel90
-    multiversion_edition: enterprise
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: rhel90
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
-    external_auth_jobs_max: 1
-    compile_variant: enterprise-rhel-90-64-bit
-    core_analyzer_distro_name: rhel90-large
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - rhel90-large
-  - name: compile_build_tools_next_TG
-    distros:
-    - rhel90-large
-  - name: test_packages
-    distros:
-    - ubuntu2204-large
-  - name: selinux_rhel9_enterprise
-  - name: .development_critical
-  - name: .release_critical
+  - name: enterprise-rhel-90-64-bit
+    display_name: "Enterprise RHEL 9.0"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel90-small
+    expansions: &enterprise-rhel-90-64-bit-expansions
+      additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: x86_64-enterprise-rhel90
+      compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+      multiversion_platform: rhel90
+      multiversion_edition: enterprise
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: x86_64
+      packager_distro: rhel90
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+      external_auth_jobs_max: 1
+      compile_variant: enterprise-rhel-90-64-bit
+      core_analyzer_distro_name: rhel90-large
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - rhel90-large
+      - name: compile_build_tools_next_TG
+        distros:
+          - rhel90-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: selinux_rhel9_enterprise
+      - name: .development_critical
+      - name: .release_critical
 
-- name: rhel90-arm64
-  display_name: RHEL 9.0 arm64
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  tags: ["bazel_check"]
-  run_on:
-  - rhel90-arm64-small
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: aarch64-rhel90
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=rhel90
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
-    test_flags: >-
-      --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: aarch64
-    packager_distro: rhel90
-    repo_edition: org
-    scons_cache_scope: shared
-    large_distro_name: rhel90-arm64-large
-    compile_variant: rhel90-arm64
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - rhel90-arm64-large
-  - name: test_packages
-    distros:
-    - ubuntu2204-arm64-small
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: rhel90-arm64
+    display_name: RHEL 9.0 arm64
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    tags: ["bazel_check"]
+    run_on:
+      - rhel90-arm64-small
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_name: linux
+      push_arch: aarch64-rhel90
+      compile_flags: >-
+        --ssl MONGO_DISTMOD=rhel90
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --modules=
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+        --enableEnterpriseTests=off
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: aarch64
+      packager_distro: rhel90
+      repo_edition: org
+      scons_cache_scope: shared
+      large_distro_name: rhel90-arm64-large
+      compile_variant: rhel90-arm64
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - rhel90-arm64-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-arm64-small
+      - name: .development_critical !.incompatible_community
+      - name: .release_critical !.incompatible_community
 
-- name: enterprise-rhel-90-arm64
-  display_name: "Enterprise RHEL 9.0 arm64"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel90-arm64-small
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: aarch64-enterprise-rhel90
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=rhel90
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-      -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: aarch64
-    packager_distro: rhel90
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    large_distro_name: rhel90-arm64-large
-    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
-    external_auth_jobs_max: 1
-    compile_variant: enterprise-rhel-90-arm64
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - rhel90-arm64-large
-  - name: test_packages
-    distros:
-    - ubuntu2204-arm64-small
-  - name: .development_critical
-  - name: .release_critical
+  - name: enterprise-rhel-90-arm64
+    display_name: "Enterprise RHEL 9.0 arm64"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel90-arm64-small
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: aarch64-enterprise-rhel90
+      compile_flags: >-
+        --ssl MONGO_DISTMOD=rhel90
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+        -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: aarch64
+      packager_distro: rhel90
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      large_distro_name: rhel90-arm64-large
+      # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+      external_auth_jobs_max: 1
+      compile_variant: enterprise-rhel-90-arm64
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - rhel90-arm64-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-arm64-small
+      - name: .development_critical
+      - name: .release_critical
 
-- name: enterprise-rhel-82-arm64-grpc
-  display_name: "Enterprise RHEL 8.2 arm64 GRPC"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel82-arm64-large
-  stepback: false
-  expansions:
-    test_flags: --excludeWithAnyTags=requires_latch_analyzer
-    compile_flags: >-
-      --ssl
-      --dbg=on
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-      ENABLE_GRPC_BUILD=1
-    compile_variant: enterprise-rhel-82-arm64-grpc
-    scons_cache_scope: shared
-  tasks:
-    - name: compile_test_parallel_unittest_stream_TG
-    - name: compile_test_parallel_core_stream_TG
-    - name: compile_test_parallel_dbtest_stream_TG
+  - name: enterprise-rhel-82-arm64-grpc
+    display_name: "Enterprise RHEL 8.2 arm64 GRPC"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel82-arm64-large
+    stepback: false
+    expansions:
+      test_flags: --excludeWithAnyTags=requires_latch_analyzer
+      compile_flags: >-
+        --ssl
+        --dbg=on
+        MONGO_DISTMOD=rhel80
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --link-model=dynamic
+        ENABLE_GRPC_BUILD=1
+      compile_variant: enterprise-rhel-82-arm64-grpc
+      scons_cache_scope: shared
+    tasks:
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG

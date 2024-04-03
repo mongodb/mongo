@@ -3,9 +3,9 @@ test_kind: cpp_integration_test
 selector:
   root: build/integration_tests.txt
   exclude_files:
-  # Tests replica set monitor.
-  - build/**/replica_set_monitor_integration_test*
-  - build/**/network_interface_ssl_test* # Requires SSL
+    # Tests replica set monitor.
+    - build/**/replica_set_monitor_integration_test*
+    - build/**/network_interface_ssl_test* # Requires SSL
 
 executor:
   archive:
@@ -13,9 +13,9 @@ executor:
       - ValidateCollections
   config: {}
   hooks:
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: MongoDFixture
     mongod_options:

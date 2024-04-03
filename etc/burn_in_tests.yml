@@ -7,10 +7,10 @@ selector:
     exclude_tasks:
     # Exclude list of jstests file names.
     exclude_tests:
-    # Requires external_auth_oidc.sh to run beforehand.
-    - src/mongo/db/modules/enterprise/jstests/external_auth_oidc/oidc_e2e_okta.js
-    # Requires external_auth_azure_setup.sh to run before, and external_auth_azure_teardown.sh to run after
-    - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_azure/oidc_e2e_azure.js
-    - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_azure/oidc_e2e_azure_machine.js
-    # Requires external_auth_gcp_setup.sh to run before and external_auth_gcp_teardown.sh to run after
-    - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_gcp/oidc_e2e_gcp_machine.js
+      # Requires external_auth_oidc.sh to run beforehand.
+      - src/mongo/db/modules/enterprise/jstests/external_auth_oidc/oidc_e2e_okta.js
+      # Requires external_auth_azure_setup.sh to run before, and external_auth_azure_teardown.sh to run after
+      - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_azure/oidc_e2e_azure.js
+      - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_azure/oidc_e2e_azure_machine.js
+      # Requires external_auth_gcp_setup.sh to run before and external_auth_gcp_teardown.sh to run after
+      - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_gcp/oidc_e2e_gcp_machine.js

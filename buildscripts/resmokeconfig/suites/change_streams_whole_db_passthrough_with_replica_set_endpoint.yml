@@ -8,31 +8,31 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/change_streams/**/*.js
+    - jstests/change_streams/**/*.js
   exclude_files:
-  # TODO (SERVER-87633): Investigate why change_streams/shell_helper.js fails when run against
-  # a sharded cluster.
-  - jstests/change_streams/shell_helper.js
-  # This test runs a transaction with the internal _shardsvrDeleteGlobalIndexKey command. This
-  # command does not exist in the router command registry so the replica set endpoint allows it
-  # to bypass the router. This causes issues when the test tries to commit the transaction since
-  # the commitTransaction command does exist in the router command registry so the replica set
-  # forces it to go through the router which does not know about this transaction. So it fails
-  # with "Cannot recover the transaction decision without a recoveryToken". This issue is test-only
-  # since _shardsvrDeleteGlobalIndexKey will always be run by an internal client and the
-  # replica set endpoint allows all comments from an internal client to bypass the router.
-  - jstests/change_streams/global_index.js
-  # Only relevant for single-collection change streams.
-  - jstests/change_streams/metadata_notifications.js
+    # TODO (SERVER-87633): Investigate why change_streams/shell_helper.js fails when run against
+    # a sharded cluster.
+    - jstests/change_streams/shell_helper.js
+    # This test runs a transaction with the internal _shardsvrDeleteGlobalIndexKey command. This
+    # command does not exist in the router command registry so the replica set endpoint allows it
+    # to bypass the router. This causes issues when the test tries to commit the transaction since
+    # the commitTransaction command does exist in the router command registry so the replica set
+    # forces it to go through the router which does not know about this transaction. So it fails
+    # with "Cannot recover the transaction decision without a recoveryToken". This issue is test-only
+    # since _shardsvrDeleteGlobalIndexKey will always be run by an internal client and the
+    # replica set endpoint allows all comments from an internal client to bypass the router.
+    - jstests/change_streams/global_index.js
+    # Only relevant for single-collection change streams.
+    - jstests/change_streams/metadata_notifications.js
   exclude_with_any_tags:
-  ##
-  # The next tags correspond to the special errors thrown by the
-  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
-  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
-  # warranted.
-  ##
-  # "Cowardly refusing to override write concern of command: ..."
-  - assumes_write_concern_unchanged
+    ##
+    # The next tags correspond to the special errors thrown by the
+    # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+    # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+    # warranted.
+    ##
+    # "Cowardly refusing to override write concern of command: ..."
+    - assumes_write_concern_unchanged
 
 executor:
   archive:
@@ -47,7 +47,7 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
-          enableMajorityReadConcern: ''
+          enableMajorityReadConcern: ""
           testingReplicaSetEndpoint: true
       # Enable causal consistency for change streams suites using 1 node replica sets. See
       # change_streams.yml for detailed explanation.
@@ -57,20 +57,20 @@ executor:
         await import('jstests/libs/override_methods/implicit_whole_db_changestreams.js');
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
   hooks:
-  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
-  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
-  # validating the entire contents of the collection.
-  - class: CheckReplOplogs
-  # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
-  # is fsync locked and has replica set endpoint enabled.
-  # - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplOplogs
+    # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
+    # is fsync locked and has replica set endpoint enabled.
+    # - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: ReplicaSetFixture
     mongod_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
         featureFlagAllMongodsAreSharded: 1

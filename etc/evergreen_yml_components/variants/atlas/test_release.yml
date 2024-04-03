@@ -5,46 +5,46 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 buildvariants:
-- name: enterprise-rhel-79-64-bit
-  display_name: "Enterprise RHEL 7.9"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel7.9-small
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: x86_64-enterprise-rhel79
-    test_flags: --excludeWithAnyTags=requires_latch_analyzer
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=rhel79
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
-    multiversion_platform: rhel79
-    multiversion_edition: enterprise
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: rhel79
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
-    external_auth_jobs_max: 1
-    compile_variant: enterprise-rhel-79-64-bit
-    core_analyzer_distro_name: rhel7.9-large
-  tasks:
-  - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - rhel7.9-large
-  - name: test_packages
-    distros:
-    - ubuntu2204-large
-  - name: selinux_rhel7_enterprise
-  - name: .development_critical
-  - name: .release_critical
+  - name: enterprise-rhel-79-64-bit
+    display_name: "Enterprise RHEL 7.9"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel7.9-small
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: x86_64-enterprise-rhel79
+      test_flags: --excludeWithAnyTags=requires_latch_analyzer
+      compile_flags: >-
+        --ssl MONGO_DISTMOD=rhel79
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+      multiversion_platform: rhel79
+      multiversion_edition: enterprise
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: x86_64
+      packager_distro: rhel79
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+      external_auth_jobs_max: 1
+      compile_variant: enterprise-rhel-79-64-bit
+      core_analyzer_distro_name: rhel7.9-large
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - rhel7.9-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: selinux_rhel7_enterprise
+      - name: .development_critical
+      - name: .release_critical

@@ -2,63 +2,62 @@ test_kind: fsm_workload_test
 
 selector:
   roots:
-  - jstests/concurrency/fsm_workloads/**/*.js
-  - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
-  # Disabled due to MongoDB restrictions and/or workload restrictions
+    # Disabled due to MongoDB restrictions and/or workload restrictions
 
-  # These workloads sometimes trigger 'Could not lock auth data update lock'
-  # errors because the AuthorizationManager currently waits for only five
-  # seconds to acquire the lock for authorization documents
-  - jstests/concurrency/fsm_workloads/auth_create_role.js
-  - jstests/concurrency/fsm_workloads/auth_create_user.js
-  - jstests/concurrency/fsm_workloads/auth_drop_role.js
-  - jstests/concurrency/fsm_workloads/auth_drop_user.js
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+    - jstests/concurrency/fsm_workloads/auth_create_role.js
+    - jstests/concurrency/fsm_workloads/auth_create_user.js
+    - jstests/concurrency/fsm_workloads/auth_drop_role.js
+    - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
-  # uses >100MB of data, which can overwhelm test hosts
-  - jstests/concurrency/fsm_workloads/agg_group_external.js
-  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    # uses >100MB of data, which can overwhelm test hosts
+    - jstests/concurrency/fsm_workloads/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/agg_sort_external.js
 
-  # compact can only be run against a standalone mongod
-  - jstests/concurrency/fsm_workloads/compact.js
-  - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
+    # compact can only be run against a standalone mongod
+    - jstests/concurrency/fsm_workloads/compact.js
+    - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
-  # can cause OOM kills on test hosts
-  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    # can cause OOM kills on test hosts
+    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
 
+    # cannot createIndex after dropDatabase without sharding first
+    - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
 
-  # cannot createIndex after dropDatabase without sharding first
-  - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
+    # reIndex is not supported in mongos.
+    - jstests/concurrency/fsm_workloads/reindex.js
+    - jstests/concurrency/fsm_workloads/reindex_background.js
+    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
-  # reIndex is not supported in mongos.
-  - jstests/concurrency/fsm_workloads/reindex.js
-  - jstests/concurrency/fsm_workloads/reindex_background.js
-  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+    # The WTWriteConflictException failpoint is not supported on mongos.
+    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
-  # The WTWriteConflictException failpoint is not supported on mongos.
-  - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
+    # TODO Undenylist (SERVER-38852).
+    - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
 
-  # TODO Undenylist (SERVER-38852).
-  - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
-  - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
+    # serverStatus does not include transaction metrics on mongos.
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 
-  # serverStatus does not include transaction metrics on mongos.
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
-  # Uses the same transaction id across different routers, which is not allowed because when either
-  # router tries to commit, it may not know the full participant list.
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
-
-  # Time-series collections are not supported on mongos.
-  - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
+    # Time-series collections are not supported on mongos.
+    - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
   exclude_with_any_tags:
-  - assumes_against_mongod_not_mongos
-  - requires_replication
-  - assumes_balancer_on
-  # mongos has no system.profile collection.
-  - requires_profiling
-  - assumes_unsharded_collection
+    - assumes_against_mongod_not_mongos
+    - requires_replication
+    - assumes_balancer_on
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - assumes_unsharded_collection
 
 executor:
   archive:
@@ -76,16 +75,16 @@ executor:
         TestData:
           runningWithBalancer: false
   hooks:
-  - class: CheckShardFilteringMetadata
-  # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
-  # - class: RunDBCheckInBackground
-  - class: CheckReplDBHashInBackground
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: CheckOrphansDeleted
-  - class: CheckRoutingTableConsistency
-  - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
-  - class: CleanupConcurrencyWorkloads
+    - class: CheckShardFilteringMetadata
+    # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
+    # - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
     config_shard: "any"

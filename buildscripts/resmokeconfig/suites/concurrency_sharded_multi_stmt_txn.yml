@@ -2,104 +2,104 @@ test_kind: fsm_workload_test
 
 selector:
   roots:
-  - jstests/concurrency/fsm_workloads/**/*.js
+    - jstests/concurrency/fsm_workloads/**/*.js
   exclude_files:
-  # $lookup and $graphLookup are not supported on sharded collections with transactions.
-  - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
-  - jstests/concurrency/fsm_workloads/agg_lookup.js
-  - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
+    # $lookup and $graphLookup are not supported on sharded collections with transactions.
+    - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
+    - jstests/concurrency/fsm_workloads/agg_lookup.js
+    - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
 
-  # Disabled due to MongoDB restrictions and/or workload restrictions
+    # Disabled due to MongoDB restrictions and/or workload restrictions
 
-  # These workloads sometimes trigger 'Could not lock auth data update lock'
-  # errors because the AuthorizationManager currently waits for only five
-  # seconds to acquire the lock for authorization documents
-  - jstests/concurrency/fsm_workloads/auth_create_role.js
-  - jstests/concurrency/fsm_workloads/auth_create_user.js
-  - jstests/concurrency/fsm_workloads/auth_drop_role.js
-  - jstests/concurrency/fsm_workloads/auth_drop_user.js
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+    - jstests/concurrency/fsm_workloads/auth_create_role.js
+    - jstests/concurrency/fsm_workloads/auth_create_user.js
+    - jstests/concurrency/fsm_workloads/auth_drop_role.js
+    - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
-  # uses >100MB of data, which can overwhelm test hosts
-  - jstests/concurrency/fsm_workloads/agg_group_external.js
-  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    # uses >100MB of data, which can overwhelm test hosts
+    - jstests/concurrency/fsm_workloads/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/agg_sort_external.js
 
-  # compact can only be run against a standalone mongod
-  - jstests/concurrency/fsm_workloads/compact.js
-  - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
+    # compact can only be run against a standalone mongod
+    - jstests/concurrency/fsm_workloads/compact.js
+    - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
-  # can cause OOM kills on test hosts
-  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    # can cause OOM kills on test hosts
+    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
 
-  # cannot createIndex after dropDatabase without sharding first
-  - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
+    # cannot createIndex after dropDatabase without sharding first
+    - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
 
-  # reIndex is not supported in mongos.
-  - jstests/concurrency/fsm_workloads/reindex.js
-  - jstests/concurrency/fsm_workloads/reindex_background.js
-  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+    # reIndex is not supported in mongos.
+    - jstests/concurrency/fsm_workloads/reindex.js
+    - jstests/concurrency/fsm_workloads/reindex_background.js
+    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
-  # The WTWriteConflictException failpoint is not supported on mongos.
-  - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
+    # The WTWriteConflictException failpoint is not supported on mongos.
+    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
-  # TODO Undenylist (SERVER-38852).
-  - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
-  - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
+    # TODO Undenylist (SERVER-38852).
+    - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
 
-  # serverStatus does not include transaction metrics on mongos.
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
+    # serverStatus does not include transaction metrics on mongos.
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 
-  # Uses the same transaction id across different routers, which is not allowed because when either
-  # router tries to commit, it may not know the full participant list.
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
-  ##
-  # Denylists from concurrency_replication_multi_stmt_txn
-  ##
+    ##
+    # Denylists from concurrency_replication_multi_stmt_txn
+    ##
 
-  # Relies on having one thread observe writes from the other threads, which won't become visible
-  # once a transaction in the thread is started because it'll keep reading from the same snapshot.
-  - jstests/concurrency/fsm_workloads/create_index_background.js
-  - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
-  - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
+    # Relies on having one thread observe writes from the other threads, which won't become visible
+    # once a transaction in the thread is started because it'll keep reading from the same snapshot.
+    - jstests/concurrency/fsm_workloads/create_index_background.js
+    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
 
-  # Expects reads to die with a particular error, but other errors are possible if the read is part
-  # of a transaction (e.g. ErrorCodes.LockTimeout).
-  - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
-  - jstests/concurrency/fsm_workloads/drop_index_during_lookup.js
+    # Expects reads to die with a particular error, but other errors are possible if the read is part
+    # of a transaction (e.g. ErrorCodes.LockTimeout).
+    - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
+    - jstests/concurrency/fsm_workloads/drop_index_during_lookup.js
 
-  ##
-  # Denylists specific to this suite.
-  ##
+    ##
+    # Denylists specific to this suite.
+    ##
 
-  # Use updates that do not contain the shard key, so they are rejected before any commands are
-  # sent to participant shards, but these workloads do not fail, so the auto retry transaction logic
-  # attempts to commit, which fails because no participants have been contacted.
-  - jstests/concurrency/fsm_workloads/update_rename.js
-  - jstests/concurrency/fsm_workloads/update_rename_noindex.js
+    # Use updates that do not contain the shard key, so they are rejected before any commands are
+    # sent to participant shards, but these workloads do not fail, so the auto retry transaction logic
+    # attempts to commit, which fails because no participants have been contacted.
+    - jstests/concurrency/fsm_workloads/update_rename.js
+    - jstests/concurrency/fsm_workloads/update_rename_noindex.js
 
-  # Time-series collections are not supported on mongos.
-  - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
+    # Time-series collections are not supported on mongos.
+    - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
   exclude_with_any_tags:
-  - assumes_against_mongod_not_mongos
-  - does_not_support_causal_consistency
-  - requires_replication
-  # Snapshot reads in transactions are banned on capped collections.
-  - requires_capped
-  - assumes_balancer_on
-  # Sharing cursors between state functions will fail in this suite because it will attempt to use
-  # the same cursor in multiple transactions.
-  - state_functions_share_cursor
-  # These start a transaction in one state function and use it in other state functions. This suite
-  # would instead execute each state function as its own transaction.
-  - state_functions_share_transaction
-  # Tests which expect commands to fail and catch the error can cause transactions to abort and
-  # retry indefinitely.
-  - catches_command_failures
-  # mongos has no system.profile collection.
-  - requires_profiling
-  - does_not_support_transactions
-  - assumes_unsharded_collection
+    - assumes_against_mongod_not_mongos
+    - does_not_support_causal_consistency
+    - requires_replication
+    # Snapshot reads in transactions are banned on capped collections.
+    - requires_capped
+    - assumes_balancer_on
+    # Sharing cursors between state functions will fail in this suite because it will attempt to use
+    # the same cursor in multiple transactions.
+    - state_functions_share_cursor
+    # These start a transaction in one state function and use it in other state functions. This suite
+    # would instead execute each state function as its own transaction.
+    - state_functions_share_transaction
+    # Tests which expect commands to fail and catch the error can cause transactions to abort and
+    # retry indefinitely.
+    - catches_command_failures
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - does_not_support_transactions
+    - assumes_unsharded_collection
 
 executor:
   archive:
@@ -118,14 +118,14 @@ executor:
           runningWithSessions: true
           traceExceptions: false
   hooks:
-  - class: CheckShardFilteringMetadata
-  - class: CheckReplDBHashInBackground
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: CheckOrphansDeleted
-  - class: CheckRoutingTableConsistency
-  - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
-  - class: CleanupConcurrencyWorkloads
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false

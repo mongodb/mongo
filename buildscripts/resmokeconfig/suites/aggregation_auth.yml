@@ -1,16 +1,16 @@
 # Section that is ignored by resmoke.py.
 config_variables:
-- &keyFile jstests/libs/authTestsKey
-- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &keyFile jstests/libs/authTestsKey
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
 
 test_kind: js_test
 
 selector:
   roots:
-  - jstests/aggregation/**/*.js
+    - jstests/aggregation/**/*.js
   exclude_files:
-  - jstests/aggregation/extras/*.js
-  - jstests/aggregation/data/*.js
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
 
 executor:
   config:
@@ -28,12 +28,12 @@ executor:
       password: *keyFileData
       username: __system
   hooks:
-  - class: CleanEveryN
-    n: 20
+    - class: CleanEveryN
+      n: 20
   fixture:
     class: MongoDFixture
     mongod_options:
-      auth: ''
+      auth: ""
       keyFile: *keyFile
       set_parameters:
         enableTestCommands: 1

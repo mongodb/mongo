@@ -1,14 +1,14 @@
 logging:
   executor:
-    format: '[%(name)s] %(asctime)s %(message)s'
+    format: "[%(name)s] %(asctime)s %(message)s"
     handlers:
       - class: logging.StreamHandler
   fixture:
-    format: '[%(name)s] %(message)s'
+    format: "[%(name)s] %(message)s"
     handlers:
       - class: buildlogger
   tests:
-    format: '[%(name)s] %(message)s'
+    format: "[%(name)s] %(message)s"
     handlers:
       - class: buildlogger
 

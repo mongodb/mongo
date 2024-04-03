@@ -109,7 +109,6 @@
             TestData:
               nonClusteredConfigTransactions: true
 
-
 ### Suite-specific overrides ###
 - name: multiversion_future_git_tag_exclude_files
   value:
@@ -200,7 +199,7 @@
         shell_options:
           global_vars:
             TestData:
-              useRandomBinVersionsWithinReplicaSet: 'last-lts'
+              useRandomBinVersionsWithinReplicaSet: "last-lts"
               nonClusteredConfigTransactions: true
 
 - name: replica_sets_multiversion_testdata_last_continuous
@@ -210,7 +209,7 @@
         shell_options:
           global_vars:
             TestData:
-              useRandomBinVersionsWithinReplicaSet: 'last-continuous'
+              useRandomBinVersionsWithinReplicaSet: "last-continuous"
               nonClusteredConfigTransactions: true
 
 - name: rollback_multiversion_fuzzer_testdata_last_lts
@@ -229,7 +228,7 @@
                 storage:
                   verbosity: 1
               rollbackShutdowns: true
-              useRandomBinVersionsWithinReplicaSet: 'last-lts'
+              useRandomBinVersionsWithinReplicaSet: "last-lts"
               nonClusteredConfigTransactions: true
 
 - name: rollback_multiversion_fuzzer_testdata_last_continuous
@@ -248,7 +247,7 @@
                 storage:
                   verbosity: 1
               rollbackShutdowns: true
-              useRandomBinVersionsWithinReplicaSet: 'last-continuous'
+              useRandomBinVersionsWithinReplicaSet: "last-continuous"
               nonClusteredConfigTransactions: true
 
 - name: sharding_multiversion_selector
@@ -281,8 +280,8 @@
         shell_options:
           global_vars:
             TestData:
-              useRandomBinVersionsWithinReplicaSet: 'last-lts'
-              mongosBinVersion: 'last-lts'
+              useRandomBinVersionsWithinReplicaSet: "last-lts"
+              mongosBinVersion: "last-lts"
               nonClusteredConfigTransactions: true
 
 - name: sharding_multiversion_testdata_last_continuous
@@ -292,8 +291,8 @@
         shell_options:
           global_vars:
             TestData:
-              useRandomBinVersionsWithinReplicaSet: 'last-continuous'
-              mongosBinVersion: 'last-continuous'
+              useRandomBinVersionsWithinReplicaSet: "last-continuous"
+              mongosBinVersion: "last-continuous"
 
 - name: jstestfuzz_replication_multiversion_hooks
   value:

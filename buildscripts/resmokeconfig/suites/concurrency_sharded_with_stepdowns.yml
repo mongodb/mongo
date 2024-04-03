@@ -2,140 +2,139 @@ test_kind: fsm_workload_test
 
 selector:
   roots:
-  - jstests/concurrency/fsm_workloads/**/*.js
-  - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
-  # Disabled because MapReduce can lose cursors if the primary steps down.
-  - jstests/concurrency/fsm_workloads/map_reduce_inline.js
-  - jstests/concurrency/fsm_workloads/map_reduce_interrupt.js
-  - jstests/concurrency/fsm_workloads/map_reduce_merge.js
-  - jstests/concurrency/fsm_workloads/map_reduce_reduce.js
-  - jstests/concurrency/fsm_workloads/map_reduce_replace.js
-  - jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js
-  - jstests/concurrency/fsm_workloads/map_reduce_replace_remove.js
+    # Disabled because MapReduce can lose cursors if the primary steps down.
+    - jstests/concurrency/fsm_workloads/map_reduce_inline.js
+    - jstests/concurrency/fsm_workloads/map_reduce_interrupt.js
+    - jstests/concurrency/fsm_workloads/map_reduce_merge.js
+    - jstests/concurrency/fsm_workloads/map_reduce_reduce.js
+    - jstests/concurrency/fsm_workloads/map_reduce_replace.js
+    - jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js
+    - jstests/concurrency/fsm_workloads/map_reduce_replace_remove.js
 
-  # Disabled due to MongoDB restrictions and/or workload restrictions
+    # Disabled due to MongoDB restrictions and/or workload restrictions
 
-  # These workloads sometimes trigger 'Could not lock auth data update lock'
-  # errors because the AuthorizationManager currently waits for only five
-  # seconds to acquire the lock for authorization documents
-  - jstests/concurrency/fsm_workloads/auth_create_role.js
-  - jstests/concurrency/fsm_workloads/auth_create_user.js
-  - jstests/concurrency/fsm_workloads/auth_drop_role.js
-  - jstests/concurrency/fsm_workloads/auth_drop_user.js
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+    - jstests/concurrency/fsm_workloads/auth_create_role.js
+    - jstests/concurrency/fsm_workloads/auth_create_user.js
+    - jstests/concurrency/fsm_workloads/auth_drop_role.js
+    - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
-  # uses >100MB of data, which can overwhelm test hosts
-  - jstests/concurrency/fsm_workloads/agg_group_external.js
-  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    # uses >100MB of data, which can overwhelm test hosts
+    - jstests/concurrency/fsm_workloads/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/agg_sort_external.js
 
-  # compact can only be run against a standalone mongod
-  - jstests/concurrency/fsm_workloads/compact.js
-  - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
+    # compact can only be run against a standalone mongod
+    - jstests/concurrency/fsm_workloads/compact.js
+    - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
-  # can cause OOM kills on test hosts
-  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    # can cause OOM kills on test hosts
+    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
 
+    # cannot createIndex after dropDatabase without sharding first
+    - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
 
-  # cannot createIndex after dropDatabase without sharding first
-  - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
+    # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
+    - jstests/concurrency/fsm_workloads/sharded_base_partitioned.js
+    - jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js
+    - jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js
+    - jstests/concurrency/fsm_workloads/sharded_splitChunk_partitioned.js
 
-  # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
-  - jstests/concurrency/fsm_workloads/sharded_base_partitioned.js
-  - jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js
-  - jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js
-  - jstests/concurrency/fsm_workloads/sharded_splitChunk_partitioned.js
+    # These workloads frequently time out waiting for the distributed lock to drop a sharded
+    # collection.
+    - jstests/concurrency/fsm_workloads/kill_aggregation.js
+    - jstests/concurrency/fsm_workloads/kill_rooted_or.js
 
-  # These workloads frequently time out waiting for the distributed lock to drop a sharded
-  # collection.
-  - jstests/concurrency/fsm_workloads/kill_aggregation.js
-  - jstests/concurrency/fsm_workloads/kill_rooted_or.js
+    # Uses getmores.
+    - jstests/concurrency/fsm_workloads/agg_base.js
+    - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/create_index_background.js
+    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
+    - jstests/concurrency/fsm_workloads/globally_managed_cursors.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_ordered_bulk.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_text.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_unordered_bulk.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_upsert.js
+    - jstests/concurrency/fsm_workloads/indexed_insert_where.js
+    - jstests/concurrency/fsm_workloads/list_indexes.js
+    - jstests/concurrency/fsm_workloads/query_stats_concurrent.js
+    - jstests/concurrency/fsm_workloads/reindex.js
+    - jstests/concurrency/fsm_workloads/reindex_background.js
+    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+    - jstests/concurrency/fsm_workloads/remove_multiple_documents.js
+    - jstests/concurrency/fsm_workloads/remove_where.js
+    - jstests/concurrency/fsm_workloads/server_status_with_time_out_cursors.js
+    - jstests/concurrency/fsm_workloads/update_where.js
+    - jstests/concurrency/fsm_workloads/yield.js
+    - jstests/concurrency/fsm_workloads/yield_fetch.js
+    - jstests/concurrency/fsm_workloads/yield_rooted_or.js
+    - jstests/concurrency/fsm_workloads/yield_sort.js
+    - jstests/concurrency/fsm_workloads/yield_sort_merge.js
+    - jstests/concurrency/fsm_workloads/yield_text.js
+    - jstests/concurrency/fsm_workloads/yield_with_drop.js
 
-  # Uses getmores.
-  - jstests/concurrency/fsm_workloads/agg_base.js
-  - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
-  - jstests/concurrency/fsm_workloads/create_index_background.js
-  - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
-  - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
-  - jstests/concurrency/fsm_workloads/globally_managed_cursors.js
-  - jstests/concurrency/fsm_workloads/indexed_insert_ordered_bulk.js
-  - jstests/concurrency/fsm_workloads/indexed_insert_text.js
-  - jstests/concurrency/fsm_workloads/indexed_insert_unordered_bulk.js
-  - jstests/concurrency/fsm_workloads/indexed_insert_upsert.js
-  - jstests/concurrency/fsm_workloads/indexed_insert_where.js
-  - jstests/concurrency/fsm_workloads/list_indexes.js
-  - jstests/concurrency/fsm_workloads/query_stats_concurrent.js
-  - jstests/concurrency/fsm_workloads/reindex.js
-  - jstests/concurrency/fsm_workloads/reindex_background.js
-  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
-  - jstests/concurrency/fsm_workloads/remove_multiple_documents.js
-  - jstests/concurrency/fsm_workloads/remove_where.js
-  - jstests/concurrency/fsm_workloads/server_status_with_time_out_cursors.js
-  - jstests/concurrency/fsm_workloads/update_where.js
-  - jstests/concurrency/fsm_workloads/yield.js
-  - jstests/concurrency/fsm_workloads/yield_fetch.js
-  - jstests/concurrency/fsm_workloads/yield_rooted_or.js
-  - jstests/concurrency/fsm_workloads/yield_sort.js
-  - jstests/concurrency/fsm_workloads/yield_sort_merge.js
-  - jstests/concurrency/fsm_workloads/yield_text.js
-  - jstests/concurrency/fsm_workloads/yield_with_drop.js
+    # Uses non retryable writes.
+    - jstests/concurrency/fsm_workloads/remove_and_bulk_insert.js
+    - jstests/concurrency/fsm_workloads/update_and_bulk_insert.js
+    - jstests/concurrency/fsm_workloads/update_check_index.js
+    - jstests/concurrency/fsm_workloads/update_multifield_multiupdate.js
+    - jstests/concurrency/fsm_workloads/update_multifield_multiupdate_noindex.js
+    - jstests/concurrency/fsm_workloads/update_ordered_bulk_inc.js
+    - jstests/concurrency/fsm_workloads/yield_id_hack.js
 
-  # Uses non retryable writes.
-  - jstests/concurrency/fsm_workloads/remove_and_bulk_insert.js
-  - jstests/concurrency/fsm_workloads/update_and_bulk_insert.js
-  - jstests/concurrency/fsm_workloads/update_check_index.js
-  - jstests/concurrency/fsm_workloads/update_multifield_multiupdate.js
-  - jstests/concurrency/fsm_workloads/update_multifield_multiupdate_noindex.js
-  - jstests/concurrency/fsm_workloads/update_ordered_bulk_inc.js
-  - jstests/concurrency/fsm_workloads/yield_id_hack.js
+    # Uses non retryable commands.
+    - jstests/concurrency/fsm_workloads/agg_out.js
+    - jstests/concurrency/fsm_workloads/agg_sort.js
+    - jstests/concurrency/fsm_workloads/collmod.js
+    - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
+    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
+    - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/invalidated_cursors.js
+    - jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js
+    - jstests/concurrency/fsm_workloads/view_catalog.js
+    - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
+    - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
 
-  # Uses non retryable commands.
-  - jstests/concurrency/fsm_workloads/agg_out.js
-  - jstests/concurrency/fsm_workloads/agg_sort.js
-  - jstests/concurrency/fsm_workloads/collmod.js
-  - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
-  - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-  - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
-  - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
-  - jstests/concurrency/fsm_workloads/invalidated_cursors.js
-  - jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js
-  - jstests/concurrency/fsm_workloads/view_catalog.js
-  - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
-  - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
+    # The auto_retry_on_network_error.js override needs to overwrite the response from drop on
+    # NamespaceNotFound, and since this workload only creates and drops collections there isn't
+    # much value in running it.
+    - jstests/concurrency/fsm_workloads/drop_collection.js
 
-  # The auto_retry_on_network_error.js override needs to overwrite the response from drop on
-  # NamespaceNotFound, and since this workload only creates and drops collections there isn't
-  # much value in running it.
-  - jstests/concurrency/fsm_workloads/drop_collection.js
+    # serverStatus does not include transaction metrics on mongos.
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 
-  # serverStatus does not include transaction metrics on mongos.
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
-  # Uses the same transaction id across different routers, which is not allowed because when either
-  # router tries to commit, it may not know the full participant list.
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+    # Use non-retryable commands not allowed by the network retry helper.
+    - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js
+    - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
 
-  # Use non-retryable commands not allowed by the network retry helper.
-  - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js
-  - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
+    # Time-series collections are not supported on mongos.
+    - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
-  # Time-series collections are not supported on mongos.
-  - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
-
-  # The test may spuriously fail when run against sharded clusters, due to limitations of the
-  # infrastructure. See SERVER-77039 for full details.
-  - jstests/concurrency/fsm_workloads/map_reduce_drop.js
+    # The test may spuriously fail when run against sharded clusters, due to limitations of the
+    # infrastructure. See SERVER-77039 for full details.
+    - jstests/concurrency/fsm_workloads/map_reduce_drop.js
 
   exclude_with_any_tags:
-  - assumes_against_mongod_not_mongos
-  - requires_replication
-  - requires_non_retryable_writes
-  - assumes_balancer_on
-  # Curop requires readConcern local.
-  - uses_curop_agg_stage
-  # mongos has no system.profile collection.
-  - requires_profiling
-  - does_not_support_stepdowns
-  - assumes_unsharded_collection
+    - assumes_against_mongod_not_mongos
+    - requires_replication
+    - requires_non_retryable_writes
+    - assumes_balancer_on
+    # Curop requires readConcern local.
+    - uses_curop_agg_stage
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - does_not_support_stepdowns
+    - assumes_unsharded_collection
 
 executor:
   archive:
@@ -153,17 +152,17 @@ executor:
           runningWithBalancer: false
           useActionPermittedFile: true
   hooks:
-  - class: ContinuousStepdown
-    config_stepdown: true
-    shard_stepdown: true
-    use_action_permitted_file: true
-  - class: CheckShardFilteringMetadata
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: CheckOrphansDeleted
-  - class: CheckRoutingTableConsistency
-  - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
-  - class: CleanupConcurrencyWorkloads
+    - class: ContinuousStepdown
+      config_stepdown: true
+      shard_stepdown: true
+      use_action_permitted_file: true
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false

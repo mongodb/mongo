@@ -10,15 +10,15 @@ continue performing other work instead of waiting synchronously for those result
 
 ## A Few Definitions
 
--   A `Future<T>` is a type that will eventually contain either a `T`, or an error indicating why the
-    `T` could not be produced (in MongoDB, the error will take the form of either an exception or a
-    `Status`).
--   A `Promise<T>` is a single-shot producer of a value (i.e., a `T`) for an associated `Future<T>`.
-    That is, to put a value or error in a `Future<T>` and make it ready for use by consumers, the
-    value is emplaced in the corresponding `Promise<T>`.
--   A continuation is a functor that can be chained on to `Future<T>` that will execute only once the
-    `T` (or error) is available and ready. A continuation in this way can "consume" the produced `T`,
-    and handle any errors.
+- A `Future<T>` is a type that will eventually contain either a `T`, or an error indicating why the
+  `T` could not be produced (in MongoDB, the error will take the form of either an exception or a
+  `Status`).
+- A `Promise<T>` is a single-shot producer of a value (i.e., a `T`) for an associated `Future<T>`.
+  That is, to put a value or error in a `Future<T>` and make it ready for use by consumers, the
+  value is emplaced in the corresponding `Promise<T>`.
+- A continuation is a functor that can be chained on to `Future<T>` that will execute only once the
+  `T` (or error) is available and ready. A continuation in this way can "consume" the produced `T`,
+  and handle any errors.
 
 ## A First Example
 

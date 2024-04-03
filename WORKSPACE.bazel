@@ -131,21 +131,3 @@ npm_translate_lock(
 load("@npm//:repositories.bzl", "npm_repositories")
 
 npm_repositories()
-
-# TODO: This comes with a lot of built in formatters
-# Since we are only using prettier for now we do not use the others
-# See https://github.com/aspect-build/rules_lint/releases/tag/v0.11.0 for all supported formatters
-http_archive(
-    name = "aspect_rules_lint",
-    sha256 = "41fad363f11ccab46a244f93f8ccb0f442bc235e606d2fad87801987ad0759b1",
-    strip_prefix = "rules_lint-0.12.0",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/aspect-build/rules_lint/releases/download/v0.12.0/rules_lint-v0.12.0.tar.gz",
-        "https://github.com/aspect-build/rules_lint/releases/download/v0.12.0/rules_lint-v0.12.0.tar.gz",
-        "https://github.com/aspect-build/rules_lint/releases/download/v0.12.0/rules_lint-v0.12.0.tar.gz",
-        "https://github.com/aspect-build/rules_lint/releases/download/v0.12.0/rules_lint-v0.12.0.tar.gz",
-        "https://github.com/aspect-build/rules_lint/releases/download/v0.12.0/rules_lint-v0.12.0.tar.gz",
-    ],
-)
