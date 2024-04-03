@@ -33,7 +33,6 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_writer_batcher.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 namespace repl {
@@ -51,13 +50,11 @@ public:
      */
     class Options {
     public:
-        Options() = delete;
-        explicit Options(bool skipWritesToOplogColl, bool skipWritesToChangeColl)
-            : skipWritesToOplogColl(skipWritesToOplogColl),
-              skipWritesToChangeColl(skipWritesToChangeColl) {}
+        Options() : skipWritesToOplogColl(false) {}
+        explicit Options(bool skipWritesToOplogColl)
+            : skipWritesToOplogColl(skipWritesToOplogColl) {}
 
         const bool skipWritesToOplogColl;
-        const bool skipWritesToChangeColl;
     };
 
     // Used to report oplog write progress.
@@ -106,27 +103,17 @@ public:
                  boost::optional<std::size_t> bytes = boost::none);
 
     /**
-     * Writes a batch of oplog entries to the oplog and/or the change collections.
+     * Writes a batch of oplog entries to the oplog and/or the change collection.
      *
-     * Returns false if nothing is written, true otherwise.
+     * If the batch write is successful, returns the optime of the last op written,
+     * which should be the last op in the batch.
      *
      * Oplog visibility and updates to replication coordinator timestamps should be
      * handled by caller.
      */
-    virtual bool writeOplogBatch(OperationContext* opCtx,
-                                 const std::vector<BSONObj>& ops,
-                                 ThreadPool* writerPool = nullptr) = 0;
+    virtual StatusWith<OpTime> writeOplogBatch(OperationContext* opCtx,
+                                               const std::vector<BSONObj>& ops) = 0;
 
-    /**
-     * Same as above, except for the type of the oplog entries.
-     */
-    virtual bool writeOplogBatch(OperationContext* opCtx,
-                                 const std::vector<OplogEntry>& ops,
-                                 ThreadPool* writerPool = nullptr) = 0;
-
-    /**
-     * Returns the options used to configure the behavior of this OplogWriter.
-     */
     const Options& getOptions() const;
 
 private:

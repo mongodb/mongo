@@ -44,7 +44,6 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
-#include "mongo/db/repl/oplog_writer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -92,6 +91,12 @@ public:
                                    std::vector<std::vector<ApplierOperation>>* writerVectors,
                                    std::vector<std::vector<OplogEntry>>* derivedOps) noexcept;
 
+    void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
+                                                  StorageInterface* storageInterface,
+                                                  ThreadPool* writerPool,
+                                                  const std::vector<OplogEntry>& ops,
+                                                  bool skipWritesToOplog) override;
+
 private:
     /**
      * Runs oplog application in a loop until shutdown() is called.
@@ -134,11 +139,13 @@ private:
     // Not owned by us.
     ThreadPool* const _writerPool;
 
-    StorageInterface* const _storageInterface;
+    StorageInterface* _storageInterface;
 
     ReplicationConsistencyMarkers* const _consistencyMarkers;
 
-    std::unique_ptr<OplogWriter> _oplogWriter;
+    // Used to determine which operations should be applied during initial sync. If this is null,
+    // we will apply all operations that were fetched.
+    OpTime _beginApplyingOpTime = OpTime();
 
 protected:
     // Marked as protected for use in unit tests.
