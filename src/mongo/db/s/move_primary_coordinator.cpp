@@ -231,8 +231,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 ScopeGuard unblockWritesLegacyOnExit([&] {
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(  // NOLINT
-                        shard_role_details::getLocker(opCtx));
+                    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT
                     unblockWritesLegacy(opCtx);
                 });
 

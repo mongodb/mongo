@@ -1024,7 +1024,7 @@ void CollectionImpl::registerCappedInserts(OperationContext* opCtx,
     // that we are operating with the wrong global lock semantics, and either hold too weak a lock
     // (e.g. IS) or that we upgraded in a way we shouldn't (e.g. IS -> IX).
     invariant(!shard_role_details::getLocker(opCtx)->hasReadTicket() ||
-              !shard_role_details::getLocker(opCtx)->uninterruptibleLocksRequested());
+              !opCtx->uninterruptibleLocksRequested_DO_NOT_USE());  // NOLINT
 
     auto* uncommitted =
         CappedWriter::get(opCtx).getUncommitedRecordsFor(_shared->_recordStore->getIdent());

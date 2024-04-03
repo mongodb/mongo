@@ -1603,7 +1603,7 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
     // OpObservers may introduce lock acquisitions (i.e. sharding state locks) and cause an
     // interruption during cleanup. For correctness, we must perform these final writes. Temporarily
     // disable interrupts.
-    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
 
     CollectionWriter coll(opCtx, replState->collectionUUID);
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
@@ -3497,7 +3497,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
     // At this point, the commitIndexBuild entry has already been written and replicated. For
     // correctness, we must perform these final writes. Temporarily disable interrupts.
-    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
 
     removeIndexBuildEntryAfterCommitOrAbort(opCtx, dbAndUUID, *indexBuildEntryColl, *replState);
     replState->stats.numIndexesAfter = getNumIndexesTotal(opCtx, collection.get());

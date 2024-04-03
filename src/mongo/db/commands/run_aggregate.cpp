@@ -1269,7 +1269,7 @@ Status _runAggregate(OperationContext* opCtx,
     // replication rollback, which at the storage layer waits for all cursors to be closed under the
     // global MODE_X lock, after having sent interrupt signals to read operations. This operation
     // must never hold open storage cursors while ignoring interrupt.
-    InterruptibleLockGuard interruptibleLockAcquisition(shard_role_details::getLocker(opCtx));
+    InterruptibleLockGuard interruptibleLockAcquisition(opCtx);
 
     auto catalog = CollectionCatalog::latest(opCtx);
 

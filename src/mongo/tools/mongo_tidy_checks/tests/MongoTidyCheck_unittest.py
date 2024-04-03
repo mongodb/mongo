@@ -115,6 +115,25 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoUninterruptibleLockGuardCheckForOpCtxMember(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-uninterruptible-lock-guard-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = (
+            "Potentially incorrect use of "
+            "OperationContext::uninterruptibleLocksRequested_DO_NOT_USE, this is a legacy "
+            "interruption mechanism that makes lock acquisition ignore interrupts. Please ensure "
+            "this use is warranted and if so add a NOLINT comment explaining why. Please also add "
+            "Service Arch to the PR so that we can verify this is necessary and there are no "
+            "alternative workarounds."
+        )
+
+        self.run_clang_tidy()
+
     def test_MongoCctypeCheck(self):
 
         self.write_config(

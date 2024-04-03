@@ -1621,8 +1621,7 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
 
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
                     {
-                        UninterruptibleLockGuard noInterrupt(  // NOLINT.
-                            shard_role_details::getLocker(opCtx));
+                        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                         AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
                                                                                              nss())

@@ -863,7 +863,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
 
         boost::optional<UninterruptibleLockGuard> noInterrupt;
         if (replCoord->isInPrimaryOrSecondaryState_UNSAFE())
-            noInterrupt.emplace(shard_role_details::getLocker(opCtx));
+            noInterrupt.emplace(opCtx);
 
         Status status = writeConflictRetry(
             opCtx, "save replica set lastVote", NamespaceString::kLastVoteNamespace, [&] {
