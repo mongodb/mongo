@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder_fwd.h"
 
 namespace mongo {
 
@@ -60,28 +59,6 @@ struct NaturalOrderHint {
 
     Direction direction;
 };
-
-bool isForward(NaturalOrderHint::Direction dir);
-
-namespace detail {
-// Concept to avoid ambiguity with BSON builder types which implement differing streaming operators.
-template <class T>
-concept string_builder = std::same_as<T, StringBuilder> || std::same_as<T, StackStringBuilder>;
-}  // namespace detail
-
-auto& operator<<(detail::string_builder auto& os, NaturalOrderHint::Direction dir) {
-    switch (dir) {
-        case NaturalOrderHint::Direction::kForward:
-            os << "forward";
-            return os;
-        case NaturalOrderHint::Direction::kBackward:
-            os << "backward";
-            return os;
-    }
-    MONGO_UNREACHABLE;
-}
-
-std::string toString(NaturalOrderHint::Direction dir);
 
 /**
  * Class represents all possible index hint definitions. Index hint may be specified as:

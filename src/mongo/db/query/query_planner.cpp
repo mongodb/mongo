@@ -1858,13 +1858,12 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             tassert(6369000,
                     "This $lookup stage should be compatible with SBE",
                     lookupStage->sbeCompatibility() != SbeCompatibility::notCompatible);
-            auto [strategy, idxEntry, scanDirection] =
-                QueryPlannerAnalysis::determineLookupStrategy(
-                    lookupStage->getFromNs(),
-                    lookupStage->getForeignField()->fullPath(),
-                    secondaryCollInfos,
-                    query.getExpCtx()->allowDiskUse,
-                    query.getCollator());
+            auto [strategy, idxEntry] = QueryPlannerAnalysis::determineLookupStrategy(
+                lookupStage->getFromNs(),
+                lookupStage->getForeignField()->fullPath(),
+                secondaryCollInfos,
+                query.getExpCtx()->allowDiskUse,
+                query.getCollator());
 
             if (!lookupStage->hasUnwindSrc()) {
                 solnForAgg =
@@ -1875,8 +1874,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                    lookupStage->getAsField().fullPath(),
                                                    strategy,
                                                    std::move(idxEntry),
-                                                   isLastSource /* shouldProduceBson */,
-                                                   scanDirection);
+                                                   isLastSource /* shouldProduceBson */);
             } else {
                 const boost::intrusive_ptr<DocumentSourceUnwind>& unwindSrc =
                     lookupStage->getUnwindSource();
@@ -1893,8 +1891,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                          isLastSource /* shouldProduceBson */,
                                                          // $unwind-specific data members.
                                                          unwindSrc->preserveNullAndEmptyArrays(),
-                                                         unwindSrc->indexPath(),
-                                                         scanDirection);
+                                                         unwindSrc->indexPath());
             }
             continue;
         }

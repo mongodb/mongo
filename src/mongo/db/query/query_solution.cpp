@@ -1875,9 +1875,6 @@ void EqLookupNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "shouldProduceBson = " << shouldProduceBson << "\n";
 
-    addIndent(ss, indent + 1);
-    *ss << "scanDirection = " << scanDirection << "\n";
-
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
     *ss << "Child:" << '\n';
@@ -1892,8 +1889,7 @@ std::unique_ptr<QuerySolutionNode> EqLookupNode::clone() const {
                                           joinField,
                                           lookupStrategy,
                                           idxEntry,
-                                          shouldProduceBson,
-                                          scanDirection);
+                                          shouldProduceBson);
 }
 
 /**
@@ -1929,9 +1925,6 @@ void EqLookupUnwindNode::appendToString(str::stream* ss, int indent) const {
         *ss << "indexPath = " << unwindNode.indexPath->fullPath() << "\n";
     }
 
-    addIndent(ss, indent + 1);
-    *ss << "scanDirection = " << scanDirection << "\n";
-
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
     *ss << "Child:" << '\n';
@@ -1951,8 +1944,7 @@ std::unique_ptr<QuerySolutionNode> EqLookupUnwindNode::clone() const {
                                                 shouldProduceBson,
                                                 // $unwind-specific data members.
                                                 unwindNode.preserveNullAndEmptyArrays,
-                                                unwindNode.indexPath,
-                                                scanDirection);
+                                                unwindNode.indexPath);
 }
 
 /**
