@@ -707,7 +707,7 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
 
 CollectionCriticalSection::~CollectionCriticalSection() {
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(_opCtx));  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
     AutoGetCollection autoColl(_opCtx, _nss, MODE_IX);
     auto scopedCsr =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, _nss);

@@ -430,8 +430,7 @@ public:
             // cursors to be closed under the global MODE_X lock, after having sent interrupt
             // signals to read operations. This operation must never hold open storage cursors while
             // ignoring interrupt.
-            InterruptibleLockGuard interruptibleLockAcquisition(
-                shard_role_details::getLocker(opCtx));
+            InterruptibleLockGuard interruptibleLockAcquisition(opCtx);
 
             _rewriteFLEPayloads(opCtx);
             auto respSc =
@@ -643,8 +642,7 @@ public:
             // cursors to be closed under the global MODE_X lock, after having sent interrupt
             // signals to read operations. This operation must never hold open storage cursors while
             // ignoring interrupt.
-            InterruptibleLockGuard interruptibleLockAcquisition(
-                shard_role_details::getLocker(opCtx));
+            InterruptibleLockGuard interruptibleLockAcquisition(opCtx);
 
             const auto& collectionPtr = collectionOrView->getCollectionPtr();
 

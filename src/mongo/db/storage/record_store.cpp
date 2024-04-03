@@ -128,7 +128,7 @@ Status RecordStore::oplogDiskLocRegister(OperationContext* opCtx,
     // that we are operating with the wrong global lock semantics, and either hold too weak a lock
     // (e.g. IS) or that we upgraded in a way we shouldn't (e.g. IS -> IX).
     invariant(!shard_role_details::getLocker(opCtx)->hasReadTicket() ||
-              !shard_role_details::getLocker(opCtx)->uninterruptibleLocksRequested());
+              !opCtx->uninterruptibleLocksRequested_DO_NOT_USE());  // NOLINT
 
     return oplogDiskLocRegisterImpl(opCtx, opTime, orderedCommit);
 }
@@ -140,7 +140,7 @@ void RecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCt
     // contribute to ticket-exhaustion. That could prevent the write we are waiting on from
     // acquiring the lock it needs to update the oplog visibility.
     invariant(!shard_role_details::getLocker(opCtx)->hasWriteTicket() ||
-              !shard_role_details::getLocker(opCtx)->uninterruptibleLocksRequested());
+              !opCtx->uninterruptibleLocksRequested_DO_NOT_USE());  // NOLINT
 
     waitForAllEarlierOplogWritesToBeVisibleImpl(opCtx);
 }

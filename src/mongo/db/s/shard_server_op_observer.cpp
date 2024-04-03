@@ -114,7 +114,7 @@ public:
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
         auto scopedCss =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, _nss);
         if (_droppingCollection)
@@ -269,8 +269,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                             lockDbIfNotPrimary.emplace(opCtx, insertedNss.dbName(), MODE_IX);
                         }
                         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                        UninterruptibleLockGuard noInterrupt(  // NOLINT.
-                            shard_role_details::getLocker(opCtx));
+                        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
                             opCtx, insertedNss.dbName());
                         scopedDss->enterCriticalSectionCatchUpPhase(opCtx, reason);
@@ -286,8 +285,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                         }
 
                         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                        UninterruptibleLockGuard noInterrupt(  // NOLINT.
-                            shard_role_details::getLocker(opCtx));
+                        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                         auto scopedCsr =
                             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                                 opCtx, insertedNss);
@@ -424,8 +422,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                     }
 
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(  // NOLINT.
-                        shard_role_details::getLocker(opCtx));
+                    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
                         opCtx, updatedNss.dbName());
                     scopedDss->enterCriticalSectionCommitPhase(opCtx, reason);
@@ -441,8 +438,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                     }
 
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(  // NOLINT.
-                        shard_role_details::getLocker(opCtx));
+                    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                     auto scopedCsr =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                             opCtx, updatedNss);
@@ -680,8 +676,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                     }
 
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(  // NOLINT.
-                        shard_role_details::getLocker(opCtx));
+                    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
                         opCtx, deletedNss.dbName());
 
@@ -704,8 +699,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                     }
 
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(  // NOLINT.
-                        shard_role_details::getLocker(opCtx));
+                    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                     auto scopedCsr =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                             opCtx, deletedNss);

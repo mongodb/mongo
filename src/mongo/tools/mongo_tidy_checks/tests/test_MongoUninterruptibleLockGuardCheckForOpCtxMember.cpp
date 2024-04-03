@@ -26,30 +26,20 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
-
-#include <clang-tidy/ClangTidy.h>
-#include <clang-tidy/ClangTidyCheck.h>
-
 namespace mongo {
-namespace tidy {
+
 /**
- * check for new instances of UninteruptibleLockGuard
- * Overrides the default registerMatchers function to add matcher to match the
- * new instance of UninteruptibleLockGuard. overrides the default check function to
- * flag the uses of UninteruptibleLockGuard since it does not comply with the design
- * requirements of MongoDB, they should be flagged so new instances receive extra
- * scrutiny from authors and code reviewers.
- *
- * TODO SERVER-68868: Remove this class once ULG doesn't exist.
+ * TODO SERVER-68868: Remove this file once we don't have the method anymore.
  */
-class MongoUninterruptibleLockGuardCheck : public clang::tidy::ClangTidyCheck {
+class OperationContext {
 public:
-    MongoUninterruptibleLockGuardCheck(clang::StringRef Name,
-                                       clang::tidy::ClangTidyContext* Context);
-    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
-    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
+    bool uninterruptibleLocksRequested_DO_NOT_USE() const {
+        return true;
+    }
 };
 
-}  // namespace tidy
+void f(OperationContext* opCtx) {
+    opCtx->uninterruptibleLocksRequested_DO_NOT_USE();
+}
+
 }  // namespace mongo

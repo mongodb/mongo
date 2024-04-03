@@ -152,7 +152,7 @@ void renameOrDropTarget(OperationContext* opCtx,
 void clearFilteringMetadataOnNss(OperationContext* opCtx, const NamespaceString& nss) {
     // Set the placement version to UNKNOWN to force a future operation to refresh the metadata
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
         ->clearFilteringMetadata(opCtx);

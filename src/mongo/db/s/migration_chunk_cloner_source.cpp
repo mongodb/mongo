@@ -257,7 +257,7 @@ void LogTransactionOperationsForShardingHandler::commit(OperationContext* opCtx,
         auto opCtx = cc().getOperationContext();
 
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
         const auto scopedCss =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
 
@@ -1523,7 +1523,7 @@ LogInsertForShardingHandler::LogInsertForShardingHandler(NamespaceString nss,
 
 void LogInsertForShardingHandler::commit(OperationContext* opCtx, boost::optional<Timestamp>) {
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
     const auto scopedCss =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, _nss);
 
@@ -1543,7 +1543,7 @@ LogUpdateForShardingHandler::LogUpdateForShardingHandler(NamespaceString nss,
 
 void LogUpdateForShardingHandler::commit(OperationContext* opCtx, boost::optional<Timestamp>) {
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
     const auto scopedCss =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, _nss);
 
@@ -1559,7 +1559,7 @@ LogDeleteForShardingHandler::LogDeleteForShardingHandler(NamespaceString nss,
 
 void LogDeleteForShardingHandler::commit(OperationContext* opCtx, boost::optional<Timestamp>) {
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
     const auto scopedCss =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, _nss);
 
@@ -1576,7 +1576,7 @@ void LogRetryableApplyOpsForShardingHandler::commit(OperationContext* opCtx,
                                                     boost::optional<Timestamp>) {
     for (const auto& nss : _namespaces) {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
         const auto scopedCss =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
 

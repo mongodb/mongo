@@ -290,7 +290,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     // MigrationSourceManager on the CSR.
     const auto [collectionMetadata, collectionIndexInfo, collectionUUID] = [&] {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(_opCtx));  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IS);
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss());
@@ -587,7 +587,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     if (!migrationCommitStatus.isOK()) {
         {
             // TODO (SERVER-71444): Fix to be interruptible or document exception.
-            UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(_opCtx));  // NOLINT.
+            UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
             AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, nss())
                 ->clearFilteringMetadata(_opCtx);
@@ -626,7 +626,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
                             "error"_attr = redact(ex));
         {
             // TODO (SERVER-71444): Fix to be interruptible or document exception.
-            UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(_opCtx));  // NOLINT.
+            UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
             AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, nss())
                 ->clearFilteringMetadata(_opCtx);
@@ -741,7 +741,7 @@ SharedSemiFuture<void> MigrationSourceManager::abort() {
 CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckForConflictingErrors() {
     auto metadata = [&] {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(_opCtx));  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
         AutoGetCollection autoColl(_opCtx, _args.getCommandParameter(), MODE_IS);
         const auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
             _opCtx, _args.getCommandParameter());
@@ -783,7 +783,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
     auto cloneDriver = [&]() {
         // Unregister from the collection's sharding state and exit the migration critical section.
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(_opCtx));  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, nss());
@@ -861,7 +861,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
         // Something went really wrong when completing the migration just unset the metadata and let
         // the next op to recover.
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(_opCtx));  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, nss())
             ->clearFilteringMetadata(_opCtx);
@@ -904,7 +904,7 @@ MigrationSourceManager::ScopedRegisterer::ScopedRegisterer(MigrationSourceManage
 
 MigrationSourceManager::ScopedRegisterer::~ScopedRegisterer() {
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(_msm->_opCtx));  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(_msm->_opCtx);  // NOLINT.
     AutoGetCollection autoColl(_msm->_opCtx, _msm->_args.getCommandParameter(), MODE_IX);
     auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
         _msm->_opCtx, _msm->_args.getCommandParameter());

@@ -545,6 +545,17 @@ public:
     }
 
     /**
+     * Indicates that this operation should not receive interruptions while acquiring locks. Note
+     * that new usages of this require the use of UninterruptibleLockGuard and are subject to the
+     * same restrictions.
+     *
+     * TODO SERVER-68868: Remove this once UninterruptibleLockGuard is removed from the codebase.
+     */
+    bool uninterruptibleLocksRequested_DO_NOT_USE() const {
+        return _interruptibleLocksRequested < 0;
+    }
+
+    /**
      * Clears metadata associated with a multi-document transaction.
      */
     void resetMultiDocumentTransactionState() {
@@ -834,6 +845,8 @@ private:
     friend class WriteUnitOfWork;
     friend class repl::UnreplicatedWritesBlock;
     friend class LockFreeReadsBlock;
+    friend class InterruptibleLockGuard;
+    friend class UninterruptibleLockGuard;
 
     Client* const _client;
 
@@ -876,6 +889,13 @@ private:
     bool _markKillOnClientDisconnect = false;
     Date_t _lastClientCheck;
     bool _isExecutingShutdown = false;
+
+    /**
+     * Contains the number of requesters for both InterruptibleLockGuard and
+     * UninterruptibleLockGuard. It is > 0 on the first case and < 0 in the other. The absolute
+     * number specifies how many requesters there are for each type.
+     */
+    int _interruptibleLocksRequested = 0;
 
     // Max operation time requested by the user or by the cursor in the case of a getMore with no
     // user-specified maxTimeMS. This is tracked with microsecond granularity for the purpose of
@@ -934,6 +954,67 @@ private:
     // Set to true if this operation is going through the router code paths because of the replica
     // set endpoint.
     bool _routedByReplicaSetEndpoint = false;
+};
+
+/**
+ * DO NOT USE THIS CLASS. USING THIS IS A PROGRAMMING ERROR AND WILL REQUIRE REVIEW FROM SERVICE
+ * ARCH. This class is here in order to transition the logic from Locker away into the
+ * OperationContext. It is here because multi-document transactions can migrate a locker across
+ * multiple living opCtx executions. Please see more details in SERVER-88292.
+ *
+ * This class prevents the given OperationContext from being interrupted while acquiring locks as
+ * long as it is in scope. The default behavior of acquisitions depends on the type of lock that is
+ * being requested. Use this in the unlikely case that waiting for a lock can't be interrupted.
+ *
+ * It is possible that multiple callers are requesting uninterruptible behavior, so the guard
+ * increments a counter on the OperationContext class to indicate how may guards are active.
+ *
+ * TODO SERVER-68868: Remove this class.
+ */
+class UninterruptibleLockGuard {
+public:
+    explicit UninterruptibleLockGuard(OperationContext* opCtx) : _opCtx(opCtx) {
+        invariant(_opCtx);
+        invariant(_opCtx->_interruptibleLocksRequested <= 0);
+        _opCtx->_interruptibleLocksRequested--;
+    }
+
+    UninterruptibleLockGuard(const UninterruptibleLockGuard& other) = delete;
+    UninterruptibleLockGuard& operator=(const UninterruptibleLockGuard&) = delete;
+
+    ~UninterruptibleLockGuard() {
+        invariant(_opCtx->_interruptibleLocksRequested < 0);
+        _opCtx->_interruptibleLocksRequested++;
+    }
+
+private:
+    OperationContext* const _opCtx;
+};
+
+/**
+ * This RAII type ensures that there are no UninterruptibleLockGuards while in scope. If an
+ * UninterruptibleLockGuard is held at a higher level, or taken at a lower level, an invariant will
+ * occur. This protects against UninterruptibleLockGuard uses on code paths that must be
+ * interruptible. Safe to nest InterruptibleLockGuard instances.
+ */
+class InterruptibleLockGuard {
+public:
+    explicit InterruptibleLockGuard(OperationContext* opCtx) : _opCtx(opCtx) {
+        invariant(_opCtx);
+        invariant(_opCtx->_interruptibleLocksRequested >= 0);
+        _opCtx->_interruptibleLocksRequested++;
+    }
+
+    InterruptibleLockGuard(const InterruptibleLockGuard& other) = delete;
+    InterruptibleLockGuard& operator=(const InterruptibleLockGuard&) = delete;
+
+    ~InterruptibleLockGuard() {
+        invariant(_opCtx->_interruptibleLocksRequested > 0);
+        _opCtx->_interruptibleLocksRequested--;
+    }
+
+private:
+    OperationContext* const _opCtx;
 };
 
 // Gets a TimeZoneDatabase pointer from the ServiceContext.

@@ -1164,7 +1164,7 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
     invariant(!_buildIsCleanedUp);
     // Aborting without cleanup is done during shutdown. At this point the operation context is
     // killed, but acquiring locks must succeed.
-    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
     // Lock if it's not already locked, to ensure storage engine cannot be destructed out from
     // underneath us.
     boost::optional<Lock::GlobalLock> lk;

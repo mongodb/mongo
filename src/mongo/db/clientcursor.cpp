@@ -285,8 +285,7 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     : _opCtx(opCtx),
       _cursor(cursor),
       _cursorManager(cursorManager),
-      _interruptibleLockGuard(
-          std::make_unique<InterruptibleLockGuard>(shard_role_details::getLocker(opCtx))) {
+      _interruptibleLockGuard(std::make_unique<InterruptibleLockGuard>(opCtx)) {
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
     invariant(!_cursor->_disposed);

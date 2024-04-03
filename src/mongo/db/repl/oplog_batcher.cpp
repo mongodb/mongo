@@ -378,8 +378,7 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             // UninterruptibleLockGuard in batch application because the only cause of
             // interruption would be shutdown, and the ReplBatcher thread has its own shutdown
             // handling.
-            UninterruptibleLockGuard noInterrupt(  // NOLINT.
-                shard_role_details::getLocker(opCtx.get()));
+            UninterruptibleLockGuard noInterrupt(opCtx.get());  // NOLINT.
 
             // Locks the oplog to check its max size, do this in the UninterruptibleLockGuard.
             batchLimits.bytes = getBatchLimitOplogBytes(opCtx.get(), storageInterface);

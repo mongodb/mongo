@@ -234,8 +234,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                     [dbName, opCtx, &dropPendingGuard, tenantLockMode] {
                         // This scope guard must succeed in acquiring locks and reverting the drop
                         // pending state even when the failure is due to an interruption.
-                        UninterruptibleLockGuard noInterrupt(  // NOLINT.
-                            shard_role_details::getLocker(opCtx));
+                        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                         AutoGetDb autoDB(
                             opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);
                         if (auto db = autoDB.getDb()) {
@@ -408,7 +407,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx] {
         // This scope guard must succeed in acquiring locks and reverting the drop pending state
         // even when the failure is due to an interruption.
-        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
 
         AutoGetDb autoDB(opCtx, dbName, MODE_IX);
         if (auto db = autoDB.getDb()) {

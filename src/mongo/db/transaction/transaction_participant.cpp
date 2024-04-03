@@ -1785,7 +1785,7 @@ TransactionParticipant::Participant::prepareTransaction(
             // of RSTL lock inside abortTransaction will be no-op since we already have it.
             // This abortGuard gets dismissed before we release the RSTL while transitioning to
             // the prepared state.
-            UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+            UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
             abortTransaction(opCtx);
         } catch (...) {
             // It is illegal for aborting a prepared transaction to fail for any reason, so we crash
@@ -2109,7 +2109,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
 
         // Once entering "committing with prepare" we cannot throw an exception,
         // and therefore our lock acquisitions cannot be interruptible.
-        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
 
         // On secondary, we generate a fake empty oplog slot, since it's not used by opObserver.
         OplogSlot commitOplogSlot;
@@ -2258,8 +2258,7 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
         // and therefore our lock acquisitions cannot be interruptible. We also must set the
         // UninterruptibleLockGuard before unstashTransactionResources because this function
         // can throw when reacquiring locks and tickets.
-        UninterruptibleLockGuard noInterrupt(  // NOLINT
-            newTxnParticipant.o().txnResourceStash->locker());
+        UninterruptibleLockGuard noInterrupt(splitOpCtx.get());  // NOLINT
         newTxnParticipant.unstashTransactionResources(splitOpCtx.get(), "commitTransaction");
 
         shard_role_details::getRecoveryUnit(splitOpCtx.get())->setCommitTimestamp(commitTimestamp);
@@ -2420,7 +2419,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
 
         try {
             // If we need to write an abort oplog entry, this function can no longer be interrupted.
-            UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+            UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
 
             // Write the abort oplog entry. This must be done after aborting the storage
             // transaction, so that the lock state is reset, and there is no max lock timeout on the
@@ -2491,8 +2490,7 @@ void TransactionParticipant::Participant::_abortSplitPreparedTxnOnPrimary(
         // and therefore our lock acquisitions cannot be interruptible. We also must set the
         // UninterruptibleLockGuard before unstashTransactionResources because this function
         // can throw when reacquiring locks and tickets.
-        UninterruptibleLockGuard noInterrupt(  // NOLINT
-            newTxnParticipant.o().txnResourceStash->locker());
+        UninterruptibleLockGuard noInterrupt(splitOpCtx.get());  // NOLINT
         newTxnParticipant.unstashTransactionResources(splitOpCtx.get(), "abortTransaction");
 
         {
