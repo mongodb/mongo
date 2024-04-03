@@ -694,6 +694,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'oplog_entry',
+        'repl_server_parameters',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/admission/execution_admission_context',
@@ -704,7 +705,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/processinfo',
         'repl_coordinator_interface',
-        'repl_server_parameters',
     ],
 )
 
@@ -727,6 +727,7 @@ env.Library(
         'oplog',
         'oplog_application_interface',
         'oplog_entry',
+        'oplog_write',
         'repl_coordinator_interface',
         'repl_settings',
         'replication_metrics',
