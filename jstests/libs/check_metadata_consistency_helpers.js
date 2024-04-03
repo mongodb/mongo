@@ -62,8 +62,14 @@ export var MetadataConsistencyChecker = (function() {
         } catch (e) {
             if (isTransientError(e)) {
                 jsTest.log(`Aborted metadata consistency check due to retriable error: ${e}`);
-            } else {
-                throw e;
+            } else if (e.code === ErrorCodes.LockBusy) {
+                const slowBuild = _isAddressSanitizerActive() || _isThreadSanitizerActive();
+                if (slowBuild) {
+                    jsTest.log(
+                        `Ignoring LockBusy error on checkMetadataConsistency because we are running with very slow build (e.g. ASAN enabled)`);
+                } else {
+                    throw e;
+                }
             }
         }
     };
