@@ -1720,6 +1720,40 @@ TEST(QueryPlannerIXSelectTest, WildcardIndicesIncludeMatchingInternalNodes) {
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
 
+TEST(QueryPlannerIXSelectTest, SparseIndexCannotBeUsedInALookup) {
+    auto wildcardIndexEntry = makeIndexEntry(
+        BSON("$**" << 1), {}, {}, BSON("wildcardProjection" << BSON("_id" << 1 << "subpath" << 1)));
+    IndexEntry sparseIndex(BSON("abc" << 1),
+                           INDEX_BTREE,
+                           IndexDescriptor::kLatestIndexVersion,
+                           false,
+                           {},    /* multiKeyPaths */
+                           {},    /* multiKeyPathSet */
+                           true,  /* sparse */
+                           false, /* unique */
+                           CoreIndexInfo::Identifier("test_foo"),
+                           nullptr,
+                           {},
+                           nullptr,
+                           nullptr);
+
+    RelevantFieldIndexMap fields = {{"_id", {true}},
+                                    {"abc", {true}},
+                                    {"def", {true}},
+                                    {"subpath.abc", {true}},
+                                    {"subpath.def", {true}},
+                                    {"subpath", {true}}};
+
+    std::vector<IndexEntry> result =
+        QueryPlannerIXSelect::expandIndexes(fields,
+                                            {wildcardIndexEntry.first, sparseIndex},
+                                            false /* hintedIndexBson */,
+                                            true /* inLookup */);
+    // Sparse indexes and wildcard indexes cannot be used for the inner side of a $lookup.
+    std::vector<BSONObj> expectedKeyPatterns;
+    ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
+}
+
 TEST(QueryPlannerIXSelectTest, WildcardIndexSupported) {
     ASSERT_FALSE(QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex(
         parseMatchExpression(fromjson("{x: {abc: 1}}")).get()));

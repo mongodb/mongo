@@ -173,11 +173,13 @@ public:
      * Given a list of IndexEntries and fields used by a query's match expression, return a list
      * "expanded" indexes (where the $** indexes in the given list have been expanded).
      * 'hintedIndexBson' indicates that the indexes in 'relevantIndices' are the results of the
-     * user's hint.
+     * user's hint. 'inLookip' indicates that this query is for the inner side of a $lookup or
+     * $graphLookup.
      */
     static std::vector<IndexEntry> expandIndexes(const RelevantFieldIndexMap& fields,
                                                  std::vector<IndexEntry> relevantIndices,
-                                                 bool hintedIndexBson = false);
+                                                 bool hintedIndexBson = false,
+                                                 bool inLookup = false);
 
     /**
      * Check if this match expression is a leaf and is supported by a wildcard index.
