@@ -1221,7 +1221,7 @@ StatusWith<std::string> WiredTigerUtil::generateImportString(StringData ident,
     ss << tableMetadata.String();
     ss << ",import=(enabled=true,repair=false,";
     if (importOptions.importTimestampRule == ImportOptions::ImportTimestampRule::kStable) {
-        ss << "compare_timestamp=stable,";
+        ss << "compare_timestamp=stable_timestamp,";
     }
     ss << "file_metadata=(" << fileMetadata.String() << "))";
 
