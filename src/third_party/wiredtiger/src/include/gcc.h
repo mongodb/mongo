@@ -234,6 +234,13 @@ __wt_atomic_storevbool(volatile bool *vp, bool v)
 #define __wt_atomic_load_generic(vp) __atomic_load_n(vp, __ATOMIC_RELAXED)
 #define __wt_atomic_store_generic(vp, v) __atomic_store_n(vp, v, __ATOMIC_RELAXED)
 
+/*
+ * These pointer specific macros behave identically to the generic ones above, but better
+ * communicate intent and should be preferred over generic.
+ */
+#define __wt_atomic_load_pointer(vp) __wt_atomic_load_generic(vp)
+#define __wt_atomic_store_pointer(vp, v) __wt_atomic_store_generic(vp, v)
+
 /* Compile read-write barrier */
 #define WT_COMPILER_BARRIER() __asm__ volatile("" ::: "memory")
 

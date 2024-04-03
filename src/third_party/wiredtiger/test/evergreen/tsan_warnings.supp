@@ -1,6 +1,6 @@
-# Suppress the listed TSan warnings. Load this file with 
+# Suppress the listed TSan warnings. Load this file with
 # export TSAN_OPTIONS="suppressions=path/to/wiredtiger/test/evergreen/tsan_warnings.supp:history_size=7"
-# before running tests with TSan. history_size isn't required but it reduces the chance that TSan reports 
+# before running tests with TSan. history_size isn't required but it reduces the chance that TSan reports
 # an error that is missing information and the message "failed to restore the stack"
 
 # This function enables threads to set double values in a shared context, and catches all TSan warnings.
@@ -10,11 +10,10 @@ race:__wt_set_shared_double
 race:src/include/stat.h
 race:src/support/stat.c
 
-# FIXME-WT-12610 Fields like log->slot_state are composite variables and more complex than the usual storing 
-# and loading of ints. These fields will be investigated in a separate ticket. 
-race:src/log
+# FIXME-WT-12734 this function copies an 8 byte struct which needs further investigation.
+race:__log_wrlsn_server
 
-# FIXME-WT-12611 CONNECTION_API_CALL contains a data race that touches the session array, but the number of macro 
+# FIXME-WT-12611 CONNECTION_API_CALL contains a data race that touches the session array, but the number of macro
 # calls makes diagnosing this very hard. For now suppress the surrounding function and handle this in a separate ticket.
 race:__conn_open_session
 

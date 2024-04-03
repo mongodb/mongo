@@ -475,9 +475,9 @@ struct __wt_connection_impl {
     bool ckpt_tid_set;                   /* Checkpoint thread set */
     WT_CONDVAR *ckpt_cond;               /* Checkpoint wait mutex */
     wt_shared uint64_t ckpt_most_recent; /* Clock value of most recent checkpoint */
-#define WT_CKPT_LOGSIZE(conn) ((conn)->ckpt_logsize != 0)
-    wt_off_t ckpt_logsize; /* Checkpoint log size period */
-    bool ckpt_signalled;   /* Checkpoint signalled */
+#define WT_CKPT_LOGSIZE(conn) (__wt_atomic_loadi64(&(conn)->ckpt_logsize) != 0)
+    wt_shared wt_off_t ckpt_logsize; /* Checkpoint log size period */
+    bool ckpt_signalled;             /* Checkpoint signalled */
 
     uint64_t ckpt_apply;           /* Checkpoint handles applied */
     uint64_t ckpt_apply_time;      /* Checkpoint applied handles gather time */

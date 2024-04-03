@@ -204,7 +204,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_DECL_RET;
 
-    t->session_id = WT_SESSION_ID_INVALID;
+    __wt_atomic_store32(&t->session_id, WT_SESSION_ID_INVALID);
     if ((ret = pthread_mutex_unlock(&t->lock)) != 0)
         WT_IGNORE_RET(__wt_panic(session, ret, "pthread_mutex_unlock: %s", t->name));
 }
@@ -302,7 +302,7 @@ static WT_INLINE bool
 __wt_spin_locked(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
-    return (t->session_id != WT_SESSION_ID_INVALID);
+    return (__wt_atomic_load32(&t->session_id) != WT_SESSION_ID_INVALID);
 }
 
 /*
@@ -312,7 +312,7 @@ __wt_spin_locked(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static WT_INLINE bool
 __wt_spin_owned(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
-    return (t->session_id == WT_SPIN_SESSION_ID_SAFE(session));
+    return (__wt_atomic_load32(&t->session_id) == WT_SPIN_SESSION_ID_SAFE(session));
 }
 
 /*

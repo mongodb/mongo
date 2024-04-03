@@ -757,7 +757,7 @@ restart:
                  * If we get here we have a slot to coalesce and free.
                  */
                 __wt_atomic_storeiv64(
-                  &coalescing->slot_last_offset, __wt_atomic_loadiv64(&slot->slot_last_offset));
+                  &coalescing->slot_last_offset, __wt_atomic_loadi64(&slot->slot_last_offset));
                 WT_ASSIGN_LSN(&coalescing->slot_end_lsn, &slot->slot_end_lsn);
                 WT_STAT_CONN_INCR(session, log_slot_coalesced);
                 /*
@@ -785,7 +785,7 @@ restart:
                  * LSN refers to the beginning of a real record. The last offset in a slot is kept
                  * so that the checkpoint LSN is close to the end of the record.
                  */
-                slot_last_offset = (uint32_t)__wt_atomic_loadiv64(&slot->slot_last_offset);
+                slot_last_offset = (uint32_t)__wt_atomic_loadi64(&slot->slot_last_offset);
                 if (__wt_lsn_offset(&slot->slot_start_lsn) != slot_last_offset)
                     __wt_atomic_store32(&slot->slot_start_lsn.l.offset, slot_last_offset);
                 WT_ASSIGN_LSN(&log->write_start_lsn, &slot->slot_start_lsn);
