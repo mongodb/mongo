@@ -225,9 +225,11 @@ function createUsers(conn) {
 
 const opts = {
     auth: "",
-    // We have to set the mongotHost parameter for the $search-related tests to pass configuration
-    // checks.
-    setParameter: {mongotHost: "localhost:27017"}
+    setParameter: {
+        mongotHost: "localhost:27017",  // We have to set the mongotHost parameter for the
+                                        // $search-related tests to pass configuration checks.
+        syncdelay: 0  // Disable checkpoints as this can cause some commands to fail transiently.
+    }
 };
 const impls = {
     createUsers: createUsers,
