@@ -24,6 +24,8 @@ const mongosTestColl = mongosTestDB.getCollection(kCollName);
 const shard0TestDB = shard0Primary.getDB(kDbName);
 
 assert.commandWorked(mongosTestDB.createCollection(kCollName));
+assert.commandWorked(
+    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}));
 
 function makeInsertCmdObj(docs, lsid, txnNumber, stmtId, startTransaction) {
     const cmdObj = {
