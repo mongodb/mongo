@@ -41,7 +41,7 @@ local_args="--edition $edition \
   --resmokeCmd \"python buildscripts/resmoke.py\" \
   --debug \
   ${last_lts_arg} \
-  ${last_continuous_arg} 4.2 4.4 5.0 6.0"
+  ${last_continuous_arg} 4.2 4.4 5.0 6.0 7.0"
 
 remote_invocation="${base_command} ${evergreen_args} ${local_args}"
 eval "${remote_invocation}"

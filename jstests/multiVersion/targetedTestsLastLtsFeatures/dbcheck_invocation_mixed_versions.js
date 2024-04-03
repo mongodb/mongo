@@ -29,31 +29,16 @@ function testDbCheckInvocationParameters(replSet) {
     function checkEntryBounds(start, end) {
         forEachNonArbiterNode(replSet, function(node) {
             const healthlog = node.getDB("local").system.healthlog;
-            let keyBoundsResult;
-            const nodeBinVersion = node.getDB("admin").serverStatus()["version"];
-            if (nodeBinVersion == MongoRunner.getBinVersionFor("latest")) {
-                keyBoundsResult = healthlog.aggregate([
-                    {$match: {operation: "dbCheckBatch"}},
-                    {
-                        $group: {
-                            _id: null,
-                            batchStart: {$min: "$data.batchStart._id"},
-                            batchEnd: {$max: "$data.batchEnd._id"}
-                        }
+            const keyBoundsResult = healthlog.aggregate([
+                {$match: {operation: "dbCheckBatch"}},
+                {
+                    $group: {
+                        _id: null,
+                        batchStart: {$min: "$data.batchStart._id"},
+                        batchEnd: {$max: "$data.batchEnd._id"}
                     }
-                ]);
-            } else {
-                keyBoundsResult = healthlog.aggregate([
-                    {$match: {operation: "dbCheckBatch"}},
-                    {
-                        $group: {
-                            _id: null,
-                            batchStart: {$min: "$data.minKey"},
-                            batchEnd: {$max: "$data.maxKey"}
-                        }
-                    }
-                ]);
-            }
+                }
+            ]);
 
             assert(keyBoundsResult.hasNext(), "dbCheck put no batches in health log");
 

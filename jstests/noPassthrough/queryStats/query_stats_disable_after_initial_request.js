@@ -48,11 +48,6 @@ function setQueryStatsCacheSize(size) {
     assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryStatsCacheSize: size}));
 }
 
-function setFCV(newFCV) {
-    assert.commandWorked(
-        testDB.adminCommand({setFeatureCompatibilityVersion: newFCV, confirm: true}));
-}
-
 // Tests the scenario of disabling query stats by setting internalQueryStatsCacheSize to 0 and
 // ending the command by running it to completion.
 testStatsAreNotCollectedWhenDisabledBeforeCommandCompletion({
@@ -72,27 +67,6 @@ testStatsAreNotCollectedWhenDisabledBeforeCommandCompletion({
     endCommandFn: (cursor) => assert.commandWorked(
         testDB.runCommand({killCursors: coll.getName(), cursors: [cursor.getId()]})),
     enableQueryStatsFn: () => setQueryStatsCacheSize("10MB")
-});
-
-// Tests the scenario of disabling query stats by downgrading the FCV and ending the command by
-// running it to completion.
-testStatsAreNotCollectedWhenDisabledBeforeCommandCompletion({
-    conn: testDB,
-    coll,
-    disableQueryStatsFn: () => setFCV(lastLTSFCV),
-    endCommandFn: (cursor) => cursor.itcount(),
-    enableQueryStatsFn: () => setFCV(binVersionToFCV("latest"))
-});
-
-// Tests the scenario of disabling query stats by downgrading the FCV and ending the command by
-// killing the cursor.
-testStatsAreNotCollectedWhenDisabledBeforeCommandCompletion({
-    conn: testDB,
-    coll,
-    disableQueryStatsFn: () => setFCV(lastLTSFCV),
-    endCommandFn: (cursor) => assert.commandWorked(
-        testDB.runCommand({killCursors: coll.getName(), cursors: [cursor.getId()]})),
-    enableQueryStatsFn: () => setFCV(binVersionToFCV("latest"))
 });
 
 MongoRunner.stopMongod(conn);

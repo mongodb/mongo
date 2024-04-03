@@ -5,6 +5,8 @@
  *
  * TODO(SERVER-84271): Remove this test when featureFlagReplicateVectoredInsertsTransactionally is
  * removed.
+ *
+ * @tags: [DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE]
  */
 
 import "jstests/multiVersion/libs/multi_rs.js";

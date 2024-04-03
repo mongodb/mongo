@@ -13,6 +13,7 @@ const timeFieldName = "time";
 // Note that this list will need to be kept up to date as versions are added/dropped.
 const upgradeVersions = [
     {binVersion: "6.0", fcv: "6.0"},
+    {binVersion: "7.0", fcv: "7.0"},
     {binVersion: "last-lts", fcv: lastLTSFCV},
     {binVersion: "latest"}
 ];
