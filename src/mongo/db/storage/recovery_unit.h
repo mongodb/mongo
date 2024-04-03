@@ -61,7 +61,7 @@ enum class PrepareConflictBehavior {
     /**
      * When prepare conflicts are encountered, block until the conflict is resolved.
      */
-    kEnforce,
+    kEnforce = 0,
 
     /**
      * Ignore prepare conflicts when they are encountered.
@@ -81,7 +81,10 @@ enum class PrepareConflictBehavior {
      * This should only be used in cases where this is known to be impossible to perform writes
      * based on other prepared updates.
      */
-    kIgnoreConflictsAllowWrites
+    kIgnoreConflictsAllowWrites,
+
+    /** kMax should always be last and is a counter of the number of enum values. */
+    kMax,
 };
 
 /**
@@ -94,8 +97,8 @@ enum class DataCorruptionDetectionMode {
      */
     kThrow,
     /**
-     * When evidence of data corruption is decected, log an entry to the health log and the server
-     * logs, but do not throw an error. Continue attempting to return results.
+     * When evidence of data corruption is decected, log an entry to the health log and the
+     * server logs, but do not throw an error. Continue attempting to return results.
      */
     kLogAndContinue,
 };
@@ -110,13 +113,13 @@ class RecoveryUnit {
 
 public:
     /**
-     * A Snapshot is a decorable type whose lifetime is tied to the the lifetime of a snapshot
-     * within the RecoveryUnit. Snapshots hold no storage engine state and are to be used for
-     * snapshot ID comparison on a single RecoveryUnit and to support decorated types that should be
-     * destructed when the storage snapshot is invalidated.
+     * A Snapshot is a decorable type whose lifetime is tied to the the lifetime of a
+     * snapshot within the RecoveryUnit. Snapshots hold no storage engine state and are to
+     * be used for snapshot ID comparison on a single RecoveryUnit and to support decorated
+     * types that should be destructed when the storage snapshot is invalidated.
      *
-     * Classes that decorate a Snapshot are constructed before a new storage snapshot is established
-     * and destructed after the storage engine snapshot has been released.
+     * Classes that decorate a Snapshot are constructed before a new storage snapshot is
+     * established and destructed after the storage engine snapshot has been released.
      */
     class Snapshot : public Decorable<Snapshot> {
     public:

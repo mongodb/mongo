@@ -49,10 +49,57 @@
 
 namespace mongo {
 using namespace fmt::literals;
+using NoReadTimestamp = WiredTigerBeginTxnBlock::NoReadTimestamp;
 
-static CompiledConfiguration compiledBeginTransaction(
-    "WT_SESSION.begin_transaction",
-    "ignore_prepare=%s,roundup_timestamps=(prepared=%d,read=%d),no_timestamp=%d");
+static inline int getConfigOffset(int ignore_prepare,
+                                  int roundup_prepared,
+                                  int roundup_read,
+                                  int no_timestamp) {
+    static constexpr int roundup_read_factor = static_cast<int>(NoReadTimestamp::kMax);
+    static constexpr int roundup_prepared_factor =
+        static_cast<int>(RoundUpReadTimestamp::kMax) * roundup_read_factor;
+    static constexpr int ignore_prepare_factor =
+        static_cast<int>(RoundUpPreparedTimestamps::kMax) * roundup_prepared_factor;
+    return ignore_prepare * ignore_prepare_factor + roundup_prepared * roundup_prepared_factor +
+        roundup_read * roundup_read_factor + no_timestamp;
+}
+
+static std::vector<CompiledConfiguration>& makeCompiledConfigurations() {
+    static std::vector<CompiledConfiguration> compiledConfigurations;
+    std::string ignore_prepare_str[] = {"false", "true", "force"};
+    std::string false_true_str[] = {"false", "true"};
+    for (int ignore_prepare = static_cast<int>(PrepareConflictBehavior::kEnforce);
+         ignore_prepare < static_cast<int>(PrepareConflictBehavior::kMax);
+         ignore_prepare++)
+        for (int roundup_prepared = static_cast<int>(RoundUpPreparedTimestamps::kNoRound);
+             roundup_prepared < static_cast<int>(RoundUpPreparedTimestamps::kMax);
+             roundup_prepared++)
+            for (int roundup_read = static_cast<int>(RoundUpReadTimestamp::kNoRoundError);
+                 roundup_read < static_cast<int>(RoundUpReadTimestamp::kMax);
+                 roundup_read++)
+                for (int no_timestamp = static_cast<int>(NoReadTimestamp::kFalse);
+                     no_timestamp < static_cast<int>(NoReadTimestamp::kMax);
+                     no_timestamp++) {
+                    // not to compile default
+                    int config = getConfigOffset(
+                        ignore_prepare, roundup_prepared, roundup_read, no_timestamp);
+                    if (config == 0) {
+                        continue;
+                    }
+                    const std::string beginTxnConfigString = fmt::format(
+                        "ignore_prepare={},roundup_timestamps=(prepared={},read={}),no_timestamp={"
+                        "}",
+                        ignore_prepare_str[ignore_prepare],
+                        false_true_str[roundup_prepared],
+                        false_true_str[roundup_read],
+                        false_true_str[no_timestamp]);
+                    compiledConfigurations.emplace_back("WT_SESSION.begin_transaction",
+                                                        beginTxnConfigString.c_str());
+                }
+    return compiledConfigurations;
+}
+
+static std::vector<CompiledConfiguration>& compiledBeginTransactions = makeCompiledConfigurations();
 
 WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
     WiredTigerSession* session,
@@ -64,57 +111,26 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
     invariant(!_rollback);
     _wt_session = _session->getSession();
 
+    NoReadTimestamp no_timestamp = NoReadTimestamp::kFalse;
+    if (allowUntimestampedWrite != RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce) {
+        no_timestamp = NoReadTimestamp::kTrue;
+    } else if (MONGO_unlikely(gAllowUnsafeUntimestampedWrites &&
+                              getReplSetMemberInStandaloneMode(getGlobalServiceContext()) &&
+                              !repl::ReplSettings::shouldRecoverFromOplogAsStandalone())) {
+        // We can safely ignore setting this configuration option when recovering from the
+        // oplog as standalone because:
+        // 1. Replaying oplog entries write with a timestamp.
+        // 2. The instance is put in read-only mode after oplog application has finished.
+        no_timestamp = NoReadTimestamp::kTrue;
+    }
+
+    int config = getConfigOffset(static_cast<int>(prepareConflictBehavior),
+                                 static_cast<int>(roundUpPreparedTimestamps),
+                                 static_cast<int>(roundUpReadTimestamp),
+                                 static_cast<int>(no_timestamp));
     const char* compiled_config = nullptr;
-    // Only create a bound configuration string if we have non-default options.
-    if (prepareConflictBehavior == PrepareConflictBehavior::kIgnoreConflicts ||
-        prepareConflictBehavior == PrepareConflictBehavior::kIgnoreConflictsAllowWrites ||
-        roundUpPreparedTimestamps == RoundUpPreparedTimestamps::kRound ||
-        roundUpReadTimestamp == RoundUpReadTimestamp::kRound ||
-        allowUntimestampedWrite != RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce ||
-        MONGO_unlikely(gAllowUnsafeUntimestampedWrites &&
-                       getReplSetMemberInStandaloneMode(getGlobalServiceContext()) &&
-                       !repl::ReplSettings::shouldRecoverFromOplogAsStandalone())) {
-        const char* ignore_prepare;
-        if (prepareConflictBehavior == PrepareConflictBehavior::kIgnoreConflicts) {
-            ignore_prepare = "true";
-        } else if (prepareConflictBehavior ==
-                   PrepareConflictBehavior::kIgnoreConflictsAllowWrites) {
-            ignore_prepare = "force";
-        } else {
-            ignore_prepare = "false";
-        }
-
-        bool roundup_prepared = false;
-        if (roundUpPreparedTimestamps == RoundUpPreparedTimestamps::kRound) {
-            roundup_prepared = true;
-        }
-
-        bool roundup_read = false;
-        if (roundUpReadTimestamp == RoundUpReadTimestamp::kRound) {
-            roundup_read = true;
-        }
-
-        bool no_timestamp = false;
-        if (allowUntimestampedWrite != RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce) {
-            no_timestamp = true;
-        } else if (MONGO_unlikely(gAllowUnsafeUntimestampedWrites &&
-                                  getReplSetMemberInStandaloneMode(getGlobalServiceContext()) &&
-                                  !repl::ReplSettings::shouldRecoverFromOplogAsStandalone())) {
-            // We can safely ignore setting this configuration option when recovering from the
-            // oplog as standalone because:
-            // 1. Replaying oplog entries write with a timestamp.
-            // 2. The instance is put in read-only mode after oplog application has finished.
-            no_timestamp = true;
-        }
-
-        compiled_config = compiledBeginTransaction.getConfig(_session);
-        invariantWTOK(_wt_session->bind_configuration(_wt_session,
-                                                      compiled_config,
-                                                      ignore_prepare,
-                                                      (int)roundup_prepared,
-                                                      (int)roundup_read,
-                                                      (int)no_timestamp),
-                      _wt_session);
+    if (config > 0) {
+        compiled_config = compiledBeginTransactions[config - 1].getConfig(_session);
     }
     invariantWTOK(_wt_session->begin_transaction(_wt_session, compiled_config), _wt_session);
     _rollback = true;
