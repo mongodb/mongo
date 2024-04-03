@@ -46,7 +46,7 @@ namespace repl {
 
 namespace {
 
-constexpr size_t kMinOpsPerThread = 16;
+const auto changeCollNss = NamespaceString::makeChangeCollectionNSS(boost::none);
 
 auto checkFeatureFlagReduceMajorityWriteLatencyFn = [] {
     return feature_flags::gReduceMajorityWriteLatency.isEnabled(
@@ -106,35 +106,6 @@ Status insertDocsToOplogAndChangeCollections(OperationContext* opCtx,
     return Status::OK();
 }
 
-std::vector<InsertStatement> createInsertStatements(const std::vector<BSONObj>& ops,
-                                                    size_t begin,
-                                                    size_t end) {
-    std::vector<InsertStatement> docs;
-    docs.reserve(end - begin);
-
-    for (size_t i = begin; i < end; ++i) {
-        auto opTime = invariantStatusOK(OpTime::parseFromOplogEntry(ops[i]));
-        docs.emplace_back(ops[i], opTime.getTimestamp(), opTime.getTerm());
-    }
-
-    return docs;
-}
-
-std::vector<InsertStatement> createInsertStatements(const std::vector<repl::OplogEntry>& ops,
-                                                    size_t begin,
-                                                    size_t end) {
-    std::vector<InsertStatement> docs;
-    docs.reserve(end - begin);
-
-    for (size_t i = begin; i < end; ++i) {
-        docs.emplace_back(ops[i].getEntry().getRaw(),
-                          ops[i].getOpTime().getTimestamp(),
-                          ops[i].getOpTime().getTerm());
-    }
-
-    return docs;
-}
-
 }  // namespace
 
 
@@ -158,14 +129,12 @@ OplogWriterImpl::OplogWriterImpl(executor::TaskExecutor* executor,
                                  OplogBuffer* applyBuffer,
                                  ReplicationCoordinator* replCoord,
                                  StorageInterface* storageInterface,
-                                 ReplicationConsistencyMarkers* consistencyMarkers,
                                  Observer* observer,
                                  const OplogWriter::Options& options)
     : OplogWriter(executor, writeBuffer, options),
       _applyBuffer(applyBuffer),
       _replCoord(replCoord),
       _storageInterface(storageInterface),
-      _consistencyMarkers(consistencyMarkers),
       _observer(observer) {}
 
 void OplogWriterImpl::_run() {
@@ -219,16 +188,14 @@ void OplogWriterImpl::_run() {
         auto lastOpTimeAndWallTime =
             invariantStatusOK(OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(ops.back()));
 
-        {
-            LOGV2_DEBUG(8352100, 2, "Oplog write batch size", "size"_attr = ops.size());
-
-            // Increment the batch stats.
-            oplogWriterMetric.incrementBatchSize(ops.size());
-            TimerHolder timer(&oplogWriterMetric.getBatches());
-
-            // Write the operations in this batch.
-            invariant(writeOplogBatch(opCtx, ops));
+        // Write the operations in this batch. 'writeOplogBatch' returns the optime of
+        // the last op that was written, which should be the last optime in the batch.
+        auto swLastOpTime = writeOplogBatch(opCtx, ops);
+        if (swLastOpTime.getStatus().code() == ErrorCodes::InterruptedAtShutdown) {
+            return;
         }
+        fassertNoTrace(8543103, swLastOpTime);
+        invariant(swLastOpTime.getValue() == lastOpTimeAndWallTime.opTime);
 
         // Update various things that care about our last written optime.
         finalizeOplogBatch(opCtx, lastOpTimeAndWallTime, flushJournal);
@@ -238,16 +205,36 @@ void OplogWriterImpl::_run() {
     }
 }
 
-bool OplogWriterImpl::writeOplogBatch(OperationContext* opCtx,
-                                      const std::vector<BSONObj>& ops,
-                                      ThreadPool* writerPool) {
-    return _writeOplogBatch(opCtx, ops, writerPool);
-}
+StatusWith<OpTime> OplogWriterImpl::writeOplogBatch(OperationContext* opCtx,
+                                                    const std::vector<BSONObj>& ops) {
+    invariant(!ops.empty());
+    LOGV2_DEBUG(8352100, 2, "Oplog write batch size", "size"_attr = ops.size());
 
-bool OplogWriterImpl::writeOplogBatch(OperationContext* opCtx,
-                                      const std::vector<OplogEntry>& ops,
-                                      ThreadPool* writerPool) {
-    return _writeOplogBatch(opCtx, ops, writerPool);
+    bool writeOplogColl = !getOptions().skipWritesToOplogColl;
+    bool writeChangeColl = change_stream_serverless_helpers::isChangeCollectionsModeActive();
+
+    // This should only happen for recovery modes.
+    if (!writeOplogColl && !writeChangeColl) {
+        return OpTime();
+    }
+
+    // Increment the batch stats.
+    oplogWriterMetric.incrementBatchSize(ops.size());
+    TimerHolder timer(&oplogWriterMetric.getBatches());
+
+    // Create insert statements from the oplog entries.
+    std::vector<InsertStatement> docs;
+    docs.reserve(ops.size());
+
+    for (const auto& op : ops) {
+        auto opTime = invariantStatusOK(OpTime::parseFromOplogEntry(op));
+        docs.emplace_back(InsertStatement{op, opTime.getTimestamp(), opTime.getTerm()});
+    }
+
+    // Perform writes to oplog collection and/or change collection.
+    _writeOplogBatchImpl(opCtx, docs, writeOplogColl, writeChangeColl);
+
+    return docs.back().oplogSlot;
 }
 
 void OplogWriterImpl::finalizeOplogBatch(OperationContext* opCtx,
@@ -269,83 +256,15 @@ void OplogWriterImpl::finalizeOplogBatch(OperationContext* opCtx,
     }
 }
 
-template <typename T>
-bool OplogWriterImpl::_writeOplogBatch(OperationContext* opCtx,
-                                       const std::vector<T>& ops,
-                                       ThreadPool* writerPool) {
-    invariant(!ops.empty());
-
-    bool writeOplogColl = !getOptions().skipWritesToOplogColl;
-    bool writeChangeColl = !getOptions().skipWritesToChangeColl &&
-        change_stream_serverless_helpers::isChangeCollectionsModeActive();
-
-    // Don't do anything if not writing to the oplog collection nor the change collections.
-    if (!writeOplogColl && !writeChangeColl) {
-        return false;
-    }
-
-    // Perform writes to oplog collection and/or change collections with the current thread.
-    if (!writerPool) {
-        _writeOplogBatchForRange(opCtx, ops, 0, ops.size(), writeOplogColl, writeChangeColl);
-        return true;
-    }
-
-    // Perform writes to oplog collection and/or change collections using the thread pool.
-
-    // When performing writes with multiple threads, we must set oplogTruncateAfterPoint
-    // in case the server crashes before all the threads finish. In such cases the oplog
-    // will be truncated after this opTime during startup recovery in order to make sure
-    // there are no holes in the oplog.
-    if (writeOplogColl) {
-        _consistencyMarkers->setOplogTruncateAfterPoint(
-            opCtx, _replCoord->getMyLastWrittenOpTime().getTimestamp());
-    }
-
-    auto makeOplogWriteForRange = [this, &ops, writeOplogColl, writeChangeColl](size_t begin,
-                                                                                size_t end) {
-        return [this, &ops, begin, end, writeOplogColl, writeChangeColl](auto status) {
-            invariant(status);
-            auto opCtx = cc().makeOperationContext();
-            _writeOplogBatchForRange(opCtx.get(), ops, begin, end, writeOplogColl, writeChangeColl);
-        };
-    };
-
-    const auto poolMaxThreads = writerPool->getStats().options.maxThreads;
-    const auto enoughToMultiThread = ops.size() >= kMinOpsPerThread * poolMaxThreads;
-    const auto numWriteThreads = enoughToMultiThread ? poolMaxThreads : 1;
-    const size_t numOpsPerThread = ops.size() / numWriteThreads;
-
-    for (size_t t = 0; t < numWriteThreads; ++t) {
-        size_t begin = t * numOpsPerThread;
-        size_t end = (t == numWriteThreads - 1) ? ops.size() : begin + numOpsPerThread;
-        writerPool->schedule(makeOplogWriteForRange(begin, end));
-    }
-
-    // Wait for all scheduled writes to complete.
-    writerPool->waitForIdle();
-
-    // Reset oplogTruncateAfterPoint after writes are complete.
-    if (writeOplogColl) {
-        _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
-    }
-
-    return true;
-}
-
-template <typename T>
-void OplogWriterImpl::_writeOplogBatchForRange(OperationContext* opCtx,
-                                               const std::vector<T>& ops,
-                                               size_t begin,
-                                               size_t end,
-                                               bool writeOplogColl,
-                                               bool writeChangeColl) {
+void OplogWriterImpl::_writeOplogBatchImpl(OperationContext* opCtx,
+                                           const std::vector<InsertStatement>& docs,
+                                           bool writeOplogColl,
+                                           bool writeChangeColl) {
     // Oplog writes are crucial to the stability of the replica set. We give the operations
     // Immediate priority so that it skips waiting for ticket acquisition and flow control.
     ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
         opCtx, AdmissionContext::Priority::kExempt);
     UnreplicatedWritesBlock uwb(opCtx);
-
-    auto docs = createInsertStatements(ops, begin, end);
 
     // The 'nsOrUUID' is used only to log the debug message when retrying inserts on the
     // oplog and change collections. The 'writeConflictRetry' helper assumes operations

@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/db/repl/oplog_writer.h"
-#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 namespace repl {
@@ -75,31 +75,24 @@ public:
                     OplogBuffer* applyBuffer,
                     ReplicationCoordinator* replCoord,
                     StorageInterface* storageInterface,
-                    ReplicationConsistencyMarkers* consistencyMarkers,
                     Observer* observer,
                     const OplogWriter::Options& options);
 
     /**
-     * Writes a batch of oplog entries to the oplog and/or the change collections.
+     * Writes a batch of oplog entries to the oplog and/or the change collection.
      *
-     * Returns false if nothing is written, true otherwise.
+     * The current implementation uses one thread to write to the oplog collection,
+     * and in serverless environment uses another thread to write to the serverless
+     * change collection in parallel.
      *
-     * If 'writerPool' is not set, the caller thread is used to perform the writes,
-     * otherwise 'writerPool' is used to perform the writes with multiple threads.
+     * If the batch write is successful, returns the optime of the last op written,
+     * which should be the last op in the batch.
      *
      * External states such as oplog visibility, replication opTimes and journaling
      * are not updated in this function.
      */
-    bool writeOplogBatch(OperationContext* opCtx,
-                         const std::vector<BSONObj>& ops,
-                         ThreadPool* writerPool = nullptr) override;
-
-    /**
-     * Same as above, except for the type of the oplog entries.
-     */
-    bool writeOplogBatch(OperationContext* opCtx,
-                         const std::vector<OplogEntry>& ops,
-                         ThreadPool* writerPool = nullptr) override;
+    StatusWith<OpTime> writeOplogBatch(OperationContext* opCtx,
+                                       const std::vector<BSONObj>& ops) override;
 
     /**
      * Finalizes the batch after writing it to storage, which updates various external
@@ -122,30 +115,18 @@ private:
      */
     void _run() override;
 
-    template <typename T>
-    bool _writeOplogBatch(OperationContext* opCtx,
-                          const std::vector<T>& ops,
-                          ThreadPool* writerPool);
+    void _writeOplogBatchImpl(OperationContext* opCtx,
+                              const std::vector<InsertStatement>& docs,
+                              bool writeOplogColl,
+                              bool writeChangeColl);
 
-    template <typename T>
-    void _writeOplogBatchForRange(OperationContext* opCtx,
-                                  const std::vector<T>& ops,
-                                  size_t begin,
-                                  size_t end,
-                                  bool writeOplogColl,
-                                  bool writeChangeColl);
-
-    // Not owned by us.
     OplogBuffer* const _applyBuffer;
 
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;
 
     // Not owned by us.
-    StorageInterface* const _storageInterface;
-
-    // Not owned by us.
-    ReplicationConsistencyMarkers* const _consistencyMarkers;
+    StorageInterface* _storageInterface;
 
     // Not owned by us.
     Observer* const _observer;
