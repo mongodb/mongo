@@ -3,6 +3,8 @@
  * to prevent implicit creation of a non-clustered collection.
  *
  * @tags: [
+ *  # TODO SERVER-86564: Random balancer for unsplittable collections may fail CheckOrphansDeleted
+ *  assumes_balancer_off,
  *  requires_fcv_53
  *  ]
  */
