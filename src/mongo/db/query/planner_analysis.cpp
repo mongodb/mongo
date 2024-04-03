@@ -64,6 +64,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
@@ -915,8 +916,7 @@ void QueryPlannerAnalysis::removeImpreciseInternalExprFilters(const QueryPlanner
 }
 
 // static
-std::pair<EqLookupNode::LookupStrategy, boost::optional<IndexEntry>>
-QueryPlannerAnalysis::determineLookupStrategy(
+QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
     const NamespaceString& foreignCollName,
     const std::string& foreignField,
     const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
@@ -926,6 +926,9 @@ QueryPlannerAnalysis::determineLookupStrategy(
     if (foreignCollItr == collectionsInfo.end() || !foreignCollItr->second.exists) {
         return {EqLookupNode::LookupStrategy::kNonExistentForeignCollection, boost::none};
     }
+
+    const auto scanDirection =
+        foreignCollItr->second.collscanDirection.value_or(NaturalOrderHint::Direction::kForward);
 
     // Check if an eligible index exists for indexed loop join strategy.
     const auto foreignIndex = [&]() -> boost::optional<IndexEntry> {
@@ -959,11 +962,14 @@ QueryPlannerAnalysis::determineLookupStrategy(
     // TODO SERVER-88629 Throw 'ErrorCodes::NoQueryExecutionPlans' if 'NO_TABLE_SCAN' option is set
     // for HashJoin and NestedLoopJoin.
     if (foreignIndex) {
-        return {EqLookupNode::LookupStrategy::kIndexedLoopJoin, std::move(foreignIndex)};
+        // $natural hinted scan direction is not relevant for IndexedLoopJoin, but is passed here
+        // for consistency.
+        return {
+            EqLookupNode::LookupStrategy::kIndexedLoopJoin, std::move(foreignIndex), scanDirection};
     } else if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {
-        return {EqLookupNode::LookupStrategy::kHashJoin, boost::none};
+        return {EqLookupNode::LookupStrategy::kHashJoin, boost::none, scanDirection};
     } else {
-        return {EqLookupNode::LookupStrategy::kNestedLoopJoin, boost::none};
+        return {EqLookupNode::LookupStrategy::kNestedLoopJoin, boost::none, scanDirection};
     }
 }
 

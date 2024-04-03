@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
@@ -42,6 +43,16 @@ namespace mongo {
 namespace {
 static constexpr auto kNaturalFieldName = "$natural"_sd;
 };  // namespace
+
+bool isForward(NaturalOrderHint::Direction dir) {
+    return dir == NaturalOrderHint::Direction::kForward;
+}
+
+std::string toString(NaturalOrderHint::Direction dir) {
+    StackStringBuilder ssb;
+    ssb << dir;
+    return ssb.str();
+}
 
 IndexHint IndexHint::parse(const BSONElement& element) {
     if (element.type() == BSONType::String) {

@@ -77,6 +77,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/bson_typemask.h"
 #include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -1291,9 +1292,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                           boost::none /* seekRecordIdSlot */,
                                           boost::none /* minRecordIdSlot */,
                                           boost::none /* maxRecordIdSlot */,
-                                          // TODO SERVER-88628 Pass the 'collscanDirection' for
-                                          // the'QueryPlannerParams::CollectionInfo' here.
-                                          true /* forward */,
+                                          isForward(eqLookupNode->scanDirection),
                                           _yieldPolicy,
                                           eqLookupNode->nodeId(),
                                           ScanCallbacks{});
@@ -1408,7 +1407,7 @@ SlotBasedStageBuilder::buildEqLookupUnwind(const QuerySolutionNode* root,
                                           boost::none /* seekRecordIdSlot */,
                                           boost::none /* minRecordIdSlot */,
                                           boost::none /* maxRecordIdSlot */,
-                                          true /* forward */,
+                                          isForward(eqLookupUnwindNode->scanDirection),
                                           _yieldPolicy,
                                           eqLookupUnwindNode->nodeId(),
                                           ScanCallbacks{});
