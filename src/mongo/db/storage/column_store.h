@@ -764,8 +764,7 @@ struct SplitCellView {
             --ptr;  // We need the dispatch byte back.
             auto elem = BSONElement(ptr,
                                     1,  // field name size including nul byte
-                                    -1  // don't know total element size
-            );
+                                    BSONElement::TrustedInitTag{});
             ptr += elem.size();
             return encoder(elem);
         }
