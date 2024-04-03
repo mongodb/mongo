@@ -25,6 +25,10 @@ selector:
   # Uses hangAfterCollectionInserts failpoint not available on mongos.
   - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 
+  # The test issues an implicit collection creation within a transaction,
+  # which may fail if the random shard is not the primary one.
+  - jstests/core/txns/concurrent_drops_and_creates.js
+
   # TODO SERVER-86727 Reenable.
   - jstests/core/txns/create_collection_not_blocked_by_txn.js
   - jstests/core/txns/indexing_not_blocked_by_txn.js
