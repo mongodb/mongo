@@ -416,7 +416,7 @@ void InListData::makeBSONOwned() {
         // Update each BSONElement in '_elements' to refer to the new buffer.
         for (auto&& e : _elements) {
             const char* newData = newBuf + (e.rawdata() - oldBuf);
-            e = BSONElement(newData, e.fieldNameSize(), e.size(), BSONElement::TrustedInitTag{});
+            e = BSONElement(newData, e.fieldNameSize(), BSONElement::TrustedInitTag{});
         }
     } else {
         // Serialize the original list of elements into an owned BSONArray.

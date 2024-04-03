@@ -791,14 +791,20 @@ public:
     /**
      * Constructs an iterator pointing to the first element in obj or EOO if it is empty.
      */
-    explicit BSONObjStlIterator(const BSONObj& obj) : BSONObjStlIterator(obj.firstElement()) {}
+    explicit BSONObjStlIterator(const BSONObj& obj) {
+        auto ptr = obj.objdata() + sizeof(int32_t);
+        _cur._data = ptr;
+        while (*ptr)
+            ++ptr;
+        _cur._fieldNameSize = ptr - _cur._data;
+    }
 
     /**
      * Returns an iterator pointing to the EOO element in obj.
      */
     static BSONObjStlIterator endOf(const BSONObj& obj) {
         auto eooElem = BSONElement();
-        eooElem.data = (obj.objdata() + obj.objsize() - 1);
+        eooElem._data = obj.objdata() + obj.objsize() - 1;
         dassert(eooElem.eoo());  // This is checked in the BSONObj constructor.
         return BSONObjStlIterator(eooElem);
     }
@@ -807,8 +813,15 @@ public:
      * pre-increment
      */
     BSONObjStlIterator& operator++() {
-        dassert(!_cur.eoo());
-        *this = BSONObjStlIterator(BSONElement(_cur.rawdata() + _cur.size()));
+        dassert(*_cur._data);                          // Must not be EOO
+        auto ptr = _cur._data + _cur.fieldNameSize();  // ptr points to the 0 byte ending the name
+
+        ptr += _cur.valuesize() + 1;  // Skip the value and the 0 byte
+        _cur._data = ptr;
+        while (*ptr)
+            ++ptr;
+
+        _cur._fieldNameSize = ptr - _cur._data;
         return *this;
     }
 
@@ -962,25 +975,21 @@ public:
 
     BSONElement next() {
         if (_cur < static_cast<int>(_fields.size())) {
-            const auto& element = _fields.at(_cur++);
-            return BSONElement(element.fieldName.rawData() - 1,  // Include type byte
-                               element.fieldName.size() + 1,     // Add null terminator
-                               element.totalSize);
+            const auto& fieldName = _fields.at(_cur++);
+            return BSONElement(fieldName.rawData() - 1,  // Include type byte
+                               fieldName.size() + 1,     // Add null terminator
+                               BSONElement::TrustedInitTag{});
         }
 
         return BSONElement();
     }
 
 protected:
-    class ElementFieldCmp;
-    BSONIteratorSorted(const BSONObj& o, const ElementFieldCmp& cmp);
+    class FieldNameCmp;
+    BSONIteratorSorted(const BSONObj& o, const FieldNameCmp& cmp);
 
 private:
-    struct Field {
-        StringData fieldName;
-        int totalSize;
-    };
-    std::vector<Field> _fields;
+    std::vector<StringData> _fields;
     int _cur;
 };
 

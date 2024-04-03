@@ -721,11 +721,6 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
      * Default value is used to suppress the uassert for `errorExtraInfo` if `errorCode` is not set.
      */
     long long errorCode = ErrorCodes::OK;
-    /**
-     * errorExtraInfo only holds a reference to the BSONElement of the parent object (data).
-     * The copy constructor of BSONObj handles cloning to keep references valid outside the scope.
-     */
-    BSONElement errorExtraInfo;
     const Command* cmd = invocation->definition();
     failCommand.executeIf(
         [&](const BSONObj& data) {
