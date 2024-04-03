@@ -587,6 +587,8 @@ last-continuous:
     ticket: SERVER-87191
   - test_file: jstests/core/timeseries/timeseries_project.js
     ticket: SERVER-87987
+  - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
+    ticket: SERVER-86253
   suites: null
 last-lts:
   all:
@@ -1230,4 +1232,6 @@ last-lts:
     ticket: SERVER-86419
   - test_file: jstests/core/timeseries/timeseries_project.js
     ticket: SERVER-87987
+  - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
+    ticket: SERVER-86253
   suites: null

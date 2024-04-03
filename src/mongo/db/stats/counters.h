@@ -666,4 +666,10 @@ extern Counter64& updateOneWithoutShardKeyWithIdRetryCount;
 // Track the number of retries for retryable non-targeted deleteOne commands (without shard key with
 // _id) on sharded collections
 extern Counter64& deleteOneWithoutShardKeyWithIdRetryCount;
+// Track the number of internal retryable writes
+extern Counter64& internalRetryableWriteCount;
+// Track the number of external retryable writes
+extern Counter64& externalRetryableWriteCount;
+// Track the number of internal transactions for retryable writes
+extern Counter64& retryableInternalTransactionCount;
 }  // namespace mongo
