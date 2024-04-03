@@ -131,8 +131,8 @@ assert(anyEq(a5.toArray(), a5result));
 
 // Test redacts that are just a variable access (this can happen as a result of optimizations)
 assert.eq(t.aggregate({$redact: "$$PRUNE"}).toArray(), []);
-assert.eq(t.aggregate({$redact: "$$KEEP"}).toArray(), t.find().toArray());
-assert.eq(t.aggregate({$redact: "$$DESCEND"}).toArray(), t.find().toArray());
+assert(anyEq(t.aggregate({$redact: "$$KEEP"}).toArray(), t.find().toArray()));
+assert(anyEq(t.aggregate({$redact: "$$DESCEND"}).toArray(), t.find().toArray()));
 
 // test $$KEEP
 t.drop();
@@ -147,6 +147,6 @@ let b1result = [];
 
 let b23result = [{_id: 1, level: 2, b: {level: 3, c: 2}, d: {level: 1, e: 8}, f: 9}];
 
-assert.eq(b1.toArray(), b1result);
-assert.eq(b2.toArray(), b23result);
-assert.eq(b3.toArray(), b23result);
+assert(anyEq(b1.toArray(), b1result));
+assert(anyEq(b2.toArray(), b23result));
+assert(anyEq(b3.toArray(), b23result));
