@@ -501,7 +501,7 @@ protected:
         tassert(8796901,
                 str::stream() << "Stage " << _commonStats.stageType
                               << " tracks reads but tracking type is " << _trackingType,
-                _trackingType == TrialRunTrackingType::TrackReads);
+                (_trackingType & TrialRunTrackingType::TrackReads));
         if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
             uasserted(ErrorCodes::QueryTrialRunCompleted,
                       str::stream() << "Trial run early exit in " << _commonStats.stageType);
@@ -516,7 +516,7 @@ protected:
         tassert(8796902,
                 str::stream() << "Stage " << _commonStats.stageType
                               << " tracks results but tracking type is " << _trackingType,
-                _trackingType == TrialRunTrackingType::TrackResults);
+                (_trackingType & TrialRunTrackingType::TrackResults));
         if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
             uasserted(ErrorCodes::QueryTrialRunCompleted,
                       str::stream() << "Trial run early exit in " << _commonStats.stageType);
