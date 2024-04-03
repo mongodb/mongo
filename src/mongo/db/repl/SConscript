@@ -1856,6 +1856,7 @@ if wiredtiger:
             'primary_only_service_test.cpp',
             'primary_only_service_util_test.cpp',
             'read_concern_args_test.cpp',
+            'repl_client_info_test.cpp',
             'repl_set_config_checks_test.cpp',
             'repl_set_config_test.cpp',
             'repl_set_heartbeat_response_test.cpp',

@@ -854,7 +854,14 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorMock::awaitHelloRespo
 
 StatusWith<OpTime> ReplicationCoordinatorMock::getLatestWriteOpTime(
     OperationContext* opCtx) const noexcept {
-    return getMyLastAppliedOpTime();
+    OpTime o = getMyLastWrittenOpTime();
+    if (o.isNull()) {
+        // ErrorCodes::OplogOperationUnsupported allows the status to be transparently upgraded to
+        // OK in setLastOpToSystemLastOpTime.
+        return StatusWith<OpTime>(ErrorCodes::OplogOperationUnsupported,
+                                  "uninitialized lastWritten");
+    }
+    return o;
 }
 
 HostAndPort ReplicationCoordinatorMock::getCurrentPrimaryHostAndPort() const {
