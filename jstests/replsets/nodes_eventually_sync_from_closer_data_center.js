@@ -106,7 +106,13 @@ assert.soon(() => {
     const syncSourcePingTime = replSetGetStatus.members[0].pingMs;
     const receivedSyncSourceHb = (syncSourcePingTime > 60);
 
-    return (receivedCentralHb && receivedSyncSourceHb);
+    // Wait for enough heartbeat's from the desired sync source so that our understanding of the
+    // ping time to that node is at least 'changeSyncSourceThresholdMillis' less than the ping time
+    // to our current sync source.
+    const centralSecondaryPingTime = replSetGetStatus.members[1].pingMs;
+    const exceedsChangeSyncSourceThreshold = (syncSourcePingTime - centralSecondaryPingTime > 5);
+
+    return (receivedCentralHb && receivedSyncSourceHb && exceedsChangeSyncSourceThreshold);
 });
 
 const replSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
