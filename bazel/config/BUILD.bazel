@@ -1493,7 +1493,7 @@ selects.config_setting_group(
 selects.config_setting_group(
     name = "streams_release_build_required_setting",
     match_all = [
-        ":release",
+        ":release_enabled",
         ":streams_release_build_enabled",
         ":platform_for_streaming_build",
     ],
