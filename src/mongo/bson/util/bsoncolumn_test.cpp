@@ -8081,6 +8081,79 @@ TEST_F(BSONColumnTest, FuzzerDiscoveredEdgeCases) {
     }
 }
 
+TEST_F(BSONColumnTest, BlockFuzzerDiscoveredEdgeCases) {
+    // This test is a collection of binaries produced by the decompression fuzzer that exposed bugs
+    // in the block-based or iterator API, and contains coverage missing from the tests defined
+    // above. This test validates that the iterator API and the block-based API must produce the
+    // same results.
+    std::vector<StringData> binariesBase64 = {
+        // Iterator API did not cast values to booleans before materializing (SERVER-87779).
+        "CAAAoJb//wD/3ylEAA=="_sd,
+        // Block-based API updated the 'lastValue' when appending EOO elements (SERVER-85860).
+        "CgAKAAoAEwAHAAoACgEAAABQUFBQUFBQUFAAAAAAAACoqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioUFBQUAAAAAAACgAKAAsAEwAKAAoACgAKAAoACgAKAAoACgAKAAoACgAA"_sd,
+        // Block-based API didn't validate the scale index for simple8b blocks (SERVER-87628 and
+        // SERVER-88738).
+        "QAEADP////+SAA=="_sd,
+        "fwBAAwAAAAAAAAAA"_sd,
+        "CgBh/wABemEUAAAAAAAAAAIBAAA="_sd,
+        "BQAvAAAAAABQslBQUFBQUFBQUFAAUFBQUFB5UP7///9QUFBQUFBQUFCBgYGBgYGBgYGBgYGBgYFQbFCpUFBQgVBQUFBQUFBQP1BQUFBQUAAA"_sd,
+        // The two APIs had different delta values, but both should fail (SERVER-85860 and
+        // SERVER-87873).
+        "BQADAAAAkP8AkJCR///+/4jIfdAmAAAAAAAAAJACAAAAAP8AAAA="_sd,
+        "fwDQYG9tfwAAAAAA"_sd,
+        "CAABwMABwMDAwMDAwH9DwMDAwMDAwMDAwMDAwMDAwMjAwMDAAAAAAA=="_sd,
+        "EwAAAGCvYK+vUgBSUlBQc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3NzFBQUFBQUc3PQ0NDQ0NDQ0NDQr1JSUlBQ0NDQ0NDQ0NDQ0NIYAAAA0NAXlaJ9//8AAA=="_sd,
+        // Block-based API using the table decoders should fail on bad selectors (SERVER-88062).
+        "CwBPpFpaWloAAKD3Af9dXQD/AAA="_sd,
+        // Block-based API had a stack overflow for BinData values (SERVER-88207).
+        "BQAXAAAAMcLCPso9PcJhJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmsMIYAAECAAIAAA=="_sd,
+        "BQAwAAAAAAcAAAAAAAEAAAAAAABAAAAAAAA7Ozs7Ozs7Ozs6Ozs7Ozs7Ozs7Ozs7Ozs7OwD+/4A7OzsA/v+A/wA="_sd,
+    };
+
+    for (auto&& binaryBase64 : binariesBase64) {
+        auto binary = base64::decode(binaryBase64);
+
+        // Store the results for validation after decompression.
+        boost::intrusive_ptr allocator{new bsoncolumn::ElementStorage()};
+        std::vector<BSONElement> iteratorElems, blockBasedElems;
+        bool blockBasedError = false;
+        bool iteratorError = false;
+
+        // Attempt to decompress using the block-based API.
+        try {
+            bsoncolumn::BSONColumnBlockBased block(binary.data(), binary.size());
+            block.decompress<bsoncolumn::BSONElementMaterializer, std::vector<BSONElement>>(
+                blockBasedElems, allocator);
+        } catch (...) {
+            blockBasedError = true;
+        }
+
+        // Attempt to decompress using the iterator API.
+        try {
+            BSONColumn column(binary.data(), binary.size());
+            for (auto&& elem : column) {
+                iteratorElems.push_back(elem);
+            };
+        } catch (...) {
+            iteratorError = true;
+        }
+
+        // If one API failed, then both APIs must fail.
+        if (iteratorError || blockBasedError) {
+            ASSERT(iteratorError && blockBasedError);
+            continue;
+        }
+
+        // If the APIs succeeded, the results must be the same.
+        ASSERT(iteratorElems.size() == blockBasedElems.size());
+        auto it = iteratorElems.begin();
+        for (auto&& elem : blockBasedElems) {
+            ASSERT(elem.binaryEqualValues(*it));
+            ++it;
+        }
+    }
+}
+
 // The large literal emits this on Visual Studio: Fatal error C1091: compiler limit: string exceeds
 // 65535 bytes in length
 #if !defined(_MSC_VER) || _MSC_VER >= 1929
