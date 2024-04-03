@@ -912,8 +912,6 @@ StatusWith<std::vector<DatabaseName>> ShardingCatalogClientImpl::getDatabasesFor
             return status;
         }
 
-        // TODO SERVER-80466 use the IDL parser instead of parsing BSON objects from
-        // _exhaustiveFindOnConfig returned values.
         dbs.push_back(DatabaseNameUtil::deserialize(
             boost::none, std::move(dbName), SerializationContext::stateDefault()));
     }
