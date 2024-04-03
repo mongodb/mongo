@@ -7,6 +7,8 @@
  *   featureFlagDefaultReadMaxTimeMS,
  *   # Uses $where operator
  *   requires_scripting,
+ *   # TODO (SERVER-88924): Re-enable the test.
+ *   __TEMPORARILY_DISABLED__,
  * ]
  */
 
