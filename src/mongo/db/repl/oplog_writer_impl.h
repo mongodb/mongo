@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/db/repl/oplog_writer.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 namespace repl {
@@ -73,26 +73,43 @@ public:
     OplogWriterImpl(executor::TaskExecutor* executor,
                     OplogBuffer* writeBuffer,
                     OplogBuffer* applyBuffer,
+                    ThreadPool* writerPool,
                     ReplicationCoordinator* replCoord,
                     StorageInterface* storageInterface,
+                    ReplicationConsistencyMarkers* consistencyMarkers,
                     Observer* observer,
                     const OplogWriter::Options& options);
 
     /**
-     * Writes a batch of oplog entries to the oplog and/or the change collection.
+     * Writes a batch of oplog entries to the oplog and/or the change collections.
      *
-     * The current implementation uses one thread to write to the oplog collection,
-     * and in serverless environment uses another thread to write to the serverless
-     * change collection in parallel.
-     *
-     * If the batch write is successful, returns the optime of the last op written,
-     * which should be the last op in the batch.
+     * Returns false if nothing is written, true otherwise.
      *
      * External states such as oplog visibility, replication opTimes and journaling
-     * are not updated in this function.
+     * should be handled by the caller.
      */
-    StatusWith<OpTime> writeOplogBatch(OperationContext* opCtx,
-                                       const std::vector<BSONObj>& ops) override;
+    bool writeOplogBatch(OperationContext* opCtx, const std::vector<BSONObj>& ops) override;
+
+    /**
+     * Schedules the writes of the oplog batch to the oplog and/or the change collections
+     * using the thread pool. Use waitForScheduledWrites() after calling this function to
+     * wait for the writes to complete.
+     *
+     * Returns false if no write is scheduled, true otherwise.
+     *
+     * External states such as oplog visibility, replication opTimes and journaling
+     * should be handled by the caller.
+     */
+    bool scheduleWriteOplogBatch(OperationContext* opCtx,
+                                 const std::vector<OplogEntry>& ops) override;
+
+    /**
+     * Wait for all scheduled writes to completed. This should be used in conjunction
+     * with scheduleWriteOplogBatch().
+     *
+     * This function also resets the 'truncateAfterPoint' after writes are completed.
+     */
+    void waitForScheduledWrites(OperationContext* opCtx) override;
 
     /**
      * Finalizes the batch after writing it to storage, which updates various external
@@ -115,18 +132,32 @@ private:
      */
     void _run() override;
 
-    void _writeOplogBatchImpl(OperationContext* opCtx,
-                              const std::vector<InsertStatement>& docs,
-                              bool writeOplogColl,
-                              bool writeChangeColl);
+    template <typename T>
+    void _writeOplogBatchForRange(OperationContext* opCtx,
+                                  const std::vector<T>& ops,
+                                  size_t begin,
+                                  size_t end,
+                                  bool writeOplogColl,
+                                  bool writeChangeColl);
 
+
+    std::pair<bool, bool> _checkWriteOptions();
+
+    // Not owned by us.
     OplogBuffer* const _applyBuffer;
+
+    // Pool of worker threads for writing oplog entries.
+    // Not owned by us.
+    ThreadPool* const _writerPool;
 
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;
 
     // Not owned by us.
-    StorageInterface* _storageInterface;
+    StorageInterface* const _storageInterface;
+
+    // Not owned by us.
+    ReplicationConsistencyMarkers* const _consistencyMarkers;
 
     // Not owned by us.
     Observer* const _observer;

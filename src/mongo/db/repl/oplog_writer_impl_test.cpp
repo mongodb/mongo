@@ -33,6 +33,7 @@
 #include "mongo/db/repl/oplog_batcher_test_fixture.h"
 #include "mongo/db/repl/oplog_writer.h"
 #include "mongo/db/repl/oplog_writer_impl.h"
+#include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
@@ -104,12 +105,16 @@ protected:
 
     OperationContext* opCtx() const;
 
+    ThreadPool* getWriterPool() const;
     ReplicationCoordinator* getReplCoord() const;
     StorageInterface* getStorageInterface() const;
+    ReplicationConsistencyMarkers* getConsistencyMarkers() const;
     JournalListenerMock* getJournalListener() const;
 
     ServiceContext* _serviceContext;
     ServiceContext::UniqueOperationContext _opCtxHolder;
+    std::unique_ptr<ThreadPool> _writerPool;
+    std::unique_ptr<ReplicationConsistencyMarkers> _consistencyMarkers;
     std::unique_ptr<CountOpsObserver> _observer;
 };
 
@@ -125,6 +130,8 @@ void OplogWriterImplTest::setUp() {
 
     StorageInterface::set(_serviceContext, std::make_unique<StorageInterfaceImpl>());
 
+    _consistencyMarkers = std::make_unique<ReplicationConsistencyMarkersMock>();
+
     MongoDSessionCatalog::set(
         _serviceContext,
         std::make_unique<MongoDSessionCatalog>(
@@ -132,11 +139,14 @@ void OplogWriterImplTest::setUp() {
 
     repl::createOplog(opCtx());
 
+    _writerPool = makeReplWriterPool();
     _observer = std::make_unique<CountOpsObserver>();
 }
 
 void OplogWriterImplTest::tearDown() {
     _opCtxHolder = {};
+    _writerPool = {};
+    _consistencyMarkers = {};
     _observer = {};
     StorageInterface::set(_serviceContext, {});
     ServiceContextMongoDTest::tearDown();
@@ -144,6 +154,10 @@ void OplogWriterImplTest::tearDown() {
 
 OperationContext* OplogWriterImplTest::opCtx() const {
     return _opCtxHolder.get();
+}
+
+ThreadPool* OplogWriterImplTest::getWriterPool() const {
+    return _writerPool.get();
 }
 
 ReplicationCoordinator* OplogWriterImplTest::getReplCoord() const {
@@ -154,43 +168,54 @@ StorageInterface* OplogWriterImplTest::getStorageInterface() const {
     return StorageInterface::get(_serviceContext);
 }
 
+ReplicationConsistencyMarkers* OplogWriterImplTest::getConsistencyMarkers() const {
+    return _consistencyMarkers.get();
+}
+
 JournalListenerMock* OplogWriterImplTest::getJournalListener() const {
     return static_cast<JournalListenerMock*>(_journalListener.get());
 }
 
 DEATH_TEST_F(OplogWriterImplTest, WriteEmptyBatchFails, "!ops.empty()") {
+    OplogWriter::Options options(false /* skipWritesToOplogColl */,
+                                 false /* skipWritesToChangeColl */);
+
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
+                                nullptr,  // writerPool
                                 getReplCoord(),
                                 getStorageInterface(),
+                                getConsistencyMarkers(),
                                 &noopOplogWriterObserver,
-                                OplogWriter::Options());
+                                options);
 
     // Writing an empty batch should hit an invariant.
-    oplogWriter.writeOplogBatch(opCtx(), {}).getStatus().ignore();
+    oplogWriter.writeOplogBatch(opCtx(), std::vector<BSONObj>{});
 }
 
 TEST_F(OplogWriterImplTest, WriteOplogCollectionOnly) {
+    OplogWriter::Options options(false /* skipWritesToOplogColl */,
+                                 true /* skipWritesToChangeColl */);
+
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
+                                nullptr,  // writerPool
                                 getReplCoord(),
                                 getStorageInterface(),
+                                getConsistencyMarkers(),
                                 _observer.get(),
-                                OplogWriter::Options());
+                                options);
 
     std::vector<BSONObj> ops;
     ops.push_back(makeRawInsertOplogEntry(1, kNss1));
     ops.push_back(makeRawInsertOplogEntry(2, kNss2));
 
-    auto returnOpTime = OpTime::parseFromOplogEntry(ops.back()).getValue();
-    auto statusWith = oplogWriter.writeOplogBatch(opCtx(), std::move(ops));
-
-    ASSERT_OK(statusWith);
-    ASSERT_EQ(returnOpTime, statusWith.getValue());
+    auto written = oplogWriter.writeOplogBatch(opCtx(), std::move(ops));
 
     // Verify that the batch is only written to the oplog collection.
+    ASSERT(written);
     ASSERT_EQ(2, _observer->oplogCollDocsCount.load());
     ASSERT_EQ(0, _observer->changeCollDocsCount.load());
 }
@@ -203,25 +228,27 @@ TEST_F(OplogWriterImplTest, WriteChangeCollectionsOnly) {
 
     ChangeStreamChangeCollectionManager::create(_serviceContext);
 
+    OplogWriter::Options options(true /* skipWritesToOplogColl */,
+                                 false /* skipWritesToChangeColl */);
+
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
+                                nullptr,  // writerPool
                                 getReplCoord(),
                                 getStorageInterface(),
+                                getConsistencyMarkers(),
                                 _observer.get(),
-                                OplogWriter::Options(true /* skipWritesToOplogColl */));
+                                options);
 
     std::vector<BSONObj> ops;
     ops.push_back(makeRawInsertOplogEntry(1, kNss1));
     ops.push_back(makeRawInsertOplogEntry(2, kNss2));
 
-    auto returnOpTime = OpTime::parseFromOplogEntry(ops.back()).getValue();
-    auto statusWith = oplogWriter.writeOplogBatch(opCtx(), std::move(ops));
-
-    ASSERT_OK(statusWith);
-    ASSERT_EQ(returnOpTime, statusWith.getValue());
+    auto written = oplogWriter.writeOplogBatch(opCtx(), std::move(ops));
 
     // Verify that the batch is only written to the change collections.
+    ASSERT(written);
     ASSERT_EQ(0, _observer->oplogCollDocsCount.load());
     ASSERT_EQ(2, _observer->changeCollDocsCount.load());
 }
@@ -234,60 +261,70 @@ TEST_F(OplogWriterImplTest, WriteBothOplogAndChangeCollections) {
 
     ChangeStreamChangeCollectionManager::create(_serviceContext);
 
+    OplogWriter::Options options(false /* skipWritesToOplogColl */,
+                                 false /* skipWritesToChangeColl */);
+
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
+                                nullptr,  // writerPool
                                 getReplCoord(),
                                 getStorageInterface(),
+                                getConsistencyMarkers(),
                                 _observer.get(),
-                                OplogWriter::Options());
+                                options);
 
     std::vector<BSONObj> ops;
     ops.push_back(makeRawInsertOplogEntry(1, kNss1));
     ops.push_back(makeRawInsertOplogEntry(2, kNss2));
 
-    auto returnOpTime = OpTime::parseFromOplogEntry(ops.back()).getValue();
-    auto statusWith = oplogWriter.writeOplogBatch(opCtx(), std::move(ops));
-
-    ASSERT_OK(statusWith);
-    ASSERT_EQ(returnOpTime, statusWith.getValue());
+    auto written = oplogWriter.writeOplogBatch(opCtx(), std::move(ops));
 
     // Verify that the batch written to both the oplog and change collections.
+    ASSERT(written);
     ASSERT_EQ(2, _observer->oplogCollDocsCount.load());
     ASSERT_EQ(2, _observer->changeCollDocsCount.load());
 }
 
 TEST_F(OplogWriterImplTest, WriteNeitherOplogNorChangeCollections) {
+    OplogWriter::Options options(true /* skipWritesToOplogColl */,
+                                 true /* skipWritesToChangeColl */);
+
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
+                                nullptr,  // writerPool
                                 getReplCoord(),
                                 getStorageInterface(),
+                                getConsistencyMarkers(),
                                 _observer.get(),
-                                OplogWriter::Options(true /* skipWritesToOplogColl */));
+                                options);
 
     std::vector<BSONObj> ops;
     ops.push_back(makeRawInsertOplogEntry(1, kNss1));
     ops.push_back(makeRawInsertOplogEntry(2, kNss2));
 
-    auto statusWith = oplogWriter.writeOplogBatch(opCtx(), std::move(ops));
+    auto written = oplogWriter.writeOplogBatch(opCtx(), std::move(ops));
 
-    ASSERT_OK(statusWith);
-    ASSERT_EQ(OpTime(), statusWith.getValue());
-
-    // Verify that the batch is only written to the oplog collection.
+    // Verify that the batch is not written any collection.
+    ASSERT(!written);
     ASSERT_EQ(0, _observer->oplogCollDocsCount.load());
     ASSERT_EQ(0, _observer->changeCollDocsCount.load());
 }
 
 TEST_F(OplogWriterImplTest, finalizeOplogBatchCorrectlyUpdatesOpTimes) {
+    OplogWriter::Options options(false /* skipWritesToOplogColl */,
+                                 false /* skipWritesToChangeColl */);
+
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
+                                nullptr,  // writerPool
                                 getReplCoord(),
                                 getStorageInterface(),
+                                getConsistencyMarkers(),
                                 &noopOplogWriterObserver,
-                                OplogWriter::Options());
+                                options);
 
     auto curOpTime = OpTime(Timestamp(2, 2), 1);
     auto curWallTime = Date_t::now();

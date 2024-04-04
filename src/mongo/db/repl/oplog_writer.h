@@ -33,6 +33,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_writer_batcher.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 namespace repl {
@@ -50,11 +51,13 @@ public:
      */
     class Options {
     public:
-        Options() : skipWritesToOplogColl(false) {}
-        explicit Options(bool skipWritesToOplogColl)
-            : skipWritesToOplogColl(skipWritesToOplogColl) {}
+        Options() = delete;
+        explicit Options(bool skipWritesToOplogColl, bool skipWritesToChangeColl)
+            : skipWritesToOplogColl(skipWritesToOplogColl),
+              skipWritesToChangeColl(skipWritesToChangeColl) {}
 
         const bool skipWritesToOplogColl;
+        const bool skipWritesToChangeColl;
     };
 
     // Used to report oplog write progress.
@@ -103,17 +106,37 @@ public:
                  boost::optional<std::size_t> bytes = boost::none);
 
     /**
-     * Writes a batch of oplog entries to the oplog and/or the change collection.
+     * Writes a batch of oplog entries to the oplog and/or the change collections.
      *
-     * If the batch write is successful, returns the optime of the last op written,
-     * which should be the last op in the batch.
+     * Returns false if nothing is written, true otherwise.
      *
-     * Oplog visibility and updates to replication coordinator timestamps should be
-     * handled by caller.
+     * External states such as oplog visibility, replication opTimes and journaling
+     * should be handled by the caller.
      */
-    virtual StatusWith<OpTime> writeOplogBatch(OperationContext* opCtx,
-                                               const std::vector<BSONObj>& ops) = 0;
+    virtual bool writeOplogBatch(OperationContext* opCtx, const std::vector<BSONObj>& ops) = 0;
 
+    /**
+     * Schedules the writes of the oplog batch to the oplog and/or the change collections
+     * using the thread pool. Use waitForScheduledWrites() after calling this function to
+     * wait for the writes to complete.
+     *
+     * Returns false if no write is scheduled, true otherwise.
+     *
+     * External states such as oplog visibility, replication opTimes and journaling
+     * should be handled by the caller.
+     */
+    virtual bool scheduleWriteOplogBatch(OperationContext* opCtx,
+                                         const std::vector<OplogEntry>& ops) = 0;
+
+    /**
+     * Wait for all scheduled writes to completed. This should be used in conjunction
+     * with scheduleWriteOplogBatch().
+     */
+    virtual void waitForScheduledWrites(OperationContext* opCtx) = 0;
+
+    /**
+     * Returns the options used to configure the behavior of this OplogWriter.
+     */
     const Options& getOptions() const;
 
 private:

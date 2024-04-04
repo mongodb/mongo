@@ -297,29 +297,29 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
 
     // Using noop observer for both writer and applier. During steady state replication,
     // there is no need to log details on every batch we apply.
-    // TODO (SERVER-87674): use a different thread pool.
     if (useOplogWriter) {
-        _oplogWriter = std::make_unique<OplogWriterImpl>(_oplogWriterTaskExecutor.get(),
-                                                         _oplogWriteBuffer.get(),
-                                                         _oplogApplyBuffer.get(),
-                                                         replCoord,
-                                                         _storageInterface,
-                                                         &noopOplogWriterObserver,
-                                                         OplogWriter::Options());
+        _oplogWriter = std::make_unique<OplogWriterImpl>(
+            _oplogWriterTaskExecutor.get(),
+            _oplogWriteBuffer.get(),
+            _oplogApplyBuffer.get(),
+            nullptr,
+            replCoord,
+            _storageInterface,
+            _replicationProcess->getConsistencyMarkers(),
+            &noopOplogWriterObserver,
+            OplogWriter::Options(false /* skipWritesToOplogColl */,
+                                 true /* skipWritesToChangeColl */));
     }
 
-    // TODO (SERVER-85697): clean up the applier options.
-    OplogApplier::Options applierOptions(OplogApplication::Mode::kSecondary,
-                                         useOplogWriter /* skipWritesToOplog */,
-                                         useOplogWriter /* skipWritesToChangeCollection */);
-    _oplogApplier = std::make_unique<OplogApplierImpl>(_oplogApplierTaskExecutor.get(),
-                                                       _oplogApplyBuffer.get(),
-                                                       &noopOplogApplierObserver,
-                                                       replCoord,
-                                                       _replicationProcess->getConsistencyMarkers(),
-                                                       _storageInterface,
-                                                       applierOptions,
-                                                       _writerPool.get());
+    _oplogApplier = std::make_unique<OplogApplierImpl>(
+        _oplogApplierTaskExecutor.get(),
+        _oplogApplyBuffer.get(),
+        &noopOplogApplierObserver,
+        replCoord,
+        _replicationProcess->getConsistencyMarkers(),
+        _storageInterface,
+        OplogApplier::Options(OplogApplication::Mode::kSecondary),
+        _writerPool.get());
 
     invariant(!_bgSync);
     _bgSync = std::make_unique<BackgroundSync>(

@@ -78,6 +78,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_writer_impl.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
@@ -207,26 +208,22 @@ public:
             std::make_unique<MongoDSessionCatalog>(
                 std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
-        _oplogBuffer = std::make_unique<repl::OplogBufferBlockingQueue>(kOplogBufferSize);
-
         repl::replWriterThreadCount = numThreads;  // Repl worker thread count
         repl::replWriterMinThreadCount = numThreads;
 
-        _oplogApplierThreadPool = repl::makeReplWriterPool();
+        _oplogWriterPool = repl::makeReplWriterPool();
 
-        repl::OplogApplier::Options oplogApplierOptions(
-            repl::OplogApplication::Mode::kSecondary,
-            false /* allowNamespaceNotFoundErrorsOnCrudOps */,
-            false /* skipWritesToOplog */,
-            false /* skipWritesToChangeCollection */);
-        _oplogApplier = std::make_unique<repl::OplogApplierImpl>(nullptr,
-                                                                 _oplogBuffer.get(),
-                                                                 &repl::noopOplogApplierObserver,
-                                                                 _replCoord,
-                                                                 &_consistencyMarkers,
-                                                                 _storageInterface,
-                                                                 oplogApplierOptions,
-                                                                 _oplogApplierThreadPool.get());
+        _oplogWriter = std::make_unique<repl::OplogWriterImpl>(
+            nullptr,
+            nullptr,
+            nullptr,
+            _oplogWriterPool.get(),
+            _replCoord,
+            _storageInterface,
+            &_consistencyMarkers,
+            &repl::noopOplogWriterObserver,
+            repl::OplogWriter::Options(false /* skipWritesToOplogColl */,
+                                       true /* skipWritesToChangeColl */));
 
         _svcCtx->notifyStorageStartupRecoveryComplete();
     }
@@ -293,12 +290,8 @@ public:
         return _replCoord;
     }
 
-    repl::OplogApplier* getOplogApplier() {
-        return _oplogApplier.get();
-    }
-
-    ThreadPool* getThreadPool() {
-        return _oplogApplierThreadPool.get();
+    repl::OplogWriter* getOplogWriter() {
+        return _oplogWriter.get();
     }
 
     repl::StorageInterface* getStorageInterface() {
@@ -309,13 +302,10 @@ private:
     ServiceContext* _svcCtx;
     Client* _client;
     repl::ReplicationCoordinatorMock* _replCoord;
-    std::unique_ptr<repl::OplogApplier> _oplogApplier;
+    std::unique_ptr<repl::OplogWriter> _oplogWriter;
     repl::StorageInterface* _storageInterface;
-
-    // This class also owns objects necessary for `_oplogApplier`.
-    std::unique_ptr<repl::OplogBufferBlockingQueue> _oplogBuffer;
     repl::ReplicationConsistencyMarkersMock _consistencyMarkers;
-    std::unique_ptr<ThreadPool> _oplogApplierThreadPool;
+    std::unique_ptr<ThreadPool> _oplogWriterPool;
     boost::optional<unittest::TempDir> _tempDir;
 };
 
@@ -329,10 +319,12 @@ class Fixture {
 public:
     Fixture(TestServiceContext* testSvcCtx) : _testSvcCtx(testSvcCtx), _foobarUUID(UUID::gen()) {}
 
-    void createBatch(int totalOps, int entrySize) {
+    void generateEntries(int totalOps, int entrySize) {
         const long long term1 = 1;
+        _oplogEntries.reserve(totalOps);
+
         for (int idx = 0; idx < totalOps; ++idx) {
-            auto x1 =
+            auto op =
                 BSON("op"
                      << "i"
                      << "ns"
@@ -340,7 +332,7 @@ public:
                      << "ui" << _foobarUUID << "o" << makeDoc(idx, entrySize) << "ts"
                      << Timestamp(1, idx) << "t" << term1 << "v" << 2 << "wall" << Date_t::now());
             // Size of the BSON obj will be 146 + entrySize bytes
-            _oplogEntries.emplace_back(x1);
+            _oplogEntries.emplace_back(op);
         }
     }
 
@@ -382,34 +374,48 @@ public:
         }
     }
 
-    void enqueueOplog(OperationContext* opCtx) {
-        _testSvcCtx->getOplogApplier()->enqueue(opCtx, _oplogEntries.begin(), _oplogEntries.end());
+    std::vector<std::vector<repl::OplogEntry>> getOplogBatches(size_t numEntriesPerBatch,
+                                                               size_t numBytesPerBatch) {
+        invariant(!_oplogEntries.empty());
+
+        std::vector<std::vector<repl::OplogEntry>> batches;
+        std::vector<repl::OplogEntry>::iterator first = _oplogEntries.begin();
+
+        std::size_t batchEntries = 1;
+        std::size_t batchBytes = first->getRawObjSizeBytes();
+
+        for (auto last = first + 1; last != _oplogEntries.end(); ++last) {
+            // Create a new batch if batch limits exceeded.
+            if ((batchEntries + 1 > numEntriesPerBatch) ||
+                (batchBytes + last->getRawObjSizeBytes() > numBytesPerBatch)) {
+                batches.emplace_back(first, last);
+                batchEntries = 1;
+                batchBytes = last->getRawObjSizeBytes();
+                first = last;
+                continue;
+            }
+            // Otherwise update batch stats and move on.
+            ++batchEntries;
+            batchBytes += last->getRawObjSizeBytes();
+        }
+        batches.emplace_back(first, _oplogEntries.end());
+
+        return batches;
     }
 
-    void writeOplog(OperationContext* opCtx, size_t numEntriesPerBatch, size_t numBytesPerBatch) {
-        while (!_testSvcCtx->getOplogApplier()->getBuffer()->isEmpty()) {
-            auto oplogBatch = invariantStatusOK(_testSvcCtx->getOplogApplier()->getNextApplierBatch(
-                                                    opCtx, {numBytesPerBatch, numEntriesPerBatch}))
-                                  .releaseBatch();
-
+    void writeOplog(OperationContext* opCtx,
+                    const std::vector<std::vector<repl::OplogEntry>>& batches) {
+        for (const auto& batch : batches) {
             AutoGetDb autoDb(opCtx, _foobarNs.dbName(), MODE_X);
-
-            _testSvcCtx->getOplogApplier()->scheduleWritesToOplogAndChangeCollection(
-                opCtx,
-                _testSvcCtx->getStorageInterface(),
-                _testSvcCtx->getThreadPool(),
-                std::move(oplogBatch),
-                false);
-
-            // Wait for writes to finish
-            _testSvcCtx->getThreadPool()->waitForIdle();
+            invariant(_testSvcCtx->getOplogWriter()->scheduleWriteOplogBatch(opCtx, batch));
+            _testSvcCtx->getOplogWriter()->waitForScheduledWrites(opCtx);
         }
     }
 
 private:
     TestServiceContext* _testSvcCtx;
 
-    std::vector<BSONObj> _oplogEntries;
+    std::vector<repl::OplogEntry> _oplogEntries;
     UUID _foobarUUID;
     NamespaceString _foobarNs = NamespaceString::createNamespaceString_forTest("foo.bar"_sd);
 };
@@ -421,9 +427,9 @@ void runBMTest(TestServiceContext& testSvcCtx, Fixture& fixture, benchmark::Stat
         auto opCtxRaii = testSvcCtx.getSvcCtx()->makeOperationContext(testSvcCtx.getClient());
         auto opCtx = opCtxRaii.get();
         repl::createOplog(opCtx);
-        fixture.enqueueOplog(opCtx);
+        auto batches = fixture.getOplogBatches(state.range(3), state.range(4));
         auto start = mongo::stdx::chrono::high_resolution_clock::now();
-        fixture.writeOplog(opCtx, state.range(3), state.range(4));
+        fixture.writeOplog(opCtx, batches);
         auto end = mongo::stdx::chrono::high_resolution_clock::now();
         auto elapsed_seconds =
             mongo::stdx::chrono::duration_cast<mongo::stdx::chrono::duration<double>>(end - start);
@@ -434,7 +440,7 @@ void runBMTest(TestServiceContext& testSvcCtx, Fixture& fixture, benchmark::Stat
 void BM_TestWriteOps(benchmark::State& state) {
     TestServiceContext testSvcCtx(state.range(0));
     Fixture fixture(&testSvcCtx);
-    fixture.createBatch(state.range(1), state.range(2));
+    fixture.generateEntries(state.range(1), state.range(2));
     runBMTest(testSvcCtx, fixture, state);
 }
 
