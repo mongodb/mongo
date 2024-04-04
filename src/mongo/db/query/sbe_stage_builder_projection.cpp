@@ -398,14 +398,17 @@ void postVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
 
             for (size_t i = 0; i < n; ++i) {
                 auto name = StringData(ctx.inputPlan->getFieldDict()[i]);
+                auto slot = ctx.slots->getIfExists(std::make_pair(PlanStageSlots::kField, name));
 
-                if (!spec->actions[i].isDrop()) {
-                    auto typedSlot = ctx.slots->get(std::make_pair(PlanStageSlots::kField, name));
-                    funcArgs.emplace_back(typedSlot);
-                } else {
-                    // If this field is a top-level drop, then we pass Nothing for the input field.
-                    funcArgs.emplace_back(b.makeNothingConstant());
-                }
+                tassert(8900500,
+                        "Expected slot to be defined",
+                        spec->actions[i].isDrop() || spec->actions[i].isValueArg() ||
+                            slot.has_value());
+
+                // If this field is a top-level drop, then we pass Nothing for the input field.
+                bool useSlot = slot.has_value() && !spec->actions[i].isDrop();
+
+                funcArgs.emplace_back(useSlot ? SbExpr{*slot} : b.makeNothingConstant());
             }
         }
 
