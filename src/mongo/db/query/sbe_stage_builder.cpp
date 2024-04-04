@@ -3231,6 +3231,18 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
             // Initialize 'projInputFields' eagerly.
             projInputFields = *fields;
 
+            // Filter out any top level creates from 'projInputFields'.
+            StringDataSet topLevelCreates;
+            for (size_t i = 0; i < nodes.size(); ++i) {
+                if ((nodes[i].isExpr() || nodes[i].isSbExpr()) &&
+                    paths[i].find('.') == std::string::npos) {
+                    topLevelCreates.emplace(paths[i]);
+                }
+            }
+
+            projInputFields = filterVector(std::move(projInputFields),
+                                           [&](auto&& f) { return !topLevelCreates.contains(f); });
+
             inputPlanSingleFields.emplace(std::move(*fields));
         }
     }
