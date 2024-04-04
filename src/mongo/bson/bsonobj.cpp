@@ -682,7 +682,7 @@ void BSONObj::getFields(unsigned n, const char** fieldNames, BSONElement* fields
 
 BSONElement BSONObj::getField(StringData name) const {
     const char* elem = objdata() + sizeof(int);
-    while (*elem) {
+    while (int8_t type = *elem) {
         auto ptr = elem;
         // Use the name comparison while computing the name length: this avoids having to look at
         // the same name bytes twice.
@@ -692,7 +692,7 @@ BSONElement BSONObj::getField(StringData name) const {
 
         // If the field name is found and complete, return the element.
         if (!*++ptr)
-            return BSONElement(elem, ptr - elem, BSONElement::TrustedInitTag{});
+            return BSONElement(elem, ptr - elem, BSONElement::computeSize(type, elem, ptr - elem));
 
         // The name is found, but the field name is not yet complete, so there's no match.
         ++ptr;
@@ -701,7 +701,7 @@ next:
         while (*ptr)
             ++ptr;
 
-        elem += BSONElement(elem, ptr - elem, BSONElement::TrustedInitTag{}).size();
+        elem += BSONElement::computeSize(type, elem, ptr - elem);
     }
     return BSONElement();
 }
@@ -844,8 +844,13 @@ BSONObj BSONObj::getObjectField(StringData name) const {
 
 int BSONObj::nFields() const {
     int n = 0;
-    for (BSONObjIterator i(*this); i.more(); i.next())
-        ++n;
+    BSONObjIterator i(*this);
+    while (i.moreWithEOO()) {
+        BSONElement e = i.next();
+        if (e.eoo())
+            break;
+        n++;
+    }
     return n;
 }
 
@@ -922,39 +927,39 @@ StringBuilder& operator<<(StringBuilder& s, const BSONObj& o) {
 }
 
 /** Compare two bson elements, provided as const char *'s, by field name. */
-class BSONIteratorSorted::FieldNameCmp {
+class BSONIteratorSorted::ElementFieldCmp {
 public:
-    FieldNameCmp(bool isArray);
-    bool operator()(StringData lhs, StringData rhs) const;
+    ElementFieldCmp(bool isArray);
+    bool operator()(const Field& lhs, const Field& rhs) const;
 
 private:
     str::LexNumCmp _cmp;
 };
 
-BSONIteratorSorted::FieldNameCmp::FieldNameCmp(bool isArray) : _cmp(!isArray) {}
+BSONIteratorSorted::ElementFieldCmp::ElementFieldCmp(bool isArray) : _cmp(!isArray) {}
 
-bool BSONIteratorSorted::FieldNameCmp::operator()(StringData lhs, StringData rhs) const {
+bool BSONIteratorSorted::ElementFieldCmp::operator()(const Field& lhs, const Field& rhs) const {
     // Just compare field names.
-    return _cmp(lhs, rhs);
+    return _cmp(lhs.fieldName, rhs.fieldName);
 }
 
-BSONIteratorSorted::BSONIteratorSorted(const BSONObj& o, const FieldNameCmp& cmp)
+BSONIteratorSorted::BSONIteratorSorted(const BSONObj& o, const ElementFieldCmp& cmp)
     : _fields(o.nFields()) {
     int x = 0;
     BSONObjIterator i(o);
     while (i.more()) {
         auto elem = i.next();
-        _fields[x++] = elem.fieldNameStringData();
+        _fields[x++] = {elem.fieldNameStringData(), elem.size()};
     }
     std::sort(_fields.begin(), _fields.end(), cmp);
     _cur = 0;
 }
 
 BSONObjIteratorSorted::BSONObjIteratorSorted(const BSONObj& object)
-    : BSONIteratorSorted(object, FieldNameCmp(false)) {}
+    : BSONIteratorSorted(object, ElementFieldCmp(false)) {}
 
 BSONArrayIteratorSorted::BSONArrayIteratorSorted(const BSONArray& array)
-    : BSONIteratorSorted(array, FieldNameCmp(true)) {}
+    : BSONIteratorSorted(array, ElementFieldCmp(true)) {}
 
 /**
  * Types used to represent BSONObj and BSONArray memory in the Visual Studio debugger

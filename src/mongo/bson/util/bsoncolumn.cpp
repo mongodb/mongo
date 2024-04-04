@@ -86,7 +86,10 @@ int ElementStorage::Element::size() const {
 }
 
 BSONElement ElementStorage::Element::element() const {
-    return {_buffer, _nameSize + 1, BSONElement::TrustedInitTag{}};
+    return {_buffer,
+            _nameSize + 1,
+            _valueSize + _nameSize + kElementValueOffset,
+            BSONElement::TrustedInitTag{}};
 }
 
 ElementStorage::ContiguousBlock::ContiguousBlock(ElementStorage& storage) : _storage(storage) {
@@ -374,7 +377,7 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
     }
 
     // Root objects always have an empty field name and we already know the total object size.
-    BSONElement obj(objdata, 1, BSONElement::TrustedInitTag{});
+    BSONElement obj(objdata, 1, objsize);
 
     _decompressed = obj;
 }
@@ -451,7 +454,7 @@ BSONColumn::Iterator::DecodingState::loadControl(ElementStorage& allocator,
     if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
         // Load BSONElement from the literal and set last encoded in case we need to calculate
         // deltas from this literal
-        BSONElement literalElem(buffer, 1, BSONElement::TrustedInitTag{});
+        BSONElement literalElem(buffer, 1, -1);
         loadUncompressed(literalElem);
         return {literalElem, literalElem.size()};
     }
@@ -718,7 +721,7 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
     while (byteIter != columnEnd) {
         control = static_cast<uint8_t>(*byteIter);
         if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
-            BSONElement literalElem(byteIter, 1, BSONElement::TrustedInitTag{});
+            BSONElement literalElem(byteIter, 1, -1);
             if (control == elementType) {
                 return true;
             } else if (control == BSONType::EOO) {

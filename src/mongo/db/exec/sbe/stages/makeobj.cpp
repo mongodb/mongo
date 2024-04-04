@@ -375,14 +375,15 @@ void MakeObjStageBase<MakeObjOutputType::BsonObject>::produceObject() {
             if (numFieldsRemaining > numFieldsRemainingThreshold ||
                 numFieldsRemaining != numComputedFieldsRemaining) {
                 while (be != end - 1) {
+                    const char* nextBe = nullptr;
 
                     auto sv = bson::fieldNameAndLength(be);
                     auto [found, projectIdx] = lookupField(sv);
 
                     if (projectIdx == std::numeric_limits<size_t>::max()) {
                         if (found == isInclusion) {
-                            bob.append(
-                                BSONElement(be, sv.size() + 1, BSONElement::TrustedInitTag{}));
+                            nextBe = bson::advance(be, sv.size());
+                            bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
                         }
 
                         numFieldsRemaining -= found;
@@ -396,13 +397,13 @@ void MakeObjStageBase<MakeObjOutputType::BsonObject>::produceObject() {
                     if (numFieldsRemaining <= numFieldsRemainingThreshold &&
                         numFieldsRemaining == numComputedFieldsRemaining) {
                         if (!isInclusion) {
-                            be = bson::advance(be, sv.size());
+                            be = nextBe ? nextBe : bson::advance(be, sv.size());
                         }
 
                         break;
                     }
 
-                    be = bson::advance(be, sv.size());
+                    be = nextBe ? nextBe : bson::advance(be, sv.size());
                 }
             }
 
@@ -411,10 +412,11 @@ void MakeObjStageBase<MakeObjOutputType::BsonObject>::produceObject() {
             if (!isInclusion) {
                 while (be != end - 1) {
                     auto sv = bson::fieldNameAndLength(be);
+                    auto nextBe = bson::advance(be, sv.size());
 
-                    bob.append(BSONElement(be, sv.size() + 1, BSONElement::TrustedInitTag{}));
+                    bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
 
-                    be = bson::advance(be, sv.size());
+                    be = nextBe;
                 }
             }
         } else if (tag == value::TypeTags::Object) {

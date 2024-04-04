@@ -63,12 +63,13 @@ void normalizeObject(const BSONObj& obj, BSONObjBuilder& builder) {
         BSONElement element() const {
             return BSONElement(fieldName.rawData() - 1,  // Include type byte before field name
                                fieldName.size() + 1,     // Include null terminator after field name
-                               BSONElement::TrustedInitTag{});
+                               totalSize);
         }
         bool operator<(const Field& rhs) const {
             return fieldName < rhs.fieldName;
         }
         StringData fieldName;
+        int totalSize;
     };
 
     // Put all elements in a buffer, sort it and then continue normalize in sorted order
@@ -80,7 +81,7 @@ void normalizeObject(const BSONObj& obj, BSONObjBuilder& builder) {
     int i = 0;
     while (bsonIt.more()) {
         auto elem = bsonIt.next();
-        fields[i++] = {elem.fieldNameStringData()};
+        fields[i++] = {elem.fieldNameStringData(), elem.size()};
     }
     auto it = fields.begin();
     auto end = fields.end();

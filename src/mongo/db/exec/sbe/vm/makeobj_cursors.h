@@ -101,7 +101,8 @@ public:
 private:
     MONGO_COMPILER_ALWAYS_INLINE BSONElement bsonElement() const {
         auto fieldNameLenWithNull = _name.size() + 1;
-        return BSONElement(_be, fieldNameLenWithNull, BSONElement::TrustedInitTag{});
+        auto totalSize = _nextBe - _be;
+        return BSONElement(_be, fieldNameLenWithNull, totalSize, BSONElement::TrustedInitTag{});
     }
 
     const char* _be{nullptr};
