@@ -59,6 +59,9 @@ function applyCRUDOnColl(coll) {
     coll.insert({age: 42});
     coll.update({age: 42}, {$set: {name: "john"}});
     coll.deleteMany({});
+    // Leaving one document around in the collection is intentional: it validates that the fast
+    // count stays accurate after replaying the oplog in queryable backup mode. See SERVER-88931.
+    coll.insert({age: 43});
 }
 applyCRUDOnColl(st.s.getDB(kDbName)[kShardedCollName]);
 applyCRUDOnColl(st.s.getDB(kDbName)[kUnshardedCollName]);
@@ -90,8 +93,8 @@ const newMongoD = MongoRunner.runMongod({
 });
 
 jsTest.log("Going to verify the number of documents of both collections");
-assert.eq(newMongoD.getDB(kDbName)[kShardedCollName].find({}).itcount(), 0);
-assert.eq(newMongoD.getDB(kDbName)[kUnshardedCollName].find({}).itcount(), 0);
+assert.eq(newMongoD.getDB(kDbName)[kShardedCollName].find({}).itcount(), 1);
+assert.eq(newMongoD.getDB(kDbName)[kUnshardedCollName].find({}).itcount(), 1);
 
 jsTest.log("Going to stop the shardsvr queryable backup mode mongod process");
 MongoRunner.stopMongod(newMongoD);
