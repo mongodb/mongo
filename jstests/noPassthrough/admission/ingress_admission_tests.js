@@ -1,6 +1,6 @@
 /**
  * Test that the ingress admission control works correctly.
- * @tags: [featureFlagIngressAdmissionControl]
+ * @tags: [requires_fcv_80]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

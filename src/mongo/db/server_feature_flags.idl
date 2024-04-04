@@ -162,7 +162,7 @@ feature_flags:
     featureFlagIngressAdmissionControl:
         description: "Feature flag to enable data node ingress admission control"
         cpp_varname: gFeatureFlagIngressAdmissionControl
-        default: false
+        default: true
         shouldBeFCVGated: false
     featureFlagPrefetch:
         description: "Feature flag to make pre-fetching available"
