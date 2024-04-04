@@ -7,6 +7,11 @@ set -o errexit
 set -o verbose
 
 activate_venv
+setup_db_contrib_tool
+
+export PIPX_HOME="${workdir}/pipx"
+export PIPX_BIN_DIR="${workdir}/pipx/bin"
+export PATH="$PATH:$PIPX_BIN_DIR"
 
 rm -rf /data/install /data/multiversion
 
@@ -39,13 +44,14 @@ version=${version#v}
 
 # This is primarily for tests for infrastructure which don't always need the latest
 # binaries.
-$python buildscripts/resmoke.py setup-multiversion \
+db-contrib-tool setup-repro-env \
   --installDir /data/install \
   --linkDir /data/multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --useLatest $version
+  --debug \
+  $version
 
 version_dir=$(find /data/install -type d -iname "*$version*")
 mv $version_dir/dist-test $(pwd)

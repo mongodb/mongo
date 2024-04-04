@@ -7,6 +7,11 @@ set -o errexit
 set -o verbose
 
 activate_venv
+setup_db_contrib_tool
+
+export PIPX_HOME="${workdir}/pipx"
+export PIPX_BIN_DIR="${workdir}/pipx/bin"
+export PATH="$PATH:$PIPX_BIN_DIR"
 
 rm -rf /data/install /data/multiversion
 
@@ -14,13 +19,14 @@ edition="${multiversion_edition}"
 platform="${multiversion_platform}"
 architecture="${multiversion_architecture}"
 
-$python buildscripts/resmoke.py setup-multiversion \
+db-contrib-tool setup-repro-env \
   --installDir /data/install \
   --linkDir /data/multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --useLatest 4.0
+  --debug \
+  4.0
 
 # The platform and architecture for how some of the binaries are reported in
 # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
@@ -39,13 +45,14 @@ if [ ! -z "${multiversion_architecture_42_or_later}" ]; then
   architecture="${multiversion_architecture_42_or_later}"
 fi
 
-$python buildscripts/resmoke.py setup-multiversion \
+db-contrib-tool setup-repro-env \
   --installDir /data/install \
   --linkDir /data/multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --useLatest 4.2
+  --debug \
+  4.2
 
 # The platform and architecture for how some of the binaries are reported in
 # https://downloads.mongodb.org/full.json changed between MongoDB 4.2 and MongoDB 4.4.
@@ -64,10 +71,11 @@ if [ ! -z "${multiversion_architecture_44_or_later}" ]; then
   architecture="${multiversion_architecture_44_or_later}"
 fi
 
-$python buildscripts/resmoke.py setup-multiversion \
+db-contrib-tool setup-repro-env \
   --installDir /data/install \
   --linkDir /data/multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --useLatest 4.4
+  --debug \
+  4.4

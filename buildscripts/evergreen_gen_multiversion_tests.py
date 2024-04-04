@@ -15,8 +15,10 @@ import requests
 import click
 import structlog
 
+from buildscripts.resmokelib.core.programs import get_path_env_var
 from buildscripts.resmokelib.multiversionconstants import (
     LAST_LTS_MONGO_BINARY, LAST_CONTINUOUS_MONGO_BINARY, REQUIRES_FCV_TAG)
+from buildscripts.resmokelib.utils import is_windows
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.fileops import read_yaml_file
 import buildscripts.ciconfig.tags as _tags
@@ -40,10 +42,16 @@ BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/10gen/mongo"
 
 def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
     """Parse the last-lts shell binary to get the commit hash."""
-    if platform.startswith("win"):
-        shell_version = check_output([mongo_shell_path + ".exe", "--version"]).decode('utf-8')
-    else:
-        shell_version = check_output([mongo_shell_path, "--version"]).decode('utf-8')
+    env_vars = os.environ.copy()
+    paths = get_path_env_var(env_vars=env_vars)
+    env_vars["PATH"] = os.pathsep.join(paths)
+
+    mongo_shell = mongo_shell_path
+    if is_windows():
+        mongo_shell = mongo_shell_path + ".exe"
+
+    shell_version = check_output(f"{mongo_shell} --version", shell=True,
+                                 env=env_vars).decode('utf-8')
     for line in shell_version.splitlines():
         if "gitVersion" in line:
             version_line = line.split(':')[1]

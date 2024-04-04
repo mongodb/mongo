@@ -11,12 +11,12 @@ import re
 import sys
 import time
 
-import requests
 import structlog
 import yaml
 
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.setup_multiversion import config, download, evergreen_conn, github_conn
+from buildscripts.resmokelib.utils import is_windows
 
 SUBCOMMAND = "setup-multiversion"
 
@@ -47,9 +47,8 @@ class SetupMultiversion(Subcommand):
     def __init__(self, options):
         """Initialize."""
         setup_logging(options.debug)
-        cwd = os.getcwd()
-        self.install_dir = os.path.join(cwd, options.install_dir)
-        self.link_dir = os.path.join(cwd, options.link_dir)
+        self.install_dir = os.path.abspath(options.install_dir)
+        self.link_dir = os.path.abspath(options.link_dir)
 
         self.edition = options.edition.lower() if options.edition else None
         self.platform = options.platform.lower() if options.platform else None
@@ -69,6 +68,9 @@ class SetupMultiversion(Subcommand):
             raw_yaml = yaml.safe_load(file_handle)
         self.config = config.SetupMultiversionConfig(raw_yaml)
 
+        self._is_windows = is_windows()
+        self._windows_bin_install_dirs = []
+
     @staticmethod
     def _get_bin_suffix(version, evg_project_id):
         """Get the multiversion bin suffix from the evergreen project ID."""
@@ -83,30 +85,6 @@ class SetupMultiversion(Subcommand):
             # Use the Evergreen project ID as fallback.
             return re.search(r"(\d+\.\d+$)", evg_project_id).group(0)
 
-    def get_backup_url(self, target_version):
-        """Get the backup url from downloads.mongodb.org/current.json."""
-        # If these attributes are not set, we can't get the backup url
-        if not self.architecture or not self.edition or not self.platform:
-            return None
-
-        # Get released mongo version data
-        current_json = requests.get('https://downloads.mongodb.org/current.json')
-        current_releases = current_json.json()
-
-        # Find a match in current.json
-        for version in current_releases['versions']:
-            if version['version'].startswith(target_version):
-                for download_obj in version['downloads']:
-                    if download_obj.get('arch', None) == self.architecture and download_obj.get(
-                            'edition', None) == self.edition and download_obj.get(
-                                'target', None) == self.platform:
-                        backup_url = download_obj.get('archive', {}).get('url', None)
-                        LOGGER.info(
-                            "Found backup url from https://downloads.mongodb.org/current.json: ",
-                            backup_url=backup_url)
-                        return backup_url
-        return None
-
     def execute(self):
         """Execute setup multiversion mongodb."""
 
@@ -118,7 +96,6 @@ class SetupMultiversion(Subcommand):
                 urls = {}
                 if self.use_latest:
                     urls = self.get_latest_urls(version)
-                    urls['backup_url'] = self.get_backup_url(version)
                 if not urls:
                     LOGGER.warning("Latest URL is not available or not requested, "
                                    "we fallback to getting the URL for a specific "
@@ -127,7 +104,6 @@ class SetupMultiversion(Subcommand):
 
                 artifacts_url = urls.get("Artifacts", "") if self.download_artifacts else None
                 binaries_url = urls.get("Binaries", "") if self.download_binaries else None
-                backup_url = urls.get("backup_url", "") if self.download_binaries else None
                 download_symbols_url = None
 
                 if self.download_symbols:
@@ -139,8 +115,12 @@ class SetupMultiversion(Subcommand):
                 # Give each version a unique install dir
                 install_dir = os.path.join(self.install_dir, version)
 
-                self.setup_mongodb(artifacts_url, binaries_url, backup_url, download_symbols_url,
-                                   install_dir, bin_suffix, self.link_dir)
+                self.setup_mongodb(artifacts_url, binaries_url, download_symbols_url, install_dir,
+                                   bin_suffix, link_dir=self.link_dir,
+                                   install_dir_list=self._windows_bin_install_dirs)
+
+                if self._is_windows:
+                    self._write_windows_install_paths(self._windows_bin_install_dirs)
 
             except (github_conn.GithubConnError, evergreen_conn.EvergreenConnError,
                     download.DownloadError) as ex:
@@ -150,6 +130,13 @@ class SetupMultiversion(Subcommand):
             else:
                 LOGGER.info("Setup version completed.", version=version)
                 LOGGER.info("-" * 50)
+
+    @staticmethod
+    def _write_windows_install_paths(paths):
+        with open(config.WINDOWS_BIN_PATHS_FILE, "w") as out:
+            out.write(os.pathsep.join(paths))
+
+        LOGGER.info(f"Finished writing binary paths on Windows to {config.WINDOWS_BIN_PATHS_FILE}")
 
     def get_latest_urls(self, version):
         """Return latest urls."""
@@ -208,18 +195,19 @@ class SetupMultiversion(Subcommand):
         return urls
 
     @staticmethod
-    def setup_mongodb(artifacts_url, binaries_url, backup_url, symbols_url, install_dir,
-                      bin_suffix=None, link_dir=None):
+    def setup_mongodb(artifacts_url, binaries_url, symbols_url, install_dir, bin_suffix=None,
+                      link_dir=None, install_dir_list=None):
         # pylint: disable=too-many-arguments
         """Download, extract and symlink."""
 
-        def try_download(download_url):
-            tarball = download.download_from_s3(download_url)
-            download.extract_archive(tarball, install_dir)
-            os.remove(tarball)
-
-        for url in [artifacts_url, symbols_url]:
+        for url in [artifacts_url, binaries_url, symbols_url]:
             if url is not None:
+
+                def try_download(download_url):
+                    tarball = download.download_from_s3(download_url)
+                    download.extract_archive(tarball, install_dir)
+                    os.remove(tarball)
+
                 try:
                     try_download(url)
                 except Exception as err:  # pylint: disable=broad-except
@@ -229,22 +217,17 @@ class SetupMultiversion(Subcommand):
                     try_download(url)
 
         if binaries_url is not None:
-            try:
-                try_download(binaries_url)
-            except Exception as err:  # pylint: disable=broad-except
-                LOGGER.warning("Setting up binaries tarball failed with error, retrying once...",
-                               error=err)
-                time.sleep(1)
-                if backup_url:
-                    LOGGER.info("Using backup url for download.")
-                    try_download(backup_url)
-                else:
-                    try_download(binaries_url)
-
-        if binaries_url is not None:
             if not link_dir:
                 raise ValueError("link_dir must be specified if downloading binaries")
-            download.symlink_version(bin_suffix, install_dir, link_dir)
+
+            if not is_windows():
+                link_dir = download.symlink_version(bin_suffix, install_dir, link_dir)
+            else:
+                LOGGER.info(
+                    "Linking to install_dir on Windows; executable have to live in different working"
+                    " directories to avoid DLLs for different versions clobbering each other")
+                link_dir = download.symlink_version(bin_suffix, install_dir, None)
+            install_dir_list.append(link_dir)
 
     def get_buildvariant_name(self, major_minor_version):
         """Return buildvariant name.

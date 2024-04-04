@@ -18,3 +18,4 @@ PyGithub == 1.53
 urllib3 >= 1.26.0, <= 1.26.7
 distro == 1.5.0
 proxy-protocol == 0.7.5
+pipx==1.2.0

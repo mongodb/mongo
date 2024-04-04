@@ -6,6 +6,8 @@ import itertools
 import os.path
 import time
 
+import buildscripts.resmokelib.setup_multiversion.config as multiversion_config
+
 # Subdirectory under the dbpath prefix that contains directories with data files of mongod's started
 # by resmoke.py.
 FIXTURE_SUBDIR = "resmoke"
@@ -37,7 +39,10 @@ DEFAULT_DBPATH_PREFIX = os.path.normpath("/data/db")
 
 # Default directory that we expect to contain binaries for multiversion testing. This directory is
 # added to the PATH when calling programs.make_process().
-DEFAULT_MULTIVERSION_DIR = os.path.normpath("/data/multiversion")
+DEFAULT_MULTIVERSION_DIRS = [os.path.normpath("/data/multiversion")]
+if os.path.isfile(multiversion_config.WINDOWS_BIN_PATHS_FILE):
+    with open(multiversion_config.WINDOWS_BIN_PATHS_FILE) as wbpf:
+        DEFAULT_MULTIVERSION_DIRS.extend(wbpf.read().split(os.pathsep))
 
 # Default location for the genny executable. Override this in the YAML suite configuration if
 # desired.
