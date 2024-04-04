@@ -31,19 +31,14 @@
 
 #include <utility>
 
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/duration.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -62,6 +57,7 @@ TicketHolderManager::TicketHolderManager(std::unique_ptr<TicketHolder> readTicke
 
 Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& newWriteTransactions) {
     if (auto client = Client::getCurrent()) {
+        auto opCtx = client->getOperationContext();
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
         if (!ticketHolderManager) {
             LOGV2_WARNING(7323602,
@@ -83,7 +79,7 @@ Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& new
 
         auto& writer = ticketHolderManager->_writeTicketHolder;
         if (writer) {
-            writer->resize(newWriteTransactions, Date_t::max());
+            writer->resize(opCtx, newWriteTransactions, Date_t::max());
             return Status::OK();
         }
         LOGV2_WARNING(6754202,
@@ -98,6 +94,7 @@ Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& new
 
 Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newReadTransactions) {
     if (auto client = Client::getCurrent()) {
+        auto opCtx = client->getOperationContext();
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
         if (!ticketHolderManager) {
             LOGV2_WARNING(7323601,
@@ -118,7 +115,7 @@ Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newR
 
         auto& reader = ticketHolderManager->_readTicketHolder;
         if (reader) {
-            reader->resize(newReadTransactions, Date_t::max());
+            reader->resize(opCtx, newReadTransactions, Date_t::max());
             return Status::OK();
         }
 

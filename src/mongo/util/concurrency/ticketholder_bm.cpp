@@ -144,8 +144,8 @@ void BM_acquireAndRelease(benchmark::State& state) {
         Microseconds timeForAcquire;
         {
             auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
-            auto ticket = fixture->ticketHolder->waitForTicketUntil(
-                *Interruptible::notInterruptible(), &admCtx, Date_t::max());
+            auto ticket =
+                fixture->ticketHolder->waitForTicketUntil(opCtx.get(), &admCtx, Date_t::max());
             timeForAcquire = timer.elapsed();
             state.PauseTiming();
             sleepmicros(1);

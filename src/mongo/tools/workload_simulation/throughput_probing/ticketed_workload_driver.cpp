@@ -160,7 +160,7 @@ void TicketedWorkloadDriver::_read(int32_t i) {
 
     while (_readRunning.load() >= i) {
         auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
-        Ticket ticket = _readTicketHolder->waitForTicket(*opCtx, &admCtx);
+        Ticket ticket = _readTicketHolder->waitForTicket(opCtx.get(), &admCtx);
         _doRead(opCtx.get(), &admCtx);
     }
 }
@@ -171,7 +171,7 @@ void TicketedWorkloadDriver::_write(int32_t i) {
 
     while (_writeRunning.load() >= i) {
         auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
-        Ticket ticket = _writeTicketHolder->waitForTicket(*opCtx, &admCtx);
+        Ticket ticket = _writeTicketHolder->waitForTicket(opCtx.get(), &admCtx);
         _doWrite(opCtx.get(), &admCtx);
     }
 }

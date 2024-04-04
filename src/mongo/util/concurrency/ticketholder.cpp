@@ -29,14 +29,7 @@
 
 #include "mongo/util/concurrency/ticketholder.h"
 
-#include <algorithm>
-#include <boost/none.hpp>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/util/duration.h"
-#include "mongo/util/interruptible.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source.h"
 
@@ -65,7 +58,7 @@ void TicketHolder::_updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx
 TicketHolder::TicketHolder(ServiceContext* svcCtx, int32_t numTickets, bool trackPeakUsed)
     : _trackPeakUsed(trackPeakUsed), _outof(numTickets), _serviceContext(svcCtx) {}
 
-bool TicketHolder::resize(int32_t newSize, Date_t deadline) noexcept {
+bool TicketHolder::resize(OperationContext* opCtx, int32_t newSize, Date_t deadline) noexcept {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
     auto difference = newSize - _outof.load();
@@ -81,8 +74,7 @@ bool TicketHolder::resize(int32_t newSize, Date_t deadline) noexcept {
         // Take tickets one-by-one without releasing.
         for (auto remaining = -difference; remaining > 0; remaining--) {
             // This call bypasses statistics reporting.
-            auto ticket =
-                _waitForTicketUntilImpl(*Interruptible::notInterruptible(), &admCtx, deadline);
+            auto ticket = _waitForTicketUntilImpl(opCtx, &admCtx, deadline, true);
             if (!ticket) {
                 // We timed out getting a ticket, fail the resize.
                 return false;
@@ -118,8 +110,8 @@ void TicketHolder::_releaseToTicketPool(Ticket& ticket) noexcept {
     _releaseToTicketPoolImpl(ticket._admissionContext);
 }
 
-Ticket TicketHolder::waitForTicket(Interruptible& interruptible, AdmissionContext* admCtx) {
-    auto res = waitForTicketUntil(interruptible, admCtx, Date_t::max());
+Ticket TicketHolder::waitForTicket(OperationContext* opCtx, AdmissionContext* admCtx) {
+    auto res = waitForTicketUntil(opCtx, admCtx, Date_t::max());
     invariant(res);
     return std::move(*res);
 }
@@ -140,9 +132,10 @@ boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
     return ticket;
 }
 
-boost::optional<Ticket> TicketHolder::waitForTicketUntil(Interruptible& interruptible,
-                                                         AdmissionContext* admCtx,
-                                                         Date_t until) {
+boost::optional<Ticket> TicketHolder::_waitForTicketUntil(OperationContext* opCtx,
+                                                          AdmissionContext* admCtx,
+                                                          Date_t until,
+                                                          bool interruptible) {
     // Attempt a quick acquisition first.
     if (auto ticket = tryAcquire(admCtx)) {
         return ticket;
@@ -163,7 +156,7 @@ boost::optional<Ticket> TicketHolder::waitForTicketUntil(Interruptible& interrup
     });
 
     WaitingForAdmissionGuard waitForAdmission(admCtx, _serviceContext->getTickSource());
-    auto ticket = _waitForTicketUntilImpl(interruptible, admCtx, until);
+    auto ticket = _waitForTicketUntilImpl(opCtx, admCtx, until, interruptible);
 
     if (ticket) {
         cancelWait.dismiss();
@@ -173,6 +166,17 @@ boost::optional<Ticket> TicketHolder::waitForTicketUntil(Interruptible& interrup
     } else {
         return boost::none;
     }
+}
+
+boost::optional<Ticket> TicketHolder::waitForTicketUntil(OperationContext* opCtx,
+                                                         AdmissionContext* admCtx,
+                                                         Date_t until) {
+    return _waitForTicketUntil(opCtx, admCtx, until, true);
+}
+
+boost::optional<Ticket> TicketHolder::waitForTicketUntilNoInterrupt_DO_NOT_USE(
+    OperationContext* opCtx, AdmissionContext* admCtx, Date_t until) {
+    return _waitForTicketUntil(opCtx, admCtx, until, false);
 }
 
 int32_t TicketHolder::getAndResetPeakUsed() {
@@ -215,7 +219,7 @@ void MockTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexce
     _available++;
 }
 
-boost::optional<Ticket> MockTicketHolder::tryAcquire(AdmissionContext* admCtx) {
+boost::optional<Ticket> MockTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
     if (_available <= 0) {
         return boost::none;
     }
@@ -226,25 +230,10 @@ boost::optional<Ticket> MockTicketHolder::tryAcquire(AdmissionContext* admCtx) {
     return Ticket{this, admCtx};
 }
 
-Ticket MockTicketHolder::waitForTicket(Interruptible& interruptible, AdmissionContext* admCtx) {
-    auto ticket = tryAcquire(admCtx);
-    invariant(ticket);
-    return std::move(ticket.get());
-}
-
-boost::optional<Ticket> MockTicketHolder::waitForTicketUntil(Interruptible& interruptible,
-                                                             AdmissionContext* admCtx,
-                                                             Date_t until) {
-    return tryAcquire(admCtx);
-}
-
-boost::optional<Ticket> MockTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
-    return tryAcquire(admCtx);
-}
-
-boost::optional<Ticket> MockTicketHolder::_waitForTicketUntilImpl(Interruptible&,
+boost::optional<Ticket> MockTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
                                                                   AdmissionContext* admCtx,
-                                                                  Date_t until) {
-    return tryAcquire(admCtx);
+                                                                  Date_t until,
+                                                                  bool interruptible) {
+    return _tryAcquireImpl(admCtx);
 }
 }  // namespace mongo

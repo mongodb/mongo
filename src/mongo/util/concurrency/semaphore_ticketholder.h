@@ -56,9 +56,10 @@ public:
     int64_t numFinishedProcessing() const final;
 
 private:
-    boost::optional<Ticket> _waitForTicketUntilImpl(Interruptible& interruptible,
+    boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
                                                     AdmissionContext* admCtx,
-                                                    Date_t until) final;
+                                                    Date_t until,
+                                                    bool interruptible) final;
 
     boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) final;
     void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept final;

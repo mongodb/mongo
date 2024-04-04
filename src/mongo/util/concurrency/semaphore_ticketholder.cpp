@@ -29,6 +29,8 @@
 
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 
+#include "mongo/db/operation_context.h"
+
 namespace mongo {
 
 int64_t SemaphoreTicketHolder::numFinishedProcessing() const {
@@ -61,9 +63,10 @@ boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext*
     }
 }
 
-boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Interruptible& interruptible,
+boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
                                                                        AdmissionContext* admCtx,
-                                                                       Date_t until) {
+                                                                       Date_t until,
+                                                                       bool interruptible) {
     auto nextDeadline = [&]() {
         // Timed waits can be problematic if we have a large number of waiters, since each time we
         // check for interrupt we risk waking up all waiting threads at the same time. We introduce
@@ -85,13 +88,19 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Interrupt
             }
 
             deadline = nextDeadline();
-            interruptible.checkForInterrupt();
+            if (interruptible) {
+                opCtx->checkForInterrupt();
+            }
         }
 
         uint32_t available = _tickets.load();
         if (available > 0 && _tickets.compareAndSwap(&available, available - 1)) {
             Ticket ticket{this, admCtx};
-            interruptible.checkForInterrupt();
+
+            if (interruptible) {
+                opCtx->checkForInterrupt();
+            }
+
             return std::move(ticket);
         }
     }

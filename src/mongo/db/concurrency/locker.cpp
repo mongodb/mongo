@@ -1000,20 +1000,22 @@ bool Locker::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadl
         // hole.
         invariant(!shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
 
-        if (auto ticket = holder->waitForTicketUntil(
-                opCtx->uninterruptibleLocksRequested_DO_NOT_USE()  // NOLINT
-                    ? *Interruptible::notInterruptible()
-                    : *opCtx,
-                &ExecutionAdmissionContext::get(opCtx),
-                deadline)) {
-            // TODO(SERVER-88732): Remove `_timeQueuedForTicketMicros` when we only track admission
-            // context for waiting metrics.
-            _timeQueuedForTicketMicros =
-                ExecutionAdmissionContext::get(opCtx).totalTimeQueuedMicros();
-            _ticket = std::move(*ticket);
-        } else {
+        _ticket = [&]() {
+            ExecutionAdmissionContext* admCtx = &ExecutionAdmissionContext::get(opCtx);
+            if (opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
+                return holder->waitForTicketUntilNoInterrupt_DO_NOT_USE(opCtx, admCtx, deadline);
+            }
+
+            return holder->waitForTicketUntil(opCtx, admCtx, deadline);
+        }();
+
+        if (!_ticket) {
             return false;
         }
+
+        // TODO(SERVER-88732): Remove `_timeQueuedForTicketMicros` when we only track admission
+        // context for waiting metrics.
+        _timeQueuedForTicketMicros = ExecutionAdmissionContext::get(opCtx).totalTimeQueuedMicros();
         restoreStateOnErrorGuard.dismiss();
     }
 
