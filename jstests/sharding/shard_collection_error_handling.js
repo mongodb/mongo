@@ -34,8 +34,10 @@ function testNonRetriableErrorInsideCommitPhase(createAsUnsharded) {
     // Start creating a new sharded collection in a parallel shell and hang before committing.
     const awaitShardCollection = startParallelShell(
         funWithArgs(function(ns) {
-            assert.commandFailedWithCode(db.adminCommand({shardCollection: ns, key: {x: "hashed"}}),
-                                         ErrorCodes.InvalidOptions);
+            assert.soon(() => {
+                let res = db.adminCommand({shardCollection: ns, key: {x: "hashed"}});
+                return res.ok == 0 && res.code == ErrorCodes.InvalidOptions;
+            });
         }, ns), st.s.port);
 
     fp.wait();
@@ -51,7 +53,6 @@ function testNonRetriableErrorInsideCommitPhase(createAsUnsharded) {
     // persisted variables, i.e. chunk distribution.
     const primaryNode = st.rs0.getPrimary();
     st.rs0.freeze(primaryNode);
-    st.rs0.waitForPrimary();
 
     awaitShardCollection();
     fp.off();
@@ -113,10 +114,13 @@ function testRetriableErrorWithoutInvolvingDBPrimaryShardAtSecondExecution(creat
         st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 0}, max: {x: MaxKey}, zone: "B_2"}));
 
     // Start creating a new sharded collection in a parallel shell and hang before committing.
-    const awaitShardCollection = startParallelShell(
-        funWithArgs(function(ns) {
-            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
-        }, ns), st.s.port);
+    const awaitShardCollection =
+        startParallelShell(funWithArgs(function(ns) {
+                               assert.soon(() => {
+                                   let res = db.adminCommand({shardCollection: ns, key: {x: 1}});
+                                   return res.ok == 1;
+                               });
+                           }, ns), st.s.port);
 
     fp.wait();
 
@@ -130,7 +134,6 @@ function testRetriableErrorWithoutInvolvingDBPrimaryShardAtSecondExecution(creat
     // persisted variables, i.e. chunk distribution.
     const primaryNode = st.rs0.getPrimary();
     st.rs0.freeze(primaryNode);
-    st.rs0.waitForPrimary();
 
     awaitShardCollection();
     fp.off();
@@ -182,10 +185,13 @@ function testRetriableErrorWithoutInvolvingParticipantShardAtSecondExecution(cre
         st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 0}, max: {x: MaxKey}, zone: "B_3"}));
 
     // Start creating a new sharded collection in a parallel shell and hang before committing.
-    const awaitShardCollection = startParallelShell(
-        funWithArgs(function(ns) {
-            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
-        }, ns), st.s.port);
+    const awaitShardCollection =
+        startParallelShell(funWithArgs(function(ns) {
+                               assert.soon(() => {
+                                   let res = db.adminCommand({shardCollection: ns, key: {x: 1}});
+                                   return res.ok == 1;
+                               });
+                           }, ns), st.s.port);
 
     fp.wait();
 
@@ -199,7 +205,6 @@ function testRetriableErrorWithoutInvolvingParticipantShardAtSecondExecution(cre
     // persisted variables, i.e. chunk distribution.
     const primaryNode = st.rs0.getPrimary();
     st.rs0.freeze(primaryNode);
-    st.rs0.waitForPrimary();
 
     awaitShardCollection();
     fp.off();
