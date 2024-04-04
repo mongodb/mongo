@@ -99,7 +99,6 @@ using namespace fmt::literals;
 // TODO SERVER-39704: Remove this fail point once the router can safely retry within a transaction
 // on stale version and snapshot errors.
 MONGO_FAIL_POINT_DEFINE(enableStaleVersionAndSnapshotRetriesWithinTransactions);
-MONGO_FAIL_POINT_DEFINE(includeAdditionalParticipantInResponse);
 
 const char kCoordinatorField[] = "coordinator";
 const char kReadConcernLevelSnapshotName[] = "snapshot";
@@ -786,39 +785,8 @@ const boost::optional<ShardId>& TransactionRouter::Router::getRecoveryShardId() 
 }
 
 boost::optional<StringMap<boost::optional<bool>>>
-TransactionRouter::Router::getAdditionalParticipantsForResponse(
-    OperationContext* opCtx,
-    boost::optional<const std::string&> commandName,
-    boost::optional<const NamespaceString&> nss) {
+TransactionRouter::Router::getAdditionalParticipantsForResponse(OperationContext* opCtx) {
     boost::optional<StringMap<boost::optional<bool>>> participants = boost::none;
-
-    // TODO SERVER-85353 Remove theis block that injects adding participants through the failpoint
-    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns.
-    if (gFeatureFlagAllowAdditionalParticipants.isEnabledAndIgnoreFCVUnsafe()) {
-        std::vector<BSONElement> shardIdsFromFpData;
-        boost::optional<bool> readOnly = boost::none;
-        if (MONGO_unlikely(
-                includeAdditionalParticipantInResponse.shouldFail([&](const BSONObj& data) {
-                    if (data.hasField("cmdName") && data.hasField("ns") &&
-                        data.hasField("shardId")) {
-                        shardIdsFromFpData = data.getField("shardId").Array();
-                        if (data.getField("readOnly")) {
-                            readOnly = boost::make_optional<bool>(data.getField("readOnly").Bool());
-                        }
-                        const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
-                        return ((data.getStringField("cmdName") == *commandName) &&
-                                (fpNss == *nss));
-                    }
-                    return false;
-                }))) {
-            participants.emplace();
-            for (auto& element : shardIdsFromFpData) {
-                participants->try_emplace(element.valueStringData().toString(), readOnly);
-            }
-
-            return participants;
-        }
-    }
 
     if (!o().subRouter || (opCtx->getTxnNumber() != o().txnNumberAndRetryCounter.getTxnNumber()) ||
         (opCtx->getTxnRetryCounter() &&
