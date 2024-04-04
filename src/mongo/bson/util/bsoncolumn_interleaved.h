@@ -48,7 +48,7 @@ using BufferVector = boost::container::small_vector<T, 1>;
 template <typename Buffer>
 struct BlockBasedSubObjectFinisher {
     BlockBasedSubObjectFinisher(const BufferVector<Buffer*>& buffers) : _buffers(buffers) {}
-    void finish(const char* elemBytes, int fieldNameSize);
+    void finish(const char* elemBytes, int fieldNameSize, int totalSize);
     void finishMissing();
 
     const BufferVector<Buffer*>& _buffers;
@@ -233,8 +233,10 @@ inline BlockBasedInterleavedDecompressor::DecodingState::DecodingState() = defau
 inline BlockBasedInterleavedDecompressor::DecodingState::Decoder64::Decoder64() = default;
 
 template <typename Buffer>
-void BlockBasedSubObjectFinisher<Buffer>::finish(const char* elemBytes, int fieldNameSize) {
-    BSONElement elem{elemBytes, fieldNameSize, BSONElement::TrustedInitTag{}};
+void BlockBasedSubObjectFinisher<Buffer>::finish(const char* elemBytes,
+                                                 int fieldNameSize,
+                                                 int totalSize) {
+    BSONElement elem{elemBytes, fieldNameSize, totalSize, BSONElement::TrustedInitTag{}};
     for (auto&& buffer : _buffers) {
         // use preallocated method here to indicate that the element does not need to be
         // copied to longer-lived memory.
@@ -982,7 +984,7 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
         std::pop_heap(heap.begin(), heap.end(), std::greater<>());
         FastDecodingState<Buffer>& state = heap.back();
         if (isUncompressedLiteralControlByte(*control)) {
-            state._refElem = BSONElement{control, 1, BSONElement::TrustedInitTag{}};
+            state._refElem = BSONElement{control, 1, -1};
             for (auto&& b : state._buffers) {
                 b->template append<BSONElement>(state._refElem);
             }

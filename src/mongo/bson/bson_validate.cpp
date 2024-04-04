@@ -554,7 +554,7 @@ private:
 
         if constexpr (precise) {
             auto nameLen = obj - _currElem;
-            _currFrame->elem = BSONElement(_currElem, nameLen, BSONElement::TrustedInitTag{});
+            _currFrame->elem = BSONElement(_currElem, nameLen, nameLen + len);
         }
         return cursor.ptr;
     }

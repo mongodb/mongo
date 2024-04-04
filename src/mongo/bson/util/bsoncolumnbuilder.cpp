@@ -505,7 +505,7 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
         last = current;
 
         if (isUncompressedLiteralControlByte(control)) {
-            BSONElement element(pos, 1, BSONElement::TrustedInitTag{});
+            BSONElement element(pos, 1, -1);
             state.loadUncompressed(element);
 
             // Uncompressed literal case
@@ -1670,6 +1670,7 @@ BSONElement BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::last() co
                                        return BSONElement{
                                            regular._prev.data(),
                                            /*field name size including null terminator*/ 1,
+                                           /*total size*/ static_cast<int>(regular._prev.size()),
                                            BSONElement::TrustedInitTag{}};
                                    },
                                    [](const typename InternalState::Interleaved&) {
