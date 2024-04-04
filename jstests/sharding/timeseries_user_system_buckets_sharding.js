@@ -170,7 +170,8 @@ function runTest(testCase, minRequiredVersion = null) {
             assert.commandWorked(coll.insert({timestamp: ISODate()}));
         },
         // TODO BACKPORT-19329 On 7.0 this test case used to cause a primary node crash.
-        "7.1"  // minRequiredVersion
+        // TODO (SERVER-88975): Remove temporary restriction requiring FCV 8.0+.
+        "8.0"  // minRequiredVersion
     );
 }
 
