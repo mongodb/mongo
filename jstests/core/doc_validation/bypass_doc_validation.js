@@ -23,6 +23,10 @@
  *   # This test has statements that do not support non-local read concern.
  *   does_not_support_causal_consistency,
  *   references_foreign_collection,
+ *   # TODO SERVER-88275: mapReduce can fail with QueryPlanKilled in suites with random migrations
+ *   # because moveCollection change the collection UUID # by dropping and re-creating the
+ *   # collection.
+ *   assumes_balancer_off,
  * ]
  */
 
