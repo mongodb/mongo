@@ -10,7 +10,7 @@ env = env.Clone()
 if env.ToolchainIs('GCC'):
     env.AppendUnique(CXXFLAGS=['-Wno-error=unused-result'])
 
-env.Library(
+env.BazelLibrary(
     target='fmt',
     source=env.File([
         'format.cc',
