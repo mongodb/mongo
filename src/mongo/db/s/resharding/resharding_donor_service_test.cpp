@@ -817,7 +817,6 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
 }
 
 TEST_F(ReshardingDonorServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinator) {
-    repl::primaryOnlyServiceTestStepUpWaitForRebuildComplete.setMode(FailPoint::alwaysOn);
     const auto abortErrMsg = "Recieved abort from the resharding coordinator";
 
     for (bool isAlsoRecipient : {false, true}) {
@@ -863,8 +862,8 @@ TEST_F(ReshardingDonorServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinato
                   ErrorCodes::InterruptedDueToReplStateChange);
         donor.reset();
 
+        removeDonorDocFailpoint->setMode(FailPoint::off);
         stepUp(opCtx.get());
-        removeDonorDocFailpoint->waitForTimesEntered(timesEnteredFailPoint + 2);
 
         auto [maybeDonor, isPausedOrShutdown] =
             DonorStateMachine::lookup(opCtx.get(), _service, instanceId);
@@ -872,7 +871,6 @@ TEST_F(ReshardingDonorServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinato
         ASSERT_FALSE(isPausedOrShutdown);
         donor = *maybeDonor;
 
-        removeDonorDocFailpoint->setMode(FailPoint::off);
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
         checkStateDocumentRemoved(opCtx.get());
     }
