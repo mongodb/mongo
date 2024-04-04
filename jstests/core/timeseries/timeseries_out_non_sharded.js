@@ -12,6 +12,11 @@
  *   featureFlagAggOutTimeseries,
  *   # TODO(mbroadst): Some bug here, appears to be double-prefixing
  *   not_allowed_with_signed_security_token,
+ *   # TODO SERVER-88275: aggregation using internally a $mergeCursor stage can fail with
+ *   # QueryPlanKilled in suites with random migrations because moveCollection change the collection
+ *   # UUID by dropping and re-creating the collection. This specially happens on $out aggregations
+ *   # where the collection doesn't live on the primary shard.
+ *   assumes_balancer_off,
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
