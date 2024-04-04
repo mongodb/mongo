@@ -95,7 +95,7 @@ public:
         return _batch->len();
     }
 
-    void append(const BSONObj& obj) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(const BSONObj& obj) {
         invariant(_active);
 
         _batch->append(obj);

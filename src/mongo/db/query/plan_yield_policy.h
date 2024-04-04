@@ -247,7 +247,7 @@ public:
      * yieldOrInterrupt(). This must only be called for auto-yielding plans, to force a yield. It
      * cannot be used to force an interrupt for INTERRUPT_ONLY plans.
      */
-    void forceYield() {
+    MONGO_COMPILER_ALWAYS_INLINE void forceYield() {
         dassert(canAutoYield());
         _forceYield = true;
     }
@@ -277,7 +277,7 @@ public:
      * either releasing storage engine resources via abandonSnapshot() OR yielding LockManager
      * locks.
      */
-    bool canAutoYield() const {
+    MONGO_COMPILER_ALWAYS_INLINE bool canAutoYield() const {
         switch (_policy) {
             case YieldPolicy::YIELD_AUTO:
             case YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:

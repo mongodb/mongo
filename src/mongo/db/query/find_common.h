@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/find.h"
+#include "mongo/db/query/plan_executor.h"
 #include <cstddef>
 
 #include "mongo/bson/bsonobj.h"
@@ -114,6 +117,67 @@ public:
     static const size_t kInitReplyBufferSize;
 
     /**
+     * Helper struct used to append to CursorResponseBuilder in getNextBatched().
+     */
+    class BSONObjCursorAppender {
+    public:
+        BSONObjCursorAppender(const bool alwaysAcceptFirstDoc,
+                              PlanExecutor* exec,
+                              CursorResponseBuilder* builder,
+                              ResourceConsumption::DocumentUnitCounter* docUnitsReturned,
+                              BSONObj& pbrt,
+                              bool& failedToAppend)
+            : _alwaysAcceptFirstDoc{alwaysAcceptFirstDoc},
+              _exec{exec},
+              _builder{builder},
+              _docUnitsReturned{docUnitsReturned},
+              _pbrt{pbrt},
+              _failedToAppend{failedToAppend} {}
+
+        BSONObjCursorAppender(const BSONObjCursorAppender&) = default;
+        ~BSONObjCursorAppender() = default;
+        BSONObjCursorAppender() = delete;
+
+        MONGO_COMPILER_ALWAYS_INLINE bool operator()(const BSONObj& obj,
+                                                     const BSONObj& nextPostBatchResumeToken,
+                                                     const size_t numAppended) {
+            objSize = obj.objsize();
+
+            if (MONGO_unlikely(!(_alwaysAcceptFirstDoc && numAppended == 0) &&
+                               !FindCommon::fitsInBatch(_builder->bytesUsed(), objSize))) {
+                // We failed to append to batch; we should stash & early out. We don't want to
+                // update the resume token here.
+                _failedToAppend = true;
+                return false;
+            }
+
+            _builder->append(obj);
+            _docUnitsReturned->observeOne(objSize);
+
+            // If this executor produces a postBatchResumeToken, store it. We will set the
+            // latest valid 'pbrt' on the batch at the end of batched execution.
+            _pbrt = nextPostBatchResumeToken;
+            return true;
+        }
+
+    private:
+        // State not owned by us.
+        const bool _alwaysAcceptFirstDoc;
+        PlanExecutor* _exec;
+        CursorResponseBuilder* _builder;
+        ResourceConsumption::DocumentUnitCounter* _docUnitsReturned;
+        BSONObj& _pbrt;
+        bool& _failedToAppend;
+
+        // State within append() calls.
+        size_t objSize;
+    };
+
+    MONGO_COMPILER_ALWAYS_INLINE static bool fitsInBatch(size_t bytesBuffered, size_t objSize) {
+        return (bytesBuffered + objSize) <= kMaxBytesToReturnToClientAtOnce;
+    }
+
+    /**
      * Returns true if the batchSize for the initial find has been satisfied.
      *
      * If 'qr' does not have a batchSize, the default batchSize is respected.
@@ -123,8 +187,8 @@ public:
     /**
      * Returns true if the batchSize for the getMore has been satisfied.
      *
-     * An 'effectiveBatchSize' value of zero is interpreted as the absence of a batchSize, in which
-     * case this method returns false.
+     * An 'effectiveBatchSize' value of zero is interpreted as the absence of a batchSize, in
+     * which case this method returns false.
      */
     static bool enoughForGetMore(long long effectiveBatchSize, long long numDocs) {
         return effectiveBatchSize && numDocs >= effectiveBatchSize;
@@ -132,31 +196,32 @@ public:
 
     /**
      * Given the number of docs ('numDocs') and bytes ('bytesBuffered') currently buffered as a
-     * response to a cursor-generating command, returns true if there are enough remaining bytes in
-     * our budget to fit 'nextDoc'.
+     * response to a cursor-generating command, returns true if there are enough remaining bytes
+     * in our budget to fit 'nextDoc'.
      */
     static bool haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, size_t bytesBuffered);
 
     /**
      * This function wraps waitWhileFailPointEnabled() on waitInFindBeforeMakingBatch.
      *
-     * Since query processing happens in three different places, this function makes it easier to
-     * check the failpoint for a query's namespace and log a helpful diagnostic message when the
-     * failpoint is active.
+     * Since query processing happens in three different places, this function makes it easier
+     * to check the failpoint for a query's namespace and log a helpful diagnostic message when
+     * the failpoint is active.
      */
     static void waitInFindBeforeMakingBatch(OperationContext* opCtx, const CanonicalQuery& cq);
 
     /**
-     * Computes an initial preallocation size for the GetMore reply buffer based on its properties.
+     * Computes an initial preallocation size for the GetMore reply buffer based on its
+     * properties.
      */
     static std::size_t getBytesToReserveForGetMoreReply(bool isTailable,
                                                         size_t firstResultSize,
                                                         size_t batchSize);
 
     /**
-     * Tracker of a size of a server response presented as a BSON array. Facilitates limiting the
-     * server response size to 16MB + certain epsilon. Accounts for array element and it's overhead
-     * size. Does not account for response "envelope" size.
+     * Tracker of a size of a server response presented as a BSON array. Facilitates limiting
+     * the server response size to 16MB + certain epsilon. Accounts for array element and it's
+     * overhead size. Does not account for response "envelope" size.
      */
     class BSONArrayResponseSizeTracker {
         // Upper bound of BSON array element overhead.

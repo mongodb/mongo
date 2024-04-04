@@ -152,7 +152,9 @@ public:
     // Member state and state transitions
     //
 
-    MemberState getState() const;
+    MONGO_COMPILER_ALWAYS_INLINE MemberState getState() const {
+        return _state;
+    }
 
     void transitionToRecordIdAndObj();
 
@@ -166,9 +168,17 @@ public:
     Snapshotted<Document> doc;
     std::vector<IndexKeyDatum> keyData;
 
-    bool hasRecordId() const;
-    bool hasObj() const;
-    bool hasOwnedObj() const;
+    MONGO_COMPILER_ALWAYS_INLINE bool hasRecordId() const {
+        return _state == RID_AND_IDX || _state == RID_AND_OBJ;
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE bool hasObj() const {
+        return _state == OWNED_OBJ || _state == RID_AND_OBJ;
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE bool hasOwnedObj() const {
+        return _state == OWNED_OBJ || _state == RID_AND_OBJ;
+    }
 
     /**
      * Ensures that 'obj' of a WSM in the RID_AND_OBJ state is owned BSON. It is a no-op if the WSM
@@ -199,7 +209,7 @@ public:
      * Returns a const reference to an object housing the metadata fields associated with this
      * WorkingSetMember.
      */
-    const DocumentMetadataFields& metadata() const {
+    MONGO_COMPILER_ALWAYS_INLINE const DocumentMetadataFields& metadata() const {
         return _metadata;
     }
 
@@ -333,13 +343,13 @@ public:
      * Do not delete the returned pointer as the WorkingSet retains ownership. Call free() to
      * release it.
      */
-    WorkingSetMember* get(WorkingSetID i) {
+    MONGO_COMPILER_ALWAYS_INLINE WorkingSetMember* get(WorkingSetID i) {
         dassert(i < _data.size());              // ID has been allocated.
         dassert(_data[i].nextFreeOrSelf == i);  // ID currently in use.
         return &_data[i].member;
     }
 
-    const WorkingSetMember* get(WorkingSetID i) const {
+    MONGO_COMPILER_ALWAYS_INLINE const WorkingSetMember* get(WorkingSetID i) const {
         dassert(i < _data.size());              // ID has been allocated.
         dassert(_data[i].nextFreeOrSelf == i);  // ID currently in use.
         return &_data[i].member;
@@ -355,7 +365,16 @@ public:
     /**
      * Deallocate the i-th query result and release its resources.
      */
-    void free(WorkingSetID i);
+    inline void free(WorkingSetID i) {
+        MemberHolder& holder = _data[i];
+        MONGO_verify(i < _data.size());            // ID has been allocated.
+        MONGO_verify(holder.nextFreeOrSelf == i);  // ID currently in use.
+
+        // Free resources and push this WSM to the head of the freelist.
+        holder.member.clear();
+        holder.nextFreeOrSelf = _freeList;
+        _freeList = i;
+    }
 
     /**
      * Removes and deallocates all members of this working set.
