@@ -19,7 +19,7 @@ filters:
   - ".clang-format":
     approvers:
       - devprod-build
-  - ".eslint-ignore":
+  - ".eslintignore":
     approvers:
       - devprod-correctness
   - ".eslintrc.yml":

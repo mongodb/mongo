@@ -3,4 +3,5 @@ aliases:
   - //buildscripts/resmokelib/devprod_correctness_aliases.yml
 filters:
   - "*":
+    approvers:
     - devprod-correctness

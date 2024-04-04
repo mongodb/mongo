@@ -1,0 +1,45 @@
+# This is a generated file do not make changes to this file.
+# This is generated from various OWNERS.yml files across the repo.
+# To regenerate this file run `bazel run //:codeowners`
+# The documentation for the OWNERS.yml files can be found here:
+# https://github.com/10gen/mongo/blob/master/docs/owners_format.md
+
+# The following patterns are parsed from ./OWNERS.yml
+OWNERS.yml @IamXander
+.bazelignore alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+.bazelrc alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+.bazelversion alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+.clang-format alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+.eslintignore alex.neben@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com trevor.guidry@mongodb.com
+.eslintrc.yml alex.neben@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com trevor.guidry@mongodb.com
+.mypy.ini alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+.prettierignore alex.neben@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com trevor.guidry@mongodb.com
+.prettierrc alex.neben@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com trevor.guidry@mongodb.com
+.pydocstyle alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+.pylintrc alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+.style.yapf alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+BUILD.bazel alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+copybara.sky @IamXander
+copybara.staging.sky alex.neben@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com trevor.guidry@mongodb.com
+jsconfig.json alex.neben@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com trevor.guidry@mongodb.com
+package.json alex.neben@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com trevor.guidry@mongodb.com
+pnpm-lock.yaml alex.neben@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com trevor.guidry@mongodb.com
+poetry.lock alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+pyproject.toml alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+SConstruct alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+WORKSPACE.bazel alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+
+# The following patterns are parsed from ./bazel/OWNERS.yml
+/bazel/**/* alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+
+# The following patterns are parsed from ./buildfarm/OWNERS.yml
+/buildfarm/**/* alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+
+# The following patterns are parsed from ./buildscripts/OWNERS.yml
+/buildscripts/**/* alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com
+
+# The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
+/buildscripts/resmokelib/**/* alex.neben@mongodb.com juan.gu@mongodb.com mikhail.shchatko@mongodb.com steve.gross@mongodb.com trevor.guidry@mongodb.com
+
+# The following patterns are parsed from ./site_scons/OWNERS.yml
+/site_scons/**/* alex.neben@mongodb.com anthony.pratti@mongodb.com daniel.moody@mongodb.com steve.gross@mongodb.com thomas.langston@mongodb.com trevor.guidry@mongodb.com udita.bose@mongodb.com zack.winter@mongodb.com

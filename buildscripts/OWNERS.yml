@@ -6,5 +6,6 @@ aliases:
   - //bazel/devprod_build_aliases.yml
 filters:
   - "*":
+    approvers:
     - devprod-correctness
     - devprod-build

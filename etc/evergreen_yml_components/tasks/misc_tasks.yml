@@ -521,6 +521,33 @@ tasks:
       target: >-
         //:format -- --mode check
 
+# TODO: rename if display_name appears on the evergreen UI
+- name: bazel_run_//:codeowners
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint", "bazel_check"]
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - command: timeout.update
+    params:
+      # 40 minutes
+      exec_timeout_secs: 2400
+  - func: "f_expansions_write"
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "get engflow creds"
+  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
+  - func: "fetch bazel"
+  - func: "bazel run"
+    vars:
+      target: >-
+        //:codeowners -- --check
+
 - name: lint_clang_format
   tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
   commands:

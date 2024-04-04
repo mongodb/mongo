@@ -3,7 +3,6 @@ load("@npm//:defs.bzl", "npm_link_all_packages")
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
-    "buildscripts/idl",
     "pyproject.toml",
     "poetry.lock",
 ])
@@ -13,4 +12,9 @@ npm_link_all_packages(name = "node_modules")
 alias(
     name = "format",
     actual = "//bazel/format",
+)
+
+alias(
+    name = "codeowners",
+    actual = "//buildscripts:codeowners",
 )

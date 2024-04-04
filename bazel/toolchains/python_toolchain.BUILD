@@ -2,7 +2,13 @@ load("@bazel_tools//tools/python:toolchain.bzl", "py_runtime_pair")
 
 filegroup(
     name = "files",
-    srcs = glob(["**/*"]),
+    srcs = glob(
+        include=["**/*"],
+        # bazel runfiles do not support paths with spaces
+        # https://github.com/bazelbuild/bazel/issues/4327
+        # The setuptools developers will not remove the spaces from these files
+        # https://github.com/pypa/setuptools/issues/746
+        exclude=["**/setuptools/**/* *"]),
     visibility = ["//visibility:public"],
 )
 
