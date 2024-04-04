@@ -408,13 +408,17 @@ insertSingleDocument(OperationContext* opCtx,
     auto reply = std::make_shared<write_ops::InsertCommandReply>();
     auto service = opCtx->getService();
 
+    auto baseStmtId = *stmtId;
     auto swResult = trun->runNoThrow(
         opCtx,
-        [service, sharedInsertBlock, reply, ownedDocument, bypassDocumentValidation](
+        [service, sharedInsertBlock, reply, ownedDocument, bypassDocumentValidation, baseStmtId](
             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
             auto [edcNss2, efc2, serverPayload2, stmtId2] = *sharedInsertBlock.get();
+
+            // Reset the statement ID in case of transient transaction retries
+            *stmtId2 = baseStmtId;
 
             if (MONGO_unlikely(fleCrudHangPreInsert.shouldFail())) {
                 LOGV2(6516701, "Hanging due to fleCrudHangPreInsert fail point");
