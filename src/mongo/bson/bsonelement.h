@@ -352,7 +352,7 @@ public:
      */
     int valuesize() const {
         auto type = static_cast<uint8_t>(*_data);
-        uint32_t mask = 1u << type;
+        uint32_t mask = 1u << (type & 0x1fu);
         int32_t size = kFixedSizes[type];
         if (mask & kVariableSizeMask)  // These types use a 32-bit int to store their size
             size += ConstDataView(value()).read<LittleEndian<int32_t>>();
