@@ -237,7 +237,7 @@ function assertNoInconsistencies() {
     st.shardColl(coll2, {skey: 1});
 
     // Save db1 and db2 configuration to restore it later
-    const configDatabasesColl = mongos.getDB('config').databases;
+    const configDatabasesColl = configDB.databases;
     const db1ConfigEntry = configDatabasesColl.findOne({_id: db1.getName()});
     const db2ConfigEntry = configDatabasesColl.findOne({_id: db2.getName()});
 
