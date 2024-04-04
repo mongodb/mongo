@@ -141,6 +141,17 @@ functions:
     type: setup
     params:
       directory: wiredtiger
+  "get automation-scripts": &get_automation_scripts
+    command: shell.exec
+    type: setup
+    params:
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        if ! [ -d "./automation-scripts" ]; then
+          git clone git@github.com:wiredtiger/automation-scripts.git
+        fi
   "fetch artifacts": &fetch_artifacts
     command: s3.get
     type: setup
@@ -297,10 +308,9 @@ functions:
         else
           echo "Using config flags $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|}"
           # Fetch the gperftools library if needed. This will also get tcmalloc.
-          if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]] && [ ! -d "./automation-scripts" ]; then
+          if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]]; then
             is_cmake_build=true
-            git clone git@github.com:wiredtiger/automation-scripts.git
-            . automation-scripts/evergreen/find_gperftools.sh ${s3_access_key} ${s3_secret_key} ${build_variant} $is_cmake_build
+            . ../automation-scripts/evergreen/find_gperftools.sh ${s3_access_key} ${s3_secret_key} ${build_variant} $is_cmake_build
           fi
           # Compiling with CMake.
           echo "Find CMake"
@@ -352,6 +362,7 @@ functions:
         fi
         echo "Ending 'make wiredtiger' step"
   "compile wiredtiger":
+    - *get_automation_scripts
     - *configure_wiredtiger
     - *make_wiredtiger
   "dump stacktraces": &dump_stacktraces
@@ -1257,6 +1268,7 @@ functions:
           ${python_binary|python3} wiredtiger/bench/perf_run_py/perf_json_converter_for_atlas_evergreen.py -i ${input_file} -n ${test_name} -o ${output_path}
 
   "upload stats to atlas":
+    - *get_automation_scripts
     - command: shell.exec
       params:
         shell: bash
@@ -1267,9 +1279,6 @@ functions:
           virtualenv -p ${python_binary|python3} venv
           source venv/bin/activate
           pip3 install pymongo[srv]==3.12.2 pygit2==1.10.1
-          if [[ ! -d "automation-scripts" ]]; then
-            git clone git@github.com:wiredtiger/automation-scripts.git
-          fi
           EVERGREEN_TASK_INFO='{ "evergreen_task_info": { "is_patch": "'${is_patch}'", "task_id": "'${task_id}'", "distro_id": "'${distro_id}'", "execution": "'${execution}'", "task_name": "'${task_name}'", "version_id": "'${version_id}'", "branch_name": "'${branch_name}'" } }'
           echo "EVERGREEN_TASK_INFO: $EVERGREEN_TASK_INFO"
           ${python_binary|python3} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_perf_test_username} -p ${atlas_perf_test_password} -c ${collection|} -d ${database|} -f ${stats_dir|./wiredtiger/cmake_build/bench/wtperf/test_stats}/atlas_out_${test-name}.json -t ${created_at} -i "$EVERGREEN_TASK_INFO" -g "./wiredtiger"
@@ -3065,9 +3074,8 @@ tasks:
             #######################################################
             # Obtain the complexity metrics for the 'previous' code
             #######################################################
-            git clone https://github.com/wiredtiger/wiredtiger.git wiredtiger_previous
+            git worktree add --detach wiredtiger_previous "${github_commit}"
             cd wiredtiger_previous
-            git checkout ${github_commit}
             if [ ${is_patch|false} = true ]; then
               # Checkout the point at which this patch/branch diverged from develop
               git checkout `python3 dist/common_functions.py last_commit_from_dev`
