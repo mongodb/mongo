@@ -2092,8 +2092,6 @@ void OpObserverImpl::onTransactionPrepare(
         oplogEntry.setObject(applyOpsBuilder.done());
         oplogEntry.setWallClockTime(wallClockTime);
 
-        // TODO SERVER-69286: set the top-level tenantId here
-
         logApplyOps(opCtx,
                     &oplogEntry,
                     DurableTxnStateEnum::kPrepared,

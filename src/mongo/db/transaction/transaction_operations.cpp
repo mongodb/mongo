@@ -379,9 +379,6 @@ std::size_t TransactionOperations::logOplogEntries(
         oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTime);
         oplogEntry.setWallClockTime(wallClockTime);
         oplogEntry.setObject(applyOpsBuilder.done());
-
-        // TODO SERVER-69286: replace this temporary fix to set the top-level tenantId to the
-        // tenantId on the first op in the list
         oplogEntry.setTid(stmtsIter->getTid());
 
         prevWriteOpTime =
