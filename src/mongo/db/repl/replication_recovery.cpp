@@ -411,6 +411,15 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
                             "Cannot use 'recoverToOplogTimestamp' without a stable checkpoint");
     }
 
+    const auto serviceCtx = opCtx->getServiceContext();
+    inReplicationRecovery(serviceCtx).store(true);
+    ON_BLOCK_EXIT([serviceCtx] {
+        invariant(
+            inReplicationRecovery(serviceCtx).load(),
+            "replication recovery flag is unexpectedly unset when exiting recoverFromOplogUpTo()");
+        inReplicationRecovery(serviceCtx).store(false);
+    });
+
     // This may take an IS lock on the oplog collection.
     _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, &recoveryTS);
 
