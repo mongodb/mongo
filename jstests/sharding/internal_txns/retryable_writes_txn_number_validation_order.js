@@ -23,6 +23,8 @@ const mongosTestColl = mongosTestDB.getCollection(kCollName);
 let shard0TestDB = shard0Primary.getDB(kDbName);
 
 assert.commandWorked(mongosTestDB.createCollection(kCollName));
+assert.commandWorked(
+    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}));
 
 const kTestMode = {
     kNonRecovery: 1,
