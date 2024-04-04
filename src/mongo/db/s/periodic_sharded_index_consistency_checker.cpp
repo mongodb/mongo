@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
@@ -179,8 +180,17 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                         continue;
                     }
 
+                    BSONObjBuilder requestBuilder;
+                    requestBuilder.append("aggregate", nss.coll());
+                    requestBuilder.append("$db",
+                                          DatabaseNameUtil::serialize(
+                                              nss.dbName(), SerializationContext::stateDefault()));
+                    requestBuilder.appendElements(aggRequestBSON);
                     auto request = aggregation_request_helper::parseFromBSON(
-                        opCtx, nss, aggRequestBSON, boost::none, false);
+                        requestBuilder.obj(),
+                        auth::ValidatedTenancyScope::get(opCtx),
+                        boost::none,
+                        false);
 
                     auto routingInfoCache = RoutingInformationCache::get(opCtx);
                     shardVersionRetry(

@@ -245,20 +245,14 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::createUpdatedCommandForN
     // Create a new shard command object containing the new resume token.
     auto shardCommand = replaceResumeTokenInCommand(resumeTokenForNewShard.toDocument());
 
-    auto* opCtx = pExpCtx->opCtx;
-    bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
-
     tassert(7663502,
             str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
                           << pExpCtx->ns.toStringForErrorMsg(),
             pExpCtx->serializationCtxt != SerializationContext::stateDefault());
 
-    // Create the 'AggregateCommandRequest' object which will help in creating the parsed pipeline.
-    auto aggCmdRequest = aggregation_request_helper::parseFromBSON(
-        opCtx, pExpCtx->ns, shardCommand, boost::none, apiStrict, pExpCtx->serializationCtxt);
-
     // Parse and optimize the pipeline.
-    auto pipeline = Pipeline::parse(aggCmdRequest.getPipeline(), pExpCtx);
+    auto pipeline = Pipeline::parseFromArray(
+        shardCommand[AggregateCommandRequest::kPipelineFieldName], pExpCtx);
     pipeline->optimizePipeline();
 
     // Split the full pipeline to get the shard pipeline.

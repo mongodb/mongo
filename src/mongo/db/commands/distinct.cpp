@@ -561,9 +561,8 @@ public:
             ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
             : SerializationContext::stateCommandRequest();
         auto viewAggRequest = aggregation_request_helper::parseFromBSON(
-            opCtx,
-            nss,
             viewAggCmd,
+            vts,
             verbosity,
             APIParameters::get(opCtx).getAPIStrict().value_or(false),
             serializationContext);

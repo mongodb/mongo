@@ -379,9 +379,8 @@ public:
                 vts, dbName, uassertStatusOK(canonicalDistinct.asAggregationCommand()))
                 .body;
         auto viewAggRequest = aggregation_request_helper::parseFromBSON(
-            opCtx,
-            nss,
             viewAggCmd,
+            vts,
             verbosity,
             APIParameters::get(opCtx).getAPIStrict().value_or(false),
             canonicalDistinct.getQuery()->getFindCommandRequest().getSerializationContext());

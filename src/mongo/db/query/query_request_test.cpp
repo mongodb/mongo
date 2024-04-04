@@ -1202,7 +1202,7 @@ TEST(QueryRequestTest, ParseCommandFirstFieldNotString) {
     BSONObj cmdObj = fromjson("{find: 1, '$db': 'test'}");
     ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
                        DBException,
-                       ErrorCodes::BadValue);
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST(QueryRequestTest, ParseCommandIgnoreShardVersionField) {

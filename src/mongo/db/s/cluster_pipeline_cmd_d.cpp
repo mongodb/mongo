@@ -94,7 +94,6 @@ struct ClusterPipelineCommandD {
     }
 
     static AggregateCommandRequest parseAggregationRequest(
-        OperationContext* opCtx,
         const OpMsgRequest& opMsgRequest,
         boost::optional<ExplainOptions::Verbosity> explainVerbosity,
         bool apiStrict) {
@@ -102,7 +101,7 @@ struct ClusterPipelineCommandD {
         auto modifiedRequestBody =
             opMsgRequest.body.replaceFieldNames(BSON(AggregateCommandRequest::kCommandName << 1));
         return aggregation_request_helper::parseFromBSON(
-            opCtx, opMsgRequest.parseDbName(), modifiedRequestBody, explainVerbosity, apiStrict);
+            modifiedRequestBody, opMsgRequest.validatedTenancyScope, explainVerbosity, apiStrict);
     }
 };
 MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandD>).forShard();

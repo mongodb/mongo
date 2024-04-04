@@ -44,6 +44,7 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -74,11 +75,6 @@ void AuthorizationSessionTestFixture::setUp() {
                            << "SCRAM-SHA-256"
                            << scram::Secrets<SHA256Block>::generateCredentials(
                                   "a", saslGlobalParams.scramSHA256IterationCount.load()));
-
-    // assume tenantId is from security token with no expectPrefix
-    _sc = SerializationContext(SerializationContext::Source::Command,
-                               SerializationContext::CallerType::Request,
-                               SerializationContext::Prefix::ExcludePrefix);
 }
 
 Status AuthorizationSessionTestFixture::createUser(const UserName& username,
@@ -148,25 +144,23 @@ void AuthorizationSessionTestFixture::assertNotAuthorized(const ResourcePattern&
 AggregateCommandRequest AuthorizationSessionTestFixture::buildAggReq(const NamespaceString& nss,
                                                                      const BSONArray& pipeline) {
     return uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        nss,
         BSON("aggregate" << nss.coll() << "pipeline" << pipeline << "cursor" << BSONObj() << "$db"
                          << nss.db_forTest()),
+        makeVTS(nss),
         boost::none,
-        false /* apiStrict */,
-        _sc));
+        false /* apiStrict */));
 }
 
 AggregateCommandRequest AuthorizationSessionTestFixture::buildAggReq(const NamespaceString& nss,
                                                                      const BSONArray& pipeline,
                                                                      bool bypassDocValidation) {
     return uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        nss,
         BSON("aggregate" << nss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "bypassDocumentValidation" << bypassDocValidation << "$db"
                          << nss.db_forTest()),
+        makeVTS(nss),
         boost::none,
-        false /* apiStrict */,
-        _sc));
+        false /* apiStrict */));
 }
 
 }  // namespace mongo

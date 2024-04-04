@@ -71,6 +71,7 @@ env.Library(
         'query_request_conversion.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',

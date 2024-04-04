@@ -107,7 +107,7 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationNoQuery) {
     auto cmdObj = OpMsgRequestBuilder::create(
                       auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg.getValue())
                       .body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
@@ -147,7 +147,7 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationDottedPathNoQuery) {
     auto cmdObj = OpMsgRequestBuilder::create(
                       auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg.getValue())
                       .body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
@@ -200,7 +200,7 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithAllOptions) {
     auto cmdObj = OpMsgRequestBuilder::create(
                       auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg.getValue())
                       .body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
@@ -247,7 +247,7 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithQuery) {
     auto cmdObj = OpMsgRequestBuilder::create(
                       auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg.getValue())
                       .body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
@@ -290,7 +290,7 @@ TEST_F(CanonicalDistinctTest, ExplainNotIncludedWhenConvertingToAggregationComma
     auto cmdObj = OpMsgRequestBuilder::create(
                       auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg.getValue())
                       .body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
