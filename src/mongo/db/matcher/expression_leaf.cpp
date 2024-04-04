@@ -687,9 +687,14 @@ BitTestMatchExpression::BitTestMatchExpression(MatchType type,
             continue;
         }
 
+        // Convert from 'byte' to 'bytePosition', the position of the byte in '_bitMask'.
+        // Note that the most significant byte is at position 0 in 'bitMaskBinary' and the least
+        // significant byte is at position 'bitMaskLen' - 1.
+        int bytePosition = bitMaskLen - byte - 1;
+
         // Build _bitMask with the first 8 bytes of the bitMaskBinary.
-        if (byte < 8) {
-            _bitMask |= static_cast<uint64_t>(byteAt) << byte * 8;
+        if (bytePosition < 8) {
+            _bitMask |= static_cast<uint64_t>(byteAt) << bytePosition * 8;
         } else {
             // Checking bits > 63 is just checking the sign bit, since we sign-extend numbers. For
             // example, the 100th bit of -1 is considered set if and only if the 63rd bit position
@@ -699,7 +704,7 @@ BitTestMatchExpression::BitTestMatchExpression(MatchType type,
 
         for (int bit = 0; bit < 8; bit++) {
             if (byteAt & (1 << bit)) {
-                _bitPositions.push_back(8 * byte + bit);
+                _bitPositions.push_back(8 * bytePosition + bit);
             }
         }
     }
@@ -739,12 +744,10 @@ bool BitTestMatchExpression::performBitTest(const char* eBinary, uint32_t eBinar
             // If position to test is longer than the data to test against, zero-extend.
             isBitSet = false;
         } else {
-            // Map to byte position and bit position within that byte. Note that byte positions
-            // start at position 0 in the char array, and bit positions start at the least
-            // significant bit.
-            int bytePosition = bitPosition / 8;
+            // Convert 'bitPosition' to 'byte' and 'bit'. Note that bit positions are
+            // 0-based starting at the right-most bit in 'eBinary'.
+            char byte = eBinary[(eBinaryLen - (bitPosition / 8)) - 1];
             int bit = bitPosition % 8;
-            char byte = eBinary[bytePosition];
 
             isBitSet = byte & (1 << bit);
         }
