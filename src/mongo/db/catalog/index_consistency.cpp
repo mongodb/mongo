@@ -569,7 +569,8 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
 bool KeyStringIndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* result) {
     invariant(!_firstPhase);
 
-    const uint32_t maxMemoryUsageBytes = maxValidateMemoryUsageMB.load() * 1024 * 1024;
+    const uint64_t maxMemoryUsageBytes =
+        static_cast<uint64_t>(maxValidateMemoryUsageMB.load()) * 1024 * 1024;
     const uint64_t totalMemoryNeededBytes =
         std::accumulate(_indexKeyBuckets.begin(),
                         _indexKeyBuckets.end(),
