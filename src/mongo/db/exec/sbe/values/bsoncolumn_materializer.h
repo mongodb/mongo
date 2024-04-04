@@ -139,10 +139,12 @@ private:
      */
     static inline value::Value copyStringWithLengthPrefix(ElementStorage& allocator,
                                                           StringData data) {
-        char* storage = allocator.allocate(sizeof(int32_t) + data.size());
+        char* storage = allocator.allocate(sizeof(int32_t) + data.size() + 1);
+
         // The length prefix should include the terminating null byte.
         DataView(storage).write<LittleEndian<int32_t>>(data.size() + 1);
         memcpy(storage + sizeof(int32_t), data.data(), data.size());
+
         DataView(storage).write<char>('\0', sizeof(int32_t) + data.size());
         return value::bitcastFrom<char*>(storage);
     }
