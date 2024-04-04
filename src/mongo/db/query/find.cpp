@@ -60,7 +60,6 @@ MONGO_FAIL_POINT_DEFINE(failReceivedGetmore);
 
 bool shouldSaveCursor(OperationContext* opCtx,
                       const CollectionPtr& collection,
-                      PlanExecutor::ExecState finalState,
                       PlanExecutor* exec) {
     const FindCommandRequest& findCommand = exec->getCanonicalQuery()->getFindCommandRequest();
     if (findCommand.getSingleBatch()) {

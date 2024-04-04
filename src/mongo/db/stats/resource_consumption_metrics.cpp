@@ -131,11 +131,6 @@ ResourceConsumption::MetricsCollector& ResourceConsumption::MetricsCollector::ge
     return getMetricsCollector(opCtx);
 }
 
-void ResourceConsumption::UnitCounter::observeOne(int64_t datumBytes) {
-    _units += std::ceil(datumBytes / static_cast<float>(unitSize()));
-    _bytes += datumBytes;
-}
-
 void ResourceConsumption::TotalUnitWriteCounter::observeOneDocument(int64_t datumBytes) {
     // If we have accumulated document bytes, calculate units along with any past index bytes.
     // Accumulate the current document bytes for use in a later unit calculation.
