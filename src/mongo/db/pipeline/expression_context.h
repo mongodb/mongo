@@ -648,6 +648,10 @@ public:
     // expression counting.
     bool enabledCounters = true;
 
+    // Forces the plan cache to be used even if there's only one solution available. Queries that
+    // are ineligible will still not be cached.
+    bool forcePlanCache = false;
+
     // Returns true if we've received a TemporarilyUnavailableException.
     bool getTemporarilyUnavailableException() {
         return _gotTemporarilyUnavailableException;
@@ -668,23 +672,28 @@ public:
     }
 
     const query_settings::QuerySettings& getQuerySettings() const {
-        return _querySettings;
+        static const auto kEmptySettings = query_settings::QuerySettings();
+        return _querySettings.get_value_or(kEmptySettings);
     }
 
-    const QueryKnobConfiguration& getQueryKnobConfiguration() const {
-        return _queryKnobConfiguration.get(_querySettings);
-    }
+    /**
+     * Attaches 'querySettings' to context if they were not previously set.
+     */
+    void setQuerySettingsIfNotPresent(query_settings::QuerySettings querySettings) {
+        if (_querySettings.has_value()) {
+            return;
+        }
 
-    void setQuerySettings(query_settings::QuerySettings querySettings) {
-        _querySettings = std::move(querySettings);
         tassert(8827100,
                 "Query knobs shouldn't be initialized before query settings are set",
                 !_queryKnobConfiguration.isInitialized());
+
+        _querySettings = std::move(querySettings);
     }
 
-    // Forces the plan cache to be used even if there's only one solution available. Queries that
-    // are ineligible will still not be cached.
-    bool forcePlanCache = false;
+    const QueryKnobConfiguration& getQueryKnobConfiguration() const {
+        return _queryKnobConfiguration.get(getQuerySettings());
+    }
 
     // This is state that is to be shared between the DocumentInternalSearchMongotRemote and
     // DocumentInternalSearchIdLookup stages (these stages are the result of desugaring $search)
@@ -811,7 +820,9 @@ private:
     // is being executed (if the variable was referenced, it is an element of this set).
     stdx::unordered_set<Variables::Id> _systemVarsReferencedInQuery;
 
-    query_settings::QuerySettings _querySettings = query_settings::QuerySettings();
+    std::once_flag _querySettingsAttached;
+
+    boost::optional<query_settings::QuerySettings> _querySettings = boost::none;
 
     DeferredFn<QueryKnobConfiguration, const query_settings::QuerySettings&>
         _queryKnobConfiguration{[](const auto& querySettings) {

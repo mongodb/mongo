@@ -346,7 +346,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     }
 
     // Perform the query settings lookup and attach it to the ExpressionContext.
-    expCtx->setQuerySettings(query_settings::lookupQuerySettingsForAgg(
+    expCtx->setQuerySettingsIfNotPresent(query_settings::lookupQuerySettingsForAgg(
         expCtx, request, *pipeline, involvedNamespaces, executionNss));
 
     return pipeline;
@@ -633,7 +633,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     return cluster_aggregation_planner::dispatchPipelineAndMerge(
                         opCtx,
                         std::move(targeter),
-                        aggregation_request_helper::serializeToCommandDoc(request),
+                        aggregation_request_helper::serializeToCommandDoc(expCtx, request),
                         request.getCursor().getBatchSize().value_or(
                             aggregation_request_helper::kDefaultBatchSize),
                         namespaces,
@@ -661,7 +661,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                         expCtx,
                         namespaces,
                         request.getExplain(),
-                        aggregation_request_helper::serializeToCommandDoc(request),
+                        aggregation_request_helper::serializeToCommandDoc(expCtx, request),
                         privileges,
                         shardId,
                         eligibleForSampling,

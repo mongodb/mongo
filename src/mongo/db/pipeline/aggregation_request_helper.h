@@ -105,8 +105,11 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
  * The explain option is not serialized. The preferred way to send an explain is with the explain
  * command, like: {explain: {aggregate: ...}, ...}, explain options are not part of the aggregate
  * command object.
+ *
+ * In case query settings are attached to 'expCtx', they will be serialized to the command document.
  */
-Document serializeToCommandDoc(const AggregateCommandRequest& request);
+Document serializeToCommandDoc(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               const AggregateCommandRequest& request);
 
 BSONObj serializeToCommandObj(const AggregateCommandRequest& request);
 

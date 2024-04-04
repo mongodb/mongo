@@ -1780,6 +1780,7 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
     }();
 
     AggregateCommandRequest aggRequest(expCtx->ns, rawStages);
+
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     auto startsWithQueue = liteParsedPipeline.startsWithQueue();
@@ -1787,7 +1788,7 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
         : startsWithQueue                     ? PipelineDataSource::kQueue
                                               : PipelineDataSource::kNormal;
     auto shardDispatchResults =
-        dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
+        dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(expCtx, aggRequest),
                               pipelineDataSource,
                               expCtx->eligibleForSampling(),
                               std::move(pipeline),
@@ -1851,17 +1852,17 @@ std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCu
         aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
     }
 
-    auto shardDispatchResults =
-        dispatchTargetedShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
-                                      targeting,
-                                      hasChangeStream,
-                                      expCtx->eligibleForSampling(),
-                                      cri,
-                                      std::move(pipeline),
-                                      boost::none /* explain */,
-                                      readConcern,
-                                      {} /* designatedHostsMap */,
-                                      {} /* resumeTokenMap */);
+    auto shardDispatchResults = dispatchTargetedShardPipeline(
+        aggregation_request_helper::serializeToCommandDoc(expCtx, aggRequest),
+        targeting,
+        hasChangeStream,
+        expCtx->eligibleForSampling(),
+        cri,
+        std::move(pipeline),
+        boost::none /* explain */,
+        readConcern,
+        {} /* designatedHostsMap */,
+        {} /* resumeTokenMap */);
 
     std::vector<ShardId> targetedShards;
     targetedShards.reserve(shardDispatchResults.remoteCursors.size());

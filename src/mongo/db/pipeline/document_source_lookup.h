@@ -451,12 +451,6 @@ private:
         }
     }
 
-    /**
-     * Sets 'querySettings' to 'expCtx' if they were not previously set.
-     */
-    void setQuerySettingsIfNeeded(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                  const query_settings::QuerySettings& querySettings);
-
     DocumentSourceLookupStats _stats;
 
     NamespaceString _fromNs;
@@ -494,11 +488,6 @@ private:
     // default binary collation. We need to differentiate between the two to avoid serializing the
     // collation when not set explicitly.
     bool _hasExplicitCollation = false;
-
-    // Flag, indicating if query settings were set to the '_fromExpCtx'. This is needed to avoid
-    // setting query settings multiple time, which results in assertion failure in cases when query
-    // knobs have already been initialized with the previous query settings.
-    bool _didSetQuerySettingsToPipeline = false;
 
     // Can this $lookup be pushed down into SBE?
     SbeCompatibility _sbeCompatibility = SbeCompatibility::notCompatible;

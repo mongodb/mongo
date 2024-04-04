@@ -157,7 +157,7 @@ public:
             // applied on the shards.
             auto querySettings =
                 query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns());
-            expCtx->setQuerySettings(querySettings);
+            expCtx->setQuerySettingsIfNotPresent(querySettings);
             findCommand = std::move(parsedFind->findCommandRequest);
 
             try {
@@ -242,7 +242,7 @@ public:
             // Perform the query settings lookup and attach it to 'expCtx'.
             auto querySettings =
                 query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns());
-            expCtx->setQuerySettings(querySettings);
+            expCtx->setQuerySettingsIfNotPresent(querySettings);
 
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedFind)});

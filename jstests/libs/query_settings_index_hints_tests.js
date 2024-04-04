@@ -47,8 +47,7 @@ export class QuerySettingsIndexHintsTests {
         // Clear the plan cache before running any queries.
         db[collName].getPlanCache().clear();
 
-        // Take the newest plan cache entry (based on 'timeOfCreation' sorting) and ensure that it
-        // contains the 'settings'.
+        // Take the plan cache entries and ensure that they contain the 'settings'.
         assert.commandWorked(db.runCommand(command));
         const planCacheStatsAfterRunningCmd = db[collName].getPlanCache().list();
         assert.gte(planCacheStatsAfterRunningCmd.length,
@@ -75,9 +74,10 @@ export class QuerySettingsIndexHintsTests {
         }
     }
 
-    assertIndexScanStage(cmd, expectedIndex) {
+    assertIndexScanStage(cmd, expectedIndex, ns) {
         return this.assertIndexUse(cmd, expectedIndex, (explain) => {
             return getQueryPlanners(explain)
+                .filter(queryPlanner => queryPlanner.namespace == `${ns.db}.${ns.coll}`)
                 .map(getWinningPlan)
                 .flatMap(winningPlan => getPlanStages(winningPlan, "IXSCAN"));
         });
@@ -142,8 +142,8 @@ export class QuerySettingsIndexHintsTests {
         for (const index of [this.indexA, this.indexB, this.indexAB]) {
             const settings = {indexHints: {ns, allowedIndexes: [index]}};
             this.qsutils.withQuerySettings(querySettingsQuery, settings, () => {
-                this.assertIndexScanStage(query, index);
-                this.assertQuerySettingsInCacheForCommand(query, settings);
+                this.assertIndexScanStage(query, index, ns);
+                this.assertQuerySettingsInCacheForCommand(query, settings, ns.coll);
             });
         }
     }
@@ -195,9 +195,9 @@ export class QuerySettingsIndexHintsTests {
             };
 
             this.qsutils.withQuerySettings(querySettingsQuery, settings, () => {
-                this.assertIndexScanStage(query, mainCollIndex);
+                this.assertIndexScanStage(query, mainCollIndex, mainNs);
                 this.assertLookupJoinStage(query, secondaryCollIndex, isSecondaryCollAView);
-                this.assertQuerySettingsInCacheForCommand(query, settings);
+                this.assertQuerySettingsInCacheForCommand(query, settings, mainNs.coll);
             });
         }
     }
@@ -232,9 +232,34 @@ export class QuerySettingsIndexHintsTests {
             };
 
             this.qsutils.withQuerySettings(querySettingsQuery, settings, () => {
-                this.assertIndexScanStage(query, mainCollIndex);
+                this.assertIndexScanStage(query, mainCollIndex, mainNs);
                 this.assertLookupPipelineStage(query, secondaryCollIndex);
-                this.assertQuerySettingsInCacheForCommand(query, settings);
+                this.assertQuerySettingsInCacheForCommand(query, settings, mainNs.coll);
+                this.assertQuerySettingsInCacheForCommand(query, settings, secondaryNs.coll);
+            });
+        }
+    }
+
+    /**
+     * Ensure query settings are applied for both collections, resulting in index scans using the
+     * hinted indexes.
+     */
+    assertQuerySettingsIndexApplications(querySettingsQuery, mainNs, secondaryNs) {
+        const query = this.qsutils.withoutDollarDB(querySettingsQuery);
+        for (const [mainCollIndex, secondaryCollIndex] of selfCrossProduct(
+                 [this.indexA, this.indexB, this.indexAB])) {
+            const settings = {
+                indexHints: [
+                    {ns: mainNs, allowedIndexes: [mainCollIndex]},
+                    {ns: secondaryNs, allowedIndexes: [secondaryCollIndex]},
+                ]
+            };
+
+            this.qsutils.withQuerySettings(querySettingsQuery, settings, () => {
+                this.assertIndexScanStage(query, mainCollIndex, mainNs);
+                this.assertIndexScanStage(query, secondaryCollIndex, secondaryNs);
+                this.assertQuerySettingsInCacheForCommand(query, settings, mainNs.coll);
+                this.assertQuerySettingsInCacheForCommand(query, settings, secondaryNs.coll);
             });
         }
     }
