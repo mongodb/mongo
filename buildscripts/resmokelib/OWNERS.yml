@@ -1,7 +1,5 @@
 version: 1.0.0
-aliases:
-  - //buildscripts/resmokelib/devprod_correctness_aliases.yml
 filters:
   - "*":
     approvers:
-    - devprod-correctness
+    - 10gen/devprod-correctness

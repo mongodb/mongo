@@ -1,11 +1,8 @@
 # TODO: This is a really loose alias for a lot of files.
 # TODO: We can tighten this up as we decide more the split between the teams.
 version: 1.0.0
-aliases:
-  - //buildscripts/resmokelib/devprod_correctness_aliases.yml
-  - //bazel/devprod_build_aliases.yml
 filters:
   - "*":
     approvers:
-    - devprod-correctness
-    - devprod-build
+    - 10gen/devprod-correctness
+    - 10gen/devprod-build

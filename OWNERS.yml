@@ -1,7 +1,4 @@
 version: 1.0.0
-aliases:
-  - //bazel/devprod_build_aliases.yml
-  - //buildscripts/resmokelib/devprod_correctness_aliases.yml
 filters:
   - "OWNERS.yml":
     approvers:
@@ -9,73 +6,73 @@ filters:
       # TODO: add more owners here
   - ".bazelignore":
     approvers:
-      - devprod-build
+      - 10gen/devprod-build
   - ".bazelrc":
     approvers:
-      - devprod-build
+      - 10gen/devprod-build
   - ".bazelversion":
     approvers:
-      - devprod-build
+      - 10gen/devprod-build
   - ".clang-format":
     approvers:
-      - devprod-build
+      - 10gen/devprod-build
   - ".eslintignore":
     approvers:
-      - devprod-correctness
+      - 10gen/devprod-correctness
   - ".eslintrc.yml":
     approvers:
-      - devprod-correctness
+      - 10gen/devprod-correctness
   - ".mypy.ini":
     approvers:
-      - devprod-correctness
-      - devprod-build
+      - 10gen/devprod-correctness
+      - 10gen/devprod-build
   - ".prettierignore":
     approvers:
-      - devprod-correctness
+      - 10gen/devprod-correctness
   - ".prettierrc":
     approvers:
-      - devprod-correctness
+      - 10gen/devprod-correctness
   - ".pydocstyle":
     approvers:
-      - devprod-correctness
-      - devprod-build
+      - 10gen/devprod-correctness
+      - 10gen/devprod-build
   - ".pylintrc":
     approvers:
-      - devprod-correctness
-      - devprod-build
+      - 10gen/devprod-correctness
+      - 10gen/devprod-build
   - ".style.yapf":
     approvers:
-      - devprod-correctness
-      - devprod-build
+      - 10gen/devprod-correctness
+      - 10gen/devprod-build
   - "BUILD.bazel":
     approvers:
-      - devprod-build
+      - 10gen/devprod-build
   - "copybara.sky":
     approvers:
       - IamXander
   - "copybara.staging.sky":
     approvers:
-      - devprod-correctness
+      - 10gen/devprod-correctness
   - "jsconfig.json":
     approvers:
-      - devprod-correctness
+      - 10gen/devprod-correctness
   - "package.json":
     approvers:
-      - devprod-correctness
+      - 10gen/devprod-correctness
   - "pnpm-lock.yaml":
     approvers:
-      - devprod-correctness
+      - 10gen/devprod-correctness
   - "poetry.lock":
     approvers:
-      - devprod-correctness
-      - devprod-build
+      - 10gen/devprod-correctness
+      - 10gen/devprod-build
   - "pyproject.toml":
     approvers:
-      - devprod-correctness
-      - devprod-build
+      - 10gen/devprod-correctness
+      - 10gen/devprod-build
   - "SConstruct":
     approvers:
-      - devprod-build
+      - 10gen/devprod-build
   - "WORKSPACE.bazel":
     approvers:
-      - devprod-build
+      - 10gen/devprod-build
