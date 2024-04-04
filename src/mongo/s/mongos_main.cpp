@@ -1104,10 +1104,6 @@ ExitCode mongos_main(int argc, char* argv[]) {
 
     const auto service = getGlobalServiceContext();
 
-    if (audit::setAuditInterface) {
-        audit::setAuditInterface(service);
-    }
-
     // Attempt to rotate the audit log pre-emptively on startup to avoid any potential conflicts
     // with existing log state. If this rotation fails, then exit nicely with failure
     try {

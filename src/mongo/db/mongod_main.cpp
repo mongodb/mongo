@@ -2152,10 +2152,6 @@ int mongod_main(int argc, char* argv[]) {
         }
     }();
 
-    if (audit::setAuditInterface) {
-        audit::setAuditInterface(service);
-    }
-
     {
         // Create the durable history registry prior to calling the `setUp*` methods. They may
         // depend on it existing at this point.
