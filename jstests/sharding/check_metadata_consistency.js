@@ -269,7 +269,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     st.shardColl(coll2, {skey: 1});
 
     // Save db1 and db2 configuration to restore it later
-    const configDatabasesColl = mongos.getDB('config').databases;
+    const configDatabasesColl = configDB.databases;
     const db1ConfigEntry = configDatabasesColl.findOne({_id: db1.getName()});
     const db2ConfigEntry = configDatabasesColl.findOne({_id: db2.getName()});
 
@@ -742,7 +742,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
 
     // Move all chunks out of the primary shard.
-    const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
+    const chunks = configDB.chunks.find({uuid: uuid}).toArray();
     assert(chunks.length > 0);
     chunks.forEach(chunk => {
         assert.commandWorked(
@@ -782,7 +782,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
 
     // Move all chunks out of the primary shard.
-    const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
+    const chunks = configDB.chunks.find({uuid: uuid}).toArray();
     assert(chunks.length > 0);
     chunks.forEach(chunk => {
         assert.commandWorked(
@@ -872,7 +872,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
 
     // Move all chunks out of the primary shard.
-    const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
+    const chunks = configDB.chunks.find({uuid: uuid}).toArray();
     assert(chunks.length > 0);
     chunks.forEach(chunk => {
         assert.commandWorked(
