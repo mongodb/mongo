@@ -32,19 +32,12 @@
 #include <fmt/format.h>
 #include <iostream>
 #include <memory>
-#include <mutex>
 #include <string>
-#include <thread>
 #include <typeinfo>
-#include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
-#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -309,7 +302,7 @@ private:
                 admissionPriority.emplace(opCtx.get(), admCtx, AdmissionContext::Priority::kLow);
             }
 
-            auto ticket = _tickets->waitForTicket(*Interruptible::notInterruptible(), &admCtx);
+            auto ticket = _tickets->waitForTicket(opCtx.get(), &admCtx);
 
             _hotel.checkIn();
 

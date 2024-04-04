@@ -80,15 +80,15 @@ private:
 
     void _run(Client*);
 
-    void _probeStable(double throughput);
-    void _probeUp(double throughput);
-    void _probeDown(double throughput);
+    void _probeStable(OperationContext* opCtx, double throughput);
+    void _probeUp(OperationContext* opCtx, double throughput);
+    void _probeDown(OperationContext* opCtx, double throughput);
 
-    void _resetConcurrency();
-    void _increaseConcurrency();
-    void _decreaseConcurrency();
+    void _resetConcurrency(OperationContext* opCtx);
+    void _increaseConcurrency(OperationContext* opCtx);
+    void _decreaseConcurrency(OperationContext* opCtx);
 
-    void _resize(TicketHolder* ticketholder, int newTickets);
+    void _resize(OperationContext* opCtx, TicketHolder* ticketholder, int newTickets);
 
     TicketHolder* _readTicketHolder;
     TicketHolder* _writeTicketHolder;
@@ -123,6 +123,11 @@ public:
     bool supportsRuntimeSizeAdjustment() const override {
         return false;
     }
+
+    /**
+     * Start the periodic job to probe throughput and dynamically adjust ticket levels
+     */
+    void startThroughputProbe();
 
 protected:
     void _appendImplStats(BSONObjBuilder& builder) const override;

@@ -34,6 +34,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
@@ -87,9 +88,10 @@ boost::optional<Ticket> PriorityTicketHolder::_tryAcquireImpl(AdmissionContext* 
     return boost::none;
 }
 
-boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(Interruptible& interruptible,
+boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
                                                                       AdmissionContext* admCtx,
-                                                                      Date_t until) {
+                                                                      Date_t until,
+                                                                      bool interruptible) {
     invariant(admCtx);
 
     while (true) {
@@ -105,7 +107,9 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(Interrupti
             }
         });
 
-        interruptible.checkForInterrupt();
+        if (interruptible) {
+            opCtx->checkForInterrupt();
+        }
 
         if (acquired) {
             rereleaseIfTimedOutOrInterrupted.dismiss();

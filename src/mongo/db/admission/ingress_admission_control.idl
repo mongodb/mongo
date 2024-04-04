@@ -35,10 +35,13 @@ global:
 server_parameters:
   ingressAdmissionControllerTicketPoolSize:
     description: >-
-        Controls the maximum number of tickets in the ingress admission control ticket pool.
+        Controls the maximum number of tickets in the ingress admission control ticket pool. Note
+        that setting this parameter to 0 will block all incoming operations that are subject to
+        ingress admission control.
     set_at: [ startup, runtime ]
     cpp_varname: gIngressAdmissionControllerTicketPoolSize
     cpp_vartype: AtomicWord<int32_t>
     on_update: IngressAdmissionController::onUpdateTicketPoolSize
     default: 1000000
+    validator: { gte: 0 }
     redact: false

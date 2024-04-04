@@ -1,6 +1,6 @@
 /**
  * Test that the ingress admission control works correctly.
- * @tags: [featureFlagIngressAdmissionControl]
+ * @tags: [requires_fcv_80]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -28,6 +28,15 @@ function waitUntilIngressAdmissionIsBlocked(db) {
             db.adminCommand({getParameter: 1, ingressAdmissionControllerTicketPoolSize: 1}));
         return res.ingressAdmissionControllerTicketPoolSize == 0;
     });
+}
+
+/**
+ * Test that we are not allowed to set the pool size to a negative value.
+ */
+function testPoolSizeValidation(db) {
+    assert.commandFailedWithCode(
+        db.adminCommand({setParameter: 1, ingressAdmissionControllerTicketPoolSize: -1}),
+        ErrorCodes.BadValue);
 }
 
 /**
@@ -104,6 +113,9 @@ function testSlowQueryLog(conn, db, collName) {
     const kDelayMillis = 50;
     const kDelayMicros = kDelayMillis * 1000;
 
+    // clear server log to make sure there's only one slow log entry when we check
+    assert.commandWorked(db.adminCommand({clearLog: "global"}));
+
     // run a parallel shell that can wait for admission control
     let parallelShell =
         startParallelShell(funWithArgs((dbName, collName) => {
@@ -172,6 +184,7 @@ function runTests() {
     const collName = `${jsTest.name()}_coll`;
     db.getCollection(collName).drop();
 
+    testPoolSizeValidation(db);
     testCurrentOp(conn, db, collName);
     testSlowQueryLog(conn, db, collName);
     testMaxTimeMS(db, collName);

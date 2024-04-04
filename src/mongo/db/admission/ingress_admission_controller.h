@@ -58,7 +58,7 @@ public:
     /**
      * Adjusts the total number of tickets allocated for ingress admission control to 'newSize'.
      */
-    void resizeTicketPool(int32_t newSize);
+    void resizeTicketPool(OperationContext* opCtx, int32_t newSize);
 
     /**
      * Reports the ingress admission control metrics.

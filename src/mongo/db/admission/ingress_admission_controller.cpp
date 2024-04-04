@@ -69,11 +69,11 @@ Ticket IngressAdmissionController::admitOperation(OperationContext* opCtx) {
         return std::move(*ticket);
     }
 
-    return _ticketHolder->waitForTicket(*opCtx, &admCtx);
+    return _ticketHolder->waitForTicket(opCtx, &admCtx);
 }
 
-void IngressAdmissionController::resizeTicketPool(int32_t newSize) {
-    uassert(8611200, "Failed to resize ticket pool", _ticketHolder->resize(newSize));
+void IngressAdmissionController::resizeTicketPool(OperationContext* opCtx, int32_t newSize) {
+    uassert(8611200, "Failed to resize ticket pool", _ticketHolder->resize(opCtx, newSize));
 }
 
 void IngressAdmissionController::appendStats(BSONObjBuilder& b) const {
@@ -81,10 +81,12 @@ void IngressAdmissionController::appendStats(BSONObjBuilder& b) const {
 }
 
 Status IngressAdmissionController::onUpdateTicketPoolSize(int32_t newValue) try {
-    auto* svcCtx = getCurrentServiceContext();
-    if (svcCtx != nullptr) {
-        getIngressAdmissionController(svcCtx).resizeTicketPool(newValue);
+    if (auto client = Client::getCurrent()) {
+        auto opCtx = client->getOperationContext();
+        getIngressAdmissionController(client->getServiceContext())
+            .resizeTicketPool(opCtx, newValue);
     }
+
     return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus();
