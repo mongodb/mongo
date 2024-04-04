@@ -12,6 +12,9 @@ function runTest(routerDB, directDB) {
     assert.commandWorked(
         routerDB.createCollection(routerColl.getName(), {writeConcern: {w: "majority"}}));
 
+    // Read from the mongoS to ensure the shard has refreshed its filtering information.
+    assert.eq(0, routerDB.getCollection(collName).countDocuments({}));
+
     //
     // Can restart a transaction that has been aborted.
     //
