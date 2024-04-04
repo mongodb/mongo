@@ -28,7 +28,7 @@
 #
 # test_timestamp19.py
 # Use the oldest timestamp in the metadata as the oldest timestamp on restart.
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -98,10 +98,8 @@ class test_timestamp19(wttest.WiredTigerTestCase):
         self.conn = self.setUpConnectionOpen('.')
         self.session = self.setUpSessionOpen(self.conn)
 
-        # The oldest timestamp on recovery is 40. Trying to set it earlier generates an error.
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10)),
-                '/oldest timestamp \(0, 10\) must not be older than current oldest timestamp \(0, 40\)/')
+        # The oldest timestamp on recovery is 40. Trying to set it earlier is a no-op.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.assertTimestampsEqual(\
             self.conn.query_timestamp('get=oldest_timestamp'), self.timestamp_str(40))
 

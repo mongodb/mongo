@@ -104,10 +104,8 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
                 '/oldest timestamp \(0, 3\) must not be later than stable timestamp \(0, 1\)/')
 
         # Oldest timestamp is 3 at the moment, trying to set it to an earlier
-        # timestamp generates an error.
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1)),
-                '/oldest timestamp \(0, 1\) must not be older than current oldest timestamp \(0, 3\)/')
+        # timestamp is a no-op.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         self.assertTimestampsEqual(\
             self.conn.query_timestamp('get=oldest_timestamp'), self.timestamp_str(3))
 
@@ -115,10 +113,8 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
             ',stable_timestamp=' + self.timestamp_str(3))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
         # Stable timestamp is 5 at the moment, trying to set it to an earlier
-        # timestamp generates an error.
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4)),
-                '/stable timestamp \(0, 4\) must not be older than current stable timestamp \(0, 5\)/')
+        # timestamp is a no-op.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4))
         self.assertTimestampsEqual(\
             self.conn.query_timestamp('get=stable_timestamp'), self.timestamp_str(5))
 
