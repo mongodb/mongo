@@ -269,6 +269,11 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
         auto serializedPipe = _pipeline->serializeToBson();
         logStartingSubPipeline(serializedPipe);
         try {
+            // Query settings are looked up after parsing and therefore are not populated in the
+            // context of the unionWith '_pipeline' as part of DocumentSourceUnionWith constructor.
+            // Attach query settings to the '_pipeline->getContext()' by copying them from the
+            // parent query ExpressionContext.
+            _pipeline->getContext()->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
             _pipeline =
                 pExpCtx->mongoProcessInterface->preparePipelineForExecution(_pipeline.release());
             _executionState = ExecutionProgress::kIteratingSubPipeline;
@@ -402,6 +407,17 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         }
 
         invariant(pipeCopy);
+
+        // Query settings are looked up after parsing and therefore are not populated in the
+        // context of the unionWith '_pipeline' as part of DocumentSourceUnionWith constructor.
+        // Attach query settings to the '_pipeline->getContext()' by copying them from the parent
+        // query ExpressionContext.
+        //
+        // NOTE: this is done here, as opposed to at the beginning of the serialize() method because
+        // serialize() is called when generating query shape, however, at that moment no query
+        // settings are present in the parent context.
+        _pipeline->getContext()->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
+
         BSONObj explainLocal =
             pExpCtx->mongoProcessInterface->preparePipelineAndExplain(pipeCopy, *opts.verbosity);
         LOGV2_DEBUG(4553501, 3, "$unionWith attached cursor to pipeline for explain");

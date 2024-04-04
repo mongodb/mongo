@@ -632,7 +632,8 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
 
     auto pipeline = Pipeline::makePipeline(rawPipeline, expCtx, pipelineOpts);
 
-    const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(request);
+    const Document serializedCommand =
+        aggregation_request_helper::serializeToCommandDoc(expCtx, request);
     auto readConcern = BSON(repl::ReadConcernArgs::kLevelFieldName
                             << repl::readConcernLevels::kSnapshotName
                             << repl::ReadConcernArgs::kAtClusterTimeFieldName << _atClusterTime

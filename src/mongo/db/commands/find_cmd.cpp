@@ -236,7 +236,7 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     // TODO: SERVER-73632 Remove feature flag for PM-635.
     // Query settings will only be looked up on mongos and therefore should be part of command body
     // on mongod if present.
-    expCtx->setQuerySettings(
+    expCtx->setQuerySettingsIfNotPresent(
         query_settings::lookupQuerySettingsForFind(expCtx, *parsedRequest, nss));
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = std::move(expCtx),
@@ -451,7 +451,7 @@ public:
                  .extensionsCallback = ExtensionsCallbackReal(opCtx, &_ns),
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
-            expCtx->setQuerySettings(
+            expCtx->setQuerySettingsIfNotPresent(
                 query_settings::lookupQuerySettingsForFind(expCtx, *parsedRequest, _ns));
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedRequest)});

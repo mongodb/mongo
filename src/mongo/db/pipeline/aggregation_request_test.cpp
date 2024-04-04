@@ -55,6 +55,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -207,7 +208,8 @@ TEST(AggregationRequestTest, ShouldOnlySerializeRequiredFieldsIfNoOptionalFields
         Document{{AggregateCommandRequest::kCommandName, nss.coll()},
                  {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
                  {AggregateCommandRequest::kCursorFieldName, Value(kDefaultCursorOptionDocument)}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
+    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
+                           make_intrusive<ExpressionContextForTest>(nss), request),
                        expectedSerialization);
 }
 
@@ -263,7 +265,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
         {AggregateCommandRequest::kCollectionUUIDFieldName, uuid},
         {AggregateCommandRequest::kIsClusterQueryWithoutShardKeyCmdFieldName, true},
         {AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName, true}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
+    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
+                           make_intrusive<ExpressionContextForTest>(nss), request),
                        expectedSerialization);
 }
 
@@ -278,7 +281,8 @@ TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
         {AggregateCommandRequest::kCommandName, nss.coll()},
         {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
         {AggregateCommandRequest::kCursorFieldName, Value(Document({{kBatchSizeFieldName, 10}}))}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
+    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
+                           make_intrusive<ExpressionContextForTest>(nss), request),
                        expectedSerialization);
 }
 
@@ -294,7 +298,8 @@ TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAgg
                   Value(Document({{aggregation_request_helper::kBatchSizeField,
                                    aggregation_request_helper::kDefaultBatchSize}}))}};
 
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
+    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
+                           make_intrusive<ExpressionContextForTest>(nss), request),
                        expectedSerialization);
 }
 
@@ -331,7 +336,8 @@ TEST(AggregationRequestTest, ShouldNotSerializeBatchSizeWhenExplainSet) {
         Document{{AggregateCommandRequest::kCommandName, nss.coll()},
                  {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
                  {AggregateCommandRequest::kCursorFieldName, Value(Document())}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
+    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
+                           make_intrusive<ExpressionContextForTest>(nss), request),
                        expectedSerialization);
 }
 
