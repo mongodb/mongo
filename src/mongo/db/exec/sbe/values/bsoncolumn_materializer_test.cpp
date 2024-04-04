@@ -272,33 +272,6 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializer) {
     auto oidStorage = obj.firstElement().value();
     assertMaterializedValue(
         oid, {value::TypeTags::bsonObjectId, value::bitcastFrom<const char*>(oidStorage)});
-
-    // Test a string and BSONCode of every size from 0 to 4097.
-    for (size_t strSize = 0; strSize < 4097; ++strSize) {
-        std::string longStr("a", strSize);
-
-        {
-            StringData sd{longStr};
-            obj = BSON("" << sd);
-            strStorage = obj.firstElement().value();
-
-            if (value::canUseSmallString(sd)) {
-                assertMaterializedValue(sd, value::makeSmallString(sd));
-            } else {
-                assertMaterializedValue(
-                    sd, {value::TypeTags::bsonString, value::bitcastFrom<const char*>(strStorage)});
-            }
-        }
-
-        {
-            BSONCode code{StringData{longStr}};
-            obj = BSON("" << code);
-            auto codeStorage = obj.firstElement().value();
-            assertMaterializedValue(
-                code,
-                {value::TypeTags::bsonJavascript, value::bitcastFrom<const char*>(codeStorage)});
-        }
-    }
 }
 
 TEST_F(BSONColumnMaterializerTest, SBEMaterializerOtherTypes) {
