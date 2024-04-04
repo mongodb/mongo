@@ -164,7 +164,9 @@ selector:
   - jstests/core/positional_projection.js # Positional projection
   - jstests/core/query/batch_size.js # singleBatch
   - jstests/core/query/dbref/dbref3.js # Positional projection
-  - jstests/core/query/explode_for_sort_plan_cache.js # Not first stage in pipeline
+  # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+  # first stage in a pipeline. This will be incomplatible with timeseries.
+  - jstests/core/query/in_expression_plan_cache.js
   - jstests/core/query/find/find_getmore_cmd.js # singleBatch
   - jstests/core/query/find/finda.js # returnKey
   - jstests/core/query/index_key_expression.js # Unclean aggregation result

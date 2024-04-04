@@ -338,8 +338,17 @@ runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}},
         [{_id: 1}, {_id: 2}, {_id: 5}, {_id: 6}],
         true);
 
-// Test that a different number of unique $in values results in a different plan cache key.
+// Test that a different number of unique $in values results in the same plan cache key if there is
+// no sort.
 runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}},
+        [{_id: 0}, {_id: 1}],
+        {query: {a: {$in: [1, 2, 3, 4]}}, projection: {_id: 1}},
+        [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
+        true);
+
+// Test that a different number of unique $in values results in the different plan cache key if
+// there is a sort.
+runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}, sort: {a: 1}},
         [{_id: 0}, {_id: 1}],
         {query: {a: {$in: [1, 2, 3, 4]}}, projection: {_id: 1}},
         [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],

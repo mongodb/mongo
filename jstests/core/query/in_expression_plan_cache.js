@@ -1,6 +1,7 @@
 /**
- * Confirms that explode for sort plans are properly cached and recovered from the plan cache,
- * yielding correct results after the query is auto-parameterized.
+ * Tests that both find and aggregate queries with $in are properly cached and recovered from the
+ * plan cache, yielding correct results after auto-parameterization. Test cases include queries with
+ * and without explode for sort optimization.
  *
  * @tags: [
  *   # Since the plan cache is per-node state, this test assumes that all operations are happening
@@ -23,6 +24,7 @@
  * ]
  */
 import {
+    getPlanCacheKeyFromPipeline,
     getPlanCacheKeyFromShape,
     getPlanStages,
     getWinningPlan
@@ -38,45 +40,82 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1, b: 1, c: 1}));
 assert.commandWorked(coll.createIndex({a: -1, b: 1, c: 1, d: 1}));
 
-const sortSpec = {
-    c: 1
-};
-
 // A helper function to look up a cache entry in the plan cache based on the given filter
 // and sort specs.
-function getPlanForCacheEntry(query, sort) {
-    const keyHash = getPlanCacheKeyFromShape({query: query, sort: sort, collection: coll, db: db});
-
+function getPlanForCacheEntry(query, sortSpec) {
+    const keyHash =
+        getPlanCacheKeyFromShape({query: query, sort: sortSpec, collection: coll, db: db});
     const res =
         coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
-    // We expect exactly one matching cache entry.
-    assert.eq(1, res.length, () => tojson(coll.aggregate([{$planCacheStats: {}}]).toArray()));
+    assert.eq(1,
+              res.length,
+              `Expected exactly one cache entry matching ${keyHash} but got ${
+                  tojson(coll.aggregate([{$planCacheStats: {}}]).toArray())}`);
     return res[0];
 }
 
-function assertIsExplodeForSort(query) {
+// A helper function to look up a cache entry in the plan cache based on the given filter
+// and sort specs.
+function getPlanForCacheEntryAgg(pipeline) {
+    const keyHash = getPlanCacheKeyFromPipeline(pipeline, coll);
+    const res =
+        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
+    assert.eq(1,
+              res.length,
+              `Expected exactly one cache entry matching ${keyHash} but got ${
+                  tojson(coll.aggregate([{$planCacheStats: {}}]).toArray())}`);
+    return res[0];
+}
+
+function assertIsExplodeForSort(query, sortSpec) {
     const explain = coll.find(query).sort(sortSpec).explain();
     const winningPlan = getWinningPlan(explain.queryPlanner);
     const sortMerges = getPlanStages(winningPlan, 'SORT_MERGE');
     assert.eq(sortMerges.length, 1, explain);
 }
 
-function assertIsNotExplodeForSort(query) {
+function assertIsNotExplodeForSort(query, sortSpec) {
     const explain = coll.find(query).sort(sortSpec).explain();
     const winningPlan = getWinningPlan(explain.queryPlanner);
     const sortMerges = getPlanStages(winningPlan, 'SORT_MERGE');
     assert.eq(sortMerges.length, 0, explain);
 }
 
-function assertQueryParameterizedCorrectly(
-    {query, queryCount, newQuery, newQueryCount, reuseEntry, isExplode = true}) {
+function assertActiveAndSameCacheEntry(
+    expectedActive, isCacheEntrySame, [lhs, lhsTag], [rhs, rhsTag]) {
+    assert.eq(lhs.isActive, expectedActive, lhs);
+    if (isCacheEntrySame) {
+        assert.eq(
+            lhs.queryHash, rhs.queryHash, `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
+        assert.eq(lhs.planCacheKey,
+                  rhs.planCacheKey,
+                  `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
+    } else {
+        assert.neq(
+            lhs.queryHash, rhs.queryHash, `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
+        assert.neq(lhs.planCacheKey,
+                   rhs.planCacheKey,
+                   `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
+    }
+}
+
+function assertQueryParameterizedCorrectly({
+    query,
+    queryCount,
+    newQuery,
+    newQueryCount,
+    reuseEntry,
+    sortSpec = {},
+    isExplodeForSort = false,
+}) {
     // Clear plan cache to have a fresh test case.
     coll.getPlanCache().clear();
+    const isEmptySort = Object.keys(sortSpec).length === 0;
 
-    if (isExplode) {
-        assertIsExplodeForSort(query);
+    if (isExplodeForSort) {
+        assertIsExplodeForSort(query, sortSpec);
     } else {
-        assertIsNotExplodeForSort(query);
+        assertIsNotExplodeForSort(query, sortSpec);
     }
 
     // Run the query for the first time to create an inactive plan cache entry.
@@ -87,34 +126,45 @@ function assertQueryParameterizedCorrectly(
     // Run the same query again to activate the cache entry.
     assert.eq(queryCount, coll.find(query).sort(sortSpec).itcount());
     const activeEntry = getPlanForCacheEntry(query, sortSpec);
-    assert.eq(activeEntry.isActive, true, activeEntry);
-    assert.eq(inactiveEntry.queryHash,
-              activeEntry.queryHash,
-              `inactive=${tojson(inactiveEntry)}, active=${tojson(activeEntry)}`);
-    assert.eq(inactiveEntry.planCacheKey,
-              activeEntry.planCacheKey,
-              `inactive=${tojson(inactiveEntry)}, active=${tojson(activeEntry)}`);
+    assertActiveAndSameCacheEntry(true /*expectedActive*/,
+                                  true /*isCacheEntrySame*/,
+                                  [activeEntry, "active"],
+                                  [inactiveEntry, "inactive"]);
+
+    // Run an equivalent aggregation and check that queryHash and planCacheKey match with the active
+    // entry.
+    let pipeline = isEmptySort ? [{$match: query}] : [{$match: query}, {$sort: sortSpec}];
+    assert.eq(queryCount, coll.aggregate(pipeline).itcount());
+    const activeEntryAgg = getPlanForCacheEntryAgg(pipeline);
+    assertActiveAndSameCacheEntry(true /*expectedActive*/,
+                                  true /*isCacheEntrySame*/,
+                                  [activeEntryAgg, "activeEntryAgg"],
+                                  [activeEntry, "activeEntry"]);
 
     // Run the new query and check for cache entry.
     assert.eq(newQueryCount, coll.find(newQuery).sort(sortSpec).itcount());
+
     if (reuseEntry) {
         const reusedEntry = getPlanForCacheEntry(newQuery, sortSpec);
-        assert.eq(reusedEntry.isActive, true, reusedEntry);
-        assert.eq(activeEntry.queryHash,
-                  reusedEntry.queryHash,
-                  `active=${tojson(activeEntry)}, reused=${tojson(reusedEntry)}`);
-        assert.eq(activeEntry.planCacheKey,
-                  reusedEntry.planCacheKey,
-                  `active=${tojson(activeEntry)}, reused=${tojson(reusedEntry)}`);
+        assertActiveAndSameCacheEntry(true /*expectedActive*/,
+                                      true /*isCacheEntrySame*/,
+                                      [reusedEntry, "reusedEntry"],
+                                      [activeEntry, "activeEntry"]);
+
+        // Run an equivalent aggregation for the newQuery and check the cache.
+        pipeline = isEmptySort ? [{$match: newQuery}] : [{$match: newQuery}, {$sort: sortSpec}];
+        assert.eq(newQueryCount, coll.aggregate(pipeline).itcount());
+        const reusedEntryAgg = getPlanForCacheEntryAgg(pipeline);
+        assertActiveAndSameCacheEntry(true /*expectedActive*/,
+                                      true /*isCacheEntrySame*/,
+                                      [reusedEntryAgg, "reusedEntryAgg"],
+                                      [activeEntry, "activeEntry"]);
     } else {
         inactiveEntry = getPlanForCacheEntry(newQuery, sortSpec);
-        assert.eq(inactiveEntry.isActive, false, inactiveEntry);
-        assert.neq(inactiveEntry.queryHash,
-                   activeEntry.queryHash,
-                   `inactive=${tojson(inactiveEntry)}, active=${tojson(activeEntry)}`);
-        assert.neq(inactiveEntry.planCacheKey,
-                   activeEntry.planCacheKey,
-                   `inactive=${tojson(inactiveEntry)}, active=${tojson(activeEntry)}`);
+        assertActiveAndSameCacheEntry(false /*expectedActive*/,
+                                      false /*isCacheEntrySame*/,
+                                      [inactiveEntry, "inactiveEntry"],
+                                      [activeEntry, "activeEntry"]);
     }
 }
 
@@ -132,7 +182,7 @@ for (let a = 1; a <= 3; a++) {
 
 // Query with shape not like point intervals but evaluates to point intervals at runtime will not be
 // optimized with exploding for sort.
-assertIsNotExplodeForSort({a: {$gte: 1, $lte: 1}, b: {$in: [1, 2]}});
+assertIsNotExplodeForSort({a: {$gte: 1, $lte: 1}, b: {$in: [1, 2]}}, {} /* sortSpec */);
 
 // Changing the $eq predicate value should reuse the plan cache and gives correct results.
 assertQueryParameterizedCorrectly({
@@ -184,14 +234,26 @@ assertQueryParameterizedCorrectly({
     reuseEntry: true,
 });
 
-// Changing the $in predicate size should not reuse the SBE plan cache but still gives correct
-// results.
+// In case of no sort, changing the $in predicate size should reuse the plan cache. (Because
+// explode-for-sort optimization will not happen.)
+// In case of sort, the plan cache entry will be reused in classic, but not in SBE. (Because classic
+// applies explode-for-sort after retrieving from the plan cache.)
+assertQueryParameterizedCorrectly({
+    query: {a: {$eq: 1}, b: {$in: [1, 2]}},
+    queryCount: 30,
+    newQuery: {a: {$eq: 1}, b: {$in: [1, 2, 3]}},
+    newQueryCount: 60,
+    reuseEntry: true,
+});
+
 assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: [1, 2]}},
     queryCount: 30,
     newQuery: {a: {$eq: 1}, b: {$in: [1, 2, 3]}},
     newQueryCount: 60,
     reuseEntry: !isSBEEnabled,
+    sortSpec: {c: 1},
+    isExplodeForSort: true,
 });
 
 // Special values in the predicate will not be parameterized hence the SBE plan cache will not be
@@ -240,16 +302,31 @@ assertQueryParameterizedCorrectly({
     newQuery: {a: {$eq: 2}, b: {$in: maxExplodeIn}},
     newQueryCount: 120,
     reuseEntry: true,
+    sortSpec: {c: 1},
+    isExplodeForSort: true,
 });
 
-// Test that in SBE a query with explode for sort optimization will use different plan cache
-// entry than the same query with too many scans to explode.
+// Test that in SBE a query with explode for sort optimization will use different plan cache entry
+// than the same query with too many scans to explode. If there is is no sort, SBE should reuse the
+// plan cache entry.
+// In case of classic, we always reuse the plan cache entry.
+assertQueryParameterizedCorrectly({
+    query: {a: {$eq: 1}, b: {$in: maxExplodeIn}},
+    queryCount: 60,
+    newQuery: {a: {$eq: 1}, b: {$in: tooLargeToExplodeIn}},
+    newQueryCount: 60,
+    reuseEntry: true,
+    isExplodeForSort: false,
+});
+
 assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: maxExplodeIn}},
     queryCount: 60,
     newQuery: {a: {$eq: 1}, b: {$in: tooLargeToExplodeIn}},
     newQueryCount: 60,
     reuseEntry: !isSBEEnabled,
+    sortSpec: {c: 1},
+    isExplodeForSort: true,
 });
 
 // Test that a query with more than "max scans to explode" will use the same plan cache
@@ -260,5 +337,6 @@ assertQueryParameterizedCorrectly({
     newQuery: {a: {$eq: 1}, b: {$in: evenLargerIn}},
     newQueryCount: 60,
     reuseEntry: true,
-    isExplode: false
+    sortSpec: {c: 1},
+    isExplodeForSort: false,
 });

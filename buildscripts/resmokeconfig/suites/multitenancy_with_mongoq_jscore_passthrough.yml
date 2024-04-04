@@ -37,7 +37,7 @@ selector:
   # collection.getPlanCache().* calls planCache* commands which are not allowed with security token.
   - jstests/core/**/cached_plan_trial_does_not_discard_work.js
   - jstests/core/**/collation_plan_cache.js
-  - jstests/core/**/explode_for_sort_plan_cache.js
+  - jstests/core/**/in_expression_plan_cache.js
   - jstests/core/**/index_filter_commands.js
   - jstests/core/**/index_filter_commands_invalidate_plan_cache_entries.js
   - jstests/core/**/introspect_hidden_index_plan_cache_entries.js

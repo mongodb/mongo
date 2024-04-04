@@ -726,9 +726,13 @@ TEST_F(CanonicalQueryEncoderTest, BonsaiInEncoding) {
     // Single element $in's are translated as $eq's, which means that two single element $in's with
     // different types shouldn't have the same key.
     ASSERT_NE(encodeBonsai("{a: {$in: [1]}}"), encodeBonsai("{a: {$in: ['str']}}"));
-    // $in's with different lengths should not have the same key.
+    // $in with length 1 is optimized to an $eq. It should have a different key than a $in with an
+    // arbitrary length.
     ASSERT_NE(encodeBonsai("{a: {$in: [1]}}"), encodeBonsai("{a: {$in: [1, 2]}}"));
-    ASSERT_NE(encodeBonsai("{a: {$in: [1, 2]}}"), encodeBonsai("{a: {$in: [1, 2, 3]}}"));
+    // $in's with different lengths should have the same key.
+    ASSERT_EQ(encodeBonsai("{a: {$in: [1, 2]}}"), encodeBonsai("{a: {$in: [1, 2, 3]}}"));
+    ASSERT_EQ(encodeBonsai("{a: {$in: [1, 2]}}"),
+              encodeBonsai("{a: {$in: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}}"));
     // $in with same length but different types have the same key.
     ASSERT_EQ(encodeBonsai("{a: {$in: [1, 2]}}"), encodeBonsai("{a: {$in: ['str1', 'str2']}}"));
 }
