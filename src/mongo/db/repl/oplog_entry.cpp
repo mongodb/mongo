@@ -312,10 +312,7 @@ MutableOplogEntry MutableOplogEntry::makeGlobalIndexCrudOperation(const OpTypeEn
 }
 
 StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {
-    boost::optional<TenantId> tid;
-    if (object.hasElement("tid"))
-        tid = TenantId::parseFromBSON(object["tid"]);
-
+    const auto tid = OplogEntry::parseTid(object);
     try {
         MutableOplogEntry oplogEntry;
         const auto vts = tid
@@ -380,9 +377,7 @@ StatusWith<DurableOplogEntry> DurableOplogEntry::parse(const BSONObj& object) {
 DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput)) {
     _raw = _raw.getOwned();
 
-    boost::optional<TenantId> tid;
-    if (_raw.hasElement("tid"))
-        tid = TenantId::parseFromBSON(_raw["tid"]);
+    const auto tid = OplogEntry::parseTid(_raw);
 
     const auto vts = tid
         ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
@@ -559,18 +554,9 @@ bool DurableOplogEntry::isSingleOplogEntryTransactionWithCommand() const {
     // optimization, if necessary, could be to ensure the primary always constructs applyOps oplog
     // entries with commands at the beginning.
     for (BSONElement e : applyOps.Array()) {
-        auto ns = e.Obj().getField("ns");
-        if (!ns.eoo()) {
-            auto tid = e.Obj().getField("tid");
-            auto tenantId = tid.eoo()
-                ? boost::none
-                : boost::make_optional<TenantId>(TenantId::parseFromBSON(tid));
-
-            if (NamespaceStringUtil::deserialize(
-                    tenantId, ns.String(), SerializationContext::stateDefault())
-                    .isCommand()) {
-                return true;
-            }
+        auto const opType = e.Obj().getStringField(OplogEntry::kOpTypeFieldName);
+        if (opType == "c"_sd) {
+            return true;
         }
     }
     return false;
@@ -662,6 +648,18 @@ StatusWith<OplogEntry> OplogEntry::parse(const BSONObj& object) {
 
     return OplogEntry(std::move(parseStatus.getValue()));
 }
+
+boost::optional<TenantId> OplogEntry::parseTid(const BSONObj& object) {
+    if (!gMultitenancySupport) {
+        return boost::none;
+    }
+    BSONElement tidElem = object["tid"];
+    if (tidElem.eoo()) {
+        return boost::none;
+    }
+    return TenantId::parseFromBSON(tidElem);
+}
+
 std::string OplogEntry::toStringForLogging() const {
     return toBSONForLogging().toString();
 }

@@ -517,18 +517,23 @@ void DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::
 void DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::_addAffectedNamespaces(
     const Document& doc) {
     // TODO SERVER-78670:  move namespace extraction to change_stream_helpers.cpp and make generic
-    const boost::optional<TenantId> tid = !doc["tid"].missing()
-        ? boost::make_optional<TenantId>(TenantId(doc["tid"].getOid()))
-        : boost::none;
+    const auto tid = [&]() -> boost::optional<TenantId> {
+        if (!gMultitenancySupport) {
+            return boost::none;
+        }
+        const auto tidField = doc["tid"];
+        return !tidField.missing() ? boost::make_optional(TenantId(tidField.getOid()))
+                                   : boost::none;
+    }();
+
+    const auto dbCmdNs = NamespaceStringUtil::deserialize(
+        tid, doc["ns"].getStringData(), SerializationContext::stateDefault());
     if (doc["op"].getStringData() != "c") {
-        _affectedNamespaces.insert(NamespaceStringUtil::deserialize(
-            tid, doc["ns"].getStringData(), SerializationContext::stateDefault()));
+        _affectedNamespaces.insert(dbCmdNs);
         return;
     }
 
     static const std::vector<std::string> kCollectionField = {"create", "createIndexes"};
-    const auto dbCmdNs = NamespaceStringUtil::deserialize(
-        tid, doc["ns"].getString(), SerializationContext::stateDefault());
     const Document& object = doc["o"].getDocument();
     for (const auto& fieldName : kCollectionField) {
         const auto field = object[fieldName];

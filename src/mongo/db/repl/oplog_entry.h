@@ -770,6 +770,8 @@ public:
      */
     static StatusWith<OplogEntry> parse(const BSONObj& object);
 
+    static boost::optional<TenantId> parseTid(const BSONObj& object);
+
     bool isForCappedCollection() const;
     void setIsForCappedCollection(bool isForCappedCollection);
 

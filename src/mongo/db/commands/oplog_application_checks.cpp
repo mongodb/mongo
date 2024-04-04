@@ -86,13 +86,11 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         return Status::OK();
     }
 
-    BSONElement nsElem = oplogEntry["ns"];
+    const BSONElement nsElem = oplogEntry["ns"];
     checkBSONType(BSONType::String, nsElem);
-    boost::optional<TenantId> tid = oplogEntry.hasElement("tid")
-        ? boost::make_optional<TenantId>(TenantId::parseFromBSON(oplogEntry["tid"]))
-        : boost::none;
+    const auto tid = repl::OplogEntry::parseTid(oplogEntry);
     NamespaceString nss = NamespaceStringUtil::deserialize(
-        tid, oplogEntry["ns"].checkAndGetStringData(), SerializationContext::stateDefault());
+        tid, nsElem.checkAndGetStringData(), SerializationContext::stateDefault());
 
     if (oplogEntry.hasField("ui"_sd)) {
         // ns by UUID overrides the ns specified if they are different.

@@ -99,10 +99,7 @@ bool ApplyOpsCommandInfo::areOpsCrudOnly() const {
 
 ApplyOpsCommandInfo::ApplyOpsCommandInfo(const BSONObj& applyOpCmd)
     : _areOpsCrudOnly(_parseAreOpsCrudOnly(applyOpCmd)) {
-    boost::optional<TenantId> tid;
-    if (applyOpCmd.hasElement("tid")) {
-        tid = TenantId::parseFromBSON(applyOpCmd["tid"]);
-    }
+    const auto tid = repl::OplogEntry::parseTid(applyOpCmd);
     const auto vts = tid
         ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
               *tid, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
