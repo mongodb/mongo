@@ -531,12 +531,8 @@ public:
          * Returns boost::none if this router is not a sub-router, or if the txnNumber or
          * retryCounter on this router do not match that on the opCtx.
          */
-        // TODO SERVER-85353 Remove commandName and nss parameters, which are used only for the
-        // failpoint
         boost::optional<StringMap<boost::optional<bool>>> getAdditionalParticipantsForResponse(
-            OperationContext* opCtx,
-            boost::optional<const std::string&> commandName = boost::none,
-            boost::optional<const NamespaceString&> nss = boost::none);
+            OperationContext* opCtx);
 
         /**
          * Commits the transaction.

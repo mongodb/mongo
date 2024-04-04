@@ -430,18 +430,12 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
     topologyVersion.serialize(&topologyVersionBuilder);
 }
 
-// TODO SERVER-85353 Remove commandName and nss parameters, which are used only for the failpoint
-// in TxnRouter::getAdditionalParticipantsForResponse
-void appendAdditionalParticipants(OperationContext* opCtx,
-                                  BSONObjBuilder* commandBodyFieldsBob,
-                                  const std::string& commandName,
-                                  const NamespaceString& nss) {
+void appendAdditionalParticipants(OperationContext* opCtx, BSONObjBuilder* commandBodyFieldsBob) {
     auto txnRouter = TransactionRouter::get(opCtx);
     if (!txnRouter)
         return;
 
-    auto additionalParticipants =
-        txnRouter.getAdditionalParticipantsForResponse(opCtx, commandName, nss);
+    auto additionalParticipants = txnRouter.getAdditionalParticipantsForResponse(opCtx);
     if (!additionalParticipants)
         return;
 
@@ -1082,10 +1076,7 @@ void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
     // 2. If the error is not retryable, mongos can then abort the transaction on the added
     // participants rather than waiting for the added shards to abort either due to a transaction
     // timeout or a new transaction being started, releasing their resources sooner.
-    appendAdditionalParticipants(opCtx,
-                                 _ecd->getExtraFieldsBuilder(),
-                                 execContext.getCommand()->getName(),
-                                 _ecd->getInvocation()->ns());
+    appendAdditionalParticipants(opCtx, _ecd->getExtraFieldsBuilder());
 
     if (status.code() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
         // Exceptions are used to resolve views in a sharded cluster, so they should be handled
@@ -1140,10 +1131,7 @@ void CheckoutSessionAndInvokeCommand::_commitInvocation() {
             auto txnResponseMetadata = txnParticipant.getResponseMetadata();
             auto bodyBuilder = replyBuilder->getBodyBuilder();
             bodyBuilder.appendElements(txnResponseMetadata);
-            appendAdditionalParticipants(execContext.getOpCtx(),
-                                         &bodyBuilder,
-                                         _ecd->getExecutionContext().getCommand()->getName(),
-                                         _ecd->getInvocation()->ns());
+            appendAdditionalParticipants(execContext.getOpCtx(), &bodyBuilder);
         }
     }
 }
