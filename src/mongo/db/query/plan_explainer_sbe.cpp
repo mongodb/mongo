@@ -264,6 +264,7 @@ void statsToBSON(const QuerySolutionNode* node,
                 bob->append("indexName", eln->idxEntry->identifier.catalogName);
                 bob->append("indexKeyPattern", eln->idxEntry->keyPattern);
             }
+            bob->append("scanDirection", toString(eln->scanDirection));
             break;
         }
         case STAGE_EQ_LOOKUP_UNWIND: {
@@ -280,6 +281,7 @@ void statsToBSON(const QuerySolutionNode* node,
                 bob->append("indexName", eln->idxEntry->identifier.catalogName);
                 bob->append("indexKeyPattern", eln->idxEntry->keyPattern);
             }
+            bob->append("scanDirection", toString(eln->scanDirection));
             break;
         }
         case STAGE_COLUMN_SCAN: {
