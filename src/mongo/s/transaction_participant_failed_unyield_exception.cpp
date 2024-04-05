@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,40 +27,34 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/operation_context.h"
+#include "mongo/s/transaction_participant_failed_unyield_exception.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
-/**
- * Functions to call before and after blocking on the network layer so that resources may be given
- * up so that "sub operations" running on the same node may use them. For example, a node may want
- * to check in its session before waiting on the network so that a sub-operation may check it out
- * and use it. This is important for preventing deadlocks.
- */
-class ResourceYielder {
-public:
-    virtual ~ResourceYielder() = default;
+namespace {
 
-    virtual void yield(OperationContext*) = 0;
-    virtual void unyield(OperationContext*) = 0;
+MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(TransactionParticipantFailedUnyieldInfo);
 
-    Status yieldNoThrow(OperationContext* opCtx) noexcept {
-        try {
-            yield(opCtx);
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-        return Status::OK();
-    };
+}  // namespace
 
-    virtual Status unyieldNoThrow(OperationContext* opCtx) noexcept {
-        try {
-            unyield(opCtx);
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-        return Status::OK();
-    };
-};
+void TransactionParticipantFailedUnyieldInfo::serialize(BSONObjBuilder* bob) const {
+    BSONObjBuilder b;
+    _originalError.serializeErrorToBSON(&b);
+    bob->append(kOriginalErrorFieldName, b.obj());
+}
+
+std::shared_ptr<const ErrorExtraInfo> TransactionParticipantFailedUnyieldInfo::parse(
+    const BSONObj& obj) {
+    return std::make_shared<TransactionParticipantFailedUnyieldInfo>(parseFromCommandError(obj));
+}
+
+TransactionParticipantFailedUnyieldInfo
+TransactionParticipantFailedUnyieldInfo::parseFromCommandError(const BSONObj& obj) {
+    return TransactionParticipantFailedUnyieldInfo(
+        getErrorStatusFromCommandResult(obj[kOriginalErrorFieldName].Obj()));
+}
+
 }  // namespace mongo

@@ -326,6 +326,9 @@ private:
 
     Status _interruptStatus = Status::OK();
 
+    // Set to true if unyielding fails, even after a successful remote response.
+    bool _failedUnyield = false;
+
     // NOTE: it's important that these two members go last in this class.  That ensures that we:
     // 1. cancel/ensure no more callbacks run which touch the ARS
     // 2. cancel any outstanding work in the task executor

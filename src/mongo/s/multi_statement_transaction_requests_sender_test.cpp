@@ -42,13 +42,18 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
+#include "mongo/s/transaction_participant_failed_unyield_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -58,11 +63,15 @@ namespace mongo {
 
 namespace {
 
-class MultiStatementTransactionRequestsSenderTest
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("test.bar");
+const ShardId kTestRemoteShardId = ShardId("FakeShard1");
+const HostAndPort kTestRemoteHostAndPort = HostAndPort("FakeShard1Host", 12345);
+
+class RouterMultiStatementTransactionRequestsSenderTest
     : public virtual service_context_test::RouterRoleOverride,
       public ShardingTestFixture {
 public:
-    MultiStatementTransactionRequestsSenderTest() {}
+    RouterMultiStatementTransactionRequestsSenderTest() {}
 
     void setUp() override {
         ShardingTestFixture::setUp();
@@ -71,16 +80,16 @@ public:
 
         std::vector<ShardType> shards;
         ShardType shardType;
-        shardType.setName(_remoteShardId.toString());
-        shardType.setHost(_remoteHostAndPort.toString());
+        shardType.setName(kTestRemoteShardId.toString());
+        shardType.setHost(kTestRemoteHostAndPort.toString());
         shards.push_back(shardType);
 
         std::unique_ptr<RemoteCommandTargeterMock> targeter(
             std::make_unique<RemoteCommandTargeterMock>());
         _targeters.push_back(targeter.get());
-        targeter->setConnectionStringReturnValue(ConnectionString(_remoteHostAndPort));
-        targeter->setFindHostReturnValue(_remoteHostAndPort);
-        targeterFactory()->addTargeterToReturn(ConnectionString(_remoteHostAndPort),
+        targeter->setConnectionStringReturnValue(ConnectionString(kTestRemoteHostAndPort));
+        targeter->setFindHostReturnValue(kTestRemoteHostAndPort);
+        targeterFactory()->addTargeterToReturn(ConnectionString(kTestRemoteHostAndPort),
                                                std::move(targeter));
 
         setupShards(shards);
@@ -109,20 +118,18 @@ protected:
         ASSERT(!request.cmdObj.hasField("txnNumber"));
     }
 
-    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.bar");
-    const ShardId _remoteShardId = ShardId("FakeShard1");
-    const HostAndPort _remoteHostAndPort = HostAndPort("FakeShard1Host", 12345);
     std::vector<RemoteCommandTargeterMock*> _targeters;  // Targeters are owned by the factory.
 };
 
-TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsNotAppendedIfNoTxnRouter) {
+TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsNotAppendedIfNoTxnRouter) {
     auto cmdName = "find";
-    std::vector<AsyncRequestsSender::Request> requests{{_remoteShardId, BSON(cmdName << "bar")}};
+    std::vector<AsyncRequestsSender::Request> requests{
+        {kTestRemoteShardId, BSON(cmdName << "bar")}};
 
     auto msars =
         MultiStatementTransactionRequestsSender(operationContext(),
                                                 executor(),
-                                                _nss.dbName(),
+                                                kTestNss.dbName(),
                                                 requests,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                 Shard::RetryPolicy::kNoRetry);
@@ -144,7 +151,7 @@ TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsNotAppendedIfNoTxn
 }
 
 
-TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedIfTxnRouter) {
+TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedIfTxnRouter) {
     operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
     operationContext()->setTxnNumber(TxnNumber(0));
     operationContext()->setInMultiDocumentTransaction();
@@ -155,14 +162,14 @@ TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedIfTxnRo
     TransactionRouter::get(operationContext()).setDefaultAtClusterTime(operationContext());
 
     auto cmdName = "find";
-    std::vector<AsyncRequestsSender::Request> requests{{_remoteShardId,
+    std::vector<AsyncRequestsSender::Request> requests{{kTestRemoteShardId,
                                                         BSON("find"
                                                              << "bar")}};
 
     auto msars =
         MultiStatementTransactionRequestsSender(operationContext(),
                                                 executor(),
-                                                _nss.dbName(),
+                                                kTestNss.dbName(),
                                                 requests,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                 Shard::RetryPolicy::kNoRetry);
@@ -186,7 +193,7 @@ TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedIfTxnRo
     future.default_timed_get();
 }
 
-TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedIfSubTxnRouter) {
+TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedIfSubTxnRouter) {
     operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
     operationContext()->setTxnNumber(TxnNumber(0));
     operationContext()->setInMultiDocumentTransaction();
@@ -207,14 +214,14 @@ TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedIfSubTx
                             TransactionRouter::TransactionActions::kStartOrContinue);
 
     auto cmdName = "find";
-    std::vector<AsyncRequestsSender::Request> requests{{_remoteShardId,
+    std::vector<AsyncRequestsSender::Request> requests{{kTestRemoteShardId,
                                                         BSON("find"
                                                              << "bar")}};
 
     auto msars =
         MultiStatementTransactionRequestsSender(operationContext(),
                                                 executor(),
-                                                _nss.dbName(),
+                                                kTestNss.dbName(),
                                                 requests,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                 Shard::RetryPolicy::kNoRetry);
@@ -236,6 +243,124 @@ TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedIfSubTx
     });
 
     future.default_timed_get();
+}
+
+class ShardsvrMultiStatementTransactionRequestsSenderTest : public ShardServerTestFixture {
+public:
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+
+        std::unique_ptr<RemoteCommandTargeterMock> targeter(
+            std::make_unique<RemoteCommandTargeterMock>());
+        targeter->setConnectionStringReturnValue(ConnectionString(kTestRemoteHostAndPort));
+        targeter->setFindHostReturnValue(kTestRemoteHostAndPort);
+        targeterFactory()->addTargeterToReturn(ConnectionString(kTestRemoteHostAndPort),
+                                               std::move(targeter));
+
+        auto future = launchAsync([this] { shardRegistry()->reload(operationContext()); });
+        onCommand([&](const auto& request) {
+            ASSERT(request.cmdObj["find"]);
+            const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+                request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
+
+            ShardType shardType;
+            shardType.setName(kTestRemoteShardId.toString());
+            shardType.setHost(kTestRemoteHostAndPort.toString());
+            return CursorResponse(
+                       NamespaceString::kConfigsvrShardsNamespace, 0LL, {shardType.toBSON()})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+
+        future.default_timed_get();
+    }
+
+protected:
+    void assertFailedToUnyieldError(Status status, ErrorCodes::Error expectedOriginalCode) {
+        ASSERT_EQ(status.code(), ErrorCodes::TransactionParticipantFailedUnyield);
+
+        auto originalErrorInfo = status.extraInfo<TransactionParticipantFailedUnyieldInfo>();
+        auto originalStatus = originalErrorInfo->getOriginalError();
+        ASSERT_EQ(originalStatus.code(), expectedOriginalCode);
+    }
+    std::vector<RemoteCommandTargeterMock*> _targeters;  // Targeters are owned by the factory.
+};
+
+TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest,
+       RequestsFailWithTransactionParticipantFailedUnyield) {
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    operationContext()->setTxnNumber(TxnNumber(0));
+    operationContext()->setInMultiDocumentTransaction();
+
+    repl::ReadConcernArgs readConcernArgs{LogicalTime(Timestamp(1, 0)),
+                                          repl::ReadConcernLevel::kMajorityReadConcern};
+    repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+
+    // Set up transaction state
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(operationContext());
+    auto contextSession = mongoDSessionCatalog->checkOutSession(operationContext());
+
+    auto txnParticipant = TransactionParticipant::get(operationContext());
+    txnParticipant.beginOrContinue(operationContext(),
+                                   TxnNumber(0),
+                                   false,
+                                   TransactionParticipant::TransactionActions::kStart);
+    txnParticipant.unstashTransactionResources(operationContext(), "insert");
+
+    // Schedule remote requests
+    std::vector<AsyncRequestsSender::Request> requests;
+    requests.emplace_back(kTestRemoteShardId,
+                          BSON("find"
+                               << "bar"));
+    requests.emplace_back(kTestRemoteShardId,
+                          BSON("find"
+                               << "bar"));
+
+    auto msars = MultiStatementTransactionRequestsSender(
+        operationContext(),
+        executor(),
+        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+        requests,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        Shard::RetryPolicy::kNoRetry);
+
+    // Enable restoreLocksFail failpoint, which should cause unyielding to fail
+    globalFailPointRegistry().find("restoreLocksFail")->setMode(FailPoint::alwaysOn);
+
+    // Get the response from the first find request. Assert TransactionParticipantFailedUnyield is
+    // thrown even after a successful response, and contains the original LockTimeout error.
+    auto future = launchAsync([&]() {
+        auto response = msars.next();
+        auto status = response.swResponse.getStatus();
+        assertFailedToUnyieldError(status, ErrorCodes::LockTimeout);
+    });
+
+    // Mock the successful find response
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        return CursorResponse(
+                   NamespaceString::createNamespaceString_forTest("db.bar"), 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    future.default_timed_get();
+
+    // Disable fail point
+    globalFailPointRegistry().find("restoreLocksFail")->setMode(FailPoint::off);
+
+    // Get the response from the second find request. It should have been marked as failed with the
+    // same error, regardless of whether we received a response yet.
+    future = launchAsync([&]() {
+        while (!msars.done()) {
+            auto response = msars.next();
+            auto status = response.swResponse.getStatus();
+            assertFailedToUnyieldError(status, ErrorCodes::LockTimeout);
+        }
+    });
+
+    future.default_timed_get();
+
+    SessionCatalog::get(operationContext()->getServiceContext())->reset_forTest();
 }
 
 }  // namespace

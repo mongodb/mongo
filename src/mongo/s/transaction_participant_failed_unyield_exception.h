@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,38 +29,41 @@
 
 #pragma once
 
-#include "mongo/db/operation_context.h"
+#include <memory>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
+
 /**
- * Functions to call before and after blocking on the network layer so that resources may be given
- * up so that "sub operations" running on the same node may use them. For example, a node may want
- * to check in its session before waiting on the network so that a sub-operation may check it out
- * and use it. This is important for preventing deadlocks.
+ * This class wraps an error originally thrown when a transaction participant shard fails when
+ * unyielding its resources after processing remote responses. This allows distinguishing between a
+ * local error versus a remote error, which is important for transaction machinery to correctly
+ * handle the error.
  */
-class ResourceYielder {
+class TransactionParticipantFailedUnyieldInfo final : public ErrorExtraInfo {
 public:
-    virtual ~ResourceYielder() = default;
+    static constexpr auto code = ErrorCodes::TransactionParticipantFailedUnyield;
+    static constexpr StringData kOriginalErrorFieldName = "originalError"_sd;
 
-    virtual void yield(OperationContext*) = 0;
-    virtual void unyield(OperationContext*) = 0;
+    TransactionParticipantFailedUnyieldInfo(const Status& originalError)
+        : _originalError(originalError) {}
 
-    Status yieldNoThrow(OperationContext* opCtx) noexcept {
-        try {
-            yield(opCtx);
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-        return Status::OK();
-    };
+    const auto& getOriginalError() const {
+        return _originalError;
+    }
 
-    virtual Status unyieldNoThrow(OperationContext* opCtx) noexcept {
-        try {
-            unyield(opCtx);
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-        return Status::OK();
-    };
+    void serialize(BSONObjBuilder* bob) const final;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
+    static TransactionParticipantFailedUnyieldInfo parseFromCommandError(const BSONObj& obj);
+
+private:
+    Status _originalError;
 };
+
 }  // namespace mongo

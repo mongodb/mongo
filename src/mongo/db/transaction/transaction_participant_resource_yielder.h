@@ -67,6 +67,13 @@ public:
      */
     void unyield(OperationContext* opCtx) override;
 
+    /**
+     * Behaves the same as unyield, but does not throw. Instead, this function will ensure the
+     * Session is checked in upon error, and will return a non-retryable error which wraps the
+     * the original error because it's not safe to continue a transaction that failed to unyield.
+     */
+    Status unyieldNoThrow(OperationContext* opCtx) noexcept override;
+
 private:
     bool _yielded = false;
     std::string _cmdName;

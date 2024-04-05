@@ -205,15 +205,12 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
 
         firstResponseProcessed.countDownAndWait();
 
-        // Unyield throws here, but the next response was already ready so it's returned. The
-        // outstanding requests are cancelled with the error unyield threw.
-        response = ars.next();
-        ASSERT(response.swResponse.getStatus().isOK());
-        ASSERT_EQ(response.shardId, kTestShardIds[1]);
-
+        // Unyield throws here. Even if the next response was already ready the response will fail.
+        // The returned error will have an empty shardId to represent a local failure rather than a
+        // remote failure.
         response = ars.next();
         ASSERT_EQ(response.swResponse.getStatus(), ErrorCodes::BadValue);
-        ASSERT_EQ(response.shardId, kTestShardIds[2]);
+        ASSERT_EQ(response.shardId, ShardId{});
     });
 
     onCommand([&](const auto& request) {
