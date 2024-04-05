@@ -29,19 +29,25 @@
 
 #include "mongo/db/query/plan_explainer_express.h"
 
+#include "mongo/db/keypattern.h"
+
 namespace mongo {
+std::string PlanExplainerExpress::getPlanSummary() const {
+    if (_iteratorStats->indexKeyPattern().isEmpty()) {
+        return _iteratorStats->stageName();
+    } else {
+        // KeyPattern::toString() is faster and produces different output compared to
+        // BSONObj::toString(). KeyPattern produces "{ a: 1 }" instead of "{ a: 1.0 }" as its
+        // output.
+        return fmt::format("{} {}",
+                           _iteratorStats->stageName(),
+                           KeyPattern(_iteratorStats->indexKeyPattern()).toString());
+    }
+}
 
 void PlanExplainerExpress::getSummaryStats(PlanSummaryStats* statsOut) const {
-    statsOut->nReturned = _stats->advanced;
-
-    if (_indexName) {
-        statsOut->indexesUsed.insert(_indexName.get());
-    }
-
-    if (_stats->works > 0) {
-        statsOut->totalKeysExamined = 1;
-        statsOut->totalDocsExamined = 1;
-    }
+    statsOut->nReturned = _planStats->numResults();
+    _iteratorStats->populateSummaryStats(statsOut);
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
@@ -49,21 +55,14 @@ PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
     BSONObjBuilder bob;
 
     bob.append("isCached", false);
-    bob.append("stage", getStageName());
+    _iteratorStats->appendDataAccessStats(bob);
     PlanSummaryStats stats;
     getSummaryStats(&stats);
-
-    if (_keyPattern) {
-        bob.append("keyPattern", _keyPattern.get());
-    }
-    if (!stats.indexesUsed.empty()) {
-        bob.append("indexName", *stats.indexesUsed.begin());
-    }
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         bob.appendNumber("keysExamined", static_cast<long long>(stats.totalKeysExamined));
         bob.appendNumber("docsExamined", static_cast<long long>(stats.totalDocsExamined));
-        bob.appendNumber("nReturned", static_cast<long long>(_stats->advanced));
+        bob.appendNumber("nReturned", static_cast<long long>(stats.nReturned));
     }
 
     return {bob.obj(), stats};

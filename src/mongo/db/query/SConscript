@@ -584,6 +584,19 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target='express_execution_test',
+    source=['express_plan_test.cpp'],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
+        '$BUILD_DIR/mongo/db/record_id_helpers',
+        '$BUILD_DIR/mongo/db/shard_role',
+        '$BUILD_DIR/mongo/db/write_stage_common',
+        'query_planner',
+    ],
+)
+
 env.Benchmark(
     target='sbe_expression_bm',
     source=[
