@@ -330,6 +330,19 @@ Status TCMallocReleaseRateServerParameter::setFromString(StringData tcmallocRele
     return Status::OK();
 }
 
+Status onUpdateHeapProfilingSampleIntervalBytes(long long newValue) {
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
+    tcmalloc::MallocExtension::SetProfileSamplingRate(newValue);
+#else
+    LOGV2_WARNING(
+        8872800,
+        "The heapProfilingSampleIntervalBytes server parameter is only configurable at startup "
+        "when using the old TCMalloc. Setting this parameter will have no effect.");
+#endif
+
+    return Status::OK();
+}
+
 namespace {
 
 MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults, (), ("BeginStartupOptionHandling"))
@@ -372,7 +385,7 @@ MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults, (), ("BeginStartupOptio
             8815000, "Could not set tcmallocMaxPerCPUCacheSize", "reason"_attr = ex.toString());
     }
 
-    tcmalloc::MallocExtension::SetProfileSamplingRate(0);
+    tcmalloc::MallocExtension::SetProfileSamplingRate(HeapProfilingSampleIntervalBytes);
 #endif  // MONGO_CONFIG_TCMALLOC_GPERF
 }
 

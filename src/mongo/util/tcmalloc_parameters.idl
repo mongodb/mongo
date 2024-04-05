@@ -30,6 +30,7 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/config.h"
+    - "mongo/util/tcmalloc_set_parameter.h"
 
 server_parameters:
 
@@ -58,7 +59,9 @@ server_parameters:
     redact: false
 
   heapProfilingEnabled:
-    description: "Enable Heap Profiling"
+    description: "Enable Heap Profiling for the tcmalloc-gperf heap profiler (you must also set 
+      heapProfilingSampleIntervalBytes at startup in order to enable this). This is not relevant 
+      for the tcmalloc-google profiler."
     set_at: startup
     cpp_vartype: bool
     cpp_varname: HeapProfilingEnabled
@@ -68,12 +71,14 @@ server_parameters:
     redact: false
 
   heapProfilingSampleIntervalBytes:
-    description: "Configure heap profiling sample interval bytes"
-    set_at: startup
+    description: "Configure heap profiling sample interval bytes. This can be used to 
+      enable/disable heap profiling at runtime on the tcmalloc-google profiler, and is a no-op 
+      at runtime on the tcmalloc-gperf profiler."
+    set_at: [startup, runtime]
     cpp_vartype: long long
     cpp_varname: HeapProfilingSampleIntervalBytes
-    # 256kb
-    default: 262144
+    on_update: onUpdateHeapProfilingSampleIntervalBytes
+    default: 0
     condition:
       preprocessor: defined(_POSIX_VERSION) && (defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE) || defined(MONGO_CONFIG_USE_LIBUNWIND))
     redact: false
