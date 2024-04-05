@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -37,10 +37,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -48,7 +46,7 @@ namespace {
 
 const int kMaxPerfThreads = 16;  // max number of threads to use for lock perf
 
-class DConcurrencyTest : public benchmark::Fixture {
+class LockManagerTest : public benchmark::Fixture {
 protected:
     void SetUp(benchmark::State& state) override {
         stdx::unique_lock ul(_mutex);
@@ -57,7 +55,7 @@ protected:
             makeKClientsWithLockers(state.threads);
             _cv.notify_all();
         } else {
-            _cv.wait(ul, [&] { return clients.size() == (size_t)state.threads; });
+            _cv.wait(ul, [&] { return clients.size() == size_t(state.threads); });
         }
     }
 
@@ -87,7 +85,7 @@ protected:
         return _serviceContextHolder.get();
     }
 
-    Mutex _mutex = MONGO_MAKE_LATCH("DConcurrencyTest BM Mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH("LockManagerTest BM Mutex");
     stdx::condition_variable _cv;
 
     ServiceContext::UniqueServiceContext _serviceContextHolder;
@@ -96,53 +94,67 @@ protected:
         clients;
 };
 
-BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentSharedLock)(benchmark::State& state) {
-    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_Mutex)(benchmark::State& state) {
+    static auto mtx = MONGO_MAKE_LATCH("BM_LockUnlock_Mutex");
+
     for (auto keepRunning : state) {
-        Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IS);
-        Lock::CollectionLock clk(clients[state.thread_index].second.get(),
-                                 NamespaceString::createNamespaceString_forTest("test.coll"),
-                                 MODE_IS);
+        stdx::unique_lock<Latch> lk(mtx);
     }
 }
 
-BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)(benchmark::State& state) {
-    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_SharedLock_Direct)(benchmark::State& state) {
+    static Lock::ResourceMutex resMutex("BM_LockUnlock_SharedLock_Direct");
+
+    auto* lockManager = LockManager::get(getServiceContext());
+    Locker locker(getServiceContext());
+
     for (auto keepRunning : state) {
-        Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IX);
-        Lock::CollectionLock clk(clients[state.thread_index].second.get(),
-                                 NamespaceString::createNamespaceString_forTest("test.coll"),
-                                 MODE_IX);
+        LockRequest requestDb;
+        requestDb.initNew(
+            &locker, nullptr /* This lock will not have contention, so don't pass a notifier */);
+
+        lockManager->lock(resMutex.getRid(), &requestDb, MODE_IS);
+        lockManager->unlock(&requestDb);
     }
 }
 
-BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionSharedLock)(benchmark::State& state) {
-    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_SharedLock_Locker)(benchmark::State& state) {
+    static Lock::ResourceMutex resMutex("BM_LockUnlock_SharedLock_Locker");
+
+    auto* opCtx = clients[state.thread_index].second.get();
+    Locker locker(getServiceContext());
+
     for (auto keepRunning : state) {
-        Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IS);
-        Lock::CollectionLock clk(clients[state.thread_index].second.get(),
-                                 NamespaceString::createNamespaceString_forTest("test.coll"),
-                                 MODE_S);
+        locker.lock(opCtx, resMutex.getRid(), MODE_IS);
+        locker.unlock(resMutex.getRid());
     }
 }
 
-BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionExclusiveLock)(benchmark::State& state) {
-    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_SharedLock)(benchmark::State& state) {
+    static Lock::ResourceMutex resMutex("BM_LockUnlock_SharedLock");
+
     for (auto keepRunning : state) {
-        Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IX);
-        Lock::CollectionLock clk(clients[state.thread_index].second.get(),
-                                 NamespaceString::createNamespaceString_forTest("test.coll"),
-                                 MODE_X);
+        Lock::SharedLock lk(clients[state.thread_index].second.get(), resMutex);
     }
 }
 
-BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionIntentSharedLock)
+BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_ExclusiveLock)(benchmark::State& state) {
+    static Lock::ResourceMutex resMutex("BM_LockUnlock_ExclusiveLock");
+
+    for (auto keepRunning : state) {
+        Lock::ExclusiveLock lk(clients[state.thread_index].second.get(), resMutex);
+    }
+}
+
+BENCHMARK_REGISTER_F(LockManagerTest, BM_LockUnlock_Mutex)->ThreadRange(1, kMaxPerfThreads);
+
+BENCHMARK_REGISTER_F(LockManagerTest, BM_LockUnlock_SharedLock_Direct)
     ->ThreadRange(1, kMaxPerfThreads);
-BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)
+BENCHMARK_REGISTER_F(LockManagerTest, BM_LockUnlock_SharedLock_Locker)
     ->ThreadRange(1, kMaxPerfThreads);
+BENCHMARK_REGISTER_F(LockManagerTest, BM_LockUnlock_SharedLock)->ThreadRange(1, kMaxPerfThreads);
 
-BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionSharedLock)->ThreadRange(1, kMaxPerfThreads);
-BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionExclusiveLock)->ThreadRange(1, kMaxPerfThreads);
+BENCHMARK_REGISTER_F(LockManagerTest, BM_LockUnlock_ExclusiveLock)->ThreadRange(1, kMaxPerfThreads);
 
 }  // namespace
 }  // namespace mongo

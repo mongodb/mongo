@@ -405,8 +405,8 @@ bool Locker::unlock(ResourceId resId) {
             _numResourcesToUnlockAtEndUnitOfWork++;
         }
         it->unlockPending++;
-        // unlockPending will be incremented if a lock is converted or acquired in the same mode
-        // recursively, and unlock() is called multiple times on one ResourceId.
+        // unlockPending will be incremented if a lock is acquired in the same mode recursively, and
+        // unlock() is called multiple times on one ResourceId.
         invariant(it->unlockPending <= it->recursiveCount);
         return false;
     }
@@ -433,8 +433,9 @@ void Locker::endWriteUnitOfWork() {
             _numResourcesToUnlockAtEndUnitOfWork--;
         }
         while (it->unlockPending > 0) {
-            // If a lock is converted, unlock() may be called multiple times on a resource within
-            // the same WriteUnitOfWork. All such unlock() requests must thus be fulfilled here.
+            // If a lock is acquired recursively, unlock() may be called multiple times on a
+            // resource within the same WriteUnitOfWork. All such unlock() requests must thus be
+            // fulfilled here.
             it->unlockPending--;
             unlock(it.key());
         }
@@ -627,7 +628,6 @@ void Locker::releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) {
     // All locks should be pending to unlock.
     invariant(_requests.size() == _numResourcesToUnlockAtEndUnitOfWork);
     for (auto it = _requests.begin(); it; it.next()) {
-        // No converted lock so we don't need to unlock more than once.
         invariant(it->unlockPending == 1);
         it->unlockPending--;
     }
@@ -824,7 +824,7 @@ LockResult Locker::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMod
         }
     }
 
-    // Making this call here will record lock re-acquisitions and conversions as well.
+    // Making this call here will record lock re-acquisitions as well.
     globalStats.recordAcquisition(_id, resId, mode);
     _stats.recordAcquisition(resId, mode);
 
