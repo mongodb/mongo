@@ -2,7 +2,7 @@
 
 buildvariants:
 - name: generate-tasks-for-version
-  display_name: "Generate tasks for evergreen version"
+  display_name: "! Generate tasks for evergreen version"
   activate: true
   run_on:
   - rhel80-medium
