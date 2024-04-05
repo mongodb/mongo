@@ -29,6 +29,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
@@ -40,8 +41,9 @@ MONGO_INITIALIZER_GENERAL(SetShouldEmitLogService, ("EndServerParameterRegistrat
     logv2::setShouldEmitLogService([]() {
         // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
         // this could run during startup while the FCV is still uninitialized.
-        return feature_flags::gMultiServiceLogAndFTDCFormat.isEnabledUseLatestFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        return !serverGlobalParams.clusterRole.has(ClusterRole::None) &&
+            feature_flags::gMultiServiceLogAndFTDCFormat.isEnabledUseLatestFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     });
 }
 
