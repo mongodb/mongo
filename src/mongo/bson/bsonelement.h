@@ -872,9 +872,7 @@ public:
      */
     struct TrustedInitTag {};
     constexpr BSONElement(const char* d, int fieldNameSize, TrustedInitTag)
-        : _data(d), _fieldNameSize(fieldNameSize) {
-        dassert(fieldNameSize > 0);
-    }
+        : _data(d), _fieldNameSize(fieldNameSize) {}
 
     std::string _asCode() const;
 
