@@ -372,5 +372,8 @@ DEFN_QUERY_COUNTER(updateOneWithoutShardKeyWithIdCount);
 DEFN_QUERY_COUNTER(nonRetryableUpdateOneWithoutShardKeyWithIdCount);
 DEFN_QUERY_COUNTER(updateOneWithoutShardKeyWithIdRetryCount);
 DEFN_QUERY_COUNTER(deleteOneWithoutShardKeyWithIdRetryCount);
+DEFN_QUERY_COUNTER(internalRetryableWriteCount);
+DEFN_QUERY_COUNTER(externalRetryableWriteCount);
+DEFN_QUERY_COUNTER(retryableInternalTransactionCount);
 #undef DEFN_QUERY_COUNTER
 }  // namespace mongo
