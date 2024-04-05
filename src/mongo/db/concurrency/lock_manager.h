@@ -29,22 +29,14 @@
 
 #pragma once
 
-#include <cstdint>
-#include <deque>
 #include <map>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/lock_request_list.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/mutex.h"
 
@@ -163,10 +155,11 @@ private:
     // These types describe the locks hash table
 
     struct LockBucket {
-        SimpleMutex mutex;
-        typedef stdx::unordered_map<ResourceId, LockHead*> Map;
-        Map data;
         LockHead* findOrInsert(ResourceId resId);
+
+        SimpleMutex mutex;
+        using Map = stdx::unordered_map<ResourceId, LockHead*>;
+        Map data;
     };
 
     // Each locker maps to a partition that is used for resources acquired in intent modes
@@ -175,8 +168,9 @@ private:
     struct Partition {
         PartitionedLockHead* find(ResourceId resId);
         PartitionedLockHead* findOrInsert(ResourceId resId);
-        typedef stdx::unordered_map<ResourceId, PartitionedLockHead*> Map;
+
         SimpleMutex mutex;
+        using Map = stdx::unordered_map<ResourceId, PartitionedLockHead*>;
         Map data;
     };
 
@@ -211,10 +205,14 @@ private:
      */
     void _cleanupUnusedLocksInBucket(LockBucket* bucket);
 
-    static const unsigned _numLockBuckets;
+    // Have more buckets than CPUs to reduce contention on lock and caches
+    static constexpr unsigned _numLockBuckets{128};
     LockBucket* _lockBuckets;
 
-    static const unsigned _numPartitions;
+    // Balance scalability of intent locks against potential added cost of conflicting locks. The
+    // exact value doesn't appear very important, but should be power of two.
+    static constexpr unsigned _numPartitions{32};
     Partition* _partitions;
 };
+
 }  // namespace mongo

@@ -29,14 +29,10 @@
 
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <map>
 #include <string>
 
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -336,7 +332,6 @@ private:
 MONGO_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
 #endif
 
-
 // Type to uniquely identify a given locker object
 typedef uint64_t LockerId;
 
@@ -383,8 +378,8 @@ public:
      * This method is invoked at most once for each lock request and indicates the outcome of
      * the lock acquisition for the specified resource id.
      *
-     * Cases where it won't be called are if a lock acquisition (be it in waiting or converting
-     * state) is cancelled through a call to unlock.
+     * Cases where it won't be called are if a pending (not-granted) lock acquisition is cancelled
+     * through a call to unlock.
      *
      * IMPORTANT: This callback runs under a spinlock for the lock manager, so the work done
      *            inside must be kept to a minimum and no locks or operations which may block
@@ -396,7 +391,6 @@ public:
      */
     virtual void notify(ResourceId resId, LockResult result) = 0;
 };
-
 
 /**
  * There is one of those entries per each request for a lock. They hang on a linked list off
@@ -411,7 +405,6 @@ struct LockRequest {
         STATUS_NEW,
         STATUS_GRANTED,
         STATUS_WAITING,
-        STATUS_CONVERTING,
 
         // Counts the rest. Always insert new status types above this entry.
         StatusCount
@@ -421,6 +414,23 @@ struct LockRequest {
      * Used for initialization of a LockRequest, which might have been retrieved from cache.
      */
     void initNew(Locker* locker, LockGrantNotification* notify);
+
+    // This is the Locker, which created this LockRequest. Pointer is not owned, just referenced.
+    // Must outlive the LockRequest.
+    //
+    // Written at construction time by Locker
+    // Read by LockManager on any thread
+    // No synchronization
+    Locker* locker;
+
+    // Notification to be invoked when the lock is granted. Pointer is not owned, just referenced.
+    // If a request is in the WAITING state, it must live at least until LockManager::unlock is
+    // called or the notification has been invoked.
+    //
+    // Written at construction time by Locker
+    // Read by LockManager
+    // No synchronization
+    LockGrantNotification* notify;
 
     // If the request cannot be granted right away, whether to put it at the front or at the end of
     // the queue. By default, requests are put at the back. If a request is requested to be put at
@@ -465,28 +475,19 @@ struct LockRequest {
     // Protected by LockHead bucket's mutex
     // Read by Locker on Locker thread
     // It is safe for the Locker to read this without taking the bucket mutex provided that the
-    // LockRequest status is not WAITING or CONVERTING.
+    // LockRequest status is not WAITING.
     LockMode mode;
-
-    // This value is different from MODE_NONE only if a conversion is requested for a lock and that
-    // conversion cannot be immediately granted.
-    //
-    // Written by LockManager on any thread
-    // Read by LockManager on any thread
-    // Protected by LockHead bucket's mutex
-    LockMode convertMode;
 
     // This unsigned represents the number of pending unlocks for this LockRequest. It is greater
     // than 0 when the LockRequest is participating in two-phase lock and unlock() is called on it.
-    // It can be greater than 1 if this lock is participating in two-phase-lock and has been
-    // converted to a different mode that also participates in two-phase-lock. unlock() may be
-    // called multiple times on the same resourceId within the same WriteUnitOfWork in this case, so
-    // the number of unlocks() to execute at the end of this WUOW is tracked with this unsigned.
+    // It can be greater than 1 if this lock is participating in two-phase-lock and unlock() has
+    // been called multiple times on the same resourceId within the same WriteUnitOfWork. So this
+    // value tracks the number of unlocks() to execute at the end of the WUOW.
     //
     // Written by Locker on Locker thread
     // Read by Locker on Locker thread
     // No synchronization
-    uint16_t unlockPending = 0;
+    uint16_t unlockPending;
 
     // How many times has LockManager::lock been called for this request. Locks are released when
     // their recursive count drops to zero.
@@ -496,23 +497,6 @@ struct LockRequest {
     // Read by Locker on Locker thread
     // No synchronization
     uint16_t recursiveCount;
-
-    // This is the Locker, which created this LockRequest. Pointer is not owned, just referenced.
-    // Must outlive the LockRequest.
-    //
-    // Written at construction time by Locker
-    // Read by LockManager on any thread
-    // No synchronization
-    Locker* locker;
-
-    // Notification to be invoked when the lock is granted. Pointer is not owned, just referenced.
-    // If a request is in the WAITING or CONVERTING state, must live at least until
-    // LockManager::unlock is cancelled or the notification has been invoked.
-    //
-    // Written at construction time by Locker
-    // Read by LockManager
-    // No synchronization
-    LockGrantNotification* notify;
 
     // Pointer to the lock to which this request belongs, or null if this request has not yet been
     // assigned to a lock or if it belongs to the PartitionedLockHead for locker (in which case

@@ -33,7 +33,6 @@
 #include <deque>
 #include <utility>
 
-#include "mongo/base/static_assert.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

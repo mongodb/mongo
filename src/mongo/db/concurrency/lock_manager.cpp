@@ -33,10 +33,7 @@
 #include <cstring>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
-#include <iosfwd>
-#include <mutex>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -46,15 +43,11 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/concurrency/lock_request_list.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_truncation.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -134,7 +127,6 @@ static const char* LockRequestStatusNames[] = {
     "new",
     "granted",
     "waiting",
-    "converting",
 };
 
 // Ensure we do not add new status types without updating the names array
@@ -142,6 +134,7 @@ MONGO_STATIC_ASSERT((sizeof(LockRequestStatusNames) / sizeof(LockRequestStatusNa
                     LockRequest::StatusCount);
 
 auto getLockManager = ServiceContext::declareDecoration<LockManager>();
+
 }  // namespace
 
 /**
@@ -170,7 +163,6 @@ struct LockHead {
         memset(conflictCounts, 0, sizeof(conflictCounts));
         conflictModes = 0;
 
-        conversionsCount = 0;
         compatibleFirstCount = 0;
     }
 
@@ -295,15 +287,15 @@ struct LockHead {
     //
 
     // Doubly-linked list of requests, which have been granted. Newly granted requests go to
-    // the end of the queue. Conversion requests are granted from the beginning forward.
+    // the end of the queue.
     LockRequestList grantedList;
 
-    // Counts the grants and conversion counts for each of the supported lock modes. These
-    // counts should exactly match the aggregated modes on the granted list.
+    // Counts the grants for each of the supported lock modes. These counts should exactly match the
+    // aggregated modes on the granted list.
     uint32_t grantedCounts[LockModesCount];
 
-    // Bit-mask of the granted + converting modes on the granted queue. Maintained in lock-step
-    // with the grantedCounts array.
+    // Bit-mask of the granted modes on the granted queue. Maintained in lock-step with the
+    // grantedCounts array.
     uint32_t grantedModes;
 
     //
@@ -328,17 +320,6 @@ struct LockHead {
     // Non-empty implies the lock has no conflicts and only has intent modes as grantedModes.
     // TODO: Remove this vector and make LockHead a POD
     std::vector<LockManager::Partition*> partitions;
-
-    //
-    // Conversion
-    //
-
-    // Counts the number of requests on the granted queue, which have requested any kind of
-    // conflicting conversion and are blocked (i.e. all requests which are currently
-    // STATUS_CONVERTING). This is an optimization for unlocking in that we do not need to
-    // check the granted queue for requests in STATUS_CONVERTING if this count is zero. This
-    // saves cycles in the regular case and only burdens the less-frequent lock upgrade case.
-    uint32_t conversionsCount;
 
     // Counts the number of requests on the granted queue, which have requested that the policy
     // be switched to compatible-first. As long as this value is > 0, the policy will stay
@@ -423,13 +404,6 @@ void LockHead::migratePartitionedLockHeads() {
 // LockManager
 //
 
-// Have more buckets than CPUs to reduce contention on lock and caches
-const unsigned LockManager::_numLockBuckets(128);
-
-// Balance scalability of intent locks against potential added cost of conflicting locks.
-// The exact value doesn't appear very important, but should be power of two
-const unsigned LockManager::_numPartitions = 32;
-
 // static
 LockManager* LockManager::get(ServiceContext* service) {
     return &getLockManager(service);
@@ -449,7 +423,6 @@ LockManager::~LockManager() {
     cleanupUnusedLocks();
 
     for (unsigned i = 0; i < _numLockBuckets; i++) {
-        // TODO: dump more information about the non-empty bucket to see what locks were leaked
         invariant(_lockBuckets[i].data.empty());
     }
 
@@ -519,8 +492,7 @@ bool LockManager::unlock(LockRequest* request) {
         // thorough the partition mutex. Migrations are expected to be rare.
         Partition* partition = _getPartition(request);
         stdx::lock_guard<SimpleMutex> scopedLock(partition->mutex);
-        invariant(request->status == LockRequest::STATUS_GRANTED ||
-                  request->status == LockRequest::STATUS_CONVERTING);
+        invariant(request->status == LockRequest::STATUS_GRANTED);
 
         if (request->status == LockRequest::STATUS_GRANTED && request->recursiveCount > 0)
             return false;
@@ -566,21 +538,6 @@ bool LockManager::unlock(LockRequest* request) {
         lock->decConflictModeCount(request->mode);
 
         _onLockModeChanged(lock, true);
-    } else if (request->status == LockRequest::STATUS_CONVERTING) {
-        // This cancels a pending convert request
-        invariant(request->recursiveCount > 0);
-        invariant(lock->conversionsCount > 0);
-
-        // Lock only goes from GRANTED to CONVERTING, so cancelling the conversion request
-        // brings it back to the previous granted mode.
-        request->status = LockRequest::STATUS_GRANTED;
-
-        lock->conversionsCount--;
-        lock->decGrantedModeCount(request->convertMode);
-
-        request->convertMode = MODE_NONE;
-
-        _onLockModeChanged(lock, lock->grantedCounts[request->convertMode] == 0);
     } else {
         // Invalid request status
         MONGO_UNREACHABLE;
@@ -635,7 +592,6 @@ void LockManager::_cleanupUnusedLocksInBucket(LockBucket* bucket) {
             invariant(lock->conflictModes == 0);
             invariant(lock->conflictList._front == nullptr);
             invariant(lock->conflictList._back == nullptr);
-            invariant(lock->conversionsCount == 0);
             invariant(lock->compatibleFirstCount == 0);
 
             bucket->data.erase(it++);
@@ -647,48 +603,6 @@ void LockManager::_cleanupUnusedLocksInBucket(LockBucket* bucket) {
 }
 
 void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
-    // Unblock any converting requests (because conversions are still counted as granted and
-    // are on the granted queue).
-    for (LockRequest* iter = lock->grantedList._front;
-         (iter != nullptr) && (lock->conversionsCount > 0);
-         iter = iter->next) {
-        // Conversion requests are going in a separate queue
-        if (iter->status == LockRequest::STATUS_CONVERTING) {
-            invariant(iter->convertMode != 0);
-
-            // Construct granted mask without our current mode, so that it is not accounted as
-            // a conflict
-            uint32_t grantedModesWithoutCurrentRequest = 0;
-
-            // We start the counting at 1 below, because LockModesCount also includes
-            // MODE_NONE at position 0, which can never be acquired/granted.
-            for (uint32_t i = 1; i < LockModesCount; i++) {
-                const uint32_t currentRequestHolds =
-                    (iter->mode == static_cast<LockMode>(i) ? 1 : 0);
-
-                const uint32_t currentRequestWaits =
-                    (iter->convertMode == static_cast<LockMode>(i) ? 1 : 0);
-
-                // We cannot both hold and wait on the same lock mode
-                invariant(currentRequestHolds + currentRequestWaits <= 1);
-
-                if (lock->grantedCounts[i] > (currentRequestHolds + currentRequestWaits)) {
-                    grantedModesWithoutCurrentRequest |= modeMask(static_cast<LockMode>(i));
-                }
-            }
-
-            if (!conflicts(iter->convertMode, grantedModesWithoutCurrentRequest)) {
-                lock->conversionsCount--;
-                lock->decGrantedModeCount(iter->mode);
-                iter->status = LockRequest::STATUS_GRANTED;
-                iter->mode = iter->convertMode;
-                iter->convertMode = MODE_NONE;
-
-                iter->notify->notify(lock->resourceId, LOCK_OK);
-            }
-        }
-    }
-
     // Grant any conflicting requests, which might now be unblocked. Note that the loop below
     // slightly violates fairness in that it will grant *all* compatible requests on the line even
     // though there might be conflicting ones interspersed between them. For example, assume that an
@@ -823,7 +737,6 @@ void LockManager::getLockInfoArray(const std::map<LockerId, BSONObj>& lockToClie
                         req.append("thread", formatThreadId(iter->locker->getThreadId()));
                     }
                     req.append("mode", modeName(iter->mode));
-                    req.append("convertMode", modeName(iter->convertMode));
                     req.append("enqueueAtFront", iter->enqueueAtFront);
                     req.append("compatibleFirst", iter->compatibleFirst);
                     req.append("debugInfo", iter->locker->getDebugInfo());
@@ -836,6 +749,28 @@ void LockManager::getLockInfoArray(const std::map<LockerId, BSONObj>& lockToClie
         }
     }
 }
+
+//
+// LockBucket
+//
+
+LockHead* LockManager::LockBucket::findOrInsert(ResourceId resId) {
+    LockHead* lock;
+    Map::iterator it = data.find(resId);
+    if (it == data.end()) {
+        lock = new LockHead();
+        lock->initNew(resId);
+
+        data.insert(Map::value_type(resId, lock));
+    } else {
+        lock = it->second;
+    }
+    return lock;
+}
+
+//
+// Partition
+//
 
 PartitionedLockHead* LockManager::Partition::find(ResourceId resId) {
     Map::iterator it = data.find(resId);
@@ -856,20 +791,6 @@ PartitionedLockHead* LockManager::Partition::findOrInsert(ResourceId resId) {
     return lock;
 }
 
-LockHead* LockManager::LockBucket::findOrInsert(ResourceId resId) {
-    LockHead* lock;
-    Map::iterator it = data.find(resId);
-    if (it == data.end()) {
-        lock = new LockHead();
-        lock->initNew(resId);
-
-        data.insert(Map::value_type(resId, lock));
-    } else {
-        lock = it->second;
-    }
-    return lock;
-}
-
 //
 // LockRequest
 //
@@ -880,19 +801,19 @@ void LockRequest::initNew(Locker* locker, LockGrantNotification* notify) {
 
     enqueueAtFront = false;
     compatibleFirst = false;
+    partitioned = false;
+
+    status = STATUS_NEW;
+    mode = MODE_NONE;
+    unlockPending = 0;
     recursiveCount = 1;
 
     lock = nullptr;
     partitionedLock = nullptr;
+
     prev = nullptr;
     next = nullptr;
-    status = STATUS_NEW;
-    partitioned = false;
-    mode = MODE_NONE;
-    convertMode = MODE_NONE;
-    unlockPending = 0;
 }
-
 
 //
 // Helper calls
