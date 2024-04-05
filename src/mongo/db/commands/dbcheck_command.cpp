@@ -700,7 +700,9 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
                         logAttrs(_info.nss),
                         "uuid"_attr = _info.uuid);
             // TODO SERVER-79850: Raise all errors to the upper level.
-            if (hashStatus.code() != ErrorCodes::IndexNotFound) {
+            if (hashStatus.code() != ErrorCodes::IndexNotFound &&
+                hashStatus.code() != ErrorCodes::WriteConcernFailed &&
+                hashStatus.code() != ErrorCodes::UnsatisfiableWriteConcern) {
                 // Raise the error to the upper level.
                 iassert(hashStatus);
             }
@@ -768,6 +770,30 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
         batchStats->logToHealthLog) {
         // On debug builds, health-log every batch result.
         HealthLogInterface::get(opCtx)->log(*logEntry);
+    }
+
+    WriteConcernResult unused;
+    status = waitForWriteConcern(opCtx, batchStats->time, _info.writeConcern, &unused);
+
+    if (!status.isOK()) {
+        BSONObjBuilder context;
+        if (batchStats->batchId) {
+            context.append("batchId", batchStats->batchId->toBSON());
+        }
+        context.append("firstKey", batchStats->firstBson);
+        context.append("lastKey", batchStats->lastBson);
+
+        // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors
+        // in one location.
+        auto entry = dbCheckErrorHealthLogEntry(_info.nss,
+                                                _info.uuid,
+                                                "dbCheck failed waiting for writeConcern",
+                                                ScopeEnum::Collection,
+                                                OplogEntriesEnum::Batch,
+                                                status,
+                                                context.done());
+        HealthLogInterface::get(opCtx)->log(*entry);
+        return status;
     }
     return Status::OK();
 }
@@ -912,6 +938,12 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
         batchStats->firstBson = firstBsonWithoutRecordId;
         batchStats->lastBson = lastBsonWithoutRecordId;
     }
+
+    if (MONGO_unlikely(hangBeforeAddingDBCheckBatchToOplog.shouldFail())) {
+        LOGV2(8831800, "Hanging dbCheck due to failpoint 'hangBeforeAddingDBCheckBatchToOplog'");
+        hangBeforeAddingDBCheckBatchToOplog.pauseWhileSet();
+    }
+
     batchStats->time = _logOp(
         opCtx, _info.nss, boost::none /* tenantIdForStartStop */, _info.uuid, oplogBatch.toBSON());
     return Status::OK();
@@ -1716,15 +1748,22 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         WriteConcernResult unused;
         auto status = waitForWriteConcern(opCtx, stats.time, _info.writeConcern, &unused);
         if (!status.isOK()) {
+            BSONObjBuilder context;
+            if (stats.batchId) {
+                context.append("batchId", stats.batchId->toBSON());
+            }
+            context.append("lastKey", stats.lastKey);
             // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors
             // in one location.
-            auto entry = dbCheckWarningHealthLogEntry(_info.nss,
-                                                      _info.uuid,
-                                                      "dbCheck failed waiting for writeConcern",
-                                                      ScopeEnum::Collection,
-                                                      OplogEntriesEnum::Batch,
-                                                      status);
+            auto entry = dbCheckErrorHealthLogEntry(_info.nss,
+                                                    _info.uuid,
+                                                    "dbCheck failed waiting for writeConcern",
+                                                    ScopeEnum::Collection,
+                                                    OplogEntriesEnum::Batch,
+                                                    status,
+                                                    context.done());
             HealthLogInterface::get(opCtx)->log(*entry);
+            return;
         }
 
         start = stats.lastKey;

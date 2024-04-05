@@ -47,6 +47,7 @@ export const logQueries = {
             {"operation": "dbCheckStop", "severity": "info"}
         ]
     },
+    writeConcernErrorQuery: {severity: "error", "msg": "dbCheck failed waiting for writeConcern"},
 };
 
 // Apply function on all secondary nodes except arbiters.

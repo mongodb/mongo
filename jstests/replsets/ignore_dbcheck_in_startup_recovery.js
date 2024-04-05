@@ -55,10 +55,12 @@ const primaryFailPoint = configureFailPoint(primary, "sleepAfterExtraIndexKeysHa
 const secondaryFailPoint =
     configureFailPoint(secondary, "hangAfterGeneratingHashForExtraIndexKeysCheck");
 
-runDbCheck(replSet,
-           primaryDb,
-           collName,
-           {validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1", maxDocsPerBatch: 20});
+runDbCheck(replSet, primaryDb, collName, {
+    validateMode: "extraIndexKeysCheck",
+    secondaryIndex: "a_1",
+    maxDocsPerBatch: 20,
+    batchWriteConcern: {w: 1}
+});
 
 primaryFailPoint.wait({timesEntered: 2});
 secondaryFailPoint.wait();

@@ -58,10 +58,7 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
     const writeConcern = {w: 2};
     resetAndInsert(replSet, db, collName, nDocs);
 
-    const dbCheckParameters = {
-        maxDocsPerBatch: maxDocsPerBatch,
-        batchWriteConcern: {w: 'majority'}
-    };
+    const dbCheckParameters = {maxDocsPerBatch: maxDocsPerBatch, batchWriteConcern: writeConcern};
     runDbCheck(replSet, db, collName, dbCheckParameters);
 
     // Confirm dbCheck logs the expected number of batches.
@@ -70,70 +67,6 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
 
     // Confirm there are no warnings or errors.
     checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "warning"}, 0);
-    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "error"}, 0);
-})();
-
-// Validate that dbCheck completes with w:majority even when the secondary is down and a wtimeout is
-// specified.
-(function testWMajorityUnavailable() {
-    // Insert 1000 docs and run a few small batches to ensure we wait for write concern between
-    // each one.
-    const nDocs = 1000;
-    const maxDocsPerBatch = 100;
-    resetAndInsert(replSet, db, collName, nDocs);
-
-    // Stop the secondary and expect that the dbCheck batches still complete on the primary.
-    const secondaryConn = replSet.getSecondary();
-    const secondaryNodeId = replSet.getNodeId(secondaryConn);
-    replSet.stop(secondaryNodeId, {forRestart: true /* preserve dbPath */});
-
-    const writeConcern = {w: 'majority', wtimeout: 10};
-    const dbCheckParameters = {maxDocsPerBatch: maxDocsPerBatch, batchWriteConcern: writeConcern};
-    runDbCheck(replSet, db, collName, dbCheckParameters);
-
-    // Confirm dbCheck logs the expected number of batches.
-    checkHealthLog(
-        healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
-
-    // Confirm dbCheck logs a warning for every batch.
-    checkHealthLog(
-        healthlog, {operation: "dbCheckBatch", severity: "warning"}, nDocs / maxDocsPerBatch);
-
-    // There should be no errors.
-    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "error"}, 0);
-
-    replSet.start(secondaryNodeId, {}, true /*restart*/);
-    replSet.awaitNodesAgreeOnPrimaryNoAuth();
-    replSet.awaitReplication();
-})();
-
-// Validate that an invalid 'w' setting still allows dbCheck to succeed when presented with a
-// wtimeout.
-(function testW3Unavailable() {
-    // Insert 1000 docs and run a few small batches to ensure we wait for write concern between
-    // each one.
-    const nDocs = 1000;
-    const maxDocsPerBatch = 100;
-    resetAndInsert(replSet, db, collName, nDocs);
-
-    // Stop the secondary and expect that the dbCheck batches still complete on the primary.
-    const secondaryConn = replSet.getSecondary();
-    const secondaryNodeId = replSet.getNodeId(secondaryConn);
-    replSet.stop(secondaryNodeId, {forRestart: true /* preserve dbPath */});
-
-    const writeConcern = {w: 3, wtimeout: 10};
-    const dbCheckParameters = {maxDocsPerBatch: maxDocsPerBatch, batchWriteConcern: writeConcern};
-    runDbCheck(replSet, db, collName, dbCheckParameters);
-
-    // Confirm dbCheck logs the expected number of batches.
-    checkHealthLog(
-        healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
-
-    // Confirm dbCheck logs a warning for every batch.
-    checkHealthLog(
-        healthlog, {operation: "dbCheckBatch", severity: "warning"}, nDocs / maxDocsPerBatch);
-
-    // There should be no errors.
     checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "error"}, 0);
 })();
 
