@@ -338,12 +338,14 @@ class TestVariant(unittest.TestCase):
 
     def test_expansion(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
-        self.assertEqual("--param=value --ubuntu", variant_ubuntu.expansion("test_flags"))
+        self.assertEqual("--param=value --ubuntu --enableEnterpriseTests=off",
+                         variant_ubuntu.expansion("test_flags"))
         self.assertEqual(None, variant_ubuntu.expansion("not_a_valid_expansion_name"))
 
     def test_expansions(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
-        self.assertEqual({"test_flags": "--param=value --ubuntu"}, variant_ubuntu.expansions)
+        self.assertEqual({"test_flags": "--param=value --ubuntu --enableEnterpriseTests=off"},
+                         variant_ubuntu.expansions)
 
     def test_modules(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
@@ -351,6 +353,11 @@ class TestVariant(unittest.TestCase):
 
         variant_osx = self.conf.get_variant("osx-108")
         self.assertEqual([], variant_osx.modules)
+
+    def test_enterprise(self):
+        variant_ubuntu = self.conf.get_variant("ubuntu")
+        is_enterprise = variant_ubuntu.is_enterprise_build()
+        self.assertEqual(is_enterprise, False)
 
     def test_run_on(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
@@ -368,7 +375,8 @@ class TestVariant(unittest.TestCase):
 
     def test_test_flags(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
-        self.assertEqual("--param=value --ubuntu", variant_ubuntu.test_flags)
+        self.assertEqual("--param=value --ubuntu --enableEnterpriseTests=off",
+                         variant_ubuntu.test_flags)
 
         variant_osx = self.conf.get_variant("osx-108")
         self.assertIsNone(variant_osx.test_flags)
@@ -393,13 +401,15 @@ class TestVariant(unittest.TestCase):
 
         # Check combined_resmoke_args when test_flags is set on the variant.
         resmoke_task = variant_ubuntu.get_task("resmoke_task")
-        self.assertEqual("--suites=resmoke_task --storageEngine=wiredTiger --param=value --ubuntu",
-                         resmoke_task.combined_resmoke_args)
+        self.assertEqual(
+            "--suites=resmoke_task --storageEngine=wiredTiger --param=value --ubuntu --enableEnterpriseTests=off",
+            resmoke_task.combined_resmoke_args)
 
         # Check combined_resmoke_args when the task doesn't have resmoke_args.
         passing_task = variant_ubuntu.get_task("passing_test")
-        self.assertEqual("--suites=passing_test  --param=value --ubuntu",
-                         passing_task.combined_resmoke_args)
+        self.assertEqual(
+            "--suites=passing_test  --param=value --ubuntu --enableEnterpriseTests=off",
+            passing_task.combined_resmoke_args)
 
         # Check combined_resmoke_args when test_flags is not set on the variant.
         variant_debian = self.conf.get_variant("debian")

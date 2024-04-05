@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime
 import shutil
 import os
+import re
 import subprocess
 import structlog
 import sys
@@ -339,8 +340,9 @@ class Variant(object):
         return modules if modules is not None else []
 
     def is_enterprise_build(self) -> bool:
-        """Determine if this build variant include the enterprise module."""
-        return ENTERPRISE_MODULE_NAME in set(self.modules)
+        """Determine if the build variant is configured for enterprise builds."""
+        pattern = r'--enableEnterpriseTests\s*=?\s*off'
+        return not re.search(pattern, str(self.raw))
 
     @property
     def run_on(self):

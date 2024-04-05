@@ -168,7 +168,7 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   expansions:
-    test_flags: "--param=value --ubuntu"
+    test_flags: "--param=value --ubuntu --enableEnterpriseTests=off"
   tasks:
   - name: compile
   - name: passing_test
