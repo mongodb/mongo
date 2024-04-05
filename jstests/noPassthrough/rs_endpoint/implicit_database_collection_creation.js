@@ -74,8 +74,8 @@ function makeDatabaseNameForTest() {
 function runTest(shard0Primary, execCtxType, expectShardingMetadata) {
     // Test implicit database and collection creation.
 
-    // TODO SERVER-85366 remove this check once retryable write can create unsplittable collections
-    // after an insert
+    // TODO SERVER-86254 adapt this check once retryable writes can track unsplittable collections
+    // on creation after an insert
     if (execCtxType == execCtxTypes.kRetryableWrite) {
         const dbName0 = makeDatabaseNameForTest();
         const collName0 = "testColl";
@@ -97,8 +97,8 @@ function runTest(shard0Primary, execCtxType, expectShardingMetadata) {
     const dbName2 = makeDatabaseNameForTest();
     const collName2 = "testColl0";
     assert.commandWorked(shard0Primary.getDB(dbName2).createCollection("testColl1"));
-    // TODO SERVER-85366 remove this check once retryable write can create unsplittable collections
-    // after an insert
+    // TODO SERVER-86254 adapt this check once retryable write can track unsplittable collections on
+    // creation after an insert
     if (execCtxType == execCtxTypes.kRetryableWrite) {
         testImplicitCreateCollection(
             shard0Primary, execCtxType, dbName2, collName2, "insert", false);
