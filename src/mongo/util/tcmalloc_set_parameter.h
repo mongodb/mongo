@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 
 namespace mongo {
@@ -50,6 +49,4 @@ size_t getTcmallocProperty(StringData propname);
 void setTcmallocProperty(StringData propname, size_t value);
 TcmallocReleaseRateT getMemoryReleaseRate();
 void setMemoryReleaseRate(TcmallocReleaseRateT val);
-
-Status onUpdateHeapProfilingSampleIntervalBytes(long long newValue);
 }  // namespace mongo

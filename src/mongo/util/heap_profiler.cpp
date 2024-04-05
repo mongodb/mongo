@@ -716,6 +716,11 @@ public:
     static const int kMaxStackInfos = 20000;
     static inline HeapProfiler* heapProfiler;
 
+    HeapProfiler() {
+        sampleIntervalBytes = HeapProfilingSampleIntervalBytes;
+        tcmalloc::MallocExtension::SetProfileSamplingRate(sampleIntervalBytes);
+    }
+
     static void generateServerStatusSection(BSONObjBuilder& builder) {
         if (heapProfiler)
             heapProfiler->_generateServerStatusSection(builder);
@@ -847,6 +852,7 @@ private:
         }
     }
 
+    std::atomic_size_t sampleIntervalBytes;
     std::atomic_size_t sampleBytesAllocated{0};
 
     bool logGeneralStats = true;  // first time only
@@ -865,30 +871,9 @@ private:
 
 #if defined(MONGO_CONFIG_TCMALLOC_GOOGLE)
 using heap_profiler_detail_tcmalloc::HeapProfiler;
-
-class HeapProfilerServerStatusSection final : public ServerStatusSection {
-public:
-    using ServerStatusSection::ServerStatusSection;
-
-    bool includeByDefault() const override {
-        return HeapProfilingSampleIntervalBytes > 0;
-    }
-
-    BSONObj generateSection(OperationContext*, const BSONElement&) const override {
-        BSONObjBuilder builder;
-        if (HeapProfilingSampleIntervalBytes > 0) {
-            HeapProfiler::generateServerStatusSection(builder);
-        }
-        return builder.obj();
-    }
-};
-
-MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("default"))
-(InitializerContext*) {
-    HeapProfiler::start();
-}
 #elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 using heap_profiler_detail_gperf_tcmalloc::HeapProfiler;
+#endif
 
 class HeapProfilerServerStatusSection final : public ServerStatusSection {
 public:
@@ -905,15 +890,14 @@ public:
     }
 };
 
+auto& heapProfilerServerStatusSection =
+    *ServerStatusSectionBuilder<HeapProfilerServerStatusSection>("heapProfile");
+
 MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext*) {
     if (HeapProfilingEnabled)
         HeapProfiler::start();
 }
-#endif  // MONGO_CONFIG_TCMALLOC_GPERF
-
-auto& heapProfilerServerStatusSection =
-    *ServerStatusSectionBuilder<HeapProfilerServerStatusSection>("heapProfile");
 
 }  // namespace
 }  // namespace mongo
