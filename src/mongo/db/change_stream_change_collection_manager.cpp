@@ -271,10 +271,10 @@ public:
      * Adds the insert statement for the provided tenant that will be written to the change
      * collection when the 'write()' method is called.
      */
-    void add(InsertStatement insertStatement) {
-        if (auto tenantId = _extractTenantId(insertStatement); tenantId) {
-            _tenantToStatementsAndChangeCollectionMap[*tenantId].insertStatements.push_back(
-                std::move(insertStatement));
+    void add(BSONObj changeCollDoc, Timestamp ts, long long term) {
+        if (auto tenantId = _extractTenantId(changeCollDoc); tenantId) {
+            _tenantInsertStatements.emplace_back(std::move(changeCollDoc), ts, term, *tenantId);
+            _tenantToChangeCollectionMap.try_emplace(*tenantId, boost::none);
         }
     }
 
@@ -283,28 +283,35 @@ public:
      */
     void acquireLocks() {
         tassert(6671503, "Locks cannot be acquired twice", !_locksAcquired);
-        for (auto&& [tenantId, insertStatementsAndChangeCollection] :
-             _tenantToStatementsAndChangeCollectionMap) {
-            insertStatementsAndChangeCollection.tenantChangeCollection.emplace(
-                _opCtx, _accessMode, tenantId);
+        for (auto&& [tenantId, autoGetChangeColl] : _tenantToChangeCollectionMap) {
+            autoGetChangeColl.emplace(_opCtx, _accessMode, tenantId);
+            // We assume that the tenant change collection is clustered so that we
+            // can reconstruct the RecordId when performing writes.
+            dassert(!(*autoGetChangeColl) || (*autoGetChangeColl)->isClustered());
         }
         _locksAcquired = true;
     }
 
     /**
-     * Writes the batch of insert statements for each change collection. If a DuplicateKey error is
-     * encountered, the write is skipped and the remaining inserts are attempted individually. Bails
-     * out further writes if any other type of failure is encountered in writing to any change
-     * collection.
+     * Writes all the insert statements to their tenant change collections. If a DuplicateKey error
+     * is encountered, the write is skipped and the remaining inserts are attempted individually.
+     * Bails out further writes if any other type of failure is encountered when writing to any of
+     * the change collections.
      *
      * Locks should be acquired before calling this method by calling 'acquireLocks()'.
      */
     Status write() {
         tassert(6671504, "Locks should be acquired first", _locksAcquired);
-        for (auto&& [tenantId, insertStatementsAndChangeCollection] :
-             _tenantToStatementsAndChangeCollectionMap) {
-            AutoGetChangeCollection& tenantChangeCollection =
-                *insertStatementsAndChangeCollection.tenantChangeCollection;
+
+        stdx::unordered_map<TenantId, TenantWriteStats, TenantId::Hasher> tenantToWriteStatsMap;
+
+        // Writes to the change collection should not be replicated.
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+        for (auto&& tenantInsertStatement : _tenantInsertStatements) {
+            const auto& tenantId = tenantInsertStatement.tenantId;
+            const auto& insertStatement = tenantInsertStatement.insertStatement;
+            auto& tenantChangeCollection = *_tenantToChangeCollectionMap[tenantId];
 
             // The change collection does not exist for a particular tenant because either the
             // change collection is not enabled or is in the process of enablement. Ignore this
@@ -313,104 +320,98 @@ public:
                 continue;
             }
 
-            // Writes to the change collection should not be replicated.
-            repl::UnreplicatedWritesBlock unReplBlock(_opCtx);
+            Status status = collection_internal::insertDocument(
+                _opCtx, *tenantChangeCollection, insertStatement, _opDebug, false);
 
-            // To avoid creating a lot of unnecessary calls to
-            // CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit we aggregate all
-            // the results and make a singular call. This requires storing the highest
-            // RecordId/WallTime seen from the insert statements.
-            RecordId maxRecordIdSeen;
-            Date_t maxWallTimeSeen;
-            int64_t bytesInserted = 0;
-
-            /**
-             * For a serverless shard merge, we clone all change collection entries from the donor
-             * and then fetch/apply retryable writes that took place before the migration. As a
-             * result, we can end up in a situation where a change collection entry already exists.
-             * If we encounter a DuplicateKey error and the entry is identical to the existing one,
-             * we can safely skip and continue.
-             */
-            for (auto&& insertStatement : insertStatementsAndChangeCollection.insertStatements) {
-                Status status = collection_internal::insertDocument(
-                    _opCtx, *tenantChangeCollection, insertStatement, _opDebug, false);
-
-                if (status.code() == ErrorCodes::DuplicateKey) {
-                    const auto dupKeyInfo = status.extraInfo<DuplicateKeyErrorInfo>();
-                    invariant(dupKeyInfo->toBSON()
-                                  .getObjectField("foundValue")
-                                  .binaryEqual(insertStatement.doc));
-                    LOGV2(7282901,
-                          "Ignoring DuplicateKey error for change collection insert",
-                          "doc"_attr = insertStatement.doc.toString());
-                    // Continue to the next insert statement as we've ommitted the current one.
-                    continue;
-                } else if (!status.isOK()) {
-                    return Status(status.code(),
-                                  str::stream()
-                                      << "Write to change collection: "
-                                      << tenantChangeCollection->ns().toStringForErrorMsg()
-                                      << "failed")
-                        .withReason(status.reason());
-                }
-
-                // Right now we assume that the tenant change collection is clustered and
-                // reconstruct the RecordId used in the KV store. Ideally we want the write path to
-                // return the record ids used for the insert but as it isn't available we
-                // reconstruct the key here.
-                dassert(tenantChangeCollection->isClustered());
-                auto recordId = invariantStatusOK(record_id_helpers::keyForDoc(
-                    insertStatement.doc,
-                    tenantChangeCollection->getClusteredInfo()->getIndexSpec(),
-                    tenantChangeCollection->getDefaultCollator()));
-
-                if (maxRecordIdSeen < recordId) {
-                    maxRecordIdSeen = std::move(recordId);
-                }
-                auto docWallTime =
-                    insertStatement.doc[repl::OplogEntry::kWallClockTimeFieldName].Date();
-                if (maxWallTimeSeen < docWallTime) {
-                    maxWallTimeSeen = docWallTime;
-                }
-
-                bytesInserted += insertStatement.doc.objsize();
+            if (status.code() == ErrorCodes::DuplicateKey) {
+                const auto dupKeyInfo = status.extraInfo<DuplicateKeyErrorInfo>();
+                invariant(dupKeyInfo->toBSON()
+                              .getObjectField("foundValue")
+                              .binaryEqual(insertStatement.doc));
+                LOGV2(7282901,
+                      "Ignoring DuplicateKey error for change collection insert",
+                      "doc"_attr = insertStatement.doc.toString());
+                // Continue to the next insert statement as we've ommitted the current one.
+                continue;
+            } else if (!status.isOK()) {
+                return Status(status.code(),
+                              str::stream()
+                                  << "Write to change collection: "
+                                  << tenantChangeCollection->ns().toStringForErrorMsg() << "failed")
+                    .withReason(status.reason());
             }
 
-            std::shared_ptr<ChangeCollectionTruncateMarkers> truncateMarkers =
-                usesUnreplicatedTruncates()
-                ? _tenantTruncateMarkersMap->find(tenantChangeCollection->uuid())
-                : nullptr;
-            if (truncateMarkers && bytesInserted > 0) {
-                // We update the TruncateMarkers instance if it exists. Creation is performed
-                // asynchronously by the remover thread.
-                truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(
-                    _opCtx,
-                    bytesInserted,
-                    maxRecordIdSeen,
-                    maxWallTimeSeen,
-                    insertStatementsAndChangeCollection.insertStatements.size());
+            // Right now we assume that the tenant change collection is clustered and
+            // reconstruct the RecordId used in the KV store. Ideally we want the
+            // write path to return the record ids used for the insert, but as it is
+            // not available we reconstruct the key here.
+            auto& tenantWriteStats = tenantToWriteStatsMap[tenantId];
+            auto recordId = invariantStatusOK(record_id_helpers::keyForDoc(
+                insertStatement.doc,
+                tenantChangeCollection->getClusteredInfo()->getIndexSpec(),
+                tenantChangeCollection->getDefaultCollator()));
+
+            if (tenantWriteStats.maxRecordIdSeen < recordId) {
+                tenantWriteStats.maxRecordIdSeen = std::move(recordId);
+            }
+            auto docWallTime =
+                insertStatement.doc[repl::OplogEntry::kWallClockTimeFieldName].Date();
+            if (tenantWriteStats.maxWallTimeSeen < docWallTime) {
+                tenantWriteStats.maxWallTimeSeen = docWallTime;
+            }
+            tenantWriteStats.bytesInserted += insertStatement.doc.objsize();
+            tenantWriteStats.docsInserted++;
+        }
+
+        for (auto&& [tenantId, autoGetChangeColl] : _tenantToChangeCollectionMap) {
+            // Only update the TruncateMarkers if the change collection exists.
+            if (auto& tenantChangeCollection = *autoGetChangeColl; tenantChangeCollection) {
+                std::shared_ptr<ChangeCollectionTruncateMarkers> truncateMarkers =
+                    usesUnreplicatedTruncates()
+                    ? _tenantTruncateMarkersMap->find(tenantChangeCollection->uuid())
+                    : nullptr;
+
+                // We update the TruncateMarkers instance if it exists. Creation
+                // is performed asynchronously by the remover thread.
+                if (truncateMarkers) {
+                    const auto& tenantWriteStats = tenantToWriteStatsMap[tenantId];
+                    if (tenantWriteStats.bytesInserted > 0) {
+                        truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(
+                            _opCtx,
+                            tenantWriteStats.bytesInserted,
+                            tenantWriteStats.maxRecordIdSeen,
+                            tenantWriteStats.maxWallTimeSeen,
+                            tenantWriteStats.docsInserted);
+                    }
+                }
             }
         }
+
         return Status::OK();
     }
 
 private:
-    /**
-     * Field 'insertStatements' contains insert statements to be written to the tenant's change
-     * collection associated with 'tenantChangeCollection' field.
-     */
-    struct TenantStatementsAndChangeCollection {
-
-        std::vector<InsertStatement> insertStatements;
-
-        boost::optional<AutoGetChangeCollection> tenantChangeCollection;
+    struct TenantInsertStatement {
+        InsertStatement insertStatement;
+        TenantId tenantId;
+        TenantInsertStatement(BSONObj changeCollDoc,
+                              Timestamp ts,
+                              long long term,
+                              TenantId tenantId)
+            : insertStatement{std::move(changeCollDoc), ts, term}, tenantId{std::move(tenantId)} {}
     };
 
-    boost::optional<TenantId> _extractTenantId(const InsertStatement& insertStatement) {
-        // Parse the oplog entry to fetch the tenant id from 'tid' field. The oplog entry will not
-        // written to the change collection if 'tid' field is missing.
-        auto& oplogDoc = insertStatement.doc;
-        if (auto tidFieldElem = oplogDoc.getField(repl::OplogEntry::kTidFieldName)) {
+    struct TenantWriteStats {
+        RecordId maxRecordIdSeen;
+        Date_t maxWallTimeSeen;
+        int64_t bytesInserted = 0;
+        int64_t docsInserted = 0;
+    };
+
+    boost::optional<TenantId> _extractTenantId(const BSONObj& changeCollDoc) {
+        // Parse the oplog entry to fetch the tenant id from 'tid' field. The entry will
+        // not be written to the change collection if 'tid' field is missing.
+        if (auto tidFieldElem = changeCollDoc.getField(repl::OplogEntry::kTidFieldName)) {
             return TenantId{Value(tidFieldElem).getOid()};
         }
 
@@ -424,9 +425,12 @@ private:
     // Mode required to access change collections.
     const AutoGetChangeCollection::AccessMode _accessMode;
 
+    // A vector of all insert statements in timestamp order.
+    std::vector<TenantInsertStatement> _tenantInsertStatements;
+
     // A mapping from a tenant id to insert statements and the change collection of the tenant.
-    stdx::unordered_map<TenantId, TenantStatementsAndChangeCollection, TenantId::Hasher>
-        _tenantToStatementsAndChangeCollectionMap;
+    stdx::unordered_map<TenantId, boost::optional<AutoGetChangeCollection>, TenantId::Hasher>
+        _tenantToChangeCollectionMap;
 
     // An operation context to use while performing all operations in this class.
     OperationContext* const _opCtx;
@@ -463,11 +467,8 @@ ChangeStreamChangeCollectionManager::ChangeCollectionsWriter::ChangeCollectionsW
         // initialized. The corresponding change collection insertion will not be timestamped.
         auto oplogSlot = oplogEntryIter->oplogSlot;
 
-        auto changeCollDoc = createChangeCollectionEntryFromOplog(oplogDoc);
-
-        if (changeCollDoc) {
-            _writer->add(InsertStatement{
-                std::move(*changeCollDoc), oplogSlot.getTimestamp(), oplogSlot.getTerm()});
+        if (auto changeCollDoc = createChangeCollectionEntryFromOplog(oplogDoc)) {
+            _writer->add(std::move(*changeCollDoc), oplogSlot.getTimestamp(), oplogSlot.getTerm());
         }
     }
 }
@@ -598,8 +599,8 @@ void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
         // Create an insert statement that should be written at the timestamp 'ts' for a particular
         // tenant.
         if (auto changeCollDoc = createChangeCollectionEntryFromOplog(record.data.toBson())) {
-            changeCollectionsWriter.add(InsertStatement{
-                std::move(changeCollDoc.get()), ts, repl::OpTime::kUninitializedTerm});
+            changeCollectionsWriter.add(
+                std::move(*changeCollDoc), ts, repl::OpTime::kUninitializedTerm);
         }
     }
 
