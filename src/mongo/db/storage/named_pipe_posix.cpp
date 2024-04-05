@@ -76,21 +76,27 @@ void removeNamedPipe(bool ignoreNoEntError, const char* pipeAbsolutePath) {
 }
 }  // namespace
 
-NamedPipeOutput::NamedPipeOutput(const std::string& pipeDir, const std::string& pipeRelativePath)
-    : _pipeAbsolutePath(pipeDir + pipeRelativePath), _ofs() {
+NamedPipeOutput::NamedPipeOutput(const std::string& pipeDir,
+                                 const std::string& pipeRelativePath,
+                                 bool persistPipe)
+    : _pipeAbsolutePath(pipeDir + pipeRelativePath), _ofs(), _persistPipe(persistPipe) {
     // Just in case that uncleaned-up named pipe is still there. This is a test-only implementation
     // and so, it should be fine to just remove it and ignore the ENOENT error.
-    removeNamedPipe(true /*ignoreNoEntError*/, _pipeAbsolutePath.c_str());
-    uassert(7005005,
-            "Failed to create a named pipe, error: {}"_format(
-                getErrorMessage("mkfifo", _pipeAbsolutePath)),
-            hasSucceeded(mkfifo(_pipeAbsolutePath.c_str(), 0664)));
+    if (!persistPipe) {
+        removeNamedPipe(true /*ignoreNoEntError*/, _pipeAbsolutePath.c_str());
+        uassert(7005005,
+                "Failed to create a named pipe, error: {}"_format(
+                    getErrorMessage("mkfifo", _pipeAbsolutePath)),
+                hasSucceeded(mkfifo(_pipeAbsolutePath.c_str(), 0664)));
+    }
 }
 
 NamedPipeOutput::~NamedPipeOutput() {
     close();
     // Makes sure that the named pipe is removed.
-    removeNamedPipe(false /*ignoreNoEntError*/, _pipeAbsolutePath.c_str());
+    if (!_persistPipe) {
+        removeNamedPipe(false /*ignoreNoEntError*/, _pipeAbsolutePath.c_str());
+    }
 }
 
 void NamedPipeOutput::open() {
