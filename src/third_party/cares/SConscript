@@ -28,7 +28,7 @@ cares_env.Append(
         cares_platform.Dir("install/include"),
     ], )
 
-cares_env.Library(
+cares_env.BazelLibrary(
     target='cares',
     source=[
         "dist/src/lib/ares_android.c",
