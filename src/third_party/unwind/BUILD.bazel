@@ -197,5 +197,11 @@ mongo_cc_library(
         # Grant access to nonstandard gnu c functions, which the dist autoconf build script is also setting.
         "_GNU_SOURCE",
     ],
+    skip_global_deps = [
+        # This is a globally injected dependency.
+        # Skip depending on all globally injected dependencies to avoid circular dependencies.
+        "allocator",
+        "libunwind",
+    ],
     target_compatible_with = ["@platforms//os:linux"],
 )

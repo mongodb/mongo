@@ -171,4 +171,10 @@ unwind_sources = unwind_common_sources + unwind_platform_sources
 env.BazelLibrary(
     target='unwind',
     source=env.File(unwind_sources, unwind_src_dir),
+    # libunwind and tcmalloc are both added as global dependencies. Skip
+    # inheriting global dependencies to avoid a circular dependency.
+    LIBDEPS_NO_INHERIT=[
+        '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/third_party/shim_unwind',
+    ],
 )

@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 Import("env")
 Import("debugBuild")
+Import('use_libunwind')
 
 env = env.Clone()
 
@@ -32,6 +33,7 @@ ca = env.SharedLibrary(
     # We don't want any special allocator here either.
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/third_party/shim_unwind',
     ],
     AIB_COMPONENT='msi-util',
     AIB_ROLE='runtime',

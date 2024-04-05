@@ -96,6 +96,12 @@ mongo_cc_library(
         "@platforms//cpu:ppc": ["__linux"],
         "//conditions:default": [],
     }),
+    skip_global_deps = [
+        # This is a globally injected dependency.
+        # Skip depending on all globally injected dependencies to avoid circular dependencies.
+        "allocator",
+        "libunwind",
+    ],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "@platforms//os:windows": [],

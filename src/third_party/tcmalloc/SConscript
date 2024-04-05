@@ -158,6 +158,13 @@ def slurpBlaze(target, source, exports, env):
         if 'LIBDEPS' in kwargs:
             kwargs['LIBDEPS'] = sorted(list(set(kwargs['LIBDEPS'])))
 
+        # libunwind and tcmalloc are both added as global dependencies. Skip
+        # inheriting global dependencies to avoid a circular dependency.
+        kwargs['LIBDEPS_NO_INHERIT'] = [
+            '$BUILD_DIR/third_party/shim_allocator',
+            '$BUILD_DIR/third_party/shim_unwind',
+        ]
+
         for cf in libDef.get('copts', []):
             kwargs.setdefault('CCFLAGS', [e for e in env.get('CCFLAGS', [])]).append(cf)
         tcmalloc_scons_print(f'env.Library(**{json.dumps(kwargs, indent=4)})', file=sys.stderr)

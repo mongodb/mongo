@@ -630,13 +630,13 @@ REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE = (
 LIBUNWIND_DEPS = select({
     "//bazel/config:libunwind_enabled": ["//src/third_party/unwind:unwind"],
     "//bazel/config:_libunwind_off": [],
-    "//bazel/config:_libunwind_auto": [],
+    "//bazel/config:_libunwind_disabled_by_auto": [],
 }, no_match_error = REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE)
 
 LIBUNWIND_DEFINES = select({
     "//bazel/config:libunwind_enabled": ["MONGO_CONFIG_USE_LIBUNWIND"],
     "//bazel/config:_libunwind_off": [],
-    "//bazel/config:_libunwind_auto": [],
+    "//bazel/config:_libunwind_disabled_by_auto": [],
 }, no_match_error = REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE)
 
 REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE = (
@@ -1046,7 +1046,8 @@ def mongo_cc_library(
         linkstatic = False,
         local_defines = [],
         mongo_api_name = None,
-        target_compatible_with = []):
+        target_compatible_with = [],
+        skip_global_deps = []):
     """Wrapper around cc_library.
 
     Args:
@@ -1065,6 +1066,7 @@ def mongo_cc_library(
         is currently not supported. The mongo build must link entirely statically or entirely dynamically. This can be
         configured via //config/bazel:linkstatic.
       local_defines: macro definitions passed to all source and header files.
+      skip_global_deps: Globally injected dependencies to skip adding as a dependency (options: "libunwind", "allocator").
     """
 
     if linkstatic == True:
@@ -1072,16 +1074,15 @@ def mongo_cc_library(
         The mongo build must link entirely statically or entirely dynamically.
         This can be configured via //config/bazel:linkstatic.""")
 
-    # Avoid injecting into unwind/libunwind_asm to avoid a circular dependency.
-    if name not in ["unwind", "tcmalloc_minimal"] and not native.package_name().startswith("src/third_party/tcmalloc") and not native.package_name().startswith("src/third_party/abseil-cpp"):
+    if "libunwind" not in skip_global_deps:
         deps += LIBUNWIND_DEPS
         local_defines += LIBUNWIND_DEFINES
 
+    if "allocator" not in skip_global_deps:
+        deps += TCMALLOC_DEPS
+
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
-
-    if name != "tcmalloc_minimal" and not name.startswith("tcmalloc") and not name.startswith("absl"):
-        deps += TCMALLOC_DEPS
 
     if mongo_api_name:
         visibility_support_defines_list = ["MONGO_USE_VISIBILITY", "MONGO_API_" + mongo_api_name]

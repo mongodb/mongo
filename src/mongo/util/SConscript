@@ -86,6 +86,10 @@ env.BazelLibrary(
         # NOTE: This library *must not* depend on any mongodb code
         'lint-leaf-node-no-deps',
     ],
+    LIBDEPS_NO_INHERIT=[
+        '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/third_party/shim_unwind',
+    ],
 )
 
 env.SConscript(
@@ -986,10 +990,6 @@ env.Benchmark(
 stacktraceEnv = env.Clone()
 if use_libunwind:
     stacktraceEnv.InjectThirdParty(libraries=['unwind'])
-    stacktraceEnv.AppendUnique(LIBDEPS=[
-        '$BUILD_DIR/third_party/shim_unwind',
-    ], )
-
     stacktraceEnv.CppUnitTest(
         target=[
             'stacktrace_libunwind_test',

@@ -357,9 +357,11 @@ if jsEngine:
     mozjsEnv.SConscript('mozjs/SConscript', exports={'env': mozjsEnv})
 
 if use_libunwind:
-    unwindEnv = env.Clone(LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
-    ], )
+    unwindEnv = env.Clone(
+        LIBDEPS_NO_INHERIT=[
+            '$BUILD_DIR/third_party/shim_allocator',
+            '$BUILD_DIR/third_party/shim_unwind',
+        ], )
     if use_system_libunwind:
         unwindEnv = unwindEnv.Clone(SYSLIBDEPS=[
             env['LIBDEPS_UNWIND_SYSLIBDEP'],
@@ -445,12 +447,6 @@ boostEnv.ShimLibrary(name="boost")
 
 abseilDirectory = 'abseil-cpp'
 abseilEnv = env.Clone()
-
-# We can't depend on the allocator if we are using tcmalloc as its depends
-# on us (abseil-cpp)
-if abseilEnv['MONGO_ALLOCATOR'] in ['tcmalloc-google']:
-    abseilEnv = abseilEnv.Clone(LIBDEPS_NO_INHERIT=['$BUILD_DIR/third_party/shim_allocator'])
-
 abseilEnv.InjectThirdParty(libraries=['abseil-cpp'])
 abseilEnv.SConscript(abseilDirectory + '/SConscript', exports={'env': abseilEnv})
 abseilEnv = abseilEnv.Clone(LIBDEPS_INTERFACE=[
@@ -539,10 +535,13 @@ if "tom" in env["MONGO_CRYPTO"]:
 
     tomcryptEnv.ShimLibrary(name="tomcrypt", )
 
-# tcmallocEnv implements this shim, so it rejects the implicit dependency.
-tcmallocEnv = env.Clone(LIBDEPS_NO_INHERIT=[
-    '$BUILD_DIR/third_party/shim_allocator',
-], )
+# libunwind and tcmalloc are both added as global dependencies. Skip
+# inheriting global dependencies to avoid a circular dependency.
+tcmallocEnv = env.Clone(
+    LIBDEPS_NO_INHERIT=[
+        '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/third_party/shim_unwind',
+    ], )
 if tcmallocEnv['MONGO_ALLOCATOR'] in ["tcmalloc-google"]:
     if use_system_version_of_library("tcmalloc-google"):
         tcmallocEnv = tcmallocEnv.Clone(SYSLIBDEPS=[

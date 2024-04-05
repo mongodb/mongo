@@ -1,7 +1,14 @@
 # AUTO-GENERATED FILE DO NOT MANUALLY EDIT
 # generated from the parse_libs_from_ninja.py script in scripts directory via `python ./parse_libs_from_ninja.py`
 Import("env")
-env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
+env = env.Clone(
+    NINJA_GENSOURCE_INDEPENDENT=True,
+    LIBDEPS_NO_INHERIT=[
+        # libunwind and tcmalloc are both added as global dependencies. Skip
+        # inheriting global dependencies to avoid a circular dependency.
+        '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/third_party/shim_unwind',
+    ])
 env.InjectThirdParty(libraries=['abseil-cpp'])
 if env.ToolchainIs('msvc'):
     env.Append(

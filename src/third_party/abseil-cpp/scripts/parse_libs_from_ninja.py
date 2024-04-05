@@ -90,7 +90,12 @@ with open(pathlib.Path(__file__).parent.parent / 'SConscript', 'w') as sconscrip
 # AUTO-GENERATED FILE DO NOT MANUALLY EDIT
 # generated from the parse_libs_from_ninja.py script in scripts directory via `python ./parse_libs_from_ninja.py`
 Import("env")
-env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
+env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True, LIBDEPS_NO_INHERIT=[
+    # libunwind and tcmalloc are both added as global dependencies. Skip
+    # inheriting global dependencies to avoid a circular dependency.
+    '$BUILD_DIR/third_party/shim_allocator',
+    '$BUILD_DIR/third_party/shim_unwind',
+])
 env.InjectThirdParty(libraries=['abseil-cpp'])
 if env.ToolchainIs('msvc'):
     env.Append(
@@ -119,7 +124,14 @@ package(default_visibility = ["//visibility:public"])
 ABSEIL_HEADERS = [
 {os.linesep.join([f"    '{hdr}'," for hdr in abseil_headers])}
 ]
-                
+
+ABSEIL_SKIP_GLOBAL_DEPS = [
+    # This is a globally injected dependency.
+    # Skip depending on all globally injected dependencies to avoid circular dependencies.
+    "allocator",
+    "libunwind",
+]
+
 """)
 
         # This will loop through the ninja file looking for the specified target libs.
@@ -231,7 +243,8 @@ mongo_cc_library(
     srcs = [
 {os.linesep.join([f"        '{source}'," for source in source_files])}
     ],
-    hdrs = ABSEIL_HEADERS,{os.linesep + f"    deps =  [" + os.linesep + os.linesep.join([f"        ':{libdep}'," for libdep in sorted(libdeps)]) + os.linesep +"    ]," if libdeps  else ""}
+    hdrs = ABSEIL_HEADERS,
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,{os.linesep + f"    deps =  [" + os.linesep + os.linesep.join([f"        ':{libdep}'," for libdep in sorted(libdeps)]) + os.linesep +"    ]," if libdeps  else ""}
     includes=['dist']
 )
 

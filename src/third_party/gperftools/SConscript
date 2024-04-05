@@ -43,7 +43,6 @@ if use_libunwind:
         ("HAVE_LIBUNWIND_H", "1"),
         'HAVE_UCONTEXT_H',
     ], )
-    env.InjectThirdParty(libraries=['unwind'])
 
 files = [
     'src/base/dynamic_annotations.c',
@@ -152,7 +151,10 @@ if env['TARGET_ARCH'] == 'ppc64le':
 env.BazelLibrary(
     target='tcmalloc_minimal',
     source=[env.Dir('dist').File(f) for f in files],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/third_party/shim_unwind' if use_libunwind else [],
+    # libunwind and tcmalloc are both added as global dependencies. Skip
+    # inheriting global dependencies to avoid a circular dependency.
+    LIBDEPS_NO_INHERIT=[
+        '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/third_party/shim_unwind',
     ],
 )

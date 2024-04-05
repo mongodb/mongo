@@ -385,6 +385,13 @@ ABSEIL_HEADERS = [
     "dist/absl/utility/utility.h",
 ]
 
+ABSEIL_SKIP_GLOBAL_DEPS = [
+    # This is a globally injected dependency.
+    # Skip depending on all globally injected dependencies to avoid circular dependencies.
+    "allocator",
+    "libunwind",
+]
+
 # absl_strerror added as a dependency of other abseil libraries
 mongo_cc_library(
     name = "absl_strerror",
@@ -393,6 +400,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_scoped_set_env added as a dependency of other abseil libraries
@@ -403,6 +411,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_log_severity",
         ":absl_raw_logging_internal",
@@ -417,6 +426,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_log_severity is an explicit dependency to the server build
@@ -427,6 +437,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_base is an explicit dependency to the server build
@@ -441,6 +452,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_log_severity",
         ":absl_raw_logging_internal",
@@ -456,6 +468,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_log_severity",
     ],
@@ -469,6 +482,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_log_severity",
@@ -485,6 +499,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_log_severity",
         ":absl_raw_logging_internal",
@@ -499,6 +514,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -539,6 +555,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -572,6 +589,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_crc32c",
@@ -600,6 +618,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_crc_cpu_detect",
@@ -625,6 +644,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_crc_cpu_detect",
@@ -642,6 +662,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_log_severity",
@@ -658,6 +679,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_debugging_internal",
         ":absl_log_severity",
@@ -673,6 +695,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_debugging_internal",
@@ -699,6 +722,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_debugging_internal",
@@ -725,6 +749,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_log_severity",
         ":absl_raw_logging_internal",
@@ -739,6 +764,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_log_severity",
@@ -755,6 +781,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_failure_signal_handler added as a dependency of other abseil libraries
@@ -765,6 +792,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_debugging_internal",
@@ -792,6 +820,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -825,6 +854,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_base",
@@ -848,6 +878,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -906,6 +937,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_base",
@@ -930,6 +962,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_flags_commandlineflag added as a dependency of other abseil libraries
@@ -940,6 +973,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_base",
@@ -963,6 +997,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -995,6 +1030,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1050,6 +1086,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_base",
@@ -1089,6 +1126,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1149,6 +1187,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1208,6 +1247,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1269,6 +1309,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_int128",
@@ -1286,6 +1327,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_log_severity",
@@ -1302,6 +1344,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1327,6 +1370,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1377,6 +1421,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1425,6 +1470,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_log_internal_globals added as a dependency of other abseil libraries
@@ -1435,6 +1481,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -1459,6 +1506,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1500,6 +1548,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_int128",
@@ -1521,6 +1570,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -1545,6 +1595,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -1571,6 +1622,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1620,6 +1672,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_log_severity",
@@ -1636,6 +1689,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1667,6 +1721,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -1692,6 +1747,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1718,6 +1774,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -1778,6 +1835,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_periodic_sampler added as a dependency of other abseil libraries
@@ -1788,6 +1846,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_exponential_biased",
     ],
@@ -1801,6 +1860,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_random_internal_randen_hwaes is an explicit dependency to the server build
@@ -1811,6 +1871,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_random_internal_platform",
         ":absl_random_internal_randen_hwaes_impl",
@@ -1825,6 +1886,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_base",
@@ -1847,6 +1909,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_random_internal_platform",
     ],
@@ -1860,6 +1923,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_random_internal_pool_urbg is an explicit dependency to the server build
@@ -1870,6 +1934,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_base",
@@ -1900,6 +1965,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_int128",
@@ -1921,6 +1987,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_random_internal_platform",
     ],
@@ -1934,6 +2001,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_base",
@@ -1964,6 +2032,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_random_internal_platform",
         ":absl_random_internal_randen_hwaes",
@@ -1981,6 +2050,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_int128",
@@ -2003,6 +2073,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_statusor is an explicit dependency to the server build
@@ -2013,6 +2084,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_bad_variant_access",
@@ -2061,6 +2133,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_base",
@@ -2108,6 +2181,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_bad_optional_access",
         ":absl_base",
@@ -2151,6 +2225,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_log_severity",
@@ -2181,6 +2256,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_int128",
@@ -2203,6 +2279,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_log_severity",
@@ -2219,6 +2296,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_exponential_biased",
         ":absl_log_severity",
@@ -2234,6 +2312,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -2281,6 +2360,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_crc32c",
@@ -2312,6 +2392,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_int128",
@@ -2333,6 +2414,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -2375,6 +2457,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -2418,6 +2501,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -2449,6 +2533,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -2473,6 +2558,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_log_severity",
@@ -2498,6 +2584,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_civil_time is an explicit dependency to the server build
@@ -2508,6 +2595,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
 )
 
 # absl_time is an explicit dependency to the server build
@@ -2522,6 +2610,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_base",
         ":absl_civil_time",
@@ -2545,6 +2634,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_log_severity",
         ":absl_raw_logging_internal",
@@ -2559,6 +2649,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_log_severity",
         ":absl_raw_logging_internal",
@@ -2573,6 +2664,7 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     includes = ["dist"],
+    skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
         ":absl_log_severity",
         ":absl_raw_logging_internal",
