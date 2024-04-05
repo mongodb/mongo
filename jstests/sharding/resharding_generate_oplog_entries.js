@@ -249,4 +249,10 @@ jsTestLog("oplog strict: " + tostrictjson(oplogEntries));
 // The temporary reshard collection must be dropped before checking metadata integrity.
 assert(testDB[tempReshardingColl].drop());
 
+// Drop the donor/recipient documents created when simulating the resharding.
+assert(st.shard0.rs.getPrimary().getDB("config").localReshardingOperations.donor.drop());
+assert(st.shard0.rs.getPrimary().getDB("config").localReshardingOperations.recipient.drop());
+assert(st.shard1.rs.getPrimary().getDB("config").localReshardingOperations.donor.drop());
+assert(st.shard1.rs.getPrimary().getDB("config").localReshardingOperations.recipient.drop());
+
 st.stop();
