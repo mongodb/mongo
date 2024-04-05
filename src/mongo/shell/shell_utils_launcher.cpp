@@ -833,12 +833,14 @@ BSONObj WriteTestPipeBsonFileSync(const BSONObj& args, void* unused) {
  *   "2": BSONArray; array of objects to round-robin write to the pipe
  *   "3": OPTIONAL string; absolute path to the directory where named pipes exist. If not given,
  *        'kDefaultPipePath' is used.
+ *   "4": OPTIONAL bool; persist the pipe between executions of this function. Defaults to false.
+ * The optional absolute path must be given to use this parameter.
  */
 BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
     int nFields = args.nFields();
     uassert(ErrorCodes::FailedToParse,
-            "Function requires 3 or 4 arguments but {} were given"_format(nFields),
-            nFields == 3 || nFields == 4);
+            "Function requires 3 to 5 arguments but {} were given"_format(nFields),
+            nFields >= 3 && nFields <= 5);
 
     BSONElement pipePathElem(args.getField("0"));
     BSONElement objectsElem(args.getField("1"));
@@ -855,7 +857,7 @@ BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
             bsonElems.type() == mongo::Array);
 
     std::string pipeDir = [&] {
-        if (nFields == 4) {
+        if (nFields >= 4) {
             BSONElement pipeDirElem(args.getField("3"));
             uassert(ErrorCodes::FailedToParse,
                     "Fourth argument (pipe dir) must be a string",
@@ -863,6 +865,18 @@ BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
             return pipeDirElem.str();
         } else {
             return kDefaultPipePath.toString();
+        }
+    }();
+
+    bool persistPipe = [&] {
+        if (nFields >= 5) {
+            BSONElement persistPipeElem(args.getField("4"));
+            uassert(ErrorCodes::FailedToParse,
+                    "Fifth argument (persistPipe) must be a bool",
+                    persistPipeElem.type() == BSONType::Bool);
+            return persistPipeElem.boolean();
+        } else {
+            return false;
         }
     }();
 
@@ -875,8 +889,11 @@ BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
     }
 
     // Write the pipe asynchronously.
-    NamedPipeHelper::writeToPipeObjectsAsync(
-        std::move(pipeDir), pipePathElem.str(), objectsElem.numberLong(), std::move(bsonObjs));
+    NamedPipeHelper::writeToPipeObjectsAsync(std::move(pipeDir),
+                                             pipePathElem.str(),
+                                             objectsElem.numberLong(),
+                                             std::move(bsonObjs),
+                                             persistPipe);
 
     return {};
 }

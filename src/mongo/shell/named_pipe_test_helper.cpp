@@ -215,7 +215,8 @@ void NamedPipeHelper::writeToPipeAsync(std::string pipeDir,
 void NamedPipeHelper::writeToPipeObjects(std::string pipeDir,
                                          std::string pipeRelativePath,
                                          long objects,
-                                         std::vector<BSONObj> bsonObjs) noexcept {
+                                         std::vector<BSONObj> bsonObjs,
+                                         bool persistPipe) noexcept {
     const std::string method = "NamedPipeHelper::writeToPipeObjects";
     // This is a test-only function. Adding a log message to help debug test failures. Same comment
     // on other log messages here.
@@ -223,7 +224,7 @@ void NamedPipeHelper::writeToPipeObjects(std::string pipeDir,
 
     try {
         const int kNumBsonObjs = bsonObjs.size();
-        NamedPipeOutput pipeWriter(pipeDir, pipeRelativePath);  // producer
+        NamedPipeOutput pipeWriter(pipeDir, pipeRelativePath, persistPipe);  // producer
 
         pipeWriter.open();
         LOGV2_INFO(8206002, "The pipe writer thread: pipe opened", "pipe"_attr = pipeRelativePath);
@@ -251,14 +252,16 @@ void NamedPipeHelper::writeToPipeObjects(std::string pipeDir,
 void NamedPipeHelper::writeToPipeObjectsAsync(std::string pipeDir,
                                               std::string pipeRelativePath,
                                               long objects,
-                                              std::vector<BSONObj> bsonObjs) {
+                                              std::vector<BSONObj> bsonObjs,
+                                              bool persistPipe) {
     // This is a test-only function. Adding a log message to help debug test failures.
     LOGV2_INFO(8206000, "Launching the pipe writer thread", "pipe"_attr = pipeRelativePath);
     stdx::thread thread(writeToPipeObjects,
                         std::move(pipeDir),
                         std::move(pipeRelativePath),
                         objects,
-                        std::move(bsonObjs));
+                        std::move(bsonObjs),
+                        persistPipe);
     thread.detach();
 }
 }  // namespace mongo

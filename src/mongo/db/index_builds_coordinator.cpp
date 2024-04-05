@@ -2487,9 +2487,13 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         // Change the startIndexBuild Oplog entry.
         // Two-phase index builds write a different oplog entry than the default behavior which
         // writes a no-op just to generate an optime.
+        // If we are in magic restore mode we will return true for canAcceptWritesFor on admin or
+        // config databases which we do not want in this case. This will not impact normal primary
+        // execution.
         onInitFn = [&](std::vector<BSONObj>& specs) {
             if (!(replCoord->getSettings().isReplSet() &&
-                  replCoord->canAcceptWritesFor(opCtx, nss))) {
+                  replCoord->canAcceptWritesFor(opCtx, nss)) ||
+                storageGlobalParams.magicRestore) {
                 // Not primary.
                 return Status::OK();
             }
@@ -2540,7 +2544,8 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
 
     try {
         if (replCoord->canAcceptWritesFor(opCtx, collection->ns()) &&
-            !replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
+            !replCoord->getSettings().shouldRecoverFromOplogAsStandalone() &&
+            !storageGlobalParams.magicRestore) {
             // On standalones and primaries, call setUpIndexBuild(), which makes the initial catalog
             // write. On primaries, this replicates the startIndexBuild oplog entry. The start
             // timestamp is only set during oplog application.
@@ -3359,7 +3364,8 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     // retry because a new signal should be received. Single-phase builds will be unable to commit
     // and will self-abort.
     bool isPrimary = replCoord->canAcceptWritesFor(opCtx, dbAndUUID) &&
-        !replCoord->getSettings().shouldRecoverFromOplogAsStandalone();
+        !replCoord->getSettings().shouldRecoverFromOplogAsStandalone() &&
+        !storageGlobalParams.magicRestore;
     if (!isPrimary && IndexBuildAction::kCommitQuorumSatisfied == action) {
         return CommitResult::kNoLongerPrimary;
     }

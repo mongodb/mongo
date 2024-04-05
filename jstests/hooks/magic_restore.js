@@ -13,20 +13,80 @@ import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 // Starts up a new node on dbpath where a backup cursor has already been written from sourceConn.
 // sourceConn must also contain a timestamp in `test.magic_restore_checkpointTimestamp` of when the
 // backup was taken.
-function performRestore(sourceConn, expectedConfig, dbpath, options) {
+function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
     // Read checkpointTimestamp from source cluster.
     const checkpointTimestamp = sourceConn.getDB("magic_restore_metadata")
                                     .getCollection("magic_restore_checkpointTimestamp")
                                     .findOne()
                                     .ts;
-    const objs = [{
-        "nodeType": "replicaSet",
-        "replicaSetConfig": expectedConfig,
-        "maxCheckpointTs": checkpointTimestamp,
-    }];
 
-    _writeObjsToMagicRestorePipe(objs, MongoRunner.dataDir);
-    _runMagicRestoreNode(dbpath, MongoRunner.dataDir, options);
+    let oplog = sourceConn.getDB("local").getCollection('oplog.rs');
+    const entriesAfterBackup =
+        oplog.find({ts: {$gt: checkpointTimestamp}, ns: {$ne: "magic_restore_metadata"}})
+            .sort({ts: 1})
+            .toArray();
+
+    if (entriesAfterBackup.length > 0) {
+        // BSON arrays take up more space than raw objects do, but computing the size of a BSON
+        // array is extremely expensive (O(N^2) time). As a compromise we will limit our size to be
+        // 90% of the real BSON max which should allow us to stay under the threshold of max BSON
+        // size. This will cause us to need to disable some tests with super large oplog entries.
+        const maxSize = sourceConn.getDB("test").hello().maxBsonObjectSize * 0.9;
+
+        let currentBatch = [];
+        let currentBatchSize = 0;
+
+        const metadataDocument = {
+            "nodeType": "replicaSet",
+            "replicaSetConfig": expectedConfig,
+            "maxCheckpointTs": checkpointTimestamp,
+            // Restore to the timestamp of the last oplog entry on the source cluster.
+            "pointInTimeTimestamp": entriesAfterBackup[entriesAfterBackup.length - 1].ts
+        };
+
+        currentBatch.push(metadataDocument);
+        currentBatchSize += Object.bsonsize(metadataDocument);
+
+        // Loop over every oplog entry and try and fit it into a batch. If a batch goes over maxBSON
+        // size then we create a new batch.
+        entriesAfterBackup.forEach((entry) => {
+            // See if the entry could push the current batch over the max size, if so we need to
+            // start a new one.
+            const entrySize = Object.bsonsize(entry);
+            if (currentBatchSize + entrySize > maxSize) {
+                jsTestLog("Magic Restore: Writing " + currentBatchSize.toString() +
+                          " bytes to pipe.");
+
+                _writeObjsToMagicRestorePipe(
+                    currentBatch, MongoRunner.dataDir + "/" + name, true /* persistPipe */);
+                currentBatch = [];
+                currentBatchSize = 0;
+
+                // Writing items to the restore pipe can take a long time for 16MB of documents. Do
+                // a small sleep here to make sure we do not write oplog entries out of order.
+                sleep(2000);
+            }
+
+            // Add the entry to the current batch.
+            currentBatch.push(entry);
+            currentBatchSize += entrySize;
+        });
+
+        // If non-empty batch remains push it into batches.
+        if (currentBatch.length != 0) {
+            _writeObjsToMagicRestorePipe(
+                currentBatch, MongoRunner.dataDir + "/" + name, true /* persistPipe */);
+        }
+    } else {
+        const objs = [{
+            "nodeType": "replicaSet",
+            "replicaSetConfig": expectedConfig,
+            "maxCheckpointTs": checkpointTimestamp,
+        }];
+        _writeObjsToMagicRestorePipe(objs, MongoRunner.dataDir + "/" + name);
+    }
+
+    _runMagicRestoreNode(dbpath, MongoRunner.dataDir + "/" + name, options);
 }
 
 // Performs a data consistency check between two nodes. The `local` database is ignored due to
@@ -137,7 +197,7 @@ function dataConsistencyCheck(sourceNode, restoreNode) {
     });
 }
 
-function performMagicRestore(sourceNode, dbPath, options) {
+function performMagicRestore(sourceNode, dbPath, name, options) {
     jsTestLog("Magic Restore: Beginning magic restore for node " + sourceNode + ".");
 
     let rst = new ReplSetTest({nodes: 1});
@@ -154,20 +214,19 @@ function performMagicRestore(sourceNode, dbPath, options) {
 
     jsTestLog("Magic Restore: Restarting with magic restore options.");
 
-    performRestore(sourceNode, expectedConfig, dbPath);
+    performRestore(sourceNode, expectedConfig, dbPath, name, options);
 
     jsTestLog("Magic Restore: Starting restore cluster for data consistency check.");
 
     rst.startSet({restart: true, dbpath: dbPath});
 
-    try {
-        dataConsistencyCheck(sourceNode, rst.getPrimary());
-    } finally {
-        jsTestLog("Magic Restore: Stopping magic restore cluster and cleaning up restore dbpath.");
+    dataConsistencyCheck(sourceNode, rst.getPrimary());
 
-        // ReplSetTest clears the dbpath when it is stopped.
-        rst.stopSet();
-    }
+    jsTestLog("Magic Restore: Stopping magic restore cluster and cleaning up restore dbpath.");
+
+    // TODO SERVER-87225: Remove skipValidation once fastcount works properly for PIT restore.
+    // ReplSetTest clears the dbpath when it is stopped.
+    rst.stopSet(null, false, {'skipValidation': true});
 
     jsTestLog("Magic Restore: Magic restore complete.");
 }
@@ -178,17 +237,18 @@ if (topology.type == Topology.kShardedCluster) {
     // Perform restore for the config server.
     const path = MongoRunner.dataPath + '../magicRestore/configsvr/node0'
     let configMongo = new Mongo(topology.configsvr.nodes[0]);
-    performMagicRestore(configMongo, path, {"configsvr": ''});
+    performMagicRestore(configMongo, path, "configsvr", {"replSet": "config-rs", "configsvr": ''});
 
     // Need to iterate over the shards and do one restore per shard.
     for (const [shardName, shard] of Object.entries(topology.shards)) {
         const dbPathPrefix = MongoRunner.dataPath + '../magicRestore/' + shardName + '/node0';
         let nodeMongo = new Mongo(shard.nodes[0]);
-        performMagicRestore(nodeMongo, dbPathPrefix, {"replSet": shardName, "shardsvr": ''});
+        performMagicRestore(
+            nodeMongo, dbPathPrefix, shardName, {"replSet": shardName, "shardsvr": ''});
     }
 } else {
     // Is replica set so just need to do one restore.
     const conn = db.getMongo();
     const backupDbPath = MongoRunner.dataPath + '../magicRestore/node0';
-    performMagicRestore(conn, backupDbPath, {"replSet": "rs"});
+    performMagicRestore(conn, backupDbPath, "rs", {"replSet": "rs"});
 }

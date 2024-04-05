@@ -42,6 +42,18 @@ selector:
   # ReplicaSetNoPrimary and create a new connection once it get the primary again.
   - jstests/core/failcommand_failpoint.js
 
+  # Uses a view with projected out _id which causes data consistency diffs due to natural order differences between primary and secondary nodes from parallel oplog application.
+  - jstests/core/views/views_find.js
+  - jstests/core/views/views_aggregation.js
+
+  # Int types within an array type in BSON get their type changed when passed into a C++ function from Javascript.
+  - jstests/core/query/type/type_array.js
+  - jstests/core/timeseries/timeseries_internal_bounded_sort_compound_mixed_types.js
+
+  # Uses documents that are too close to max BSON size for us to support passing to C++ as a BSON array.
+  - jstests/core/max_doc_size.js
+  - jstests/core/query/find/find_getmore_bsonsize.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # After SERVER-80339, the server runs a "listIndexes" command on the background, which could show
@@ -56,6 +68,7 @@ executor:
   hooks:
   - class: MagicRestoreEveryN
     n: 20
+    randomize_pit: True
   fixture:
     class: ReplicaSetFixture
     mongod_options:

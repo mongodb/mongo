@@ -56,7 +56,9 @@ public:
         : NamedPipeOutput(kDefaultPipePath.toString(), pipeRelativePath) {}
 
     // Searches the named pipe in 'pipeDir' + 'pipeRelativePath' in POSIX system'
-    NamedPipeOutput(const std::string& pipeDir, const std::string& pipeRelativePath);
+    NamedPipeOutput(const std::string& pipeDir,
+                    const std::string& pipeRelativePath,
+                    bool persistPipe = false);
 
     ~NamedPipeOutput();
     void open();
@@ -67,6 +69,7 @@ private:
     std::string _pipeAbsolutePath;
 #ifndef _WIN32
     std::ofstream _ofs;
+    bool _persistPipe;
 #else
     HANDLE _pipe;
     bool _isOpen;

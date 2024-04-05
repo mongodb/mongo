@@ -54,10 +54,12 @@ public:
     static void writeToPipeObjects(std::string pipeDir,
                                    std::string pipeRelativePath,
                                    long objects,
-                                   std::vector<BSONObj> bsonObjs) noexcept;
+                                   std::vector<BSONObj> bsonObjs,
+                                   bool persistPipe = false) noexcept;
     static void writeToPipeObjectsAsync(std::string pipeDir,
                                         std::string pipeRelativePath,
                                         long objects,
-                                        std::vector<BSONObj> bsonObjs);
+                                        std::vector<BSONObj> bsonObjs,
+                                        bool persistPipe = false);
 };
 }  // namespace mongo
