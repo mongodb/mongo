@@ -65,7 +65,7 @@ void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
                                                     BSONObjBuilder* b,
                                                     StringData name,
                                                     const boost::optional<TenantId>&) {
-    *b << name << _data.first;
+    *b << name << StringData{*_data.first};
 }
 
 Status validateExtraDiagnostics(const std::vector<std::string>& value,
