@@ -89,6 +89,19 @@ function startShellWithOp(comment) {
     return awaitShell;
 }
 
+// Check if there is a shard in the cluster with a log line containing the given pattern.
+// We can't be sure which is the shard containing that log line because there may be a move
+// collection operation running in background.
+// The only thing we know is that it must happen on at least one shard
+function testLogPattern(db, pattern) {
+    const nodesToCheck = FixtureHelpers.isStandalone(db) ? [db] : FixtureHelpers.getPrimaries(db);
+
+    return nodesToCheck.some(conn => {
+        const log = conn.adminCommand({getLog: "global"});
+        return pattern.test(log.log);
+    });
+}
+
 // Test that the currentOp server command truncates long operations with a warning logged.
 const serverCommandTest = startShellWithOp("currentOp_server");
 res = db.adminCommand({
@@ -116,9 +129,7 @@ if (FixtureHelpers.numberOfShardsForCollection(coll) > 1) {
     assert.eq(res.inprog[0].op, "command", res);
     assert(res.inprog[0].command.hasOwnProperty("$truncated"), res);
 }
-
-const log = FixtureHelpers.getPrimaryForNodeHostingDatabase(db).adminCommand({getLog: "global"});
-assert(/will be truncated/.test(log.log));
+assert(testLogPattern(db, /will be truncated/));
 
 res.inprog.forEach((op) => {
     assert.commandWorked(db.killOp(op.opid));
