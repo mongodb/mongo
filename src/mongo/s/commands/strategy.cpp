@@ -110,6 +110,7 @@
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/transaction_participant_failed_unyield_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
@@ -311,9 +312,15 @@ void ExecCommandClient::_epilogue() {
         const Command* c = _invocation->definition();
         c->incrementCommandsFailed();
 
+        auto status = getStatusFromCommandResult(body.asTempObj());
         if (auto txnRouter = TransactionRouter::get(opCtx)) {
-            txnRouter.implicitlyAbortTransaction(opCtx,
-                                                 getStatusFromCommandResult(body.asTempObj()));
+            txnRouter.implicitlyAbortTransaction(opCtx, status);
+        }
+
+        // Throw this error so that it will be upconverted into the orignal error before being
+        // returned back to the client
+        if (status.code() == ErrorCodes::TransactionParticipantFailedUnyield) {
+            iassert(status);
         }
     }
 }
@@ -1163,6 +1170,15 @@ Future<void> ParseAndRunCommand::RunAndRetry::run() {
         .onError<ErrorCodes::CannotImplicitlyCreateCollection>([this](Status status) {
             _onCannotImplicitlyCreateCollection(status);
             return run();  // Retry
+        })
+        .onError<ErrorCodes::TransactionParticipantFailedUnyield>([this](Status status) {
+            auto originalErrorInfo = status.extraInfo<TransactionParticipantFailedUnyieldInfo>();
+            if (!originalErrorInfo)
+                iassert(status);
+
+            // Throw original error
+            auto originalStatus = originalErrorInfo->getOriginalError();
+            iassert(originalStatus);
         });
 }
 

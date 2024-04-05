@@ -541,6 +541,12 @@ error_codes:
 
     - {code: 412, name: UpdatesStillPending, categories: [RetriableError]}
 
+    # This error wraps the error thrown if a transaction participant shard fails locally when
+    # unyielding its resources after procesing remote responses. This allows distinguishing between
+    # a local error versus a remote error, which is important for transaction machinery to correctly
+    # handle the error.
+    - {code: 413, name: TransactionParticipantFailedUnyield, extra: TransactionParticipantFailedUnyieldInfo}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

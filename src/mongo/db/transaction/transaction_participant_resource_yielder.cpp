@@ -29,10 +29,13 @@
 
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/s/transaction_participant_failed_unyield_exception.h"
 
 namespace mongo {
 
@@ -70,9 +73,29 @@ void TransactionParticipantResourceYielder::unyield(OperationContext* opCtx) {
         mongoDSessionCatalog->checkOutUnscopedSession(opCtx);
 
         if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
+            // Re-check the session back in in case of failure during unstashing of the transaction
+            // resources.
+            ScopeGuard releaseOnError([&] {
+                mongoDSessionCatalog->checkInUnscopedSession(
+                    opCtx, OperationContextSession::CheckInReason::kYield);
+            });
+
             txnParticipant.unstashTransactionResources(opCtx, _cmdName);
+            releaseOnError.dismiss();
         }
     }
+}
+
+Status TransactionParticipantResourceYielder::unyieldNoThrow(OperationContext* opCtx) noexcept {
+    try {
+        unyield(opCtx);
+    } catch (const DBException& e) {
+        auto status = e.toStatus();
+        return Status{TransactionParticipantFailedUnyieldInfo(status),
+                      "Failed to unyield transaction participant resources"};
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo

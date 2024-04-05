@@ -129,6 +129,11 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
     // If we've been interrupted, the response queue should be filled with interrupted answers, go
     // ahead and return one of those
     if (!_interruptStatus.isOK()) {
+        if (_failedUnyield) {
+            AsyncRequestsSender::Response response{.swResponse = _interruptStatus};
+            return response;
+        }
+
         return _responseQueue.pop();
     }
 
@@ -158,8 +163,9 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
         auto unyieldStatus =
             _resourceYielder ? _resourceYielder->unyieldNoThrow(_opCtx) : Status::OK();
 
-        uassertStatusOK(waitStatus);
+        _failedUnyield = !unyieldStatus.isOK();
         uassertStatusOK(unyieldStatus);
+        uassertStatusOK(waitStatus);
 
         // There should always be a response ready after the wait above.
         auto response = _responseQueue.tryPop();
@@ -184,6 +190,11 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
 
     // shutdown the scoped task executor
     _subExecutor->shutdown();
+
+    if (_failedUnyield) {
+        AsyncRequestsSender::Response response{.swResponse = _interruptStatus};
+        return response;
+    }
 
     return _responseQueue.pop();
 }
