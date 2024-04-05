@@ -216,6 +216,11 @@ public:
         return _inputParamId;
     }
 
+    const BSONObj& getOwnedBackingBSON() const {
+        tassert(8870300, "Expected backing BSON to be owned", _backingBSON.isOwned());
+        return _backingBSON;
+    }
+
 protected:
     /**
      * 'collator' must outlive the ComparisonMatchExpression and any clones made of it.
