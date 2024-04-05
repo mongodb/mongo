@@ -432,15 +432,21 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'server_base',
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
 )
 
 env.Library(
     target='write_concern_options',
     source=[
+        'write_concern_idl.cpp',
+        'write_concern.idl',
         'write_concern_options.cpp',
         'write_concern_options.idl',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
         'read_write_concern_provenance',
     ],
     LIBDEPS_PRIVATE=[
