@@ -72,20 +72,18 @@ void assertBinaryEqual(BSONBinData finalizedColumn, const BufBuilder& buffer) {
 class BSONColumnTest : public unittest::Test {
 public:
     ~BSONColumnTest() override {
-// TODO (SERVER-88754): Re-enable or document why this is disabled on MSVC debug builds.
-#if !defined(_MSC_VER) || !defined(MONGO_CONFIG_DEBUG_BUILD)
         auto& trackingContext = trackingContextChecker.trackingContext;
         auto allocated = trackingContext.allocated();
         ASSERT_GT(allocated, 0);
 
+        // Move construct and move assign builders. These operations may allocate memory on certain
+        // platforms/implementations so we cannot check the exact memory usage in an platform
+        // independent way. But we make sure that the memory usage is 0 when all these are torn down
+        // to ensure there's no memory tracking leaks after moving.
         TrackedBSONColumnBuilder moveContructBuilder{std::move(cb)};
-        ASSERT_EQ(trackingContext.allocated(), allocated);
-
         TrackedBSONColumnBuilder moveAssignBuilder{
             trackingContextChecker.trackingContext.makeAllocator<void>()};
         moveAssignBuilder = std::move(moveContructBuilder);
-        ASSERT_EQ(trackingContext.allocated(), allocated);
-#endif
     }
 
     BSONElement createBSONColumn(const char* buffer, int size) {
@@ -1052,12 +1050,14 @@ public:
 protected:
     struct TrackingContextChecker {
         ~TrackingContextChecker() {
+            // Ensure we have freed all memory we allocated and are tracking this properly.
             ASSERT_EQ(trackingContext.allocated(), 0);
         }
 
         TrackingContext trackingContext;
     };
 
+    // Needs to be defined first so it is destroyed after TrackedBSONColumnBuilder
     TrackingContextChecker trackingContextChecker;
     TrackedBSONColumnBuilder cb{trackingContextChecker.trackingContext.makeAllocator<void>()};
 
