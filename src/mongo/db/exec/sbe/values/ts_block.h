@@ -182,6 +182,11 @@ public:
         return static_cast<bool>(_decompressedBlock);
     }
 
+    // Test-only helper.
+    ValueBlock* decompressedBlock_forTest() {
+        return _decompressedBlock.get();
+    }
+
 private:
     /**
      * Returns the BinData for this TsBlock, if present. It's illegal to call this for TsBlocks
