@@ -129,6 +129,27 @@ void BM_LargeIn(benchmark::State& state) {
     }
 }
 
+void BM_LargeEq(benchmark::State& state) {
+    // Tests single-field equality to a large array.
+    BSONObjBuilder bob;
+    BSONObjBuilder subA(bob.subobjStart("a"));
+
+    BSONArrayBuilder eqValue(subA.subarrayStart("$eq"));
+    for (int i = 0; i < 20000; ++i) {
+        eqValue.append(i);
+    }
+    eqValue.done();
+    subA.done();
+
+    auto filter = bob.obj();
+    auto cq = getCanonicalQuery({.filter = filter});
+    QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
+    plannerParams.mainCollectionInfo.indexes = {createIndexEntry(BSON("a" << 1))};
+    for (auto _ : state) {
+        auto solns = QueryPlanner::plan(*cq, plannerParams);
+    }
+}
+
 void BM_IndexedContainedOrFilter(benchmark::State& state) {
     // Contained $or query with exponential number of solutions.
     auto original = internalQueryEnumerationMaxOrSolutions.load();
@@ -267,6 +288,7 @@ BENCHMARK(BM_NoIndexes);
 BENCHMARK(BM_SingleIndex);
 BENCHMARK(BM_MultipleIndexes);
 BENCHMARK(BM_LargeIn);
+BENCHMARK(BM_LargeEq);
 BENCHMARK(BM_IndexedContainedOrFilter);
 BENCHMARK(BM_IndexIntersection);
 BENCHMARK(BM_IndexDedupping);
@@ -275,6 +297,5 @@ BENCHMARK(BM_IndexSatisfiesSort);
 BENCHMARK(BM_ShardFilter);
 BENCHMARK(BM_CoveredPlan);
 BENCHMARK(BM_HintedPlan);
-
 
 }  // namespace mongo

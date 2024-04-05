@@ -48,15 +48,19 @@ struct Interval {
     // 'start' may not point at the first field in _intervalData.
     // 'end' may not point at the last field in _intervalData.
     // 'start' and 'end' may point at the same field.
-    // This BSON may or may not be owned. In some cases (such as indexed $in), we store an unowned
-    // BSON pointing to the $in array as an optimization. As such, we cannot made any assumptions
-    // about the order of elements in this object; its field names also do not have an meaning.
+    // This BSON may contain elements other than the start and end elements. We cannot make any
+    // assumptions about the order of elements in this object; we should also not make any
+    // assumptions about the field names of the elements, which are not guaranteed to be empty.
     BSONObj _intervalData;
 
     // Start and End must be ordered according to the index order.
+    // For the reasons mentioned above, comparisons to 'start' and 'end' should ignore the field
+    // names of the BSONElements.
     BSONElement start;
     bool startInclusive;
 
+    // For the reasons mentioned above, comparisons to 'start' and 'end' should ignore the field
+    // names of the BSONElements.
     BSONElement end;
     bool endInclusive;
 

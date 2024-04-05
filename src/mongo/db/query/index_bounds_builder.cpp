@@ -664,7 +664,18 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // There is no need to sort intervals or merge overlapping intervals here since the output
         // is from one element.
 
-        translateEquality(node, node->getData(), nullptr, index, isHashed, oilOut, tightnessOut);
+        // Passing a "holder" for the BOSNElement (node->getData()) here allows us to skip
+        // creating a new BSON to wrap the element in translateEquality().
+        // TODO SERVER-87277: After SERVER-87277, there might not be owned backing BSON on the match
+        // expression. Passing unowned BSON as the "holder" here is acceptable, as long as the BSON
+        // lives for as long as the query plan.
+        translateEquality(node,
+                          node->getData(),
+                          &node->getOwnedBackingBSON(),
+                          index,
+                          isHashed,
+                          oilOut,
+                          tightnessOut);
         if (ietBuilder != nullptr) {
             switch (expr->matchType()) {
                 case MatchExpression::EQ:
@@ -1445,7 +1456,12 @@ void IndexBoundsBuilder::translateEquality(const PathMatchExpression* matchExpr,
     // {a: [1, 2, 3]} will match documents like {a: [[1, 2, 3], 4, 5]}.
 
     // Case 3.
-    oil->intervals.push_back(makePointInterval(objFromElement(data, index.collator)));
+    // Reuse the BSON from the parse tree if possible to avoid allocating a BSONObj.
+    if (!index.collator && holder) {
+        oil->intervals.emplace_back(*holder, data, true, data, true);
+    } else {
+        oil->intervals.push_back(makePointInterval(objFromElement(data, index.collator)));
+    }
 
     if (data.Obj().isEmpty()) {
         // Case 2.
@@ -1454,8 +1470,13 @@ void IndexBoundsBuilder::translateEquality(const PathMatchExpression* matchExpr,
         oil->intervals.push_back(makePointInterval(undefinedBob.obj()));
     } else {
         // Case 1.
+        // Reuse the BSON from the parse tree if possible to avoid allocating a BSONObj.
         BSONElement firstEl = data.Obj().firstElement();
-        oil->intervals.push_back(makePointInterval(objFromElement(firstEl, index.collator)));
+        if (!index.collator && holder) {
+            oil->intervals.emplace_back(*holder, firstEl, true, firstEl, true);
+        } else {
+            oil->intervals.push_back(makePointInterval(objFromElement(firstEl, index.collator)));
+        }
     }
 
     std::sort(oil->intervals.begin(), oil->intervals.end(), IntervalComparison);
