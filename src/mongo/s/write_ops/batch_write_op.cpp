@@ -729,9 +729,17 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
     }
 
     int firstTargetedWriteOpIdx = targetedBatch.getWrites().front()->writeOpRef.first;
-    bool shouldDeferWriteWithoutShardKeyReponse =
-        _writeOps[firstTargetedWriteOpIdx].getWriteType() == WriteType::WithoutShardKeyWithId &&
-        targetedBatch.getNumOps() > 1;
+    bool isWriteWithoutShardKeyWithId =
+        _writeOps[firstTargetedWriteOpIdx].getWriteType() == WriteType::WithoutShardKeyWithId;
+    int batchSize = targetedBatch.getNumOps();
+    // A WriteWithoutShardKeyWithId batch of size 1 can be completed if it found n=1 from a
+    // previous shard. In this case skip processing the response.
+    if (batchSize == 1 && isWriteWithoutShardKeyWithId &&
+        _writeOps[firstTargetedWriteOpIdx].getWriteState() == WriteOpState_Completed) {
+        return;
+    }
+
+    bool shouldDeferWriteWithoutShardKeyReponse = isWriteWithoutShardKeyWithId && batchSize > 1;
     if (!shouldDeferWriteWithoutShardKeyReponse) {
         // Increment stats for this batch
         _incBatchStats(response);
@@ -790,14 +798,6 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
     write_ops::WriteError* lastError = nullptr;
     for (auto&& write : targetedBatch.getWrites()) {
         WriteOp& writeOp = _writeOps[write->writeOpRef.first];
-        // A WriteWithoutShardKeyWithId batch of size 1 can be completed if it found n=1 from a
-        // previous shard.
-        if (targetedBatch.getNumOps() == 1 &&
-            writeOp.getWriteType() == WriteType::WithoutShardKeyWithId &&
-            writeOp.getWriteState() == WriteOpState_Completed) {
-            break;
-        }
-
         invariant(writeOp.getWriteState() == WriteOpState_Pending);
 
         // See if we have an error for the write
