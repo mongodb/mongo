@@ -1165,6 +1165,7 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgr
 }
 
 TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinator) {
+    repl::primaryOnlyServiceTestStepUpWaitForRebuildComplete.setMode(FailPoint::alwaysOn);
     const auto abortErrMsg = "Recieved abort from the resharding coordinator";
 
     for (bool isAlsoDonor : {false, true}) {
@@ -1209,8 +1210,8 @@ TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordi
         ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
         recipient.reset();
 
-        removeRecipientDocFailpoint->setMode(FailPoint::off);
         stepUp(opCtx.get());
+        removeRecipientDocFailpoint->waitForTimesEntered(timesEnteredFailPoint + 2);
 
         auto [maybeRecipient, isPausedOrShutdown] =
             RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
@@ -1218,6 +1219,7 @@ TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordi
         ASSERT_FALSE(isPausedOrShutdown);
         recipient = *maybeRecipient;
 
+        removeRecipientDocFailpoint->setMode(FailPoint::off);
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
         checkStateDocumentRemoved(opCtx.get());
     }
