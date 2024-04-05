@@ -39,7 +39,7 @@ server_parameters:
         set_at: runtime
         cpp_class:
             name: WiredTigerEngineRuntimeConfigParameter
-            data: 'std::pair<std::string, WiredTigerKVEngine*>'
+            data: 'std::pair<synchronized_value<std::string>, WiredTigerKVEngine*>'
         # The data element of this param gets initialized in three
         # disparate ways by different parts of the codebase
         # none of which are easily encoded here.
