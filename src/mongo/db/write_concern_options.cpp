@@ -185,88 +185,27 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
     return parse(writeConcernObj);
 }
 
-WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
-    using namespace fmt::literals;
-    if (wEl.isNumber()) {
-        uassert(ErrorCodes::FailedToParse, "w cannot be NaN", !wEl.isNaN());
-        auto wNum = wEl.safeNumberLong();
-        if (wNum < 0 || wNum > static_cast<long long>(repl::ReplSetConfig::kMaxMembers)) {
-            uasserted(ErrorCodes::FailedToParse,
-                      "w has to be a non-negative number and not greater than {}; found: {}"_format(
-                          repl::ReplSetConfig::kMaxMembers, wNum));
-        }
+WriteConcernIdl WriteConcernOptions::toWriteConcernIdl() const {
+    WriteConcernIdl idl;
 
-        return WriteConcernW{wNum};
-    } else if (wEl.type() == BSONType::String) {
-        return WriteConcernW{wEl.str()};
-    } else if (wEl.type() == BSONType::Object) {
-        auto wTags = wEl.Obj();
-        uassert(ErrorCodes::FailedToParse, "tagged write concern requires tags", !wTags.isEmpty());
+    idl.setWriteConcernW(w);
 
-        WTags tags;
-        for (auto&& e : wTags) {
-            uassert(
-                ErrorCodes::FailedToParse,
-                "tags must be a single level document with only number values; found: {}"_format(
-                    e.toString()),
-                e.isNumber());
-
-            tags.try_emplace(e.fieldName(), e.safeNumberInt());
-        }
-
-        return WriteConcernW{std::move(tags)};
-    } else if (wEl.eoo() || wEl.type() == BSONType::jstNULL || wEl.type() == BSONType::Undefined) {
-        return WriteConcernW{};
+    if (syncMode == SyncMode::FSYNC) {
+        idl.setFsync(true);
+    } else if (syncMode == SyncMode::JOURNAL) {
+        idl.setJ(true);
+    } else if (syncMode == SyncMode::NONE) {
+        idl.setJ(false);
     }
-    uasserted(ErrorCodes::FailedToParse,
-              "w has to be a number, string, or object; found: {}"_format(typeName(wEl.type())));
-}
 
-void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONObjBuilder* builder) {
-    visit(OverloadedVisitor{[&](int64_t wNumNodes) {
-                                builder->appendNumber(fieldName, static_cast<long long>(wNumNodes));
-                            },
-                            [&](std::string wMode) { builder->append(fieldName, wMode); },
-                            [&](WTags wTags) {
-                                builder->append(fieldName, wTags);
-                            }},
-          w);
-}
+    idl.setWtimeout(wTimeout.count());
+    idl.setSource(_provenance.getSource());
 
-std::int64_t parseWTimeoutFromBSON(BSONElement element) {
-    // Store wTimeout as a 64-bit value but functionally limit it to int32 as values larger than
-    // than that do not make much sense to use and were not previously supported.
-    constexpr std::array<mongo::BSONType, 4> validTypes{
-        NumberLong, NumberInt, NumberDecimal, NumberDouble};
-    bool isValidType = std::any_of(
-        validTypes.begin(), validTypes.end(), [&](auto type) { return element.type() == type; });
-
-    auto value = isValidType ? element.safeNumberLong() : 0;
-    uassert(ErrorCodes::FailedToParse,
-            "wtimeout must be a 32-bit integer",
-            value <= std::numeric_limits<int32_t>::max());
-    return value;
+    return idl;
 }
 
 BSONObj WriteConcernOptions::toBSON() const {
-    BSONObjBuilder builder;
-    serializeWriteConcernW(w, "w", &builder);
-
-    if (syncMode == SyncMode::FSYNC) {
-        builder.append("fsync", true);
-    } else if (syncMode == SyncMode::JOURNAL) {
-        builder.append("j", true);
-    } else if (syncMode == SyncMode::NONE) {
-        builder.append("j", false);
-    }
-
-    // Historically we have serialized this as a int32_t, even though it is defined as an
-    // int64_t in our IDL format.
-    builder.append("wtimeout", static_cast<int32_t>(durationCount<Milliseconds>(wTimeout)));
-
-    _provenance.serialize(&builder);
-
-    return builder.obj();
+    return toWriteConcernIdl().toBSON();
 }
 
 bool WriteConcernOptions::needToWaitForOtherNodes() const {

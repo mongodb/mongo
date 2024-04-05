@@ -40,14 +40,13 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/read_write_concern_provenance.h"
+#include "mongo/db/write_concern_gen.h"
+#include "mongo/db/write_concern_idl.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-using WTags = StringMap<int64_t>;
-using WriteConcernW = std::variant<std::string, std::int64_t, WTags>;
 
 struct WriteConcernOptions {
 public:
@@ -109,6 +108,11 @@ public:
     // Returns the BSON representation of this object.
     // Warning: does not return the same object passed on the last parse() call.
     BSONObj toBSON() const;
+
+    /**
+     * Returns the IDL-struct representation of this object's BSON serialized form.
+     */
+    WriteConcernIdl toWriteConcernIdl() const;
 
     bool operator==(const WriteConcernOptions& other) const;
 
@@ -199,10 +203,4 @@ public:
 private:
     ReadWriteConcernProvenance _provenance;
 };
-
-// Helpers for IDL parsing
-WriteConcernW deserializeWriteConcernW(BSONElement wEl);
-void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONObjBuilder* builder);
-std::int64_t parseWTimeoutFromBSON(BSONElement element);
-
 }  // namespace mongo
