@@ -589,6 +589,8 @@ last-continuous:
     ticket: SERVER-87987
   - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
     ticket: SERVER-86253
+  - test_file: jstests/sharding/retryable_update_one_by_id_chunk_migration.js
+    ticket: SERVER-89018
   suites: null
 last-lts:
   all:
@@ -1234,4 +1236,6 @@ last-lts:
     ticket: SERVER-87987
   - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
     ticket: SERVER-86253
+  - test_file: jstests/sharding/retryable_update_one_by_id_chunk_migration.js
+    ticket: SERVER-89018
   suites: null

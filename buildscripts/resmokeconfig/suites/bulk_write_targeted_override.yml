@@ -51,6 +51,7 @@ selector:
   - jstests/sharding/batched_writes_with_id_without_shard_key_basic.js
   - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
   - jstests/sharding/timeseries_writes_without_shard_key_single_shard_data_placement_change.js
+  - jstests/sharding/retryable_update_one_by_id_chunk_migration.js
   # End updateOne/deleteOne with _id without shard key tests
   exclude_files:
   # Update API version tests should not be run with bulkWrite override.
