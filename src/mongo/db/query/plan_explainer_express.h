@@ -28,9 +28,97 @@
  */
 
 #pragma once
+
+#include <fmt/format.h>
+
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_summary_stats.h"
 
 namespace mongo {
+namespace express {
+class IteratorStats {
+public:
+    const std::string& stageName() const {
+        return _stageName;
+    }
+
+    long long numKeysExamined() const {
+        return _numKeysExamined;
+    }
+
+    long long numDocumentsFetched() const {
+        return _numDocumentsFetched;
+    }
+
+    const std::string& indexName() const {
+        return _indexName;
+    }
+
+    const BSONObj& indexKeyPattern() const {
+        return _indexKeyPattern;
+    }
+
+    void setStageName(std::string stageName) {
+        _stageName = std::move(stageName);
+    }
+
+    void incNumKeysExamined(size_t amount) {
+        _numKeysExamined += amount;
+    }
+
+    void incNumDocumentsFetched(size_t amount) {
+        _numDocumentsFetched += amount;
+    }
+
+    void setIndexName(const std::string indexName) {
+        _indexName = indexName;
+    }
+
+    void setIndexKeyPattern(const BSONObj& indexKeyPattern) {
+        _indexKeyPattern = indexKeyPattern;
+    }
+
+    void populateSummaryStats(PlanSummaryStats* statsOut) const {
+        statsOut->totalKeysExamined = _numKeysExamined;
+        statsOut->totalDocsExamined = _numDocumentsFetched;
+        if (!_indexName.empty()) {
+            statsOut->indexesUsed.emplace(_indexName);
+        }
+    }
+
+    void appendDataAccessStats(BSONObjBuilder& builder) const {
+        builder.append("stage"_sd, _stageName);
+        if (!_indexKeyPattern.isEmpty()) {
+            builder.append("keyPattern"_sd, _indexKeyPattern);
+        }
+        if (!_indexName.empty()) {
+            builder.append("indexName"_sd, _indexName);
+        }
+    }
+
+private:
+    std::string _stageName;
+    size_t _numKeysExamined{0};
+    size_t _numDocumentsFetched{0};
+    std::string _indexName;
+    BSONObj _indexKeyPattern;
+};
+
+class PlanStats {
+public:
+    size_t numResults() const {
+        return _numResults;
+    }
+
+    void incNumResults(size_t amount) {
+        _numResults += amount;
+    }
+
+private:
+    size_t _numResults{0};
+};
+}  // namespace express
+
 /**
  * A PlanExplainer implementation for express execution plans. Since we don't build a plan tree for
  * these queries, PlanExplainerExpress does not include stage information that is typically included
@@ -40,9 +128,9 @@ namespace mongo {
 class PlanExplainerExpress final : public PlanExplainer {
 public:
     PlanExplainerExpress(const mongo::CommonStats* stats,
-                         bool isClusteredOnId,
-                         const boost::optional<const std::string>& indexName)
-        : _stats(stats), _isClusteredOnId(isClusteredOnId), _indexName(indexName) {}
+                         const express::PlanStats* planStats,
+                         const express::IteratorStats* iteratorStats)
+        : _stats(stats), _planStats(planStats), _iteratorStats(iteratorStats) {}
 
     const ExplainVersion& getVersion() const override {
         static const ExplainVersion kExplainVersion = "1";
@@ -53,16 +141,7 @@ public:
         return false;
     }
 
-    std::string getPlanSummary() const override {
-        StringBuilder s;
-        s << getStageName();
-        if (_keyPattern) {
-            // KeyPattern::toString() is faster and produces different output compared to
-            // BSONObj::toString(). KeyPattern will return "{ a: 1 }" instead of "{ a: 1.0 }".
-            s << " " << KeyPattern{_keyPattern.get()};
-        }
-        return s.str();
-    }
+    std::string getPlanSummary() const override;
 
     void getSummaryStats(PlanSummaryStats* statsOut) const override;
 
@@ -81,26 +160,9 @@ public:
         return {};
     }
 
-    bool isClusteredOnId() const {
-        return _isClusteredOnId;
-    }
-
-    void setKeyPattern(const BSONObj& keyPattern) {
-        _keyPattern.emplace(keyPattern);
-    }
-
 private:
-    std::string getStageName() const {
-        if (_isClusteredOnId) {
-            return "EXPRESS_CLUSTERED_IXSCAN";
-        }
-        return "EXPRESS_IXSCAN";
-    }
-
     const mongo::CommonStats* _stats;
-    const bool _isClusteredOnId;
-    const boost::optional<const std::string>& _indexName;
-    boost::optional<const BSONObj&> _keyPattern;
+    const express::PlanStats* _planStats;
+    const express::IteratorStats* _iteratorStats;
 };
-
 }  // namespace mongo
