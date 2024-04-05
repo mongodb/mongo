@@ -116,6 +116,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeDbCheckLogOp);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingDbCheckRun);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingFirstBatch);
 MONGO_FAIL_POINT_DEFINE(hangAndSetDBCheckReadTimestampToLastApplied);
+MONGO_FAIL_POINT_DEFINE(hangBeforeAddingDBCheckBatchToOplog);
 
 // The optional `tenantIdForStartStop` is used for dbCheckStart/dbCheckStop oplog entries so that
 // the namespace is still the admin command namespace but the tenantId will be set using the
@@ -942,6 +943,12 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
     if (_info.secondaryIndexCheckParameters) {
         oplogBatch.setSecondaryIndexCheckParameters(_info.secondaryIndexCheckParameters);
     }
+
+    if (MONGO_unlikely(hangBeforeAddingDBCheckBatchToOplog.shouldFail())) {
+        LOGV2(8831800, "Hanging dbCheck due to failpoint 'hangBeforeAddingDBCheckBatchToOplog'");
+        hangBeforeAddingDBCheckBatchToOplog.pauseWhileSet();
+    }
+
     batchStats->time = _logOp(opCtx,
                               _info.nss,
                               boost::none /* tenantIdForStartStop */,
@@ -987,7 +994,6 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
     }
     return Status::OK();
 }
-
 
 /**
  * Gets batch bounds for extra index keys check and stores the info in batchStats. Runs
@@ -1555,13 +1561,22 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         WriteConcernResult unused;
         auto status = waitForWriteConcern(opCtx, stats.time, _info.writeConcern, &unused);
         if (!status.isOK()) {
-            auto entry = dbCheckWarningHealthLogEntry(_info.nss,
-                                                      _info.uuid,
-                                                      "dbCheck failed waiting for writeConcern",
-                                                      ScopeEnum::Collection,
-                                                      OplogEntriesEnum::Batch,
-                                                      status);
+            BSONObjBuilder context;
+            if (stats.batchId) {
+                context.append("batchId", stats.batchId->toBSON());
+            }
+            context.append("lastKey", stats.lastKey);
+            // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors
+            // in one location.
+            auto entry = dbCheckErrorHealthLogEntry(_info.nss,
+                                                    _info.uuid,
+                                                    "dbCheck failed waiting for writeConcern",
+                                                    ScopeEnum::Collection,
+                                                    OplogEntriesEnum::Batch,
+                                                    status,
+                                                    context.done());
             HealthLogInterface::get(opCtx)->log(*entry);
+            return;
         }
 
         start = stats.lastKey;
@@ -1706,6 +1721,11 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
     DbCheckCollectionBatchStats result;
     result.logToHealthLog = _shouldLogBatch(batch);
     result.batchId = batch.getBatchId();
+
+    if (MONGO_unlikely(hangBeforeAddingDBCheckBatchToOplog.shouldFail())) {
+        LOGV2(8831801, "Hanging dbCheck due to failpoint 'hangBeforeAddingDBCheckBatchToOplog'");
+        hangBeforeAddingDBCheckBatchToOplog.pauseWhileSet();
+    }
     result.time = _logOp(opCtx,
                          _info.nss,
                          boost::none /* tenantIdForStartStop */,
