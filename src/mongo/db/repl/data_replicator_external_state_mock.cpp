@@ -60,12 +60,6 @@ public:
           _observer(observer),
           _externalState(externalState) {}
 
-    void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
-                                                  StorageInterface* storageInterface,
-                                                  ThreadPool* writerPool,
-                                                  const std::vector<OplogEntry>& ops,
-                                                  bool skipWritesToOplog) override;
-
 private:
     void _run(OplogBuffer* oplogBuffer) final {}
     StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx,
@@ -76,12 +70,6 @@ private:
     OplogApplier::Observer* const _observer;
     DataReplicatorExternalStateMock* const _externalState;
 };
-
-void OplogApplierMock::scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
-                                                                StorageInterface* storageInterface,
-                                                                ThreadPool* writerPool,
-                                                                const std::vector<OplogEntry>& ops,
-                                                                bool skipWritesToOplog) {}
 
 }  // namespace
 

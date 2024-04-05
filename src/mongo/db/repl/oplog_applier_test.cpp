@@ -73,11 +73,6 @@ public:
 
     void _run(OplogBuffer* oplogBuffer) final;
     StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx, std::vector<OplogEntry> ops) final;
-    void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
-                                                  StorageInterface* storageInterface,
-                                                  ThreadPool* writerPool,
-                                                  const std::vector<OplogEntry>& ops,
-                                                  bool skipWritesToOplog) override;
 };
 
 OplogApplierMock::OplogApplierMock(OplogBuffer* oplogBuffer)
@@ -92,12 +87,6 @@ StatusWith<OpTime> OplogApplierMock::_applyOplogBatch(OperationContext* opCtx,
                                                       std::vector<OplogEntry> ops) {
     return OpTime();
 }
-
-void OplogApplierMock::scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
-                                                                StorageInterface* storageInterface,
-                                                                ThreadPool* writerPool,
-                                                                const std::vector<OplogEntry>& ops,
-                                                                bool skipWritesToOplog) {}
 
 class OplogApplierTest : public ServiceContextTest {
 public:
