@@ -1,26 +1,35 @@
+
+
 export var CheckOrphansAreDeletedHelpers = (function() {
     function runCheck(mongosConn, shardConn, shardId) {
+        const assertCollectionEmptyWithTimeout = (database, collName) => {
+            let coll = database[collName];
+            let docs = [];
+            assert.soon(
+                () => {
+                    try {
+                        docs = coll.find().toArray();
+                        return docs.length === 0;
+                    } catch (e) {
+                        print('An exception occurred while checking documents in ' +
+                              coll.getFullName() +
+                              '. Will retry again unless timed out: ' + tojson(e));
+                    }
+                },
+                () => {
+                    return 'Timed out waiting for ' + coll.getFullName() + ' to be empty @ ' +
+                        shardId + ', last known contents: ' + tojson(docs);
+                },
+                10 * 60 * 1000,
+                1000);
+        };
+
         const configDB = shardConn.getDB('config');
 
-        let migrationCoordinatorDocs = [];
-        assert.soon(
-            () => {
-                try {
-                    migrationCoordinatorDocs = configDB.migrationCoordinators.find().toArray();
-                    return migrationCoordinatorDocs.length === 0;
-                } catch (exp) {
-                    // Primary purpose is to stabilize shell repl set monitor to recognize the
-                    // current primary.
-                    print('caught exception while checking migration coordinators, ' +
-                          'will retry again unless timed out: ' + tojson(exp));
-                }
-            },
-            () => {
-                return 'timed out waiting for migrationCoordinators to be empty @ ' + shardId +
-                    ', last known contents: ' + tojson(migrationCoordinatorDocs);
-            },
-            5 * 60 * 1000,
-            1000);
+        assertCollectionEmptyWithTimeout(configDB, 'migrationCoordinators');
+
+        assertCollectionEmptyWithTimeout(configDB, 'localReshardingOperations.recipient');
+        assertCollectionEmptyWithTimeout(configDB, 'localReshardingOperations.donor');
 
         mongosConn.getDB('config').collections.find().forEach(collDoc => {
             const ns = collDoc._id;
