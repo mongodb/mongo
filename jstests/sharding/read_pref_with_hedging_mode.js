@@ -25,11 +25,11 @@ assert.commandFailedWithCode(st.s.adminCommand({setParameter: 1, readHedgingMode
                              ErrorCodes.BadValue);
 
 // Test setting maxTimeMS for hedged reads.
-assert.commandWorked(st.s.adminCommand({setParameter: 1, maxTimeMSForHedgedReads: 100}));
+assert.commandWorked(st.s.adminCommand({setParameter: 1, maxTimeMSForHedgedReads: 1000}));
 
 // Test hedging with maxTimeMS.
 assert.commandWorked(st.s.getDB(dbName).runCommand(
-    {find: collName, maxTimeMS: 1000, $readPreference: {mode: "nearest", hedge: {}}}));
+    {find: collName, maxTimeMS: 10000, $readPreference: {mode: "nearest", hedge: {}}}));
 
 // Test hedging without maxTimeMS.
 assert.commandWorked(st.s.getDB(dbName).runCommand(
