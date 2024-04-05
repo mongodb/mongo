@@ -15,10 +15,7 @@ if len(sys.argv) < 2:
     print("Must provide at least 1 archive to sign.")
     sys.exit(1)
 
-supported_archs = {
-    'arm64': 'arm64',
-    'x86_64': 'amd64'
-}
+supported_archs = {'arm64': 'arm64', 'x86_64': 'amd64'}
 arch = platform.uname().machine.lower()
 
 if arch not in supported_archs:
@@ -51,22 +48,32 @@ for archive in archives:
 
     signing_cmd = [
         f'./{macnotary_name}/macnotary',
-        '-f', f'{unsigned_archive}',
-        '-m', f'{signing_type}',
-        '-u', 'https://dev.macos-notary.build.10gen.cc/api',
-        '-k', 'server',
-        '--entitlements', 'etc/macos_entitlements.xml',
+        '-f',
+        f'{unsigned_archive}',
+        '-m',
+        f'{signing_type}',
+        '-u',
+        'https://dev.macos-notary.build.10gen.cc/api',
+        '-k',
+        'server',
+        '--entitlements',
+        'etc/macos_entitlements.xml',
         '--verify',
-        '-b', 'server.mongodb.com',
-        '-i', f'{os.environ["task_id"]}',
-        '-c', f'{os.environ["project"]}',
-        '-o', f'{archive}'
+        '-b',
+        'server.mongodb.com',
+        '-i',
+        f'{os.environ["task_id"]}',
+        '-c',
+        f'{os.environ["project"]}',
+        '-o',
+        f'{archive}',
     ]
 
     signing_env = os.environ.copy()
     signing_env['MACOS_NOTARY_SECRET'] = os.environ["macos_notarization_secret"]
     print(' '.join(signing_cmd))
-    p = subprocess.Popen(signing_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=signing_env)
+    p = subprocess.Popen(signing_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         env=signing_env)
 
     print(f"Signing tool completed with exitcode: {p.returncode}")
     for line in iter(p.stdout.readline, b''):
@@ -81,4 +88,3 @@ for archive in archives:
 
 if failed:
     exit(1)
-

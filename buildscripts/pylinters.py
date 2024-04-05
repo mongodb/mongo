@@ -72,7 +72,7 @@ def is_interesting_file(file_name):
     directory_denylist = ["src/third_party"]
     if file_name in file_denylist or file_name.startswith(tuple(directory_denylist)):
         return False
-    directory_list = ["buildscripts", "pytests"]
+    directory_list = ["buildscripts", "evergreen"]
     return file_name.endswith(".py") and file_name.startswith(tuple(directory_list))
 
 

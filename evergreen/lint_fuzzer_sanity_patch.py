@@ -21,7 +21,9 @@ from buildscripts import simple_report
 
 def is_js_file(filename: str) -> bool:
     # return True
-    return (filename.startswith("jstests") or filename.startswith("src/mongo/db/modules/enterprise/jstests")) and filename.endswith(".js")
+    return (filename.startswith("jstests")
+            or filename.startswith("src/mongo/db/modules/enterprise/jstests")
+            ) and filename.endswith(".js")
 
 
 diffed_files = [Path(f) for f in gather_changed_files_for_lint(is_js_file)]
@@ -53,7 +55,8 @@ subprocess.run([
 
 def _parse_jsfile(jsfile: Path) -> simple_report.Result:
     """
-    Takes in a path to be attempted to parse
+    Takes in a path to be attempted to parse.
+    
     Returns what should be added to the report given to evergreen
     """
     print(f"Trying to parse jsfile {jsfile}")
