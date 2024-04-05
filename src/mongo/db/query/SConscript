@@ -445,6 +445,14 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='plan_cache_test_util',
+    source=[
+        'plan_cache_test_util.cpp',
+    ],
+    LIBDEPS=['$BUILD_DIR/mongo/db/query_exec'],
+)
+
 env.CppUnitTest(
     target='db_query_test',
     source=[
@@ -538,6 +546,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/catalog/catalog_impl',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/catalog/collection_query_info',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util',
@@ -564,6 +573,7 @@ env.CppUnitTest(
         'index_hint',
         'map_reduce_output_format',
         'optimizer/unit_test_utils',
+        'plan_cache_test_util',
         'query_common',
         'query_planner',
         'query_planner_test_fixture',
@@ -626,5 +636,19 @@ env.Benchmark(
     LIBDEPS=[
         'query_planner',
         'query_test_service_context',
+    ],
+)
+
+env.Benchmark(
+    target='plan_cache_classic_bm',
+    source=[
+        'plan_cache_classic_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_impl',
+        '$BUILD_DIR/mongo/db/query/canonical_query',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
+        'plan_cache_test_util',
     ],
 )

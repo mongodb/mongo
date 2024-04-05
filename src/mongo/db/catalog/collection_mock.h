@@ -382,7 +382,7 @@ public:
 
     StatusWith<int> checkMetaDataForIndex(const std::string& indexName,
                                           const BSONObj& spec) const override {
-        MONGO_UNREACHABLE;
+        return 1;
     }
 
     void updateTTLSetting(OperationContext* opCtx,
@@ -474,7 +474,7 @@ public:
     }
 
     bool isIndexReady(StringData indexName) const override {
-        MONGO_UNREACHABLE;
+        return true;
     }
 
     void replaceMetadata(OperationContext* opCtx,

@@ -68,6 +68,7 @@
 #include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_cache_key_info.h"
+#include "mongo/db/query/plan_cache_test_util.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -174,26 +175,6 @@ std::pair<IndexEntry, std::unique_ptr<WildcardProjection>> makeWildcardEntry(BSO
 //
 // Tests for CachedSolution.
 //
-
-/**
- * Utility function to create a PlanRankingDecision.
- */
-std::unique_ptr<plan_ranker::PlanRankingDecision> createDecision(size_t numPlans,
-                                                                 size_t works = 0) {
-    auto why = std::make_unique<plan_ranker::PlanRankingDecision>();
-    std::vector<std::unique_ptr<PlanStageStats>> stats;
-    for (size_t i = 0; i < numPlans; ++i) {
-        CommonStats common("COLLSCAN");
-        auto stat = std::make_unique<PlanStageStats>(common, STAGE_COLLSCAN);
-        stat->specific.reset(new CollectionScanStats());
-        stat->common.works = works;
-        stats.push_back(std::move(stat));
-        why->scores.push_back(0U);
-        why->candidateOrder.push_back(i);
-    }
-    why->getStats<PlanStageStats>().candidatePlanStats = std::move(stats);
-    return why;
-}
 
 std::unique_ptr<QuerySolution> getQuerySolutionForCaching() {
     std::unique_ptr<QuerySolution> qs = std::make_unique<QuerySolution>();
@@ -347,14 +328,6 @@ TEST_F(PlanCacheTest, ShouldNotCacheQueryTriviallyFalse) {
     std::unique_ptr<CanonicalQuery> cq(canonicalize("{$alwaysFalse: 1}"));
     ASSERT_TRUE(cq->getPrimaryMatchExpression()->isTriviallyFalse());
     assertShouldNotCacheQuery(*cq);
-}
-
-PlanCacheCallbacksImpl<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
-createCallback(const CanonicalQuery& cq, const plan_ranker::PlanRankingDecision& decision) {
-    auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
-        return plan_cache_util::buildDebugInfo(cq, decision.clone());
-    };
-    return {cq, std::move(buildDebugInfoFn)};
 }
 
 void addCacheEntryForShape(const CanonicalQuery& cq, PlanCache* planCache) {

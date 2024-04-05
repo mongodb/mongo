@@ -14,6 +14,7 @@ selector:
   - build/install/bin/plan_cache_key_encoding_bm*
   - build/install/bin/canonical_query_bm*
   - build/install/bin/query_planner_bm*
+  - build/install/bin/plan_cache_classic_bm*
 
 executor:
   config: {}
