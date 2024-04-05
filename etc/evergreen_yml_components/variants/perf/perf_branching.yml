@@ -97,6 +97,7 @@ buildvariants:
     cron: &cron_sunday_thursday "0 0 * * 0,4"
     modules: *perf_modules
     expansions:
+      mongodb_setup_release: 2022-11
       mongodb_setup: atlas
       canaries: none
       atlas_setup: M60-repl
@@ -139,6 +140,7 @@ buildvariants:
     cron: *cron_sunday_thursday
     modules: *perf_modules
     expansions:
+      mongodb_setup_release: 2022-11
       mongodb_setup: atlas
       canaries: none
       atlas_setup: M60-repl-azure
