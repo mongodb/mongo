@@ -158,8 +158,8 @@ public:
     void tearDown() override {
         LOGV2(6007905, "Clean up test resources");
         // Shutdown the executor before the context is deleted.
-        serverGlobalParams.clusterRole = _saved;
         resetManager();
+        serverGlobalParams.clusterRole = _saved;
     }
 
     void constructTaskExecutor() {
