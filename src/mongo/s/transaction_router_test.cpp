@@ -4560,6 +4560,56 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
 }
 
+TEST_F(TransactionRouterTestWithDefaultSession, CanDisallowSingleWriteShardCommit) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+    auto opCtx = operationContext();
+
+    auto txnRouter = TransactionRouter::get(opCtx);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(opCtx);
+
+    txnRouter.disallowSingleWriteShardCommit();
+
+    // One read shard and one write shard, which qualifies for the single write shard commit.
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, kDummyFindCmd);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard2, kDummyFindCmd);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
+
+    // Committing will use the 2PC protocol instead of sending commitTransaction directly.
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+    auto future = launchAsync([&] { txnRouter.commitTransaction(opCtx, boost::none); });
+    expectCoordinateCommitTransaction();
+    future.default_timed_get();
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       DisallowSingleWriteShardCommitDoesNotAffectOtherCommits) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+    auto opCtx = operationContext();
+
+    auto txnRouter = TransactionRouter::get(opCtx);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(opCtx);
+
+    txnRouter.disallowSingleWriteShardCommit();
+
+    // Two read shards which should trigger a read only commit.
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, kDummyFindCmd);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard2, kDummyFindCmd);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
+
+    // Committing will still send commitTransaction directly to each read only shard.
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+    auto future = launchAsync([&] { txnRouter.commitTransaction(opCtx, boost::none); });
+    expectCommitTransaction();
+    expectCommitTransaction();
+    future.default_timed_get();
+}
+
 TEST_F(TransactionRouterTestWithDefaultSession, CannotAdvanceTxnNumberWithActiveYielder) {
     TxnNumber txnNum{3};
     operationContext()->setTxnNumber(txnNum);

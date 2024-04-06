@@ -591,6 +591,10 @@ last-continuous:
     ticket: SERVER-86253
   - test_file: jstests/sharding/retryable_update_one_by_id_chunk_migration.js
     ticket: SERVER-89018
+  - test_file: jstests/sharding/move_chunk_update_shard_key_in_retryable_write.js
+    ticket: SERVER-84796
+  - test_file: jstests/sharding/retryable_upsert_single_write_shard.js
+    ticket: SERVER-84796
   suites: null
 last-lts:
   all:
@@ -1238,4 +1242,8 @@ last-lts:
     ticket: SERVER-86253
   - test_file: jstests/sharding/retryable_update_one_by_id_chunk_migration.js
     ticket: SERVER-89018
+  - test_file: jstests/sharding/move_chunk_update_shard_key_in_retryable_write.js
+    ticket: SERVER-84796
+  - test_file: jstests/sharding/retryable_upsert_single_write_shard.js
+    ticket: SERVER-84796
   suites: null

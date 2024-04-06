@@ -277,6 +277,15 @@ bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
                                      const WouldChangeOwningShardInfo& documentKeyChangeInfo,
                                      bool isTimeseriesViewRequest,
                                      bool fleCrudProcessed) {
+    // WouldChangeOwningShard writes are not fully retryable by design but are required to error if
+    // the client retries, which may not happen if the original shard commits a transaction without
+    // operations, which could happen for an upsert. To prevent this, we require using two phase
+    // commit. If we are not in a txn we will not have TransactionRouter available here.
+    // TODO: SERVER-89032 Investigate why is a TransactionRouter not available in some cases.
+    if (TransactionRouter::get(opCtx)) {
+        TransactionRouter::get(opCtx).disallowSingleWriteShardCommit();
+    }
+
     auto updatePreImage = documentKeyChangeInfo.getPreImage().getOwned();
     auto updatePostImage = documentKeyChangeInfo.getPostImage().getOwned();
 
