@@ -31,13 +31,11 @@
 
 #include <boost/optional/optional.hpp>
 #include <memory>
-#include <string>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
@@ -165,14 +163,18 @@ public:
      * Allows setting non-basic values (e.g. vector<string>)
      * via the {setParameter: ...} call.
      */
-    Status set(const BSONElement& newValueElement, const boost::optional<TenantId>&) final;
+    Status set(OperationContext* opCtx,
+               const BSONElement& newValueElement,
+               const boost::optional<TenantId>&) final;
 
     /**
      * Update the underlying value from a string.
      *
      * Typically invoked from commandline --setParameter usage.
      */
-    Status setFromString(StringData str, const boost::optional<TenantId>&) final;
+    Status setFromString(OperationContext* opCtx,
+                         StringData str,
+                         const boost::optional<TenantId>&) final;
 
 private:
     FeatureFlag& _storage;

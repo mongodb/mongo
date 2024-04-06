@@ -394,7 +394,7 @@ void TTLMonitor::set(ServiceContext* serviceCtx, std::unique_ptr<TTLMonitor> mon
     ttlMonitor = std::move(monitor);
 }
 
-Status TTLMonitor::onUpdateTTLMonitorSleepSeconds(int newSleepSeconds) {
+Status TTLMonitor::onUpdateTTLMonitorSleepSeconds(OperationContext* opCtx, int newSleepSeconds) {
     if (auto client = Client::getCurrent()) {
         if (auto ttlMonitor = TTLMonitor::get(client->getServiceContext())) {
             ttlMonitor->updateSleepSeconds(Seconds{newSleepSeconds});

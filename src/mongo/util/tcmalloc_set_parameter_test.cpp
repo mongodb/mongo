@@ -112,7 +112,7 @@ void runAppendTest(T param, StringData name, size_t value, const F& setTcmallocV
 template <typename T, typename F>
 void runSetTest(T param, StringData name, int value, const F& getTcmallocValue) {
     BSONElement emptyElem;
-    ASSERT_EQ(ErrorCodes::TypeMismatch, param.set(emptyElem, boost::none));
+    ASSERT_EQ(ErrorCodes::TypeMismatch, param.set(nullptr, emptyElem, boost::none));
 
     BSONObjBuilder bob;
     bob.appendNumber("a", -1);
@@ -120,10 +120,10 @@ void runSetTest(T param, StringData name, int value, const F& getTcmallocValue) 
     BSONObj obj = bob.obj();
 
     BSONElement negVal = obj.getField("a");
-    ASSERT_EQ(ErrorCodes::BadValue, param.set(negVal, boost::none));
+    ASSERT_EQ(ErrorCodes::BadValue, param.set(nullptr, negVal, boost::none));
 
     BSONElement val = obj.getField("b");
-    ASSERT_OK(param.set(val, boost::none));
+    ASSERT_OK(param.set(nullptr, val, boost::none));
 
     size_t actualVal = getTcmallocValue(name);
     ASSERT_EQ(actualVal, value);
@@ -144,10 +144,11 @@ void runSetFromStringTest(T param, StringData name, StringData value, const F& g
     int intVal;
     ASSERT_OK(NumberParser{}(value, &intVal));
 
-    ASSERT_EQ(ErrorCodes::FailedToParse, param.setFromString("", boost::none));
-    ASSERT_NOT_OK(param.setFromString("-1", boost::none));
-    ASSERT_EQ(ErrorCodes::Overflow, param.setFromString(std::string(359, '9'), boost::none));
-    ASSERT_OK(param.setFromString(value, boost::none));
+    ASSERT_EQ(ErrorCodes::FailedToParse, param.setFromString(nullptr, "", boost::none));
+    ASSERT_NOT_OK(param.setFromString(nullptr, "-1", boost::none));
+    ASSERT_EQ(ErrorCodes::Overflow,
+              param.setFromString(nullptr, std::string(359, '9'), boost::none));
+    ASSERT_OK(param.setFromString(nullptr, value, boost::none));
 
     size_t actualVal = getTcmallocValue(name);
     ASSERT_EQ(actualVal, intVal);
@@ -183,7 +184,7 @@ void runNoOpSetTest(T param, StringData name, const F& getTcmallocValue) {
     BSONObjBuilder bob;
     bob.appendNumber("a", 1);
     BSONElement val = bob.obj().getField("a");
-    ASSERT_OK(param.set(val, boost::none));
+    ASSERT_OK(param.set(nullptr, val, boost::none));
 }
 
 /**
@@ -200,7 +201,7 @@ template <typename T, typename F>
 void runNoOpSetFromStringTest(T param, StringData name, const F& getTcmallocValue) {
     ASSERT_THROWS_CODE(
         getTcmallocValue(name), ExceptionFor<ErrorCodes::InternalError>, ErrorCodes::InternalError);
-    ASSERT_OK(param.setFromString("1", boost::none));
+    ASSERT_OK(param.setFromString(nullptr, "1", boost::none));
 }
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE

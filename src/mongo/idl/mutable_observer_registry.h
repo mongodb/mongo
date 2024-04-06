@@ -34,9 +34,10 @@
 #include "mongo/base/status.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/functional.h"
-#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
+
+class OperationContext;
 
 /**
  * Offers a type which allows idl to register observers for server parameters at runtime.
@@ -56,7 +57,7 @@ public:
         _registry.emplace_back(std::move(observer));
     }
 
-    Status operator()(const T& t) {
+    Status operator()(OperationContext*, const T& t) {
         stdx::lock_guard lk(_mutex);
         for (const auto& observer : _registry) {
             observer(t);

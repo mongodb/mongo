@@ -144,7 +144,7 @@ ScopedSetRouterService::~ScopedSetRouterService() {
 
 }  // namespace
 
-Status userCacheInvalidationIntervalSecsNotify(const int& value) {
+Status userCacheInvalidationIntervalSecsNotify(OperationContext* opCtx, const int& value) {
     LOGV2_DEBUG(20259, 5, "setInterval", "newInterval"_attr = loadInterval());
     if (hasGlobalServiceContext()) {
         auto service = getGlobalServiceContext();

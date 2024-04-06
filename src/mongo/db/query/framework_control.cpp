@@ -55,7 +55,9 @@ void QueryFrameworkControl::append(OperationContext*,
     *b << name << QueryFrameworkControl_serializer(_data.get());
 }
 
-Status QueryFrameworkControl::setFromString(StringData value, const boost::optional<TenantId>&) {
+Status QueryFrameworkControl::setFromString(OperationContext* opCtx,
+                                            StringData value,
+                                            const boost::optional<TenantId>&) {
     auto newVal =
         QueryFrameworkControl_parse(IDLParserContext("internalQueryFrameworkControl"), value);
 

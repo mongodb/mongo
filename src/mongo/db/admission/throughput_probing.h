@@ -49,9 +49,15 @@ namespace mongo {
 namespace admission {
 namespace throughput_probing {
 
-Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
-Status validateMinConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
-Status validateMaxConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
+Status validateInitialConcurrency(OperationContext*,
+                                  int32_t concurrency,
+                                  const boost::optional<TenantId>&);
+Status validateMinConcurrency(OperationContext*,
+                              int32_t concurrency,
+                              const boost::optional<TenantId>&);
+Status validateMaxConcurrency(OperationContext*,
+                              int32_t concurrency,
+                              const boost::optional<TenantId>&);
 
 }  // namespace throughput_probing
 

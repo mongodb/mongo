@@ -27,15 +27,9 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/net/ssl_parameters.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/config.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
@@ -95,7 +89,9 @@ void TLSModeServerParameter::append(OperationContext*,
         SSLParams::tlsModeFormat(static_cast<SSLParams::SSLModes>(sslGlobalParams.sslMode.load())));
 }
 
-Status SSLModeServerParameter::setFromString(StringData strMode, const boost::optional<TenantId>&) {
+Status SSLModeServerParameter::setFromString(OperationContext* opCtx,
+                                             StringData strMode,
+                                             const boost::optional<TenantId>&) {
     std::call_once(warnForSSLMode, [] {
         LOGV2_WARNING(
             23804, "Use of deprecated server parameter 'sslMode', please use 'tlsMode' instead.");
@@ -110,7 +106,9 @@ Status SSLModeServerParameter::setFromString(StringData strMode, const boost::op
     return Status::OK();
 }
 
-Status TLSModeServerParameter::setFromString(StringData strMode, const boost::optional<TenantId>&) {
+Status TLSModeServerParameter::setFromString(OperationContext* opCtx,
+                                             StringData strMode,
+                                             const boost::optional<TenantId>&) {
     auto swNewMode = checkTLSModeTransition(
         SSLParams::tlsModeFormat, SSLParams::tlsModeParse, "tlsMode", strMode);
     if (!swNewMode.isOK()) {
@@ -177,7 +175,8 @@ void TLSCATrustsSetParameter::append(OperationContext*,
  *   { role: "read", db: "" }      // May grant 'read' role on any DB.
  *   { role: "", db: "" }          // May grant any role on any DB.
  */
-Status TLSCATrustsSetParameter::set(const BSONElement& element,
+Status TLSCATrustsSetParameter::set(OperationContext* opCtx,
+                                    const BSONElement& element,
                                     const boost::optional<TenantId>&) try {
     if ((element.type() != Object) || !element.Obj().couldBeArray()) {
         return {ErrorCodes::BadValue, "Value must be an array"};
@@ -207,9 +206,10 @@ Status TLSCATrustsSetParameter::set(const BSONElement& element,
     return exceptionToStatus();
 }
 
-Status TLSCATrustsSetParameter::setFromString(StringData json,
+Status TLSCATrustsSetParameter::setFromString(OperationContext* opCtx,
+                                              StringData json,
                                               const boost::optional<TenantId>&) try {
-    return set(BSON("" << fromjson(json)).firstElement(), boost::none);
+    return set(opCtx, BSON("" << fromjson(json)).firstElement(), boost::none);
 } catch (...) {
     return exceptionToStatus();
 }
@@ -231,7 +231,8 @@ void ClusterAuthX509OverrideParameter::append(OperationContext* opCtx,
     subObjBuilder.doneFast();
 }
 
-Status ClusterAuthX509OverrideParameter::set(const BSONElement& element,
+Status ClusterAuthX509OverrideParameter::set(OperationContext* opCtx,
+                                             const BSONElement& element,
                                              const boost::optional<TenantId>&) try {
     if ((element.type() != Object)) {
         return {ErrorCodes::BadValue, "Value must be an object"};
@@ -259,16 +260,18 @@ Status ClusterAuthX509OverrideParameter::set(const BSONElement& element,
     return exceptionToStatus();
 }
 
-Status ClusterAuthX509OverrideParameter::setFromString(StringData json,
+Status ClusterAuthX509OverrideParameter::setFromString(OperationContext* opCtx,
+                                                       StringData json,
                                                        const boost::optional<TenantId>&) try {
-    return set(BSON("" << fromjson(json)).firstElement(), boost::none);
+    return set(opCtx, BSON("" << fromjson(json)).firstElement(), boost::none);
 } catch (...) {
     return exceptionToStatus();
 }
 
 }  // namespace mongo
 
-mongo::Status mongo::validateOpensslCipherConfig(const std::string&,
+mongo::Status mongo::validateOpensslCipherConfig(OperationContext* opCtx,
+                                                 const std::string&,
                                                  const boost::optional<TenantId>&) {
     if (sslGlobalParams.sslCipherConfig != kSSLCipherConfigDefault) {
         return {ErrorCodes::BadValue,
@@ -284,7 +287,8 @@ mongo::Status mongo::validateOpensslCipherConfig(const std::string&,
     return Status::OK();
 }
 
-mongo::Status mongo::validateDisableNonTLSConnectionLogging(const bool&,
+mongo::Status mongo::validateDisableNonTLSConnectionLogging(OperationContext* opCtx,
+                                                            const bool&,
                                                             const boost::optional<TenantId>&) {
     if (sslGlobalParams.disableNonSSLConnectionLoggingSet) {
         return {ErrorCodes::BadValue,
@@ -294,7 +298,7 @@ mongo::Status mongo::validateDisableNonTLSConnectionLogging(const bool&,
     return Status::OK();
 }
 
-mongo::Status mongo::onUpdateDisableNonTLSConnectionLogging(const bool&) {
+mongo::Status mongo::onUpdateDisableNonTLSConnectionLogging(OperationContext*, const bool&) {
     // disableNonSSLConnectionLogging is a write-once setting.
     // Once we've updated it, we're not allowed to specify the set-param again.
     // Record that update in a second bool value.

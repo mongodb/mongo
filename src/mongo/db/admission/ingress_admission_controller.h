@@ -69,7 +69,7 @@ public:
      * Called automatically when the value of the server parameter that controls the ticket pool
      * size changes.
      */
-    static Status onUpdateTicketPoolSize(int newValue);
+    static Status onUpdateTicketPoolSize(OperationContext* opCtx, int newValue);
 
     /**
      * Initialize the IngressAdmissionController after the ServiceContext is constructed. This will

@@ -29,14 +29,15 @@
 
 #include "mongo/db/query/search/search_index_options.h"
 
-#include "mongo/db/query/search/search_index_options_gen.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
 SearchIndexParams globalSearchIndexParams;
 
-Status SearchIndexParams::onValidateHost(StringData str, const boost::optional<TenantId>&) {
+Status SearchIndexParams::onValidateHost(OperationContext* opCtx,
+                                         StringData str,
+                                         const boost::optional<TenantId>&) {
     // Unset value is OK
     if (str.empty()) {
         return Status::OK();

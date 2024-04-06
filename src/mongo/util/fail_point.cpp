@@ -371,7 +371,9 @@ void FailPointServerParameter::append(OperationContext* opCtx,
     *b << name << _data->toBSON();
 }
 
-Status FailPointServerParameter::setFromString(StringData str, const boost::optional<TenantId>&) {
+Status FailPointServerParameter::setFromString(OperationContext* opCtx,
+                                               StringData str,
+                                               const boost::optional<TenantId>&) {
     BSONObj failPointOptions;
     try {
         failPointOptions = fromjson(str);

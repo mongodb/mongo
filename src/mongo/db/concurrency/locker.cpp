@@ -37,7 +37,7 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/new.h"
 #include "mongo/util/background.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/testing_proctor.h"

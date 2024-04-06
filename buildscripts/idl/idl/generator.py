@@ -1006,21 +1006,24 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             )
             if cls.override_set:
                 self._writer.write_line(
-                    'Status set(const BSONElement&, const boost::optional<TenantId>&) final;')
+                    'Status set(OperationContext*, const BSONElement&, const boost::optional<TenantId>&) final;'
+                )
             self._writer.write_line(
-                'Status setFromString(StringData, const boost::optional<TenantId>&) final;')
+                'Status setFromString(OperationContext*, StringData, const boost::optional<TenantId>&) final;'
+            )
 
             # If override_validate is set, provide an override definition. Otherwise, it will inherit
             # from the base ServerParameter implementation.
             if cls.override_validate:
                 self._writer.write_line(
-                    'Status validate(const BSONElement&, const boost::optional<TenantId>& tenantId) const final;'
+                    'Status validate(OperationContext*, const BSONElement&, const boost::optional<TenantId>& tenantId) const final;'
                 )
 
             # The reset() and getClusterParameterTime() methods must be custom implemented for
             # specialized cluster server parameters. Provide the declarations here.
             if scp.set_at == 'ServerParameterType::kClusterWide':
-                self._writer.write_line('Status reset(const boost::optional<TenantId>&) final;')
+                self._writer.write_line(
+                    'Status reset(OperationContext*, const boost::optional<TenantId>&) final;')
                 self._writer.write_line(
                     'LogicalTime getClusterParameterTime(const boost::optional<TenantId>&) const final;'
                 )
@@ -2863,7 +2866,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # Specialized cluster parameters should also provide the implementation of setFromString().
         if is_cluster_param:
             with self._block(
-                    'Status %s::setFromString(StringData str, const boost::optional<TenantId>& tenantId) {'
+                    'Status %s::setFromString(OperationContext* opCtx, StringData str, const boost::optional<TenantId>& tenantId) {'
                     % (cls.name), '}'):
                 self._writer.write_line(
                     'return {ErrorCodes::BadValue, "setFromString should never be used with cluster server parameters"};'

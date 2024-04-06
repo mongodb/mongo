@@ -29,7 +29,6 @@
 
 
 #include <cstdint>
-#include <mutex>
 #include <string>
 #include <utility>
 #include <variant>
@@ -47,9 +46,7 @@
 #include "mongo/db/change_stream_options_parameter_gen.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -100,7 +97,8 @@ void ChangeStreamOptionsParameter::append(OperationContext* opCtx,
     bob->appendElementsUnique(changeStreamOptionsManager.getOptions(opCtx).toBSON());
 }
 
-Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement,
+Status ChangeStreamOptionsParameter::set(OperationContext* opCtx,
+                                         const BSONElement& newValueElement,
                                          const boost::optional<TenantId>& tenantId) {
     try {
         ChangeStreamOptionsManager& changeStreamOptionsManager =
@@ -116,7 +114,8 @@ Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement,
     }
 }
 
-Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement,
+Status ChangeStreamOptionsParameter::validate(OperationContext* opCtx,
+                                              const BSONElement& newValueElement,
                                               const boost::optional<TenantId>& tenantId) const {
     try {
         BSONObj changeStreamOptionsObj = newValueElement.Obj();
@@ -171,7 +170,8 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
     }
 }
 
-Status ChangeStreamOptionsParameter::reset(const boost::optional<TenantId>& tenantId) {
+Status ChangeStreamOptionsParameter::reset(OperationContext* opCtx,
+                                           const boost::optional<TenantId>& tenantId) {
     // Replace the current changeStreamOptions with a default-constructed one, which should
     // automatically set preAndPostImages.expirationSeconds to 'off' by default.
     ChangeStreamOptionsManager& changeStreamOptionsManager =

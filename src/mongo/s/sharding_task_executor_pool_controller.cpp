@@ -75,7 +75,8 @@ bool isConfigServer(const ShardRegistry* sr, const HostAndPort& peer) {
 
 }  // namespace
 
-Status ShardingTaskExecutorPoolController::validateHostTimeout(const int& hostTimeoutMS,
+Status ShardingTaskExecutorPoolController::validateHostTimeout(OperationContext* opCtx,
+                                                               const int& hostTimeoutMS,
                                                                const boost::optional<TenantId>&) {
     auto toRefreshTimeoutMS = gParameters.toRefreshTimeoutMS.load();
     auto pendingTimeoutMS = gParameters.pendingTimeoutMS.load();
@@ -91,7 +92,7 @@ Status ShardingTaskExecutorPoolController::validateHostTimeout(const int& hostTi
 }
 
 Status ShardingTaskExecutorPoolController::validatePendingTimeout(
-    const int& pendingTimeoutMS, const boost::optional<TenantId>&) {
+    OperationContext* opCtx, const int& pendingTimeoutMS, const boost::optional<TenantId>&) {
     auto toRefreshTimeoutMS = gParameters.toRefreshTimeoutMS.load();
     if (pendingTimeoutMS < toRefreshTimeoutMS) {
         return Status::OK();
@@ -103,7 +104,8 @@ Status ShardingTaskExecutorPoolController::validatePendingTimeout(
     return Status(ErrorCodes::BadValue, msg);
 }
 
-Status ShardingTaskExecutorPoolController::onUpdateMatchingStrategy(const std::string& str) {
+Status ShardingTaskExecutorPoolController::onUpdateMatchingStrategy(OperationContext* opCtx,
+                                                                    const std::string& str) {
     if (str == "automatic") {
         if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
             gParameters.matchingStrategy.store(MatchingStrategy::kMatchPrimaryNode);

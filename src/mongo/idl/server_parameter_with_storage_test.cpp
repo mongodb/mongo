@@ -86,11 +86,11 @@ void doStorageTest(StringData name,
             uassertStatusOK(idl_server_parameter_detail::coerceFromString<element_type>(v));
 
         // setFromString() API.
-        ASSERT_OK(param.setFromString(v, boost::none));
+        ASSERT_OK(param.setFromString(nullptr, v, boost::none));
         ASSERT_EQ_OR_NAN(param.getValue(boost::none), typedVal);
 
         // set() API.
-        ASSERT_OK(param.set(BSON("" << typedVal).firstElement(), boost::none));
+        ASSERT_OK(param.set(nullptr, BSON("" << typedVal).firstElement(), boost::none));
 
         // append() API.
         BSONObjBuilder b;
@@ -100,42 +100,45 @@ void doStorageTest(StringData name,
         ASSERT_EQ_OR_NAN(param.getValue(boost::none), exp);
     }
     for (const auto& v : invalid) {
-        ASSERT_NOT_OK(param.setFromString(v, boost::none));
+        ASSERT_NOT_OK(param.setFromString(nullptr, v, boost::none));
         ASSERT_NOT_OK(idl_server_parameter_detail::coerceFromString<element_type>(v));
     }
 
     // Check onUpdate is invoked.
     size_t count = 0;
-    param.setOnUpdate([&count](const element_type&) {
+    param.setOnUpdate([&count](OperationContext*, const element_type&) {
         ++count;
         return Status::OK();
     });
     for (size_t i = 0; i < valid.size(); ++i) {
         ASSERT_EQ(count, i);
-        ASSERT_OK(param.setFromString(valid[i], boost::none));
+        ASSERT_OK(param.setFromString(nullptr, valid[i], boost::none));
     }
     ASSERT_EQ(count, valid.size());
 
     // Check failed onUpdate does not block value being set.
-    param.setOnUpdate([](const element_type&) { return Status(ErrorCodes::BadValue, "Go away"); });
+    param.setOnUpdate([](OperationContext*, const element_type&) {
+        return Status(ErrorCodes::BadValue, "Go away");
+    });
     for (const auto& v : valid) {
         auto typedVal =
             uassertStatusOK(idl_server_parameter_detail::coerceFromString<element_type>(v));
-        ASSERT_NOT_OK(param.setFromString(v, boost::none));
+        ASSERT_NOT_OK(param.setFromString(nullptr, v, boost::none));
         ASSERT_EQ_OR_NAN(param.getValue(boost::none), typedVal);
     }
 
     // Clear onUpdate for next test.
     param.setOnUpdate(nullptr);
-    ASSERT_OK(param.setFromString(valid[0], boost::none));
+    ASSERT_OK(param.setFromString(nullptr, valid[0], boost::none));
 
     // Check validation occurs and DOES block value being set.
     auto current = param.getValue(boost::none);
-    param.addValidator([](const element_type&, const boost::optional<TenantId>&) {
-        return Status(ErrorCodes::BadValue, "Go away");
-    });
+    param.addValidator(
+        [](OperationContext*, const element_type&, const boost::optional<TenantId>&) {
+            return Status(ErrorCodes::BadValue, "Go away");
+        });
     for (const auto& v : valid) {
-        ASSERT_NOT_OK(param.setFromString(v, boost::none));
+        ASSERT_NOT_OK(param.setFromString(nullptr, v, boost::none));
         ASSERT_EQ_OR_NAN(current, param.getValue(boost::none));
     }
 }
@@ -186,14 +189,14 @@ TEST(ServerParameterWithStorage, BoundsTest) {
     IDLServerParameterWithStorage<SPT::kStartupOnly, int> param("BoundsTest", val);
 
     param.addBound<GT>(10);
-    auto status = param.setFromString("5", boost::none);
+    auto status = param.setFromString(nullptr, "5", boost::none);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.reason(), "Invalid value for parameter BoundsTest: 5 is not greater than 10");
-    ASSERT_OK(param.setFromString("15", boost::none));
+    ASSERT_OK(param.setFromString(nullptr, "15", boost::none));
 
     param.addBound<LT>(20);
-    ASSERT_OK(param.setValue(15, boost::none));
-    status = param.setValue(25, boost::none);
+    ASSERT_OK(param.setValue(nullptr, 15, boost::none));
+    status = param.setValue(nullptr, 25, boost::none);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.reason(), "Invalid value for parameter BoundsTest: 25 is not less than 20");
 }
@@ -211,14 +214,14 @@ TEST(IDLServerParameterWithStorage, stdIntDeclared) {
     ASSERT_EQ(test::gStdIntDeclared.load(), 42);
 
     auto* stdIntDeclared = getNodeServerParameter("stdIntDeclared");
-    ASSERT_OK(stdIntDeclared->setFromString("999", boost::none));
+    ASSERT_OK(stdIntDeclared->setFromString(nullptr, "999", boost::none));
     ASSERT_EQ(test::gStdIntDeclared.load(), 999);
-    ASSERT_NOT_OK(stdIntDeclared->setFromString("1000", boost::none));
-    ASSERT_NOT_OK(stdIntDeclared->setFromString("-1", boost::none));
-    ASSERT_NOT_OK(stdIntDeclared->setFromString("alpha", boost::none));
+    ASSERT_NOT_OK(stdIntDeclared->setFromString(nullptr, "1000", boost::none));
+    ASSERT_NOT_OK(stdIntDeclared->setFromString(nullptr, "-1", boost::none));
+    ASSERT_NOT_OK(stdIntDeclared->setFromString(nullptr, "alpha", boost::none));
 
     // Reset to default.
-    ASSERT_OK(stdIntDeclared->reset(boost::none));
+    ASSERT_OK(stdIntDeclared->reset(nullptr, boost::none));
     ASSERT_EQ(test::gStdIntDeclared.load(), 42);
 }
 
@@ -229,17 +232,17 @@ TEST(IDLServerParameterWithStorage, stdIntPreallocated) {
     ASSERT_EQ(test::gStdIntPreallocatedUpdateCount.load(), 1);
 
     auto* stdIntPreallocated = getNodeServerParameter("stdIntPreallocated");
-    ASSERT_OK(stdIntPreallocated->setFromString("41", boost::none));
+    ASSERT_OK(stdIntPreallocated->setFromString(nullptr, "41", boost::none));
     ASSERT_EQ(test::gStdIntPreallocated.load(), 41);
     ASSERT_EQ(test::gStdIntPreallocatedUpdateCount.load(), 2);
 
-    ASSERT_NOT_OK(stdIntPreallocated->setFromString("42", boost::none));
-    ASSERT_NOT_OK(stdIntPreallocated->setFromString("-1", boost::none));
-    ASSERT_NOT_OK(stdIntPreallocated->setFromString("alpha", boost::none));
+    ASSERT_NOT_OK(stdIntPreallocated->setFromString(nullptr, "42", boost::none));
+    ASSERT_NOT_OK(stdIntPreallocated->setFromString(nullptr, "-1", boost::none));
+    ASSERT_NOT_OK(stdIntPreallocated->setFromString(nullptr, "alpha", boost::none));
     ASSERT_EQ(test::gStdIntPreallocatedUpdateCount.load(), 2);
 
     // Reset to default.
-    ASSERT_OK(stdIntPreallocated->reset(boost::none));
+    ASSERT_OK(stdIntPreallocated->reset(nullptr, boost::none));
     ASSERT_EQ(test::gStdIntPreallocated.load(), 11);
     ASSERT_EQ(test::gStdIntPreallocatedUpdateCount.load(), 3);
 }
@@ -248,11 +251,11 @@ TEST(IDLServerParameterWithStorage, startupString) {
     auto* sp = getNodeServerParameter("startupString");
     ASSERT_EQ(sp->allowedToChangeAtStartup(), true);
     ASSERT_EQ(sp->allowedToChangeAtRuntime(), false);
-    ASSERT_OK(sp->setFromString("New Value", boost::none));
+    ASSERT_OK(sp->setFromString(nullptr, "New Value", boost::none));
     ASSERT_EQ(test::gStartupString, "New Value");
 
     // Reset to default.
-    ASSERT_OK(sp->reset(boost::none));
+    ASSERT_OK(sp->reset(nullptr, boost::none));
     ASSERT_EQ(test::gStartupString, "");
 }
 
@@ -260,17 +263,17 @@ TEST(IDLServerParameterWithStorage, runtimeBoostDouble) {
     auto* sp = getNodeServerParameter("runtimeBoostDouble");
     ASSERT_EQ(sp->allowedToChangeAtStartup(), false);
     ASSERT_EQ(sp->allowedToChangeAtRuntime(), true);
-    ASSERT_OK(sp->setFromString("1.0", boost::none));
+    ASSERT_OK(sp->setFromString(nullptr, "1.0", boost::none));
     ASSERT_EQ(test::gRuntimeBoostDouble.get(), 1.0);
 
     // Reset to default.
-    ASSERT_OK(sp->reset(boost::none));
+    ASSERT_OK(sp->reset(nullptr, boost::none));
     ASSERT_EQ(test::gRuntimeBoostDouble.get(), 0.0);
 }
 
 TEST(IDLServerParameterWithStorage, startupStringRedacted) {
     auto* sp = getNodeServerParameter("startupStringRedacted");
-    ASSERT_OK(sp->setFromString("Hello World", boost::none));
+    ASSERT_OK(sp->setFromString(nullptr, "Hello World", boost::none));
     ASSERT_EQ(test::gStartupStringRedacted, "Hello World");
 
     BSONObjBuilder b;
@@ -280,7 +283,7 @@ TEST(IDLServerParameterWithStorage, startupStringRedacted) {
     ASSERT_EQ(obj[sp->name()].String(), "###");
 
     // Reset to default.
-    ASSERT_OK(sp->reset(boost::none));
+    ASSERT_OK(sp->reset(nullptr, boost::none));
     ASSERT_EQ(test::gStartupStringRedacted, "");
 }
 
@@ -289,12 +292,12 @@ TEST(IDLServerParameterWithStorage, startupIntWithExpressions) {
         getNodeServerParameter("startupIntWithExpressions"));
     ASSERT_EQ(test::gStartupIntWithExpressions, test::kStartupIntWithExpressionsDefault);
 
-    ASSERT_NOT_OK(sp->setValue(test::kStartupIntWithExpressionsMinimum - 1, boost::none));
-    ASSERT_OK(sp->setValue(test::kStartupIntWithExpressionsMinimum, boost::none));
+    ASSERT_NOT_OK(sp->setValue(nullptr, test::kStartupIntWithExpressionsMinimum - 1, boost::none));
+    ASSERT_OK(sp->setValue(nullptr, test::kStartupIntWithExpressionsMinimum, boost::none));
     ASSERT_EQ(test::gStartupIntWithExpressions, test::kStartupIntWithExpressionsMinimum);
 
-    ASSERT_NOT_OK(sp->setValue(test::kStartupIntWithExpressionsMaximum + 1, boost::none));
-    ASSERT_OK(sp->setValue(test::kStartupIntWithExpressionsMaximum, boost::none));
+    ASSERT_NOT_OK(sp->setValue(nullptr, test::kStartupIntWithExpressionsMaximum + 1, boost::none));
+    ASSERT_OK(sp->setValue(nullptr, test::kStartupIntWithExpressionsMaximum, boost::none));
     ASSERT_EQ(test::gStartupIntWithExpressions, test::kStartupIntWithExpressionsMaximum);
 }
 
@@ -309,7 +312,7 @@ TEST(IDLServerParameterWithStorage, exportedDefaults) {
 TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
     // Test int
     auto* stdIntDeclared = getNodeServerParameter("stdIntDeclared");
-    ASSERT_OK(stdIntDeclared->setFromString("42", boost::none));
+    ASSERT_OK(stdIntDeclared->setFromString(nullptr, "42", boost::none));
     ASSERT_EQ(test::gStdIntDeclared.load(), 42);
     {
         RAIIServerParameterControllerForTest controller("stdIntDeclared", 10);
@@ -319,7 +322,7 @@ TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
 
     // Test bool
     auto* uglyComplicated = getNodeServerParameter("ugly complicated-name.sp");
-    ASSERT_OK(uglyComplicated->setFromString("false", boost::none));
+    ASSERT_OK(uglyComplicated->setFromString(nullptr, "false", boost::none));
     ASSERT_EQ(test::gUglyComplicatedNameSp, false);
     {
         RAIIServerParameterControllerForTest controller("ugly complicated-name.sp", true);
@@ -330,7 +333,7 @@ TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
     // Test string
     auto* startupString = getNodeServerParameter("startupString");
     const auto coolStartupString = "Cool startup string";
-    ASSERT_OK(startupString->setFromString(coolStartupString, boost::none));
+    ASSERT_OK(startupString->setFromString(nullptr, coolStartupString, boost::none));
     ASSERT_EQ(test::gStartupString, coolStartupString);
     {
         const auto badStartupString = "Bad startup string";
@@ -368,7 +371,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     updatedParam.setClusterServerParameter(baseCSP);
     updatedParam.setPreAndPostImages(updatedPrePostImgs);
     updatedParam.setTestStringField("testString");
-    ASSERT_OK(clusterParam->ServerParameter::set(updatedParam.toBSON(), boost::none));
+    ASSERT_OK(clusterParam->ServerParameter::set(nullptr, updatedParam.toBSON(), boost::none));
 
     retrievedParam = clusterParam->getValue(boost::none);
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 40);
@@ -390,10 +393,10 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     }
 
     // setFromString should fail for cluster server parameters.
-    ASSERT_NOT_OK(clusterParam->setFromString("", boost::none));
+    ASSERT_NOT_OK(clusterParam->setFromString(nullptr, "", boost::none));
 
     // Reset the parameter and check that it now has its default value.
-    ASSERT_OK(clusterParam->reset(boost::none));
+    ASSERT_OK(clusterParam->reset(nullptr, boost::none));
     retrievedParam = clusterParam->getValue(boost::none);
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 30);
     ASSERT_EQ(retrievedParam.getTestStringField(), "");
@@ -430,7 +433,8 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     updatedParam.setPreAndPostImages(updatedPrePostImgs);
     updatedParam.setTestStringField("newTestString");
     updateTime = LogicalTime(Timestamp(Date_t::now()));
-    ASSERT_NOT_OK(clusterParam->ServerParameter::validate(updatedParam.toBSON(), boost::none));
+    ASSERT_NOT_OK(
+        clusterParam->ServerParameter::validate(nullptr, updatedParam.toBSON(), boost::none));
     retrievedParam = clusterParam->getValue(boost::none);
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 35);
     ASSERT_EQ(retrievedParam.getTestStringField(), "default");
@@ -448,7 +452,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     ASSERT_EQ(retrievedParam2.getPreAndPostImages().getExpireAfterSeconds(), 35);
 
     // Setting for one tenant should not change any other tenants.
-    ASSERT_OK(clusterParam->ServerParameter::set(newDefaultParam.toBSON(), tenant1));
+    ASSERT_OK(clusterParam->ServerParameter::set(nullptr, newDefaultParam.toBSON(), tenant1));
     retrievedParam = clusterParam->getValue(boost::none);
     retrievedParam1 = clusterParam->getValue(tenant1);
     retrievedParam2 = clusterParam->getValue(tenant2);
@@ -458,7 +462,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
 
     updatedPrePostImgs.setExpireAfterSeconds(40);
     updatedParam.setPreAndPostImages(updatedPrePostImgs);
-    ASSERT_OK(clusterParam->ServerParameter::set(updatedParam.toBSON(), boost::none));
+    ASSERT_OK(clusterParam->ServerParameter::set(nullptr, updatedParam.toBSON(), boost::none));
     retrievedParam = clusterParam->getValue(boost::none);
     retrievedParam1 = clusterParam->getValue(tenant1);
     retrievedParam2 = clusterParam->getValue(tenant2);
@@ -467,7 +471,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     ASSERT_EQ(retrievedParam2.getPreAndPostImages().getExpireAfterSeconds(), 35);
 
     // Resetting one tenant should not change any other tenants.
-    ASSERT_OK(clusterParam->reset(tenant1));
+    ASSERT_OK(clusterParam->reset(nullptr, tenant1));
     retrievedParam = clusterParam->getValue(boost::none);
     retrievedParam1 = clusterParam->getValue(tenant1);
     retrievedParam2 = clusterParam->getValue(tenant2);
@@ -476,7 +480,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     ASSERT_EQ(retrievedParam2.getPreAndPostImages().getExpireAfterSeconds(), 35);
 
     // Append should append only the tenant specified.
-    ASSERT_OK(clusterParam->ServerParameter::set(newDefaultParam.toBSON(), tenant2));
+    ASSERT_OK(clusterParam->ServerParameter::set(nullptr, newDefaultParam.toBSON(), tenant2));
     {
         BSONObjBuilder b;
         clusterParam->append(nullptr, &b, clusterParam->name(), boost::none);

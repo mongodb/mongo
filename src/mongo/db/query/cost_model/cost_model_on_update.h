@@ -46,7 +46,7 @@ Status updateCostCoefficients();
  * On-update hook to update the cost coefficients in 'CostModelManager' when cost coefficients are
  * updated.
  */
-constexpr inline auto updateCostCoefficientsOnUpdate = [](auto&&) {
+constexpr inline auto updateCostCoefficientsOnUpdate = [](OperationContext* opCtx, auto&&) {
     auto status = updateCostCoefficients();
     if (status != Status::OK()) {
         return status;

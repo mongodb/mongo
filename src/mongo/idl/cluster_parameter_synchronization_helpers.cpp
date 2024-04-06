@@ -65,7 +65,7 @@ void validateParameter(OperationContext* opCtx,
     auto name = nameElem.valueStringData();
     auto* sp = ServerParameterSet::getClusterParameterSet()->getIfExists(name);
     uassert(ErrorCodes::OperationFailed, "Validate on unknown cluster parameter", sp);
-    uassertStatusOK(sp->validate(doc, tenantId));
+    uassertStatusOK(sp->validate(opCtx, doc, tenantId));
 }
 
 void updateParameter(OperationContext* opCtx,
@@ -107,13 +107,13 @@ void updateParameter(OperationContext* opCtx,
         return;
     }
 
-    uassertStatusOK(sp->validate(doc, tenantId));
+    uassertStatusOK(sp->validate(opCtx, doc, tenantId));
 
     BSONObjBuilder oldValueBob;
     sp->append(opCtx, &oldValueBob, name.toString(), tenantId);
     audit::logUpdateCachedClusterParameter(opCtx->getClient(), oldValueBob.obj(), doc, tenantId);
 
-    uassertStatusOK(sp->set(doc, tenantId));
+    uassertStatusOK(sp->set(opCtx, doc, tenantId));
 }
 
 void clearParameter(OperationContext* opCtx,
@@ -127,7 +127,7 @@ void clearParameter(OperationContext* opCtx,
     BSONObjBuilder oldValueBob;
     sp->append(opCtx, &oldValueBob, sp->name(), tenantId);
 
-    uassertStatusOK(sp->reset(tenantId));
+    uassertStatusOK(sp->reset(opCtx, tenantId));
 
     BSONObjBuilder newValueBob;
     sp->append(opCtx, &newValueBob, sp->name(), tenantId);

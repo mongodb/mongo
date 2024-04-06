@@ -37,8 +37,10 @@
 #include "mongo/db/tenant_id.h"
 
 namespace mongo {
-
-Status validateTrafficRecordDestination(const std::string& path, const boost::optional<TenantId>&);
+class OperationContext;
+Status validateTrafficRecordDestination(OperationContext* opCtx,
+                                        const std::string& path,
+                                        const boost::optional<TenantId>&);
 
 
 }  // namespace mongo

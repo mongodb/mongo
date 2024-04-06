@@ -276,7 +276,7 @@ protected:
 
         auto oldSettings = changeStreamsParam->getValue(tenantId);
         oldSettings.setExpireAfterSeconds(seconds.count());
-        changeStreamsParam->setValue(oldSettings, tenantId).ignore();
+        changeStreamsParam->setValue(nullptr, oldSettings, tenantId).ignore();
     }
 
     RecordId generatePreImageRecordId(Timestamp timestamp) {

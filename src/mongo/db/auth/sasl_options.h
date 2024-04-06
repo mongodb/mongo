@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+class OperationContext;
+
 namespace optionenvironment {
 class OptionSection;
 class Environment;
@@ -60,28 +62,28 @@ struct SASLGlobalParams {
 
     SASLGlobalParams();
 
-    static Status onSetAuthenticationMechanism(const std::vector<std::string>&) {
+    static Status onSetAuthenticationMechanism(OperationContext*, const std::vector<std::string>&) {
         saslGlobalParams.numTimesAuthenticationMechanismsSet++;
         return Status::OK();
     }
 
-    static Status onSetHostName(const std::string&) {
+    static Status onSetHostName(OperationContext*, const std::string&) {
         saslGlobalParams.haveHostName = true;
         return Status::OK();
     }
-    static Status onSetServiceName(const std::string&) {
+    static Status onSetServiceName(OperationContext*, const std::string&) {
         saslGlobalParams.haveServiceName = true;
         return Status::OK();
     }
-    static Status onSetAuthdPath(const std::string&) {
+    static Status onSetAuthdPath(OperationContext*, const std::string&) {
         saslGlobalParams.haveAuthdPath = true;
         return Status::OK();
     }
-    static Status onSetScramSHA1IterationCount(const int) {
+    static Status onSetScramSHA1IterationCount(OperationContext*, const int) {
         saslGlobalParams.numTimesScramSHA1IterationCountSet++;
         return Status::OK();
     }
-    static Status onSetScramSHA256IterationCount(const int) {
+    static Status onSetScramSHA256IterationCount(OperationContext*, const int) {
         saslGlobalParams.numTimesScramSHA256IterationCountSet++;
         return Status::OK();
     }

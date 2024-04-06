@@ -93,7 +93,8 @@ void AllowListedClusterNetworkSetting::append(OperationContext*,
     }
 }
 
-Status AllowListedClusterNetworkSetting::set(const mongo::BSONElement& e,
+Status AllowListedClusterNetworkSetting::set(OperationContext* opCtx,
+                                             const mongo::BSONElement& e,
                                              const boost::optional<TenantId>&) {
     std::shared_ptr<std::vector<std::string>> allowlistedClusterNetwork;
     if (e.isNull()) {
@@ -121,7 +122,8 @@ Status AllowListedClusterNetworkSetting::set(const mongo::BSONElement& e,
     return Status::OK();
 }
 
-Status AllowListedClusterNetworkSetting::setFromString(StringData s,
+Status AllowListedClusterNetworkSetting::setFromString(OperationContext* opCtx,
+                                                       StringData s,
                                                        const boost::optional<TenantId>&) {
     return {ErrorCodes::InternalError, "Cannot invoke this method"};
 }

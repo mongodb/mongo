@@ -77,6 +77,6 @@ private:
     OIDorTimestamp _previousGeneration;
 };
 
-Status userCacheInvalidationIntervalSecsNotify(const int& newValue);
+Status userCacheInvalidationIntervalSecsNotify(OperationContext* opCtx, const int& newValue);
 
 }  // namespace mongo

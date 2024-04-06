@@ -68,7 +68,8 @@ void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
     *b << name << StringData{*_data.first};
 }
 
-Status validateExtraDiagnostics(const std::vector<std::string>& value,
+Status validateExtraDiagnostics(OperationContext* opCtx,
+                                const std::vector<std::string>& value,
                                 const boost::optional<TenantId>& tenantId) {
     try {
         std::set<std::string> flagArr = {"all",
@@ -94,7 +95,8 @@ Status validateExtraDiagnostics(const std::vector<std::string>& value,
     return Status::OK();
 }
 
-Status WiredTigerEngineRuntimeConfigParameter::setFromString(StringData str,
+Status WiredTigerEngineRuntimeConfigParameter::setFromString(OperationContext* opCtx,
+                                                             StringData str,
                                                              const boost::optional<TenantId>&) {
     size_t pos = str.find('\0');
     if (pos != std::string::npos) {
@@ -125,7 +127,8 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(StringData str,
     return Status::OK();
 }
 
-Status WiredTigerDirectoryForIndexesParameter::setFromString(StringData,
+Status WiredTigerDirectoryForIndexesParameter::setFromString(OperationContext* opCtx,
+                                                             StringData,
                                                              const boost::optional<TenantId>&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter"};

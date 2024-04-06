@@ -38,7 +38,9 @@
 
 namespace mongo {
 
-Status validateTrafficRecordDestination(const std::string& path, const boost::optional<TenantId>&) {
+Status validateTrafficRecordDestination(OperationContext* opCtx,
+                                        const std::string& path,
+                                        const boost::optional<TenantId>&) {
     if (!path.empty() && !boost::filesystem::is_directory(path)) {
         return Status(ErrorCodes::FileNotOpen,
                       str::stream()

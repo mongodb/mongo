@@ -166,18 +166,22 @@ public:
         append(opCtx, b, name, tenantId);
     }
 
-    virtual Status validate(const BSONElement& newValueElement,
+    virtual Status validate(OperationContext* opCtx,
+                            const BSONElement& newValueElement,
                             const boost::optional<TenantId>& tenantId) const {
         return Status::OK();
     }
 
-    Status validate(const BSONObj& newValueObj, const boost::optional<TenantId>& tenantId) const {
-        return validate(BSON("" << newValueObj).firstElement(), tenantId);
+    Status validate(OperationContext* opCtx,
+                    const BSONObj& newValueObj,
+                    const boost::optional<TenantId>& tenantId) const {
+        return validate(opCtx, BSON("" << newValueObj).firstElement(), tenantId);
     }
 
     // This base implementation calls `setFromString(coerceToString(newValueElement))`.
     // Derived classes may customize the behavior by specifying `override_set` in IDL.
-    virtual Status set(const BSONElement& newValueElement,
+    virtual Status set(OperationContext* opCtx,
+                       const BSONElement& newValueElement,
                        const boost::optional<TenantId>& tenantId);
 
     /**
@@ -192,7 +196,7 @@ public:
      * method. If it is called without being implemented, it will return an error via the inherited
      * method below.
      */
-    virtual Status reset(const boost::optional<TenantId>& tenantId) {
+    virtual Status reset(OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
         return Status{ErrorCodes::OperationFailed,
                       str::stream()
                           << "Parameter reset not implemented for server parameter: " << name()};
@@ -202,11 +206,15 @@ public:
      * Overload of set() that accepts BSONObjs instead of BSONElements. This is currently only used
      * for cluster server parameters but can be used for node-only server parameters.
      */
-    Status set(const BSONObj& newValueObj, const boost::optional<TenantId>& tenantId) {
-        return set(BSON("" << newValueObj).firstElement(), tenantId);
+    Status set(OperationContext* opCtx,
+               const BSONObj& newValueObj,
+               const boost::optional<TenantId>& tenantId) {
+        return set(opCtx, BSON("" << newValueObj).firstElement(), tenantId);
     }
 
-    virtual Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) = 0;
+    virtual Status setFromString(OperationContext* opCtx,
+                                 StringData str,
+                                 const boost::optional<TenantId>& tenantId) = 0;
 
     /**
      * Simply returns the uninitialized/default-constructed LogicalTime by default.
@@ -384,9 +392,13 @@ public:
                 BSONObjBuilder* b,
                 StringData name,
                 const boost::optional<TenantId>& tenantId) final;
-    Status reset(const boost::optional<TenantId>& tenantId) final;
-    Status set(const BSONElement& newValueElement, const boost::optional<TenantId>& tenantId) final;
-    Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) final;
+    Status reset(OperationContext* opCtx, const boost::optional<TenantId>& tenantId) final;
+    Status set(OperationContext* opCtx,
+               const BSONElement& newValueElement,
+               const boost::optional<TenantId>& tenantId) final;
+    Status setFromString(OperationContext* opCtx,
+                         StringData str,
+                         const boost::optional<TenantId>& tenantId) final;
 
 private:
     std::once_flag _warnOnce;

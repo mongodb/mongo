@@ -39,7 +39,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_with_storage_test_structs_gen.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/basic.h"
 
 namespace mongo {
 namespace test {
@@ -63,14 +62,17 @@ inline Status validateOdd(const std::int32_t& value) {
     return (value & 1) ? Status::OK() : Status(ErrorCodes::BadValue, "Must be odd");
 }
 
-inline Status validateOddSP(const std::int32_t& value, const boost::optional<TenantId>&) {
+inline Status validateOddSP(OperationContext* opCtx,
+                            const std::int32_t& value,
+                            const boost::optional<TenantId>&) {
     return validateOdd(value);
 }
 
 /**
  * Validates that the new expireAfterSeconds is non-negative.
  */
-inline Status validateNonNegativeExpireAfterSeconds(const ChangeStreamOptionsClusterParam& newVal,
+inline Status validateNonNegativeExpireAfterSeconds(OperationContext* opCtx,
+                                                    const ChangeStreamOptionsClusterParam& newVal,
                                                     const boost::optional<TenantId>& tenantId) {
     if (newVal.getPreAndPostImages().getExpireAfterSeconds() < 0) {
         return Status(ErrorCodes::BadValue, "Should be non-negative value only");
@@ -82,7 +84,7 @@ inline Status validateNonNegativeExpireAfterSeconds(const ChangeStreamOptionsClu
  * Bumps the count of gStdIntPreallocatedUpdateCount in response
  * to the successful update of gStdIntPreallocated.
  */
-inline Status onUpdateStdIntPreallocated(const std::int32_t&) {
+inline Status onUpdateStdIntPreallocated(OperationContext*, const std::int32_t&) {
     gStdIntPreallocatedUpdateCount.fetchAndAdd(1);
     return Status::OK();
 }
@@ -90,7 +92,8 @@ inline Status onUpdateStdIntPreallocated(const std::int32_t&) {
 /**
  * Bumps count in response to the successful update of changeStreamOptions.
  */
-inline Status onUpdateChangeStreamOptions(const ChangeStreamOptionsClusterParam&) {
+inline Status onUpdateChangeStreamOptions(OperationContext*,
+                                          const ChangeStreamOptionsClusterParam&) {
     ++count;
     return Status::OK();
 }

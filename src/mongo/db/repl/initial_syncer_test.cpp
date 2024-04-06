@@ -33,11 +33,8 @@
 #include <boost/optional/optional.hpp>
 #include <functional>
 #include <iosfwd>
-#include <list>
-#include <map>
 #include <memory>
 #include <ostream>
-#include <ratio>
 #include <utility>
 
 #include "mongo/base/error_codes.h"
@@ -82,7 +79,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/shard_id.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/db/tenant_id.h"
@@ -100,16 +96,13 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
@@ -4488,7 +4481,7 @@ TEST_F(InitialSyncerTest, TestRemainingInitialSyncEstimatedMillisMetric) {
     auto opCtx = makeOpCtx();
     ASSERT_OK(ServerParameterSet::getNodeParameterSet()
                   ->get("collectionClonerBatchSize")
-                  ->setFromString("1", boost::none));
+                  ->setFromString(opCtx.get(), "1", boost::none));
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 27017));
 
@@ -4651,7 +4644,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     auto opCtx = makeOpCtx();
     ASSERT_OK(ServerParameterSet::getNodeParameterSet()
                   ->get("collectionClonerBatchSize")
-                  ->setFromString("1", boost::none));
+                  ->setFromString(opCtx.get(), "1", boost::none));
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 27017));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), 2U));

@@ -143,13 +143,13 @@ extern FTDCStartupParams ftdcStartupParams;
 /**
  * Server Parameter callbacks
  */
-Status onUpdateFTDCEnabled(bool value);
-Status onUpdateFTDCPeriod(std::int32_t value);
-Status onUpdateFTDCMetadataCaptureFrequency(std::int32_t value);
-Status onUpdateFTDCDirectorySize(std::int32_t value);
-Status onUpdateFTDCFileSize(std::int32_t value);
-Status onUpdateFTDCSamplesPerChunk(std::int32_t value);
-Status onUpdateFTDCPerInterimUpdate(std::int32_t value);
+Status onUpdateFTDCEnabled(OperationContext* opCtx, bool value);
+Status onUpdateFTDCPeriod(OperationContext* opCtx, std::int32_t value);
+Status onUpdateFTDCMetadataCaptureFrequency(OperationContext* opCtx, std::int32_t value);
+Status onUpdateFTDCDirectorySize(OperationContext* opCtx, std::int32_t value);
+Status onUpdateFTDCFileSize(OperationContext* opCtx, std::int32_t value);
+Status onUpdateFTDCSamplesPerChunk(OperationContext* opCtx, std::int32_t value);
+Status onUpdateFTDCPerInterimUpdate(OperationContext* opCtx, std::int32_t value);
 
 /**
  * Server Parameter accessors

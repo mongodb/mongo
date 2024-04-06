@@ -37,12 +37,14 @@
 
 namespace mongo {
 
+class OperationContext;
 class ChangeStreamsClusterParameterStorage;
 
 /**
  * Validates 'changeStreams' cluster-wide parameter.
  */
 Status validateChangeStreamsClusterParameter(
+    OperationContext* opCtx,
     const ChangeStreamsClusterParameterStorage& clusterParameter,
     const boost::optional<TenantId>& tenantId);
 }  // namespace mongo

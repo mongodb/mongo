@@ -44,14 +44,14 @@ void ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol
     BSONElement newParameter = parameterIterator.next();
     const auto foundParameter = findRSMProtocolServerParameter();
 
-    uassertStatusOK(foundParameter->second->set(newParameter, boost::none));
+    uassertStatusOK(foundParameter->second->set(nullptr, newParameter, boost::none));
 }
 
 void ReplicaSetMonitorProtocolTestUtil::resetRSMProtocol() {
     const auto defaultParameter = kDefaultParameter[kRSMProtocolFieldName];
     const auto foundParameter = findRSMProtocolServerParameter();
 
-    uassertStatusOK(foundParameter->second->set(defaultParameter, boost::none));
+    uassertStatusOK(foundParameter->second->set(nullptr, defaultParameter, boost::none));
 }
 
 ServerParameter::Map::const_iterator

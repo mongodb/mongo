@@ -61,7 +61,7 @@ std::pair<ServiceContext*, OnParamChangeUpdater*> getUpdater(const Client& clien
 }  // namespace
 
 
-Status onQueryStatsStoreSizeUpdate(const std::string& str) {
+Status onQueryStatsStoreSizeUpdate(OperationContext* opCtx, const std::string& str) {
     auto newSize = memory_util::MemorySize::parse(str);
     if (!newSize.isOK()) {
         return newSize.getStatus();
@@ -78,11 +78,13 @@ Status onQueryStatsStoreSizeUpdate(const std::string& str) {
     return Status::OK();
 }
 
-Status validateQueryStatsStoreSize(const std::string& str, const boost::optional<TenantId>&) {
+Status validateQueryStatsStoreSize(OperationContext*,
+                                   const std::string& str,
+                                   const boost::optional<TenantId>&) {
     return memory_util::MemorySize::parse(str).getStatus();
 }
 
-Status onQueryStatsSamplingRateUpdate(int samplingRate) {
+Status onQueryStatsSamplingRateUpdate(OperationContext* opCtx, int samplingRate) {
     // The client is nullptr if the parameter is supplied from the command line. In this case, we
     // ignore the update event, the parameter will be processed when initializing the service
     // context.

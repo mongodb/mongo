@@ -489,7 +489,8 @@ MONGO_INITIALIZER_GENERAL(MungeUmask, ("EndStartupOptionHandling"), ("ServerLogR
 #endif
 
 // --setParameter honorSystemUmask
-Status HonorSystemUMaskServerParameter::setFromString(StringData value,
+Status HonorSystemUMaskServerParameter::setFromString(OperationContext* opCtx,
+                                                      StringData value,
                                                       const boost::optional<TenantId>&) {
 #ifndef _WIN32
     if ((value == "0") || (value == "false")) {
@@ -525,7 +526,8 @@ void HonorSystemUMaskServerParameter::append(OperationContext*,
 }
 
 // --setParameter processUmask
-Status ProcessUMaskServerParameter::setFromString(StringData value,
+Status ProcessUMaskServerParameter::setFromString(OperationContext* opCtx,
+                                                  StringData value,
                                                   const boost::optional<TenantId>&) {
 #ifndef _WIN32
     if (honorSystemUmask) {

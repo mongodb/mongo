@@ -60,11 +60,15 @@ public:
 
     virtual ~TicketHolderManager(){};
 
-    static Status updateConcurrentWriteTransactions(const int32_t& newWriteTransactions);
-    static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
-    static Status validateConcurrentWriteTransactions(const int32_t& newWriteTransactions,
+    static Status updateConcurrentWriteTransactions(OperationContext* opCtx,
+                                                    const int32_t& newWriteTransactions);
+    static Status updateConcurrentReadTransactions(OperationContext* opCtx,
+                                                   const int32_t& newReadTransactions);
+    static Status validateConcurrentWriteTransactions(OperationContext* opCtx,
+                                                      const int32_t& newWriteTransactions,
                                                       boost::optional<TenantId>);
-    static Status validateConcurrentReadTransactions(const int32_t& newReadTransactions,
+    static Status validateConcurrentReadTransactions(OperationContext* opCtx,
+                                                     const int32_t& newReadTransactions,
                                                      boost::optional<TenantId>);
 
     // The 'lowPriorityAdmissionBypassThreshold' is only applicable when ticket admission is
@@ -72,7 +76,8 @@ public:
     //
     // Returns Status::OK() and updates the 'lowPriorityAdmissionBypassThreshold' provided all
     // TicketHolders are initialized and of type PriorityTicketHolders. Otherwise, returns an error.
-    static Status updateLowPriorityAdmissionBypassThreshold(const int32_t& newBypassThreshold);
+    static Status updateLowPriorityAdmissionBypassThreshold(OperationContext* opCtx,
+                                                            const int32_t& newBypassThreshold);
 
     static TicketHolderManager* get(ServiceContext* svcCtx);
 

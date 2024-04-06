@@ -449,7 +449,7 @@ MONGO_INITIALIZER_GENERAL(EnableFeatureFlagGlobalIndexes,
 (InitializerContext*) {
     auto* param = ServerParameterSet::getNodeParameterSet()->get("featureFlagGlobalIndexes");
     uassertStatusOK(
-        param->set(BSON("featureFlagGlobalIndexes" << true).firstElement(), boost::none));
+        param->set(nullptr, BSON("featureFlagGlobalIndexes" << true).firstElement(), boost::none));
 }
 
 TEST_F(GlobalIndexClonerServiceTest, CloneInsertsToGlobalIndexCollection) {

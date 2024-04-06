@@ -59,7 +59,8 @@ void RSMProtocolServerParameter::append(OperationContext*,
     builder->append(name, toString(gReplicaSetMonitorProtocol));
 }
 
-Status RSMProtocolServerParameter::setFromString(StringData protocolStr,
+Status RSMProtocolServerParameter::setFromString(OperationContext* opCtx,
+                                                 StringData protocolStr,
                                                  const boost::optional<TenantId>&) {
     if (protocolStr == toString(ReplicaSetMonitorProtocol::kStreamable)) {
         gReplicaSetMonitorProtocol = ReplicaSetMonitorProtocol::kStreamable;

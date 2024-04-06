@@ -91,7 +91,8 @@ class WiredTigerSizeStorer;
 
 class WiredTigerEngineRuntimeConfigParameter;
 
-Status validateExtraDiagnostics(const std::vector<std::string>& value,
+Status validateExtraDiagnostics(OperationContext* opCtx,
+                                const std::vector<std::string>& value,
                                 const boost::optional<TenantId>& tenantId);
 
 struct WiredTigerFileVersion {

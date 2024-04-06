@@ -45,12 +45,14 @@ namespace mongo::plan_cache_util {
 /**
  * Callback called on a change of planCacheSize parameter.
  */
-Status onPlanCacheSizeUpdate(const std::string& str);
+Status onPlanCacheSizeUpdate(OperationContext* opCtx, const std::string& str);
 
 /**
  * Callback called on validation of planCacheSize parameter.
  */
-Status validatePlanCacheSize(const std::string& str, const boost::optional<TenantId>&);
+Status validatePlanCacheSize(OperationContext* opCtx,
+                             const std::string& str,
+                             const boost::optional<TenantId>&);
 
 /**
  * Clears the SBE plan cache. Used to implement 'clearSbeCacheOnParameterChange()' below.
@@ -61,7 +63,7 @@ Status clearSbeCacheOnParameterChangeHelper();
  * Hook to delete all SBE plan cache entries when query-related setParameter values are updated at
  * runtime.
  */
-constexpr inline auto clearSbeCacheOnParameterChange = [](auto&&) {
+constexpr inline auto clearSbeCacheOnParameterChange = [](OperationContext*, auto&&) {
     return clearSbeCacheOnParameterChangeHelper();
 };
 

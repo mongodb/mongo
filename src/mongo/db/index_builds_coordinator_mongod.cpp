@@ -229,7 +229,7 @@ IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod()
         IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, AtomicWord<int>>;
     ServerParameterSet::getNodeParameterSet()
         ->get<ParamT>(kMaxNumActiveUserIndexBuildsServerParameterName)
-        ->setOnUpdate([this](const int) -> Status {
+        ->setOnUpdate([this](OperationContext*, const int) -> Status {
             _indexBuildFinished.notify_all();
             return Status::OK();
         });

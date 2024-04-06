@@ -54,7 +54,8 @@ void stopMongoDFTDC();
 /**
  * Validation callback for setParameter
  */
-Status validateCollectionStatsNamespaces(std::vector<std::string> value,
+Status validateCollectionStatsNamespaces(OperationContext* opCtx,
+                                         std::vector<std::string> value,
                                          const boost::optional<TenantId>& tenantId);
 
 }  // namespace mongo

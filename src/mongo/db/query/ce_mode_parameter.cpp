@@ -34,7 +34,9 @@
 #include "mongo/base/error_codes.h"
 
 namespace mongo::optimizer::ce {
-Status validateCEMode(const std::string& value, const boost::optional<TenantId>&) {
+Status validateCEMode(OperationContext* opCtx,
+                      const std::string& value,
+                      const boost::optional<TenantId>&) {
     if (value == kHeuristic || value == kHistogram || value == kSampling) {
         return Status::OK();
     }

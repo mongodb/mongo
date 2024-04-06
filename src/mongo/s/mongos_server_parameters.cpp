@@ -59,7 +59,8 @@ void HedgingModeServerParameter::append(OperationContext*,
     builder->append(name, toReadHedgingModeString(gReadHedgingMode.load()));
 }
 
-Status HedgingModeServerParameter::setFromString(StringData modeStr,
+Status HedgingModeServerParameter::setFromString(OperationContext* opCtx,
+                                                 StringData modeStr,
                                                  const boost::optional<TenantId>&) {
     if (modeStr == "on") {
         gReadHedgingMode.store(ReadHedgingMode::kOn);

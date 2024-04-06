@@ -297,7 +297,8 @@ void MirroredReadsServerParameter::append(OperationContext*,
     _data->serialize(&subBob);
 }
 
-Status MirroredReadsServerParameter::set(const BSONElement& value,
+Status MirroredReadsServerParameter::set(OperationContext* opCtx,
+                                         const BSONElement& value,
                                          const boost::optional<TenantId>&) try {
     auto obj = value.Obj();
 
@@ -308,7 +309,8 @@ Status MirroredReadsServerParameter::set(const BSONElement& value,
     return e.toStatus();
 }
 
-Status MirroredReadsServerParameter::setFromString(StringData str,
+Status MirroredReadsServerParameter::setFromString(OperationContext* opCtx,
+                                                   StringData str,
                                                    const boost::optional<TenantId>&) try {
     auto obj = fromjson(str);
 

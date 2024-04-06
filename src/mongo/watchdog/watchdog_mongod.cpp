@@ -76,7 +76,9 @@ bool watchdogEnabled{true};
 
 }  // namespace
 
-Status validateWatchdogPeriodSeconds(const int& value, const boost::optional<TenantId>&) {
+Status validateWatchdogPeriodSeconds(OperationContext* opCtx,
+                                     const int& value,
+                                     const boost::optional<TenantId>&) {
     const bool shouldSkipValidateForTest =
         TestingProctor::instance().isInitialized() && TestingProctor::instance().isEnabled();
     if (!shouldSkipValidateForTest && value < 60 && value != -1) {
@@ -92,7 +94,7 @@ Status validateWatchdogPeriodSeconds(const int& value, const boost::optional<Ten
     return Status::OK();
 }
 
-Status onUpdateWatchdogPeriodSeconds(const int& value) {
+Status onUpdateWatchdogPeriodSeconds(OperationContext* opCtx, const int& value) {
     auto monitor = WatchdogMonitorInterface::getGlobalWatchdogMonitorInterface();
     if (monitor) {
         monitor->setPeriod(Seconds(value));

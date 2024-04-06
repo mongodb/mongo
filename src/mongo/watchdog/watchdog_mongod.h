@@ -38,6 +38,7 @@
 namespace mongo {
 
 class ServiceContext;
+class OperationContext;
 
 /**
  * Start the watchdog.
@@ -47,7 +48,9 @@ void startWatchdog(ServiceContext* service);
 /**
  * Callbacks used by the 'watchdogPeriodSeconds' set parameter.
  */
-Status validateWatchdogPeriodSeconds(const int& value, const boost::optional<TenantId>&);
-Status onUpdateWatchdogPeriodSeconds(const int& value);
+Status validateWatchdogPeriodSeconds(OperationContext* opCtx,
+                                     const int& value,
+                                     const boost::optional<TenantId>&);
+Status onUpdateWatchdogPeriodSeconds(OperationContext*, const int& value);
 
 }  // namespace mongo

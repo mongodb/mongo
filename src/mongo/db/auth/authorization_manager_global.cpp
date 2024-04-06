@@ -122,7 +122,8 @@ void AuthzVersionParameter::append(OperationContext* opCtx,
     b->append(name, authzVersion);
 }
 
-Status AuthzVersionParameter::setFromString(StringData newValueString,
+Status AuthzVersionParameter::setFromString(OperationContext* opCtx,
+                                            StringData newValueString,
                                             const boost::optional<TenantId>&) {
     return {ErrorCodes::InternalError, "set called on unsettable server parameter"};
 }

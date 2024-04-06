@@ -454,7 +454,7 @@ public:
             }
 
             try {
-                uassertStatusOK(foundParameter->second->set(parameter, boost::none));
+                uassertStatusOK(foundParameter->second->set(opCtx, parameter, boost::none));
             } catch (const DBException& ex) {
                 LOGV2(20496,
                       "Error setting parameter to new value",
@@ -509,7 +509,8 @@ void LogLevelServerParameter::append(OperationContext*,
                         .toInt());
 }
 
-Status LogLevelServerParameter::set(const BSONElement& newValueElement,
+Status LogLevelServerParameter::set(OperationContext* opCtx,
+                                    const BSONElement& newValueElement,
                                     const boost::optional<TenantId>&) {
     int newValue;
     Status coercionStatus = newValueElement.tryCoerce(&newValue);
@@ -524,7 +525,8 @@ Status LogLevelServerParameter::set(const BSONElement& newValueElement,
     return Status::OK();
 }
 
-Status LogLevelServerParameter::setFromString(StringData strLevel,
+Status LogLevelServerParameter::setFromString(OperationContext* opCtx,
+                                              StringData strLevel,
                                               const boost::optional<TenantId>&) {
     int newValue;
     Status status = NumberParser{}(strLevel, &newValue);
@@ -549,7 +551,8 @@ void LogComponentVerbosityServerParameter::append(OperationContext*,
     builder->append(name, currentSettings);
 }
 
-Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElement,
+Status LogComponentVerbosityServerParameter::set(OperationContext* opCtx,
+                                                 const BSONElement& newValueElement,
                                                  const boost::optional<TenantId>&) {
     if (!newValueElement.isABSONObj()) {
         return Status(ErrorCodes::TypeMismatch,
@@ -559,7 +562,8 @@ Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElem
     return setLogComponentVerbosity(newValueElement.Obj());
 }
 
-Status LogComponentVerbosityServerParameter::setFromString(StringData str,
+Status LogComponentVerbosityServerParameter::setFromString(OperationContext* opCtx,
+                                                           StringData str,
                                                            const boost::optional<TenantId>&) try {
     return setLogComponentVerbosity(fromjson(str));
 } catch (const DBException& ex) {
@@ -576,16 +580,18 @@ void AutomationServiceDescriptorServerParameter::append(OperationContext*,
     }
 }
 
-Status AutomationServiceDescriptorServerParameter::set(const BSONElement& newValueElement,
+Status AutomationServiceDescriptorServerParameter::set(OperationContext* opCtx,
+                                                       const BSONElement& newValueElement,
                                                        const boost::optional<TenantId>&) {
     if (newValueElement.type() != String) {
         return {ErrorCodes::TypeMismatch,
                 "Value for parameter automationServiceDescriptor must be of type 'string'"};
     }
-    return setFromString(newValueElement.String(), boost::none);
+    return setFromString(opCtx, newValueElement.String(), boost::none);
 }
 
-Status AutomationServiceDescriptorServerParameter::setFromString(StringData str,
+Status AutomationServiceDescriptorServerParameter::setFromString(OperationContext* opCtx,
+                                                                 StringData str,
                                                                  const boost::optional<TenantId>&) {
     auto kMaxSize = 64U;
     if (str.size() > kMaxSize)

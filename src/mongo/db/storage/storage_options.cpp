@@ -67,7 +67,9 @@ void StorageGlobalParams::reset() {
 
 StorageGlobalParams storageGlobalParams;
 
-Status StorageDirectoryPerDbParameter::setFromString(StringData, const boost::optional<TenantId>&) {
+Status StorageDirectoryPerDbParameter::setFromString(OperationContext* opCtx,
+                                                     StringData,
+                                                     const boost::optional<TenantId>&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter"};
 };

@@ -31,8 +31,10 @@ global:
     # Use a nested namespace simply to exercise nested namespace support for the code generator.
     cpp_namespace: "mongo::idl::test"
     cpp_includes:
+        - "mongo/db/feature_compatibility_version_parser.h"
         - "mongo/idl/idl_test_types.h"
         - "mongo/idl/idl_test.h"
+
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -290,13 +292,13 @@ structs:
         description: Struct that is chained with a view struct.
         chained_structs:
             ViewStruct: ViewStruct
-    
+
     ViewStructChainedType:
         description: Struct that is chained with a view type.
         strict: false
         chained_types:
             ViewChainedType: ViewChainedType
-    
+
     ViewStructWithViewStructMember:
         description: Struct that has a type that is a view and a struct.
         fields:

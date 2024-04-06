@@ -94,6 +94,7 @@ private:
     Mutex _mutex = MONGO_MAKE_LATCH("ClusterServerParameterRefresher::_mutex");
 };
 
-Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue);
+Status clusterServerParameterRefreshIntervalSecsNotify(OperationContext* opCtx,
+                                                       const int& newValue);
 
 }  // namespace mongo

@@ -38,7 +38,8 @@
 
 namespace mongo {
 
-inline Status validateChunkMigrationConcurrency(const int& chunkMigrationConcurrency,
+inline Status validateChunkMigrationConcurrency(OperationContext* opCtx,
+                                                const int& chunkMigrationConcurrency,
                                                 const boost::optional<TenantId>&) {
     const int maxConcurrency = 500;
     // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
@@ -59,7 +60,7 @@ inline Status validateChunkMigrationConcurrency(const int& chunkMigrationConcurr
 }
 
 inline Status validateChunkMigrationFetcherMaxBufferedSizeBytesPerThread(
-    const int& maxSize, const boost::optional<TenantId>&) {
+    OperationContext* opCtx, const int& maxSize, const boost::optional<TenantId>&) {
     if (maxSize == 0) {
         return Status::OK();
     }
