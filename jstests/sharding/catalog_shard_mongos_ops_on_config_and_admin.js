@@ -2,7 +2,7 @@
  * Tests to make sure that the mongos does not allow certain commands on the config and admin
  * databases when configShard is enabled.
  *
- * @tags: [requires_fcv_70, featureFlagTransitionToCatalogShard]
+ * @tags: [requires_fcv_80]
  */
 var st = new ShardingTest({mongos: 1, shards: 1, config: 1, configShard: true});
 

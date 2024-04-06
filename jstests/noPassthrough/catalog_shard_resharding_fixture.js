@@ -2,8 +2,7 @@
  * Test the ReshardingTest fixture can work with a configShard.
  *
  * @tags: [
- *   requires_fcv_70,
- *   featureFlagTransitionToCatalogShard,
+ *   requires_fcv_80,
  * ]
  */
 
