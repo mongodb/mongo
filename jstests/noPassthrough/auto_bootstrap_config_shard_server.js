@@ -10,7 +10,7 @@
  * @tags: [
  *   multiversion_incompatible,
  *   requires_replication,
- *   featureFlagTransitionToCatalogShard,
+ *   requires_fcv_80
  * ]
  * */
 

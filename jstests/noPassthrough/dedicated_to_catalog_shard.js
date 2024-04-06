@@ -2,8 +2,7 @@
  * Tests config shard topology.
  *
  * @tags: [
- *   requires_fcv_70,
- *   featureFlagTransitionToCatalogShard,
+ *   requires_fcv_80,
  * ]
  */
 

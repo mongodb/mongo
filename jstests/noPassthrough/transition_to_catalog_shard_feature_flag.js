@@ -2,7 +2,7 @@
  * Verifies the transitionFromDedicatedConfigServer feature flag guards running the config shard
  * transition commands.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [requires_fcv_80]
  */
 delete TestData.setParameters.featureFlagTransitionToCatalogShard;
 delete TestData.setParametersMongos.featureFlagTransitionToCatalogShard;

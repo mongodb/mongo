@@ -68,7 +68,7 @@ const rs = s.rs0;
 if (!TestData.configShard) {
     rs.add({'shardsvr': ""});
 } else {
-    rs.add({'configsvr': "", 'setParameter': "featureFlagTransitionToCatalogShard=true"});
+    rs.add({'configsvr': ""});
 }
 
 try {
