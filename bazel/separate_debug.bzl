@@ -167,6 +167,21 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
             for library in input.libraries:
                 dep_libraries.append(library)
 
+    # CcInfo's linkopts are ignored by cc_shared_library by default. To support both transitive and nontransitive
+    # dynamic linkopts use:
+    #   cc_library's linkopts field for both static and dynamic transitive link opts
+    #   cc_shared_library's user_link_flags field for dynamic non-transitive link opts
+    all_user_link_flags = dict()
+    for input in ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list():
+        for flag in input.user_link_flags:
+            all_user_link_flags[flag] = True
+
+    # We define global linkopts here too, remove duplicates to prevent repeats of the global opts
+    # from accumulating.
+    for flag in original_info.linker_input.user_link_flags:
+        all_user_link_flags[flag] = True
+    all_user_link_flags = [flag for flag, _ in all_user_link_flags.items()]
+
     linker_input = cc_common.create_linker_input(
         owner = ctx.label,
         libraries = depset(direct = [
@@ -179,7 +194,7 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
                 # Omit reference to static library
             ),
         ], transitive = [depset(dep_libraries)]),
-        user_link_flags = original_info.linker_input.user_link_flags,
+        user_link_flags = all_user_link_flags,
         additional_inputs = depset(original_info.linker_input.additional_inputs),
     )
 

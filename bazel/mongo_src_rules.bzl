@@ -1047,7 +1047,8 @@ def mongo_cc_library(
         local_defines = [],
         mongo_api_name = None,
         target_compatible_with = [],
-        skip_global_deps = []):
+        skip_global_deps = [],
+        non_transitive_dyn_linkopts = []):
     """Wrapper around cc_library.
 
     Args:
@@ -1060,13 +1061,16 @@ def mongo_cc_library(
       data: Data targets the library depends on.
       tags: Tags to add to the rule.
       copts: Any extra compiler options to pass in.
-      linkopts: Any extra link options to pass in.
+      linkopts: Any extra link options to pass in. These are applied transitively to all targets that depend on this target.
       includes: Any directory which should be exported to dependents, will be prefixed with the package path
       linkstatic: Whether or not linkstatic should be passed to the native bazel cc_test rule. This argument
         is currently not supported. The mongo build must link entirely statically or entirely dynamically. This can be
         configured via //config/bazel:linkstatic.
       local_defines: macro definitions passed to all source and header files.
       skip_global_deps: Globally injected dependencies to skip adding as a dependency (options: "libunwind", "allocator").
+      non_transitive_dyn_linkopts: Any extra link options to pass in when linking dynamically. Unlike linkopts these are not
+        applied transitively to all targets depending on this target, and are only used when linking this target itself.
+        See https://jira.mongodb.org/browse/SERVER-89047 for motivation.
     """
 
     if linkstatic == True:
@@ -1166,7 +1170,7 @@ def mongo_cc_library(
         deps = [name + WITH_DEBUG_SUFFIX],
         visibility = visibility,
         tags = tags,
-        user_link_flags = MONGO_GLOBAL_LINKFLAGS + linkopts + rpath_flags + visibility_support_shared_flags,
+        user_link_flags = MONGO_GLOBAL_LINKFLAGS + non_transitive_dyn_linkopts + rpath_flags + visibility_support_shared_flags,
         target_compatible_with = select({
             "//bazel/config:linkstatic_disabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
