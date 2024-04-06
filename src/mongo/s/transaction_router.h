@@ -609,6 +609,10 @@ public:
             p().createdDatabases.insert(dbName);
         }
 
+        void disallowSingleWriteShardCommit() {
+            p().disallowSingleWriteShardCommit = true;
+        }
+
     private:
         /**
          * Resets the router's state. Used when the router sees a new transaction for the first
@@ -922,6 +926,10 @@ private:
 
         // Tracks databases that this transaction has attempted to create.
         std::set<DatabaseName> createdDatabases;
+
+        // Set true to prevent using the single write shard commit optimization. Only for updates to
+        // a document's shard key value that use the legacy protocol.
+        bool disallowSingleWriteShardCommit{false};
     } _p;
 };
 

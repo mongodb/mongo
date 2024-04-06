@@ -1540,7 +1540,7 @@ BSONObj TransactionRouter::Router::_commitTransaction(
         return sendCommitDirectlyToShards(opCtx, {shardId});
     }
 
-    if (writeShards.size() == 1) {
+    if (writeShards.size() == 1 && !p().disallowSingleWriteShardCommit) {
         LOGV2_DEBUG(22894,
                     3,
                     "Committing single-write-shard transaction",

@@ -31,6 +31,10 @@ last-continuous:
       ticket: SERVER-88735
     - test_file: jstests/sharding/invalid_shard_identity_doc.js
       ticket: SERVER-88735
+    - test_file: jstests/sharding/move_chunk_update_shard_key_in_retryable_write.js
+      ticket: SERVER-84796
+    - test_file: jstests/sharding/retryable_upsert_single_write_shard.js
+      ticket: SERVER-84796
   suites: null
 last-lts:
   all:
@@ -44,4 +48,8 @@ last-lts:
       ticket: SERVER-88735
     - test_file: jstests/sharding/invalid_shard_identity_doc.js
       ticket: SERVER-88735
+    - test_file: jstests/sharding/move_chunk_update_shard_key_in_retryable_write.js
+      ticket: SERVER-84796
+    - test_file: jstests/sharding/retryable_upsert_single_write_shard.js
+      ticket: SERVER-84796
   suites: null

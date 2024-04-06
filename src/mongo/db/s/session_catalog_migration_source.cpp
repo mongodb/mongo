@@ -269,11 +269,13 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx,
         // against.
         if (txnParticipant.isValid() && !txnParticipant.hasIncompleteHistory()) {
             const auto& namespaces = txnParticipant.affectedNamespaces();
-            // If a session only contains the dead sentinel for incomplete oplog history
-            // then it will have affectedNamespaces size of 0, not allowing this op to go through
-            // the rest of session migration code to be properly handled will result in a different
-            // error than IncompleteTransactionHistory when the command is retried.
-            if (!namespaces.contains(_ns)) {
+            // If a txn doesn't modify the collection at source shard, affected namespaces would be
+            // empty. We still need to migrate such sessions to handle retryable WCOS writes. This
+            // means transactions which did no writes on this shard will unnecessarily migrate a
+            // $incompleteOplogHistory dead sentinel to the recipient shard. These other
+            // transactions cannot be distinguished by their config.transactions or oplog entries
+            // from the retryable WCOS writes which occurred in a transaction.
+            if (!namespaces.empty() && !namespaces.contains(_ns)) {
                 sessionsToIgnore.emplace(session.getSessionId());
             }
         }
