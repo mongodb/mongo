@@ -1,0 +1,55 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "benchmark",
+    srcs = [
+        "dist/src/benchmark.cc",
+        "dist/src/benchmark_api_internal.cc",
+        "dist/src/benchmark_name.cc",
+        "dist/src/benchmark_register.cc",
+        "dist/src/benchmark_runner.cc",
+        "dist/src/colorprint.cc",
+        "dist/src/commandlineflags.cc",
+        "dist/src/complexity.cc",
+        "dist/src/console_reporter.cc",
+        "dist/src/counter.cc",
+        "dist/src/csv_reporter.cc",
+        "dist/src/json_reporter.cc",
+        "dist/src/reporter.cc",
+        "dist/src/sleep.cc",
+        "dist/src/statistics.cc",
+        "dist/src/string_util.cc",
+        "dist/src/sysinfo.cc",
+        "dist/src/timers.cc",
+    ],
+    hdrs = glob([
+        "dist/include/benchmark/benchmark.h",
+        "dist/src/*.h",
+    ]),
+    copts = select({
+        "@platforms//os:windows": [
+            # "function" : destructor never returns, potential memory leak
+            "/wd4722",
+        ],
+        "//conditions:default": [
+            "-Wno-unused-but-set-variable",
+            "-Wno-unknown-warning-option",
+            # TODO(SERVER-59996): Fix warnings with -Wstringop-truncation when possible
+            "-Wno-stringop-truncation",
+        ],
+    }),
+    includes = [
+        "dist/include",
+    ],
+    linkopts = select({
+        "@platforms//os:windows": [
+            "-lShLwApi",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "HAVE_STD_REGEX",
+    ],
+)

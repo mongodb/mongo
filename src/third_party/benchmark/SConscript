@@ -26,7 +26,7 @@ env.Append(
 
 src_dir = env.Dir('dist/src')
 
-env.Library(
+env.BazelLibrary(
     target="benchmark",
     source=env.File(
         [
