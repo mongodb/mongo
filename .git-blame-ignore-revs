@@ -36,3 +36,6 @@ a4f458fe4d7a44eba056f5c150753e73067c8e4d
 
 # SERVER-87034 Initally formatted all markdown using prettier
 64e388007ec1ac3744537253540995af628bcc00
+
+# SERVER-88970 Formatted all yaml using prettier
+35db3811d8f749edd5b79ba910adcbc1ceb54cc4

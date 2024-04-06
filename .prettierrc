@@ -1,3 +1,11 @@
 {
-    "bracketSpacing": false
+    "bracketSpacing": false,
+    "overrides": [
+        {
+            "files": "*.js",
+            "options": {
+                "tabWidth": 4
+            }
+        }
+    ]
 }
