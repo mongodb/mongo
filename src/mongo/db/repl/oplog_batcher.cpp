@@ -383,9 +383,15 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             // Locks the oplog to check its max size, do this in the UninterruptibleLockGuard.
             batchLimits.bytes = getBatchLimitOplogBytes(opCtx.get(), storageInterface);
 
-            ops = fassertNoTrace(
-                31004,
-                getNextApplierBatch(opCtx.get(), batchLimits, Milliseconds(oplogBatchDelayMillis)));
+            // When this feature flag is enabled, the oplogBatchDelayMillis is handled in
+            // OplogWriter.
+            auto waitToFillBatch =
+                Milliseconds(feature_flags::gReduceMajorityWriteLatency.isEnabled(
+                                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
+                                 ? 0
+                                 : oplogBatchDelayMillis);
+            ops = fassertNoTrace(31004,
+                                 getNextApplierBatch(opCtx.get(), batchLimits, waitToFillBatch));
         } catch (const ExceptionForCat<ErrorCategory::CancellationError>& e) {
             LOGV2_DEBUG(6133400,
                         1,

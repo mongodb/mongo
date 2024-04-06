@@ -125,6 +125,7 @@ public:
     StatusWith<OplogApplierBatch> getNextApplierBatch(
         OperationContext* opCtx,
         const BatchLimits& batchLimits,
+        // TODO(SERVER-80981): Remove this parameter as it has been moved to OplogWriter.
         Milliseconds waitToFillBatch = Milliseconds(0));
 
     /**

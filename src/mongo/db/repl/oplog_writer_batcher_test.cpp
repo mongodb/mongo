@@ -32,6 +32,7 @@
 #include "mongo/db/repl/oplog_writer_batcher.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 
@@ -115,7 +116,10 @@ public:
     }
 
     bool waitForDataUntil(Date_t deadline, Interruptible* interruptible) override {
-        MONGO_UNIMPLEMENTED;
+        stdx::unique_lock<Latch> lk(_mutex);
+        interruptible->waitForConditionOrInterruptUntil(
+            _notEmptyCv, lk, deadline, [&] { return !_queue.empty(); });
+        return !_queue.empty();
     }
 
     bool peek(OperationContext*, Value* value) override {
@@ -384,6 +388,43 @@ TEST_F(OplogWriterBatcherTest, BatcherCheckDraining) {
         auto endTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
         ASSERT_TRUE(endTime - startTime >= 1);
     }
+}
+
+TEST_F(OplogWriterBatcherTest, BatcherWaitDelayMillisWhenBatchIsSmall) {
+    RAIIServerParameterControllerForTest controller("oplogBatchDelayMillis", 100);
+    OplogWriterBufferMock writerBuffer;
+    OplogWriterBatcher writerBatcher(&writerBuffer);
+    OplogWriterBatch batch({makeNoopOplogEntry(Seconds(123))}, 1);
+    writerBuffer.push_forTest(batch);
+    auto startTime = durationCount<Milliseconds>(Date_t::now().toDurationSinceEpoch());
+    ASSERT_EQ(1, writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).byteSize());
+    auto endTime = durationCount<Milliseconds>(Date_t::now().toDurationSinceEpoch());
+    ASSERT_TRUE(endTime - startTime >= 100);
+}
+
+TEST_F(OplogWriterBatcherTest, BatcherNotWaitDelayMillisWhenBatchIsLarge) {
+    RAIIServerParameterControllerForTest controller("oplogBatchDelayMillis", 5000);
+    OplogWriterBufferMock writerBuffer;
+    OplogWriterBatcher writerBatcher(&writerBuffer);
+    OplogWriterBatch batch({makeNoopOplogEntry(Seconds(123))}, _limits.minBytes + 1);
+    writerBuffer.push_forTest(batch);
+    auto startTime = durationCount<Milliseconds>(Date_t::now().toDurationSinceEpoch());
+    ASSERT_EQ(_limits.minBytes + 1,
+              writerBatcher.getNextBatch(opCtx(), Seconds(10), _limits).byteSize());
+    auto endTime = durationCount<Milliseconds>(Date_t::now().toDurationSinceEpoch());
+    ASSERT_TRUE(endTime - startTime < 5000);
+}
+
+TEST_F(OplogWriterBatcherTest, OplogBatchDelayMillisCapAtMaxWaitTime) {
+    RAIIServerParameterControllerForTest controller("oplogBatchDelayMillis", 10000);
+    OplogWriterBufferMock writerBuffer;
+    OplogWriterBatcher writerBatcher(&writerBuffer);
+    OplogWriterBatch batch({makeNoopOplogEntry(Seconds(123))}, 1);
+    writerBuffer.push_forTest(batch);
+    auto startTime = durationCount<Milliseconds>(Date_t::now().toDurationSinceEpoch());
+    ASSERT_EQ(1, writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).byteSize());
+    auto endTime = durationCount<Milliseconds>(Date_t::now().toDurationSinceEpoch());
+    ASSERT_TRUE(endTime - startTime >= 1000 && endTime - startTime < 10000);
 }
 
 }  // namespace repl

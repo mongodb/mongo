@@ -29,6 +29,7 @@
 
 #include "mongo/db/repl/oplog_writer_batcher.h"
 
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/duration.h"
 
@@ -63,7 +64,17 @@ OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx,
     size_t totalBytes = 0;
     size_t totalOps = 0;
     bool exhausted = false;
-    auto delaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp();
+    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto delaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp(now);
+    auto delayMillis = Milliseconds(oplogBatchDelayMillis);
+    Date_t waitForDataDeadline = now + maxWaitTime;
+    // We expect oplogBatchDelayMillis to be tens of milliseconds so we cap it at
+    // maxWaitTime to avoid unexpected behavior. Therefore, secondaryDelaySecs won't be affected by
+    // oplogBatchDelayMillis because it will be at least 1s if set so it will override
+    // oplogBatchDelayMillis.
+    Date_t batchDeadline = delayMillis > Milliseconds(0)
+        ? now + std::min(delayMillis, duration_cast<Milliseconds>(maxWaitTime))
+        : Date_t();
 
     while (true) {
         while (_pollFromBuffer(opCtx, &batch, delaySecsLatestTimestamp)) {
@@ -86,10 +97,20 @@ OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx,
         }
 
         if (!batches.empty()) {
-            break;
+            if (batchDeadline != Date_t() && totalBytes <= batchLimits.minBytes) {
+                waitForDataDeadline = batchDeadline;
+                LOGV2_DEBUG(8663100,
+                            3,
+                            "Waiting for batch to fill",
+                            "deadline"_attr = waitForDataDeadline,
+                            "delayMillis"_attr = delayMillis,
+                            "totalBytes"_attr = totalBytes);
+            } else {
+                break;
+            }
         }
 
-        if (!_waitForData(opCtx, maxWaitTime)) {
+        if (!_waitForData(opCtx, waitForDataDeadline)) {
             exhausted = _oplogBuffer->inDrainModeAndEmpty();
             break;
         }
@@ -156,7 +177,7 @@ OplogWriterBatch OplogWriterBatcher::_mergeBatches(std::vector<OplogWriterBatch>
     return OplogWriterBatch(std::move(ops), totalBytes);
 }
 
-bool OplogWriterBatcher::_waitForData(OperationContext* opCtx, Seconds maxWaitTime) {
+bool OplogWriterBatcher::_waitForData(OperationContext* opCtx, Date_t waitDeadline) {
     // If there is a stashedBatch, meaning we only have this batch and it is not passing
     // secondaryDelaySecs yet, so we wait 1s here and return an empty batch to the caller of this
     // batcher.
@@ -166,7 +187,7 @@ bool OplogWriterBatcher::_waitForData(OperationContext* opCtx, Seconds maxWaitTi
     }
 
     try {
-        if (_oplogBuffer->waitForDataFor(duration_cast<Milliseconds>(maxWaitTime), opCtx)) {
+        if (_oplogBuffer->waitForDataUntil(waitDeadline, opCtx)) {
             return true;
         }
     } catch (const ExceptionForCat<ErrorCategory::CancellationError>& e) {
@@ -182,15 +203,15 @@ bool OplogWriterBatcher::_waitForData(OperationContext* opCtx, Seconds maxWaitTi
  * If secondaryDelaySecs is enabled, this function calculates the most recent timestamp of any oplog
  * entries that can be be returned in a batch.
  */
-boost::optional<Date_t> OplogWriterBatcher::_calculateSecondaryDelaySecsLatestTimestamp() {
+boost::optional<Date_t> OplogWriterBatcher::_calculateSecondaryDelaySecsLatestTimestamp(
+    Date_t now) {
     auto service = cc().getServiceContext();
     auto replCoord = ReplicationCoordinator::get(service);
     auto secondaryDelaySecs = replCoord->getSecondaryDelaySecs();
     if (secondaryDelaySecs <= Seconds(0)) {
         return {};
     }
-    auto fastClockSource = service->getFastClockSource();
-    return fastClockSource->now() - secondaryDelaySecs;
+    return now - secondaryDelaySecs;
 }
 
 }  // namespace repl
