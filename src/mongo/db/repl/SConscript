@@ -662,6 +662,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         'oplog_entry',
         'repl_coordinator_interface',
+        'repl_server_parameters',
     ],
 )
 
