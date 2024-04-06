@@ -130,6 +130,11 @@ public:
         return false;
     }
 
+    /**
+     * Start the periodic job to probe throughput and dynamically adjust ticket levels
+     */
+    void startThroughputProbe();
+
 protected:
     void _appendImplStats(BSONObjBuilder& builder) const override;
 

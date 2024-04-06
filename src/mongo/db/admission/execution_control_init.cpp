@@ -78,9 +78,9 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
         }
     };
 
+    std::unique_ptr<TicketHolderManager> ticketHolderManager;
     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        std::unique_ptr<TicketHolderManager> ticketHolderManager;
 #ifdef __linux__
         LOGV2_DEBUG(6902900, 1, "Using Priority Queue-based ticketing scheduler");
 
@@ -105,15 +105,24 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
                                     std::make_unique<SemaphoreTicketHolder>(
                                         svcCtx, writeTransactions, usingThroughputProbing));
 #endif
-        TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
     } else {
-        auto ticketHolderManager =
+        ticketHolderManager =
             makeTicketHolderManager(std::make_unique<SemaphoreTicketHolder>(
                                         svcCtx, readTransactions, usingThroughputProbing),
                                     std::make_unique<SemaphoreTicketHolder>(
                                         svcCtx, writeTransactions, usingThroughputProbing));
-        TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
+    }
+
+    TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
+
+    if (usingThroughputProbing) {
+        // Throughput probing requires creation of an opCtx which in turn creates a locker that
+        // accesses the `TicketHolderManager` decoration. We defer starting probing until after the
+        // decoration has been set to avoid data races.
+        reinterpret_cast<ThroughputProbingTicketHolderManager*>(TicketHolderManager::get(svcCtx))
+            ->startThroughputProbe();
     }
 }
+
 }  // namespace admission
 }  // namespace mongo

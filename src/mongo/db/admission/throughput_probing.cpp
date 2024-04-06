@@ -398,13 +398,16 @@ ThroughputProbingTicketHolderManager::ThroughputProbingTicketHolderManager(
     : TicketHolderManager(std::move(read), std::move(write)) {
     _monitor = std::make_unique<admission::ThroughputProbing>(
         svcCtx, _readTicketHolder.get(), _writeTicketHolder.get(), interval);
-    _monitor->start();
 }
 
 void ThroughputProbingTicketHolderManager::_appendImplStats(BSONObjBuilder& b) const {
     BSONObjBuilder bbb(b.subobjStart("monitor"));
     _monitor->appendStats(bbb);
     bbb.done();
+}
+
+void ThroughputProbingTicketHolderManager::startThroughputProbe() {
+    _monitor->start();
 }
 
 }  // namespace admission
