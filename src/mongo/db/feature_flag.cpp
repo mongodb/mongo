@@ -190,8 +190,7 @@ void FeatureFlagServerParameter::appendSupportingRoundtrip(OperationContext* opC
     b->append(name, enabled);
 }
 
-Status FeatureFlagServerParameter::set(OperationContext* opCtx,
-                                       const BSONElement& newValueElement,
+Status FeatureFlagServerParameter::set(const BSONElement& newValueElement,
                                        const boost::optional<TenantId>&) {
     bool newValue;
 
@@ -205,9 +204,7 @@ Status FeatureFlagServerParameter::set(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status FeatureFlagServerParameter::setFromString(OperationContext* opCtx,
-                                                 StringData str,
-                                                 const boost::optional<TenantId>&) {
+Status FeatureFlagServerParameter::setFromString(StringData str, const boost::optional<TenantId>&) {
     auto swNewValue = idl_server_parameter_detail::coerceFromString<bool>(str);
     if (!swNewValue.isOK()) {
         return swNewValue.getStatus();

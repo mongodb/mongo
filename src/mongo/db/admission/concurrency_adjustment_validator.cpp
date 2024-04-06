@@ -38,8 +38,7 @@
 
 namespace mongo {
 
-Status validateConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
-                                              const std::string& name,
+Status validateConcurrencyAdjustmentAlgorithm(const std::string& name,
                                               const boost::optional<TenantId>&) try {
     StorageEngineConcurrencyAdjustmentAlgorithm_parse(
         IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"}, name);

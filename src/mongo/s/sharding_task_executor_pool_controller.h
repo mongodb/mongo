@@ -129,22 +129,19 @@ public:
      * Validate that hostTimeoutMS is greater than the sum of pendingTimeoutMS and
      * toRefreshTimeoutMS
      */
-    static Status validateHostTimeout(OperationContext* opCtx,
-                                      const int& hostTimeoutMS,
-                                      const boost::optional<TenantId>&);
+    static Status validateHostTimeout(const int& hostTimeoutMS, const boost::optional<TenantId>&);
 
     /**
      * Validate that pendingTimeoutMS is less than toRefreshTimeoutMS
      */
-    static Status validatePendingTimeout(OperationContext* opCtx,
-                                         const int& pendingTimeoutMS,
+    static Status validatePendingTimeout(const int& pendingTimeoutMS,
                                          const boost::optional<TenantId>&);
 
     /**
      *  Matches the matching strategy string against a set of literals
      *  and either sets gParameters.matchingStrategy or returns !Status::isOK().
      */
-    static Status onUpdateMatchingStrategy(OperationContext* opCtx, const std::string& str);
+    static Status onUpdateMatchingStrategy(const std::string& str);
 
     explicit ShardingTaskExecutorPoolController(std::weak_ptr<ShardRegistry> shardRegistry)
         : _shardRegistry(std::move(shardRegistry)) {}

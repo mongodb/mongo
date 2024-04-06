@@ -67,7 +67,7 @@ public:
 
     static void set(ServiceContext* serviceCtx, std::unique_ptr<TTLMonitor> monitor);
 
-    static Status onUpdateTTLMonitorSleepSeconds(OperationContext* opCtx, int newSleepSeconds);
+    static Status onUpdateTTLMonitorSleepSeconds(int newSleepSeconds);
 
     std::string name() const override {
         return "TTLMonitor";

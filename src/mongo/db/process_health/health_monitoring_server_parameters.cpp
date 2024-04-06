@@ -84,8 +84,7 @@ ConfigValues mergeConfigValues(const ConfigValues& oldValues, const ConfigValues
 }
 }  // namespace
 
-Status HealthMonitoringIntensitiesServerParameter::setFromString(OperationContext* opCtx,
-                                                                 StringData value,
+Status HealthMonitoringIntensitiesServerParameter::setFromString(StringData value,
                                                                  const boost::optional<TenantId>&) {
     const auto oldValue = **_data;
     auto newValue = HealthObserverIntensities::parse(
@@ -96,8 +95,7 @@ Status HealthMonitoringIntensitiesServerParameter::setFromString(OperationContex
     return Status::OK();
 }
 
-Status HealthMonitoringIntensitiesServerParameter::set(OperationContext* opCtx,
-                                                       const BSONElement& newValueElement,
+Status HealthMonitoringIntensitiesServerParameter::set(const BSONElement& newValueElement,
                                                        const boost::optional<TenantId>&) {
     const auto oldValue = **_data;
     auto newValue = HealthObserverIntensities::parse(
@@ -118,14 +116,13 @@ void HealthMonitoringIntensitiesServerParameter::append(OperationContext*,
 }
 
 Status HealthMonitoringProgressMonitorServerParameter::setFromString(
-    OperationContext* opCtx, StringData value, const boost::optional<TenantId>&) {
+    StringData value, const boost::optional<TenantId>&) {
     *_data = HealthObserverProgressMonitorConfig::parse(
         IDLParserContext("health monitoring liveness"), fromjson(value));
     return Status::OK();
 }
 
-Status HealthMonitoringProgressMonitorServerParameter::set(OperationContext* opCtx,
-                                                           const BSONElement& newValueElement,
+Status HealthMonitoringProgressMonitorServerParameter::set(const BSONElement& newValueElement,
                                                            const boost::optional<TenantId>&) {
     *_data = HealthObserverProgressMonitorConfig::parse(
         IDLParserContext("health monitoring liveness"), newValueElement.Obj());
@@ -142,7 +139,7 @@ void HealthMonitoringProgressMonitorServerParameter::append(OperationContext*,
 }
 
 Status PeriodicHealthCheckIntervalsServerParameter::setFromString(
-    OperationContext* opCtx, StringData value, const boost::optional<TenantId>&) {
+    StringData value, const boost::optional<TenantId>&) {
     const auto oldValue = **_data;
     auto newValue = HealthObserverIntervals::parse(IDLParserContext("health monitoring interval"),
                                                    fromjson(value));
@@ -151,8 +148,7 @@ Status PeriodicHealthCheckIntervalsServerParameter::setFromString(
     return Status::OK();
 }
 
-Status PeriodicHealthCheckIntervalsServerParameter::set(OperationContext* opCtx,
-                                                        const BSONElement& newValueElement,
+Status PeriodicHealthCheckIntervalsServerParameter::set(const BSONElement& newValueElement,
                                                         const boost::optional<TenantId>&) {
     const auto oldValue = **_data;
     auto newValue = HealthObserverIntervals::parse(IDLParserContext("health monitoring interval"),

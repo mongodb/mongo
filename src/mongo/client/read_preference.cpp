@@ -72,9 +72,7 @@ TagSet defaultTagSetForMode(ReadPreference mode) {
 
 }  // namespace
 
-Status validateReadPreferenceMode(OperationContext* opCtx,
-                                  const std::string& prefStr,
-                                  const boost::optional<TenantId>&) {
+Status validateReadPreferenceMode(const std::string& prefStr, const boost::optional<TenantId>&) {
     try {
         ReadPreference_parse(IDLParserContext(kModeFieldName), prefStr);
     } catch (DBException& e) {

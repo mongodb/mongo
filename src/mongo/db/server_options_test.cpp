@@ -1235,9 +1235,7 @@ public:
             bob->append(name, val);
         }
 
-        Status setFromString(OperationContext*,
-                             StringData str,
-                             const boost::optional<TenantId>&) final {
+        Status setFromString(StringData str, const boost::optional<TenantId>&) final {
             int value;
             Status status = NumberParser{}(str, &value);
             if (!status.isOK())

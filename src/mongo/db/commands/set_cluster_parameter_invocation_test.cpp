@@ -90,20 +90,16 @@ public:
                                    StringData name,
                                    const boost::optional<TenantId>&) override {}
 
-    Status set(OperationContext* opCtx,
-               const BSONElement& newValueElement,
+    Status set(const BSONElement& newValueElement,
                const boost::optional<TenantId>& tenantId) override {
         return Status(ErrorCodes::BadValue, "Should not call set() in this test");
     }
 
-    Status setFromString(OperationContext* opCtx,
-                         StringData str,
-                         const boost::optional<TenantId>& tenantId) override {
+    Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) override {
         return Status(ErrorCodes::BadValue, "Should not call setFromString() in this test");
     }
 
-    Status validate(OperationContext* opCtx,
-                    const BSONElement& newValueElement,
+    Status validate(const BSONElement& newValueElement,
                     const boost::optional<TenantId>& tenantId) const override {
         return validateImpl(newValueElement);
     }

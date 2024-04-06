@@ -55,8 +55,7 @@ TicketHolderManager::TicketHolderManager(std::unique_ptr<TicketHolder> readTicke
     : _readTicketHolder(std::move(readTicketHolder)),
       _writeTicketHolder(std::move(writeTicketHolder)) {}
 
-Status TicketHolderManager::updateConcurrentWriteTransactions(OperationContext* opCtx,
-                                                              const int32_t& newWriteTransactions) {
+Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& newWriteTransactions) {
     if (auto client = Client::getCurrent()) {
         auto opCtx = client->getOperationContext();
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
@@ -93,8 +92,7 @@ Status TicketHolderManager::updateConcurrentWriteTransactions(OperationContext* 
     return Status::OK();
 };
 
-Status TicketHolderManager::updateConcurrentReadTransactions(OperationContext* opCtx,
-                                                             const int32_t& newReadTransactions) {
+Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newReadTransactions) {
     if (auto client = Client::getCurrent()) {
         auto opCtx = client->getOperationContext();
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
@@ -131,8 +129,7 @@ Status TicketHolderManager::updateConcurrentReadTransactions(OperationContext* o
     return Status::OK();
 }
 
-Status TicketHolderManager::validateConcurrentWriteTransactions(OperationContext* opCtx,
-                                                                const int32_t& newWriteTransactions,
+Status TicketHolderManager::validateConcurrentWriteTransactions(const int32_t& newWriteTransactions,
                                                                 const boost::optional<TenantId>) {
     if (!getTestCommandsEnabled() && newWriteTransactions < 5) {
         return Status(ErrorCodes::BadValue,
@@ -141,8 +138,7 @@ Status TicketHolderManager::validateConcurrentWriteTransactions(OperationContext
     return Status::OK();
 }
 
-Status TicketHolderManager::validateConcurrentReadTransactions(OperationContext* opCtx,
-                                                               const int32_t& newReadTransactions,
+Status TicketHolderManager::validateConcurrentReadTransactions(const int32_t& newReadTransactions,
                                                                const boost::optional<TenantId>) {
     if (!getTestCommandsEnabled() && newReadTransactions < 5) {
         return Status(ErrorCodes::BadValue,
@@ -152,7 +148,7 @@ Status TicketHolderManager::validateConcurrentReadTransactions(OperationContext*
 }
 
 Status TicketHolderManager::updateLowPriorityAdmissionBypassThreshold(
-    OperationContext* opCtx, const int32_t& newBypassThreshold) {
+    const int32_t& newBypassThreshold) {
     if (auto client = Client::getCurrent()) {
         // TODO SERVER-72616: Remove the ifdef once TicketPool is implemented in a cross-platform
         // manner.

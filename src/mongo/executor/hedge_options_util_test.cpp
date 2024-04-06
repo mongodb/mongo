@@ -65,8 +65,7 @@ protected:
         BSONObjIterator parameterIterator(parameters);
         while (parameterIterator.more()) {
             BSONElement parameter = parameterIterator.next();
-            uassertStatusOK(
-                paramSet->get(parameter.fieldName())->set(nullptr, parameter, boost::none));
+            uassertStatusOK(paramSet->get(parameter.fieldName())->set(parameter, boost::none));
         }
     }
 

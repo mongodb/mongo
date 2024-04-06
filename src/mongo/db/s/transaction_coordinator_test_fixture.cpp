@@ -43,6 +43,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/transaction_coordinator_test_fixture.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
@@ -76,7 +77,7 @@ void TransactionCoordinatorTestFixture::setUp() {
 
     ASSERT_OK(ServerParameterSet::getNodeParameterSet()
                   ->get("logComponentVerbosity")
-                  ->setFromString(nullptr, "{transaction: {verbosity: 3}}", boost::none));
+                  ->setFromString("{transaction: {verbosity: 3}}", boost::none));
 
     for (const auto& shardId : kThreeShardIdList) {
         auto shardTargeter = RemoteCommandTargeterMock::get(

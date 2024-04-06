@@ -34,15 +34,11 @@
 
 namespace mongo {
 
-class OperationContext;
-
 /**
  * Search index configuration options
  */
 struct SearchIndexParams {
-    static Status onValidateHost(OperationContext* opCtx,
-                                 StringData str,
-                                 const boost::optional<TenantId>&);
+    static Status onValidateHost(StringData str, const boost::optional<TenantId>&);
     std::string host = "";
     // The search index server doesn't support our authentication protocol at this time,
     // so this is `true` by default.

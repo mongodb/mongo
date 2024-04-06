@@ -34,8 +34,11 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -44,7 +47,6 @@
 namespace mongo {
 
 Status validateChangeStreamsClusterParameter(
-    OperationContext* opCtx,
     const ChangeStreamsClusterParameterStorage& clusterParameter,
     const boost::optional<TenantId>& tenantId) {
     if (clusterParameter.getExpireAfterSeconds() <= 0) {

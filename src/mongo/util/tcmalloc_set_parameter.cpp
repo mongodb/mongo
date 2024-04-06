@@ -212,8 +212,7 @@ void TCMallocMaxPerCPUCacheSizeServerParameter::append(OperationContext*,
 #endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 }
 
-Status TCMallocMaxPerCPUCacheSizeServerParameter::set(OperationContext* opCtx,
-                                                      const BSONElement& newValueElement,
+Status TCMallocMaxPerCPUCacheSizeServerParameter::set(const BSONElement& newValueElement,
                                                       const boost::optional<TenantId>&) {
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
     return doSetProperty<TCMallocMaxPerCPUCacheSizeServerParameter>(name(), newValueElement);
@@ -226,8 +225,7 @@ Status TCMallocMaxPerCPUCacheSizeServerParameter::set(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status TCMallocMaxPerCPUCacheSizeServerParameter::setFromString(OperationContext* opCtx,
-                                                                StringData str,
+Status TCMallocMaxPerCPUCacheSizeServerParameter::setFromString(StringData str,
                                                                 const boost::optional<TenantId>&) {
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
     return doSetPropertyFromString<TCMallocMaxPerCPUCacheSizeServerParameter>(str);
@@ -249,8 +247,7 @@ void TCMallocMaxTotalThreadCacheBytesServerParameter::append(OperationContext*,
 #endif  // MONGO_CONFIG_TCMALLOC_GPERF
 }
 
-Status TCMallocMaxTotalThreadCacheBytesServerParameter::set(OperationContext* opCtx,
-                                                            const BSONElement& newValueElement,
+Status TCMallocMaxTotalThreadCacheBytesServerParameter::set(const BSONElement& newValueElement,
                                                             const boost::optional<TenantId>&) {
 #ifdef MONGO_CONFIG_TCMALLOC_GPERF
     return doSetProperty<TCMallocMaxTotalThreadCacheBytesServerParameter>(name(), newValueElement);
@@ -264,7 +261,7 @@ Status TCMallocMaxTotalThreadCacheBytesServerParameter::set(OperationContext* op
 }
 
 Status TCMallocMaxTotalThreadCacheBytesServerParameter::setFromString(
-    OperationContext* opCtx, StringData str, const boost::optional<TenantId>&) {
+    StringData str, const boost::optional<TenantId>&) {
 #ifdef MONGO_CONFIG_TCMALLOC_GPERF
     return doSetPropertyFromString<TCMallocMaxTotalThreadCacheBytesServerParameter>(str);
 #endif  // MONGO_CONFIG_TCMALLOC_GPERF
@@ -285,8 +282,7 @@ void TCMallocAggressiveMemoryDecommitServerParameter::append(OperationContext*,
 #endif  //  MONGO_CONFIG_TCMALLOC_GPERF
 }
 
-Status TCMallocAggressiveMemoryDecommitServerParameter::set(OperationContext* opCtx,
-                                                            const BSONElement& newValueElement,
+Status TCMallocAggressiveMemoryDecommitServerParameter::set(const BSONElement& newValueElement,
                                                             const boost::optional<TenantId>&) {
 #ifdef MONGO_CONFIG_TCMALLOC_GPERF
     return doSetProperty<TCMallocAggressiveMemoryDecommitServerParameter>(name(), newValueElement);
@@ -300,7 +296,7 @@ Status TCMallocAggressiveMemoryDecommitServerParameter::set(OperationContext* op
 }
 
 Status TCMallocAggressiveMemoryDecommitServerParameter::setFromString(
-    OperationContext* opCtx, StringData str, const boost::optional<TenantId>&) {
+    StringData str, const boost::optional<TenantId>&) {
 #ifdef MONGO_CONFIG_TCMALLOC_GPERF
     return doSetPropertyFromString<TCMallocAggressiveMemoryDecommitServerParameter>(str);
 #endif  //  MONGO_CONFIG_TCMALLOC_GPERF
@@ -319,8 +315,7 @@ void TCMallocReleaseRateServerParameter::append(OperationContext*,
     builder->append(fieldName, getMemoryReleaseRate());
 }
 
-Status TCMallocReleaseRateServerParameter::setFromString(OperationContext* opCtx,
-                                                         StringData tcmallocReleaseRate,
+Status TCMallocReleaseRateServerParameter::setFromString(StringData tcmallocReleaseRate,
                                                          const boost::optional<TenantId>&) {
     double value;
     Status status = NumberParser{}(tcmallocReleaseRate, &value);

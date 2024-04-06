@@ -59,8 +59,7 @@
 
 namespace mongo {
 
-Status validateCollectionStatsNamespaces(OperationContext* opCtx,
-                                         const std::vector<std::string> value,
+Status validateCollectionStatsNamespaces(const std::vector<std::string> value,
                                          const boost::optional<TenantId>& tenantId) {
     try {
         for (const auto& nsStr : value) {

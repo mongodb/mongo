@@ -196,8 +196,7 @@ getFCVAndClusterParametersFromConfigServer() {
 
 }  // namespace
 
-Status clusterServerParameterRefreshIntervalSecsNotify(OperationContext* opCtx,
-                                                       const int& newValue) {
+Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue) {
     LOGV2_DEBUG(6226400,
                 5,
                 "Set clusterServerParameterRefresher interval seconds",
@@ -334,11 +333,11 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
             auto it = tenantParamDocs.find(name);
             if (it == tenantParamDocs.end()) {
                 // Reset the local parameter to its default value.
-                status = sp->reset(opCtx, tenantId);
+                status = sp->reset(tenantId);
             } else {
                 // Set the local parameter to the pulled value.
                 const auto& clusterParameterDoc = it->second;
-                status = sp->set(opCtx, clusterParameterDoc, tenantId);
+                status = sp->set(clusterParameterDoc, tenantId);
             }
 
             if (!status.isOK()) {

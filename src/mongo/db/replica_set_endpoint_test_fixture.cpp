@@ -42,7 +42,6 @@ void ReplicaSetEndpointTest::setHasTwoOrShardsClusterParameter(bool value) {
         clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
             "shardedClusterCardinalityForDirectConns");
     uassertStatusOK(clusterCardinalityParam->set(
-        nullptr,
         BSON("shardedClusterCardinalityForDirectConns"
              << BSON(ShardedClusterCardinalityParam::kHasTwoOrMoreShardsFieldName << value))
             .firstElement(),

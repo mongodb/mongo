@@ -54,8 +54,7 @@ void RedactEncryptedFields::append(OperationContext* opCtx,
     *b << name << logv2::shouldRedactBinDataEncrypt();
 }
 
-Status RedactEncryptedFields::set(OperationContext* opCtx,
-                                  const BSONElement& newValueElement,
+Status RedactEncryptedFields::set(const BSONElement& newValueElement,
                                   const boost::optional<TenantId>&) {
     bool newVal;
     if (!newValueElement.coerce(&newVal)) {
@@ -67,9 +66,7 @@ Status RedactEncryptedFields::set(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status RedactEncryptedFields::setFromString(OperationContext* opCtx,
-                                            StringData str,
-                                            const boost::optional<TenantId>&) {
+Status RedactEncryptedFields::setFromString(StringData str, const boost::optional<TenantId>&) {
     if (str == "true" || str == "1") {
         logv2::setShouldRedactBinDataEncrypt(true);
     } else if (str == "false" || str == "0") {

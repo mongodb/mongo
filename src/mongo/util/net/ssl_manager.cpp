@@ -410,8 +410,7 @@ void ClusterAuthDNOverrideParameter::append(OperationContext* opCtx,
     }
 }
 
-Status ClusterAuthDNOverrideParameter::setFromString(OperationContext* opCtx,
-                                                     StringData str,
+Status ClusterAuthDNOverrideParameter::setFromString(StringData str,
                                                      const boost::optional<TenantId>&) {
     if (str.empty()) {
         *clusterAuthDNOverride = boost::none;

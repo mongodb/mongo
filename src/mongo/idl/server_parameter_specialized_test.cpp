@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -55,6 +56,8 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/matcher.h"
+#include "mongo/unittest/matcher_core.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 
@@ -114,8 +117,7 @@ void SpecializedDummyServerParameter::append(OperationContext*,
     *b << name << "Dummy Value";
 }
 
-Status SpecializedDummyServerParameter::setFromString(OperationContext*,
-                                                      StringData value,
+Status SpecializedDummyServerParameter::setFromString(StringData value,
                                                       const boost::optional<TenantId>&) {
     return Status::OK();
 }
@@ -123,10 +125,9 @@ Status SpecializedDummyServerParameter::setFromString(OperationContext*,
 TEST(SpecializedServerParameter, dummy) {
     auto* dsp = getServerParameter("specializedDummy");
     ASSERT_APPENDED_STRING(dsp, "Dummy Value");
-    ASSERT_OK(dsp->setFromString(nullptr, "new value", boost::none));
-    ASSERT_NOT_OK(dsp->set(nullptr, BSON("" << BSON_ARRAY("bar")).firstElement(), boost::none));
-    ASSERT_OK(dsp->set(nullptr,
-                       BSON(""
+    ASSERT_OK(dsp->setFromString("new value", boost::none));
+    ASSERT_NOT_OK(dsp->set(BSON("" << BSON_ARRAY("bar")).firstElement(), boost::none));
+    ASSERT_OK(dsp->set(BSON(""
                             << "bar")
                            .firstElement(),
                        boost::none));
@@ -151,8 +152,7 @@ void SpecializedConstructorServerParameter::append(OperationContext*,
     *b << name << gSCSP;
 }
 
-Status SpecializedConstructorServerParameter::setFromString(OperationContext*,
-                                                            StringData value,
+Status SpecializedConstructorServerParameter::setFromString(StringData value,
                                                             const boost::optional<TenantId>&) {
     gSCSP = value.toString();
     return Status::OK();
@@ -161,7 +161,7 @@ Status SpecializedConstructorServerParameter::setFromString(OperationContext*,
 TEST(SpecializedServerParameter, withCtor) {
     auto* csp = getServerParameter("specializedWithCtor");
     ASSERT_APPENDED_STRING(csp, "Value from ctor");
-    ASSERT_OK(csp->setFromString(nullptr, "Updated Value", boost::none));
+    ASSERT_OK(csp->setFromString("Updated Value", boost::none));
     ASSERT_EQ(gSCSP, "Updated Value");
     ASSERT_APPENDED_STRING(csp, "Updated Value");
 }
@@ -175,8 +175,7 @@ void SpecializedWithValueServerParameter::append(OperationContext*,
     *b << name << _data;
 }
 
-Status SpecializedWithValueServerParameter::setFromString(OperationContext*,
-                                                          StringData value,
+Status SpecializedWithValueServerParameter::setFromString(StringData value,
                                                           const boost::optional<TenantId>&) {
     return NumberParser{}(value, &_data);
 }
@@ -188,7 +187,7 @@ TEST(SpecializedServerParameter, withValue) {
     auto* wv = getServerParameter<cls>("specializedWithValue");
     ASSERT_EQ(wv->_data, cls::kDataDefault);
     ASSERT_APPENDED_INT(wv, cls::kDataDefault);
-    ASSERT_OK(wv->setFromString(nullptr, "102", boost::none));
+    ASSERT_OK(wv->setFromString("102", boost::none));
     ASSERT_APPENDED_INT(wv, 102);
     ASSERT_EQ(wv->_data, 102);
 }
@@ -202,8 +201,7 @@ void SpecializedWithStringValueServerParameter::append(OperationContext*,
     *b << name << _data;
 }
 
-Status SpecializedWithStringValueServerParameter::setFromString(OperationContext*,
-                                                                StringData value,
+Status SpecializedWithStringValueServerParameter::setFromString(StringData value,
                                                                 const boost::optional<TenantId>&) {
     _data = value.toString();
     return Status::OK();
@@ -216,7 +214,7 @@ TEST(SpecializedServerParameter, withStringValue) {
     auto* wsv = getServerParameter<cls>("specializedWithStringValue");
     ASSERT_EQ(wsv->_data, cls::kDataDefault);
     ASSERT_APPENDED_STRING(wsv, cls::kDataDefault);
-    ASSERT_OK(wsv->setFromString(nullptr, "Goodbye Land", boost::none));
+    ASSERT_OK(wsv->setFromString("Goodbye Land", boost::none));
     ASSERT_APPENDED_STRING(wsv, "Goodbye Land");
     ASSERT_EQ(wsv->_data, "Goodbye Land");
 }
@@ -230,8 +228,7 @@ void SpecializedWithAtomicValueServerParameter::append(OperationContext*,
     *b << name << _data.load();
 }
 
-Status SpecializedWithAtomicValueServerParameter::setFromString(OperationContext*,
-                                                                StringData value,
+Status SpecializedWithAtomicValueServerParameter::setFromString(StringData value,
                                                                 const boost::optional<TenantId>&) {
     std::uint32_t val;
 
@@ -251,9 +248,9 @@ TEST(SpecializedServerParameter, withAtomicValue) {
     auto* wv = getServerParameter<cls>("specializedWithAtomicValue");
     ASSERT_EQ(wv->_data.load(), cls::kDataDefault);
     ASSERT_APPENDED_INT(wv, cls::kDataDefault);
-    ASSERT_OK(wv->set(nullptr, BSON("" << 99).firstElement(), boost::none));
+    ASSERT_OK(wv->set(BSON("" << 99).firstElement(), boost::none));
     ASSERT_APPENDED_INT(wv, 99);
-    ASSERT_OK(wv->setFromString(nullptr, "101", boost::none));
+    ASSERT_OK(wv->setFromString("101", boost::none));
     ASSERT_APPENDED_INT(wv, 101);
     ASSERT_EQ(wv->_data.load(), 101);
 }
@@ -267,8 +264,7 @@ void SpecializedMultiValueServerParameter::append(OperationContext*,
     *b << name << BSON("value" << _data.value << "flag" << _data.flag);
 }
 
-Status SpecializedMultiValueServerParameter::set(OperationContext*,
-                                                 const BSONElement& value,
+Status SpecializedMultiValueServerParameter::set(const BSONElement& value,
                                                  const boost::optional<TenantId>&) try {
     auto obj = value.Obj();
     _data.value = obj["value"].String();
@@ -278,11 +274,9 @@ Status SpecializedMultiValueServerParameter::set(OperationContext*,
     return {ErrorCodes::BadValue, "Failed parsing extra data"};
 }
 
-Status SpecializedMultiValueServerParameter::setFromString(OperationContext*,
-                                                           StringData value,
+Status SpecializedMultiValueServerParameter::setFromString(StringData value,
                                                            const boost::optional<TenantId>&) {
-    return set(
-        nullptr, BSON("" << BSON("value" << value << "flag" << false)).firstElement(), boost::none);
+    return set(BSON("" << BSON("value" << value << "flag" << false)).firstElement(), boost::none);
 }
 
 TEST(SpecializedServerParameter, multiValue) {
@@ -291,13 +285,12 @@ TEST(SpecializedServerParameter, multiValue) {
                            BSON("value"
                                 << "start value"
                                 << "flag" << true));
-    ASSERT_OK(edsp->setFromString(nullptr, "second value", boost::none));
+    ASSERT_OK(edsp->setFromString("second value", boost::none));
     ASSERT_APPENDED_OBJECT(edsp,
                            BSON("value"
                                 << "second value"
                                 << "flag" << false));
-    ASSERT_OK(edsp->set(nullptr,
-                        BSON("" << BSON("value"
+    ASSERT_OK(edsp->set(BSON("" << BSON("value"
                                         << "third value"
                                         << "flag" << true))
                             .firstElement(),
@@ -321,8 +314,7 @@ void SpecializedWithCtorAndValueServerParameter::append(OperationContext*,
     *b << name << _data;
 }
 
-Status SpecializedWithCtorAndValueServerParameter::setFromString(OperationContext*,
-                                                                 StringData value,
+Status SpecializedWithCtorAndValueServerParameter::setFromString(StringData value,
                                                                  const boost::optional<TenantId>&) {
     return NumberParser{}(value, &_data);
 }
@@ -331,7 +323,7 @@ TEST(SpecializedServerParameter, withCtorAndValue) {
     using cls = SpecializedWithCtorAndValueServerParameter;
     auto* cvsp = getServerParameter<cls>("specializedWithCtorAndValue");
     ASSERT_APPENDED_INT(cvsp, cls::kDataDefault);
-    ASSERT_OK(cvsp->setFromString(nullptr, std::to_string(cls::kDataDefault + 1), boost::none));
+    ASSERT_OK(cvsp->setFromString(std::to_string(cls::kDataDefault + 1), boost::none));
     ASSERT_EQ(cvsp->_data, cls::kDataDefault + 1);
     ASSERT_APPENDED_INT(cvsp, cls::kDataDefault + 1);
 }
@@ -342,9 +334,7 @@ namespace {
 std::string gSWO = "Initial Value";
 }  // namespace
 
-Status SpecializedWithOptions::setFromString(OperationContext*,
-                                             StringData value,
-                                             const boost::optional<TenantId>&) {
+Status SpecializedWithOptions::setFromString(StringData value, const boost::optional<TenantId>&) {
     gSWO = value.toString();
     return Status::OK();
 }
@@ -352,13 +342,13 @@ Status SpecializedWithOptions::setFromString(OperationContext*,
 TEST(SpecializedServerParameter, withOptions) {
     auto* swo = getServerParameter("specializedWithOptions");
     ASSERT_APPENDED_STRING(swo, "###");
-    ASSERT_OK(swo->setFromString(nullptr, "second value", boost::none));
+    ASSERT_OK(swo->setFromString("second value", boost::none));
     ASSERT_EQ(gSWO, "second value");
     ASSERT_APPENDED_STRING(swo, "###");
 
     auto* dswo = getServerParameter("deprecatedWithOptions");
     ASSERT_APPENDED_STRING(dswo, "###");
-    ASSERT_OK(dswo->setFromString(nullptr, "third value", boost::none));
+    ASSERT_OK(dswo->setFromString("third value", boost::none));
     ASSERT_EQ(gSWO, "third value");
     ASSERT_APPENDED_STRING(dswo, "###");
 }
@@ -370,14 +360,11 @@ void SpecializedRuntimeOnly::append(OperationContext*,
                                     StringData,
                                     const boost::optional<TenantId>&) {}
 
-Status SpecializedRuntimeOnly::setFromString(OperationContext*,
-                                             StringData value,
-                                             const boost::optional<TenantId>&) {
+Status SpecializedRuntimeOnly::setFromString(StringData value, const boost::optional<TenantId>&) {
     return Status::OK();
 }
 
-Status SpecializedRedactedSettable::setFromString(OperationContext*,
-                                                  StringData value,
+Status SpecializedRedactedSettable::setFromString(StringData value,
                                                   const boost::optional<TenantId>&) {
     std::cout << "Setting to: " << value << "\n";
     _data = value.toString();
@@ -395,7 +382,7 @@ TEST(SpecializedServerParameter, SpecializedRedactedSettable) {
     auto& dataMember = down->_data;
 
     auto store = [&](auto&& name, auto&& value) {
-        return sp->set(nullptr, BSON(name << value).firstElement(), boost::none);
+        return sp->set(BSON(name << value).firstElement(), boost::none);
     };
     auto load = [&] {
         BSONObjBuilder bob;
@@ -454,16 +441,13 @@ void SpecializedWithValidateServerParameter::append(OperationContext*,
                                                     StringData,
                                                     const boost::optional<TenantId>&) {}
 
-Status SpecializedWithValidateServerParameter::setFromString(OperationContext*,
-                                                             StringData str,
+Status SpecializedWithValidateServerParameter::setFromString(StringData str,
                                                              const boost::optional<TenantId>&) {
     return NumberParser{}(str, &_data);
 }
 
 Status SpecializedWithValidateServerParameter::validate(
-    OperationContext*,
-    const BSONElement& newValueElement,
-    const boost::optional<TenantId>& tenantId) const {
+    const BSONElement& newValueElement, const boost::optional<TenantId>& tenantId) const {
     try {
         auto val = newValueElement.Int();
         if (val < 0) {
@@ -485,20 +469,18 @@ TEST(SpecializedServerParameter, withValidate) {
     ASSERT(nullptr != validateSP);
 
     // Assert that validate works by itself.
-    ASSERT_OK(validateSP->validate(
-        nullptr, BSON(kSpecializedWithValidate << 5).firstElement(), boost::none));
-    ASSERT_OK(validateSP->validate(
-        nullptr, BSON(kSpecializedWithValidate << 0).firstElement(), boost::none));
-    ASSERT_NOT_OK(validateSP->validate(
-        nullptr, BSON(kSpecializedWithValidate << -1).firstElement(), boost::none));
+    ASSERT_OK(
+        validateSP->validate(BSON(kSpecializedWithValidate << 5).firstElement(), boost::none));
+    ASSERT_OK(
+        validateSP->validate(BSON(kSpecializedWithValidate << 0).firstElement(), boost::none));
+    ASSERT_NOT_OK(
+        validateSP->validate(BSON(kSpecializedWithValidate << -1).firstElement(), boost::none));
 
     // Assert that validate works when called within set.
-    ASSERT_OK(
-        validateSP->set(nullptr, BSON(kSpecializedWithValidate << 5).firstElement(), boost::none));
-    ASSERT_OK(
-        validateSP->set(nullptr, BSON(kSpecializedWithValidate << 0).firstElement(), boost::none));
+    ASSERT_OK(validateSP->set(BSON(kSpecializedWithValidate << 5).firstElement(), boost::none));
+    ASSERT_OK(validateSP->set(BSON(kSpecializedWithValidate << 0).firstElement(), boost::none));
     ASSERT_NOT_OK(
-        validateSP->set(nullptr, BSON(kSpecializedWithValidate << -1).firstElement(), boost::none));
+        validateSP->set(BSON(kSpecializedWithValidate << -1).firstElement(), boost::none));
 }
 
 // specializedWithClusterServerParameter
@@ -511,10 +493,9 @@ void SpecializedClusterServerParameter::append(OperationContext*,
     builder->appendElementsUnique(_data.toBSON());
 }
 
-Status SpecializedClusterServerParameter::set(OperationContext* opCtx,
-                                              const BSONElement& newValueElement,
+Status SpecializedClusterServerParameter::set(const BSONElement& newValueElement,
                                               const boost::optional<TenantId>& tenantId) {
-    Status status = validate(opCtx, newValueElement, tenantId);
+    Status status = validate(newValueElement, tenantId);
     if (!status.isOK()) {
         return status;
     }
@@ -524,9 +505,7 @@ Status SpecializedClusterServerParameter::set(OperationContext* opCtx,
 }
 
 Status SpecializedClusterServerParameter::validate(
-    OperationContext*,
-    const BSONElement& newValueElement,
-    const boost::optional<TenantId>& tenantId) const {
+    const BSONElement& newValueElement, const boost::optional<TenantId>& tenantId) const {
     try {
         auto obj = newValueElement.Obj();
         auto strValue = obj["strData"_sd].String();
@@ -543,8 +522,7 @@ Status SpecializedClusterServerParameter::validate(
     return Status::OK();
 }
 
-Status SpecializedClusterServerParameter::reset(OperationContext*,
-                                                const boost::optional<TenantId>& tenantId) {
+Status SpecializedClusterServerParameter::reset(const boost::optional<TenantId>& tenantId) {
     _data.reset();
     return Status::OK();
 }
@@ -570,10 +548,10 @@ TEST(SpecializedServerParameter, clusterServerParameter) {
     data.setStrData("hello");
     data.setId(kSpecializedCSPName);
     data.serialize(&builder);
-    ASSERT_OK(specializedCsp->set(nullptr, builder.asTempObj(), boost::none));
+    ASSERT_OK(specializedCsp->set(builder.asTempObj(), boost::none));
 
     // Assert that the parameter cannot be set from strings.
-    ASSERT_NOT_OK(specializedCsp->setFromString(nullptr, "", boost::none));
+    ASSERT_NOT_OK(specializedCsp->setFromString("", boost::none));
 
     // Assert that the clusterParameterTime can be retrieved.
     ASSERT_EQ(specializedCsp->getClusterParameterTime(boost::none), updateTime);
@@ -595,12 +573,12 @@ TEST(SpecializedServerParameter, clusterServerParameter) {
     data.setIntData(-1);
     data.setStrData("");
     data.serialize(&builder);
-    ASSERT_NOT_OK(specializedCsp->validate(nullptr, builder.asTempObj(), boost::none));
-    ASSERT_NOT_OK(specializedCsp->set(nullptr, builder.asTempObj(), boost::none));
+    ASSERT_NOT_OK(specializedCsp->validate(builder.asTempObj(), boost::none));
+    ASSERT_NOT_OK(specializedCsp->set(builder.asTempObj(), boost::none));
 
     // Assert that the parameter can be reset to its defaults.
     builder.resetToEmpty();
-    ASSERT_OK(specializedCsp->reset(nullptr, boost::none));
+    ASSERT_OK(specializedCsp->reset(boost::none));
     specializedCsp->append(nullptr, &builder, kSpecializedCSPName.toString(), boost::none);
     obj = builder.asTempObj();
     ASSERT_EQ(obj.nFields(), 4);

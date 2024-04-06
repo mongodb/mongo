@@ -68,16 +68,12 @@ const std::string getSSLVersion(const std::string& prefix, const std::string& su
 /**
  * Validation callback for setParameter 'opensslCipherConfig'.
  */
-Status validateOpensslCipherConfig(OperationContext* opCtx,
-                                   const std::string&,
-                                   const boost::optional<TenantId>&);
+Status validateOpensslCipherConfig(const std::string&, const boost::optional<TenantId>&);
 
 /**
  * Validation callback for setParameter 'disableNonTLSConnectionLogging'.
  */
-Status validateDisableNonTLSConnectionLogging(OperationContext* opCtx,
-                                              const bool&,
-                                              const boost::optional<TenantId>&);
+Status validateDisableNonTLSConnectionLogging(const bool&, const boost::optional<TenantId>&);
 }  // namespace mongo
 
 #ifdef MONGO_CONFIG_SSL

@@ -59,10 +59,9 @@ MONGO_INITIALIZER_GROUP(EndServerParameterRegistration,
 ServerParameter::ServerParameter(StringData name, ServerParameterType spt)
     : _name{name}, _type(spt) {}
 
-Status ServerParameter::set(OperationContext* opCtx,
-                            const BSONElement& newValueElement,
+Status ServerParameter::set(const BSONElement& newValueElement,
                             const boost::optional<TenantId>& tenantId) {
-    auto validateStatus = validate(opCtx, newValueElement, tenantId);
+    auto validateStatus = validate(newValueElement, tenantId);
     if (!validateStatus.isOK()) {
         return validateStatus;
     }
@@ -70,7 +69,7 @@ Status ServerParameter::set(OperationContext* opCtx,
     auto swValue = _coerceToString(newValueElement);
     if (!swValue.isOK())
         return swValue.getStatus();
-    return setFromString(opCtx, swValue.getValue(), boost::none);
+    return setFromString(swValue.getValue(), boost::none);
 }
 
 ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
@@ -193,19 +192,17 @@ void IDLServerParameterDeprecatedAlias::append(OperationContext* opCtx,
     _sp->append(opCtx, b, fieldName, tenantId);
 }
 
-Status IDLServerParameterDeprecatedAlias::reset(OperationContext* opCtx,
-                                                const boost::optional<TenantId>& tenantId) {
+Status IDLServerParameterDeprecatedAlias::reset(const boost::optional<TenantId>& tenantId) {
     std::call_once(_warnOnce, [&] {
         LOGV2_WARNING(636301,
                       "Use of deprecated server parameter name",
                       "deprecatedName"_attr = name(),
                       "canonicalName"_attr = _sp->name());
     });
-    return _sp->reset(opCtx, tenantId);
+    return _sp->reset(tenantId);
 }
 
-Status IDLServerParameterDeprecatedAlias::set(OperationContext* opCtx,
-                                              const BSONElement& newValueElement,
+Status IDLServerParameterDeprecatedAlias::set(const BSONElement& newValueElement,
                                               const boost::optional<TenantId>& tenantId) {
     std::call_once(_warnOnce, [&] {
         LOGV2_WARNING(636302,
@@ -213,11 +210,10 @@ Status IDLServerParameterDeprecatedAlias::set(OperationContext* opCtx,
                       "deprecatedName"_attr = name(),
                       "canonicalName"_attr = _sp->name());
     });
-    return _sp->set(opCtx, newValueElement, tenantId);
+    return _sp->set(newValueElement, tenantId);
 }
 
-Status IDLServerParameterDeprecatedAlias::setFromString(OperationContext* opCtx,
-                                                        StringData str,
+Status IDLServerParameterDeprecatedAlias::setFromString(StringData str,
                                                         const boost::optional<TenantId>& tenantId) {
     std::call_once(_warnOnce, [&] {
         LOGV2_WARNING(636303,
@@ -225,7 +221,7 @@ Status IDLServerParameterDeprecatedAlias::setFromString(OperationContext* opCtx,
                       "deprecatedName"_attr = name(),
                       "canonicalName"_attr = _sp->name());
     });
-    return _sp->setFromString(opCtx, str, tenantId);
+    return _sp->setFromString(str, tenantId);
 }
 
 void ServerParameterSet::disableTestParameters() {

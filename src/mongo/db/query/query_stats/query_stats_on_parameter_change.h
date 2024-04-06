@@ -34,21 +34,23 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
 
 namespace mongo::query_stats_util {
 
-Status onQueryStatsStoreSizeUpdate(OperationContext* opCtx, const std::string& str);
+Status onQueryStatsStoreSizeUpdate(const std::string& str);
 
-Status validateQueryStatsStoreSize(OperationContext*,
-                                   const std::string& str,
-                                   const boost::optional<TenantId>&);
 
-Status onQueryStatsSamplingRateUpdate(OperationContext* opCtx, int samplingRate);
+Status validateQueryStatsStoreSize(const std::string& str, const boost::optional<TenantId>&);
+
+Status onQueryStatsSamplingRateUpdate(int samplingRate);
 
 /**
  * An interface used to modify the queryStats store when query setParameters are modified. This is

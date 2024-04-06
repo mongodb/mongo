@@ -61,7 +61,7 @@ Status clearSbeCacheOnParameterChangeHelper() {
     return Status::OK();
 }
 
-Status onPlanCacheSizeUpdate(OperationContext* opCtx, const std::string& str) {
+Status onPlanCacheSizeUpdate(const std::string& str) {
     auto newSize = memory_util::MemorySize::parse(str);
     if (!newSize.isOK()) {
         return newSize.getStatus();
@@ -78,9 +78,7 @@ Status onPlanCacheSizeUpdate(OperationContext* opCtx, const std::string& str) {
     return Status::OK();
 }
 
-Status validatePlanCacheSize(OperationContext* opCtx,
-                             const std::string& str,
-                             const boost::optional<TenantId>&) {
+Status validatePlanCacheSize(const std::string& str, const boost::optional<TenantId>&) {
     return memory_util::MemorySize::parse(str).getStatus();
 }
 

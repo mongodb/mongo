@@ -36,15 +36,9 @@
 #include "mongo/base/status.h"
 #include "mongo/db/tenant_id.h"
 
-namespace mongo {
 
-class OperationContext;
+namespace mongo::optimizer {
 
-namespace optimizer {
+Status validateOptimizerExplainVersion(const std::string& value, const boost::optional<TenantId>&);
 
-Status validateOptimizerExplainVersion(OperationContext* opCtx,
-                                       const std::string& value,
-                                       const boost::optional<TenantId>&);
-
-}  // namespace optimizer
-}  // namespace mongo
+}  // namespace mongo::optimizer

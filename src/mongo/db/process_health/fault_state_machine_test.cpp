@@ -383,7 +383,7 @@ TEST_F(FaultManagerTest, DNSHealthCheckWithBadHostNameFailsAndGoodHostNameSucces
                                                     << "interval" << 1000)));
     const BSONObj newParameterObj = BSON("key" << bsonOBj);
     auto element = newParameterObj.getField("key");
-    uassertStatusOK(serverParam->set(nullptr, element, boost::none));
+    uassertStatusOK(serverParam->set(element, boost::none));
 
     registerHealthObserver<DnsHealthObserver>();
     globalFailPointRegistry()

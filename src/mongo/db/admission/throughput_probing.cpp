@@ -52,9 +52,7 @@ namespace mongo {
 namespace admission {
 namespace throughput_probing {
 
-Status validateInitialConcurrency(OperationContext*,
-                                  int32_t concurrency,
-                                  const boost::optional<TenantId>&) {
+Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&) {
     if (concurrency < gMinConcurrency) {
         return {ErrorCodes::BadValue,
                 "Throughput probing initial concurrency cannot be less than minimum concurrency"};
@@ -69,9 +67,7 @@ Status validateInitialConcurrency(OperationContext*,
     return Status::OK();
 }
 
-Status validateMinConcurrency(OperationContext*,
-                              int32_t concurrency,
-                              const boost::optional<TenantId>&) {
+Status validateMinConcurrency(int32_t concurrency, const boost::optional<TenantId>&) {
     if (concurrency < 1) {
         return {ErrorCodes::BadValue,
                 "Throughput probing minimum concurrency cannot be less than 1"};
@@ -86,9 +82,7 @@ Status validateMinConcurrency(OperationContext*,
     return Status::OK();
 }
 
-Status validateMaxConcurrency(OperationContext*,
-                              int32_t concurrency,
-                              const boost::optional<TenantId>&) {
+Status validateMaxConcurrency(int32_t concurrency, const boost::optional<TenantId>&) {
     if (concurrency < gMinConcurrency) {
         return {ErrorCodes::BadValue,
                 "Throughput probing maximum concurrency cannot be less than minimum concurrency"};

@@ -136,7 +136,7 @@ TEST_F(ClusterParameterServerStatusTest, DoNotReportDisabledParameters) {
 
 TEST_F(ClusterParameterServerStatusTest, DoNotReportUnsetParameters) {
     auto parameter = std::addressof(_testParameters[0]->parameter);
-    ASSERT_OK(parameter->reset(nullptr, boost::none));
+    ASSERT_OK(parameter->reset(boost::none));
     _parameterSet.add(parameter);
     ASSERT_BSONOBJ_EQ(getReport(), BSONObj::kEmptyObject);
 }

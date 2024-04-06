@@ -220,7 +220,7 @@ protected:
 
         auto oldSettings = changeStreamsParam->getValue(_tenantId);
         oldSettings.setExpireAfterSeconds(seconds.count());
-        changeStreamsParam->setValue(opCtx, oldSettings, _tenantId).ignore();
+        changeStreamsParam->setValue(oldSettings, _tenantId).ignore();
     }
 
     size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,

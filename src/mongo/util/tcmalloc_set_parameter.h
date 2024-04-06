@@ -33,8 +33,6 @@
 
 namespace mongo {
 
-class OperationContext;
-
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 using TcmallocReleaseRateT = long long;
 #elif defined(MONGO_CONFIG_TCMALLOC_GPERF)

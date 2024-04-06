@@ -80,10 +80,11 @@ void IngressAdmissionController::appendStats(BSONObjBuilder& b) const {
     _ticketHolder->appendStats(b);
 }
 
-Status IngressAdmissionController::onUpdateTicketPoolSize(OperationContext* opCtx,
-                                                          int32_t newValue) try {
-    if (opCtx) {
-        getIngressAdmissionController(opCtx->getServiceContext()).resizeTicketPool(opCtx, newValue);
+Status IngressAdmissionController::onUpdateTicketPoolSize(int32_t newValue) try {
+    if (auto client = Client::getCurrent()) {
+        auto opCtx = client->getOperationContext();
+        getIngressAdmissionController(client->getServiceContext())
+            .resizeTicketPool(opCtx, newValue);
     }
 
     return Status::OK();

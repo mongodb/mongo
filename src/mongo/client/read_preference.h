@@ -57,9 +57,7 @@ using ReadPreference = ReadPreferenceEnum;
 /**
  * Validate a ReadPreference string. This is intended for use as an IDL validator callback.
  */
-Status validateReadPreferenceMode(OperationContext* opCtx,
-                                  const std::string& prefStr,
-                                  const boost::optional<TenantId>&);
+Status validateReadPreferenceMode(const std::string& prefStr, const boost::optional<TenantId>&);
 
 /**
  * A simple object for representing the list of tags requested by a $readPreference.

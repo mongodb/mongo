@@ -53,23 +53,23 @@ namespace mongo::admission::throughput_probing {
 namespace {
 
 TEST(ThroughputProbingParameterTest, InitialConcurrency) {
-    ASSERT_OK(validateInitialConcurrency(nullptr, gMinConcurrency, {}));
-    ASSERT_OK(validateInitialConcurrency(nullptr, gMaxConcurrency.load(), {}));
-    ASSERT_NOT_OK(validateInitialConcurrency(nullptr, gMinConcurrency - 1, {}));
-    ASSERT_NOT_OK(validateInitialConcurrency(nullptr, gMaxConcurrency.load() + 1, {}));
+    ASSERT_OK(validateInitialConcurrency(gMinConcurrency, {}));
+    ASSERT_OK(validateInitialConcurrency(gMaxConcurrency.load(), {}));
+    ASSERT_NOT_OK(validateInitialConcurrency(gMinConcurrency - 1, {}));
+    ASSERT_NOT_OK(validateInitialConcurrency(gMaxConcurrency.load() + 1, {}));
 }
 
 TEST(ThroughputProbingParameterTest, MinConcurrency) {
-    ASSERT_OK(validateMinConcurrency(nullptr, 5, {}));
-    ASSERT_OK(validateMinConcurrency(nullptr, gMaxConcurrency.load(), {}));
-    ASSERT_NOT_OK(validateMinConcurrency(nullptr, 0, {}));
-    ASSERT_NOT_OK(validateMinConcurrency(nullptr, gMaxConcurrency.load() + 1, {}));
+    ASSERT_OK(validateMinConcurrency(5, {}));
+    ASSERT_OK(validateMinConcurrency(gMaxConcurrency.load(), {}));
+    ASSERT_NOT_OK(validateMinConcurrency(0, {}));
+    ASSERT_NOT_OK(validateMinConcurrency(gMaxConcurrency.load() + 1, {}));
 }
 
 TEST(ThroughputProbingParameterTest, MaxConcurrency) {
-    ASSERT_OK(validateMaxConcurrency(nullptr, gMinConcurrency, {}));
-    ASSERT_OK(validateMaxConcurrency(nullptr, 256, {}));
-    ASSERT_NOT_OK(validateMaxConcurrency(nullptr, gMinConcurrency - 1, {}));
+    ASSERT_OK(validateMaxConcurrency(gMinConcurrency, {}));
+    ASSERT_OK(validateMaxConcurrency(256, {}));
+    ASSERT_NOT_OK(validateMaxConcurrency(gMinConcurrency - 1, {}));
 }
 
 class ThroughputProbingTest : public unittest::Test {

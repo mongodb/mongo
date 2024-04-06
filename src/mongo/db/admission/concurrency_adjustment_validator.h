@@ -37,9 +37,8 @@
 #include "mongo/db/tenant_id.h"
 
 namespace mongo {
-class OperationContext;
-Status validateConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
-                                              const std::string& name,
+
+Status validateConcurrencyAdjustmentAlgorithm(const std::string& name,
                                               const boost::optional<TenantId>&);
 
 }  // namespace mongo

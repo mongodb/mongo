@@ -70,10 +70,10 @@ protected:
 void FeatureFlagTest::setUp() {
     // Set common flags which test the version string to true
     _featureFlagBlender = getServerParameter("featureFlagBlender");
-    ASSERT_OK(_featureFlagBlender->setFromString(nullptr, "true", boost::none));
+    ASSERT_OK(_featureFlagBlender->setFromString("true", boost::none));
 
     _featureFlagSpoon = getServerParameter("featureFlagSpoon");
-    ASSERT_OK(_featureFlagSpoon->setFromString(nullptr, "true", boost::none));
+    ASSERT_OK(_featureFlagSpoon->setFromString("true", boost::none));
 
     _featureFlagFork = getServerParameter("featureFlagFork");
 
@@ -89,9 +89,9 @@ TEST(IDLFeatureFlag, Basic) {
     ASSERT(feature_flags::gFeatureFlagToaster.isEnabledAndIgnoreFCVUnsafe() == false);
 
     auto* featureFlagToaster = getServerParameter("featureFlagToaster");
-    ASSERT_OK(featureFlagToaster->setFromString(nullptr, "true", boost::none));
+    ASSERT_OK(featureFlagToaster->setFromString("true", boost::none));
     ASSERT(feature_flags::gFeatureFlagToaster.isEnabledAndIgnoreFCVUnsafe() == true);
-    ASSERT_NOT_OK(featureFlagToaster->setFromString(nullptr, "alpha", boost::none));
+    ASSERT_NOT_OK(featureFlagToaster->setFromString("alpha", boost::none));
 
     // (Generic FCV reference): feature flag test
     ASSERT(feature_flags::gFeatureFlagToaster.getVersion() == multiversion::GenericFCV::kLatest);
@@ -107,9 +107,9 @@ TEST_F(FeatureFlagTest, Version) {
     // (Generic FCV reference): feature flag test
     ASSERT(feature_flags::gFeatureFlagSpoon.getVersion() == multiversion::GenericFCV::kLastLTS);
 
-    ASSERT_OK(_featureFlagBlender->setFromString(nullptr, "false", boost::none));
+    ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
     ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCVUnsafe() == false);
-    ASSERT_NOT_OK(_featureFlagBlender->setFromString(nullptr, "alpha", boost::none));
+    ASSERT_NOT_OK(_featureFlagBlender->setFromString("alpha", boost::none));
 
     ASSERT_THROWS(feature_flags::gFeatureFlagBlender.getVersion(), AssertionException);
 }
@@ -117,7 +117,7 @@ TEST_F(FeatureFlagTest, Version) {
 // Test feature flag server parameters are serialized correctly
 TEST_F(FeatureFlagTest, ServerStatus) {
     {
-        ASSERT_OK(_featureFlagBlender->setFromString(nullptr, "true", boost::none));
+        ASSERT_OK(_featureFlagBlender->setFromString("true", boost::none));
         ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCVUnsafe() == true);
 
         BSONObjBuilder builder;
@@ -133,7 +133,7 @@ TEST_F(FeatureFlagTest, ServerStatus) {
     }
 
     {
-        ASSERT_OK(_featureFlagBlender->setFromString(nullptr, "false", boost::none));
+        ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
         ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCVUnsafe() == false);
 
         BSONObjBuilder builder;
@@ -145,7 +145,7 @@ TEST_F(FeatureFlagTest, ServerStatus) {
     }
 
     {
-        ASSERT_OK(_featureFlagFork->setFromString(nullptr, "true", boost::none));
+        ASSERT_OK(_featureFlagFork->setFromString("true", boost::none));
         ASSERT(feature_flags::gFeatureFlagFork.isEnabledAndIgnoreFCVUnsafe() == true);
 
         BSONObjBuilder builder;
@@ -161,7 +161,7 @@ TEST_F(FeatureFlagTest, ServerStatus) {
     }
 
     {
-        ASSERT_OK(_featureFlagFork->setFromString(nullptr, "false", boost::none));
+        ASSERT_OK(_featureFlagFork->setFromString("false", boost::none));
         ASSERT(feature_flags::gFeatureFlagFork.isEnabledAndIgnoreFCVUnsafe() == false);
 
         BSONObjBuilder builder;
@@ -199,8 +199,8 @@ TEST_F(FeatureFlagTest, IsEnabledTrue) {
 TEST_F(FeatureFlagTest, IsEnabledFalse) {
     // Test FCV checks with disabled flag
     // Test newest version
-    ASSERT_OK(_featureFlagBlender->setFromString(nullptr, "false", boost::none));
-    ASSERT_OK(_featureFlagSpoon->setFromString(nullptr, "false", boost::none));
+    ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
+    ASSERT_OK(_featureFlagSpoon->setFromString("false", boost::none));
 
     // (Generic FCV reference): feature flag test
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
@@ -223,7 +223,7 @@ TEST_F(FeatureFlagTest, IsEnabledFalse) {
 // Test that the RAIIServerParameterControllerForTest works correctly on a feature flag.
 TEST_F(FeatureFlagTest, RAIIFeatureFlagController) {
     // Set false feature flag to true
-    ASSERT_OK(_featureFlagBlender->setFromString(nullptr, "false", boost::none));
+    ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
     {
         RAIIServerParameterControllerForTest controller("featureFlagBlender", true);
         ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(
@@ -233,7 +233,7 @@ TEST_F(FeatureFlagTest, RAIIFeatureFlagController) {
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     // Set true feature flag to false
-    ASSERT_OK(_featureFlagBlender->setFromString(nullptr, "true", boost::none));
+    ASSERT_OK(_featureFlagBlender->setFromString("true", boost::none));
     {
         RAIIServerParameterControllerForTest controller("featureFlagBlender", false);
         ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(
@@ -248,7 +248,7 @@ TEST_F(FeatureFlagTest, ShouldBeFCVGatedFalse) {
     // Test that feature flag that is enabled and not FCV gated will return true for isEnabled.
     // Test newest version
     // (Generic FCV reference): feature flag test
-    ASSERT_OK(_featureFlagFork->setFromString(nullptr, "true", boost::none));
+    ASSERT_OK(_featureFlagFork->setFromString("true", boost::none));
 
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 

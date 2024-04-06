@@ -722,8 +722,7 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
     }
 }
 
-Status FeatureCompatibilityVersionParameter::setFromString(OperationContext* opCtx,
-                                                           StringData,
+Status FeatureCompatibilityVersionParameter::setFromString(StringData,
                                                            const boost::optional<TenantId>&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter. See "

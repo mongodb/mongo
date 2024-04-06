@@ -241,8 +241,7 @@ void QuerySettingsClusterParameter::append(OperationContext* opCtx,
     querySettingsManager.appendQuerySettingsClusterParameterValue(opCtx, bob, tenantId);
 }
 
-Status QuerySettingsClusterParameter::set(OperationContext* opCtx,
-                                          const BSONElement& newValueElement,
+Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
                                           const boost::optional<TenantId>& tenantId) {
     auto& querySettingsManager = QuerySettingsManager::get(getGlobalServiceContext());
     auto newSettings = QuerySettingsClusterParameterValue::parse(
@@ -269,8 +268,7 @@ Status QuerySettingsClusterParameter::set(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status QuerySettingsClusterParameter::reset(OperationContext* opCtx,
-                                            const boost::optional<TenantId>& tenantId) {
+Status QuerySettingsClusterParameter::reset(const boost::optional<TenantId>& tenantId) {
     auto& querySettingsManager = QuerySettingsManager::get(getGlobalServiceContext());
     querySettingsManager.removeAllQueryShapeConfigurations(
         Client::getCurrent()->getOperationContext(), tenantId);

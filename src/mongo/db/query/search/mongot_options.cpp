@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
@@ -42,13 +43,11 @@ MongotParams::MongotParams() {
     host = kMongotHostDefault;
 }
 
-Status MongotParams::onSetHost(OperationContext* opCtx, const std::string&) {
+Status MongotParams::onSetHost(const std::string&) {
     return Status::OK();
 }
 
-Status MongotParams::onValidateHost(OperationContext* opCtx,
-                                    StringData str,
-                                    const boost::optional<TenantId>&) {
+Status MongotParams::onValidateHost(StringData str, const boost::optional<TenantId>&) {
     // Unset value is OK
     if (str.empty()) {
         return Status::OK();

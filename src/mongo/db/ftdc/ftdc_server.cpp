@@ -86,7 +86,7 @@ void DiagnosticDataCollectionDirectoryPathServerParameter::append(
 }
 
 Status DiagnosticDataCollectionDirectoryPathServerParameter::setFromString(
-    OperationContext* opCtx, StringData str, const boost::optional<TenantId>&) {
+    StringData str, const boost::optional<TenantId>&) {
     if (!hasGlobalServiceContext()) {
         ftdcDirectoryPathParameter = str.toString();
         return Status::OK();
@@ -108,7 +108,7 @@ boost::filesystem::path getFTDCDirectoryPathParameter() {
     return ftdcDirectoryPathParameter.get();
 }
 
-Status onUpdateFTDCEnabled(OperationContext* opCtx, const bool value) {
+Status onUpdateFTDCEnabled(const bool value) {
     if (FTDCController * controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         return controller->setEnabled(value);
@@ -117,8 +117,7 @@ Status onUpdateFTDCEnabled(OperationContext* opCtx, const bool value) {
     return Status::OK();
 }
 
-Status onUpdateFTDCMetadataCaptureFrequency(OperationContext* opCtx,
-                                            const std::int32_t potentialNewValue) {
+Status onUpdateFTDCMetadataCaptureFrequency(const std::int32_t potentialNewValue) {
     if (FTDCController * controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->setMetadataCaptureFrequency(potentialNewValue);
@@ -127,7 +126,7 @@ Status onUpdateFTDCMetadataCaptureFrequency(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status onUpdateFTDCPeriod(OperationContext* opCtx, const std::int32_t potentialNewValue) {
+Status onUpdateFTDCPeriod(const std::int32_t potentialNewValue) {
     if (FTDCController * controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->setPeriod(Milliseconds(potentialNewValue));
@@ -136,7 +135,7 @@ Status onUpdateFTDCPeriod(OperationContext* opCtx, const std::int32_t potentialN
     return Status::OK();
 }
 
-Status onUpdateFTDCDirectorySize(OperationContext* opCtx, const std::int32_t potentialNewValue) {
+Status onUpdateFTDCDirectorySize(const std::int32_t potentialNewValue) {
     if (potentialNewValue < ftdcStartupParams.maxFileSizeMB.load()) {
         return Status(
             ErrorCodes::BadValue,
@@ -154,7 +153,7 @@ Status onUpdateFTDCDirectorySize(OperationContext* opCtx, const std::int32_t pot
     return Status::OK();
 }
 
-Status onUpdateFTDCFileSize(OperationContext* opCtx, const std::int32_t potentialNewValue) {
+Status onUpdateFTDCFileSize(const std::int32_t potentialNewValue) {
     if (potentialNewValue > ftdcStartupParams.maxDirectorySizeMB.load()) {
         return Status(
             ErrorCodes::BadValue,
@@ -172,7 +171,7 @@ Status onUpdateFTDCFileSize(OperationContext* opCtx, const std::int32_t potentia
     return Status::OK();
 }
 
-Status onUpdateFTDCSamplesPerChunk(OperationContext* opCtx, const std::int32_t potentialNewValue) {
+Status onUpdateFTDCSamplesPerChunk(const std::int32_t potentialNewValue) {
     if (FTDCController * controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->setMaxSamplesPerArchiveMetricChunk(potentialNewValue);
@@ -181,7 +180,7 @@ Status onUpdateFTDCSamplesPerChunk(OperationContext* opCtx, const std::int32_t p
     return Status::OK();
 }
 
-Status onUpdateFTDCPerInterimUpdate(OperationContext* opCtx, const std::int32_t potentialNewValue) {
+Status onUpdateFTDCPerInterimUpdate(const std::int32_t potentialNewValue) {
     if (FTDCController * controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->setMaxSamplesPerInterimMetricChunk(potentialNewValue);

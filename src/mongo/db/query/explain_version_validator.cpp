@@ -33,13 +33,10 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/operation_context.h"
 
 namespace mongo::optimizer {
 
-Status validateOptimizerExplainVersion(OperationContext* opCtx,
-                                       const std::string& value,
-                                       const boost::optional<TenantId>&) {
+Status validateOptimizerExplainVersion(const std::string& value, const boost::optional<TenantId>&) {
     if (value == "bson"_sd || value == "v1"_sd || value == "v2"_sd || value == "v2compact"_sd) {
         return Status::OK();
     }

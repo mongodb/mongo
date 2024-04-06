@@ -27,12 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/util/net/ssl_parameters_auth_gen.h"
 
-#include "mongo/client/internal_auth.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/client/authenticate.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/net/ssl_parameters_auth_gen.h"
 
 namespace mongo {
 void ClusterAuthModeServerParameter::append(OperationContext*,
@@ -43,8 +47,7 @@ void ClusterAuthModeServerParameter::append(OperationContext*,
     builder->append(fieldName, clusterAuthMode.toString());
 }
 
-Status ClusterAuthModeServerParameter::setFromString(OperationContext* opCtx,
-                                                     StringData strMode,
+Status ClusterAuthModeServerParameter::setFromString(StringData strMode,
                                                      const boost::optional<TenantId>&) try {
     auto mode = uassertStatusOK(ClusterAuthMode::parse(strMode));
 

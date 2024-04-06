@@ -157,7 +157,7 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     BSONObj query = queryBuilder.obj();
 
     if (!skipValidation) {
-        uassertStatusOK(sp->validate(opCtx, update, tenantId));
+        uassertStatusOK(sp->validate(update, tenantId));
     }
 
     return {query, update};

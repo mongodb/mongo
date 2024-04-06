@@ -37,25 +37,19 @@
 
 namespace mongo {
 
-class OperationContext;
-
 /**
  * Validation callback for setParameter 'opensslCipherConfig'.
  */
-Status validateOpensslCipherConfig(OperationContext* opCtx,
-                                   const std::string&,
-                                   const boost::optional<TenantId>&);
+Status validateOpensslCipherConfig(const std::string&, const boost::optional<TenantId>&);
 
 /**
  * Validation callback for setParameter 'disableNonTLSConnectionLogging'.
  */
-Status validateDisableNonTLSConnectionLogging(OperationContext* opCtx,
-                                              const bool&,
-                                              const boost::optional<TenantId>&);
+Status validateDisableNonTLSConnectionLogging(const bool&, const boost::optional<TenantId>&);
 
 /**
  * Records that disableNonTLSConnectionLogging has been set.
  */
-Status onUpdateDisableNonTLSConnectionLogging(OperationContext*, const bool&);
+Status onUpdateDisableNonTLSConnectionLogging(const bool&);
 
 }  // namespace mongo

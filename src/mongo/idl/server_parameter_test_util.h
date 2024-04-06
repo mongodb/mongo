@@ -54,14 +54,13 @@ public:
         _oldValue = bob.obj();
 
         // Set server param to the new value.
-        uassertStatusOK(
-            _serverParam->set(nullptr, BSON(name << value).firstElement(), boost::none));
+        uassertStatusOK(_serverParam->set(BSON(name << value).firstElement(), boost::none));
     }
 
     void reset() {
         // Reset to the old value.
         auto elem = _oldValue.firstElement();
-        uassertStatusOK(_serverParam->set(nullptr, elem, boost::none));
+        uassertStatusOK(_serverParam->set(elem, boost::none));
     }
 
 private:

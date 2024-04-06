@@ -37,16 +37,12 @@
 
 namespace mongo {
 
-class OperationContext;
-
 /**
  * Mongot (search) configuration options
  */
 struct MongotParams {
-    static Status onSetHost(OperationContext* opCtx, const std::string&);
-    static Status onValidateHost(OperationContext* opCtx,
-                                 StringData str,
-                                 const boost::optional<TenantId>&);
+    static Status onSetHost(const std::string&);
+    static Status onValidateHost(StringData str, const boost::optional<TenantId>&);
 
     MongotParams();
 
