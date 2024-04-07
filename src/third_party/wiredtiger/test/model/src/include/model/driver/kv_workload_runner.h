@@ -230,6 +230,17 @@ protected:
      *     Execute the given workload operation in the model.
      */
     int
+    do_operation(const operation::set_oldest_timestamp &op)
+    {
+        _database.set_oldest_timestamp(op.oldest_timestamp);
+        return 0;
+    }
+
+    /*
+     * kv_workload_runner::do_operation --
+     *     Execute the given workload operation in the model.
+     */
+    int
     do_operation(const operation::set_stable_timestamp &op)
     {
         _database.set_stable_timestamp(op.stable_timestamp);

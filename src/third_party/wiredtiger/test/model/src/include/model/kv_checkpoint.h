@@ -46,9 +46,10 @@ public:
      * kv_checkpoint::kv_checkpoint --
      *     Create a new instance of the checkpoint.
      */
-    inline kv_checkpoint(
-      const char *name, kv_transaction_snapshot_ptr snapshot, timestamp_t stable_timestamp) noexcept
-        : _name(name), _snapshot(std::move(snapshot)), _stable_timestamp(stable_timestamp)
+    inline kv_checkpoint(const char *name, kv_transaction_snapshot_ptr snapshot,
+      timestamp_t oldest_timestamp, timestamp_t stable_timestamp) noexcept
+        : _name(name), _snapshot(std::move(snapshot)), _oldest_timestamp(oldest_timestamp),
+          _stable_timestamp(stable_timestamp)
     {
     }
 
@@ -62,6 +63,16 @@ public:
     name() const noexcept
     {
         return _name.c_str();
+    }
+
+    /*
+     * kv_transaction::oldest_timestamp --
+     *     Get the checkpoint's oldest timestamp, if set.
+     */
+    inline timestamp_t
+    oldest_timestamp() const noexcept
+    {
+        return _oldest_timestamp;
     }
 
     /*
@@ -86,7 +97,7 @@ public:
 
 private:
     kv_transaction_snapshot_ptr _snapshot;
-    timestamp_t _stable_timestamp;
+    timestamp_t _oldest_timestamp, _stable_timestamp;
     std::string _name;
 };
 

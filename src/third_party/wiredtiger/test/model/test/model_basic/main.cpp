@@ -687,6 +687,147 @@ test_model_truncate_wt(bool logging)
 }
 
 /*
+ * test_model_oldest --
+ *     Test setting the oldest timestamp.
+ */
+static void
+test_model_oldest(void)
+{
+    model::kv_database database;
+    model::kv_table_ptr table = database.create_table("table");
+
+    /* Populate the table with data from a few different timestamps. */
+    testutil_check(table->insert(key1, value1, 10));
+    testutil_check(table->insert(key1, value2, 20));
+    testutil_check(table->insert(key1, value3, 30));
+    testutil_check(table->insert(key1, value4, 40));
+    testutil_check(table->insert(key1, value5, 50));
+
+    /* Set the oldest timestamp. */
+    database.set_oldest_timestamp(30);
+    testutil_assert(database.oldest_timestamp() == 30);
+
+    /* Verify the behavior. */
+    model::data_value v;
+    testutil_assert(table->get_ext(key1, v, 10) == EINVAL);
+    testutil_assert(table->get_ext(key1, v, 20) == EINVAL);
+    testutil_assert(table->get(key1, 30) == value3);
+    testutil_assert(table->get(key1, 40) == value4);
+    testutil_assert(table->get(key1, 50) == value5);
+
+    /* Set the oldest timestamp again. */
+    database.set_oldest_timestamp(50);
+    testutil_assert(database.oldest_timestamp() == 50);
+
+    /* Verify the behavior. */
+    testutil_assert(table->get_ext(key1, v, 10) == EINVAL);
+    testutil_assert(table->get_ext(key1, v, 20) == EINVAL);
+    testutil_assert(table->get_ext(key1, v, 30) == EINVAL);
+    testutil_assert(table->get_ext(key1, v, 40) == EINVAL);
+    testutil_assert(table->get(key1, 50) == value5);
+
+    /* Test moving the oldest timestamp backwards - this should fail silently. */
+    database.set_oldest_timestamp(10);
+    testutil_assert(database.oldest_timestamp() == 50);
+
+    /* The oldest timestamp should reset, because we don't have the stable timestamp. */
+    database.restart();
+    testutil_assert(database.oldest_timestamp() == 0);
+
+    /* Now try it with both the oldest and stable timestamps. */
+    database.set_oldest_timestamp(50);
+    database.set_stable_timestamp(55);
+    database.restart();
+    testutil_assert(database.oldest_timestamp() == 50);
+}
+
+/*
+ * test_model_oldest_wt --
+ *     Test setting the oldest timestamp - with WiredTiger.
+ */
+static void
+test_model_oldest_wt(void)
+{
+    model::kv_database database;
+    model::kv_table_ptr table = database.create_table("table");
+
+    /* Create the test's home directory and database. */
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    const char *uri = "table:table";
+
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "oldest";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    testutil_check(
+      session->create(session, uri, "key_format=S,value_format=S,log=(enabled=false)"));
+
+    /* Populate the table with data from a few different timestamps. */
+    wt_model_insert_both(table, uri, key1, value1, 10);
+    wt_model_insert_both(table, uri, key1, value2, 20);
+    wt_model_insert_both(table, uri, key1, value3, 30);
+    wt_model_insert_both(table, uri, key1, value4, 40);
+    wt_model_insert_both(table, uri, key1, value5, 50);
+
+    /* Set the oldest timestamp. */
+    wt_model_set_oldest_timestamp_both(30);
+    testutil_assert(database.oldest_timestamp() == wt_get_oldest_timestamp(conn));
+
+    /* Verify the behavior. */
+    wt_model_assert(table, uri, key1, 10);
+    wt_model_assert(table, uri, key1, 20);
+    wt_model_assert(table, uri, key1, 30);
+    wt_model_assert(table, uri, key1, 40);
+    wt_model_assert(table, uri, key1, 50);
+
+    /* Set the oldest timestamp again. */
+    wt_model_set_oldest_timestamp_both(50);
+    testutil_assert(database.oldest_timestamp() == wt_get_oldest_timestamp(conn));
+
+    /* Verify the behavior. */
+    wt_model_assert(table, uri, key1, 10);
+    wt_model_assert(table, uri, key1, 20);
+    wt_model_assert(table, uri, key1, 30);
+    wt_model_assert(table, uri, key1, 40);
+    wt_model_assert(table, uri, key1, 50);
+
+    /* Test moving the oldest timestamp backwards - this should fail silently. */
+    wt_model_set_oldest_timestamp_both(10);
+    testutil_assert(database.oldest_timestamp() == wt_get_oldest_timestamp(conn));
+
+    /* Verify. */
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Restart the database. */
+    database.restart();
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+
+    /* The oldest timestamp should reset, because we don't have the stable timestamp. */
+    testutil_assert(database.oldest_timestamp() == wt_get_oldest_timestamp(conn));
+
+    /* Now try it with both the oldest and stable timestamps. */
+    wt_model_set_oldest_timestamp_both(50);
+    wt_model_set_stable_timestamp_both(55);
+    database.restart();
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    testutil_assert(database.oldest_timestamp() == wt_get_oldest_timestamp(conn));
+
+    /* Clean up. */
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+
+    /* Verify using the debug log. */
+    verify_using_debug_log(opts, test_home.c_str(), true);
+}
+
+/*
  * usage --
  *     Print usage help for the program.
  */
@@ -744,6 +885,8 @@ main(int argc, char *argv[])
         test_model_truncate_wt(false);
         test_model_truncate(true);
         test_model_truncate_wt(true);
+        test_model_oldest();
+        test_model_oldest_wt();
     } catch (std::exception &e) {
         std::cerr << "Test failed with exception: " << e.what() << std::endl;
         ret = EXIT_FAILURE;

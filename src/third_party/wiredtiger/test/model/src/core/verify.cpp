@@ -72,6 +72,7 @@ kv_table_verify_cursor::verify_next(const data_value &key, const data_value &val
 
     /* Advance the iterator, but keep the current position for the rest of this function. */
     auto i = _iterator;
+    _prev = i;
     _iterator++;
 
     /* Check the key. */
@@ -90,12 +91,11 @@ kv_table_verify_cursor::verify_next(const data_value &key, const data_value &val
 std::pair<data_value, data_value>
 kv_table_verify_cursor::get_prev() const
 {
-    if (_iterator == _data.begin())
-        throw model_exception("The iterator is at the beginning");
+    /* If there is no previous value, just return a pair of NONE values. */
+    if (!_prev.has_value())
+        return make_pair(NONE, NONE);
 
-    auto i = _iterator;
-    i--;
-
+    auto i = *_prev;
     return make_pair(i->first, i->second.get());
 }
 

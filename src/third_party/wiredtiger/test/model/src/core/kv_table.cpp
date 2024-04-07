@@ -73,10 +73,14 @@ kv_table::contains_any(kv_checkpoint_ptr ckpt, const data_value &key, const data
 data_value
 kv_table::get(const data_value &key, timestamp_t timestamp) const
 {
+    timestamp_t t = fix_timestamp(timestamp);
+    if (t < _database.oldest_timestamp())
+        throw wiredtiger_exception(EINVAL);
+
     const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return NONE;
-    return item->get(fix_timestamp(timestamp));
+    return item->get(t);
 }
 
 /*
@@ -87,10 +91,14 @@ kv_table::get(const data_value &key, timestamp_t timestamp) const
 data_value
 kv_table::get(kv_checkpoint_ptr ckpt, const data_value &key, timestamp_t timestamp) const
 {
+    timestamp_t t = fix_timestamp(timestamp);
+    if (t < _database.oldest_timestamp())
+        throw wiredtiger_exception(EINVAL);
+
     const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return NONE;
-    return item->get(std::move(ckpt), fix_timestamp(timestamp));
+    return item->get(std::move(ckpt), t);
 }
 
 /*

@@ -677,6 +677,53 @@ operator<<(std::ostream &out, const set_commit_timestamp &op)
 }
 
 /*
+ * set_oldest_timestamp --
+ *     A representation of this workload operation.
+ */
+struct set_oldest_timestamp : public without_txn_id {
+    timestamp_t oldest_timestamp;
+
+    /*
+     * set_oldest_timestamp::set_oldest_timestamp --
+     *     Create the operation.
+     */
+    inline set_oldest_timestamp(timestamp_t oldest_timestamp) : oldest_timestamp(oldest_timestamp)
+    {
+    }
+
+    /*
+     * set_oldest_timestamp::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const set_oldest_timestamp &other) const noexcept
+    {
+        return oldest_timestamp == other.oldest_timestamp;
+    }
+
+    /*
+     * set_oldest_timestamp::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const set_oldest_timestamp &other) const noexcept
+    {
+        return !(*this == other);
+    }
+};
+
+/*
+ * operator<< --
+ *     Human-readable output.
+ */
+inline std::ostream &
+operator<<(std::ostream &out, const set_oldest_timestamp &op)
+{
+    out << "set_oldest_timestamp(" << op.oldest_timestamp << ")";
+    return out;
+}
+
+/*
  * set_stable_timestamp --
  *     A representation of this workload operation.
  */
@@ -782,7 +829,7 @@ operator<<(std::ostream &out, const truncate &op)
  */
 using any = std::variant<begin_transaction, checkpoint, commit_transaction, crash, create_table,
   insert, prepare_transaction, remove, restart, rollback_to_stable, rollback_transaction,
-  set_commit_timestamp, set_stable_timestamp, truncate>;
+  set_commit_timestamp, set_oldest_timestamp, set_stable_timestamp, truncate>;
 
 /*
  * operator<< --
