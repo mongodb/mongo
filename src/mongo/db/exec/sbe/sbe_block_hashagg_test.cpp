@@ -734,6 +734,51 @@ TEST_F(BlockHashAggStageTest, SumCompoundKeysMissingKey) {
     runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {6});
 }
 
+// TODO SERVER-85731 Revisit input sizes if kMaxNumPartitionsForTokenizedPath changes.
+// Tests that our bailout when a single tokenized block has high cardinality works correctly.
+TEST_F(BlockHashAggStageTest, HighPartitionSizeTokenizeBailoutTest) {
+    // Each entry is ID followed by bitset followed by a block of data.
+    // Mix high partition rows with low partition.
+    std::vector<Bucket> buckets = {
+        // First ID block is low cardinality, second is high.
+        Bucket{.ids = {makeInt32sBlock({1, 2, 1, 2, 1, 2}), makeInt32sBlock({8, 7, 6, 5, 4, 3})},
+               .bitset = {true, true, true, true, true, true},
+               .dataBlocks = {makeInt32sBlock({7, 8, 9, 10, 11, 12})}},
+        // Both ID blocks are high cardinality.
+        Bucket{.ids = {makeInt32sBlock({8, 7, 6, 5, 4, 3}), makeInt32sBlock({1, 2, 3, 4, 5, 6})},
+               .bitset = {true, true, true, true, true, true},
+               .dataBlocks = {makeInt32sBlock({19, 20, 21, 22, 23, 24})}}};
+
+    /*
+     * Every key ends up having a unique value.
+     * {1, 8} -> 7
+     * {2, 7} -> 8
+     * {1, 6} -> 9
+     * {2, 5} -> 10
+     * {1, 4} -> 11
+     * {2, 3} -> 12
+     * {8, 1} -> 19
+     * {7, 2} -> 20
+     * {6, 3} -> 21
+     * {5, 4} -> 22
+     * {4, 5} -> 23
+     * {3, 6} -> 24
+     */
+    TestResultType expected = {{{1, 8}, {7}},
+                               {{2, 7}, {8}},
+                               {{1, 6}, {9}},
+                               {{2, 5}, {10}},
+                               {{1, 4}, {11}},
+                               {{2, 3}, {12}},
+                               {{8, 1}, {19}},
+                               {{7, 2}, {20}},
+                               {{6, 3}, {21}},
+                               {{5, 4}, {22}},
+                               {{4, 5}, {23}},
+                               {{3, 6}, {24}}};
+    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {12});
+}
+
 TEST_F(BlockHashAggStageTest, BlockOutSizeTest) {
     TestResultType expected;
     auto addToExpected = [&expected](int32_t id, bool exists, int32_t data) {

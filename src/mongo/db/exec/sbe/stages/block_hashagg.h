@@ -147,13 +147,14 @@ private:
      * accumulator calls by processing the data with the same keys together. This is best if there
      * are only a few partitions.
      */
-    void runAccumulatorsTokenized(const TokenizedKeys& tokenizedKeys);
+    void runAccumulatorsTokenized(const TokenizedKeys& tokenizedKeys,
+                                  const value::DeblockedTagVals& inBitmap);
 
     /*
      * Runs the accumulators on each element of the inputs, one at a time. This is best if the
      * number of unique keys is high so the partitioning approach would be quadratic.
      */
-    void runAccumulatorsElementWise();
+    void runAccumulatorsElementWise(const value::DeblockedTagVals& extractedBitmap);
 
     // Returns false if we've run out of spilled keys, otherwise returns true.
     bool getNextSpilledHelper();

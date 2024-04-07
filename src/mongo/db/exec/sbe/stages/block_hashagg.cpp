@@ -410,27 +410,14 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
     }
 }
 
-void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedKeys) {
+void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedKeys,
+                                                 const value::DeblockedTagVals& inBitmap) {
     // We're using the block-based accumulator, so increment the corresponding metric.
     _specificStats.blockAccumulations++;
-
-    invariant(_blockBitsetInAccessor);
-    auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
-    invariant(bitmapInTag == value::TypeTags::valueBlock);
-
-    auto bitmapBlock = value::bitcastTo<value::ValueBlock*>(bitmapInVal);
-    // If the mask can tell us it's completely false without extracting the values, bail out
-    // immediately.
-    if (bitmapBlock->allFalse().get_value_or(false)) {
-        return;
-    }
-    value::DeblockedTagVals inBitmap = bitmapBlock->extract();
     tassert(8573801,
             "Bitmap used in aggregator must be of the same size of the tokenized keys",
             inBitmap.count() == tokenizedKeys.idxs.size());
-    if (!bitmapBlock->allTrue().get_value_or(false) && allFalse(inBitmap)) {
-        return;
-    }
+    auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
 
     // Set '_accumulatorDataAccessors' to the input value blocks.
     for (size_t i = 0; i < _dataBlocks.size(); ++i) {
@@ -477,12 +464,9 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
     _accumulatorBitsetAccessor.reset(false, value::TypeTags::Nothing, 0);
 }
 
-void BlockHashAggStage::runAccumulatorsElementWise() {
+void BlockHashAggStage::runAccumulatorsElementWise(const value::DeblockedTagVals& extractedBitmap) {
     // We're using the element-wise accumulator, so increment the corresponding metric.
     _specificStats.elementWiseAccumulations++;
-
-    // Extract the bitmap.
-    value::DeblockedTagVals extractedBitmap = _bitmapBlock->extract();
 
     // Extract the group bys.
     std::vector<value::DeblockedTagVals> extractedGbs;
@@ -508,14 +492,26 @@ boost::optional<std::vector<size_t>> BlockHashAggStage::tokenizeTokenInfos(
     const std::vector<value::TokenizedBlock>& tokenInfos) {
     invariant(!tokenInfos.empty());
 
-    // TODO SERVER-85739: Note that we could have a special path here for the case where
-    // 'tokenInfos' is size 1. We would not need to do the hashing in that case.  We can also have
-    // a path that quickly bails out and returns boost::none if _any_ of the inputs have more than
-    // kMaxNumPartitionsForTokenizedPath tokens.
+    // If any individual ID block is high enough partition, we know the combined output will also be
+    // high partition. We can return early in this case.
+    for (const auto& tokenInfo : tokenInfos) {
+        if (tokenInfo.tokens->count() > kMaxNumPartitionsForTokenizedPath) {
+            return boost::none;
+        }
+    }
 
     // compoundKeys is a blockSize x numBlocks (row x column) vector.
     const size_t blockSize = tokenInfos[0].idxs.size();
     const size_t numBlocks = tokenInfos.size();
+
+    // If we have one input to tokenize, there's no additional work to do. We can save the work of
+    // creating and filling a hash table.
+    if (numBlocks == 1) {
+        // We don't have to worry about having high partition IDs (and returning boost::none)
+        // because the check above would have bailed out in that case.
+        return tokenInfos[0].idxs;
+    }
+
     _compoundKeys.resize(blockSize * numBlocks, 0);
 
     // All input blocks must be the same size, enforced by an invariant in open().
@@ -618,6 +614,10 @@ boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tryTokenize
         size_t nextTokenIdToAdd = 0;
         for (size_t i = 0; i < finalTokens.size(); ++i) {
             const size_t tokenId = finalTokens[i];
+            tassert(8573900,
+                    "Expected next tokenId to be less than or equal to the current maximum tokenId "
+                    "plus one",
+                    tokenId <= nextTokenIdToAdd);
 
             // We've found a token that we haven't yet constructed a key for.
             if (nextTokenIdToAdd == tokenId) {
@@ -676,8 +676,6 @@ void BlockHashAggStage::open(bool reOpen) {
         _done = false;
     }
 
-    invariant(_blockBitsetInAccessor);
-
     MemoryCheckData memoryCheckData;
 
     while (PlanState::ADVANCED == _children[0]->getNext()) {
@@ -701,17 +699,34 @@ void BlockHashAggStage::open(bool reOpen) {
                                                                 : makeMonoBlock(tag, val);
         }
 
-        // Try to generate tokenized group-by keys.
-        auto tokenizedKeys = tryTokenizeGbs();
+        // If the bitset has any ones in it, return the deblocked data so we can accumulate.
+        auto maybeDeblockedBitmap = [&]() -> boost::optional<value::DeblockedTagVals> {
+            // Check the fast path first.
+            if (_bitmapBlock->allFalse().get_value_or(false)) {
+                return boost::none;
+            }
+            // Use the slower extract() path. If there are any active bits, return the deblocked
+            // data.
+            value::DeblockedTagVals deblockedBitmap = _bitmapBlock->extract();
+            if (allFalse(deblockedBitmap)) {
+                return boost::none;
+            }
+            return deblockedBitmap;
+        }();
 
-        if (tokenizedKeys) {
-            // If we generated tokenized group-by keys successfully, call runAccumulatorsTokenized()
-            // to run the block-level accumulators.
-            runAccumulatorsTokenized(*tokenizedKeys);
-        } else {
-            // If tryTokenizeGbs() returned boost::none, call runAccumulatorsElementWise() to
-            // deblock everything and run the row-level accumulators.
-            runAccumulatorsElementWise();
+        // If the mask is all false we can avoid tokenization and running the accumulators.
+        if (maybeDeblockedBitmap) {
+            // Try to generate tokenized group-by keys.
+            boost::optional<BlockHashAggStage::TokenizedKeys> tokenizedKeys = tryTokenizeGbs();
+            if (tokenizedKeys) {
+                // If we generated tokenized group-by keys successfully, call
+                // runAccumulatorsTokenized() to run the block-level accumulators.
+                runAccumulatorsTokenized(*tokenizedKeys, *maybeDeblockedBitmap);
+            } else {
+                // If tryTokenizeGbs() returned boost::none, call runAccumulatorsElementWise() to
+                // deblock everything and run the row-level accumulators.
+                runAccumulatorsElementWise(*maybeDeblockedBitmap);
+            }
         }
 
         if (!_ht->empty()) {
@@ -808,7 +823,6 @@ bool BlockHashAggStage::getNextSpilledHelper() {
 }
 
 PlanState BlockHashAggStage::getNextSpilled() {
-
     size_t resultIdx = 0;
     for (; resultIdx < kBlockOutSize; resultIdx++) {
         bool hasNextKey = getNextSpilledHelper();
