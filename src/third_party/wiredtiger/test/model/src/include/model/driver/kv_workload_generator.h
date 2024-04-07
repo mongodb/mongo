@@ -74,6 +74,7 @@ struct kv_workload_generator_spec {
     float checkpoint;
     float crash;
     float restart;
+    float rollback_to_stable;
     float set_oldest_timestamp;
     float set_stable_timestamp;
 

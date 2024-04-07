@@ -57,6 +57,7 @@ kv_workload_generator_spec::kv_workload_generator_spec()
     checkpoint = 0.02;
     crash = 0.002;
     restart = 0.002;
+    rollback_to_stable = 0.005;
     set_oldest_timestamp = 0.1;
     set_stable_timestamp = 0.2;
 
@@ -545,6 +546,13 @@ kv_workload_generator::run()
                 *p << operation::restart();
                 _sequences.push_back(p);
             }
+            probability_case(_spec.rollback_to_stable)
+            {
+                kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
+                  _sequences.size(), kv_workload_sequence_type::rollback_to_stable);
+                *p << operation::rollback_to_stable();
+                _sequences.push_back(p);
+            }
             probability_case(_spec.set_oldest_timestamp)
             {
                 kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
@@ -577,6 +585,18 @@ kv_workload_generator::run()
             for (size_t prev = last_nontransaction; prev < i; prev++)
                 _sequences[prev]->must_finish_before(_sequences[i].get());
             last_nontransaction = i;
+        }
+
+    /*
+     * Rollback to stable must be executed outside of transactions, so make sure to add the
+     * corresponding dependencies.
+     */
+    for (size_t i = 0; i < _sequences.size(); i++)
+        if (_sequences[i]->type() == kv_workload_sequence_type::rollback_to_stable) {
+            for (size_t j = 0; j < i; j++)
+                _sequences[j]->must_finish_before(_sequences[i].get());
+            for (size_t j = i + 1; j < _sequences.size(); j++)
+                _sequences[i]->must_finish_before(_sequences[j].get());
         }
 
     /*
