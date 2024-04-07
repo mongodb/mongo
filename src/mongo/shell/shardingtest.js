@@ -1581,6 +1581,10 @@ var ShardingTest = function ShardingTest(params) {
             rsDefaults.setParameter.migrationLockAcquisitionMaxWaitMS =
                 otherParams.migrationLockAcquisitionMaxWaitMS;
 
+            if (isConfigShardMode && i == 0) {
+                rsDefaults.setParameter.featureFlagTransitionToCatalogShard = true
+            }
+
             var rsSettings = rsDefaults.settings;
             delete rsDefaults.settings;
 
@@ -1856,6 +1860,10 @@ var ShardingTest = function ShardingTest(params) {
             options.setParameter = options.setParameter || {};
             options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown =
                 options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown || 0;
+
+            if (isConfigShardMode) {
+                options.setParameter.featureFlagTransitionToCatalogShard = true;
+            }
 
             options.port = options.port || _allocatePortForMongos();
 
