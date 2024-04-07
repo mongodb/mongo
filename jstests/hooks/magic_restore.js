@@ -19,6 +19,12 @@ function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
                                     .getCollection("magic_restore_checkpointTimestamp")
                                     .findOne()
                                     .ts;
+    const objs = [{
+        "nodeType": "replicaSet",
+        "replicaSetConfig": expectedConfig,
+        "maxCheckpointTs": checkpointTimestamp,
+    }];
+    jsTestLog("Restore configuration: " + tojson(objs[0]));
 
     let oplog = sourceConn.getDB("local").getCollection('oplog.rs');
     const entriesAfterBackup =
@@ -194,11 +200,14 @@ function dataConsistencyCheck(sourceNode, restoreNode) {
         assert(idx == restoreCollectionInfos.length,
                "restore node contains more collections than its source for the " + dbName +
                    " database.");
+        const dbStats = assert.commandWorked(sourceDb.runCommand({dbStats: 1}));
+        jsTestLog("Magic Restore: Checked the consistency of database " + dbName +
+                  ". dbStats: " + tojson(dbStats));
     });
 }
 
 function performMagicRestore(sourceNode, dbPath, name, options) {
-    jsTestLog("Magic Restore: Beginning magic restore for node " + sourceNode + ".");
+    jsTestLog("Magic Restore: Beginning magic restore for node " + sourceNode.host + ".");
 
     let rst = new ReplSetTest({nodes: 1});
 

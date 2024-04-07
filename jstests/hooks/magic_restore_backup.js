@@ -17,7 +17,7 @@ function writeMetadataInfo(conn, checkpoint) {
 }
 
 function takeBackup(conn, dbPathPrefix) {
-    jsTestLog("Magic Restore: Taking backup");
+    jsTestLog("Magic Restore: Taking backup of node " + conn.host);
     // Take the initial checkpoint.
     assert.commandWorked(db.adminCommand({fsync: 1}));
 
@@ -25,6 +25,7 @@ function takeBackup(conn, dbPathPrefix) {
     mkdir(dbPathPrefix);
     let backupCursor = openBackupCursor(conn.getDB("admin"));
     let metadata = getBackupCursorMetadata(backupCursor);
+    jsTestLog("Backup cursor metadata document: " + tojson(metadata));
     copyBackupCursorFiles(backupCursor, /*namespacesToSkip=*/[], metadata.dbpath, dbPathPrefix);
 
     jsTestLog("Magic Restore: Backup written to " + dbPathPrefix);
@@ -46,6 +47,7 @@ if (topology.type == Topology.kReplicaSet) {
     let restorePaths = [];
     let backupIds = [];
     let cursors = [];
+    const checkpointTimestamps = {};
 
     let maxCheckpointTimestamp = Timestamp();
 
@@ -59,6 +61,7 @@ if (topology.type == Topology.kReplicaSet) {
     let [cursor, metadata] = takeBackup(nodeMongo, path);
     dbPaths.push(metadata.dbpath);
     backupIds.push(metadata.backupId);
+    checkpointTimestamps[nodeMongo.host] = metadata.checkpointTimestamp;
 
     if (timestampCmp(metadata.checkpointTimestamp, maxCheckpointTimestamp) > 0) {
         maxCheckpointTimestamp = metadata.checkpointTimestamp;
@@ -78,6 +81,7 @@ if (topology.type == Topology.kReplicaSet) {
 
         dbPaths.push(metadata.dbpath);
         backupIds.push(metadata.backupId);
+        checkpointTimestamps[nodeMongo.host] = metadata.checkpointTimestamp;
 
         if (timestampCmp(metadata.checkpointTimestamp, maxCheckpointTimestamp) > 0) {
             maxCheckpointTimestamp = metadata.checkpointTimestamp;
@@ -85,13 +89,17 @@ if (topology.type == Topology.kReplicaSet) {
 
         cursors.push(cursor);
     }
-
+    jsTestLog("Magic Restore: Checkpoint timestamps for nodes: " + tojson(checkpointTimestamps));
+    jsTestLog("Magic Restore: maxCheckpointTimestamp for cluster is " +
+              tojson(maxCheckpointTimestamp));
     let threads = [];
 
     // Need to extend the backup cursor and copy the files over for each shard node.
     // Then need to write the max checkpoint timestamp into the node.
     for (let i = 0; i < nodes.length; i++) {
         writeMetadataInfo(nodes[i], maxCheckpointTimestamp);
+        jsTestLog("Magic Restore: Extending backup cursor for node " + nodes[i].host +
+                  " to timestamp: " + tojson(maxCheckpointTimestamp));
         let cursor = extendBackupCursor(nodes[i], backupIds[i], maxCheckpointTimestamp);
         let thread = copyBackupCursorExtendFiles(
             cursor, /*namespacesToSkip=*/[], dbPaths[i], restorePaths[i], true);
