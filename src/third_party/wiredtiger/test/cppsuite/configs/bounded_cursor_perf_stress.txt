@@ -2,7 +2,7 @@
 # The test will repeatedly call next() and prev() operations and track performance of the operations
 # done with both range cursor and regular cursors.
 
-duration_seconds=1800,
+duration_seconds=300,
 cache_size_mb=1000,
 workload_manager=
 (
