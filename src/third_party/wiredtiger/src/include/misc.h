@@ -225,13 +225,13 @@
 #define FLD_MASK(field, mask) ((field) & (mask))
 #define FLD_ISSET(field, mask) (FLD_MASK(field, mask) != 0)
 #define FLD_SET(field, mask) ((void)((field) |= (mask)))
+#endif
 /* Named like a macro for consistency. An inline function to evaluate mask only once. */
 static inline bool
 FLD_AREALLSET(uint64_t field, uint64_t mask)
 {
     return (FLD_MASK(field, mask) == mask);
 }
-#endif
 
 #define F_CLR(p, mask) FLD_CLR((p)->flags, mask)
 #define F_ISSET(p, mask) FLD_ISSET((p)->flags, mask)
@@ -243,7 +243,7 @@ FLD_AREALLSET(uint64_t field, uint64_t mask)
 #define LF_ISSET(mask) FLD_ISSET(flags, mask)
 #define LF_MASK(mask) FLD_MASK(flags, mask)
 #define LF_SET(mask) FLD_SET(flags, mask)
-#define LF_AREALLSSET(mask) FLD_AREALLSET(flags, mask)
+#define LF_AREALLSET(mask) FLD_AREALLSET(flags, mask)
 
 /*
  * Insertion sort, for sorting small sets of values.
