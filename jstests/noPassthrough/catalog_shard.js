@@ -232,7 +232,9 @@ const newShardName =
 
     moveDatabaseAndUnshardedColls(st.s.getDB(dbName), newShardName);
     moveDatabaseAndUnshardedColls(st.s.getDB(unshardedDbName), newShardName);
-    moveDatabaseAndUnshardedColls(st.s.getDB(timeseriesDbName), newShardName);
+    // TODO (SERVER-83878 or SERVER-88304) call moveDatabaseAndUnshardedColls instead of
+    // movePrimary.
+    assert.commandWorked(st.s.adminCommand({movePrimary: timeseriesDbName, to: newShardName}));
 
     // The draining sharded collections should not have been locally dropped yet.
     assert(configPrimary.getCollection(ns).exists());
