@@ -58,12 +58,7 @@ set_stable(uint64_t stable_ts)
 void
 start_threads(void)
 {
-    /*
-     * Ensure we are not going backwards and start with 1 as the stable as 0 is not a valid
-     * timestamp.
-     */
-    set_stable(WT_MAX(1, g.ts_stable));
-
+    set_stable(1); /* Let's start with 1 as the stable as 0 is not a valid timestamp. */
     /*
      * If there are N worker threads (0 - N-1), the checkpoint thread has an ID of N and the clock
      * thread an ID of N + 1.
