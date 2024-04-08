@@ -2,8 +2,10 @@
 conn_config="cache_size=200M,eviction=(threads_max=8)"
 # Mimic MongoDB index file setup.
 table_config="type=file,internal_page_max=16k,leaf_page_max=16k"
-# Spread out 50M keys.
-icount=50000000
+# Spread out 20M keys.
+icount=20000000
+index=true
+index_like_table=true
 report_interval=5
 populate_threads=2
 checkpoint_threads=1

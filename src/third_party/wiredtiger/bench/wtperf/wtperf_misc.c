@@ -30,6 +30,67 @@
 
 #define WT_BACKUP_COPY_SIZE (128 * 1024)
 
+/* Common key snprintf function for both generating and deleting keys. */
+static void
+create_index_key(char *key_buf, size_t len, uint64_t index_val, uint64_t keyno)
+{
+    testutil_snprintf(key_buf, len, "%" PRIu64 ":%" PRIu64, index_val, keyno);
+}
+
+int
+delete_index_key(WTPERF *wtperf, WT_CURSOR *index_cursor, char *key_buf, uint64_t keyno)
+{
+    CONFIG_OPTS *opts;
+    uint64_t i, index_val;
+    size_t len;
+    int ret;
+
+    opts = wtperf->opts;
+    len = opts->key_sz + opts->value_sz_max;
+
+    /* Delete any other index entries. */
+    for (i = 1; i <= INDEX_MAX_MULTIPLIER; ++i) {
+        index_val = i * INDEX_BASE;
+        create_index_key(key_buf, len, index_val, keyno);
+        index_cursor->set_key(index_cursor, key_buf);
+        ret = index_cursor->remove(index_cursor);
+        if (ret == 0 || ret == WT_NOTFOUND)
+            continue;
+        if (ret == WT_ROLLBACK)
+            return (ret);
+        lprintf(wtperf, ret, 1, "Delete earlier index key failed");
+    }
+    return (0);
+}
+
+/*
+ * Set up an index key based on global values. The populate inserted index values of the form
+ * INDEX_BASE:key. Then each workload thread is assigned an id and uses its id to modify the index
+ * keys. This spreads out the keys for each key number but clusters the keys from each particular
+ * thread.
+ */
+void
+generate_index_key(WTPERF_THREAD *thread, bool populate, char *key_buf, uint64_t keyno)
+{
+    CONFIG_OPTS *opts;
+    WTPERF *wtperf;
+    uint64_t index_val, mult;
+    size_t len;
+
+    wtperf = thread->wtperf;
+    opts = wtperf->opts;
+    if (populate)
+        mult = INDEX_POPULATE_MULT;
+    else
+        /* Multipliers go from 2 through the maximum.  */
+        mult = __wt_random(&thread->rnd) % (INDEX_MAX_MULTIPLIER - INDEX_POPULATE_MULT) +
+          INDEX_POPULATE_MULT + 1;
+
+    len = opts->key_sz + opts->value_sz_max;
+    index_val = mult * INDEX_BASE;
+    create_index_key(key_buf, len, index_val, keyno);
+}
+
 /* Setup the logging output mechanism. */
 int
 setup_log_file(WTPERF *wtperf)
