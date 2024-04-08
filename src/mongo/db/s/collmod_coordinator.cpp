@@ -174,6 +174,7 @@ void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationCo
         const auto optColl =
             sharding_ddl_util::getCollectionFromConfigServer(opCtx, info.nsForTargeting);
         info.isTracked = (bool)optColl;
+        info.isSharded = optColl && !optColl->getUnsplittable();
         _collInfo = std::move(info);
     }
 }
@@ -383,7 +384,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                 if (_collInfo->isTracked) {
                     try {
-                        if (!_firstExecution) {
+                        if (!_firstExecution && _collInfo->isSharded) {
                             bool allowMigrations = sharding_ddl_util::checkAllowMigrations(
                                 opCtx, _collInfo->nsForTargeting);
                             if (_result.is_initialized() && allowMigrations) {

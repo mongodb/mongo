@@ -83,6 +83,7 @@ public:
 private:
     struct CollectionInfo {
         bool isTracked;
+        bool isSharded;
         boost::optional<TimeseriesOptions> timeSeriesOptions;
         // The targeting namespace can be different from the original namespace in some cases, like
         // time-series collections.
