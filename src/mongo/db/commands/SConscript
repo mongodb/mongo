@@ -84,6 +84,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/command_generic_argument',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 

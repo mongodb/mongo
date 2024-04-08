@@ -12,7 +12,8 @@ timeZoneEnv.Library(
         'date_time_support.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
+        # '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/third_party/shim_timelib',
     ]
 )
@@ -25,6 +26,7 @@ timeZoneEnv.Library(
     LIBDEPS=[
         'date_time_support',
         '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/third_party/shim_timelib',
     ]
 )
