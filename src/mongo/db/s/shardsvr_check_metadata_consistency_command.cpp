@@ -75,6 +75,7 @@
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/metadata_consistency_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -218,21 +219,57 @@ public:
                                                       dbNss,
                                                       boost::none /* shardVersion */,
                                                       db.getVersion() /* databaseVersion */);
-                try {
-                    DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                        opCtx, dbNss.dbName(), kDDLLockReason, MODE_S};
 
-                    auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
-                    cursors.insert(cursors.end(),
-                                   std::make_move_iterator(dbCursors.begin()),
-                                   std::make_move_iterator(dbCursors.end()));
-                } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
-                    LOGV2_DEBUG(7328700,
-                                1,
-                                "Skipping database metadata check since the database is "
-                                "currently being migrated",
-                                logAttrs(dbNss.dbName()),
-                                "error"_attr = redact(ex));
+                auto checkMetadataForDb = [&]() {
+                    try {
+                        DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
+                            opCtx, dbNss.dbName(), kDDLLockReason, MODE_S};
+
+                        auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
+                        cursors.insert(cursors.end(),
+                                       std::make_move_iterator(dbCursors.begin()),
+                                       std::make_move_iterator(dbCursors.end()));
+                        return Status::OK();
+                    } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
+                        // Receiving a StaleDbVersion is because of one of these scenarios:
+                        // - A movePrimary is changing the db primary shard.
+                        // - The database is being dropped.
+                        // - This shard doesn't know about the existence of the db.
+                        LOGV2_DEBUG(8840400,
+                                    1,
+                                    "Received StaleDbVersion error while trying to run database "
+                                    "metadata checks",
+                                    logAttrs(dbNss.dbName()),
+                                    "error"_attr = redact(ex));
+                        return ex.toStatus();
+                    }
+                };
+
+                bool skippedMetadataChecks = false;
+                auto status = checkMetadataForDb();
+                if (!status.isOK()) {
+                    auto extraInfo = status.extraInfo<StaleDbRoutingVersion>();
+                    if (extraInfo->getVersionWanted()) {
+                        // In case there is a wanted shard version means that the metadata is stale
+                        // and we are going to skip the checks.
+                        skippedMetadataChecks = true;
+                    } else {
+                        // In case the shard doesn't know about the collection, we perform a refresh
+                        // and re-try the metadata checks.
+                        (void)onDbVersionMismatchNoExcept(
+                            opCtx, dbNss.dbName(), extraInfo->getVersionReceived());
+
+                        skippedMetadataChecks = !checkMetadataForDb().isOK();
+                    }
+                }
+
+                // All the other scenarios, we skip the metadata checks for this db.
+                if (skippedMetadataChecks) {
+                    LOGV2_DEBUG(
+                        7328700,
+                        1,
+                        "Skipping database metadata check since the database version is stale",
+                        logAttrs(dbNss.dbName()));
                 }
             }
 
