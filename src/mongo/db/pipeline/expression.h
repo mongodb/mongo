@@ -423,7 +423,7 @@ public:
 
     static Value serializeConstant(const SerializationOptions& opts,
                                    Value val,
-                                   bool wrapRepresentativeValue = false);
+                                   bool wrapRepresentativeValue = true);
 
     bool selfAndChildrenAreConstant() const override final {
         return true;
