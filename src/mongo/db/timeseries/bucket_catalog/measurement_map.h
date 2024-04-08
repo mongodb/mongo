@@ -57,7 +57,7 @@ public:
      * - An existing data field is missing in this measurement - adds a skip to the builder of the
      * missing data field.
      */
-    void insertOne(std::vector<BSONElement> oneMeasurementDataFields);
+    void insertOne(const std::vector<BSONElement>& oneMeasurementDataFields);
 
     /**
      * Sets internal state of builders to that of pre-existing compressed builders.

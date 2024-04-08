@@ -121,7 +121,7 @@ void MeasurementMap::_fillSkipsInMissingFields(const std::set<StringData>& field
     }
 }
 
-void MeasurementMap::insertOne(std::vector<BSONElement> oneMeasurementDataFields) {
+void MeasurementMap::insertOne(const std::vector<BSONElement>& oneMeasurementDataFields) {
     std::set<StringData> fieldsSeen;
 
     for (const auto& elem : oneMeasurementDataFields) {
