@@ -46,15 +46,21 @@ function doTestTeardown(conn, t, testcase, res) {
  * Run the command specified in 't' with the privileges specified in 'privileges'.
  */
 function testProperAuthorization(conn, t, testcase, privileges) {
-    const runOnDb = conn.getDB(testcase.runOnDb);
+    const authDb = conn.getDB(testcase.runOnDb);
     const state = doTestSetup(conn.sidechannel, t, testcase, privileges);
-    authCommandsLib.authenticatedSetup(t, runOnDb);
+    authCommandsLib.authenticatedSetup(t, authDb);
 
     let command = t.command;
     if (typeof (command) === "function") {
         command = t.command(state, testcase.commandArgs);
     }
-    const res = runOnDb.runCommand(command);
+
+    let cmdDb = authDb;
+    if (t.hasOwnProperty("runOnDb")) {
+        assert.eq(typeof (t.runOnDb), "function");
+        cmdDb = authDb.getSiblingDB(t.runOnDb(state));
+    }
+    const res = cmdDb.runCommand(command);
 
     let out = "";
     if (!testcase.expectFail && (res.ok != 1) && (res.code != commandNotSupportedCode)) {

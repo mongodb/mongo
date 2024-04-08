@@ -56,15 +56,20 @@ export const roles = [
 function testProperAuthorization(conn, t, testcase, r) {
     var out = "";
 
-    var runOnDb = conn.getDB(testcase.runOnDb);
-    var state = authCommandsLib.setup(conn, t, runOnDb);
+    var authDb = conn.getDB(testcase.runOnDb);
+    var state = authCommandsLib.setup(conn, t, authDb);
     assert(r.db.auth("user|" + r.key, "password"));
-    authCommandsLib.authenticatedSetup(t, runOnDb);
+    authCommandsLib.authenticatedSetup(t, authDb);
     var command = t.command;
     if (typeof (command) === "function") {
         command = t.command(state, testcase.commandArgs);
     }
-    var res = runOnDb.runCommand(command);
+    var cmdDb = authDb;
+    if (t.hasOwnProperty("runOnDb")) {
+        assert.eq(typeof (t.runOnDb), "function");
+        cmdDb = authDb.getSiblingDB(t.runOnDb(state));
+    }
+    var res = cmdDb.runCommand(command);
 
     if (testcase.roles[r.key]) {
         if (res.ok == 0 && res.code == authErrCode) {
@@ -89,7 +94,7 @@ function testProperAuthorization(conn, t, testcase, r) {
     }
 
     r.db.logout();
-    authCommandsLib.teardown(conn, t, runOnDb, res);
+    authCommandsLib.teardown(conn, t, authDb, res);
     return out;
 }
 

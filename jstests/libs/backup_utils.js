@@ -1,7 +1,14 @@
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
+export const getBackupCursorDB = function(mongo) {
+    const dbName = FeatureFlagUtil.isEnabled(mongo, "ReplicaSetEndpoint") ? "local" : "admin";
+    return mongo.getDB(dbName);
+};
+
 export function backupData(mongo, destinationDirectory) {
-    let backupCursor = openBackupCursor(mongo.getDB("admin"));
+    const backupCursorDB = getBackupCursorDB(mongo);
+    let backupCursor = openBackupCursor(backupCursorDB);
     let metadata = getBackupCursorMetadata(backupCursor);
     copyBackupCursorFiles(
         backupCursor, /*namespacesToSkip=*/[], metadata.dbpath, destinationDirectory);
@@ -10,6 +17,7 @@ export function backupData(mongo, destinationDirectory) {
 }
 
 export function openBackupCursor(db, backupOptions, aggregateOptions) {
+    const backupCursorDB = getBackupCursorDB(db.getMongo());
     // Opening a backup cursor can race with taking a checkpoint, resulting in a transient
     // error. Retry until it succeeds.
     backupOptions = backupOptions || {};
@@ -17,7 +25,7 @@ export function openBackupCursor(db, backupOptions, aggregateOptions) {
 
     while (true) {
         try {
-            return db.aggregate([{$backupCursor: backupOptions}], aggregateOptions);
+            return backupCursorDB.aggregate([{$backupCursor: backupOptions}], aggregateOptions);
         } catch (exc) {
             jsTestLog({"Failed to open a backup cursor, retrying.": exc});
         }
@@ -25,7 +33,8 @@ export function openBackupCursor(db, backupOptions, aggregateOptions) {
 }
 
 export function extendBackupCursor(mongo, backupId, extendTo) {
-    return mongo.getDB("admin").aggregate(
+    const backupCursorDB = getBackupCursorDB(mongo);
+    return backupCursorDB.aggregate(
         [{$backupCursorExtend: {backupId: backupId, timestamp: extendTo}}],
         {maxTimeMS: 180 * 1000});
 }
@@ -34,9 +43,12 @@ export function startHeartbeatThread(host, backupCursor, session, stopCounter) {
     let cursorId = tojson(backupCursor._cursorid);
     let lsid = tojson(session.getSessionId());
 
-    let heartbeatBackupCursor = function(host, cursorId, lsid, stopCounter) {
+    const conn = new Mongo(host);
+    const backupCursorDB = getBackupCursorDB(conn);
+
+    let heartbeatBackupCursor = function(host, backupCursorDbName, cursorId, lsid, stopCounter) {
         const conn = new Mongo(host);
-        const db = conn.getDB("admin");
+        const db = conn.getDB(backupCursorDbName);
         while (stopCounter.getCount() > 0) {
             let res = assert.commandWorked(db.runCommand({
                 getMore: eval("(" + cursorId + ")"),
@@ -47,7 +59,8 @@ export function startHeartbeatThread(host, backupCursor, session, stopCounter) {
         }
     };
 
-    const heartbeater = new Thread(heartbeatBackupCursor, host, cursorId, lsid, stopCounter);
+    const heartbeater = new Thread(
+        heartbeatBackupCursor, host, backupCursorDB.getName(), cursorId, lsid, stopCounter);
     heartbeater.start();
     return heartbeater;
 }

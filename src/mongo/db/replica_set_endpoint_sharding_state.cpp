@@ -28,9 +28,9 @@
  */
 
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
+
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/s/sharding_cluster_parameters_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -94,18 +94,6 @@ bool ReplicaSetEndpointShardingState::supportsReplicaSetEndpoint() {
 
     std::shared_lock rLock(_mutex);  // NOLINT
     return _isReplicaSetMember && _isConfigShard;
-}
-
-bool isFeatureFlagEnabled() {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    return fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabled(fcvSnapshot);
-}
-
-bool isFeatureFlagEnabledIgnoreFCV() {
-    // (Ignore FCV check): The ReplicaSetEndpointShardingState needs to be maintained even before
-    // the FCV is fully upgraded.
-    return feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabledAndIgnoreFCVUnsafe();
 }
 
 }  // namespace replica_set_endpoint

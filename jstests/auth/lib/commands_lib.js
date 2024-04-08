@@ -101,6 +101,7 @@ import {
     isShardMergeEnabled,
 } from "jstests/replsets/libs/tenant_migration_util.js";
 import {storageEngineIsWiredTigerOrInMemory} from "jstests/libs/storage_engine_utils.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // constants
 
@@ -7090,6 +7091,13 @@ export const authCommandsLib = {
         },
         {
           testname: "aggregate_$backupCursor",
+          setup: (db) => {
+            return {isReplicaSetEndpointEnabled: FeatureFlagUtil.isEnabled(db, "ReplicaSetEndpoint")};
+          },
+          runOnDb: (state) => {
+            const {isReplicaSetEndpointEnabled} = state;
+            return isReplicaSetEndpointEnabled ? "local" : adminDbName;
+          },
           command: {aggregate: 1, cursor: {}, pipeline: [{$backupCursor: {}}]},
           skipSharded: true,
           // Only enterprise knows of this aggregation stage.
