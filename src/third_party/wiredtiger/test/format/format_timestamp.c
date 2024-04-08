@@ -65,16 +65,19 @@ timestamp_maximum_committed(void)
  * timestamp_query --
  *     Query a timestamp.
  */
-void
+int
 timestamp_query(const char *query, uint64_t *tsp)
 {
     WT_CONNECTION *conn;
+    WT_DECL_RET;
     char tsbuf[WT_TS_HEX_STRING_SIZE];
 
     conn = g.wts_conn;
 
-    testutil_check(conn->query_timestamp(conn, tsbuf, query));
-    *tsp = testutil_timestamp_parse(tsbuf);
+    ret = conn->query_timestamp(conn, tsbuf, query);
+    if (ret == 0)
+        *tsp = testutil_timestamp_parse(tsbuf);
+    return (ret);
 }
 
 /*
@@ -84,7 +87,7 @@ timestamp_query(const char *query, uint64_t *tsp)
 void
 timestamp_init(void)
 {
-    timestamp_query("get=recovery", &g.timestamp);
+    testutil_check(timestamp_query("get=recovery", &g.timestamp));
     if (g.timestamp == 0)
         g.timestamp = 5;
 }
@@ -123,7 +126,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
          * allows two runs that finish with stable timestamps in the same ballpark to be compared.
          */
         if (stable_timestamp > 10 * WT_THOUSAND)
-            oldest_timestamp = stable_timestamp - 10 * WT_THOUSAND;
+            oldest_timestamp = WT_MAX(stable_timestamp - 10 * WT_THOUSAND, g.oldest_timestamp);
         else
             oldest_timestamp = stable_timestamp / 2;
     } else if (!final) {
@@ -206,36 +209,4 @@ timestamp_teardown(WT_SESSION *session)
      * verify from running.
      */
     timestamp_once(session, false, true);
-}
-
-/*
- * timestamp_set_oldest --
- *     Query the oldest timestamp from wiredtiger and set it as our global oldest timestamp. This
- *     should only be called on runs for pre existing databases.
- */
-void
-timestamp_set_oldest(void)
-{
-    static const char *oldest_timestamp_str = "oldest_timestamp=";
-
-    WT_CONNECTION *conn;
-    WT_DECL_RET;
-    uint64_t oldest_ts;
-    char buf[WT_TS_HEX_STRING_SIZE * 2 + 64], tsbuf[WT_TS_HEX_STRING_SIZE];
-
-    conn = g.wts_conn;
-
-    if ((ret = conn->query_timestamp(conn, tsbuf, "get=oldest_timestamp")) == 0) {
-        oldest_ts = testutil_timestamp_parse(tsbuf);
-        g.timestamp = oldest_ts;
-        testutil_snprintf(buf, sizeof(buf), "%s%" PRIx64, oldest_timestamp_str, g.oldest_timestamp);
-    } else if (ret != WT_NOTFOUND)
-        /*
-         * Its possible there may not be an oldest timestamp as such we could get not found. This
-         * should be okay assuming timestamps are not configured if they are, it's still okay as we
-         * could have configured timestamps after not running with timestamps. As such only error if
-         * we get a non not found error. If we were supposed to fail with not found we'll see an
-         * error later on anyway.
-         */
-        testutil_die(ret, "unable to query oldest timestamp");
 }

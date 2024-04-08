@@ -105,6 +105,7 @@ public:
      * kv_transaction::set_stable_timestamp --
      *     Set the database's stable timestamp, if set.
      */
+    /* FIXME-WT-12412: Return an error if the provided timestamp is older than the current one. */
     inline void
     set_stable_timestamp(timestamp_t timestamp) noexcept
     {

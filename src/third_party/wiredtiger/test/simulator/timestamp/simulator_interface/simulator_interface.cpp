@@ -533,8 +533,7 @@ print_rules()
         case 1:
             print_border_msg("Timestamp value should be greater than 0.", WHITE);
             print_border_msg(
-              "It is a no-op to set the oldest or stable timestamps behind the global values.",
-              WHITE);
+              "Timestamp value cannot be older than the current one in the system.", WHITE);
             print_border_msg("Oldest must not be greater than the stable timestamp", WHITE);
             break;
         case 2:

@@ -74,9 +74,6 @@ terms of both disk and I/O resources.
 During recovery, the \c oldest_timestamp is set to its value as of the checkpoint
 to which recovery is done.
 
-Attempting to set the \c oldest_timestamp to a value earlier than its current
-value will be silently ignored.
-
 The \c oldest_timestamp must be less than or equal to the \c stable_timestamp.
 
 @subsection timestamp_global_set_api_stable_timestamp Setting the "stable_timestamp" timestamp
@@ -96,9 +93,6 @@ It is possible to explicitly roll back to a time after, or equal to, the current
 
 The \c stable_timestamp should be updated frequently as it determines the
 amount of work required after recovery to bring the system online.
-
-Attempting to set the \c stable_timestamp to a value earlier than its current
-value will be silently ignored.
 
 Using the stable timestamp in the checkpoint is not required, and can be
 overridden using the <tt>use_timestamp=false</tt> configuration of the
