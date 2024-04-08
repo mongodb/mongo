@@ -220,7 +220,7 @@ function runTestNoMetaCursorOnConn(shardDB, expectedDocs) {
 }
 
 // Run queries against a specific shard to see what a mongod response to a search query looks like.
-// Since we are running a pipeline with $_internalSearchMongotRemote we need to use an internal
+// Since we are simulating a $search pipeline sent from the router, we need to use an internal
 // client.
 let expectedDocs = [
     // SortKey and searchScore are included because we're getting results directly from the

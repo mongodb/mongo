@@ -35,7 +35,9 @@ imports:
 structs:
   InternalSearchMongotRemoteSpec:
     description: Specification for a $_internalSearchMongotRemote stage given in the full, explicit format.
-    strict: true
+    # Because the specification is internal only, we permit extra fields. This avoids some upgrade/downngrade
+    # concerns where a router may send a command to a node with fields not known by the node.
+    strict: false
     fields:
       mongotQuery:
         description: The remote text search query.
