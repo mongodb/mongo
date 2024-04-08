@@ -63,7 +63,8 @@ functions:
                 exit 1
               fi
 
-              export LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/libtcmalloc.so
+              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$WT_TOPDIR/TCMALLOC_LIB/lib"
+              export LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
             fi
 
             # Create the common sanitizer options and export the specific sanitizer environment
@@ -211,10 +212,6 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger"
-      include_expansions_in_env:
-       - "s3_bucket_tcmalloc"
-       - "s3_access_key"
-       - "s3_secret_key"
       shell: bash
       script: |
         set -o errexit
@@ -299,17 +296,12 @@ functions:
           powershell.exe  -NonInteractive '.\test\evergreen\build_windows.ps1' -configure 1 $DEFINED_EVERGREEN_CONFIG_FLAGS ${windows_configure_flags|}
         else
           echo "Using config flags $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|}"
-
-          if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]]; then
-            # Run this script in its own process as it depends on managing
-            # shell options.
-            /bin/bash test/evergreen/tcmalloc_install_or_build.sh ${build_variant}
-
-            # Preload tcmalloc in the Evergreen environment: this will affect
-            # ALL binaries.
-            export LD_PRELOAD=$PWD/TCMALLOC_LIB/libtcmalloc.so
+          # Fetch the gperftools library if needed. This will also get tcmalloc.
+          if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]] && [ ! -d "./automation-scripts" ]; then
+            is_cmake_build=true
+            git clone git@github.com:wiredtiger/automation-scripts.git
+            . automation-scripts/evergreen/find_gperftools.sh ${s3_access_key} ${s3_secret_key} ${build_variant} $is_cmake_build
           fi
-
           # Compiling with CMake.
           echo "Find CMake"
           . test/evergreen/find_cmake.sh
