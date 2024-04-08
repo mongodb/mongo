@@ -258,6 +258,7 @@
     "python3 ../test/suite/run.py test_tiered08",
     "python3 ../test/suite/run.py test_timestamp10",
     "python3 ../test/suite/run.py test_truncate15",
+    "python3 ../test/suite/run.py test_truncate24",
     "python3 ../test/suite/run.py test_turtle01",
     "python3 ../test/suite/run.py test_txn15",
     "python3 ../test/suite/run.py test_unicode01",
