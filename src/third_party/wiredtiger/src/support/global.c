@@ -167,7 +167,6 @@ __global_once(void)
 
     /* Run-time configuration. */
 #ifdef WT_STANDALONE_BUILD
-    __wt_process.fast_truncate_2022 = true;
     __wt_process.tiered_shared_2023 = true;
 #endif
 }
