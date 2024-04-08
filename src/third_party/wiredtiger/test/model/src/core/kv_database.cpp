@@ -76,6 +76,19 @@ kv_database::create_checkpoint(
   const char *name, kv_transaction_snapshot_ptr snapshot, timestamp_t stable_timestamp)
 {
     std::lock_guard lock_guard(_checkpoints_lock);
+    return create_checkpoint_nolock(name, std::move(snapshot), stable_timestamp);
+}
+
+/*
+ * kv_database::create_checkpoint --
+ *     Create a checkpoint from custom metadata. Throw an exception if the name is not unique.
+ *     Assume the relevant locks are held.
+ */
+kv_checkpoint_ptr
+kv_database::create_checkpoint_nolock(
+  const char *name, kv_transaction_snapshot_ptr snapshot, timestamp_t stable_timestamp)
+{
+    /* Requires the checkpoint lock. */
 
     /* Use the default checkpoint name, if it is not specified. */
     if (name == nullptr)
@@ -247,6 +260,7 @@ kv_database::rollback_to_stable(timestamp_t timestamp, kv_transaction_snapshot_p
 {
     std::lock_guard lock_guard1(_tables_lock);
     std::lock_guard lock_guard2(_transactions_lock);
+    std::lock_guard lock_guard3(_checkpoints_lock);
 
     rollback_to_stable_nolock(timestamp, std::move(snapshot));
 }
@@ -264,6 +278,9 @@ kv_database::rollback_to_stable_nolock(timestamp_t timestamp, kv_transaction_sna
 
     for (auto &p : _tables)
         p.second->rollback_to_stable(timestamp, snapshot);
+
+    /* Force a checkpoint. */
+    create_checkpoint_nolock(WT_CHECKPOINT, txn_snapshot(), _stable_timestamp);
 }
 
 /*
