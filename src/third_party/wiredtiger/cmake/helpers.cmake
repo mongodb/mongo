@@ -651,6 +651,28 @@ function(parse_filelist_source filelist output_var)
     set(${output_var} ${output_files} PARENT_SCOPE)
 endfunction()
 
+# escape_regex_special_characters(input output)
+# A helper function that escapes special characters in the input string,
+# making it safe for checking regular expressions. It replaces each special character
+# with its escaped counterpart by adding a preceding '\'.
+# function(escape_regex_special_characters input output)
+function(escape_regex_special_characters input output)
+    string(REGEX REPLACE "([][+.*()^])" "\\\\\\1" escaped_input "${input}")
+    set(${output} "${escaped_input}" PARENT_SCOPE)
+endfunction()
+
+
+# check_c_flag(flag)
+# A helper function that adds a CMake flag to a list of included flags if it's not already present.
+# It first checks if the flag is already included in the list using a regex pattern.
+# If the flag is not already included, it appends the flag to the list of included flags.
+function(add_cmake_flag included_flags flag)
+    escape_regex_special_characters("${flag}" escaped_flag)
+    if (NOT ${included_flags} MATCHES ".*${escaped_flag}.*")
+        set(${included_flags} "${${included_flags}} ${flag}" CACHE STRING "" FORCE)
+    endif()
+endfunction()
+
 macro(source_python3_package python_libs python_version python_executable)
     set(required_version)
     if(PYTHON3_REQUIRED_VERSION)
