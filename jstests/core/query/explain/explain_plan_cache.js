@@ -11,8 +11,8 @@
  *   assumes_read_preference_unchanged,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
- *   # Uses the "isCached" field which does not exist on all versions.
- *   multiversion_incompatible,
+ *   # The "isCached" field which was introduced in 8.0.
+ *   requires_fcv_80,
  * ]
  */
 import {
