@@ -677,10 +677,6 @@ __debug_cell_kv(
         break;
     }
 
-    /* Early exit for column store deleted cells. There's nothing further to print. */
-    if (unpack->raw == WT_CELL_DEL)
-        return (0);
-
     /* Overflow addresses. */
     switch (unpack->raw) {
     case WT_CELL_KEY_OVFL:
@@ -690,6 +686,10 @@ __debug_cell_kv(
         break;
     }
     WT_RET(ds->f(ds, "\n"));
+
+    /* Early exit for column store deleted cells. There's nothing further to print. */
+    if (unpack->raw == WT_CELL_DEL)
+        return (0);
 
     WT_RET(page == NULL ? __wt_dsk_cell_data_ref_kv(session, page_type, unpack, ds->t1) :
                           __wt_page_cell_data_ref_kv(session, page, unpack, ds->t1));
