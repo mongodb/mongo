@@ -290,7 +290,8 @@ def bazel_build_thread_func(log_dir: str, verbose: bool) -> None:
 
     except ImportError:
         bazel_proc = subprocess.Popen(bazel_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                      env={**os.environ.copy(), **Globals.bazel_env_variables})
+                                      env={**os.environ.copy(),
+                                           **Globals.bazel_env_variables}, text=True)
         while True:
             line = bazel_proc.stdout.readline()
             if not line:
@@ -301,9 +302,9 @@ def bazel_build_thread_func(log_dir: str, verbose: bool) -> None:
                     Globals.bazel_thread_terminal_output.seek(0)
                     sys.stdout.write(Globals.bazel_thread_terminal_output.read())
                     Globals.bazel_thread_terminal_output = None
-                sys.stdout.write(line.decode())
+                sys.stdout.write(line)
             else:
-                Globals.bazel_thread_terminal_output.write(line.decode())
+                Globals.bazel_thread_terminal_output.write(line)
 
         stdout, stderr = bazel_proc.communicate()
 
@@ -656,17 +657,8 @@ def generate(env: SCons.Environment.Environment) -> None:
         if normalized_os == "macos" and evergreen_tmp_dir:
             bazel_internal_flags.append(f"--sandbox_writable_path={evergreen_tmp_dir}")
 
-        # Any flags that need to appear before the actual bazel command (ex. "bazel {--flags} build")
-        bazel_pre_command_internal_flags = []
-        if evergreen_tmp_dir:
-            bazel_pre_command_internal_flags += [
-                "--output_user_root=" + os.path.join(
-                    os.path.abspath(evergreen_tmp_dir), "bazel-output-root")
-            ]
-
         Globals.bazel_base_build_command = [
             os.path.abspath(bazel_executable),
-            *bazel_pre_command_internal_flags,
             'build',
         ] + bazel_internal_flags + shlex.split(env.get("BAZEL_FLAGS", ""))
 

@@ -177,18 +177,18 @@ functions:
       # Mark as optional to allow local-mode execution to succeed.
       optional: true
 
-  "generate evergreen engflow bazelrc": &generate_evergreen_engflow_bazelrc
+  "generate evergreen bazelrc": &generate_evergreen_bazelrc
     command: subprocess.exec
     params:
-      display_name: "generate evergreen engflow bazelrc"
+      display_name: "generate evergreen bazelrc"
       binary: bash
       args:
-        - "src/evergreen/generate_evergreen_engflow_bazelrc.sh"
+        - "src/evergreen/generate_evergreen_bazelrc.sh"
 
   "get engflow creds":
     - *get_engflow_key
     - *get_engflow_cert
-    - *generate_evergreen_engflow_bazelrc
+    - *generate_evergreen_bazelrc
 
   "adjust venv": &adjust_venv
     command: subprocess.exec
@@ -2537,4 +2537,4 @@ functions:
     - *f_expansions_write
     - *get_engflow_key
     - *get_engflow_cert
-    - *generate_evergreen_engflow_bazelrc
+    - *generate_evergreen_bazelrc
