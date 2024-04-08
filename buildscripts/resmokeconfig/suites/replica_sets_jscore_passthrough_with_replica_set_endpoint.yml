@@ -58,6 +58,9 @@ selector:
     # the router. TODO (SERVER-84342): listCollections command doesn't return collections created
     # directly through applyOps commands.
     - jstests/core/ddl/rename_collection_staytemp.js
+    # TODO (SERVER-84342): applyOps doesn't work on sharded clusters. Re-enable these tests once we
+    # agree on a solution to support applyOps.
+    - jstests/core/administrative/apply_ops/*.js
     # This test runs the internal internalRenameIfOptionsAndIndexeMatch command without attaching
     # database version, so cannot be against a shardsvr mongod.
     - jstests/core/query/internal_rename_if_options_and_indexes_match.js
