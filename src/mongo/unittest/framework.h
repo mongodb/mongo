@@ -62,6 +62,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/optional_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/synchronized_value.h"
 
 /**
  * Construct a single test, named `TEST_NAME` within the test Suite `SUITE_NAME`.
@@ -388,7 +389,7 @@ protected:
      * Gets a vector of strings, one log line per string, captured since
      * the last call to startCapturingLogMessages() in this test.
      */
-    const std::vector<std::string>& getCapturedTextFormatLogMessages() const;
+    std::vector<std::string> getCapturedTextFormatLogMessages() const;
     std::vector<BSONObj> getCapturedBSONFormatLogMessages() const;
 
     /**
