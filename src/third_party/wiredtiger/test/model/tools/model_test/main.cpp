@@ -191,6 +191,9 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
         UPDATE_SPEC(restart, float);
         UPDATE_SPEC(set_stable_timestamp, float);
 
+        UPDATE_SPEC(remove_existing, float);
+        UPDATE_SPEC(update_existing, float);
+
         UPDATE_SPEC(prepared_transaction, float);
         UPDATE_SPEC(nonprepared_transaction_rollback, float);
         UPDATE_SPEC(prepared_transaction_rollback_after_prepare, float);
