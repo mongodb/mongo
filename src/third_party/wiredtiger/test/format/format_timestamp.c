@@ -102,6 +102,9 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
     uint64_t oldest_timestamp, stable_timestamp, stop_timestamp;
     char buf[WT_TS_HEX_STRING_SIZE * 2 + 64];
 
+    /* Ensure timestamps are used. */
+    testutil_assert(g.transaction_timestamps_config);
+
     conn = g.wts_conn;
 
     /* Get the maximum not-in-use timestamp, noting that it may not be set. */

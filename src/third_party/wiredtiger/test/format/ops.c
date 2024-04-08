@@ -483,7 +483,8 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
 
     if (lastrun) {
         tinfo_teardown();
-        timestamp_teardown(session);
+        if (g.transaction_timestamps_config)
+            timestamp_teardown(session);
     }
 
     wt_wrap_close_session(session);
