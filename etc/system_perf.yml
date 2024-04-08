@@ -1410,6 +1410,7 @@ buildvariants:
     display_name: PERF M60-Atlas ReplSet ARM AWS 2023-11
     modules: *modules
     expansions:
+      mongodb_setup_release: 2022-11
       mongodb_setup: atlas
       canaries: none
       atlas_setup: M60-repl
@@ -1446,6 +1447,7 @@ buildvariants:
     display_name: PERF M60-Atlas ReplSet Intel Azure 2023-11
     modules: *modules
     expansions:
+      mongodb_setup_release: 2022-11
       mongodb_setup: atlas
       canaries: none
       atlas_setup: M60-repl-azure
