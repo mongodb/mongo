@@ -308,6 +308,12 @@ protected:
      * kv_workload_runner_wt::do_operation --
      *     Execute the given workload operation in WiredTiger.
      */
+    int do_operation(const operation::set_oldest_timestamp &op);
+
+    /*
+     * kv_workload_runner_wt::do_operation --
+     *     Execute the given workload operation in WiredTiger.
+     */
     int do_operation(const operation::set_stable_timestamp &op);
 
     /*

@@ -74,6 +74,7 @@ struct kv_workload_generator_spec {
     float checkpoint;
     float crash;
     float restart;
+    float set_oldest_timestamp;
     float set_stable_timestamp;
 
     /* The probabilities for choosing an existing key, if available. */
@@ -435,14 +436,15 @@ protected:
      *     Assert that the timestamps are assigned correctly. Call this function one sequence at a
      *     time.
      */
-    void assert_timestamps(
-      const kv_workload_sequence &sequence, const operation::any &op, timestamp_t &stable);
+    void assert_timestamps(const kv_workload_sequence &sequence, const operation::any &op,
+      timestamp_t &oldest, timestamp_t &stable);
 
     /*
      * kv_workload_generator::assign_timestamps --
      *     Assign timestamps to operations in a sequence.
      */
-    void assign_timestamps(kv_workload_sequence &sequence, timestamp_t first, timestamp_t last);
+    void assign_timestamps(kv_workload_sequence &sequence, timestamp_t first, timestamp_t last,
+      timestamp_t &oldest, timestamp_t &stable);
 
     /*
      * kv_workload_generator::choose_table --

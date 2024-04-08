@@ -50,7 +50,11 @@ public:
      * kv_database::kv_database --
      *     Create a new instance.
      */
-    inline kv_database() : _last_transaction_id(k_txn_none), _stable_timestamp(k_timestamp_none) {}
+    inline kv_database()
+        : _last_transaction_id(k_txn_none), _oldest_timestamp(k_timestamp_none),
+          _stable_timestamp(k_timestamp_none)
+    {
+    }
 
     /*
      * kv_database::create_checkpoint --
@@ -62,8 +66,8 @@ public:
      * kv_database::create_checkpoint --
      *     Create a checkpoint from custom metadata. Throw an exception if the name is not unique.
      */
-    kv_checkpoint_ptr create_checkpoint(
-      const char *name, kv_transaction_snapshot_ptr snapshot, timestamp_t stable_timestamp);
+    kv_checkpoint_ptr create_checkpoint(const char *name, kv_transaction_snapshot_ptr snapshot,
+      timestamp_t oldest_timestamp, timestamp_t stable_timestamp);
 
     /*
      * kv_database::create_table --
@@ -100,6 +104,27 @@ public:
      *     Get the checkpoint. Throw an exception if it does not exist.
      */
     kv_checkpoint_ptr checkpoint(const char *name = nullptr);
+
+    /*
+     * kv_transaction::set_oldest_timestamp --
+     *     Set the database's oldest timestamp, if set.
+     */
+    inline void
+    set_oldest_timestamp(timestamp_t timestamp) noexcept
+    {
+        std::lock_guard lock_guard(_timestamps_lock);
+        _oldest_timestamp = std::max(_oldest_timestamp, timestamp);
+    }
+
+    /*
+     * kv_transaction::oldest_timestamp --
+     *     Get the database's stable timestamp, if set.
+     */
+    inline timestamp_t
+    oldest_timestamp() const noexcept
+    {
+        return _oldest_timestamp;
+    }
 
     /*
      * kv_transaction::set_stable_timestamp --
@@ -236,8 +261,9 @@ protected:
      *     Create a checkpoint from custom metadata. Throw an exception if the name is not unique.
      *     Assume the relevant locks are held.
      */
-    kv_checkpoint_ptr create_checkpoint_nolock(
-      const char *name, kv_transaction_snapshot_ptr snapshot, timestamp_t stable_timestamp);
+    kv_checkpoint_ptr create_checkpoint_nolock(const char *name,
+      kv_transaction_snapshot_ptr snapshot, timestamp_t oldest_timestamp,
+      timestamp_t stable_timestamp);
 
     /*
      * kv_database::rollback_all_nolock --
@@ -290,6 +316,7 @@ private:
     std::unordered_map<std::string, kv_checkpoint_ptr> _checkpoints; /* Key: checkpoint name. */
 
     mutable std::mutex _timestamps_lock;
+    timestamp_t _oldest_timestamp;
     timestamp_t _stable_timestamp;
 };
 

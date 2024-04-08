@@ -88,6 +88,16 @@ public:
     }
 
     /*
+     * kv_transaction::empty --
+     *     Check if there are no updates.
+     */
+    inline bool
+    empty() const noexcept
+    {
+        return _updates.empty();
+    }
+
+    /*
      * kv_transaction::id --
      *     Get the transaction's ID.
      */

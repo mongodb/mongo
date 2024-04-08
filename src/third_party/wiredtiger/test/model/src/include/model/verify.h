@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -103,6 +104,7 @@ public:
 private:
     std::map<data_value, kv_table_item> &_data;
     std::map<data_value, kv_table_item>::iterator _iterator;
+    std::optional<std::map<data_value, kv_table_item>::iterator> _prev;
     kv_checkpoint_ptr _ckpt;
 };
 

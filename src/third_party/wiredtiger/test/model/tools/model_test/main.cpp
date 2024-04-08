@@ -104,7 +104,6 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
         throw std::runtime_error("Failed to close file: " + workload_file);
 
     /* Run the workload in WiredTiger. */
-
     std::vector<int> ret_wt;
     try {
         ret_wt =
@@ -189,6 +188,7 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
         UPDATE_SPEC(checkpoint, float);
         UPDATE_SPEC(crash, float);
         UPDATE_SPEC(restart, float);
+        UPDATE_SPEC(set_oldest_timestamp, float);
         UPDATE_SPEC(set_stable_timestamp, float);
 
         UPDATE_SPEC(remove_existing, float);

@@ -42,6 +42,7 @@ extern "C" {
 
 #include "model/driver/debug_log_parser.h"
 #include "model/kv_database.h"
+#include "model/util.h"
 
 /*
  * Command-line arguments.
@@ -53,6 +54,35 @@ extern char *__wt_optarg;
  * Configuration.
  */
 #define ENV_CONFIG_BASE "readonly=true,log=(enabled=false)"
+
+/*
+ * verify_timestamps --
+ *     Verify the global database timestamps. Throw exception on error.
+ */
+static void
+verify_timestamps(model::kv_database &db, WT_CONNECTION *conn)
+{
+    char buf[64];
+    int ret;
+
+    ret = conn->query_timestamp(conn, buf, "get=oldest_timestamp");
+    if (ret != 0)
+        throw model::wiredtiger_exception(ret);
+    model::timestamp_t oldest_timestamp = model::parse_uint64(std::string("0x") + buf);
+    if (oldest_timestamp != db.oldest_timestamp())
+        throw std::runtime_error("The oldest timestamp does not match: WiredTiger has " +
+          std::to_string(oldest_timestamp) + ", but " + std::to_string(db.oldest_timestamp()) +
+          " was expected.");
+
+    ret = conn->query_timestamp(conn, buf, "get=stable_timestamp");
+    if (ret != 0)
+        throw model::wiredtiger_exception(ret);
+    model::timestamp_t stable_timestamp = model::parse_uint64(std::string("0x") + buf);
+    if (stable_timestamp != db.stable_timestamp())
+        throw std::runtime_error("The stable timestamp does not match: WiredTiger has " +
+          std::to_string(stable_timestamp) + ", but " + std::to_string(db.stable_timestamp()) +
+          " was expected.");
+}
 
 /*
  * usage --
@@ -166,6 +196,16 @@ main(int argc, char *argv[])
             ckpt = db.checkpoint(checkpoint);
     } catch (std::exception &e) {
         std::cerr << "Failed to get the checkpoint: " << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * Verify the global timestamps.
+     */
+    try {
+        verify_timestamps(db, conn);
+    } catch (std::exception &e) {
+        std::cerr << "Verification failed: " << e.what() << std::endl;
         return EXIT_FAILURE;
     }
 

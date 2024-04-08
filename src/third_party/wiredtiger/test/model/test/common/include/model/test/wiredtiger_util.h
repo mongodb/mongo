@@ -141,16 +141,56 @@ model::data_value wt_ckpt_get(WT_SESSION *session, const char *uri, const model:
 void wt_ckpt_create(WT_SESSION *session, const char *ckpt_name = nullptr);
 
 /*
+ * wt_get_timestamp --
+ *     Get the given timestamp in WiredTiger.
+ */
+model::timestamp_t wt_get_timestamp(WT_CONNECTION *conn, const char *kind);
+
+/*
+ * wt_set_timestamp --
+ *     Set the given timestamp in WiredTiger.
+ */
+void wt_set_timestamp(WT_CONNECTION *conn, const char *kind, model::timestamp_t timestamp);
+
+/*
+ * wt_get_stable_timestamp --
+ *     Get the oldest timestamp in WiredTiger.
+ */
+inline model::timestamp_t
+wt_get_oldest_timestamp(WT_CONNECTION *conn)
+{
+    return wt_get_timestamp(conn, "oldest_timestamp");
+}
+
+/*
+ * wt_set_oldest_timestamp --
+ *     Set the oldest timestamp in WiredTiger.
+ */
+inline void
+wt_set_oldest_timestamp(WT_CONNECTION *conn, model::timestamp_t timestamp)
+{
+    wt_set_timestamp(conn, "oldest_timestamp", timestamp);
+}
+
+/*
  * wt_get_stable_timestamp --
  *     Get the stable timestamp in WiredTiger.
  */
-model::timestamp_t wt_get_stable_timestamp(WT_CONNECTION *conn);
+inline model::timestamp_t
+wt_get_stable_timestamp(WT_CONNECTION *conn)
+{
+    return wt_get_timestamp(conn, "stable_timestamp");
+}
 
 /*
  * wt_set_stable_timestamp --
  *     Set the stable timestamp in WiredTiger.
  */
-void wt_set_stable_timestamp(WT_CONNECTION *conn, model::timestamp_t timestamp);
+inline void
+wt_set_stable_timestamp(WT_CONNECTION *conn, model::timestamp_t timestamp)
+{
+    wt_set_timestamp(conn, "stable_timestamp", timestamp);
+}
 
 /*
  * wt_print_debug_log --
@@ -306,6 +346,16 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
     {                                            \
         wt_ckpt_create(session, ##__VA_ARGS__);  \
         database.create_checkpoint(__VA_ARGS__); \
+    }
+
+/*
+ * wt_model_set_oldest_timestamp_both --
+ *     Set the oldest timestamp in both the model and the database.
+ */
+#define wt_model_set_oldest_timestamp_both(timestamp) \
+    {                                                 \
+        wt_set_oldest_timestamp(conn, timestamp);     \
+        database.set_oldest_timestamp(timestamp);     \
     }
 
 /*

@@ -185,6 +185,10 @@ parse(const char *str)
         CHECK_NUM_ARGS(2);
         return set_commit_timestamp(parse_uint64(args[0]), parse_uint64(args[1]));
     }
+    if (name == "set_oldest_timestamp") {
+        CHECK_NUM_ARGS(1);
+        return set_oldest_timestamp(parse_uint64(args[0]));
+    }
     if (name == "set_stable_timestamp") {
         CHECK_NUM_ARGS(1);
         return set_stable_timestamp(parse_uint64(args[0]));
