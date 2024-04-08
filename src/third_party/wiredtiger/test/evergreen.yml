@@ -3438,7 +3438,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            cp ../../../bench/wtperf/split_heavy.wtperf .
+            cp ../../../bench/wtperf/runners/split_heavy.wtperf .
             ./wtperf -O ./split_heavy.wtperf -o verbose=2
 
   - name: memory-model-test
