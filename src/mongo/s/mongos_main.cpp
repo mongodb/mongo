@@ -126,6 +126,10 @@
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
@@ -893,6 +897,18 @@ std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongos
     return std::make_unique<AuthzManagerExternalStateMongos>();
 }
 
+void disableMongosTHPUnderTestingEnvironment() {
+#ifdef __linux__
+    if (TestingProctor::instance().isEnabled()) {
+        if (prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0) == -1) {
+            LOGV2_WARNING(8751802, "Could not disable THP on mongos");
+        } else {
+            LOGV2_INFO(8751803, "Successfully disabled THP on mongos");
+        }
+    }
+#endif
+}
+
 ExitCode main(ServiceContext* serviceContext) {
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds{10}));
 
@@ -966,6 +982,8 @@ ExitCode mongos_main(int argc, char* argv[]) {
             "error"_attr = status);
         return ExitCode::abrupt;
     }
+
+    disableMongosTHPUnderTestingEnvironment();
 
     try {
         auto serviceContextHolder = ServiceContext::make();
