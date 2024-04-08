@@ -470,9 +470,9 @@ __conn_dhandle_config_parse_ts(WT_SESSION_IMPL *session)
 
     /* Timestamp usage asserts. */
     WT_RET(__wt_config_gets(session, cfg, "assert.read_timestamp", &cval));
-    if (WT_STRING_MATCH("always", cval.str, cval.len))
+    if (WT_CONFIG_LIT_MATCH("always", cval))
         LF_SET(WT_DHANDLE_TS_ASSERT_READ_ALWAYS);
-    else if (WT_STRING_MATCH("never", cval.str, cval.len))
+    else if (WT_CONFIG_LIT_MATCH("never", cval))
         LF_SET(WT_DHANDLE_TS_ASSERT_READ_NEVER);
 
     /*
@@ -481,7 +481,7 @@ __conn_dhandle_config_parse_ts(WT_SESSION_IMPL *session)
      * behavior is the same as "ordered".
      */
     WT_RET(__wt_config_gets(session, cfg, "write_timestamp_usage", &cval));
-    if (WT_STRING_MATCH("never", cval.str, cval.len))
+    if (WT_CONFIG_LIT_MATCH("never", cval))
         LF_SET(WT_DHANDLE_TS_NEVER);
     else
         LF_SET(WT_DHANDLE_TS_ORDERED);

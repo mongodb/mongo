@@ -337,6 +337,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
     WT_CURSOR *cursor;
     WT_CURSOR_BACKUP *cb, *othercb;
     WT_DECL_RET;
+    size_t uri_len;
 
     WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_BACKUP);
 
@@ -346,6 +347,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
     cursor->session = (WT_SESSION *)session;
     cursor->key_format = "S";  /* Return the file names as the key. */
     cursor->value_format = ""; /* No value, for now. */
+    uri_len = strlen(uri);
 
     session->bkp_cursor = cb;
     othercb = (WT_CURSOR_BACKUP *)other;
@@ -356,13 +358,13 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
         __wt_verbose(session, WT_VERB_BACKUP, "Backup cursor config \"%s\"", cfg[1]);
 
     /* Special backup cursor to query incremental IDs. */
-    if (WT_STRING_MATCH("backup:query_id", uri, strlen(uri))) {
+    if (WT_STRING_LIT_MATCH("backup:query_id", uri, uri_len)) {
         /* Top level cursor code does not allow a URI and cursor. We don't need to check here. */
         WT_ASSERT(session, othercb == NULL);
         if (!F_ISSET(S2C(session), WT_CONN_INCR_BACKUP))
             WT_ERR_MSG(session, EINVAL, "Incremental backup is not configured");
         F_SET(cb, WT_CURBACKUP_QUERYID);
-    } else if (WT_STRING_MATCH("backup:export", uri, strlen(uri)))
+    } else if (WT_STRING_LIT_MATCH("backup:export", uri, uri_len))
         /* Special backup cursor for export operation. */
         F_SET(cb, WT_CURBACKUP_EXPORT);
 
@@ -478,7 +480,7 @@ __backup_find_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_BLKINCR **in
         /* If it isn't valid, skip it. */
         if (!F_ISSET(blk, WT_BLKINCR_VALID))
             continue;
-        if (WT_STRING_MATCH(blk->id_str, cval->str, cval->len)) {
+        if (WT_CONFIG_MATCH(blk->id_str, *cval)) {
             if (F_ISSET(blk, WT_BLKINCR_INUSE))
                 WT_RET_MSG(session, EINVAL, "Incremental backup structure already in use");
             if (incrp != NULL)

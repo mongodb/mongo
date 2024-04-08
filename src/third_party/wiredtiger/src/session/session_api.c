@@ -1005,7 +1005,7 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
          * go.
          */
         if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0 &&
-          !WT_STRING_MATCH("file", cval.str, cval.len) &&
+          !WT_CONFIG_LIT_MATCH("file", cval) &&
           (strncmp(uri, cval.str, cval.len) != 0 || uri[cval.len] != ':'))
             WT_ERR_MSG(session, EINVAL, "%s: unsupported type configuration", uri);
         WT_ERR_NOTFOUND_OK(ret, false);
@@ -1076,9 +1076,9 @@ __session_log_flush(WT_SESSION *wt_session, const char *config)
         WT_ERR_MSG(session, EINVAL, "logging not enabled");
 
     WT_ERR(__wt_config_gets_def(session, cfg, "sync", 0, &cval));
-    if (WT_STRING_MATCH("off", cval.str, cval.len))
+    if (WT_CONFIG_LIT_MATCH("off", cval))
         flags = WT_LOG_FLUSH;
-    else if (WT_STRING_MATCH("on", cval.str, cval.len))
+    else if (WT_CONFIG_LIT_MATCH("on", cval))
         flags = WT_LOG_FSYNC;
     ret = __wt_log_flush(session, flags);
 
@@ -1345,15 +1345,15 @@ __session_join(
     flags = 0;
     WT_ERR(__wt_config_gets(session, cfg, "compare", &cval));
     if (cval.len != 0) {
-        if (WT_STRING_MATCH("gt", cval.str, cval.len))
+        if (WT_CONFIG_LIT_MATCH("gt", cval))
             range = WT_CURJOIN_END_GT;
-        else if (WT_STRING_MATCH("lt", cval.str, cval.len))
+        else if (WT_CONFIG_LIT_MATCH("lt", cval))
             range = WT_CURJOIN_END_LT;
-        else if (WT_STRING_MATCH("le", cval.str, cval.len))
+        else if (WT_CONFIG_LIT_MATCH("le", cval))
             range = WT_CURJOIN_END_LE;
-        else if (WT_STRING_MATCH("eq", cval.str, cval.len))
+        else if (WT_CONFIG_LIT_MATCH("eq", cval))
             range = WT_CURJOIN_END_EQ;
-        else if (!WT_STRING_MATCH("ge", cval.str, cval.len))
+        else if (!WT_CONFIG_LIT_MATCH("ge", cval))
             WT_ERR_MSG(session, EINVAL, "compare=%.*s not supported", (int)cval.len, cval.str);
     }
     WT_ERR(__wt_config_gets(session, cfg, "count", &cval));
@@ -1362,9 +1362,9 @@ __session_join(
 
     WT_ERR(__wt_config_gets(session, cfg, "strategy", &cval));
     if (cval.len != 0) {
-        if (WT_STRING_MATCH("bloom", cval.str, cval.len))
+        if (WT_CONFIG_LIT_MATCH("bloom", cval))
             LF_SET(WT_CURJOIN_ENTRY_BLOOM);
-        else if (!WT_STRING_MATCH("default", cval.str, cval.len))
+        else if (!WT_CONFIG_LIT_MATCH("default", cval))
             WT_ERR_MSG(session, EINVAL, "strategy=%.*s not supported", (int)cval.len, cval.str);
     }
     WT_ERR(__wt_config_gets(session, cfg, "bloom_bit_count", &cval));
@@ -1382,7 +1382,7 @@ __session_join(
         LF_SET(WT_CURJOIN_ENTRY_FALSE_POSITIVES);
 
     WT_ERR(__wt_config_gets(session, cfg, "operation", &cval));
-    if (cval.len != 0 && WT_STRING_MATCH("or", cval.str, cval.len))
+    if (cval.len != 0 && WT_CONFIG_LIT_MATCH("or", cval))
         LF_SET(WT_CURJOIN_ENTRY_DISJUNCTION);
 
     if (nested && (count != 0 || range != WT_CURJOIN_END_EQ || LF_ISSET(WT_CURJOIN_ENTRY_BLOOM)))

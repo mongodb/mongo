@@ -294,8 +294,8 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
         if (session->import_list == NULL && import) {
             against_stable =
               __wt_config_getones(session, config, "import.compare_timestamp", &cval) == 0 &&
-              (WT_STRING_MATCH("stable", cval.str, cval.len) ||
-                WT_STRING_MATCH("stable_timestamp", cval.str, cval.len));
+              (WT_CONFIG_LIT_MATCH("stable", cval) ||
+                WT_CONFIG_LIT_MATCH("stable_timestamp", cval));
             WT_ERR(__check_imported_ts(session, uri, filestripped, against_stable));
         }
     }
@@ -341,13 +341,13 @@ __wt_schema_colgroup_source(
 
     tablename = table->iface.name + strlen("table:");
     if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0 &&
-      !WT_STRING_MATCH("file", cval.str, cval.len)) {
+      !WT_CONFIG_LIT_MATCH("file", cval)) {
         prefix = cval.str;
         len = cval.len;
         suffix = "";
     } else if ((S2C(session)->bstorage == NULL) ||
       ((ret = __wt_config_getones(session, config, "tiered_storage.name", &cval)) == 0 &&
-        cval.len != 0 && WT_STRING_MATCH("none", cval.str, cval.len))) {
+        cval.len != 0 && WT_CONFIG_LIT_MATCH("none", cval))) {
         /*
          * If we're using tiered storage, the default is not file unless the user explicitly turns
          * off using tiered storage for this create. Otherwise the default prefix is tiered.
@@ -460,11 +460,11 @@ __schema_is_tiered_storage_shared(WT_SESSION_IMPL *session, const char *config)
     if (__wt_config_getones(session, config, "source", &cval) == 0 && cval.len != 0)
         return (false);
     else if (__wt_config_getones(session, config, "type", &cval) == 0 &&
-      !WT_STRING_MATCH("file", cval.str, cval.len))
+      !WT_CONFIG_LIT_MATCH("file", cval))
         return (false);
     else if ((S2C(session)->bstorage == NULL) ||
       (__wt_config_getones(session, config, "tiered_storage.name", &cval) == 0 && cval.len != 0 &&
-        WT_STRING_MATCH("none", cval.str, cval.len)))
+        WT_CONFIG_LIT_MATCH("none", cval)))
         return (false);
     else if (!S2C(session)->bstorage->tiered_shared ||
       ((__wt_config_getones(session, config, "tiered_storage.shared", &cval) == 0) && !cval.val))
@@ -661,7 +661,7 @@ __wt_schema_index_source(
 
     tablename = table->iface.name + strlen("table:");
     if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0 &&
-      !WT_STRING_MATCH("file", cval.str, cval.len)) {
+      !WT_CONFIG_LIT_MATCH("file", cval)) {
         prefix = cval.str;
         len = cval.len;
         suffix = "_idx";
@@ -1347,8 +1347,8 @@ __schema_create_config_check(
      */
     tiered_name_set =
       __wt_config_getones(session, config, "tiered_storage.name", &cval) == 0 && cval.len != 0;
-    is_tiered = S2C(session)->bstorage != NULL &&
-      (!tiered_name_set || !WT_STRING_MATCH("none", cval.str, cval.len));
+    is_tiered =
+      S2C(session)->bstorage != NULL && (!tiered_name_set || !WT_CONFIG_LIT_MATCH("none", cval));
 
     /* The import.file_metadata configuration is incompatible with tiered storage. */
     if (is_tiered && file_metadata)
@@ -1360,7 +1360,7 @@ __schema_create_config_check(
      * fail the operation.
      */
     if (is_tiered && __wt_config_getones(session, config, "type", &cval) == 0 &&
-      !WT_STRING_MATCH("file", cval.str, cval.len))
+      !WT_CONFIG_LIT_MATCH("file", cval))
         WT_RET_MSG(session, ENOTSUP,
           "unsupported type configuration: %.*s: type must be file for tiered storage",
           (int)cval.len, cval.str);

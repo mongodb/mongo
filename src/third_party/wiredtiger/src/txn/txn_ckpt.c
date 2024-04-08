@@ -203,7 +203,7 @@ __checkpoint_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len, boo
         WT_RET_MSG(session, EINVAL, "the checkpoint name \"%s\" is reserved", WT_CHECKPOINT);
 
     /* The name "all" is also special. */
-    if (!allow_all && WT_STRING_MATCH("all", name, len))
+    if (!allow_all && WT_STRING_LIT_MATCH("all", name, len))
         WT_RET_MSG(session, EINVAL, "the checkpoint name \"all\" is reserved");
 
     return (0);
@@ -1745,7 +1745,7 @@ __drop_from(
     /*
      * There's a special case -- if the name is "all", then we delete all of the checkpoints.
      */
-    if (WT_STRING_MATCH("all", name, len)) {
+    if (WT_STRING_LIT_MATCH("all", name, len)) {
         WT_CKPT_FOREACH (ckptbase, ckpt) {
             /* Remember the names of named checkpoints we're dropping. */
             if (drop_list != NULL && !WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT))
@@ -2054,9 +2054,9 @@ __checkpoint_lock_dirty_tree(
 
                 if (v.len == 0)
                     WT_ERR(__drop(session, drop_list, ckptbase, k.str, k.len));
-                else if (WT_STRING_MATCH("from", k.str, k.len))
+                else if (WT_CONFIG_LIT_MATCH("from", k))
                     WT_ERR(__drop_from(session, drop_list, ckptbase, v.str, v.len));
-                else if (WT_STRING_MATCH("to", k.str, k.len))
+                else if (WT_CONFIG_LIT_MATCH("to", k))
                     WT_ERR(__drop_to(session, drop_list, ckptbase, v.str, v.len));
                 else
                     WT_ERR_MSG(session, EINVAL, "unexpected value for checkpoint key: %.*s",

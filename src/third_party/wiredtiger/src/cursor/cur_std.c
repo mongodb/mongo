@@ -981,13 +981,13 @@ __cursor_reuse_or_init(WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *
     owner = ownerp ? *ownerp : NULL;
     if (cval.len != 0 && owner == NULL) {
         uint64_t dump_flag;
-        if (WT_STRING_MATCH("json", cval.str, cval.len))
+        if (WT_CONFIG_LIT_MATCH("json", cval))
             dump_flag = WT_CURSTD_DUMP_JSON;
-        else if (WT_STRING_MATCH("print", cval.str, cval.len))
+        else if (WT_CONFIG_LIT_MATCH("print", cval))
             dump_flag = WT_CURSTD_DUMP_PRINT;
-        else if (WT_STRING_MATCH("pretty", cval.str, cval.len))
+        else if (WT_CONFIG_LIT_MATCH("pretty", cval))
             dump_flag = WT_CURSTD_DUMP_PRETTY;
-        else if (WT_STRING_MATCH("pretty_hex", cval.str, cval.len))
+        else if (WT_CONFIG_LIT_MATCH("pretty_hex", cval))
             dump_flag = WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRETTY;
         else
             dump_flag = WT_CURSTD_DUMP_HEX;

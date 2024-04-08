@@ -34,11 +34,11 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
         FLD_CLR(txn_logsync, WT_LOG_SYNC_ENABLED);
 
     WT_RET(__wt_config_gets(session, cfg, "transaction_sync.method", &cval));
-    if (WT_STRING_MATCH("dsync", cval.str, cval.len))
+    if (WT_CONFIG_LIT_MATCH("dsync", cval))
         FLD_SET(txn_logsync, WT_LOG_DSYNC | WT_LOG_FLUSH);
-    else if (WT_STRING_MATCH("fsync", cval.str, cval.len))
+    else if (WT_CONFIG_LIT_MATCH("fsync", cval))
         FLD_SET(txn_logsync, WT_LOG_FSYNC);
-    else if (WT_STRING_MATCH("none", cval.str, cval.len))
+    else if (WT_CONFIG_LIT_MATCH("none", cval))
         FLD_SET(txn_logsync, WT_LOG_FLUSH);
     WT_RELEASE_WRITE_WITH_BARRIER(conn->txn_logsync, txn_logsync);
     return (0);
@@ -324,7 +324,7 @@ __wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
      */
     if (!reconfig) {
         WT_RET(__wt_config_gets_def(session, cfg, "log.recover", 0, &cval));
-        if (WT_STRING_MATCH("error", cval.str, cval.len))
+        if (WT_CONFIG_LIT_MATCH("error", cval))
             FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR);
     }
 

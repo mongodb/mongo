@@ -443,10 +443,10 @@ __config_process_value(WT_CONFIG_ITEM *value)
         return;
 
     if (value->type == WT_CONFIG_ITEM_ID) {
-        if (WT_STRING_MATCH("false", value->str, value->len)) {
+        if (WT_CONFIG_LIT_MATCH("false", *value)) {
             value->type = WT_CONFIG_ITEM_BOOL;
             value->val = 0;
-        } else if (WT_STRING_MATCH("true", value->str, value->len)) {
+        } else if (WT_CONFIG_LIT_MATCH("true", *value)) {
             value->type = WT_CONFIG_ITEM_BOOL;
             value->val = 1;
         }
@@ -609,7 +609,7 @@ __wt_config_gets_none(
   WT_SESSION_IMPL *session, const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
     WT_RET(__wt_config_gets(session, cfg, key, value));
-    if (WT_STRING_MATCH("none", value->str, value->len))
+    if (WT_CONFIG_LIT_MATCH("none", *value))
         value->len = 0;
     return (0);
 }
@@ -652,7 +652,7 @@ __wt_config_getones_none(
   WT_SESSION_IMPL *session, const char *config, const char *key, WT_CONFIG_ITEM *value)
 {
     WT_RET(__wt_config_getones(session, config, key, value));
-    if (WT_STRING_MATCH("none", value->str, value->len))
+    if (WT_CONFIG_LIT_MATCH("none", *value))
         value->len = 0;
     return (0);
 }

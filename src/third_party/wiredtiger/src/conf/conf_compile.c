@@ -698,11 +698,10 @@ __conf_verbose_cat_config(WT_SESSION_IMPL *session, const char **cfg, WT_CONF *c
                      * and fast compare to true/false constants must also work.
                      */
                     if (value.val == 0) {
-                        WT_ASSERT(session, WT_STRING_MATCH("false", value.str, value.len));
+                        WT_ASSERT(session, WT_CONFIG_LIT_MATCH("false", value));
                         WT_ASSERT(session, WT_CONF_STRING_MATCH(false, value));
                     } else {
-                        WT_ASSERT(
-                          session, value.val == 1 && WT_STRING_MATCH("true", value.str, value.len));
+                        WT_ASSERT(session, value.val == 1 && WT_CONFIG_LIT_MATCH("true", value));
                         WT_ASSERT(session, WT_CONF_STRING_MATCH(true, value));
                     }
                 }

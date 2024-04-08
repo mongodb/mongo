@@ -187,10 +187,10 @@ err:
  * Check if a key matches the metadata. The public value is "metadata:", but also check for the
  * internal version of the URI.
  */
-#define WT_KEY_IS_METADATA(key)                                          \
-    ((key)->size > 0 &&                                                  \
-      (WT_STRING_MATCH(WT_METADATA_URI, (key)->data, (key)->size - 1) || \
-        WT_STRING_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1)))
+#define WT_KEY_IS_METADATA(key)                                              \
+    ((key)->size > 0 &&                                                      \
+      (WT_STRING_LIT_MATCH(WT_METADATA_URI, (key)->data, (key)->size - 1) || \
+        WT_STRING_LIT_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1)))
 
 /*
  * __curmetadata_metadata_search --
