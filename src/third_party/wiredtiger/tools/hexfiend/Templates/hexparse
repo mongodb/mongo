@@ -9,7 +9,7 @@ set __f {}
 set __fs 0
 set __fpos 0
 
-set __flag_hexdump 0       ;# 0: none   1: separate line   2: same line   3: separate line, on the right
+set __flag_hexdump 0       ;# 0: none   1: separate line   2: same line   3: separate line, on the right   4: indented
 
 proc __globals {args} {
   foreach pat $args {
@@ -120,10 +120,12 @@ proc say {str} {
   }
 }
 proc entry {name val args} {
-  global __flag_hexdump
-  if {$name ne "pad" && $__flag_hexdump == 2} { __hexdump {*}$args; }
-  say "$name = [__safeStr $val] ($args)";
-  if {$name ne "pad" && ($__flag_hexdump == 1 || $__flag_hexdump == 3)} { __hexdump {*}$args; }
+  globals __flag_hexdump __indent_nodump
+  set isPad [string match pad* $name]
+  set padIndent [expr {$isPad ? $__indent_nodump : ""}]
+  if {!$isPad && $__flag_hexdump == 2} { __hexdump {*}$args; }
+  say "$padIndent$name = [__safeStr $val] ($args)";
+  if {!$isPad && ($__flag_hexdump == 1 || $__flag_hexdump == 3 || $__flag_hexdump == 4)} { __hexdump {*}$args; }
   return $val;
 }
 proc section {args} {
@@ -161,15 +163,15 @@ proc len {} { global __fs; return $__fs }
 proc end {} { global __fs; expr {[pos] >= $__fs} }
 
 proc __hexdump {{len 0} {offset -1}} {
-  globals __f __output __flag_hexdump
+  globals __f __output __flag_hexdump __indentstr
   if {$len < 1 || $__flag_hexdump == 0} { return }
   if {$offset < 0} { set offset [pos] }
   set savedpos [pos]
-  set prefix [expr {$__flag_hexdump == 3 ? [string repeat " " 78] : ""}]
+  set prefix [expr {$__flag_hexdump == 3 ? [string repeat " " 79] : $__flag_hexdump == 4 ? $__indentstr : ""}]
   goto $offset
   set pos [expr {$offset & ~0xF}]
   set end [expr {$offset + $len}]
-  append __output [format "${prefix}0x%08X:" $pos]
+  append __output [format "${prefix}0x%08X:" $offset]
   set dumpstr ""
   for {} {$pos < $offset} {incr pos} { append __output "   "; append dumpstr " "; }
   for {} {$pos < $end || $dumpstr ne ""} {incr pos} {
@@ -240,6 +242,7 @@ set __cmdline_opts {
   {hexdump1 "Print a hex dump of values on a separate line"}
   {hexdump2 "Print a hex dump of values on the same line"}
   {hexdump3 "Print a hex dump of values on a separate line on the right"}
+  {hexdump4 "Print a hex dump of values indented"}
 }
 
 if {[catch {
@@ -247,14 +250,14 @@ if {[catch {
     set __flag_$name $val
   }
   set argv [lassign $argv template]
-  set __flag_hexdump [expr {$__flag_hexdump3 ? 3 : $__flag_hexdump2 ? 2 : $__flag_hexdump1 ? 1 : 0 }]
+  set __flag_hexdump [expr {$__flag_hexdump4 ? 4 : $__flag_hexdump3 ? 3 : $__flag_hexdump2 ? 2 : $__flag_hexdump1 ? 1 : 0 }]
 }]} {
   puts [cmdline::usage $__cmdline_opts {usage: $ hexparse [options] {TEMPLATE} {file ...}}]
   exit
 }
 
-set __indent_dump [string repeat " " [expr {$__flag_hexdump == 1 ? 78 : $__flag_hexdump == 2 ? 2 : 0}]]
-set __indent_nodump [expr {$__flag_hexdump == 2 ? [string repeat " " 78] : ""}]
+set __indent_dump [string repeat " " [expr {$__flag_hexdump == 1 ? 79 : $__flag_hexdump == 2 ? 2 : 0}]]
+set __indent_nodump [expr {$__flag_hexdump == 2 ? [string repeat " " 77] : ""}]
 
 set template [__find_template_path $template]
 
