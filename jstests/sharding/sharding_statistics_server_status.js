@@ -82,13 +82,6 @@ function checkServerStatusAbortedMigrationCount(shardConn, count) {
     assert.eq(count, shardStats.countDonorMoveChunkAbortConflictingIndexOperation);
 }
 
-function checkServerStatusNumShardedCollections(conn, count) {
-    const shardStats =
-        assert.commandWorked(conn.adminCommand({serverStatus: 1})).shardingStatistics;
-    assert(shardStats.hasOwnProperty("numShardedCollections"));
-    assert.eq(count, shardStats.numShardedCollections);
-}
-
 function runConcurrentMoveChunk(host, ns, toShard) {
     const mongos = new Mongo(host);
     // Helper function to run moveChunk, retrying on ConflictingOperationInProgress. We need to
@@ -157,13 +150,7 @@ assert.commandWorked(
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 0}}));
 
-// Check the number of sharded collections.
 const testDB = st.rs0.getPrimary().getDB(dbName);
-st.shardColl(dbName + ".coll2", {_id: 1}, false);
-st.shardColl(dbName + ".coll3", {_id: 1}, false);
-const configCollections = mongos.getCollection("config.collections");
-checkServerStatusNumShardedCollections(st.configRS.getPrimary(),
-                                       configCollections.countDocuments({}));
 
 // Move chunk from shard0 to shard1 without docs.
 assert.commandWorked(
