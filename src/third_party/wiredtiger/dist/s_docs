@@ -43,6 +43,7 @@ wtperf_config()
     # instead.
     cat ../bench/wtperf/wtperf_opt_inline.h |
     ${CC:-cc} -E -DOPT_DEFINE_DOXYGEN - | python3 wtperf_config.py > $t
+    cp ../src/docs/wtperf.dox $t2 2>/dev/null
     (echo '/START_AUTO_GENERATED_WTPERF_CONFIGURATION/+3,/STOP_AUTO_GENERATED_WTPERF_CONFIGURATION/-1d'
      echo 'i'
      echo ''
@@ -52,7 +53,14 @@ wtperf_config()
      echo ''
      echo '.'
      echo 'w'
-     echo 'q') | ed ../src/docs/wtperf.dox 1>/dev/null 2>/dev/null
+     echo 'q') | ed $t2 1>/dev/null 2>/dev/null
+     if ! cmp -s ../src/docs/wtperf.dox $t2; then
+         echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+         echo '../src/docs/wtperf.dox changed. wtperf.dox needs to be committed.'
+         echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+         e=1
+         mv $t2 ../src/docs/wtperf.dox
+     fi
 }
 
 glossarychk()
