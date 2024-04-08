@@ -42,6 +42,11 @@ export var CreateShardedCollectionUtil = (function() {
         assert(Object.values(chunks[chunks.length - 1].max).every(x => x === MaxKey),
                "last chunk must have all MaxKey as max: " + tojson(chunks[chunks.length - 1].max));
 
+        const zoneNss =
+            (shardCollOptions !== undefined && shardCollOptions.hasOwnProperty("timeseries"))
+            ? `${collection.getDB().getName()}.system.buckets.${collection.getName()}`
+            : collection.getFullName();
+
         let prevChunk;
         for (let chunk of chunks) {
             if (prevChunk !== undefined) {
@@ -51,7 +56,7 @@ export var CreateShardedCollectionUtil = (function() {
             }
 
             assert.commandWorked(adminDB.runCommand({
-                updateZoneKeyRange: collection.getFullName(),
+                updateZoneKeyRange: zoneNss,
                 min: chunk.min,
                 max: chunk.max,
                 zone: makeZoneName(chunk.shard),
@@ -70,7 +75,7 @@ export var CreateShardedCollectionUtil = (function() {
         // We disassociate the chunk ranges from the zones to allow removing the zones altogether.
         for (let chunk of chunks) {
             assert.commandWorked(adminDB.runCommand({
-                updateZoneKeyRange: collection.getFullName(),
+                updateZoneKeyRange: zoneNss,
                 min: chunk.min,
                 max: chunk.max,
                 zone: null,
