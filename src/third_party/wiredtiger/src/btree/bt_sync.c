@@ -326,9 +326,6 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         /* Write all dirty in-cache pages. */
         LF_SET(WT_READ_NO_EVICT);
 
-        /* Read pages with history store entries and evict them asap. */
-        LF_SET(WT_READ_WONT_NEED);
-
         /*
          * Perform checkpoint cleanup when not in startup or shutdown phase by traversing internal
          * pages looking for obsolete child pages. This is a form of fast-truncate and so it works
@@ -408,7 +405,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             }
 
             /*
-             * If the page was pulled into cache by our read, try to evict it now.
+             * When the timing stress is enabled, perform the leaf page eviction by the checkpoint.
              *
              * For eviction to have a chance, we first need to move the walk point to the next page
              * checkpoint will visit. We want to avoid this code being too special purpose, so try
@@ -416,16 +413,14 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              *
              * Regardless of whether eviction succeeds or fails, the walk continues from the
              * previous location. We remember whether we tried eviction, and don't try again. Even
-             * if eviction fails (the page may stay in cache clean but with history that cannot be
-             * discarded), that is not wasted effort because checkpoint doesn't need to write the
-             * page again.
+             * if eviction fails (the page may stay in cache clean), that is not a wasted effort
+             * because checkpoint doesn't need to write the page again.
              *
              * Once the transaction has given up it's snapshot it is no longer safe to reconcile
              * pages. That happens prior to the final metadata checkpoint.
              */
             if (!is_internal &&
-              (__wt_atomic_load64(&page->read_gen) == WT_READGEN_WONT_NEED ||
-                FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE)) &&
+              FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE) &&
               !tried_eviction && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) {
                 ret = __wt_page_release_evict(session, walk, 0);
                 walk = NULL;
