@@ -94,7 +94,8 @@ function bulkWriteBasicTest(ordered) {
     insertedDocs = getCollection(orange).find({}).toArray();
     assert.eq(2, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
 
-    // TODO (SERVER-87807): Skip this check also for uponMoveCollection feature flag
+    // When featureFlagTrackUnshardedCollectionsUponCreation is enabled, the stale mongos already
+    // knows that the collection is tracked and so the write will not throw a staleDBVersion error.
     if (!isTrackUnshardedUponCreationEnabled) {
         assert(checkLog.checkContainsOnce(st.s0, staleDbTest2Log));
     }
