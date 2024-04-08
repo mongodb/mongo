@@ -46,10 +46,13 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
-using AuthorizationSessionTest = AuthorizationSessionTestFixture;
-
 namespace {
+
+class AuthorizationSessionTest : public AuthorizationSessionTestFixture {
+public:
+    void testInvalidateUser(std::string mechanismData);
+};
+
 const NamespaceString testFooNss = NamespaceString::createNamespaceString_forTest("test.foo");
 const NamespaceString testBarNss = NamespaceString::createNamespaceString_forTest("test.bar");
 const NamespaceString testQuxNss = NamespaceString::createNamespaceString_forTest("test.qux");
@@ -293,10 +296,13 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
     authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
 }
 
-TEST_F(AuthorizationSessionTest, InvalidateUser) {
+void AuthorizationSessionTest::testInvalidateUser(std::string mechanismData) {
+    UserRequest userRequest(kSpencerTest, boost::none);
+    userRequest.mechanismData = std::move(mechanismData);
+
     // Add a readWrite user
     ASSERT_OK(createUser(kSpencerTest, {{"readWrite", "test"}}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), userRequest, boost::none));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
@@ -304,6 +310,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
 
     User* user = authzSession->lookupUser(kSpencerTest);
+    ASSERT(user != nullptr);
 
     // Change the user to be read-only
     int ignored;
@@ -320,6 +327,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
 
     user = authzSession->lookupUser(kSpencerTest);
+    ASSERT(user != nullptr);
 
     // Delete the user.
     ASSERT_OK(managerState->remove(
@@ -333,6 +341,18 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
     ASSERT_FALSE(authzSession->lookupUser(kSpencerTest));
     authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+}
+
+TEST_F(AuthorizationSessionTest, InvalidateUserByName) {
+    // Basic test with no roles or mechanism data.
+    std::string mechanismData{};
+    testInvalidateUser(std::move(mechanismData));
+}
+
+TEST_F(AuthorizationSessionTest, InvalidateUserByNameWithMechanismData) {
+    // Attach cache-key breaking mechanism data to validate cache invalidation.
+    std::string mechanismData("mechdata");
+    testInvalidateUser(std::move(mechanismData));
 }
 
 TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
