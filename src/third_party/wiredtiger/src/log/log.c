@@ -758,8 +758,8 @@ __wt_log_fill(
         __wt_atomic_add32(&lsnp->l.offset, (uint32_t)myslot->offset);
     }
 err:
-    if (ret != 0 && myslot->slot->slot_error == 0)
-        myslot->slot->slot_error = ret;
+    if (ret != 0 && __wt_atomic_loadi32(&myslot->slot->slot_error) == 0)
+        __wt_atomic_storei32(&myslot->slot->slot_error, ret);
     return (ret);
 }
 
@@ -1912,7 +1912,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
     log = conn->log;
     if (freep != NULL)
         *freep = true;
-    release_buffered = WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
+    release_buffered = WT_LOG_SLOT_RELEASED_BUFFERED(__wt_atomic_loadiv64(&slot->slot_state));
     release_bytes = release_buffered + slot->slot_unbuffered;
 
     /*
@@ -1941,7 +1941,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
       FLD_ISSET(conn->server_flags, WT_CONN_SERVER_LOG)) {
         if (freep != NULL)
             *freep = false;
-        slot->slot_state = WT_LOG_SLOT_WRITTEN;
+        __wt_atomic_storeiv64(&slot->slot_state, WT_LOG_SLOT_WRITTEN);
         /*
          * After this point the worker thread owns the slot. There is nothing more to do but return.
          */
@@ -2024,8 +2024,8 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
     }
 err:
     __wt_spin_unlock_if_owned(session, &log->log_sync_lock);
-    if (ret != 0 && slot->slot_error == 0)
-        slot->slot_error = ret;
+    if (ret != 0 && __wt_atomic_loadi32(&slot->slot_error) == 0)
+        __wt_atomic_storei32(&slot->slot_error, ret);
     return (ret);
 }
 
@@ -2483,7 +2483,7 @@ __wt_log_force_write(WT_SESSION_IMPL *session, bool retry, bool *did_work)
     WT_STAT_CONN_INCR(session, log_force_write);
     if (did_work != NULL)
         *did_work = true;
-    myslot.slot = log->active_slot;
+    myslot.slot = __wt_atomic_load_pointer(&log->active_slot);
     return (__wt_log_slot_switch(session, &myslot, retry, true, did_work));
 }
 
@@ -2706,7 +2706,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
      * may still need to call release and free.
      */
     if (ret != 0)
-        myslot.slot->slot_error = ret;
+        __wt_atomic_storei32(&myslot.slot->slot_error, ret);
     WT_ASSERT(session, ret == 0);
     if (WT_LOG_SLOT_DONE(release_size)) {
         WT_ERR(__wt_log_release(session, myslot.slot, &free_slot));
@@ -2726,11 +2726,13 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
     }
     if (LF_ISSET(WT_LOG_FLUSH)) {
         /* Wait for our writes to reach the OS */
-        while (__wt_log_cmp(&log->write_lsn, &lsn) <= 0 && myslot.slot->slot_error == 0)
+        while (__wt_log_cmp(&log->write_lsn, &lsn) <= 0 &&
+          __wt_atomic_loadi32(&myslot.slot->slot_error) == 0)
             __wt_cond_wait(session, log->log_write_cond, 10 * WT_THOUSAND, NULL);
     } else if (LF_ISSET(WT_LOG_FSYNC)) {
         /* Wait for our writes to reach disk */
-        while (__wt_log_cmp(&log->sync_lsn, &lsn) <= 0 && myslot.slot->slot_error == 0)
+        while (__wt_log_cmp(&log->sync_lsn, &lsn) <= 0 &&
+          __wt_atomic_loadi32(&myslot.slot->slot_error) == 0)
             __wt_cond_wait(session, log->log_sync_cond, 10 * WT_THOUSAND, NULL);
     }
 
@@ -2743,7 +2745,7 @@ err:
      * it. If we're not synchronous, only report if our own operation got an error.
      */
     if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC) && ret == 0 && myslot.slot != NULL)
-        ret = myslot.slot->slot_error;
+        ret = __wt_atomic_loadi32(&myslot.slot->slot_error);
 
     /*
      * If one of the sync flags is set, assert the proper LSN has moved to match on success.

@@ -47,13 +47,13 @@ typedef enum {
 #define WT_CAP_READ 55
 
 struct __wt_capacity {
-    uint64_t chunkcache; /* Bytes/sec chunk cache capacity */
-    uint64_t ckpt;       /* Bytes/sec checkpoint capacity */
-    uint64_t evict;      /* Bytes/sec eviction capacity */
-    uint64_t log;        /* Bytes/sec logging capacity */
-    uint64_t read;       /* Bytes/sec read capacity */
-    uint64_t total;      /* Bytes/sec total capacity */
-    uint64_t threshold;  /* Capacity size period */
+    uint64_t chunkcache;      /* Bytes/sec chunk cache capacity */
+    uint64_t ckpt;            /* Bytes/sec checkpoint capacity */
+    uint64_t evict;           /* Bytes/sec eviction capacity */
+    uint64_t log;             /* Bytes/sec logging capacity */
+    uint64_t read;            /* Bytes/sec read capacity */
+    wt_shared uint64_t total; /* Bytes/sec total capacity */
+    uint64_t threshold;       /* Capacity size period */
 
     wt_shared volatile uint64_t written; /* Written this period */
     wt_shared volatile bool signalled;   /* Capacity signalled */

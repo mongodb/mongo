@@ -310,9 +310,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          */
         WT_ASSERT(session,
           __wt_atomic_load_enum(&btree->syncing) == WT_BTREE_SYNC_OFF &&
-            __wt_atomic_load_generic(&btree->sync_session) == NULL);
+            __wt_atomic_load_pointer(&btree->sync_session) == NULL);
 
-        __wt_atomic_store_generic(&btree->sync_session, session);
+        __wt_atomic_store_pointer(&btree->sync_session, session);
         __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_WAIT);
         __wt_gen_next_drain(session, WT_GEN_EVICT);
         __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_RUNNING);
@@ -502,7 +502,7 @@ err:
 
     /* Clear the checkpoint flag. */
     __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_OFF);
-    __wt_atomic_store_generic(&btree->sync_session, NULL);
+    __wt_atomic_store_pointer(&btree->sync_session, NULL);
 
     __wt_spin_unlock(session, &btree->flush_lock);
 

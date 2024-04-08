@@ -192,8 +192,8 @@ struct __wt_logslot {
     WT_CACHE_LINE_PAD_BEGIN
     wt_shared volatile int64_t slot_state; /* Slot state */
     int64_t slot_unbuffered;               /* Unbuffered data in this slot */
-    int slot_error;                        /* Error value */
-    wt_off_t slot_start_offset;            /* Starting file offset */
+    wt_shared int slot_error;              /* Error value */
+    wt_shared wt_off_t slot_start_offset;  /* Starting file offset */
     wt_shared wt_off_t slot_last_offset;   /* Last record offset */
     WT_LSN slot_release_lsn;               /* Slot release LSN */
     WT_LSN slot_start_lsn;                 /* Slot starting LSN */
@@ -292,7 +292,7 @@ struct __wt_log {
  * arrays.
  */
 #define WT_SLOT_POOL 128
-    WT_LOGSLOT *active_slot;                      /* Active slot */
+    wt_shared WT_LOGSLOT *active_slot;            /* Active slot */
     wt_shared WT_LOGSLOT slot_pool[WT_SLOT_POOL]; /* Pool of all slots */
     int32_t pool_index;                           /* Index into slot pool */
     size_t slot_buf_size;                         /* Buffer size for slots */
