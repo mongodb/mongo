@@ -1,12 +1,14 @@
 # Suppress the listed TSan warnings. Load this file with 
-# export TSAN_OPTIONS="suppressions=path/to/wiredtiger/test/evergreen/tsan_warnings.supp"
-# before running tests with TSan
+# export TSAN_OPTIONS="suppressions=path/to/wiredtiger/test/evergreen/tsan_warnings.supp:history_size=7"
+# before running tests with TSan. history_size isn't required but it reduces the chance that TSan reports 
+# an error that is missing information and the message "failed to restore the stack"
 
 # This function enables threads to set double values in a shared context, and catches all TSan warnings.
 race:__wt_set_shared_double
 
 # Stats are allowed to be fuzzy. Ignore races in TSan
 race:src/include/stat.h
+race:src/support/stat.c
 
 # FIXME-WT-12610 Fields like log->slot_state are composite variables and more complex than the usual storing 
 # and loading of ints. These fields will be investigated in a separate ticket. 
@@ -21,3 +23,6 @@ race:__tiered_queue_peek_empty
 
 # The ref track code is diagnostic only and allows for races
 race:__ref_track_state
+
+# __wt_configure_method intentionally allows for races between threads to avoid the overhead of taking a lock on each API call.  
+race:__wt_configure_method

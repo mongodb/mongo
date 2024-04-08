@@ -637,7 +637,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
      * values could lead to surprising bugs in the future.
      */
     if (F_ISSET(conn, WT_CONN_HS_OPEN) && __wt_hs_get_btree(session, &hs_tree) == 0) {
-        __wt_atomic_store64(&cache->bytes_hs, hs_tree->bytes_inmem);
+        __wt_atomic_store64(&cache->bytes_hs, __wt_atomic_load64(&hs_tree->bytes_inmem));
         cache->bytes_hs_dirty = hs_tree->bytes_dirty_intl + hs_tree->bytes_dirty_leaf;
     }
 

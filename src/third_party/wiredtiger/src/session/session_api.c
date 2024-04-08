@@ -235,7 +235,7 @@ __session_clear(WT_SESSION_IMPL *session)
      */
     memset(session, 0, WT_SESSION_CLEAR_SIZE);
 
-    session->hazards.inuse = 0;
+    __wt_atomic_store32(&session->hazards.inuse, 0);
     session->hazards.num_active = 0;
 }
 
@@ -2644,7 +2644,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         WT_ERR(
           __wt_calloc_def(session, WT_SESSION_INITIAL_HAZARD_SLOTS, &session_ret->hazards.arr));
         session_ret->hazards.size = WT_SESSION_INITIAL_HAZARD_SLOTS;
-        session_ret->hazards.inuse = 0;
+        __wt_atomic_store32(&session_ret->hazards.inuse, 0);
         session_ret->hazards.num_active = 0;
     }
 

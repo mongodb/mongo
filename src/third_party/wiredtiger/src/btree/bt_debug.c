@@ -1288,7 +1288,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
     if (split_gen != 0)
         WT_RET(ds->f(ds, " | split_gen: %" PRIu64, split_gen));
     if (mod != NULL)
-        WT_RET(ds->f(ds, " | page_state: %" PRIu32, mod->page_state));
+        WT_RET(ds->f(ds, " | page_state: %" PRIu32, __wt_atomic_load32(&mod->page_state)));
     WT_RET(ds->f(ds, " | page_mem_size: %" WT_SIZET_FMT, page->memory_footprint));
     return (ds->f(ds, "\n"));
 }

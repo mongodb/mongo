@@ -102,8 +102,6 @@ functions:
       remote_file: engflow/engflow.key
       bucket: serverengflow
       local_file: "mongo/engflow.key"
-      # Mark as optional to allow local-mode execution to succeed.
-      optional: true
   - command: s3.get
     display_name: "get engflow cert"
     params:
@@ -112,8 +110,6 @@ functions:
       remote_file: engflow/engflow.cert
       bucket: serverengflow
       local_file: "mongo/engflow.cert"
-      # Mark as optional to allow local-mode execution to succeed.
-      optional: true
   - command: shell.exec
     params:
       display_name: "generate evergreen engflow bazelrc"
@@ -1649,7 +1645,7 @@ tasks:
       - func: "make check directory"
         vars:
           directory: examples/c
-          extra_args: -R "(ex_access|ex_col_store|ex_config_parse|ex_cursor|ex_encrypt|ex_event_handler|ex_extending|ex_extra_diagnostics|ex_extractor|ex_hello|ex_pack|ex_process|ex_schema|ex_smoke|ex_thread|ex_tiered|ex_verbose)" -j ${num_jobs}
+          extra_args: -E "(ex_all|ex_backup|ex_backup_block|ex_file_system)" -j ${num_jobs}
 
   - name: examples-c-production-disable-shared-test
     tags: ["pull_request"]
@@ -5360,7 +5356,7 @@ buildvariants:
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=TSan
     ENABLE_TCMALLOC: 0
     additional_env_vars: |
-      export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/tsan_warnings.supp"
+      export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:history_size=7:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/tsan_warnings.supp"
       export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
