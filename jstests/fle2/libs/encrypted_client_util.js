@@ -441,13 +441,6 @@ export function isFLE2ReplicationEnabled() {
 }
 
 /**
- * @returns Returns true if featureFlagFLE2CleanupCommand is enabled
- */
-export function isFLE2CleanupEnabled(db) {
-    return FeatureFlagUtil.isEnabled(db, "FLE2CleanupCommand");
-}
-
-/**
  * @returns Returns true if internalQueryFLEAlwaysUseEncryptedCollScanMode is enabled
  */
 export function isFLE2AlwaysUseCollScanModeEnabled(db) {

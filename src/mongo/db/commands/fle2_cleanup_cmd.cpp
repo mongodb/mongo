@@ -147,12 +147,6 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
     }
 
-    uassert(7618803,
-            str::stream() << "Feature flag `FLE2CleanupCommand` must be enabled to run "
-                          << CleanupStructuredEncryptionData::kCommandName,
-            gFeatureFlagFLE2CleanupCommand.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
     uassert(7618804,
             str::stream() << CleanupStructuredEncryptionData::kCommandName
                           << " must be run through mongos in a sharded cluster",
