@@ -7418,9 +7418,8 @@ export const authCommandsLib = {
           pipeline: [{$querySettings: {}}],
           cursor: {}
         },
-        // TODO: SERVER-71537 Remove Feature Flag for PM-412.
         skipTest: (conn) => {
-          return isStandalone(conn) || !TestData.setParameters.featureFlagQuerySettings;
+          return isStandalone(conn);
         },
         testcases: [
           // Tests that a cluster admin can successfully run the `$querySettings` stage as part of
@@ -7446,9 +7445,8 @@ export const authCommandsLib = {
             }
           }
         },
-        // TODO: SERVER-71537 Remove Feature Flag for PM-412.
         skipTest: (conn) => {
-          return isStandalone(conn) || !TestData.setParameters.featureFlagQuerySettings;
+          return isStandalone(conn);
         },
         teardown: function(db) {
           db.adminCommand({removeQuerySettings: {
@@ -7473,9 +7471,8 @@ export const authCommandsLib = {
             $db: firstDbName,
           }
         },
-        // TODO: SERVER-71537 Remove Feature Flag for PM-412.
         skipTest: (conn) => {
-          return isStandalone(conn) || !TestData.setParameters.featureFlagQuerySettings;
+          return isStandalone(conn);
         },
         testcases: [
           // Tests that an admin cluster can successfully run the `removeQuerySettings` command.
@@ -7496,8 +7493,7 @@ export const authCommandsLib = {
      * and false otherwise.
      */
     isMongos: function(conn) {
-        var res = conn.getDB("admin").runCommand({isdbgrid: 1});
-        return (res.ok == 1 && res.isdbgrid == 1);
+        return FixtureHelpers.isMongos(conn.getDB(adminDbName));
     },
 
     /**
@@ -7520,23 +7516,27 @@ export const authCommandsLib = {
           shard0name = options.shard0Name;
         }
 
-        jsTest.log("Running test: " + t.testname);
-
         if (t.skipTest && t.skipTest(conn)) {
-            return [];
+          jsTest.log("Skipping test: " + t.testname);
+          return [];
         }
         // some tests shouldn't run in a sharded environment
         if (t.skipSharded && isMongos) {
-            return [];
+          jsTest.log("Skipping test against mongos: " + t.testname);
+          return [];
         }
         // others shouldn't run in a standalone environment
         if (t.skipUnlessSharded && !isMongos) {
-            return [];
+          jsTest.log("Skipping test against mongod: " + t.testname);
+          return [];
         }
         // some tests require replica sets to be enabled.
-        if (t.skipUnlessReplicaSet && !FixtureHelpers.isReplSet(conn.getDB("admin"))) {
-            return [];
+        if (t.skipUnlessReplicaSet && !FixtureHelpers.isReplSet(conn.getDB(adminDbName))) {
+          jsTest.log("Skipping test against standalone or cluster: " + t.testname);
+          return [];
         }
+
+        jsTest.log("Running test: " + t.testname);
 
         return impls.runOneTest(conn, t);
     },
@@ -7600,7 +7600,5 @@ export const authCommandsLib = {
  * Returns true iff the test is ran in a standalone environment.
  */
 function isStandalone(conn) {
-    const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
-    const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
-    return isStandalone;
+    return FixtureHelpers.isStandalone(conn.getDB(adminDbName));
 }
