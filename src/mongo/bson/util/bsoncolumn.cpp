@@ -353,6 +353,22 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
         // Exit interleaved mode and load as regular. Re-instantiate the state and set last known
         // value.
         uassert(6067604, "Invalid BSON Column interleaved encoding", processed == 0);
+
+        // Before exiting interleaved mode, verify all of the decoders are exhausted.
+        while (stateIt != stateEnd) {
+            auto& state = *stateIt;
+            if (auto d64 = get_if<DecodingState::Decoder64>(&state.decoder);
+                d64 && d64->pos.valid()) {
+                uassert(
+                    8902201, "Invalid BSON Column interleaved encoding", !((++d64->pos).more()));
+            } else if (auto d128 = get_if<DecodingState::Decoder128>(&state.decoder);
+                       d128 && d128->pos.valid()) {
+                uassert(
+                    8902202, "Invalid BSON Column interleaved encoding", !((++d128->pos).more()));
+            }
+            stateIt++;
+        }
+
         // This invalidates 'interleaved' reference, may no longer be dereferenced.
         Regular& regular = _mode.emplace<Regular>();
         get<0>(regular.state.decoder).deltaOfDelta = false;
