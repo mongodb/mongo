@@ -11,6 +11,7 @@ ADDRs
 AJ
 ANDed
 APIs
+AREALLSET
 ARG
 ARGS
 ASAN
@@ -191,6 +192,7 @@ INTRINSICS
 INUSE
 INVL
 ISA
+ISSET
 ITEMs
 InitializeCriticalSectionAndSpinCount
 Instantiation

@@ -201,6 +201,14 @@
  * Flags can be different unsigned bit values -- we cast to keep the compiler quiet (the hex
  * constant might be a negative integer), and to ensure the hex constant is the correct size before
  * applying the bitwise not operator.
+ *
+ * Summary of flag tests:
+ *
+ * Is any flag set? - F*_ISSET()
+ *
+ * Are none of the flags set? - !F*_ISSET()
+ *
+ * Are all of the flags set? - F*_AREALLSET()
  */
 #ifdef TSAN_BUILD
 /*
@@ -217,17 +225,25 @@
 #define FLD_MASK(field, mask) ((field) & (mask))
 #define FLD_ISSET(field, mask) (FLD_MASK(field, mask) != 0)
 #define FLD_SET(field, mask) ((void)((field) |= (mask)))
+/* Named like a macro for consistency. An inline function to evaluate mask only once. */
+static inline bool
+FLD_AREALLSET(uint64_t field, uint64_t mask)
+{
+    return (FLD_MASK(field, mask) == mask);
+}
 #endif
 
 #define F_CLR(p, mask) FLD_CLR((p)->flags, mask)
 #define F_ISSET(p, mask) FLD_ISSET((p)->flags, mask)
 #define F_MASK(p, mask) FLD_MASK((p)->flags, mask)
 #define F_SET(p, mask) FLD_SET((p)->flags, mask)
+#define F_AREALLSET(p, mask) FLD_AREALLSET((uint64_t)((p)->flags), (uint64_t)(mask))
 
 #define LF_CLR(mask) FLD_CLR(flags, mask)
 #define LF_ISSET(mask) FLD_ISSET(flags, mask)
 #define LF_MASK(mask) FLD_MASK(flags, mask)
 #define LF_SET(mask) FLD_SET(flags, mask)
+#define LF_AREALLSSET(mask) FLD_AREALLSET(flags, mask)
 
 /*
  * Insertion sort, for sorting small sets of values.
