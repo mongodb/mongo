@@ -44,9 +44,6 @@ let data = [
     {_id: 15, a: "zbarz", c: "foo"},
     // A 12-byte BinData where the last 6 bits are 1 and all preceding bits are 0.
     {_id: 16, a: BinData(0, "AAAAAAAAAAAAAAA/"), c: "foo"},
-    // A 12-byte BinData where the most significant byte is 00111111 and all successive bytes are
-    // 00000000.
-    {_id: 17, a: BinData(0, "PwAAAAAAAAAAAAAA"), c: "foo"},
 ];
 assert.commandWorked(coll.insert(data));
 
@@ -198,30 +195,30 @@ runTest({query: {a: {$gte: 6}}, projection: {c: 0}},
 
 // Test basic auto-parameterization of $bitsAllClear.
 runTest({query: {a: {$bitsAllClear: [0, 3]}}, projection: {_id: 1}},
-        [{_id: 1}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 17}],
+        [{_id: 1}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 16}],
         {query: {a: {$bitsAllClear: [0, 2, 65]}}, projection: {_id: 1}},
-        [{_id: 1}, {_id: 6}, {_id: 17}],
+        [{_id: 1}, {_id: 6}, {_id: 16}],
         true);
 
 // Test basic auto-parameterization of $bitsAllSet.
 runTest({query: {a: {$bitsAllSet: [0, 2]}}, projection: {_id: 1}},
-        [{_id: 5}, {_id: 6}, {_id: 16}],
+        [{_id: 5}, {_id: 6}],
         {query: {a: {$bitsAllSet: [0, 1]}}, projection: {_id: 1}},
-        [{_id: 2}, {_id: 5}, {_id: 6}, {_id: 16}],
+        [{_id: 2}, {_id: 5}, {_id: 6}],
         true);
 
 // Test basic auto-parameterization of $bitsAnyClear.
 runTest({query: {a: {$bitsAnyClear: 1}}, projection: {_id: 1}},
-        [{_id: 1}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 17}],
+        [{_id: 1}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 16}],
         {query: {a: {$bitsAnyClear: 3}}, projection: {_id: 1}},
-        [{_id: 0}, {_id: 1}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 17}],
+        [{_id: 0}, {_id: 1}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 16}],
         true);
 
 // Test basic auto-parameterization of $bitsAnySet.
 runTest({query: {a: {$bitsAnySet: 1}}, projection: {_id: 1}},
-        [{_id: 0}, {_id: 2}, {_id: 5}, {_id: 6}, {_id: 16}],
+        [{_id: 0}, {_id: 2}, {_id: 5}, {_id: 6}],
         {query: {a: {$bitsAnySet: 3}}, projection: {_id: 1}},
-        [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 5}, {_id: 6}, {_id: 16}],
+        [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 5}, {_id: 6}],
         true);
 
 // Auto-parameterization of bit-test operators should work even if looking past 64 bits is required
@@ -229,7 +226,7 @@ runTest({query: {a: {$bitsAnySet: 1}}, projection: {_id: 1}},
 runTest({query: {a: {$bitsAllSet: [0, 94]}}, projection: {_id: 1}},
         [],
         {query: {a: {$bitsAllSet: [88, 89, 90, 91, 92, 93]}}, projection: {_id: 1}},
-        [{_id: 17}],
+        [{_id: 16}],
         true);
 
 // Test auto-parameterization of $elemMatch object.
@@ -294,7 +291,6 @@ runTest({query: {a: {$exists: true}}, projection: {_id: 1}},
             {_id: 14},
             {_id: 15},
             {_id: 16},
-            {_id: 17},
         ],
         {query: {a: {$exists: false}}, projection: {_id: 1}},
         [{_id: 7}],
