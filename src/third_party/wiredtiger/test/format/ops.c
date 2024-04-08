@@ -241,7 +241,7 @@ rollback_to_stable(WT_SESSION *session)
      * Get the stable timestamp, and update ours. They should be the same, but there's no point in
      * debugging the race.
      */
-    testutil_check(timestamp_query("get=stable_timestamp", &g.stable_timestamp));
+    timestamp_query("get=stable", &g.stable_timestamp);
     trace_msg(session, "rollback-to-stable: stable timestamp %" PRIu64, g.stable_timestamp);
 
     /* Check the saved snap operations for consistency. */

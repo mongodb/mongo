@@ -185,7 +185,6 @@ int
 main(int argc, char *argv[])
 {
     READ_SCAN_ARGS scan_args;
-    WT_DECL_RET;
     uint64_t now, start;
     u_int ops_seconds, reps;
     int ch;
@@ -345,11 +344,7 @@ main(int argc, char *argv[])
             is_backup = true;
         wts_open(g.home, &g.wts_conn, !is_backup);
         timestamp_init();
-        /* Update the oldest and stable timestamps if they have been previously set. */
-        ret = timestamp_query("get=oldest_timestamp", &g.oldest_timestamp);
-        testutil_assert(ret == 0 || ret == WT_NOTFOUND);
-        ret = timestamp_query("get=stable_timestamp", &g.stable_timestamp);
-        testutil_assert(ret == 0 || ret == WT_NOTFOUND);
+        timestamp_set_oldest();
     } else {
         wts_create_home();
         config_print(false);
