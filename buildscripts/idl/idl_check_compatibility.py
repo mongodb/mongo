@@ -391,15 +391,10 @@ class AllowedNewPrivilege:
         return cls(privilege.resource_pattern, privilege.action_type, privilege.agg_stage)
 
 
-ALLOWED_NEW_ACCESS_CHECK_PRIVILEGES = dict(
+ALLOWED_NEW_ACCESS_CHECK_PRIVILEGES: Dict[str, List[AllowedNewPrivilege]] = dict(
     # Do not add any command other than the aggregate command or any privilege that is not required
     # only by an aggregation stage not present in previously released versions.
-    aggregate=[
-        # TODO SERVER-87193: Check if we can remove the line below after the next 7.0 patch release (7.0.7) is out.
-        # The feature using 'queryStatsReadTransformed' has been backported to v7.0 but is not present
-        # in the latest patch release. It is guarded by a feature flag so we are allowing this conflict here.
-        AllowedNewPrivilege("cluster", ["queryStatsReadTransformed"], "queryStats"),
-    ],
+    aggregate=[],
 
     # This list is only used in unit-tests.
     complexChecksSupersetAllowed=[
