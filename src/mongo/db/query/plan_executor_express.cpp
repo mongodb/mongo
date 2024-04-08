@@ -27,366 +27,22 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-#include <memory>
-#include <utility>
-#include <variant>
-
 #include "mongo/db/query/plan_executor_express.h"
-
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/express/express_plan.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/write_stage_common.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/cursor_response_gen.h"
-#include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_explainer_express.h"
+#include "mongo/db/exec/projection.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/planner_ixselect.h"
-#include "mongo/db/query/projection.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
-namespace {
-template <class Plan>
-class PlanExecutorExpress final : public PlanExecutor {
-public:
-    PlanExecutorExpress(OperationContext* opCtx,
-                        std::unique_ptr<CanonicalQuery> cq,
-                        VariantCollectionPtrOrAcquisition coll,
-                        Plan plan);
-
-    CanonicalQuery* getCanonicalQuery() const override {
-        return _cq.get();
-    }
-
-    Pipeline* getPipeline() const override {
-        MONGO_UNREACHABLE_TASSERT(8375801);
-    }
-
-    const NamespaceString& nss() const override {
-        return _nss;
-    }
-
-    const std::vector<NamespaceStringOrUUID>& getSecondaryNamespaces() const override {
-        return _secondaryNss;
-    }
-
-    OperationContext* getOpCtx() const override {
-        return _opCtx;
-    }
-
-    void saveState() override {
-        _plan.releaseResources();
-    }
-
-    void restoreState(const RestoreContext& context) override {
-        _coll = context.collection();
-        _plan.restoreResources(_opCtx, &_coll.getCollectionPtr());
-    }
-
-    void detachFromOperationContext() override {
-        _opCtx = nullptr;
-    }
-
-    void reattachToOperationContext(OperationContext* opCtx) override {
-        _opCtx = opCtx;
-    }
-
-    ExecState getNext(BSONObj* out, RecordId* dlOut) override;
-
-    ExecState getNextDocument(Document* objOut, RecordId* dlOut) override {
-        BSONObj bsonDoc;
-        auto state = getNext(&bsonDoc, dlOut);
-        *objOut = Document(bsonDoc);
-        return state;
-    }
-
-    bool isEOF() override {
-        return _plan.exhausted();
-    };
-
-    long long executeCount() override {
-        MONGO_UNREACHABLE_TASSERT(8375802);
-    }
-
-    UpdateResult executeUpdate() override {
-        MONGO_UNREACHABLE_TASSERT(8375803);
-    }
-
-    UpdateResult getUpdateResult() const override {
-        MONGO_UNREACHABLE_TASSERT(8375804);
-    }
-
-    long long executeDelete() override {
-        MONGO_UNREACHABLE_TASSERT(8375805);
-    }
-
-    long long getDeleteResult() const override {
-        MONGO_UNREACHABLE_TASSERT(8375806);
-    }
-
-    BatchedDeleteStats getBatchedDeleteStats() override {
-        MONGO_UNREACHABLE_TASSERT(8375807);
-    }
-
-    void markAsKilled(Status killStatus) override {
-        invariant(!killStatus.isOK());
-        if (_killStatus.isOK()) {
-            _killStatus = killStatus;
-        }
-    }
-
-    void dispose(OperationContext* opCtx) override {
-        _isDisposed = true;
-    }
-
-    void stashResult(const BSONObj& obj) override {
-        MONGO_UNREACHABLE_TASSERT(8375808);
-    }
-
-    bool isMarkedAsKilled() const override {
-        return !_killStatus.isOK();
-    }
-
-    Status getKillStatus() override {
-        invariant(isMarkedAsKilled());
-        return _killStatus;
-    }
-
-    bool isDisposed() const override {
-        return _isDisposed;
-    }
-
-    Timestamp getLatestOplogTimestamp() const override {
-        return {};
-    }
-
-    BSONObj getPostBatchResumeToken() const override {
-        return {};
-    }
-
-    LockPolicy lockPolicy() const override {
-        return LockPolicy::kLockExternally;
-    }
-
-    const PlanExplainer& getPlanExplainer() const override {
-        return _planExplainer;
-    }
-
-    void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {}
-
-    bool isSaveRecoveryUnitAcrossCommandsEnabled() const override {
-        return false;
-    }
-
-    boost::optional<StringData> getExecutorType() const override {
-        return CursorType_serializer(_cursorType);
-    }
-
-    QueryFramework getQueryFramework() const override {
-        return PlanExecutor::QueryFramework::kClassicOnly;
-    }
-
-    void setReturnOwnedData(bool returnOwnedData) override {
-        // TODO (SERVER-89054): It may be necessary to honor this flag in some cases.
-    }
-
-    bool usesCollectionAcquisitions() const override {
-        return _coll.isAcquisition();
-    }
-
-    const Plan& getPlan() const {
-        return _plan;
-    }
-
-private:
-    void readyPlanExecution(express::Ready);
-    void readyPlanExecution(express::Exhausted);
-
-    OperationContext* _opCtx;
-    std::unique_ptr<CanonicalQuery> _cq;
-    NamespaceString _nss;  // Copied from _cq.
-    VariantCollectionPtrOrAcquisition _coll;
-
-    mongo::CommonStats _commonStats;
-    express::PlanStats _planStats;
-    express::IteratorStats _iteratorStats;
-    bool _isDisposed{false};
-    Status _killStatus = Status::OK();
-
-    PlanExplainerExpress _planExplainer;
-    std::vector<NamespaceStringOrUUID> _secondaryNss;
-
-    Plan _plan;
-
-    /**
-     * Some commands return multiple cursors to the client, which are distinguished by their "cursor
-     * type." Express execution is only ever used for the standard case of reading documents from a
-     * collection.
-     */
-    static constexpr CursorTypeEnum _cursorType = CursorTypeEnum::DocumentResult;
-};
-
-template <class Plan>
-PlanExecutorExpress<Plan>::PlanExecutorExpress(OperationContext* opCtx,
-                                               std::unique_ptr<CanonicalQuery> cq,
-                                               VariantCollectionPtrOrAcquisition coll,
-                                               Plan plan)
-    : _opCtx(opCtx),
-      _cq(std::move(cq)),
-      _nss(_cq->nss()),
-      _coll(coll),
-      _commonStats("EXPRESS"),
-      _planExplainer(&_commonStats, &_planStats, &_iteratorStats),
-      _plan(std::move(plan)) {
-    _plan.open(_opCtx, &coll.getCollectionPtr(), &_planStats, &_iteratorStats);
-}
-
-template <class Plan>
-PlanExecutor::ExecState PlanExecutorExpress<Plan>::getNext(BSONObj* out, RecordId* dlOut) {
-    bool haveOutput = false;
-
-    express::PlanProgress progress((express::Ready()));
-    while (!haveOutput) {
-        if (_plan.exhausted()) {
-            return ExecState::IS_EOF;
-        }
-
-        _opCtx->checkForInterrupt();
-
-        progress = _plan.proceed(_opCtx, [&](RecordId rid, BSONObj obj) {
-            *out = std::move(obj);
-            if (dlOut) {
-                *dlOut = std::move(rid);
-            }
-            haveOutput = true;
-            return express::Ready();
-        });
-
-        std::visit([&, this](auto result) { this->readyPlanExecution(std::move(result)); },
-                   std::move(progress));
-    }
-
-    return ExecState::ADVANCED;
-}
-
-template <class Plan>
-void PlanExecutorExpress<Plan>::readyPlanExecution(express::Ready) {
-    // Born ready B).
-}
-
-template <class Plan>
-void PlanExecutorExpress<Plan>::readyPlanExecution(express::Exhausted) {
-    // No execution to get ready for.
-}
-
-template <class IteratorChoice>
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
-    OperationContext* opCtx,
-    IteratorChoice iterator,
-    std::unique_ptr<CanonicalQuery> cq,
-    VariantCollectionPtrOrAcquisition coll,
-    boost::optional<ScopedCollectionFilter> collectionFilter) {
-    using ShardFilterForRead = std::variant<express::NoShardFilter, ScopedCollectionFilter>;
-
-    ShardFilterForRead shardFilter = express::NoShardFilter();
-    if (collectionFilter) {
-        shardFilter = std::move(*collectionFilter);
-    }
-
-    using Projection = std::variant<express::IdentityProjection, const projection_ast::Projection*>;
-    Projection projection((express::IdentityProjection()));
-    if (cq->getProj() != nullptr) {
-        projection = cq->getProj();
-    }
-
-    return std::visit(
-        [&](auto& chosenShardFilter,
-            auto& chosenProjection) -> std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> {
-            auto plan = express::ExpressPlan(
-                std::move(iterator), std::move(chosenShardFilter), std::move(chosenProjection));
-
-            return {new PlanExecutorExpress(opCtx, std::move(cq), coll, std::move(plan)),
-                    PlanExecutor::Deleter(opCtx)};
-        },
-        shardFilter,
-        projection);
-}
-}  // namespace
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindById(
-    OperationContext* opCtx,
-    std::unique_ptr<CanonicalQuery> cq,
-    VariantCollectionPtrOrAcquisition coll,
-    boost::optional<ScopedCollectionFilter> collectionFilter) {
-    const BSONObj& queryFilter = cq->getQueryObj();
-    return makeExpressExecutor(opCtx,
-                               express::IdLookupViaIndex(queryFilter),
-                               std::move(cq),
-                               coll,
-                               std::move(collectionFilter));
-}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByClusteredId(
-    OperationContext* opCtx,
-    std::unique_ptr<CanonicalQuery> cq,
-    VariantCollectionPtrOrAcquisition coll,
-    boost::optional<ScopedCollectionFilter> collectionFilter) {
-    const BSONObj& queryFilter = cq->getQueryObj();
-    return makeExpressExecutor(opCtx,
-                               express::IdLookupOnClusteredCollection(queryFilter),
-                               std::move(cq),
-                               coll,
-                               std::move(collectionFilter));
-}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByUserIndex(
-    OperationContext* opCtx,
-    std::unique_ptr<CanonicalQuery> cq,
-    VariantCollectionPtrOrAcquisition coll,
-    const IndexEntry& index,
-    boost::optional<ScopedCollectionFilter> collectionFilter) {
-    auto indexDescriptor = coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
-        opCtx, index.identifier.catalogName);
-    tassert(8884404,
-            fmt::format("Attempt to build plan for nonexistent index -- namespace: {}, "
-                        "CanonicalQuery: {}, IndexEntry: {}",
-                        coll.getCollectionPtr()->ns().toStringForErrorMsg(),
-                        cq->toStringShortForErrorMsg(),
-                        index.toString()),
-            indexDescriptor);
-
-    const CollatorInterface* collator = cq->getCollator();
-    BSONElement queryFilter =
-        static_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression())->getData();
-    return makeExpressExecutor(opCtx,
-                               express::LookupViaUserIndex(queryFilter,
-                                                           indexDescriptor->getEntry()->getIdent(),
-                                                           index.identifier.catalogName,
-                                                           collator),
-                               std::move(cq),
-                               coll,
-                               std::move(collectionFilter));
-}
-
-boost::optional<IndexEntry> getIndexForExpressEquality(const CanonicalQuery& cq,
-                                                       const QueryPlannerParams& plannerParams) {
+/*
+ * Tries to find an index suitable for use in the express equality path. Excludes indexes which
+ * cannot 1) satisfy the given query with exact bounds and 2) provably return at most one result
+ * doc. If at least one suitable index remains, returns the name of the index with the fewest
+ * fields. If not, returns boost::none.
+ */
+boost::optional<std::string> getIndexForExpressEquality(const CanonicalQuery& cq,
+                                                        const QueryPlannerParams& plannerParams) {
     const auto& findCommand = cq.getFindCommandRequest();
 
     const bool needsShardFilter =
@@ -431,6 +87,204 @@ boost::optional<IndexEntry> getIndexForExpressEquality(const CanonicalQuery& cq,
         bestEntry = &e;
         numFields = currNFields;
     }
-    return (bestEntry != nullptr) ? boost::make_optional(std::move(*bestEntry)) : boost::none;
+    if (bestEntry) {
+        return bestEntry->identifier.catalogName;
+    }
+    return boost::none;
 }
+
+PlanExecutorExpressParams PlanExecutorExpressParams::makeExecutorParamsForIdQuery(
+    OperationContext* opCtx,
+    VariantCollectionPtrOrAcquisition coll,
+    boost::optional<ScopedCollectionFilter> collectionFilter,
+    bool isClusteredOnId) {
+    return PlanExecutorExpressParams(
+        opCtx, coll, std::move(collectionFilter), isClusteredOnId, boost::none /* indexName */);
+}
+
+PlanExecutorExpressParams PlanExecutorExpressParams::makeExecutorParamsForIndexedEqualityQuery(
+    OperationContext* opCtx,
+    VariantCollectionPtrOrAcquisition coll,
+    boost::optional<ScopedCollectionFilter> collectionFilter,
+    std::string indexName) {
+    return PlanExecutorExpressParams(opCtx,
+                                     coll,
+                                     std::move(collectionFilter),
+                                     false /* isClusteredOnId */,
+                                     std::move(indexName));
+}
+
+PlanExecutorExpressParams::PlanExecutorExpressParams(
+    OperationContext* opCtx,
+    VariantCollectionPtrOrAcquisition coll,
+    boost::optional<ScopedCollectionFilter> collectionFilter,
+    bool isClusteredOnId,
+    boost::optional<const std::string> indexName)
+    : _opCtx(opCtx),
+      _coll(coll),
+      _collectionFilter(std::move(collectionFilter)),
+      _isClusteredOnId{isClusteredOnId},
+      _indexName(std::move(indexName)) {}
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlanExecutorExpress::makeExecutor(
+    std::unique_ptr<CanonicalQuery> cq, PlanExecutorExpressParams params) {
+    return {new PlanExecutorExpress(std::move(cq),
+                                    params._opCtx,
+                                    params._coll,
+                                    std::move(params._collectionFilter),
+                                    params._isClusteredOnId,
+                                    std::move(params._indexName)),
+            PlanExecutor::Deleter{params._opCtx}};
+}
+
+PlanExecutorExpress::PlanExecutorExpress(std::unique_ptr<CanonicalQuery> cq,
+                                         OperationContext* opCtx,
+                                         VariantCollectionPtrOrAcquisition coll,
+                                         boost::optional<ScopedCollectionFilter> collectionFilter,
+                                         bool isClusteredOnId,
+                                         boost::optional<const std::string> indexName)
+    : _opCtx(opCtx),
+      _cq(std::move(cq)),
+      _isClusteredOnId{isClusteredOnId},
+      _coll(coll),
+      _indexName(std::move(indexName)),
+      _commonStats("EXPRESS"),
+      _nss(_cq->nss()),
+      _planExplainer(&_commonStats, isClusteredOnId, _indexName),
+      _shardFilterer(std::move(collectionFilter)) {
+    if (_indexName) {
+        auto descriptor =
+            _coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx, _indexName.get());
+        tassert(8623700,
+                str::stream() << "Missing index. Namespace: "
+                              << _coll.getCollectionPtr()->ns().toStringForErrorMsg()
+                              << ", index name: " << *_indexName,
+                descriptor);
+        _entry = descriptor->getEntry();
+        _planExplainer.setKeyPattern(descriptor->keyPattern());
+    } else if (!_isClusteredOnId) {
+        auto descriptor = _coll.getCollectionPtr()->getIndexCatalog()->findIdIndex(_opCtx);
+        tassert(8623701,
+                str::stream() << "Missing _id index. Namespace: "
+                              << _coll.getCollectionPtr()->ns().toStringForErrorMsg(),
+                descriptor);
+        _entry = descriptor->getEntry();
+        _indexName.emplace("_id_");
+        _planExplainer.setKeyPattern(descriptor->keyPattern());
+    }
+}
+
+PlanExecutor::ExecState PlanExecutorExpress::getNext(BSONObj* out, RecordId* dlOut) {
+    if (_done) {
+        _commonStats.isEOF = true;
+        return ExecState::IS_EOF;
+    }
+    _done = true;
+    _commonStats.works++;
+
+    RecordId rid = getRIDForPoint(
+        static_cast<ComparisonMatchExpressionBase*>(_cq->getPrimaryMatchExpression())->getData());
+
+    // It's possible that we could do a covered index scan here, to avoid fetching the whole
+    // document. However, 1) the impact would be small, since we always expect to return at most
+    // one document, and 2) it would require a query like find({_id: <num>}, {_id: 1}), which we
+    // assume is an uncommon pattern.
+    const auto& collptr = _coll.getCollectionPtr();
+    Snapshotted<BSONObj> snapDoc;
+    BSONObj doc;
+    bool found = false;
+    if (!rid.isNull() && collptr->findDoc(_opCtx, rid, &snapDoc)) {
+        doc = std::move(snapDoc.value());
+        if (dlOut) {
+            *dlOut = std::move(rid);
+        }
+        found = true;
+    }
+
+    auto belongsToShard = [&](const BSONObj& doc) {
+        if (_shardFilterer && _shardFilterer->isCollectionSharded()) {
+            return _shardFilterer->documentBelongsToMe(doc) ==
+                ShardFilterer::DocumentBelongsResult::kBelongs;
+        }
+        return true;
+    };
+
+    if (found && belongsToShard(doc)) {
+        invariant(!doc.isEmpty());
+        if (_cq->getProj()) {
+            // Only simple projections are currently supported.
+            auto proj = _cq->getProj();
+            auto projType = proj->type();
+            if (projType == projection_ast::ProjectType::kInclusion) {
+                doc = ProjectionStageSimple::transform(
+                    doc, _cq->getProj()->getRequiredFields(), projType);
+            } else {
+                doc = ProjectionStageSimple::transform(
+                    doc, _cq->getProj()->getExcludedPaths(), projType);
+            }
+        }
+        *out = std::move(doc);
+        _commonStats.advanced++;
+        return ExecState::ADVANCED;
+    };
+    _commonStats.isEOF = true;
+    return ExecState::IS_EOF;
+}
+
+RecordId PlanExecutorExpress::getRIDForPoint(const BSONElement& val) const {
+    const auto& collptr = _coll.getCollectionPtr();
+
+    // For a clustered collection, compute the RID directly. Otherwise, do an index access.
+    if (_isClusteredOnId) {
+        return record_id_helpers::keyForObj(
+            IndexBoundsBuilder::objFromElement(val, collptr->getDefaultCollator()));
+    }
+
+    uassert(ErrorCodes::QueryPlanKilled,
+            str::stream() << "query plan killed :: index '" << _indexName.get() << "' dropped",
+            _entry);
+    const IndexDescriptor* desc = _entry->descriptor();
+
+    // For the _id index, we can do a point look up in the index.
+    // TODO SERVER-87148: We may be able to use the findSingle() path with any single-field index,
+    // or maybe any non-dotted single-field index.
+    auto sortedAccessMethod = _entry->accessMethod()->asSortedData();
+    if (desc->isIdIndex() == 1) {
+        return sortedAccessMethod->findSingle(_opCtx, collptr, _entry, val.wrap());
+    }
+
+    // Build the start and end bounds for the equality by appending a fully-open bound for each
+    // remaining field in the compound index.
+    BSONObjBuilder startBob, endBob;
+    CollationIndexKey::collationAwareIndexKeyAppend(val, _cq->getCollator(), &startBob);
+    CollationIndexKey::collationAwareIndexKeyAppend(val, _cq->getCollator(), &endBob);
+    for (int i = 1; i < desc->getNumFields(); ++i) {
+        if (desc->ordering().get(i) == 1) {
+            startBob.appendMinKey("");
+            endBob.appendMaxKey("");
+        } else {
+            startBob.appendMaxKey("");
+            endBob.appendMinKey("");
+        }
+    }
+    auto startKey = startBob.obj();
+    auto endKey = endBob.obj();
+
+    // Now seek to the first matching key in the index.
+    auto indexCursor = sortedAccessMethod->newCursor(_opCtx, true /* forward */);
+    indexCursor->setEndPosition(endKey, true /* endKeyInclusive */);
+    auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+        startKey,
+        sortedAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
+        sortedAccessMethod->getSortedDataInterface()->getOrdering(),
+        true /* forward */,
+        true /* startKeyInclusive */);
+    auto kv =
+        indexCursor->seek(keyStringForSeek, SortedDataInterface::Cursor::KeyInclusion::kExclude);
+    if (!kv) {
+        return {};
+    }
+    return kv->loc;
+}
+
 }  // namespace mongo

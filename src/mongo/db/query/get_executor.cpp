@@ -125,7 +125,6 @@
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_express.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer.h"
@@ -1226,6 +1225,37 @@ boost::optional<ScopedCollectionFilter> getScopedCollectionFilter(
     return boost::none;
 }
 
+PlanExecutorExpressParams getExpressIdPointParams(OperationContext* opCtx,
+                                                  const CanonicalQuery& canonicalQuery,
+                                                  const MultipleCollectionAccessor& collections,
+                                                  std::size_t plannerOptions) {
+    QueryPlannerParams plannerParams{
+        QueryPlannerParams::ArgsForExpress{opCtx, canonicalQuery, collections, plannerOptions}};
+    const bool isClusteredOnId = plannerParams.clusteredInfo
+        ? clustered_util::isClusteredOnId(plannerParams.clusteredInfo)
+        : false;
+    return PlanExecutorExpressParams::makeExecutorParamsForIdQuery(
+        opCtx,
+        collections.getMainCollectionPtrOrAcquisition(),
+        getScopedCollectionFilter(opCtx, collections, plannerParams),
+        isClusteredOnId);
+}
+
+boost::optional<PlanExecutorExpressParams> tryGetExpressIndexEqualityParams(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    const CanonicalQuery& canonicalQuery,
+    const QueryPlannerParams& plannerParams) {
+    if (auto indexName = getIndexForExpressEquality(canonicalQuery, plannerParams)) {
+        return PlanExecutorExpressParams::makeExecutorParamsForIndexedEqualityQuery(
+            opCtx,
+            collections.getMainCollectionPtrOrAcquisition(),
+            getScopedCollectionFilter(opCtx, collections, plannerParams),
+            std::move(*indexName));
+    }
+    return boost::none;
+}
+
 boost::optional<ExecParams> tryGetBonsaiParams(OperationContext* opCtx,
                                                CanonicalQuery* canonicalQuery,
                                                const MultipleCollectionAccessor& collections) {
@@ -1339,24 +1369,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     const auto expressEligibility = isExpressEligible(opCtx, mainColl, *canonicalQuery);
     if (expressEligibility == ExpressEligibility::IdPointQueryEligible) {
         planCacheCounters.incrementClassicSkippedCounter();
-        QueryPlannerParams plannerParams{QueryPlannerParams::ArgsForExpress{
-            opCtx, *canonicalQuery, collections, plannerOptions}};
-        auto collectionFilter = getScopedCollectionFilter(opCtx, collections, plannerParams);
-        const bool isClusteredOnId = plannerParams.clusteredInfo
-            ? clustered_util::isClusteredOnId(plannerParams.clusteredInfo)
-            : false;
-
-        auto expressExecutor = isClusteredOnId
-            ? makeExpressExecutorForFindByClusteredId(
-                  opCtx,
-                  std::move(canonicalQuery),
-                  collections.getMainCollectionPtrOrAcquisition(),
-                  std::move(collectionFilter))
-            : makeExpressExecutorForFindById(opCtx,
-                                             std::move(canonicalQuery),
-                                             collections.getMainCollectionPtrOrAcquisition(),
-                                             std::move(collectionFilter));
-
+        auto expressParams =
+            getExpressIdPointParams(opCtx, *canonicalQuery, collections, plannerOptions);
+        auto expressExecutor =
+            PlanExecutorExpress::makeExecutor(std::move(canonicalQuery), std::move(expressParams));
         setCurOpQueryFramework(expressExecutor.get());
         return std::move(expressExecutor);
     }
@@ -1367,14 +1383,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     // the express index equality one fails.
     auto paramsForSingleCollectionQuery = makeQueryPlannerParams(plannerOptions);
     if (expressEligibility == ExpressEligibility::IndexedEqualityEligible) {
-        if (auto indexEntry =
-                getIndexForExpressEquality(*canonicalQuery, paramsForSingleCollectionQuery)) {
-            auto expressExecutor = makeExpressExecutorForFindByUserIndex(
-                opCtx,
-                std::move(canonicalQuery),
-                collections.getMainCollectionPtrOrAcquisition(),
-                *indexEntry,
-                getScopedCollectionFilter(opCtx, collections, paramsForSingleCollectionQuery));
+        if (auto expressParams = tryGetExpressIndexEqualityParams(
+                opCtx, collections, *canonicalQuery, paramsForSingleCollectionQuery)) {
+            planCacheCounters.incrementClassicSkippedCounter();
+            auto expressExecutor = PlanExecutorExpress::makeExecutor(std::move(canonicalQuery),
+                                                                     std::move(*expressParams));
             setCurOpQueryFramework(expressExecutor.get());
             return std::move(expressExecutor);
         }
