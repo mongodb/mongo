@@ -84,7 +84,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 }
 
 (function testCursor() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testCursor");
     const db = getNewDb();
 
     assert.commandWorked(
@@ -133,7 +133,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testCollectionUUIDMismatchInconsistency() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testCollectionUUIDMismatchInconsistency");
     const db = getNewDb();
 
     assert.commandWorked(
@@ -161,7 +161,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testMisplacedCollection() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testMisplacedCollection");
     const db = getNewDb();
 
     assert.commandWorked(
@@ -185,7 +185,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testMissingShardKeyInconsistency() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testMissingShardKeyInconsistency");
 
     const db = getNewDb();
     const kSourceCollName = "coll";
@@ -212,7 +212,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testMissingIndex() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testMissingIndex");
 
     const db = getNewDb();
     const coll = db.coll;
@@ -256,7 +256,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testHiddenShardedCollections() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testHiddenShardedCollections");
 
     const kSourceCollName = "coll";
     const db1 = getNewDb();
@@ -307,7 +307,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testRoutingTableInconsistency() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testRoutingTableInconsistency");
 
     const db = getNewDb();
     const kSourceCollName = "coll";
@@ -352,7 +352,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testClusterLevelMode() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testClusterLevelMode");
 
     const db_MisplacedCollection1 = getNewDb();
     const db_MisplacedCollection2 = getNewDb();
@@ -400,7 +400,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testUnsplittableCollectionHas2Chunks() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testUnsplittableCollectionHas2Chunks");
 
     const db = getNewDb();
     const kSourceCollName = "unsplittable_collection";
@@ -429,7 +429,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testUnsplittableHasInvalidKey() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testUnsplittableHasInvalidKey");
 
     const db = getNewDb();
     const kSourceCollName = "unsplittable_collection";
@@ -461,7 +461,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testTimeseriesOptionsMismatch() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testTimeseriesOptionsMismatch");
 
     // TODO SERVER-79304 Remove FCV check when 8.0 becomes last LTS.
     if (!isFcvGraterOrEqualTo('8.0')) {
@@ -508,7 +508,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testDefaultCollationMismatch1() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testDefaultCollationMismatch1");
 
     // TODO SERVER-79304 Remove FCV check when 8.0 becomes last LTS.
     if (!isFcvGraterOrEqualTo('8.0')) {
@@ -560,7 +560,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testCappedCollectionCantBeSharded() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testCappedCollectionCantBeSharded");
 
     // TODO SERVER-79304 Remove FCV check when 8.0 becomes last LTS.
     if (!isFcvGraterOrEqualTo('8.0')) {
@@ -628,7 +628,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testCollectionNotFoundOnAnyShard() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testCollectionNotFoundOnAnyShard");
 
     const db = getNewDb();
     const kSourceCollName = "collection";
@@ -671,7 +671,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testUuidMismatchAcrossShards() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testUuidMismatchAcrossShards");
 
     const db = getNewDb();
     const kSourceCollName = "collection";
@@ -717,7 +717,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testDbPrimaryWithoutData() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testDbPrimaryWithoutData");
 
     const db = getNewDb();
     const kSourceCollName = "collection";
@@ -757,7 +757,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testDbPrimaryWithoutDataAndUuidMismatch() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testDbPrimaryWithoutDataAndUuidMismatch");
 
     const db = getNewDb();
     const kSourceCollName = "collection";
@@ -808,7 +808,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testCollectionMissingOnDbPrimary() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testCollectionMissingOnDbPrimary");
 
     const db = getNewDb();
     const kSourceCollName = "collection";
@@ -847,7 +847,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testDbPrimaryWithoutDataAndCollectionMissing() {
-    jsTest.log("Executing " + arguments.callee.name);
+    jsTest.log("Executing testDbPrimaryWithoutDataAndCollectionMissing");
 
     const db = getNewDb();
     const kSourceCollName = "collection";
