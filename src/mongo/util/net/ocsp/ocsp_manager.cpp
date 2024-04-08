@@ -71,7 +71,6 @@ void OCSPManager::start(ServiceContext* service) {
 
 void OCSPManager::shutdown(ServiceContext* service) {
     get(service)->_pool->shutdown();
-    getOCSPManager(service).reset();
 }
 
 OCSPManager::OCSPManager() {
