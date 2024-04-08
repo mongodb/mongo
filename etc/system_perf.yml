@@ -1850,6 +1850,7 @@ buildvariants:
         --ssl
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
+        --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --use-diagnostic-latches=off
     run_on:
@@ -1875,6 +1876,7 @@ buildvariants:
         --ssl
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
+        --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --use-diagnostic-latches=off
     run_on:
@@ -1900,6 +1902,7 @@ buildvariants:
         --ssl
         MONGO_DISTMOD=rhel82
         -j$(grep -c ^processor /proc/cpuinfo)
+        --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     run_on:
       - amazon2023.0-arm64-large
