@@ -45,6 +45,7 @@ const newPrimDB = secondary.getDB(dbName);
 assert.commandWorked(newPrimDB[collName].insertMany([{_id: 2}, {_id: 3}]));
 
 // Both nodes should have nine documents.
+replTest.awaitReplication();
 const docsOnNewPrim = newPrimDB[collName].find().toArray();
 const docsOnOldPrim = primDB[collName].find().toArray();
 assert.eq(3, docsOnNewPrim.length, docsOnNewPrim);

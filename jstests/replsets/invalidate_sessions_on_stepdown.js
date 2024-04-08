@@ -55,6 +55,7 @@ assert.commandWorked(node1DB.adminCommand({
     autocommit: false,
     writeConcern: {w: "majority"}
 }));
+rst.awaitReplication();
 assert.eq(2, node0SessionDB.coll.find().itcount());
 assert.eq(0, node0SessionDB.coll.find({b: 1}).itcount());
 assert.eq(1, node0SessionDB.coll.find({c: 1}).itcount());

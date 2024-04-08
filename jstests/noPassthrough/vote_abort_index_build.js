@@ -90,6 +90,7 @@ assert.commandWorked(primary.adminCommand({
 // Wait for the index build to stop.
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build abort');
+rst.awaitReplication();
 
 // Verify none of the nodes list the aborted index, and all of them have replicated the
 // 'abortIndexBuild' oplog entry.
