@@ -503,9 +503,10 @@ void AuthorizationManagerImpl::invalidateUserByName(const UserName& userName) {
     LOGV2_DEBUG(20235, 2, "Invalidating user", "user"_attr = userName);
     _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
-    // Invalidate the named User, assuming no externally provided roles. When roles are defined
-    // externally, there exists no user document which may become invalid.
-    _userCache.invalidateKey(UserRequest(userName, boost::none));
+    // There may be multiple entries in the cache with arbitrary other UserRequest data.
+    // Scan the full cache looking for a weak match on UserName only.
+    _userCache.invalidateKeyIf(
+        [&userName](const UserRequest& key) { return key.name == userName; });
 }
 
 void AuthorizationManagerImpl::invalidateUsersFromDB(const DatabaseName& dbname) {
