@@ -1,6 +1,5 @@
-// Cannot implicitly shard accessed collections because of following errmsg: A single
-// update/delete on a sharded collection must contain an exact match on _id or contain the shard
-// key.
+// Upsert without shard key targeted to a single shard must run in a transaction or retryable write
+// if the upsert doc does not belong on the initial shard.
 // @tags: [assumes_unsharded_collection]
 
 //

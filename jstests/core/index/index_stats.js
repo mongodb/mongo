@@ -5,9 +5,7 @@
 //   # $indexStats stage. The former operation must be routed to the primary in a replica set,
 //   # whereas the latter may be routed to a secondary.
 //   assumes_read_preference_unchanged,
-//   # Cannot implicitly shard accessed collections because of following errmsg: A single
-//   # update/delete on a sharded collection must contain an exact match on _id or contain the shard
-//   # key.
+//   # This test asserts on query plans expected from unsharded collections.
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 //   does_not_support_repeated_reads,

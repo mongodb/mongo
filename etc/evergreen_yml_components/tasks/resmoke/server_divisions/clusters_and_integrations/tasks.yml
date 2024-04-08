@@ -1840,17 +1840,6 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
 
-  - <<: *gen_task_template
-    name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "default",
-        "sharding",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-
   - <<: *task_template
     name: sharded_jscore_txns
     tags:

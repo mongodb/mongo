@@ -1,6 +1,5 @@
-// Cannot implicitly shard accessed collections because of following errmsg: A single
-// update/delete on a sharded collection must contain an exact match on _id or contain the shard
-// key.
+//  This test has assertions that expect a certain document is deleted whereas updateOnes,
+//  deleteOnes, and findAndModify without shard key can pick and modify any matching document.
 //
 // @tags: [
 //   assumes_unsharded_collection,

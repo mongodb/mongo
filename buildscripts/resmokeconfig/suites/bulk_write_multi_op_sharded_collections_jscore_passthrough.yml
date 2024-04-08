@@ -139,6 +139,11 @@ selector:
     # bulkWrite and delete use different parsing for the multi field
     - jstests/core/write/batch_write_command_w0.js
 
+    # Runs an update with illegal format (no 'updates'). We could work around this in the
+    # override but it is very annoying.
+    - jstests/core/write/update/batch_write_command_update.js
+    - jstests/core/write/delete/batch_write_command_delete.js
+
     # Checks for specific sessions to exist
     - jstests/core/administrative/list_sessions.js
 

@@ -1,9 +1,4 @@
-// Cannot implicitly shard accessed collections because of following errmsg: A single
-// update/delete on a sharded collection must contain an exact match on _id or contain the shard
-// key.
-//
 // @tags: [
-//   assumes_unsharded_collection,
 //   assumes_write_concern_unchanged,
 //   requires_non_retryable_writes,
 //   requires_fastcount,
