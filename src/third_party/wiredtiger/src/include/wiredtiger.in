@@ -2656,14 +2656,12 @@ struct __wt_connection {
      * durable timestamp\, or rollback-to-stable resets the value.  See @ref timestamp_global_api.,
      * a string; default empty.}
      * @config{oldest_timestamp, future commits and queries will be no earlier than the specified
-     * timestamp.  Values must be monotonically increasing; any attempt to set the value to older
-     * than the current is silently ignored.  The value must not be newer than the current stable
-     * timestamp.  See @ref timestamp_global_api., a string; default empty.}
+     * timestamp.  Values must be monotonically increasing.  The value must not be newer than the
+     * current stable timestamp.  See @ref timestamp_global_api., a string; default empty.}
      * @config{stable_timestamp, checkpoints will not include commits that are newer than the
      * specified timestamp in tables configured with \c "log=(enabled=false)". Values must be
-     * monotonically increasing; any attempt to set the value to older than the current is silently
-     * ignored.  The value must not be older than the current oldest timestamp.  See @ref
-     * timestamp_global_api., a string; default empty.}
+     * monotonically increasing.  The value must not be older than the current oldest timestamp.
+     * See @ref timestamp_global_api., a string; default empty.}
      * @configend
      * @errors
      */
