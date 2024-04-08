@@ -278,6 +278,10 @@ const char* BlockBasedInterleavedDecompressor::decompress(
         findScalar.traverse(refObj);
     }
 
+    // If we are in interleaved mode, there must be at least one scalar field in the reference
+    // object.
+    uassert(8884002, "Invalid BSONColumn encoding", !scalarElems.empty());
+
     // For each path, we can use a fast implementation if it just decompresses a single scalar field
     // to a buffer. Paths that don't match any elements in the reference object will just get a
     // bunch of missing values appended, and can take the fast path as well.
@@ -472,7 +476,10 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
                 decodingStateElem = state.loadDelta(_allocator, *d128);
                 ++d128->pos;
             } else {
-                invariant(*control != EOO, "moreData() should ensure we terminate loop at EOO");
+                // If interleaved mode is ending, it means there were streams of different lengths,
+                // since moreData(), which checks the first field, must have returned true.
+                uassert(8884000, "Invalid BSON Column encoding", *control != EOO);
+
                 // No more deltas for this scalar field. The next control byte is guaranteed
                 // to belong to this scalar field, since traversal order is fixed.
                 auto result = state.loadControl(_allocator, control);
@@ -997,6 +1004,13 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
             control += (1 + size);
         }
         std::push_heap(heap.begin(), heap.end(), std::greater<>());
+    }
+
+    // At this point all the scalar streams should have had the same number of elements.
+    size_t valueCount = heap.front()._valueCount;
+    for (auto&& state : std::span{heap}.subspan(1)) {
+        uassert(
+            8884001, "Invalid BSONColumn interleaved encoding", valueCount == state._valueCount);
     }
 
     // If there were paths that don't match anything, call appendMissing().
