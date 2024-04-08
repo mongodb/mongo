@@ -247,13 +247,14 @@ public:
     void verifyTopBottomNOutput(const std::vector<std::unique_ptr<value::ValueBlock>>& keyBlocks,
                                 TypedValue finalRes,
                                 const SortSpec& sortSpec,
+                                const std::vector<bool>& bitset,
                                 StringData builtinName) {
         auto inputKeys = blocksTo2dVector(keyBlocks);
         ASSERT_EQ(finalRes.first, value::TypeTags::Array) << builtinName;
         auto* finalArr = value::getArrayView(finalRes.second);
 
         TypedValues sortKeys;
-        stdx::unordered_map<size_t, bool> seenIdxs;
+        stdx::unordered_set<size_t> seenIdxs;
         for (auto [outTag, outVal] : finalArr->values()) {
             ASSERT_EQ(outTag, value::TypeTags::Array) << builtinName;
             auto* outArr = value::getArrayView(outVal);
@@ -263,7 +264,7 @@ public:
             ASSERT_EQ(outIdxTag, value::TypeTags::NumberInt64) << builtinName;
             size_t outIdx = value::bitcastTo<size_t>(outIdxVal);
 
-            auto [_, newIdx] = seenIdxs.insert({outIdx, true});
+            auto [_, newIdx] = seenIdxs.insert(outIdx);
             invariant(newIdx);
             invariant(inputKeys[outIdx].size() == 1);
 
@@ -272,29 +273,36 @@ public:
                 auto [t, v] = sortSpec.compare(
                     sortKeys.back().first, sortKeys.back().second, sortKeyTag, sortKeyVal);
                 ASSERT_EQ(t, value::TypeTags::NumberInt32) << builtinName;
-                ASSERT_LT(value::bitcastTo<int32_t>(v), 0) << builtinName;
-                sortKeys.push_back(TypedValue{sortKeyTag, sortKeyVal});
+                ASSERT_LTE(value::bitcastTo<int32_t>(v), 0) << builtinName;
             }
+            sortKeys.push_back(TypedValue{sortKeyTag, sortKeyVal});
         }
 
         if (sortKeys.empty()) {
             return;
         }
 
-        for (size_t i = 0; i < keyBlocks.size(); ++i) {
+        for (size_t i = 0; i < inputKeys.size(); ++i) {
             // Don't compare against sort keys that are in the final output that we already verified
             // compare >= to sortKeys.back().
-            if (seenIdxs.contains(i)) {
+            if (seenIdxs.contains(i) || !bitset[i % bitset.size()]) {
                 continue;
             }
 
             invariant(inputKeys[i].size() == 1);
             auto [sortKeyTag, sortKeyVal] = inputKeys[i][0];
-            auto [t, v] = sortSpec.compare(
-                sortKeys.back().first, sortKeys.back().second, sortKeyTag, sortKeyVal);
-            ASSERT_EQ(t, value::TypeTags::NumberInt32) << builtinName;
-            ASSERT_LT(value::bitcastTo<int32_t>(v), 0) << builtinName;
-            sortKeys.push_back(TypedValue{sortKeyTag, sortKeyVal});
+
+            if (builtinName == "valueBlockAggTopN") {
+                auto [t, v] = sortSpec.compare(
+                    sortKeys.back().first, sortKeys.back().second, sortKeyTag, sortKeyVal);
+                ASSERT_EQ(t, value::TypeTags::NumberInt32) << builtinName;
+                ASSERT_LTE(value::bitcastTo<int32_t>(v), 0) << builtinName;
+            } else {
+                auto [t, v] = sortSpec.compare(
+                    sortKeys.front().first, sortKeys.front().second, sortKeyTag, sortKeyVal);
+                ASSERT_EQ(t, value::TypeTags::NumberInt32) << builtinName;
+                ASSERT_GTE(value::bitcastTo<int32_t>(v), 0) << builtinName;
+            }
         }
     }
 
@@ -324,7 +332,8 @@ public:
                     std::vector<StringData> accType{"valueBlockAggTopN"_sd,
                                                     "valueBlockAggBottomN"_sd};
                     for (size_t i = 0; i < finalRes.size(); ++i) {
-                        verifyTopBottomNOutput(keyBlocks, finalRes[i], sortSpec, accType[i]);
+                        verifyTopBottomNOutput(
+                            keyBlocks, finalRes[i], sortSpec, bitset, accType[i]);
                     }
                 }
             }
@@ -398,9 +407,10 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNSingleKeySingleOutputTest) {
             value::ValueGuard topNInterGuard{topNInter};
             value::ValueGuard bottomNInterGuard{bottomNInter};
 
-            verifyTopBottomNOutput(combinedKeyBlocks, topNInter, sortSpec, "valueBlockAggTopN");
             verifyTopBottomNOutput(
-                combinedKeyBlocks, bottomNInter, sortSpec, "valueBlockAggBottomN");
+                combinedKeyBlocks, topNInter, sortSpec, bitset, "valueBlockAggTopN");
+            verifyTopBottomNOutput(
+                combinedKeyBlocks, bottomNInter, sortSpec, bitset, "valueBlockAggBottomN");
         }
 
         auto [keyBlocks, valBlocks] =
@@ -418,7 +428,7 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNSingleKeySingleOutputTest) {
         TypedValues finalRes{topNFinal, bottomNFinal};
         std::vector<StringData> accType{"valueBlockAggTopN"_sd, "valueBlockAggBottomN"_sd};
         for (size_t i = 0; i < finalRes.size(); ++i) {
-            verifyTopBottomNOutput(combinedKeyBlocks, finalRes[i], sortSpec, accType[i]);
+            verifyTopBottomNOutput(combinedKeyBlocks, finalRes[i], sortSpec, bitset, accType[i]);
         }
     };
 
@@ -544,7 +554,7 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNSingleKeySingleOutputTest) {
         TypedValues finalRes{topNFinal, bottomNFinal};
         std::vector<StringData> accType{"valueBlockAggTopN"_sd, "valueBlockAggBottomN"_sd};
         for (size_t i = 0; i < finalRes.size(); ++i) {
-            verifyTopBottomNOutput(keyBlocks, finalRes[i], sortSpec, accType[i]);
+            verifyTopBottomNOutput(keyBlocks, finalRes[i], sortSpec, bitset, accType[i]);
         }
 
         release2dValueVector(std::move(addlInputKeys));
@@ -725,8 +735,9 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNHomogeneousTest) {
             value::ValueGuard topNGuard{topNFinal};
             value::ValueGuard bottomNGuard{bottomNFinal};
 
-            verifyTopBottomNOutput(keyBlocks, topNFinal, sortSpec, "valueBlockAggTopN");
-            verifyTopBottomNOutput(keyBlocks, bottomNFinal, sortSpec, "valueBlockAggBottomN");
+            verifyTopBottomNOutput(keyBlocks, topNFinal, sortSpec, bitset, "valueBlockAggTopN");
+            verifyTopBottomNOutput(
+                keyBlocks, bottomNFinal, sortSpec, bitset, "valueBlockAggBottomN");
         }
     };
 
@@ -866,76 +877,77 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNLazyExtractionTest) {
     auto highMax = makeDecimal("8");
     value::ValueGuard highMaxGuard{highMax};
 
-    auto runExtractionTest =
-        [this]<typename InBlockType>(std::vector<std::vector<TypedValues>> inputKeysVec,
-                                     std::vector<std::vector<TypedValues>> outValsVec,
-                                     std::vector<bool> bitset,
-                                     size_t maxSize,
-                                     bool isAscending,
-                                     size_t numIters = 1,
-                                     std::vector<TypedValues> inputKeyMins = {},
-                                     std::vector<TypedValues> inputKeyMaxs = {}) {
-            invariant(inputKeysVec.size() == numIters && outValsVec.size() == numIters);
-            invariant((inputKeyMins.empty() && inputKeyMaxs.empty()) ||
-                      (inputKeyMins.size() == numIters && inputKeyMaxs.size() == numIters));
+    auto runExtractionTest = [this]<typename InBlockType>(
+                                 std::vector<std::vector<TypedValues>> inputKeysVec,
+                                 std::vector<std::vector<TypedValues>> outValsVec,
+                                 std::vector<bool> bitset,
+                                 size_t maxSize,
+                                 bool isAscending,
+                                 size_t numIters = 1,
+                                 std::vector<TypedValues> inputKeyMins = {},
+                                 std::vector<TypedValues> inputKeyMaxs = {}) {
+        invariant(inputKeysVec.size() == numIters && outValsVec.size() == numIters);
+        invariant((inputKeyMins.empty() && inputKeyMaxs.empty()) ||
+                  (inputKeyMins.size() == numIters && inputKeyMaxs.size() == numIters));
 
-            SortSpec sortSpec{BSON("sortField" << (isAscending ? 1 : -1))};
+        SortSpec sortSpec{BSON("sortField" << (isAscending ? 1 : -1))};
 
-            auto topNState = makeEmptyState(maxSize);
-            std::pair<value::TypeTags, value::Value> bottomNState{value::TypeTags::Nothing, 0u};
-            size_t startIdx = 0;
+        auto topNState = makeEmptyState(maxSize);
+        std::pair<value::TypeTags, value::Value> bottomNState{value::TypeTags::Nothing, 0u};
+        size_t startIdx = 0;
 
-            // Initialize the combined blocks.
-            std::vector<std::unique_ptr<value::ValueBlock>> combinedKeyBlocks;
-            for (size_t j = 0;
-                 !inputKeysVec.empty() && !inputKeysVec[0].empty() && j < inputKeysVec[0][0].size();
-                 ++j) {
-                combinedKeyBlocks.push_back(std::make_unique<value::HeterogeneousBlock>());
-            }
+        // Initialize the combined blocks.
+        std::vector<std::unique_ptr<value::ValueBlock>> combinedKeyBlocks;
+        for (size_t j = 0;
+             !inputKeysVec.empty() && !inputKeysVec[0].empty() && j < inputKeysVec[0][0].size();
+             ++j) {
+            combinedKeyBlocks.push_back(std::make_unique<value::HeterogeneousBlock>());
+        }
 
-            for (size_t iter = 0; iter < numIters - 1; ++iter) {
-                // Only the last blocks can be unextractable or we will not be able to populate an
-                // intermediate heap.
-                auto [keyBlocks, valBlocks] = makeBlockTopBottomNInputs<TestBlock, TestBlock>(
-                    inputKeysVec[iter],
-                    outValsVec[iter],
-                    startIdx,
-                    inputKeyMins.empty() ? TypedValues{} : inputKeyMins[iter],
-                    inputKeyMaxs.empty() ? TypedValues{} : inputKeyMaxs[iter]);
-                startIdx += inputKeysVec[iter].size();
+        for (size_t iter = 0; iter < numIters - 1; ++iter) {
+            // Only the last blocks can be unextractable or we will not be able to populate an
+            // intermediate heap.
+            auto [keyBlocks, valBlocks] = makeBlockTopBottomNInputs<TestBlock, TestBlock>(
+                inputKeysVec[iter],
+                outValsVec[iter],
+                startIdx,
+                inputKeyMins.empty() ? TypedValues{} : inputKeyMins[iter],
+                inputKeyMaxs.empty() ? TypedValues{} : inputKeyMaxs[iter]);
+            startIdx += inputKeysVec[iter].size();
 
-                std::tie(topNState, bottomNState) =
-                    executeBlockTopBottomN(keyBlocks, valBlocks, topNState, bitset, sortSpec);
-
-                // Add to the keys we have encountered so far.
-                addToCombinedBlocks(combinedKeyBlocks, inputKeysVec[iter]);
-
-                // Verify that intermediate results are still correct.
-                auto [topNInter, _] = finalizeTopBottomN(topNState, sortSpec);
-                value::ValueGuard topNInterGuard{topNInter};
-
-                verifyTopBottomNOutput(combinedKeyBlocks, topNInter, sortSpec, "valueBlockAggTopN");
-            }
-
-            auto [keyBlocks, valBlocks] =
-                makeBlockTopBottomNInputs<InBlockType, UnextractableTestBlock>(
-                    inputKeysVec.back(),
-                    outValsVec.back(),
-                    startIdx,
-                    inputKeyMins.empty() ? TypedValues{} : inputKeyMins.back(),
-                    inputKeyMaxs.empty() ? TypedValues{} : inputKeyMaxs.back());
-
-            bottomNState = {value::TypeTags::Nothing, 0u};
-            auto [topNFinal, _] = executeAndFinalizeTopBottomN(
-                keyBlocks, valBlocks, topNState, bottomNState, bitset, sortSpec);
-
-            value::ValueGuard topNFinalGuard{topNFinal};
+            std::tie(topNState, bottomNState) =
+                executeBlockTopBottomN(keyBlocks, valBlocks, topNState, bitset, sortSpec);
 
             // Add to the keys we have encountered so far.
-            addToCombinedBlocks(combinedKeyBlocks, inputKeysVec.back());
+            addToCombinedBlocks(combinedKeyBlocks, inputKeysVec[iter]);
 
-            verifyTopBottomNOutput(combinedKeyBlocks, topNFinal, sortSpec, "valueBlockAggTopN");
-        };
+            // Verify that intermediate results are still correct.
+            auto [topNInter, _] = finalizeTopBottomN(topNState, sortSpec);
+            value::ValueGuard topNInterGuard{topNInter};
+
+            verifyTopBottomNOutput(
+                combinedKeyBlocks, topNInter, sortSpec, bitset, "valueBlockAggTopN");
+        }
+
+        auto [keyBlocks, valBlocks] =
+            makeBlockTopBottomNInputs<InBlockType, UnextractableTestBlock>(
+                inputKeysVec.back(),
+                outValsVec.back(),
+                startIdx,
+                inputKeyMins.empty() ? TypedValues{} : inputKeyMins.back(),
+                inputKeyMaxs.empty() ? TypedValues{} : inputKeyMaxs.back());
+
+        bottomNState = {value::TypeTags::Nothing, 0u};
+        auto [topNFinal, _] = executeAndFinalizeTopBottomN(
+            keyBlocks, valBlocks, topNState, bottomNState, bitset, sortSpec);
+
+        value::ValueGuard topNFinalGuard{topNFinal};
+
+        // Add to the keys we have encountered so far.
+        addToCombinedBlocks(combinedKeyBlocks, inputKeysVec.back());
+
+        verifyTopBottomNOutput(combinedKeyBlocks, topNFinal, sortSpec, bitset, "valueBlockAggTopN");
+    };
 
     {
         // Input blocks don't have min or max set. The second input block will be extracted but

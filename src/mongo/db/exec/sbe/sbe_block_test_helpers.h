@@ -117,7 +117,7 @@ static std::unique_ptr<value::ValueBlock> makeBoolBlock(std::vector<bool> bools)
 
 static void release2dValueVector(const std::vector<TypedValues>& vals) {
     for (size_t i = 0; i < vals.size(); ++i) {
-        for (size_t j = 0; j < vals[j].size(); ++j) {
+        for (size_t j = 0; j < vals[i].size(); ++j) {
             releaseValue(vals[i][j].first, vals[i][j].second);
         }
     }
