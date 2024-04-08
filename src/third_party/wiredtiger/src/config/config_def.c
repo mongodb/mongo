@@ -3720,7 +3720,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     confchk_WT_CONNECTION_set_timestamp, 4, confchk_WT_CONNECTION_set_timestamp_jump, 14,
     WT_CONF_SIZING_NONE, false},
   {"WT_CURSOR.bound", "action=set,bound=,inclusive=true", confchk_WT_CURSOR_bound, 3,
-    confchk_WT_CURSOR_bound_jump, 15, WT_CONF_SIZING_NONE, false},
+    confchk_WT_CURSOR_bound_jump, 15, WT_CONF_SIZING_INITIALIZE(WT_CURSOR, bound), true},
   {"WT_CURSOR.close", "", NULL, 0, NULL, 16, WT_CONF_SIZING_NONE, false},
   {"WT_CURSOR.reconfigure", "append=false,overwrite=true,prefix_search=false",
     confchk_WT_CURSOR_reconfigure, 3, confchk_WT_CURSOR_reconfigure_jump, 17, WT_CONF_SIZING_NONE,
