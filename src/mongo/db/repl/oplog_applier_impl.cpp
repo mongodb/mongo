@@ -579,7 +579,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         }
 
         // Don't allow the fsync+lock thread to see intermediate states of batch application.
-        stdx::lock_guard<SimpleMutex> fsynclk(filesLockedFsync);
+        stdx::lock_guard<SimpleMutex> fsynclk(oplogApplierLockedFsync);
 
         // Apply the operations in this batch. '_applyOplogBatch' returns the optime of the
         // last op that was applied, which should be the last optime in the batch.

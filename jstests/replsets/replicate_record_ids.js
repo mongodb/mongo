@@ -77,6 +77,7 @@ const docAUpdateOpTime =
             primDB.runCommand({update: replRidCollName, updates: [{q: docA, u: {$set: {'a': 2}}}]}))
         .opTime;
 docA = newDocA;
+replSet.awaitReplication();
 validateRidInOplogs({ns: `${replRidNs}`, ...docAUpdateOpTime}, docAReplRid);
 
 // The recordId should also be in the oplog entry for the delete.
@@ -84,6 +85,7 @@ const docARemoveOpTime =
     assert
         .commandWorked(primDB.runCommand({delete: replRidCollName, deletes: [{q: docA, limit: 1}]}))
         .opTime;
+replSet.awaitReplication();
 validateRidInOplogs({ns: `${replRidNs}`, ...docARemoveOpTime}, docAReplRid);
 
 // On replication, secondaries apply oplog entries in parallel - a batch of oplog entries is
@@ -107,6 +109,7 @@ assert.commandWorked(primDB[replRidCollName].insertMany(docs));
 assert.eq(primDB[replRidCollName].count(), 500);
 
 // Ensure that the on disk data on both nodes has the same recordIds.
+replSet.awaitReplication();
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidCollName);
 
 replSet.stopSet();

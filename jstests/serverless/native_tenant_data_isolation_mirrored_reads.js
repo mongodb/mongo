@@ -25,6 +25,7 @@ const secondary = rst.getSecondary();
 // Must be authenticated as a user with ActionType::useTenant in order to use security token
 assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
 assert(adminDb.auth('admin', 'pwd'));
+rst.awaitReplication();
 assert(secondary.getDB('admin').auth('admin', 'pwd'));
 
 const kTenant = ObjectId();

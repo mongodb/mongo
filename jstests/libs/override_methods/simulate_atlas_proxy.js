@@ -424,6 +424,10 @@ function runCommandRetryOnTenantMigrationErrors(
                     bulkWriteResponse.nMatched += resObj.nMatched;
                     bulkWriteResponse.nModified += resObj.nModified;
                     bulkWriteResponse.nUpserted += resObj.nUpserted;
+
+                    // Update clusterTime and operationTime to keep causal consistency.
+                    bulkWriteResponse["$clusterTime"] = resObj["$clusterTime"];
+                    bulkWriteResponse["operationTime"] = resObj["operationTime"];
                 }
             }
 

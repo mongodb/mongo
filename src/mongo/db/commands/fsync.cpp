@@ -80,7 +80,8 @@ Mutex fsyncStateMutex = MONGO_MAKE_LATCH("fsyncStateMutex");
 std::unique_ptr<FSyncLockThread> globalFsyncLockThread = nullptr;
 
 // Exposed publically via extern in fsync.h.
-SimpleMutex filesLockedFsync;
+SimpleMutex oplogWriterLockedFsync;
+SimpleMutex oplogApplierLockedFsync;
 
 namespace {
 
@@ -414,9 +415,22 @@ void FSyncLockThread::shutdown(stdx::unique_lock<Latch>& stateLock) {
     }
 }
 
+void FSyncLockThread::_waitUntilLastAppliedCatchupLastWritten() {
+    auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
+    while (replCoord->getMyLastAppliedOpTimeAndWallTime() !=
+           replCoord->getMyLastWrittenOpTimeAndWallTime()) {
+        sleepmillis(100);
+    }
+}
+
 void FSyncLockThread::run() {
     ThreadClient tc("fsyncLockWorker", _serviceContext->getService(ClusterRole::ShardServer));
-    stdx::lock_guard<SimpleMutex> lkf(filesLockedFsync);
+    // We first lock to stop oplogWriter then wait oplogApplier to apply everything in its buffer.
+    // This can make sure we have applied all oplogs that have been written when we fsync lock the
+    // server.
+    stdx::lock_guard<SimpleMutex> writerLk(oplogWriterLockedFsync);
+    _waitUntilLastAppliedCatchupLastWritten();
+    stdx::lock_guard<SimpleMutex> applierLk(oplogApplierLockedFsync);
     stdx::unique_lock<Latch> stateLock(fsyncStateMutex);
 
     // TODO(SERVER-74657): Please revisit if this thread could be made killable.

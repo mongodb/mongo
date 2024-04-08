@@ -65,15 +65,26 @@ public:
     void shutdown(stdx::unique_lock<Latch>& lk);
 
 private:
+    /**
+     * Wait lastApplied to catch lastWritten so we won't write/apply any oplog when fsync locked.
+     */
+    void _waitUntilLastAppliedCatchupLastWritten();
+
+private:
     ServiceContext* const _serviceContext;
     bool _allowFsyncFailure;
     const Milliseconds _deadline;
 };
 
 /**
- * Allows holders to block on an active fsyncLock.
+ * This is used to block oplogWriter and should never be acquired by others.
  */
-extern SimpleMutex filesLockedFsync;
+extern SimpleMutex oplogWriterLockedFsync;
+
+/**
+ * This is used to block oplogApplier and should never be acquired by others.
+ */
+extern SimpleMutex oplogApplierLockedFsync;
 
 /**
  * Must be taken before accessing globalFsyncLockThread below.
