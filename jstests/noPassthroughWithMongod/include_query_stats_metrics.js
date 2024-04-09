@@ -14,14 +14,21 @@ function assertMetricEqual(metrics, name, expectedValue) {
     }
 }
 
-function assertMetricsEqual(
-    cursor,
-    {keysExamined, docsExamined, hasSortStage, usedDisk, fromMultiPlanner, fromPlanCache} = {}) {
+function assertMetricsEqual(cursor, {
+    keysExamined,
+    docsExamined,
+    workingTimeMillis,
+    hasSortStage,
+    usedDisk,
+    fromMultiPlanner,
+    fromPlanCache
+} = {}) {
     assert(cursor.hasOwnProperty("metrics"), "cursor is missing metrics field");
     const metrics = cursor.metrics;
 
     assertMetricEqual(metrics, "keysExamined", keysExamined);
     assertMetricEqual(metrics, "docsExamined", docsExamined);
+    assertMetricEqual(metrics, "workingTimeMillis", workingTimeMillis);
     assertMetricEqual(metrics, "hasSortStage", hasSortStage);
     assertMetricEqual(metrics, "usedDisk", usedDisk);
     assertMetricEqual(metrics, "fromMultiPlanner", fromMultiPlanner);

@@ -241,6 +241,13 @@ public:
         // Amount of time spent executing a query.
         boost::optional<Microseconds> executionTime;
 
+        // If query stats are being collected for this operation, stores the duration of execution
+        // across the cluster. In a standalone mongod, this is just the local working time. In
+        // mongod in a sharded cluster, this is the local execution time plus any execution time
+        // for other nodes to do work on our behalf. In mongos, this tracks the total working time
+        // across the cluster.
+        boost::optional<Milliseconds> clusterWorkingTime{0};
+
         // True if the query plan involves an in-memory sort.
         bool hasSortStage{false};
         // True if the given query used disk.

@@ -54,6 +54,7 @@ namespace {
 static const BSONObj basicMetricsObj = fromjson(R"({
     keysExamined: {"$numberLong": "1"},
     docsExamined: {"$numberLong": "2"},
+    workingTimeMillis: {"$numberLong": "3"},
     hasSortStage: true,
     usedDisk: true,
     fromMultiPlanner: true,
@@ -292,6 +293,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     cursorBuilder << "metrics" << fromjson(R"({
         keysExamined: {"$numberLong": "1"},
         docsExamined: {"$numberLong": "2"},
+        workingTimeMillis: {"$numberLong": "3"},
         hasSortStage: true,
         usedDisk: true,
         fromMultiPlanner: true,
@@ -310,6 +312,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
 
     ASSERT_EQ(metrics.getKeysExamined(), 1);
     ASSERT_EQ(metrics.getDocsExamined(), 2);
+    ASSERT_EQ(metrics.getWorkingTimeMillis(), 3);
     ASSERT_TRUE(metrics.getHasSortStage());
     ASSERT_TRUE(metrics.getUsedDisk());
     ASSERT_TRUE(metrics.getFromMultiPlanner());
@@ -343,6 +346,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetricsIncomplete) {
     // Remove each mandatory field and then check that the result is invalid.
     std::vector<StringData> fields{CursorMetrics::kKeysExaminedFieldName,
                                    CursorMetrics::kDocsExaminedFieldName,
+                                   CursorMetrics::kWorkingTimeMillisFieldName,
                                    CursorMetrics::kHasSortStageFieldName,
                                    CursorMetrics::kUsedDiskFieldName,
                                    CursorMetrics::kFromMultiPlannerFieldName,
@@ -850,6 +854,7 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
 
     CursorMetrics metrics(2 /* keysExamined */,
                           3 /* docsExamined */,
+                          4 /* workingTimeMillis */,
                           false /* hasSortStage */,
                           true /* usedDisk */,
                           true /* fromMultiPlanner */,
@@ -875,6 +880,7 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_TRUE(parsedMetrics.has_value());
     ASSERT_EQ(parsedMetrics->getKeysExamined(), 2);
     ASSERT_EQ(parsedMetrics->getDocsExamined(), 3);
+    ASSERT_EQ(parsedMetrics->getWorkingTimeMillis(), 4);
     ASSERT_FALSE(parsedMetrics->getHasSortStage());
     ASSERT_TRUE(parsedMetrics->getUsedDisk());
     ASSERT_TRUE(parsedMetrics->getFromMultiPlanner());

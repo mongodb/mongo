@@ -241,11 +241,13 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
 
     additiveMetrics.keysExamined = 1;
     additiveMetrics.docsExamined = 2;
+    additiveMetrics.clusterWorkingTime = Milliseconds(3);
     additiveMetrics.hasSortStage = false;
     additiveMetrics.usedDisk = false;
 
     CursorMetrics cursorMetrics(3 /* keysExamined */,
                                 4 /* docsExamined */,
+                                5 /* workingTimeMillis */,
                                 true /* hasSortStage */,
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
@@ -255,6 +257,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
 
     ASSERT_EQ(*additiveMetrics.keysExamined, 4);
     ASSERT_EQ(*additiveMetrics.docsExamined, 6);
+    ASSERT_EQ(additiveMetrics.clusterWorkingTime, Milliseconds(8));
     ASSERT_EQ(additiveMetrics.hasSortStage, true);
     ASSERT_EQ(additiveMetrics.usedDisk, false);
 }
@@ -267,6 +270,7 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
 
     CursorMetrics cursorMetrics(1 /* keysExamined */,
                                 2 /* docsExamined */,
+                                3 /* workingTimeMillis */,
                                 true /* hasSortStage */,
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
@@ -283,12 +287,14 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
 
     additiveMetrics.keysExamined = 1;
     additiveMetrics.docsExamined = 2;
+    additiveMetrics.clusterWorkingTime = Milliseconds(3);
     additiveMetrics.hasSortStage = false;
     additiveMetrics.usedDisk = false;
 
     query_stats::DataBearingNodeMetrics remoteMetrics;
     remoteMetrics.keysExamined = 3;
     remoteMetrics.docsExamined = 4;
+    remoteMetrics.clusterWorkingTime = Milliseconds(5);
     remoteMetrics.hasSortStage = true;
     remoteMetrics.usedDisk = false;
 
@@ -296,6 +302,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
 
     ASSERT_EQ(*additiveMetrics.keysExamined, 4);
     ASSERT_EQ(*additiveMetrics.docsExamined, 6);
+    ASSERT_EQ(additiveMetrics.clusterWorkingTime, Milliseconds(8));
     ASSERT_EQ(additiveMetrics.hasSortStage, true);
     ASSERT_EQ(additiveMetrics.usedDisk, false);
 }
