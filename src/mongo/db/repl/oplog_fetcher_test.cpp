@@ -1883,7 +1883,8 @@ TEST_F(OplogFetcherTest,
         ErrorCodes::IDLFailedToParse,
         processSingleBatch(makeFirstBatch(cursorId,
                                           {firstEntry,
-                                           BSON("o" << BSON("msg"
+                                           BSON("v" << OplogEntry::kOplogVersion << "o"
+                                                    << BSON("msg"
                                                             << "oplog entry without optime"))},
                                           metadataObj))
             ->getStatus());
@@ -2172,7 +2173,8 @@ TEST_F(OplogFetcherTest, ValidateDocumentsReturnsBadValueIfAnyOplogEntryHasMissi
 
 TEST_F(OplogFetcherTest, ValidateDocumentsReturnsNoSuchKeyIfTimestampIsNotFoundInAnyDocument) {
     auto firstEntry = makeNoopOplogEntry(Seconds(123));
-    auto secondEntry = BSON("o" << BSON("msg"
+    auto secondEntry = BSON("v" << OplogEntry::kOplogVersion << "o"
+                                << BSON("msg"
                                         << "oplog entry without optime"));
 
     ASSERT_EQUALS(ErrorCodes::IDLFailedToParse,
