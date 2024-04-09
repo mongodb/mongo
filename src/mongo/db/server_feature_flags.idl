@@ -137,3 +137,8 @@ feature_flags:
         cpp_varname: gFeatureFlagAutoCompact
         default: false
         shouldBeFCVGated: false
+    featureFlagOIDCMultipurposeIDP:
+        description: "Feature flag for OIDC multi-purpose IdPs"
+        cpp_varname: gFeatureFlagOIDCMultipurposeIDP
+        default: false
+        shouldBeFCVGated: false
