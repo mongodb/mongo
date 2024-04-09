@@ -5,7 +5,6 @@
  * ]
  */
 import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const testName = "initial_sync_survives_restart";
 const rst = new ReplSetTest({name: testName, nodes: 1});
@@ -14,16 +13,6 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");
-
-// TODO(SERVER-88447): Re-enable this test after determine whether to call
-// replCoord->finishRecoveryIfEligible in OplogWriter or OplogApplier.
-const isMultiversion =
-    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
-if (isMultiversion || FeatureFlagUtil.isPresentAndEnabled(primary, "ReduceMajorityWriteLatency")) {
-    jsTest.log("Skipping test since featureFlagReduceMajorityWriteLatency is enabled.");
-    rst.stopSet();
-    quit();
-}
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(primary.adminCommand(
@@ -80,20 +69,22 @@ function retryStage(rst, {cloner, stage, extraData}) {
     beforeRetryFailPoint.wait();
     beforeRetryFailPoint.off();
 
-    // Turning on rsSyncApplyStop prevents the sync source from coming out of RECOVERING,
-    // so we can ensure the syncing node does some retries while the sync source is not ready.
+    // Turning on hangBeforeFinishRecovery prevents the sync source from coming
+    // out of RECOVERING so we can ensure the syncing node does some retries
+    // while the sync source is not ready.
     const options = {
-        setParameter: {'failpoint.rsSyncApplyStop': tojson({mode: 'alwaysOn'})},
+        setParameter: {'failpoint.hangBeforeFinishRecovery': tojson({mode: 'alwaysOn'})},
         waitForConnect: true
     };
     primary = rst.start(primary, options, true /* restart */);
 
     // Wait for the sync source to be in RECOVERING.
     assert.commandWorked(primary.adminCommand({
-        waitForFailPoint: "rsSyncApplyStop",
+        waitForFailPoint: "hangBeforeFinishRecovery",
         timesEntered: 1,
         maxTimeMS: kDefaultWaitForFailPointTimeout
     }));
+    rst.waitForState(primary, ReplSetTest.State.RECOVERING);
 
     // Make sure some retries happen while the sync source is available and in "RECOVERING"
     beforeRetryFailPoint = configureFailPoint(
@@ -103,7 +94,7 @@ function retryStage(rst, {cloner, stage, extraData}) {
 
     // Now let the sync source finish recovering and keep retrying.
     assert.commandWorked(
-        primary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
+        primary.adminCommand({configureFailPoint: "hangBeforeFinishRecovery", mode: "off"}));
     afterStageFailPoint.wait();
     jsTestLog("Cloner " + cloner + " stage " + stage + " complete.");
     return afterStageFailPoint;
