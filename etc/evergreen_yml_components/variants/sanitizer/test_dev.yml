@@ -333,7 +333,6 @@ buildvariants:
         --opt=on
         --sanitize=undefined
         --ssl
-        --allocator=tcmalloc-gperf
         -j$(grep -c ^processor /proc/cpuinfo)
         --link-model=dynamic
         --use-diagnostic-latches=on
