@@ -207,13 +207,16 @@ buildvariants:
       - name: jsCore
         distros:
           - amazon2-arm64-large
+      - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
+        distros:
+          - amazon2-arm64-large
       - name: replica_sets_jscore_passthrough_gen
       - name: sharded_collections_jscore_passthrough_gen
       - name: sharding_jscore_passthrough_gen
       - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
       - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
       - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
-      - name: aggregation_repeat_queries
+      - name: aggregation_repeat_queries_multiplan_single_solutions
       - name: burn_in_tests_gen
         depends_on:
           - name: version_burn_in_gen

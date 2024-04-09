@@ -7,6 +7,8 @@
  *   # than maximum BSON size, we cannot serialize the result and send it to mongos. Such problem
  *   # does not exist in standalone and replica set setups.
  *   assumes_against_mongod_not_mongos,
+ *   # TODO SERVER-89078: Re-enable this test after we fix supporting huge intermediate docs
+ *   does_not_support_multiplanning_single_solutions,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

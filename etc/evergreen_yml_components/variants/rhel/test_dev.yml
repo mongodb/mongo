@@ -276,7 +276,7 @@ buildvariants:
         distros:
           - rhel80-xlarge
       - name: .updatefuzzer
-      - name: aggregation_repeat_queries
+      - name: aggregation_repeat_queries_multiplan_single_solutions
       - name: audit
       - name: burn_in_tests_gen
         depends_on:
@@ -295,7 +295,7 @@ buildvariants:
       - name: jsCore
         distros:
           - rhel80-xlarge
-      - name: jsCore_min_batch_repeat_queries_ese_gsm
+      - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
       - name: jsCore_txns_large_txns_format
       - name: json_schema
       - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
@@ -370,7 +370,7 @@ buildvariants:
       - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
       - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
       - name: .jscore .common !.sbe_only
-      - name: jsCore_min_batch_repeat_queries_ese_gsm
+      - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
       - name: jsCore_txns_large_txns_format
       - name: json_schema
       - name: .multi_shard .common

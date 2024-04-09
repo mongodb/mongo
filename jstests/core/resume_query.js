@@ -10,6 +10,8 @@
  *   requires_persistence,
  *   no_selinux,
  *   cannot_run_during_upgrade_downgrade,
+ *   # Multiplanning breaks postBatchResumeTokens, as they don't account for PlanExecutor's stash
+ *   does_not_support_multiplanning_single_solutions,
  * ]
  */
 

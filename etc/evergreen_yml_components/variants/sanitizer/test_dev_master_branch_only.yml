@@ -180,7 +180,7 @@ buildvariants:
         distros:
           - rhel80-xlarge
       - name: .jscore .common !jsCore
-      - name: jsCore_min_batch_repeat_queries_ese_gsm
+      - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
       - name: jsCore_txns_large_txns_format
       - name: json_schema
       # TODO(SERVER-69996) reenable after ticket is complete
@@ -560,7 +560,7 @@ buildvariants:
         distros:
           - rhel80-xlarge
       - name: .jscore .common !jsCore
-      - name: jsCore_min_batch_repeat_queries_ese_gsm
+      - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
       - name: jsCore_txns_large_txns_format
       - name: json_schema
       - name: .jstestfuzz !.feature_flag_guarded !.flow_control # Flow control jstestfuzz take longer.

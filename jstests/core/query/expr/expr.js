@@ -10,6 +10,8 @@
 //   requires_fcv_60,
 //   # Uses mapReduce command.
 //   requires_scripting,
+//   # Does not support multiplanning, because it makes explain fail
+//   does_not_support_multiplanning_single_solutions,
 // ]
 
 import "jstests/libs/sbe_assert_error_override.js";

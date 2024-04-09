@@ -281,7 +281,7 @@ buildvariants:
       - name: external_auth_oidc
       - name: initial_sync_fuzzer_gen
       - name: .jscore .common
-      - name: jsCore_min_batch_repeat_queries_ese_gsm
+      - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
       - name: jsCore_txns_large_txns_format
       - name: json_schema
       - name: .multi_shard .common
@@ -369,7 +369,7 @@ buildvariants:
       - name: .encrypt
       - name: initial_sync_fuzzer_gen
       - name: .jscore .common
-      - name: jsCore_min_batch_repeat_queries_ese_gsm
+      - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
       - name: jsCore_txns_large_txns_format
       - name: json_schema
       - name: .multi_shard .common

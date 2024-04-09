@@ -556,7 +556,8 @@ public:
 
         // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
         // manually update the plan cache instead without multiplanning but this is simpler.
-        if (1 == solutions.size() && !_cq->getExpCtxRaw()->forcePlanCache) {
+        if (1 == solutions.size() && !_cq->getExpCtxRaw()->forcePlanCache &&
+            !internalQueryPlannerUseMultiplannerForSingleSolutions) {
             // Only one possible plan. Build the stages from the solution.
             solutions[0]->indexFilterApplied = _plannerParams.indexFiltersApplied;
             return buildSingleSolutionPlan(std::move(solutions[0]));
@@ -992,7 +993,9 @@ private:
             solution->indexFilterApplied = _plannerParams.indexFiltersApplied;
         }
 
-        if (solutions.size() > 1) {
+        if (solutions.size() > 1 ||
+            // Search queries are not supported in classic multi-planner.
+            (internalQueryPlannerUseMultiplannerForSingleSolutions && !_cq->isSearchQuery())) {
             auto result = releaseResult();
             result->runtimePlanner = std::make_unique<crp_sbe::MultiPlanner>(
                 makePlannerData(), std::move(solutions), PlanCachingMode::AlwaysCache);
@@ -1072,6 +1075,11 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     if (decisionWorks || hasHashLookup) {
         return std::make_unique<sbe::CachedSolutionPlanner>(
             opCtx, collections, *canonicalQuery, decisionWorks, yieldPolicy, remoteCursors);
+    }
+
+    if (internalQueryPlannerUseMultiplannerForSingleSolutions) {
+        return std::make_unique<sbe::MultiPlanner>(
+            opCtx, collections, *canonicalQuery, PlanCachingMode::AlwaysCache, yieldPolicy);
     }
 
     // Runtime planning is not required.

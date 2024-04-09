@@ -3,12 +3,12 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/core_min_batch_repeat_queries_ese_gsm.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
-description: This suite is a combination of core_ese_gcm, core_repeat_queries, and
-  core_minimum_batch_size. You can run any of these tests individually to debug any
-  issues that might arrise.
+description: This suite is a combination of core_ese_gcm, core_repeat_queries, core_multiplan_single_solutions,
+  and core_minimum_batch_size. You can run any of these tests individually to debug
+  any issues that might arrise.
 executor:
   archive:
     hooks:
@@ -21,6 +21,8 @@ executor:
       global_vars:
         TestData:
           batchSize: 2
+          setParameters:
+            internalQueryPlannerUseMultiplannerForSingleSolutions: true
       objcheck: ''
   fixture:
     class: MongoDFixture
@@ -52,6 +54,7 @@ selector:
   - does_not_support_encrypted_storage_engine
   - does_not_support_repeated_reads
   - requires_profiling
+  - does_not_support_multiplanning_single_solutions
   roots:
   - jstests/core/**/*.js
   - jstests/core_standalone/**/*.js

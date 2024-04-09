@@ -20,7 +20,9 @@
 //   # messes with the latency stats tracking and counts the operation as an aggregate instead of a
 //   # command. It's an implementation detail that leaks and invalidates the test.
 //   assumes_no_implicit_index_creation,
-//   uses_compact
+//   uses_compact,
+//   # Does not support multiplanning, because it stashes documents beyond batch size.
+//   does_not_support_multiplanning_single_solutions,
 // ]
 //
 

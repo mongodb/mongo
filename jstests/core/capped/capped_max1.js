@@ -15,6 +15,8 @@
  *   # Reading from an pre-existing cursor after tenant migration returns stale data by design,
  *   # so the cursor-invalidation test will not work in that scenario.
  *   tenant_migration_incompatible,
+ *   # Does not support multiplanning, because it stashes results beyond batchSize.
+ *   does_not_support_multiplanning_single_solutions,
  * ]
  */
 

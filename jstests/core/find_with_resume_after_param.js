@@ -5,6 +5,8 @@
  *   # Queries on mongoS may not request or provide a resume token.
  *   assumes_against_mongod_not_mongos,
  *   cannot_run_during_upgrade_downgrade,
+ *   # Does not support multiplanning, because it makes explain fail
+ *   does_not_support_multiplanning_single_solutions,
  * ]
  */
 

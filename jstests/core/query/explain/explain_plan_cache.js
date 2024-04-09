@@ -13,6 +13,8 @@
  *   tenant_migration_incompatible,
  *   # The "isCached" field which was introduced in 8.0.
  *   requires_fcv_80,
+ *   # Does not support multiplanning, because it caches more plans
+ *   does_not_support_multiplanning_single_solutions,
  * ]
  */
 import {

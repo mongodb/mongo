@@ -4,6 +4,8 @@
  * @tags: [
  *   # TODO SERVER-79448: Investigate why the test timeouts on TSAN variant.
  *   tsan_incompatible,
+ *   # TODO SERVER-89078: Re-enable this test after we fix supporting huge intermediate docs
+ *   does_not_support_multiplanning_single_solutions,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

@@ -1098,7 +1098,7 @@ tasks:
           npm_command: agg-fuzzer
 
   - <<: *task_template
-    name: aggregation_repeat_queries
+    name: aggregation_repeat_queries_multiplan_single_solutions
     tags: ["assigned_to_jira_team_server_query_optimization", "default"]
     depends_on:
       - name: aggregation

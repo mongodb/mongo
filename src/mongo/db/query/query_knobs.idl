@@ -422,6 +422,15 @@ server_parameters:
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
 
+  internalQueryPlannerUseMultiplannerForSingleSolutions:
+    description: "Forces planner to use multiplanning even if there is only one solution present.
+    Used for testing to increase multiplanning and replanning test coverage."
+    set_at: startup
+    cpp_varname: "internalQueryPlannerUseMultiplannerForSingleSolutions"
+    cpp_vartype: bool
+    default: false
+    redact: false
+
   internalQueryIgnoreUnknownJSONSchemaKeywords:
     description: "Ignore unknown JSON Schema keywords."
     set_at: [ startup, runtime ]

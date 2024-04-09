@@ -1,6 +1,9 @@
-# This test suite runs the tests in aggregation with 'rerun_queries.js' override. By rerunning
+# This test suite runs the tests in aggregation with 'rerun_queries.js' override and
+# internalQueryPlannerUseMultiplannerForSingleSolutions query knob enabled. By rerunning
 # queries multiple times, this tests that any caches involved in query processing -- in particular
-# the plan cache -- do not affect correctness.
+# the plan cache -- do not affect correctness. By running multiplanning even when there is a
+# single solution, this tests adds more plans to the cache and increases multiplanning and
+# replanning test coverage.
 
 test_kind: js_test
 
@@ -10,9 +13,13 @@ selector:
   exclude_files:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
+    # TODO SERVER-88949 Re-enable optimize_away_pipeline test
+    - jstests/aggregation/optimize_away_pipeline.js
   exclude_with_any_tags:
-    # Used to tag tests which cannot run in the 'core_repeat_queries' or 'aggregation_repeat_queries' suites.
+    # Used to tag tests which cannot run in the 'repeat_queries' suites.
     - does_not_support_repeated_reads
+    # Used to tag tests which cannot run in the 'multiplan_single_solutions' suites.
+    - does_not_support_multiplanning_single_solutions
     # By repeating queries when the profiler is enabled, we end up writing additional profiler entries.
     # Most tests using profiling are not prepared for these additional profiler entries.
     - requires_profiling
@@ -35,3 +42,4 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        internalQueryPlannerUseMultiplannerForSingleSolutions: true

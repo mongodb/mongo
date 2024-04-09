@@ -1,6 +1,8 @@
 // @tags: [
 //   assumes_balancer_off,
 //   requires_getmore,
+//   # Does not support multiplanning, because it makes explain fail
+//   does_not_support_multiplanning_single_solutions,
 // ]
 
 // Test that even when the execution of a query fails, explain reports query

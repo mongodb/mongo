@@ -1221,7 +1221,7 @@ tasks:
           suite: core_ese
 
   - <<: *task_template
-    name: jsCore_min_batch_repeat_queries_ese_gsm
+    name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
     tags:
       [
         "assigned_to_jira_team_server_security",
@@ -1237,7 +1237,7 @@ tasks:
       - func: "do setup"
       - func: "run tests"
         vars:
-          suite: core_min_batch_repeat_queries_ese_gsm
+          suite: core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
 
   - <<: *gen_task_template
     name: multiversion_auth_future_git_tag_gen
