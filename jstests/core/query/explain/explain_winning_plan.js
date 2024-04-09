@@ -5,6 +5,8 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   assumes_against_mongod_not_mongos,
+//   # Does not support multiplanning, because it changes allPlansExecution explain output
+//   does_not_support_multiplanning_single_solutions,
 // ]
 
 import {getExecutionStats, getOptimizer} from "jstests/libs/analyze_plan.js";

@@ -7,6 +7,9 @@
  *   # Can't wrap queries in facets without going past max BSON depth.
  *   do_not_wrap_aggregations_in_facets,
  *   not_allowed_with_signed_security_token,
+ *   # Can't use multiplanning, as it leads to query serialization that fails because of max BSON
+ *   # size.
+ *   does_not_support_multiplanning_single_solutions
  * ]
  */
 

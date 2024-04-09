@@ -18,6 +18,8 @@
  *   # Makes checks based on which engine is used. This can change if an index is implicitly
  *   # created.
  *   assumes_no_implicit_index_creation,
+ *   # Does not support multiplanning, because it caches more plans
+ *   does_not_support_multiplanning_single_solutions,
  * ]
  */
 import {

@@ -11,6 +11,8 @@
 //   requires_profiling,
 //   # Uses $where operator
 //   requires_scripting,
+//   # TODO SERVER-89016 Remove this tag
+//   does_not_support_multiplanning_single_solutions,
 // ]
 
 import {

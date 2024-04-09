@@ -89,11 +89,15 @@ assert.commandFailed(res);
 // data dependent errors can get ok:1 but fail in getMore if they don't fail in first batch
 res = t.runCommand(buildAggCmd([{$project: {cantAddString: {$add: [1, '$bigStr']}}}], 1));
 assert.commandFailed(res);
+
+// Setting batchSize 0 doesn't guarantee that command will succeed: it may fail during plan
+// selection.
 res = t.runCommand(buildAggCmd([{$project: {cantAddString: {$add: [1, '$bigStr']}}}], 0));
-assert.commandWorked(res);
-assert.throws(function() {
-    makeCursor(res).itcount();
-});
+if (res.ok) {
+    assert.throws(function() {
+        makeCursor(res).itcount();
+    });
+}
 
 // error if collection dropped after first batch
 cursor = aggCursor([{$unwind: '$bigArray'}], 0);

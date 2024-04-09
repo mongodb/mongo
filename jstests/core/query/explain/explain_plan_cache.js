@@ -13,6 +13,8 @@
  *   tenant_migration_incompatible,
  *   # Uses the "isCached" field which does not exist on all versions.
  *   multiversion_incompatible,
+ *   # Does not support multiplanning, because it caches more plans
+ *   does_not_support_multiplanning_single_solutions,
  * ]
  */
 import {
