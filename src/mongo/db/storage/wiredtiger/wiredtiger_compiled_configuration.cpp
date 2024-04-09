@@ -38,7 +38,7 @@ CompiledConfiguration::CompiledConfiguration(const char* apiName, const char* co
     _compileToken = CompiledConfigurationRegistry::instance()->add(apiName, config);
 }
 
-const char* CompiledConfiguration::getConfig(WiredTigerSession* session) {
+const char* CompiledConfiguration::getConfig(WiredTigerSession* session) const {
     CompiledConfigurationsPerConnection* compiled =
         session->getCompiledConfigurationsPerConnection();
     return (compiled->get(_compileToken));

@@ -44,7 +44,7 @@ class CompiledConfiguration {
 public:
     CompiledConfiguration(const char* apiName, const char* config);
 
-    const char* getConfig(WiredTigerSession* session);
+    const char* getConfig(WiredTigerSession* session) const;
 
 private:
     std::string _apiName;
@@ -60,7 +60,7 @@ public:
     CompiledConfigurationsPerConnection() {}
 
     Status compileAll(WT_CONNECTION* conn);
-    const char* get(int compileToken) {
+    const char* get(int compileToken) const {
         return _compileResults[compileToken];
     }
 
