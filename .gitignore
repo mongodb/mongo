@@ -149,7 +149,7 @@ CMakeLists.txt
 .xcworkspace
 
 # VSCode projects
-# .vscode/
+.vscode
 
 # Windows MSI builder artifacts
 *.msi
@@ -167,6 +167,7 @@ local.properties
 compile_commands.json
 
 .cache/
+.root
 build/*
 src/mongo/installer/compass/install_compass
 out.perf
