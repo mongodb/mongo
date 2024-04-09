@@ -555,6 +555,20 @@ Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const Names
     }
 }
 
+Status StorageInterfaceImpl::dropCollectionsWithPrefix(OperationContext* opCtx,
+                                                       const DatabaseName& dbName,
+                                                       const std::string& collectionNamePrefix) {
+    return writeConflictRetry(
+        opCtx,
+        "StorageInterfaceImpl::dropCollectionsWithPrefix",
+        NamespaceString::createNamespaceString_forTest(dbName, collectionNamePrefix),
+        [&] {
+            AutoGetDb autoDB(opCtx, dbName, MODE_X);
+            StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            return storageEngine->dropCollectionsWithPrefix(opCtx, dbName, collectionNamePrefix);
+        });
+}
+
 Status StorageInterfaceImpl::truncateCollection(OperationContext* opCtx,
                                                 const NamespaceString& nss) {
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::truncateCollection", nss, [&] {
@@ -1123,9 +1137,16 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
 Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const TimestampedBSONObj& update) {
+    return putSingleton(opCtx, nss, {} /* query */, update);
+}
+
+Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const BSONObj& query,
+                                          const TimestampedBSONObj& update) {
     auto request = UpdateRequest();
     request.setNamespaceString(nss);
-    request.setQuery({});
+    request.setQuery(query);
     request.setUpdateModification(
         write_ops::UpdateModification::parseFromClassicUpdate(update.obj));
     request.setUpsert(true);
@@ -1147,16 +1168,21 @@ Status StorageInterfaceImpl::updateSingleton(OperationContext* opCtx,
     return _updateWithQuery(opCtx, request, update.timestamp);
 }
 
-Status StorageInterfaceImpl::updateDocuments(OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             const BSONObj& query,
-                                             const TimestampedBSONObj& update) {
+Status StorageInterfaceImpl::updateDocuments(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& query,
+    const TimestampedBSONObj& update,
+    const boost::optional<std::vector<BSONObj>>& arrayFilters) {
     auto request = UpdateRequest();
     request.setNamespaceString(nss);
     request.setQuery(query);
     request.setUpdateModification(
         write_ops::UpdateModification::parseFromClassicUpdate(update.obj));
     request.setMulti(true);
+    if (arrayFilters) {
+        request.setArrayFilters(arrayFilters.get());
+    }
     invariant(!request.isUpsert());
     return _updateWithQuery(opCtx, request, update.timestamp);
 }

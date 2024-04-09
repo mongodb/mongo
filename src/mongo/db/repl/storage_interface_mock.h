@@ -211,6 +211,12 @@ public:
         return truncateCollFn(opCtx, nss);
     }
 
+    Status dropCollectionsWithPrefix(OperationContext* opCtx,
+                                     const DatabaseName& dbName,
+                                     const std::string& collectionNamePrefix) override {
+        return Status{ErrorCodes::IllegalOperation, "dropCollections not implemented."};
+    }
+
     Status renameCollection(OperationContext* opCtx,
                             const NamespaceString& fromNS,
                             const NamespaceString& toNS,
@@ -263,6 +269,13 @@ public:
         return putSingletonFn(opCtx, nss, update);
     }
 
+    Status putSingleton(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const BSONObj& query,
+                        const TimestampedBSONObj& update) override {
+        return Status{ErrorCodes::IllegalOperation, "putSingleton with query not implemented."};
+    }
+
     Status updateSingleton(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const BSONObj& query,
@@ -270,10 +283,12 @@ public:
         return Status{ErrorCodes::IllegalOperation, "updateSingleton not implemented."};
     }
 
-    Status updateDocuments(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           const BSONObj& query,
-                           const TimestampedBSONObj& update) override {
+    Status updateDocuments(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const TimestampedBSONObj& update,
+        const boost::optional<std::vector<BSONObj>>& arrayFilters = boost::none) override {
         return Status{ErrorCodes::IllegalOperation, "updateDocuments not implemented."};
     }
 

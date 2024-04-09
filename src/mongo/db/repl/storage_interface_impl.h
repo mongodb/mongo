@@ -108,6 +108,10 @@ public:
 
     Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) override;
 
+    Status dropCollectionsWithPrefix(OperationContext* opCtx,
+                                     const DatabaseName& dbName,
+                                     const std::string& collectionNamePrefix) override;
+
     Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) override;
 
     Status renameCollection(OperationContext* opCtx,
@@ -145,15 +149,22 @@ public:
                         const NamespaceString& nss,
                         const TimestampedBSONObj& update) override;
 
+    Status putSingleton(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const BSONObj& query,
+                        const TimestampedBSONObj& update) override;
+
     Status updateSingleton(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const BSONObj& query,
                            const TimestampedBSONObj& update) override;
 
-    Status updateDocuments(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           const BSONObj& query,
-                           const TimestampedBSONObj& update) override;
+    Status updateDocuments(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const TimestampedBSONObj& update,
+        const boost::optional<std::vector<BSONObj>>& arrayFilters = boost::none) override;
 
     StatusWith<BSONObj> findById(OperationContext* opCtx,
                                  const NamespaceStringOrUUID& nsOrUUID,

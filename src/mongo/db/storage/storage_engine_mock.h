@@ -60,6 +60,12 @@ public:
     Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final {
         return Status::OK();
     }
+    Status dropCollectionsWithPrefix(OperationContext* opCtx,
+                                     const DatabaseName& dbName,
+                                     const std::string& collectionNamePrefix) final {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine doesn't support dropCollections");
+    }
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) final {}
     Status beginBackup(OperationContext* opCtx) final {
         return Status(ErrorCodes::CommandNotSupported,
