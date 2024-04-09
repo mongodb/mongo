@@ -355,7 +355,7 @@ Status OplogApplierImplTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
     TestApplyOplogGroupApplier oplogApplier(
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary));
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false));
     std::vector<ApplierOperation> opsPtrs;
     for (auto& op : ops) {
         opsPtrs.emplace_back(&op);
