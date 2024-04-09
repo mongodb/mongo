@@ -92,7 +92,3 @@ feature_flags:
         cpp_varname: gFeatureFlagOIDCInternalAuthorization
         default: true
         version: 7.0
-    featureFlagOIDCMultipurposeIDP:
-        description: "Feature flag for OIDC multi-purpose IdPs"
-        cpp_varname: gFeatureFlagOIDCMultipurposeIDP
-        default: false

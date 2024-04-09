@@ -115,11 +115,22 @@ JWSValidatedToken::JWSValidatedToken(JWKManager* keyMgr, StringData token)
     uassertStatusOK(validate(keyMgr));
 };
 
-StatusWith<std::string> JWSValidatedToken::extractIssuerFromCompactSerialization(
+StatusWith<IssuerAudiencePair> JWSValidatedToken::extractIssuerAndAudienceFromCompactSerialization(
     StringData token) try {
     auto tokenSplit = parseSignedToken(token);
     auto payload = fromjson(base64url::decode(tokenSplit.token[1]));
-    return JWT::parse(IDLParserContext{"JWT"}, payload).getIssuer().toString();
+    auto jwt = JWT::parse(IDLParserContext{"JWT"}, payload);
+
+    IssuerAudiencePair pair;
+    pair.issuer = jwt.getIssuer().toString();
+
+    auto& audience = jwt.getAudience();
+    if (stdx::holds_alternative<std::string>(audience)) {
+        pair.audience.push_back(stdx::get<std::string>(audience));
+    } else {
+        pair.audience = stdx::get<std::vector<std::string>>(audience);
+    }
+    return pair;
 } catch (const DBException& ex) {
     return ex.toStatus();
 }

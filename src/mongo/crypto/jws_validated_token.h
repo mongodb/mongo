@@ -35,6 +35,11 @@
 
 namespace mongo::crypto {
 
+struct IssuerAudiencePair {
+    std::string issuer;
+    std::vector<std::string> audience;
+};
+
 class JWSValidatedToken {
 public:
     JWSValidatedToken() = delete;
@@ -49,9 +54,10 @@ public:
     JWSValidatedToken(JWKManager* keyMgr, StringData token);
 
     /**
-     * Extract just the Issuer name ('iss') from the token.
+     * Extract the Issuer name ('iss') and the audience list ('aud') from the token.
      */
-    static StatusWith<std::string> extractIssuerFromCompactSerialization(StringData token);
+    static StatusWith<IssuerAudiencePair> extractIssuerAndAudienceFromCompactSerialization(
+        StringData token);
 
     /**
      * Validates token is not expired or issued on a later date,
