@@ -77,7 +77,6 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
             str::stream() << "$collStats must take a nested object but found: " << specElem,
             specElem.type() == BSONType::Object);
 
-    // TODO SERVER-77056: add assertion to validate pExpCtx->serializationCtxt != stateDefault()
     const auto tenantId = pExpCtx->ns.tenantId();
     const auto vts = tenantId
         ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
