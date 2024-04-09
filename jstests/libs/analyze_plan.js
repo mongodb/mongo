@@ -720,18 +720,22 @@ export function isEofPlan(db, root) {
     return planHasStage(db, root, "EOF");
 }
 
+export function isIdhackOrExpress(db, root) {
+    // SERVER-77719: Ensure that the decision for using the scan lines up with CQF optimizer.
+    return isExpress(db, root) || isIdhack(db, root);
+}
+
 /**
  * Returns true if the BSON representation of a plan rooted at 'root' is using
  * the idhack fast path, and false otherwise. These can be represented either as
- * explicit 'IDHACK' or 'EXPRESS' stages, or as 'CLUSTERED_IXSCAN' stages with equal min & max
+ * explicit 'IDHACK' or as 'CLUSTERED_IXSCAN' stages with equal min & max
  * record bounds in the case of clustered collections.
  *
  * This helper function can be used only with classic optimizer (TODO SERVER-77719: address this
  * behavior).
  */
-export function isIdhackOrExpress(db, root) {
-    // SERVER-77719: Ensure that the decision for using the scan lines up with CQF optimizer.
-    if (planHasStage(db, root, "IDHACK") || isExpress(db, root)) {
+export function isIdhack(db, root) {
+    if (planHasStage(db, root, "IDHACK")) {
         return true;
     }
     if (!isClusteredIxscan(db, root)) {

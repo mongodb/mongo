@@ -519,6 +519,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
                                                 collection,
                                                 yieldPolicy,
                                                 false /* whether owned BSON must be returned */);
+
     invariant(executor.getStatus());
     return std::move(executor.getValue());
 }

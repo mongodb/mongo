@@ -422,6 +422,23 @@ public:
 };
 extern QueryFrameworkCounters queryFrameworkCounters;
 
+class FastPathQueryCounters {
+public:
+    void incrementIdHackQueryCounter() {
+        idHackQueryCounter.increment();
+    }
+
+    void incrementExpressQueryCounter() {
+        expressQueryCounter.increment();
+    }
+
+    // Counter for the number of queries planned using idHack fast planning.
+    Counter64& idHackQueryCounter = *MetricBuilder<Counter64>{"query.planning.fastPath.idHack"};
+    // Counter for the number of queries planned using express fast planning.
+    Counter64& expressQueryCounter = *MetricBuilder<Counter64>{"query.planning.fastPath.express"};
+};
+extern FastPathQueryCounters fastPathQueryCounters;
+
 class LookupPushdownCounters {
 public:
     LookupPushdownCounters() = default;

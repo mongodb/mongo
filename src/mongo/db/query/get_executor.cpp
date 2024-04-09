@@ -691,6 +691,7 @@ private:
                     "Using classic engine idhack",
                     "canonicalQuery"_attr = redact(_queryStringForDebugLog));
         planCacheCounters.incrementClassicSkippedCounter();
+        fastPathQueryCounters.incrementIdHackQueryCounter();
         auto result = releaseResult();
         result->runtimePlanner =
             std::make_unique<crp_classic::IdHackPlanner>(makePlannerData(), descriptor);
@@ -1667,6 +1668,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                                                   ws.get(),
                                                   coll,
                                                   idHackStage.release());
+                fastPathQueryCounters.incrementIdHackQueryCounter();
                 return plan_executor_factory::make(expCtx,
                                                    std::move(ws),
                                                    std::move(root),
@@ -1821,6 +1823,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
                 // Working set 'ws' is discarded. InternalPlanner::updateWithIdHack() makes its own
                 // WorkingSet.
+                fastPathQueryCounters.incrementIdHackQueryCounter();
                 return InternalPlanner::updateWithIdHack(opCtx,
                                                          coll,
                                                          updateStageParams,

@@ -344,6 +344,7 @@ SortCounters sortCounters;
 ValidatorCounters validatorCounters;
 GroupCounters groupCounters;
 PlanCacheCounters planCacheCounters;
+FastPathQueryCounters fastPathQueryCounters;
 
 OperatorCounters operatorCountersAggExpressions{"operatorCounters.expressions."};
 OperatorCounters operatorCountersMatchExpressions{"operatorCounters.match."};

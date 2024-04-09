@@ -58,6 +58,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/assert_util.h"
 
@@ -315,6 +316,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
     if (cq->getProj() != nullptr) {
         projection = cq->getProj();
     }
+
+    fastPathQueryCounters.incrementExpressQueryCounter();
 
     return std::visit(
         [&](auto& chosenShardFilter,
