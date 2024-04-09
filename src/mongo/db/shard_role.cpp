@@ -1646,7 +1646,8 @@ void shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
     const CollectionCatalog& stashedCatalog,
     const CollectionPtr& collectionPtr,
     const NamespaceString& nss) {
-    if (opCtx->inMultiDocumentTransaction()) {
+    if (opCtx->inMultiDocumentTransaction() ||
+        repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
         // The latest catalog.
         const auto latestCatalog = CollectionCatalog::latest(opCtx);
 

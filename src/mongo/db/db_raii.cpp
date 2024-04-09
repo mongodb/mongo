@@ -1022,6 +1022,14 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
         scopedCss->checkShardVersionOrThrow(opCtx);
     }
 
+    const auto receivedShardVersion{
+        OperationShardingState::get(opCtx).getShardVersion(_autoCollForRead.getNss())};
+    if (receivedShardVersion == ShardVersion::UNSHARDED()) {
+        const auto catalog = CollectionCatalog::get(opCtx);
+        shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
+            opCtx, *catalog, _autoCollForRead.getCollection(), _autoCollForRead.getNss());
+    }
+
     checkCollectionUUIDMismatch(
         opCtx, _autoCollForRead.getNss(), _autoCollForRead.getCollection(), options._expectedUUID);
 }
