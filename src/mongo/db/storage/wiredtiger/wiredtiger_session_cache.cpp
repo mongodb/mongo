@@ -198,6 +198,31 @@ void WiredTigerSession::closeAllCursors(const std::string& uri) {
     }
 }
 
+void WiredTigerSession::reconfigure(const std::string& newConfig, std::string undoConfig) {
+    if (newConfig == undoConfig) {
+        // The undoConfig string is the config string that resets our session back to default
+        // settings. If our new configuration is the same as the undoconfig string, then that means
+        // that we are either setting our configuration back to default, or that the newConfig
+        // string does not change our default values. In this case, we can erase the undoConfig
+        // string from our set of undo config strings, since we no longer need to do any work to
+        // restore the session to its default configuration.
+        _undoConfigStrings.erase(undoConfig);
+    } else {
+        // Store the config string that will reset our session to its default configuration.
+        _undoConfigStrings.emplace(std::move(undoConfig));
+    }
+    auto wtSession = getSession();
+    invariantWTOK(wtSession->reconfigure(wtSession, newConfig.c_str()), wtSession);
+}
+
+void WiredTigerSession::resetSessionConfiguration() {
+    auto wtSession = getSession();
+    for (const std::string& undoConfigString : _undoConfigStrings) {
+        invariantWTOK(wtSession->reconfigure(wtSession, undoConfigString.c_str()), wtSession);
+    }
+    _undoConfigStrings.clear();
+}
+
 namespace {
 AtomicWord<unsigned long long> nextTableId(WiredTigerSession::kLastTableId);
 }
@@ -478,6 +503,8 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         if (gWiredTigerCursorCacheSize.load() < 0) {
             session->closeAllCursors("");
         }
+
+        session->resetSessionConfiguration();
         invariantWTOK(ss->reset(ss), ss);
     }
 

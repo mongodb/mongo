@@ -265,7 +265,6 @@ private:
     UniqueWiredTigerSession _unique_session;
     WiredTigerSession* _session = nullptr;
     bool _isTimestamped = false;
-    bool _prefetchingSet = false;
 
     // Helpers used to keep track of multi timestamp constraint violations on the transaction.
     struct MultiTimestampConstraintTracker {
