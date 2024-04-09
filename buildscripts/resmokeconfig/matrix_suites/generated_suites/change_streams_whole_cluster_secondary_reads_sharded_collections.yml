@@ -6,9 +6,9 @@
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_whole_cluster_secondary_reads_sharded_collections.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
-description: This suite is a combination of core_ese_gcm, core_repeat_queries, and
-  core_minimum_batch_size. You can run any of these tests individually to debug any
-  issues that might arrise.
+description: This suite is a combination of change_streams_whole_cluster_mongos_passthrough,
+  change_streams_whole_cluster_secondary_reads_passthrough, and change_streams_whole_cluster_sharded_collections_passthrough.
+  You can run any of these tests individually to debug any issues that might arrise.
 executor:
   archive:
     hooks:
