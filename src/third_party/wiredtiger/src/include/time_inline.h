@@ -36,8 +36,6 @@ __wt_rdtsc(void)
         __asm__ volatile("mrs %0,  cntvct_el0" : "=r"(t));
         return (t);
     }
-#elif defined(_M_AMD64)
-    return (__rdtsc());
 #else
     return (0);
 #endif

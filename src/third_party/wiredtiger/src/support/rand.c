@@ -48,11 +48,6 @@
 #ifdef ENABLE_ANTITHESIS
 #include "instrumentation.h"
 #endif
-
-#define DEFAULT_SEED_W 521288629
-#define DEFAULT_SEED_Z 362436069
-#define WT_LEFT_CIRCULAR_SHIFT32(x, nbits) (((x) << (nbits)) | ((x) >> (32 - (nbits))))
-
 /*
  * __wt_random_init --
  *     Initialize return of a 32-bit pseudo-random number.
@@ -62,8 +57,8 @@ __wt_random_init(WT_RAND_STATE volatile *rnd_state) WT_GCC_FUNC_ATTRIBUTE((visib
 {
     WT_RAND_STATE rnd;
 
-    M_W(rnd) = DEFAULT_SEED_W;
-    M_Z(rnd) = DEFAULT_SEED_Z;
+    M_W(rnd) = 521288629;
+    M_Z(rnd) = 362436069;
     *rnd_state = rnd;
 }
 
@@ -104,17 +99,8 @@ __wt_random_init_seed(WT_SESSION_IMPL *session, WT_RAND_STATE volatile *rnd_stat
      * Take the seconds and nanoseconds from the clock together with the thread ID to generate a
      * 64-bit seed, then smear that value using algorithm "xor" from Marsaglia, "Xorshift RNGs".
      */
-    M_W(rnd) =
-      (uint32_t)ts.tv_sec ^ (uint32_t)WT_LEFT_CIRCULAR_SHIFT32(ts.tv_nsec, 29) ^ DEFAULT_SEED_W;
-    M_Z(rnd) =
-      (uint32_t)ts.tv_nsec ^ (uint32_t)WT_LEFT_CIRCULAR_SHIFT32(ts.tv_sec, 27) ^ DEFAULT_SEED_Z;
-/*
- * Some system clocks do not have a high enough resolution between each tick cycle. Perform an extra
- * xor against the machine's timestamp counter.
- */
-#ifdef _WIN32
-    rnd.v ^= __wt_rdtsc();
-#endif
+    M_W(rnd) = (uint32_t)ts.tv_sec ^ 521288629;
+    M_Z(rnd) = (uint32_t)ts.tv_nsec ^ 362436069;
     rnd.v ^= (uint64_t)threadid;
     rnd.v ^= rnd.v << 13;
     rnd.v ^= rnd.v >> 7;
