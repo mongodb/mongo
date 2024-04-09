@@ -234,27 +234,18 @@ TransactionOperations::CollectionUUIDs TransactionOperations::getCollectionUUIDs
 }
 
 TransactionOperations::ApplyOpsInfo TransactionOperations::getApplyOpsInfo(
-    const std::vector<OplogSlot>& oplogSlots,
-    std::size_t oplogEntryCountLimit,
-    std::size_t oplogEntrySizeLimitBytes,
-    bool prepare) const {
+    std::size_t oplogEntryCountLimit, std::size_t oplogEntrySizeLimitBytes, bool prepare) const {
     const auto& operations = _transactionOperations;
     if (operations.empty()) {
         return {/*applyOpsEntries=*/{},
-                /*numberOfOplogSlotsUsed=*/0,
+                /*numberOfOplogSlotsRequired=*/(prepare ? 1U : 0),
                 /*numOperationsWithNeedsRetryImage=*/0,
                 prepare};
     }
-    tassert(6278504, "Insufficient number of oplogSlots", operations.size() <= oplogSlots.size());
 
     std::vector<ApplyOpsInfo::ApplyOpsEntry> applyOpsEntries;
-    auto oplogSlotIter = oplogSlots.begin();
-    auto getNextOplogSlot = [&]() {
-        tassert(6278505, "Unexpected end of oplog slot vector", oplogSlotIter != oplogSlots.end());
-        return *oplogSlotIter++;
-    };
-
     std::size_t numOperationsWithNeedsRetryImage = 0;
+    std::size_t numOplogSlotsRequired = 0;
     auto hasNeedsRetryImage = [](const repl::ReplOperation& operation) {
         return static_cast<bool>(operation.getNeedsRetryImage());
     };
@@ -267,22 +258,17 @@ TransactionOperations::ApplyOpsInfo TransactionOperations::getApplyOpsInfo(
             std::count_if(operationIt, operationIt + applyOpsOperations.size(), hasNeedsRetryImage);
         if (opCountWithNeedsRetryImage > 0) {
             // Reserve a slot for a forged no-op entry.
-            getNextOplogSlot();
+            numOplogSlotsRequired++;
 
             numOperationsWithNeedsRetryImage += opCountWithNeedsRetryImage;
         }
         operationIt += applyOpsOperations.size();
         applyOpsEntries.emplace_back(
-            ApplyOpsInfo::ApplyOpsEntry{getNextOplogSlot(), std::move(applyOpsOperations)});
+            ApplyOpsInfo::ApplyOpsEntry{std::move(applyOpsOperations), numOplogSlotsRequired++});
     }
 
-    // In the special case of writing the implicit 'prepare' oplog entry, we use the last reserved
-    // oplog slot. This may mean we skipped over some reserved slots, but there's no harm in that.
-    if (prepare) {
-        applyOpsEntries.back().oplogSlot = oplogSlots.back();
-    }
     return {std::move(applyOpsEntries),
-            /*numberOfOplogSlotsUsed=*/static_cast<std::size_t>(oplogSlotIter - oplogSlots.begin()),
+            numOplogSlotsRequired,
             /*numOperationsWithNeedsRetryImage=*/numOperationsWithNeedsRetryImage,
             prepare};
 }
@@ -295,6 +281,8 @@ std::size_t TransactionOperations::logOplogEntries(
     LogApplyOpsFn logApplyOpsFn,
     boost::optional<TransactionOperation::ImageBundle>* prePostImageToWriteToImageCollection)
     const {
+    invariant(oplogSlots.size() == applyOpsOperationAssignment.numberOfOplogSlotsRequired,
+              "Wrong number of oplogSlots reserved");
 
     // Each entry in a chain of applyOps contains a 'prevOpTime' field that serves as a back
     // pointer to the previous entry.
@@ -375,7 +363,7 @@ std::size_t TransactionOperations::logOplogEntries(
         repl::MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
         oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
-        oplogEntry.setOpTime(applyOpsEntry.oplogSlot);
+        oplogEntry.setOpTime(oplogSlots[applyOpsEntry.oplogSlotIndex]);
         oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTime);
         oplogEntry.setWallClockTime(wallClockTime);
         oplogEntry.setObject(applyOpsBuilder.done());
@@ -401,7 +389,7 @@ std::size_t TransactionOperations::logOplogEntries(
         stmtsIter = nextStmt;
     }
 
-    return applyOpsOperationAssignment.numberOfOplogSlotsUsed;
+    return applyOpsOperationAssignment.numberOfOplogSlotsRequired;
 }
 
 const std::vector<TransactionOperations::TransactionOperation>&

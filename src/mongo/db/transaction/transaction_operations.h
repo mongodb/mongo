@@ -101,7 +101,7 @@ public:
     /**
      * Contains "applyOps" oplog entries for a transaction. "applyOps" entries are not actual
      * "applyOps" entries to be written to the oplog, but comprise certain parts of those entries -
-     * BSON serialized operations, and the assigned oplog slot. The operations in field
+     * BSON serialized operations, and the relative position in the oplog. The operations in field
      * 'ApplyOpsEntry::operations' should be considered opaque outside the OpObserver.
      */
     struct ApplyOpsInfo {
@@ -109,30 +109,30 @@ public:
         static constexpr std::size_t kBSONArrayElementOverhead = 8U;
 
         struct ApplyOpsEntry {
-            OplogSlot oplogSlot;
             std::vector<BSONObj> operations;
+            size_t oplogSlotIndex;
         };
 
         ApplyOpsInfo(std::vector<ApplyOpsEntry> applyOpsEntries,
-                     std::size_t numberOfOplogSlotsUsed,
+                     std::size_t numberOfOplogSlotsRequired,
                      std::size_t numOperationsWithNeedsRetryImage,
                      bool prepare)
             : applyOpsEntries(std::move(applyOpsEntries)),
-              numberOfOplogSlotsUsed(numberOfOplogSlotsUsed),
+              numberOfOplogSlotsRequired(numberOfOplogSlotsRequired),
               numOperationsWithNeedsRetryImage(numOperationsWithNeedsRetryImage),
               prepare(prepare) {}
 
         explicit ApplyOpsInfo(bool prepare)
             : applyOpsEntries(),
-              numberOfOplogSlotsUsed(0),
+              numberOfOplogSlotsRequired(0),
               numOperationsWithNeedsRetryImage(0),
               prepare(prepare) {}
 
         // Representation of "applyOps" oplog entries.
         std::vector<ApplyOpsEntry> applyOpsEntries;
 
-        // Number of oplog slots utilized.
-        std::size_t numberOfOplogSlotsUsed;
+        // Number of oplog slots required for these oplog entries including pre/post image slots.
+        std::size_t numberOfOplogSlotsRequired;
 
         // Number of operations with 'needsRetryImage' set.
         std::size_t numOperationsWithNeedsRetryImage;
@@ -213,14 +213,12 @@ public:
     CollectionUUIDs getCollectionUUIDs() const;
 
     /**
-     * Returns oplog slots to be used for "applyOps" oplog entries, BSON serialized operations,
-     * their assignments to "applyOps" entries, and oplog slots to be used for writing pre- and
-     * post- image oplog entries for the transaction consisting of 'operations'. Allocates oplog
-     * slots from 'oplogSlots'. The 'prepare' indicates if the function is called when preparing a
-     * transaction.
+     * Returns the number of oplog slots to be used for "applyOps" oplog entries, BSON serialized
+     * operations, their assignments to "applyOps" entries, and the number of oplog slots to be used
+     * for writing pre- and post- image oplog entries for the transaction consisting of
+     * 'operations'. The 'prepare' indicates if the function is called when preparing a transaction.
      */
-    ApplyOpsInfo getApplyOpsInfo(const std::vector<OplogSlot>& oplogSlots,
-                                 std::size_t oplogEntryCountLimit,
+    ApplyOpsInfo getApplyOpsInfo(std::size_t oplogEntryCountLimit,
                                  std::size_t oplogEntrySizeLimitBytes,
                                  bool prepare) const;
 
@@ -235,11 +233,9 @@ public:
      * are given, the data size of each statement, and the 'oplogEntryCountLimit' parameter
      * given to getApplyOpsInfo().
      *
-     * This function expects that the size of 'oplogSlots' be at least as big as the size of
-     * '_transactionOperations' in the worst case, where each operation requires an applyOps
-     * entry of its own. If there are more oplog slots than applyOps operations are written, the
-     * number of oplog slots corresponding to the number of applyOps written will be used.
-     * It also expects that the vector of given statements is non-empty.
+     * This function expects that the size of 'oplogSlots' be the exact size needed to
+     * assign slots to the '_transactionOperations' vector (including any pre-/post- image no-ops),
+     * which size is returned in ApplyOpsInfo by getApplyOpsInfo above.
      *
      * The 'applyOpsOperationAssignment' contains BSON serialized transaction statements, their
      * assignment to "applyOps" oplog entries for a transaction.
@@ -248,11 +244,6 @@ public:
      * transaction (kDontGroup), a potentially multi-oplog-entry transactional batched wrote
      * (kGroupForTransaction), or a multi-oplog-entry potentially retryable write
      * (kGroupForPossiblyRetryableOperations)
-     *
-     *
-     * In the case of writing entries for a prepared transaction, the last oplog entry
-     * (i.e. the implicit prepare) will always be written using the last oplog slot given,
-     * even if this means skipping over some reserved slots.
      *
      * The number of oplog entries written is returned.
      *

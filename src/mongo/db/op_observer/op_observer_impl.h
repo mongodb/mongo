@@ -241,6 +241,7 @@ public:
 
     void preTransactionPrepare(
         OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
         const TransactionOperations& transactionOperations,
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         Date_t wallClockTime) final {}

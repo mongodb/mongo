@@ -1829,6 +1829,10 @@ TransactionParticipant::Participant::prepareTransaction(
         o(lk).txnState.transitionTo(TransactionState::kPrepared);
     }
 
+    auto applyOpsOplogSlotAndOperationAssignment = completedTransactionOperations->getApplyOpsInfo(
+        getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
+        getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
+        /*prepare=*/true);
     std::vector<OplogSlot> reservedSlots;
     if (prepareOptime) {
         // On secondary, we just prepare the transaction and discard the buffered ops.
@@ -1838,10 +1842,11 @@ TransactionParticipant::Participant::prepareTransaction(
         reservedSlots.push_back(prepareOplogSlot);
     } else {
         // Even if the prepared transaction contained no statements, we always reserve at least
-        // 1 oplog slot for the prepare oplog entry.
-        auto numSlotsToReserve = retrieveCompletedTransactionOperations(opCtx)->numOperations();
-        numSlotsToReserve += p().transactionOperations.getNumberOfPrePostImagesToWrite();
-        oplogSlotReserver.emplace(opCtx, std::max(1, static_cast<int>(numSlotsToReserve)));
+        // 1 oplog slot for the prepare oplog entry.  The result of getApplyOpsInfo should
+        // reflect that.
+        auto numSlotsToReserve = applyOpsOplogSlotAndOperationAssignment.numberOfOplogSlotsRequired;
+        dassert(numSlotsToReserve >= 1);
+        oplogSlotReserver.emplace(opCtx, static_cast<int>(numSlotsToReserve));
         invariant(oplogSlotReserver->getSlots().size() >= 1);
         prepareOplogSlot = oplogSlotReserver->getLastSlot();
         reservedSlots = oplogSlotReserver->getSlots();
@@ -1864,15 +1869,11 @@ TransactionParticipant::Participant::prepareTransaction(
             hangAfterReservingPrepareTimestamp.pauseWhileSet();
         }
     }
-    auto applyOpsOplogSlotAndOperationAssignment = completedTransactionOperations->getApplyOpsInfo(
-        reservedSlots,
-        getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
-        getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
-        /*prepare=*/true);
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     const auto wallClockTime = opCtx->getServiceContext()->getFastClockSource()->now();
     opObserver->preTransactionPrepare(opCtx,
+                                      reservedSlots,
                                       *completedTransactionOperations,
                                       applyOpsOplogSlotAndOperationAssignment,
                                       wallClockTime);
@@ -2001,21 +2002,19 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
 
-    // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
-    // reserve enough entries for all statements in the transaction.
-    std::vector<OplogSlot> reservedSlots;
-    if (!txnOps->isEmpty()) {
-        reservedSlots = LocalOplogInfo::get(opCtx)->getNextOpTimes(
-            opCtx, txnOps->numOperations() + txnOps->getNumberOfPrePostImagesToWrite());
-    }
-
     // Serialize transaction statements to BSON and determine their assignment to "applyOps"
     // entries.
     const auto applyOpsOplogSlotAndOperationAssignment =
-        txnOps->getApplyOpsInfo(reservedSlots,
-                                getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
+        txnOps->getApplyOpsInfo(getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
                                 getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
                                 /*prepare=*/false);
+
+    // Reserve all the optimes for the applyOps operations and any pre/post images.
+    std::vector<OplogSlot> reservedSlots;
+    if (!txnOps->isEmpty()) {
+        reservedSlots = LocalOplogInfo::get(opCtx)->getNextOpTimes(
+            opCtx, applyOpsOplogSlotAndOperationAssignment.numberOfOplogSlotsRequired);
+    }
 
     opObserver->onUnpreparedTransactionCommit(
         opCtx, reservedSlots, *txnOps, applyOpsOplogSlotAndOperationAssignment);
