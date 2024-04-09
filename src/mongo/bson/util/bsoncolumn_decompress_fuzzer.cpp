@@ -51,7 +51,7 @@ static bool isDataInterleaved(const char* binary, size_t size) {
 
         if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
             // Scan over the entire literal.
-            BSONElement literal(pos, 1, -1);
+            BSONElement literal(pos, 1, BSONElement::TrustedInitTag{});
             pos += literal.size();
             continue;
         }
