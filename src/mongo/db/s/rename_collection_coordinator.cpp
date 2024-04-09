@@ -861,6 +861,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                 str::stream()
                                     << "Can't rename source collection `"
                                     << fromNss.toStringForErrorMsg() << "` because it is a view.",
+                                !CollectionCatalog::get(opCtx)->lookupView(opCtx, originalNss()));
+
+                        uassert(ErrorCodes::CommandNotSupportedOnView,
+                                str::stream()
+                                    << "Can't rename source collection `"
+                                    << fromNss.toStringForErrorMsg() << "` because it is a view.",
                                 !CollectionCatalog::get(opCtx)->lookupView(opCtx, fromNss));
 
                         checkCollectionUUIDMismatch(
