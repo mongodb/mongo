@@ -573,6 +573,8 @@ last-continuous:
     ticket: SERVER-87191
   - test_file: jstests/core/query/bittest.js
     ticket: SERVER-86419
+  - test_file: jstests/core/timeseries/timeseries_project.js
+    ticket: SERVER-87987
   suites: null
 last-lts:
   all:
@@ -1202,4 +1204,6 @@ last-lts:
     ticket: SERVER-84589
   - test_file: jstests/core/query/bittest.js
     ticket: SERVER-86419
+  - test_file: jstests/core/timeseries/timeseries_project.js
+    ticket: SERVER-87987
   suites: null
