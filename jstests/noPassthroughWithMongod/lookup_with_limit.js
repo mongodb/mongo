@@ -2,8 +2,13 @@
  * Tests that the $limit stage is pushed before $lookup stages, except when there is an $unwind.
  */
 import {flattenQueryPlanTree, getWinningPlan} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {
+    checkSbeFullFeatureFlagEnabled,
+    checkSbeFullyEnabled,
+    checkSbeRestrictedOrFullyEnabled
+} from "jstests/libs/sbe_util.js";
 
+const isFeatureFlagSbeFullEnabled = checkSbeFullFeatureFlagEnabled(db);
 const isSbeEnabled = checkSbeFullyEnabled(db);
 const isSbeGroupLookupOnly = checkSbeRestrictedOrFullyEnabled(db);
 
@@ -87,9 +92,12 @@ pipeline = [
     {$unwind: "$from_other"},
     {$limit: 5}
 ];
-
-if (isSbeEnabled) {
+if (isFeatureFlagSbeFullEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "UNWIND", "LIMIT"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$limit"]);
+} else if (isSbeEnabled) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$limit"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
 } else {
@@ -106,12 +114,16 @@ pipeline = [
     {$sort: {x: 1}},
     {$limit: 5}
 ];
-
-if (isSbeEnabled) {
+if (isFeatureFlagSbeFullEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "UNWIND", "SORT", "LIMIT"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);
+} else if (isSbeEnabled) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);
 } else {
     checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$unwind", "$sort", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);
 }
-checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);
