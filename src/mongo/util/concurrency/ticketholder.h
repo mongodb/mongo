@@ -65,7 +65,7 @@ public:
      * Returns 'true' if the resize completed without reaching the 'deadline', and 'false'
      * otherwise.
      */
-    bool resize(OperationContext* opCtx, int32_t newSize, Date_t deadline = Date_t::max()) noexcept;
+    bool resize(OperationContext* opCtx, int32_t newSize, Date_t deadline = Date_t::max());
 
     /**
      * Attempts to acquire a ticket without blocking.

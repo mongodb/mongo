@@ -42,38 +42,45 @@ using namespace mongo;
 class SemaphoreTicketHolderTest : public TicketHolderTestFixture {};
 
 TEST_F(SemaphoreTicketHolderTest, BasicTimeoutSemaphore) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    getServiceContext()->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
     basicTimeout(
         _opCtx.get(),
-        std::make_unique<SemaphoreTicketHolder>(&serviceContext, 1, false /* trackPeakUsed */));
+        std::make_unique<SemaphoreTicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */));
 }
 
 TEST_F(SemaphoreTicketHolderTest, ResizeStatsSemaphore) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
+    getServiceContext()->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto tickSource =
+        dynamic_cast<TickSourceMock<Microseconds>*>(getServiceContext()->getTickSource());
 
     resizeTest(
         _opCtx.get(),
-        std::make_unique<SemaphoreTicketHolder>(&serviceContext, 1, false /* trackPeakUsed */),
+        std::make_unique<SemaphoreTicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */),
         tickSource);
 }
 
 TEST_F(SemaphoreTicketHolderTest, Interruption) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    getServiceContext()->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
     interruptTest(
         _opCtx.get(),
-        std::make_unique<SemaphoreTicketHolder>(&serviceContext, 1, false /* trackPeakUsed */));
+        std::make_unique<SemaphoreTicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */));
+}
+
+TEST_F(SemaphoreTicketHolderTest, InterruptResize) {
+    getServiceContext()->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto ticketHolder =
+        std::make_unique<SemaphoreTicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
+
+    _opCtx->markKilled(ErrorCodes::ClientMarkedKilled);
+    ASSERT_THROWS_CODE(
+        ticketHolder->resize(_opCtx.get(), 0), DBException, ErrorCodes::ClientMarkedKilled);
 }
 
 TEST_F(SemaphoreTicketHolderTest, PriorityBookkeeping) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    getServiceContext()->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
     priorityBookkeepingTest(
         _opCtx.get(),
-        std::make_unique<SemaphoreTicketHolder>(&serviceContext, 1, false /* trackPeakUsed */),
+        std::make_unique<SemaphoreTicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */),
         AdmissionContext::Priority::kNormal,
         AdmissionContext::Priority::kExempt,
         [](auto statsWhileProcessing, auto statsWhenFinished) {

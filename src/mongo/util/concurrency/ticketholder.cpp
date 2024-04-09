@@ -58,7 +58,7 @@ void TicketHolder::_updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx
 TicketHolder::TicketHolder(ServiceContext* svcCtx, int32_t numTickets, bool trackPeakUsed)
     : _trackPeakUsed(trackPeakUsed), _outof(numTickets), _serviceContext(svcCtx) {}
 
-bool TicketHolder::resize(OperationContext* opCtx, int32_t newSize, Date_t deadline) noexcept {
+bool TicketHolder::resize(OperationContext* opCtx, int32_t newSize, Date_t deadline) {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
     auto difference = newSize - _outof.load();
