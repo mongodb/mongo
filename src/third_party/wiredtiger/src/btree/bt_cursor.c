@@ -55,16 +55,14 @@ __btcur_bounds_contains_key(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_ITEM
  *     search near key is updated to the nearest bound.
  */
 static int
-__btcur_bounds_search_near_reposition(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__btcur_bounds_search_near_reposition(
+  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int *reposition_exactp)
 {
     WT_CURSOR *cursor;
     bool key_out_of_bounds, upper;
 
     cursor = &cbt->iface;
     key_out_of_bounds = upper = false;
-
-    if (!WT_CURSOR_BOUNDS_SET(cursor))
-        return (0);
 
     /*
      * Suppose a caller calls with the search key set to the lower bound but also specifies that the
@@ -79,6 +77,13 @@ __btcur_bounds_search_near_reposition(WT_SESSION_IMPL *session, WT_CURSOR_BTREE 
 
     if (key_out_of_bounds) {
         __wt_cursor_set_raw_key(cursor, upper ? &cursor->upper_bound : &cursor->lower_bound);
+        /*
+         * Given that we have positioned the cursor on either of the upper or lower bounds we can
+         * determine the "exact" return argument. If we positioned at the upper bound then any key
+         * we find must be less than or equal to that bound which is guaranteed to be less than the
+         * original search near key. The reverse holds true for the lower bound.
+         */
+        *reposition_exactp = upper ? -1 : 1;
         WT_STAT_CONN_DATA_INCR(session, cursor_bounds_search_near_repositioned_cursor);
     }
     return (0);
@@ -979,13 +984,13 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
     WT_CURSOR *cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    int exact;
+    int bounds_reposition_exact, exact;
     bool valid;
 
+    bounds_reposition_exact = exact = 0;
     btree = CUR2BT(cbt);
     cursor = &cbt->iface;
     session = CUR2S(cbt);
-    exact = 0;
     valid = false;
 
     WT_STAT_CONN_DATA_INCR(session, cursor_search_near);
@@ -1008,7 +1013,8 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
      * the search key is outside the bounds. Otherwise search near should behave as normal with an
      * additional bounds check after the call to row/col search.
      */
-    WT_ERR(__btcur_bounds_search_near_reposition(session, cbt));
+    if (WT_CURSOR_BOUNDS_SET(cursor))
+        WT_ERR(__btcur_bounds_search_near_reposition(session, cbt, &bounds_reposition_exact));
 
     /*
      * For row-store search the pinned page if there is one. Unlike WT_CURSOR.search, ignore pinned
@@ -1048,20 +1054,9 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
      * If that fails, quit, there's no record to return.
      */
     if (valid) {
-        exact = cbt->compare;
+        /* If the bounded cursor logic repositioned the cursor override exact. */
+        exact = bounds_reposition_exact != 0 ? bounds_reposition_exact : cbt->compare;
         WT_ERR(__cursor_kv_return(cbt, cbt->upd_value));
-        /*
-         * This compare is needed for bounded cursors in the event that a valid key is found. The
-         * returned value of exact must reflect the comparison between the found key and the
-         * original search key, not the repositioned bounds key. This comparison ensures that is the
-         * case.
-         */
-        if (WT_CURSOR_BOUNDS_SET(cursor)) {
-            if (btree->type == BTREE_ROW)
-                WT_ERR(__wt_compare(session, btree->collator, &cursor->key, &state.key, &exact));
-            else
-                exact = cbt->recno < state.recno ? -1 : cbt->recno == state.recno ? 0 : 1;
-        }
     } else if (__cursor_fix_implicit(btree, cbt)) {
         cbt->recno = cursor->recno;
         cbt->v = 0;
