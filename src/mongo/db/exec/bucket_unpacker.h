@@ -116,8 +116,11 @@ public:
         return _computedMetaProjFields;
     }
 
-    void eraseFromComputedMetaProjFields(const std::string& field) {
-        _computedMetaProjFields.erase(field);
+    // Remove fields that the predicate function evaluates to true for.
+    void eraseIfPredTrueFromComputedMetaProjFields(const std::function<bool(std::string)> pred) {
+        std::erase_if(_computedMetaProjFields, [&](const std::string& computedMetaProjField) {
+            return pred(computedMetaProjField);
+        });
     }
 
     void setUsesExtendedRange(bool usesExtendedRange) {
@@ -382,8 +385,9 @@ private:
     // included in the materialized measurements.
     void eraseMetaFromFieldSetAndDetermineIncludeMeta();
 
-    // Erase computed meta projection fields if they are present in the exclusion field set.
-    void eraseExcludedComputedMetaProjFields();
+    // Erase computed meta projection fields if they are present in the exclusion field set or if
+    // they are not present in the inclusion set.
+    void eraseUnneededComputedMetaProjFields();
 
     BucketSpec _spec;
 
