@@ -29,7 +29,6 @@
 
 #include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 
-#include <map>
 #include <set>
 #include <string>
 #include <utility>
@@ -41,23 +40,94 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/util/functional.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo::cluster_parameters {
+namespace {
 
 constexpr auto kIdField = "_id"_sd;
 constexpr auto kCPTField = "clusterParameterTime"_sd;
 constexpr auto kOplog = "oplog"_sd;
 
-void validateParameter(OperationContext* opCtx,
-                       BSONObj doc,
-                       const boost::optional<TenantId>& tenantId) {
+void clearParameter(OperationContext* opCtx,
+                    ServerParameter* sp,
+                    const boost::optional<TenantId>& tenantId) {
+    if (sp->getClusterParameterTime(tenantId) == LogicalTime::kUninitialized) {
+        // Nothing to clear.
+        return;
+    }
+
+    // Callback handlers of the ServerParameters take operation context and are allowed to acquire
+    // Shared and ExclusiveLock (ResourceMutex). These mutex acquisitions are not allowed to throw
+    // and not allowed to do any blocking work either. Placing this ULG here covers the first
+    // condition.
+    UninterruptibleLockGuard ulg(opCtx);  // NOLINT (ResourceMutex acquisition)
+
+    BSONObjBuilder oldValueBob;
+    sp->append(opCtx, &oldValueBob, sp->name(), tenantId);
+
+    uassertStatusOK(sp->reset(tenantId));
+
+    BSONObjBuilder newValueBob;
+    sp->append(opCtx, &newValueBob, sp->name(), tenantId);
+
+    audit::logUpdateCachedClusterParameter(
+        opCtx->getClient(), oldValueBob.obj(), newValueBob.obj(), tenantId);
+}
+
+void doLoadAllTenantParametersFromCollection(
+    OperationContext* opCtx,
+    const Collection& coll,
+    StringData mode,
+    unique_function<
+        void(OperationContext*, const BSONObj&, StringData, const boost::optional<TenantId>&)>
+        onEntry) try {
+    invariant(coll.ns() == NamespaceString::makeClusterParametersNSS(coll.ns().tenantId()));
+
+    // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise abandon
+    // the snapshot when exiting the function.
+    ScopeGuard scopeGuard([&] { shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot(); });
+    if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
+        scopeGuard.dismiss();
+    }
+
+    std::vector<Status> failures;
+
+    auto cursor = coll.getCursor(opCtx);
+    for (auto doc = cursor->next(); doc; doc = cursor->next()) {
+        try {
+            auto data = doc.get().data.toBson();
+            validateParameter(data, coll.ns().tenantId());
+            onEntry(opCtx, data, mode, coll.ns().tenantId());
+        } catch (const DBException& ex) {
+            failures.push_back(ex.toStatus());
+        }
+    }
+
+    if (!failures.empty()) {
+        StringBuilder msg;
+        for (const auto& failure : failures) {
+            msg << failure.toString() << ", ";
+        }
+        msg.reset(msg.len() - 2);
+        uasserted(ErrorCodes::OperationFailed, msg.str());
+    }
+} catch (const DBException& ex) {
+    uassertStatusOK(ex.toStatus().withContext(
+        str::stream() << "Failed " << mode << " cluster server parameters from disk"));
+}
+
+}  // namespace
+
+void validateParameter(BSONObj doc, const boost::optional<TenantId>& tenantId) {
     auto nameElem = doc[kIdField];
     uassert(ErrorCodes::OperationFailed,
             "Validate with invalid parameter name",
@@ -109,31 +179,17 @@ void updateParameter(OperationContext* opCtx,
 
     uassertStatusOK(sp->validate(doc, tenantId));
 
+    // Callback handlers of the ServerParameters take operation context and are allowed to acquire
+    // Shared and ExclusiveLock (ResourceMutex). These mutex acquisitions are not allowed to throw
+    // and not allowed to do any blocking work either. Placing this ULG here covers the first
+    // condition.
+    UninterruptibleLockGuard ulg(opCtx);  // NOLINT (ResourceMutex acquisition)
+
     BSONObjBuilder oldValueBob;
     sp->append(opCtx, &oldValueBob, name.toString(), tenantId);
     audit::logUpdateCachedClusterParameter(opCtx->getClient(), oldValueBob.obj(), doc, tenantId);
 
     uassertStatusOK(sp->set(doc, tenantId));
-}
-
-void clearParameter(OperationContext* opCtx,
-                    ServerParameter* sp,
-                    const boost::optional<TenantId>& tenantId) {
-    if (sp->getClusterParameterTime(tenantId) == LogicalTime::kUninitialized) {
-        // Nothing to clear.
-        return;
-    }
-
-    BSONObjBuilder oldValueBob;
-    sp->append(opCtx, &oldValueBob, sp->name(), tenantId);
-
-    uassertStatusOK(sp->reset(tenantId));
-
-    BSONObjBuilder newValueBob;
-    sp->append(opCtx, &newValueBob, sp->name(), tenantId);
-
-    audit::logUpdateCachedClusterParameter(
-        opCtx->getClient(), oldValueBob.obj(), newValueBob.obj(), tenantId);
 }
 
 void clearParameter(OperationContext* opCtx,

@@ -29,46 +29,23 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
 #include <boost/optional/optional.hpp>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_parameter.h"
-#include "mongo/db/storage/record_data.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/db/transaction_resources.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
-
 namespace cluster_parameters {
 
-void validateParameter(OperationContext* opCtx,
-                       BSONObj doc,
-                       const boost::optional<TenantId>& tenantId);
+void validateParameter(BSONObj doc, const boost::optional<TenantId>& tenantId);
 
 void updateParameter(OperationContext* opCtx,
                      BSONObj doc,
                      StringData mode,
                      const boost::optional<TenantId>& tenantId);
-
-void clearParameter(OperationContext* opCtx,
-                    ServerParameter* sp,
-                    const boost::optional<TenantId>& tenantId);
 
 void clearParameter(OperationContext* opCtx,
                     StringData id,
@@ -88,46 +65,5 @@ void initializeAllTenantParametersFromCollection(OperationContext* opCtx, const 
 void resynchronizeAllTenantParametersFromCollection(OperationContext* opCtx,
                                                     const Collection& coll);
 
-template <typename OnEntry>
-void doLoadAllTenantParametersFromCollection(OperationContext* opCtx,
-                                             const Collection& coll,
-                                             StringData mode,
-                                             OnEntry onEntry) try {
-    invariant(coll.ns() == NamespaceString::makeClusterParametersNSS(coll.ns().tenantId()));
-
-    // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise
-    // abandon the snapshot when exiting the function.
-    ScopeGuard scopeGuard([&] { shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot(); });
-    if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
-        scopeGuard.dismiss();
-    }
-
-    std::vector<Status> failures;
-
-    auto cursor = coll.getCursor(opCtx);
-    for (auto doc = cursor->next(); doc; doc = cursor->next()) {
-        try {
-            auto data = doc.get().data.toBson();
-            validateParameter(opCtx, data, coll.ns().tenantId());
-            onEntry(opCtx, data, mode, coll.ns().tenantId());
-        } catch (const DBException& ex) {
-            failures.push_back(ex.toStatus());
-        }
-    }
-
-    if (!failures.empty()) {
-        StringBuilder msg;
-        for (const auto& failure : failures) {
-            msg << failure.toString() << ", ";
-        }
-        msg.reset(msg.len() - 2);
-        uasserted(ErrorCodes::OperationFailed, msg.str());
-    }
-} catch (const DBException& ex) {
-    uassertStatusOK(ex.toStatus().withContext(
-        str::stream() << "Failed " << mode << " cluster server parameters from disk"));
-}
-
 }  // namespace cluster_parameters
-
 }  // namespace mongo

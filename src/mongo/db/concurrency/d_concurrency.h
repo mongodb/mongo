@@ -33,7 +33,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <string>
-#include <utility>
 
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
@@ -42,7 +41,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -87,17 +85,10 @@ public:
                      LockMode mode,
                      Date_t deadline = Date_t::max())
             : _opCtx(opCtx), _rid(rid) {
-            invariant(opCtx);
             _lock(mode, deadline);
         }
 
-        ResourceLock(ResourceLock&& otherLock)
-            : _opCtx(otherLock._opCtx),
-              _rid(std::move(otherLock._rid)),
-              _result(otherLock._result) {
-            otherLock._opCtx = nullptr;
-            otherLock._result = LOCK_INVALID;
-        }
+        ResourceLock(ResourceLock&& other);
 
         ~ResourceLock() {
             _unlock();
@@ -120,9 +111,9 @@ public:
 
         OperationContext* _opCtx;
 
+    private:
         ResourceId _rid;
 
-    private:
         LockResult _result{LOCK_INVALID};
     };
 
