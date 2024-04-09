@@ -2,7 +2,12 @@
  * Runs stress tests of exchange producers, where multiple threads run concurrent getNexts on the
  * consumer cursors.
  *
- * @tags: [assumes_against_mongod_not_mongos]
+ * @tags: [
+ *   assumes_against_mongod_not_mongos,
+ *   # The config fuzzer runs logical session cache refreshes, which was occasionally killing the
+ *   # cursors before the test is over.
+ *   does_not_support_config_fuzzer
+ * ]
  */
 
 // The buffer needs to be big enough that no one consumer buffer gets filled near the final
