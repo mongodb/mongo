@@ -937,6 +937,12 @@ std::vector<DatabaseName> StorageEngineImpl::listDatabases(
 }
 
 Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
+    return dropCollectionsWithPrefix(opCtx, dbName, "" /*collectionNamePrefix*/);
+}
+
+Status StorageEngineImpl::dropCollectionsWithPrefix(OperationContext* opCtx,
+                                                    const DatabaseName& dbName,
+                                                    const std::string& collectionNamePrefix) {
     auto catalog = CollectionCatalog::get(opCtx);
     {
         auto dbNames = catalog->getAllDbNames();
@@ -946,37 +952,43 @@ Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, const DatabaseNa
     }
 
     std::vector<UUID> toDrop = catalog->getAllCollectionUUIDsFromDb(dbName);
-    return _dropCollections(opCtx, toDrop);
+    return _dropCollections(opCtx, toDrop, collectionNamePrefix);
 }
 
 /**
  * Returns the first `dropCollection` error that this method encounters. This method will attempt
- * to drop all collections, regardless of the error status.
+ * to drop all collections, regardless of the error status. This method will attempt to drop all
+ * collections matching the prefix 'collectionNamePrefix'. To drop all collections regardless of
+ * prefix, use an empty string.
  */
 Status StorageEngineImpl::_dropCollections(OperationContext* opCtx,
-                                           const std::vector<UUID>& toDrop) {
+                                           const std::vector<UUID>& toDrop,
+                                           const std::string& collectionNamePrefix) {
     Status firstError = Status::OK();
     WriteUnitOfWork wuow(opCtx);
     auto collectionCatalog = CollectionCatalog::get(opCtx);
     for (auto& uuid : toDrop) {
         auto coll = collectionCatalog->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
+        if (coll->ns().coll().startsWith(collectionNamePrefix)) {
+            // Drop all indexes in the collection.
+            coll->getIndexCatalog()->dropAllIndexes(
+                opCtx, coll, /*includingIdIndex=*/true, /*onDropFn=*/{});
 
-        // Drop all indexes in the collection.
-        coll->getIndexCatalog()->dropAllIndexes(
-            opCtx, coll, /*includingIdIndex=*/true, /*onDropFn=*/{});
+            audit::logDropCollection(opCtx->getClient(), coll->ns());
 
-        audit::logDropCollection(opCtx->getClient(), coll->ns());
-
-        if (auto sharedIdent = coll->getSharedIdent()) {
-            Status result =
-                catalog::dropCollection(opCtx, coll->ns(), coll->getCatalogId(), sharedIdent);
-            if (!result.isOK() && firstError.isOK()) {
-                firstError = result;
+            if (auto sharedIdent = coll->getSharedIdent()) {
+                Status result =
+                    catalog::dropCollection(opCtx, coll->ns(), coll->getCatalogId(), sharedIdent);
+                if (!result.isOK() && firstError.isOK()) {
+                    firstError = result;
+                }
             }
-        }
 
-        CollectionCatalog::get(opCtx)->dropCollection(
-            opCtx, coll, opCtx->getServiceContext()->getStorageEngine()->supportsPendingDrops());
+            CollectionCatalog::get(opCtx)->dropCollection(
+                opCtx,
+                coll,
+                opCtx->getServiceContext()->getStorageEngine()->supportsPendingDrops());
+        }
     }
 
     wuow.commit();

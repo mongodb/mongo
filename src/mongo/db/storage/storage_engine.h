@@ -251,6 +251,14 @@ public:
     virtual Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
     /**
+     * Delete all collections with a name starting with collectionNamePrefix in a database.
+     * To drop all collections regardless of prefix, use an empty string.
+     */
+    virtual Status dropCollectionsWithPrefix(OperationContext* opCtx,
+                                             const DatabaseName& dbName,
+                                             const std::string& collectionNamePrefix) = 0;
+
+    /**
      * Checkpoints the data to disk.
      *
      * 'callerHoldsReadLock' signals whether the caller holds a read lock. A write lock may be taken

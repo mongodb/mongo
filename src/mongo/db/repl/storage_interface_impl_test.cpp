@@ -2572,6 +2572,48 @@ TEST_F(StorageInterfaceImplTest, UpdateDocumentsUpdatesDocumentWhenCollectionIsN
         opCtx, nss, {BSON("_id" << 0 << "x" << 1), BSON("_id" << 1 << "x" << 1)});
 }
 
+TEST_F(StorageInterfaceImplTest, UpdateDocumentsWithArrayFilter) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
+    auto doc1 = BSON("_id" << 0 << "participants"
+                           << BSON_ARRAY("a"
+                                         << "b"));
+    auto doc2 = BSON("_id" << 1 << "participants"
+                           << BSON_ARRAY("c"
+                                         << "b"));
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {InsertStatement{doc1}, InsertStatement{doc2}}));
+
+    TimestampedBSONObj update;
+    update.obj = BSON("$set" << BSON("participants.$[src]"
+                                     << "d"));
+    update.timestamp = Timestamp();
+    std::vector<BSONObj> arrayFilters{BSON("src"
+                                           << "b")};
+
+    ASSERT_OK(storage.updateDocuments(opCtx, nss, {} /* query */, update, arrayFilters));
+    auto docs =
+        unittest::assertGet(storage.findDocuments(opCtx,
+                                                  nss,
+                                                  {},
+                                                  repl::StorageInterface::ScanDirection::kForward,
+                                                  {},
+                                                  BoundInclusion::kIncludeStartKeyOnly,
+                                                  -1 /* limit */));
+    ASSERT_EQ(2, docs.size());
+    BSONObj expectedDoc0 = BSON("_id" << 0 << "participants"
+                                      << BSON_ARRAY("a"
+                                                    << "d"));
+    BSONObj expectedDoc1 = BSON("_id" << 1 << "participants"
+                                      << BSON_ARRAY("c"
+                                                    << "d"));
+
+    ASSERT_BSONOBJ_EQ(expectedDoc0, docs[0]);
+    ASSERT_BSONOBJ_EQ(expectedDoc1, docs[1]);
+    _assertDocumentsInCollectionEquals(opCtx, nss, {expectedDoc0, expectedDoc1});
+}
+
 TEST_F(StorageInterfaceImplTest, UpdateDocumentsNamespaceNotFound) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
@@ -2581,6 +2623,30 @@ TEST_F(StorageInterfaceImplTest, UpdateDocumentsNamespaceNotFound) {
     update.timestamp = Timestamp();
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   storage.updateDocuments(opCtx, nss, BSON("x" << 0), update));
+}
+
+TEST_F(StorageInterfaceImplTest, DropCollectionsWithPrefix) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("db.coll1");
+    NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("db.coll2");
+    NamespaceString nss3 = NamespaceString::createNamespaceString_forTest("db.coll11");
+    ASSERT_OK(storage.createCollection(opCtx, nss1, generateOptionsWithUuid()));
+    ASSERT_OK(storage.createCollection(opCtx, nss2, generateOptionsWithUuid()));
+    ASSERT_OK(storage.createCollection(opCtx, nss3, generateOptionsWithUuid()));
+
+    ASSERT_OK(storage.dropCollectionsWithPrefix(
+        opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "db"), "coll1"));
+
+    // With the prefix coll1, only nss1 and nss3 should be dropped.
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.findSingleton(opCtx, nss1));
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, storage.findSingleton(opCtx, nss2));
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.findSingleton(opCtx, nss3));
+
+    ASSERT_OK(storage.dropCollectionsWithPrefix(
+        opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "db"), ""));
+
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.findSingleton(opCtx, nss2));
 }
 
 TEST_F(StorageInterfaceImplTest, FindByIdThrowsIfUUIDNotInCatalog) {

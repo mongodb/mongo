@@ -197,6 +197,14 @@ public:
     virtual Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     /**
+     * Drops all collections with a name starting with the prefix in the database.
+     * To drop all collections regardless of prefix, use an empty string.
+     */
+    virtual Status dropCollectionsWithPrefix(OperationContext* opCtx,
+                                             const DatabaseName& dbName,
+                                             const std::string& collectionNamePrefix) = 0;
+
+    /**
      * Truncates a collection.
      */
     virtual Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) = 0;
@@ -287,6 +295,20 @@ public:
                                 const TimestampedBSONObj& update) = 0;
 
     /**
+     * Updates a singleton document in a collection. Upserts the document if it does not exist. If
+     * the document is upserted and no '_id' is provided, one will be generated.
+     * If the collection has more than 1 document matching the query, the update will only be
+     * performed on the first one found. The upsert is performed at the given timestamp. Returns
+     * 'NamespaceNotFound' if the collection does not exist. This does not implicitly create the
+     * collection so that the caller can create the collection with any collection options they want
+     * (ex: capped, temp, collation, etc.).
+     */
+    virtual Status putSingleton(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const BSONObj& query,
+                                const TimestampedBSONObj& update) = 0;
+
+    /**
      * Updates a singleton document in a collection. Never upsert.
      *
      * If the collection has more than 1 document, the update will only be performed on the first
@@ -309,10 +331,12 @@ public:
      * create the collection so that the caller can create the collection with any collection
      * options they want (ex: capped, temp, collation, etc.).
      */
-    virtual Status updateDocuments(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   const BSONObj& query,
-                                   const TimestampedBSONObj& update) = 0;
+    virtual Status updateDocuments(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const TimestampedBSONObj& update,
+        const boost::optional<std::vector<BSONObj>>& arrayFilters = boost::none) = 0;
 
     /**
      * Finds a single document in the collection referenced by the specified _id.
