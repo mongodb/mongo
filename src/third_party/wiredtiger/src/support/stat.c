@@ -1429,6 +1429,17 @@ static const char *const __stats_connection_desc[] = {
   "cache: eviction server candidate queue empty when topping up",
   "cache: eviction server candidate queue not empty when topping up",
   "cache: eviction server evicting pages",
+  "cache: eviction server skips dirty pages during a running checkpoint",
+  "cache: eviction server skips metadata pages with history",
+  "cache: eviction server skips pages that are written with transactions greater than the last "
+  "running",
+  "cache: eviction server skips pages that previously failed eviction and likely will again",
+  "cache: eviction server skips pages that we do not want to evict",
+  "cache: eviction server skips trees because there are too many active walks",
+  "cache: eviction server skips trees that are being checkpointed",
+  "cache: eviction server skips trees that are configured to stick in cache",
+  "cache: eviction server skips trees that disable eviction",
+  "cache: eviction server skips trees that were not useful before",
   "cache: eviction server slept, because we did not make progress with eviction",
   "cache: eviction server unable to reach eviction goal",
   "cache: eviction server waiting for a leaf page",
@@ -1555,9 +1566,6 @@ static const char *const __stats_connection_desc[] = {
   "cache: recent modification of a page blocked its eviction",
   "cache: reverse splits performed",
   "cache: reverse splits skipped because of VLCS namespace gap restrictions",
-  "cache: skip dirty pages during a running checkpoint",
-  "cache: skip pages that are written with transactions greater than the last running",
-  "cache: skip pages that previously failed eviction and likely will again",
   "cache: the number of times full update inserted to history store",
   "cache: the number of times reverse modify inserted to history store",
   "cache: total milliseconds spent inside reentrant history store evictions in a reconciliation",
@@ -2151,6 +2159,16 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_eviction_queue_empty = 0;
     stats->cache_eviction_queue_not_empty = 0;
     stats->cache_eviction_server_evicting = 0;
+    stats->cache_eviction_server_skip_dirty_pages_during_checkpoint = 0;
+    stats->cache_eviction_server_skip_metatdata_with_history = 0;
+    stats->cache_eviction_server_skip_pages_last_running = 0;
+    stats->cache_eviction_server_skip_pages_retry = 0;
+    stats->cache_eviction_server_skip_unwanted_pages = 0;
+    stats->cache_eviction_server_skip_trees_too_many_active_walks = 0;
+    stats->cache_eviction_server_skip_checkpointing_trees = 0;
+    stats->cache_eviction_server_skip_trees_stick_in_cache = 0;
+    stats->cache_eviction_server_skip_trees_eviction_disabled = 0;
+    stats->cache_eviction_server_skip_trees_not_useful_before = 0;
     stats->cache_eviction_server_slept = 0;
     stats->cache_eviction_slow = 0;
     stats->cache_eviction_walk_leaf_notfound = 0;
@@ -2265,9 +2283,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_eviction_blocked_recently_modified = 0;
     stats->cache_reverse_splits = 0;
     stats->cache_reverse_splits_skipped_vlcs = 0;
-    stats->cache_eviction_server_skip_dirty_pages_during_checkpoint = 0;
-    stats->cache_eviction_server_skip_pages_last_running = 0;
-    stats->cache_eviction_server_skip_pages_retry = 0;
     stats->cache_hs_insert_full_update = 0;
     stats->cache_hs_insert_reverse_modify = 0;
     /* not clearing cache_reentry_hs_eviction_milliseconds */
@@ -2843,6 +2858,26 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_eviction_queue_empty += WT_STAT_READ(from, cache_eviction_queue_empty);
     to->cache_eviction_queue_not_empty += WT_STAT_READ(from, cache_eviction_queue_not_empty);
     to->cache_eviction_server_evicting += WT_STAT_READ(from, cache_eviction_server_evicting);
+    to->cache_eviction_server_skip_dirty_pages_during_checkpoint +=
+      WT_STAT_READ(from, cache_eviction_server_skip_dirty_pages_during_checkpoint);
+    to->cache_eviction_server_skip_metatdata_with_history +=
+      WT_STAT_READ(from, cache_eviction_server_skip_metatdata_with_history);
+    to->cache_eviction_server_skip_pages_last_running +=
+      WT_STAT_READ(from, cache_eviction_server_skip_pages_last_running);
+    to->cache_eviction_server_skip_pages_retry +=
+      WT_STAT_READ(from, cache_eviction_server_skip_pages_retry);
+    to->cache_eviction_server_skip_unwanted_pages +=
+      WT_STAT_READ(from, cache_eviction_server_skip_unwanted_pages);
+    to->cache_eviction_server_skip_trees_too_many_active_walks +=
+      WT_STAT_READ(from, cache_eviction_server_skip_trees_too_many_active_walks);
+    to->cache_eviction_server_skip_checkpointing_trees +=
+      WT_STAT_READ(from, cache_eviction_server_skip_checkpointing_trees);
+    to->cache_eviction_server_skip_trees_stick_in_cache +=
+      WT_STAT_READ(from, cache_eviction_server_skip_trees_stick_in_cache);
+    to->cache_eviction_server_skip_trees_eviction_disabled +=
+      WT_STAT_READ(from, cache_eviction_server_skip_trees_eviction_disabled);
+    to->cache_eviction_server_skip_trees_not_useful_before +=
+      WT_STAT_READ(from, cache_eviction_server_skip_trees_not_useful_before);
     to->cache_eviction_server_slept += WT_STAT_READ(from, cache_eviction_server_slept);
     to->cache_eviction_slow += WT_STAT_READ(from, cache_eviction_slow);
     to->cache_eviction_walk_leaf_notfound += WT_STAT_READ(from, cache_eviction_walk_leaf_notfound);
@@ -2987,12 +3022,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_READ(from, cache_eviction_blocked_recently_modified);
     to->cache_reverse_splits += WT_STAT_READ(from, cache_reverse_splits);
     to->cache_reverse_splits_skipped_vlcs += WT_STAT_READ(from, cache_reverse_splits_skipped_vlcs);
-    to->cache_eviction_server_skip_dirty_pages_during_checkpoint +=
-      WT_STAT_READ(from, cache_eviction_server_skip_dirty_pages_during_checkpoint);
-    to->cache_eviction_server_skip_pages_last_running +=
-      WT_STAT_READ(from, cache_eviction_server_skip_pages_last_running);
-    to->cache_eviction_server_skip_pages_retry +=
-      WT_STAT_READ(from, cache_eviction_server_skip_pages_retry);
     to->cache_hs_insert_full_update += WT_STAT_READ(from, cache_hs_insert_full_update);
     to->cache_hs_insert_reverse_modify += WT_STAT_READ(from, cache_hs_insert_reverse_modify);
     to->cache_reentry_hs_eviction_milliseconds +=
