@@ -501,21 +501,21 @@ void AuthorizationManagerImpl::_updateCacheGeneration() {
 
 void AuthorizationManagerImpl::invalidateUserByName(const UserName& userName) {
     LOGV2_DEBUG(20235, 2, "Invalidating user", "user"_attr = userName);
-    _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     // There may be multiple entries in the cache with arbitrary other UserRequest data.
     // Scan the full cache looking for a weak match on UserName only.
     _userCache.invalidateKeyIf(
         [&userName](const UserRequest& key) { return key.name == userName; });
+    _updateCacheGeneration();
 }
 
 void AuthorizationManagerImpl::invalidateUsersFromDB(const DatabaseName& dbname) {
     LOGV2_DEBUG(20236, 2, "Invalidating all users from database", "database"_attr = dbname);
-    _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     _userCache.invalidateKeyIf([&](const UserRequest& userRequest) {
         return userRequest.name.getDatabaseName() == dbname;
     });
+    _updateCacheGeneration();
 }
 
 void AuthorizationManagerImpl::invalidateUsersByTenant(const boost::optional<TenantId>& tenant) {
@@ -525,17 +525,17 @@ void AuthorizationManagerImpl::invalidateUsersByTenant(const boost::optional<Ten
     }
 
     LOGV2_DEBUG(6323600, 2, "Invalidating tenant users", "tenant"_attr = tenant);
-    _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     _userCache.invalidateKeyIf(
         [&](const UserRequest& userRequest) { return userRequest.name.getTenant() == tenant; });
+    _updateCacheGeneration();
 }
 
 void AuthorizationManagerImpl::invalidateUserCache() {
     LOGV2_DEBUG(20237, 2, "Invalidating user cache");
-    _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     _userCache.invalidateAll();
+    _updateCacheGeneration();
 }
 
 Status AuthorizationManagerImpl::refreshExternalUsers(OperationContext* opCtx) {
