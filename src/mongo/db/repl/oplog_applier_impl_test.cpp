@@ -1133,7 +1133,7 @@ DEATH_TEST_F(OplogApplierImplTest, MultiApplyAbortsWhenNoOperationsAreGiven, "!o
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
     oplogApplier.applyOplogBatch(_opCtx.get(), {}).getStatus().ignore();
 }
@@ -1158,7 +1158,7 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
         replCoord,
         consistencyMarkers,
         storageInterface,
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
     auto lastOpTime = unittest::assertGet(oplogApplier.applyOplogBatch(opCtx, {op}));
     ASSERT_EQUALS(op.getOpTime(), lastOpTime);
@@ -1206,7 +1206,7 @@ TEST_F(OplogApplierImplTest,
     WorkerMultikeyPathInfo pathInfo;
 
     TestApplyOplogGroupApplier oplogApplier(
-        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
+        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary, false));
     const bool dataIsConsistent = true;
     ASSERT_OK(
         oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo, dataIsConsistent));
@@ -1239,7 +1239,7 @@ TEST_F(OplogApplierImplTest,
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
 
     std::vector<std::vector<ApplierOperation>> writerVectors(
@@ -1497,7 +1497,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierRetryableUpdate) {
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {updateOp, deleteOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
@@ -1557,7 +1557,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierFirstRetryableUpdate
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {updateOp, deleteOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
@@ -1622,7 +1622,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteAfterLaterRetryableUpdate) {
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {deleteOp, updateOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
@@ -1701,7 +1701,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierRetryableInternalTra
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {applyOpsOp, deleteOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
@@ -1772,7 +1772,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteAfterLaterRetryableInternalTransa
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {deleteOp, applyOpsOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
@@ -1846,7 +1846,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteBeforeEarlierRetryableUpd
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {updateOp, applyOpsOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
@@ -1915,7 +1915,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteAfterLaterRetryableUpdate
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {applyOpsOp, updateOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
@@ -2056,7 +2056,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionSepar
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     // Apply a batch with only the first operation.  This should result in the first oplog entry
@@ -2176,7 +2176,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionTwoBa
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     // Insert the first entry in its own batch.  This should result in the oplog entry being written
@@ -2301,7 +2301,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyTwoTransactionsOneBatch) {
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     // Note the insert counter so we can check it later.  It is necessary to use opCounters as
@@ -2378,7 +2378,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyNontransactionalRetryableW
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     // Insert the applyops entry in its own batch.  This should result in the oplog entry being
@@ -2453,7 +2453,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyNontransactionalRetryableW
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     // Insert the first entry in its own batch.  This should result in the oplog entry being written
@@ -2635,7 +2635,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     // Insert the first entry in its own batch.  This should result in the oplog entry being written
@@ -2705,7 +2705,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     // Insert the first entry in its own batch.  This should result in the oplog entry being written
@@ -2807,7 +2807,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionStea
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     // Apply a batch with the insert operations.  This should result in the oplog entries
@@ -2870,7 +2870,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortPreparedTransactio
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     // Apply a batch with the insert operations.  This should result in the oplog entries
@@ -3055,7 +3055,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplySingleApplyOpsPreparedT
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
 
@@ -3099,7 +3099,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyEmptyApplyOpsPreparedTr
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     auto emptyPrepareApplyOp = makeCommandOplogEntryWithSessionInfoAndStmtIds(
@@ -3152,7 +3152,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortSingleApplyOpsPrep
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
@@ -3393,7 +3393,7 @@ TEST_F(MultiPreparedTransactionsInOneBatchTest, CommitAndAbortMultiPreparedTrans
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         _writerPool.get());
 
     // Apply a batch with multiple prepares and regular CRUD ops.
@@ -3467,7 +3467,7 @@ void testWorkerMultikeyPaths(OperationContext* opCtx,
                              const OplogEntry& op,
                              unsigned long numPaths) {
     TestApplyOplogGroupApplier oplogApplier(
-        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
+        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary, false));
     WorkerMultikeyPathInfo pathInfo;
     std::vector<ApplierOperation> ops = {ApplierOperation{&op}};
     const bool dataIsConsistent = true;
@@ -3536,7 +3536,7 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsMultipleWorkerMultike
         auto opB = makeInsertDocumentOplogEntry({Timestamp(Seconds(5), 0), 1LL}, nss, docB);
 
         TestApplyOplogGroupApplier oplogApplier(
-            nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
+            nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary, false));
         WorkerMultikeyPathInfo pathInfo;
         std::vector<ApplierOperation> ops = {ApplierOperation{&opA}, ApplierOperation{&opB}};
         const bool dataIsConsistent = true;
@@ -3588,7 +3588,7 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncFailsWhenCollectionCreati
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
 
     TestApplyOplogGroupApplier oplogApplier(
-        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
+        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary, false));
     std::vector<ApplierOperation> ops = {ApplierOperation{&op}};
     const bool dataIsConsistent = true;
     ASSERT_EQUALS(
@@ -4659,7 +4659,7 @@ TEST_F(OplogApplierImplTxnTableTest, SimpleWriteWithTxn) {
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOp}));
@@ -4699,7 +4699,7 @@ TEST_F(OplogApplierImplTxnTableTest, WriteWithTxnMixedWithDirectWriteToTxnTable)
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
 
 
@@ -4753,7 +4753,7 @@ TEST_F(OplogApplierImplTxnTableTest, InterleavedWriteWithTxnMixedWithDirectDelet
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOp, deleteOp, insertOp2}));
@@ -4796,7 +4796,7 @@ TEST_F(OplogApplierImplTxnTableTest, InterleavedWriteWithTxnMixedWithDirectUpdat
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOp, updateOp}));
@@ -4860,7 +4860,7 @@ TEST_F(OplogApplierImplTxnTableTest, RetryableWriteThenMultiStatementTxnWriteOnS
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
 
     ASSERT_OK(
@@ -4930,7 +4930,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiStatementTxnWriteThenRetryableWriteOnS
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
 
     ASSERT_OK(
@@ -5003,7 +5003,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(
@@ -5086,7 +5086,7 @@ TEST_F(OplogApplierImplTxnTableTest, SessionMigrationNoOpEntriesShouldUpdateTxnT
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOplog}));
@@ -5118,7 +5118,7 @@ TEST_F(OplogApplierImplTxnTableTest, PreImageNoOpEntriesShouldNotUpdateTxnTable)
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {preImageOplog}));
@@ -5152,7 +5152,7 @@ TEST_F(OplogApplierImplTxnTableTest, NonMigrateNoOpEntriesShouldNotUpdateTxnTabl
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
         writerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {oplog}));
@@ -5891,7 +5891,7 @@ protected:
             ReplicationCoordinator::get(_opCtx.get()),
             getConsistencyMarkers(),
             getStorageInterface(),
-            repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
             _writerPool.get());
     }
 
@@ -6309,7 +6309,7 @@ protected:
             ReplicationCoordinator::get(_opCtx.get()),
             getConsistencyMarkers(),
             getStorageInterface(),
-            repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
             _writerPool.get());
     }
 
