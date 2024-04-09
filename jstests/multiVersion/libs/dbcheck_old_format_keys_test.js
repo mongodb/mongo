@@ -243,6 +243,8 @@ export class DbCheckOldFormatKeysTest {
                 // the journal, which will raise an invalid version error because they will see the
                 // old FCV.
                 rst.awaitLastOpCommitted();
+
+                this._fcv = fcv;
             }
             this._binVersion = nextVersion;
         }
@@ -250,7 +252,7 @@ export class DbCheckOldFormatKeysTest {
         assert.eq("latest", this._binVersion);
         const fcvDoc = this.getRst().getPrimary().adminCommand(
             {getParameter: 1, featureCompatibilityVersion: 1});
-        assert.eq("8.0", fcvDoc.featureCompatibilityVersion.version);
+        assert.eq(this._fcv, fcvDoc.featureCompatibilityVersion.version);
 
         forEachNonArbiterNode(this.getRst(), function(node) {
             assert.commandWorked(node.adminCommand({
