@@ -78,7 +78,6 @@ def process_owners_file(output_lines: list[str], directory: str) -> None:
     with open(owners_file_path, "r") as file:
         contents = yaml.safe_load(file)
         assert "version" in contents, f"Version not found in {owners_file_path}"
-        assert "filters" in contents, f"Filters not found in {owners_file_path}"
         assert contents["version"] == "1.0.0", f"Invalid version in {owners_file_path}"
         no_parent_owners = False
         if "options" in contents:
@@ -94,38 +93,38 @@ def process_owners_file(output_lines: list[str], directory: str) -> None:
         if "aliases" in contents:
             for alias_file in contents["aliases"]:
                 aliases.update(process_alias_import(alias_file))
+        if "filters" in contents:
+            filters = contents["filters"]
+            for _filter in filters:
+                assert "approvers" in _filter, f"Filter in {owners_file_path} does not have approvers."
+                approvers = _filter["approvers"]
+                del _filter["approvers"]
+                if "emeritus_approvers" in _filter:
+                    del _filter["emeritus_approvers"]
 
-        filters = contents["filters"]
-        for _filter in filters:
-            assert "approvers" in _filter, f"Filter in {owners_file_path} does not have approvers."
-            approvers = _filter["approvers"]
-            del _filter["approvers"]
-            if "emeritus_approvers" in _filter:
-                del _filter["emeritus_approvers"]
+                # the last key remaining should be the pattern for the filter
+                assert len(_filter) == 1, f"Filter in {owners_file_path} has incorrect values."
+                pattern = next(iter(_filter))
+                owners = set()
 
-            # the last key remaining should be the pattern for the filter
-            assert len(_filter) == 1, f"Filter in {owners_file_path} has incorrect values."
-            pattern = next(iter(_filter))
-            owners = set()
+                def process_owner(owner: str):
+                    if "@" in owner:
+                        # approver is email, just add as is
+                        if not owner.endswith("@mongodb.com"):
+                            raise RuntimeError("Any emails specified must be a mongodb.com email.")
+                        owners.add(owner)
+                    else:
+                        # approver is github username, need to prefix with @
+                        owners.add(f"@{owner}")
 
-            def process_owner(owner: str):
-                if "@" in owner:
-                    # approver is email, just add as is
-                    if not owner.endswith("@mongodb.com"):
-                        raise RuntimeError("Any emails specified must be a mongodb.com email.")
-                    owners.add(owner)
-                else:
-                    # approver is github username, need to prefix with @
-                    owners.add(f"@{owner}")
+                for approver in approvers:
+                    if approver in aliases:
+                        for member in aliases[approver]:
+                            process_owner(member)
+                    else:
+                        process_owner(approver)
 
-            for approver in approvers:
-                if approver in aliases:
-                    for member in aliases[approver]:
-                        process_owner(member)
-                else:
-                    process_owner(approver)
-
-            add_owner_line(output_lines, directory, pattern, owners)
+                add_owner_line(output_lines, directory, pattern, owners)
     output_lines.append("")
 
 

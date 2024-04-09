@@ -38,6 +38,12 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./buildscripts/OWNERS.yml
 /buildscripts/**/* @10gen/devprod-build @10gen/devprod-correctness
 
+# The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/OWNERS.yml
+/buildscripts/resmokeconfig/matrix_suites/**/*
+
+# The following patterns are parsed from ./buildscripts/resmokeconfig/suites/OWNERS.yml
+/buildscripts/resmokeconfig/suites/**/*
+
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
 /buildscripts/resmokelib/**/* @10gen/devprod-correctness
 

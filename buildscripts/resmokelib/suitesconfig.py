@@ -32,9 +32,13 @@ def get_named_suites() -> List[SuiteName]:
         # Skip dbtest; its executable location needs to be updated for local usage.
         dbtest = {"dbtest"}
 
+        # skip config yaml files that might be in the same directory as suites
+        misc_config_files = {"OWNERS"}
+
+        skipped_files = executor_only.union(dbtest).union(misc_config_files)
+
         explicit_suite_names = [
-            name for name in ExplicitSuiteConfig.get_named_suites()
-            if (name not in executor_only and name not in dbtest)
+            name for name in ExplicitSuiteConfig.get_named_suites() if (name not in skipped_files)
         ]
         composed_suite_names = MatrixSuiteConfig.get_named_suites()
         _NAMED_SUITES = explicit_suite_names + composed_suite_names
