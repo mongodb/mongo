@@ -138,8 +138,6 @@ bool MultiPlanner::_shouldUseEofOptimization() const {
         !cq()->getExpCtxRaw()->explain &&
         // We can't use EOF optimization if pipeline is present. Because we need to execute the
         // pipeline part in SBE, we have to rebuild and rerun the whole query.
-        // TODO SERVER-86061 Avoid rerunning find part of the query if it reached EOF during
-        // planning.
         cq()->cqPipeline().empty() &&
         // We want more coverage for SBE in debug builds.
         !kDebugBuild;
