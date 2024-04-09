@@ -328,7 +328,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockMinMaxImpl(
 
     tassert(
         8137400, "Expected block and bitset to be the same size", block.count() == bitset.count());
-    tassert(8137401, "Expected bitset to be all bools", allBools(bitset.tags(), bitset.count()));
+    dassert(allBools(bitset.tags(), bitset.count()), "Expected bitset to be all bools");
 
     value::TypeTags accTag = value::TypeTags::Nothing;
     value::Value accVal = 0;
@@ -489,7 +489,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggCou
 
     value::DeblockedTagVals bitset = bitsetBlock->extract();
 
-    tassert(8151800, "Expected bitset to be all bools", allBools(bitset.tags(), bitset.count()));
+    dassert(allBools(bitset.tags(), bitset.count()), "Expected bitset to be all bools");
 
     int64_t n = accTag == value::TypeTags::NumberInt64 ? value::bitcastTo<int64_t>(accVal) : 0;
 
@@ -535,7 +535,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggSum
 
     tassert(
         8151801, "Expected block and bitset to be the same size", block.count() == bitset.count());
-    tassert(8151802, "Expected bitset to be all bools", allBools(bitset.tags(), bitset.count()));
+    dassert(allBools(bitset.tags(), bitset.count()), "Expected bitset to be all bools");
 
     value::TypeTags blockResTag = value::TypeTags::Nothing;
     value::Value blockResVal = 0;
@@ -1079,7 +1079,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::blockNativeAggTopBottom
     }
 
     auto bitset = bitsetBlock->extract();
-    tassert(8794903, "Expected bitset to be all bools", allBools(bitset.tags(), bitset.count()));
+    dassert(allBools(bitset.tags(), bitset.count()), "Expected bitset to be all bools");
     auto bitsetVals = bitset.valsSpan();
 
     auto sortKeys = sortKeyBlock->extract();
@@ -1292,7 +1292,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggTop
 
     value::DeblockedTagVals bitset = bitsetBlock->extract();
 
-    tassert(8448711, "Expected bitset to be all bools", allBools(bitset.tags(), bitset.count()));
+    dassert(allBools(bitset.tags(), bitset.count()), "Expected bitset to be all bools");
 
     std::vector<value::DeblockedTagVals> keys;
     std::vector<value::DeblockedTagVals> values;
@@ -2196,9 +2196,8 @@ void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
         tassert(8123000,
                 "Mask and block have a different number of items",
                 extracted.count() == extractedMask.count());
-        tassert(8123001,
-                "Expected mask to be all bool values",
-                allBools(extractedMask.tags(), extractedMask.count()));
+        dassert(allBools(extractedMask.tags(), extractedMask.count()),
+                "Expected mask to be all bools");
 
         // Pre-fill with Nothing, and overwrite only the allowed indexes.
         std::vector<value::Value> valueOut(extracted.count());
