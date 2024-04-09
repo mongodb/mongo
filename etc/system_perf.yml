@@ -23,12 +23,6 @@ parameters:
 variables:
   ###
   # Leave this section uncommented to enable compile.
-  _real_compile_amazon2: &_compile_amazon2
-    - name: compile
-      variant: compile-amazon2
-  _real_compile_rhel70: &_compile_rhel70
-    - name: compile
-      variant: compile-rhel70
   _real_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
     - name: compile
       variant: compile-amazon-linux2-arm64
@@ -62,10 +56,6 @@ variables:
 
   ###
   # **Or**: Leave this section uncommented to bypass/skip compile.
-  #  _skip_compile_amazon2: &_compile_amazon2
-  #      []
-  #  _skip_compile_rhel70: &_compile_rhel70
-  #      []
   #  _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
   #     []
   #  _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
@@ -446,28 +436,6 @@ functions:
             echo "build --bes_keywords=evg:project=${project}" >> .bazelrc.evergreen
             echo "build --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen
           fi
-  compile prep old:
-    # We create a virtual environment with the Python dependencies for compiling the server
-    # installed.
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          mkdir -p mongodb/bin
-
-          # This is copied from evergreen/functions/venv_setup.sh
-          # Consider consolidating this in the future
-          /opt/mongodbtoolchain/v4/bin/python3 -m venv "${workdir}/compile_venv"
-          source "${workdir}/compile_venv/bin/activate"
-
-          python -m pip install "poetry==1.5.1"
-          # See BF-29897 / https://github.com/python-poetry/poetry/issues/7584
-          poetry config installer.max-workers 10
-          # Trying poetry install due to https://github.com/python-poetry/poetry/issues/7611
-          python -m poetry install --no-root --sync || python -m poetry install --no-root --sync
     - command: expansions.write
       params:
         file: expansions.yml
@@ -597,52 +565,6 @@ functions:
           wget "$binary_url" -O mongo-tools.tar.gz
           sudo tar -xzvf mongo-tools.tar.gz -C mongodb/ --strip-components=1 "mong*/bin"
           echo "MongoDB tools installed successfully!"
-  compile mongo tools old:
-    - command: shell.exec
-      params:
-        working_dir: src/mongo-tools/src/github.com/mongodb/mongo-tools
-        script: |
-          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            set -o verbose
-            set -o errexit
-
-            # make sure newlines in the scripts are handled correctly by windows
-            if [ "Windows_NT" = "$OS" ]; then
-              set -o igncr
-            fi;
-
-            export cleanup=false
-
-            # install go for tools if required (al2023 for now).
-            if [ ! -d "/opt/golang/go1.19" ]; then
-              cleanup=true
-              echo -n "go-lang missing downloading ..."
-              go_file=./go1.19.8.tar.gz
-              wget --quiet https://go.dev/dl/go1.19.8.linux$(echo ${compile_variant} | sed 's/^-al202.//').tar.gz -O "$go_file"
-              echo -n " installing ..."
-              sudo mkdir -p /opt/golang/go1.19
-              sudo tar -C /opt/golang/go1.19 -xzf "$go_file" --strip-components=1
-              [ -e "$go_file" ] && rm -f "$go_file"
-              echo  "done"
-            fi
-
-            # set_goenv provides set_goenv()
-            . ./set_goenv.sh
-            GOROOT="" set_goenv || exit
-            go version
-
-            build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
-            if [ "${build_mongoreplay}" = "true" ]; then
-                build_tools="$build_tools mongoreplay"
-            fi
-            for i in $build_tools; do
-                go build -o "../../../../../mongodb/bin/$i${exe|}" $i/main/$i.go
-                "../../../../../mongodb/bin/$i${exe|}" --version
-            done
-            if "$cleanup"; then
-              sudo rm -rf "/opt/golang/go1.19"
-            fi
-          fi
   generate feature flag list:
     - command: shell.exec
       params:
@@ -654,19 +576,6 @@ functions:
           python ./buildscripts/idl/gen_all_feature_flag_list.py
           mkdir -p mongodb/feature_flags
           cp ./all_feature_flags.txt mongodb/feature_flags
-  generate feature flag list old:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            set -o errexit
-            set -o verbose
-            source "${workdir}/compile_venv/bin/activate"
-            python ./buildscripts/idl/gen_all_feature_flag_list.py
-            mkdir -p mongodb/feature_flags
-            cp ./all_feature_flags.txt mongodb/feature_flags
-          fi
   generate server params list:
     - command: shell.exec
       params:
@@ -678,19 +587,6 @@ functions:
           python ./buildscripts/idl/gen_all_server_params_list.py
           mkdir -p mongodb/server_params
           cp ./all_server_params.txt mongodb/server_params
-  generate server params list old:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            set -o errexit
-            set -o verbose
-            source "${workdir}/compile_venv/bin/activate"
-            python ./buildscripts/idl/gen_all_server_params_list.py
-            mkdir -p mongodb/server_params
-            cp ./all_server_params.txt mongodb/server_params
-          fi
   compile mongodb:
     - command: shell.exec
       params:
@@ -717,21 +613,6 @@ functions:
           mv ./dist-test/bin/mongocryptd mongodb/bin
           # Copy libs folder if it exists
           [ ! -d ./dist-test/lib ] || mv ./dist-test/lib mongodb
-  download mongodb old:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            set -o errexit
-            set -o verbose
-            wget --quiet https://s3.amazonaws.com/mciuploads/${project}/${compile_variant}/${version_id}/binaries/mongo-${revision_order_id}.${ext|tgz}
-            tar -xvf mongo-${revision_order_id}.${ext|tgz}
-            mv ./dist-test/bin/mongo mongodb/bin
-            mv ./dist-test/bin/mongos mongodb/bin
-            mv ./dist-test/bin/mongod mongodb/bin
-            mv ./dist-test/bin/mongocryptd mongodb/bin
-          fi
   download jstests:
     - command: shell.exec
       params:
@@ -754,44 +635,12 @@ functions:
             await import("jstests/hooks/run_validate_collections.actual.js");
           EOF
           fi
-  download jstests old:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            set -o errexit
-            set -o verbose
-            mkdir -p mongodb/jstests/hooks
-            if [ -d jstests/hooks ]
-            then
-              echo "Fetching JS test DB correctness checks from directory jstests"
-              cp -a jstests/* mongodb/jstests
-
-              echo "Now adding our own special run_validate_collections.js wrapper"
-              mv mongodb/jstests/hooks/run_validate_collections.js mongodb/jstests/hooks/run_validate_collections.actual.js
-
-              cat << EOF > mongodb/jstests/hooks/run_validate_collections.js
-              print("NOTE: run_validate_collections.js will skip the oplog!");
-              TestData = { skipValidationNamespaces: ['local.oplog.rs'] };
-              await import("jstests/hooks/run_validate_collections.actual.js");
-          EOF
-            fi
-          fi
   package binary:
     - command: shell.exec
       params:
         working_dir: src
         script: |
           tar czf mongodb${compile_variant|}.tar.gz mongodb
-  package binary old:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            tar czf mongodb${compile_variant|}.tar.gz mongodb
-          fi
     - command: shell.exec
       params:
         working_dir: src
@@ -804,18 +653,6 @@ functions:
             python buildscripts/download_sys_perf_binaries.py -v ${reuse_compile_from} -b ${build_variant} -u ${evergreen_api_user} -k ${evergreen_api_key}
             mv binary.tar.gz mongodb${compile_variant|}.tar.gz
           fi
-  package old debugsymbols:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            set -o errexit
-            set -o verbose
-            # Put all matching mongo debug from the build directory in an archive in the same location
-            # as the library archive (i.e. mongodb/bin).
-            tar czvf mongodb${compile_variant|}-debugsymbols.tar.gz $(find ./build/cached -name mongo\*.debug -type f) --xform 's:^.*/:mongodb/bin/:'
-          fi
   upload binary:
     - command: s3.put
       params:
@@ -827,19 +664,6 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb${compile_variant|}.tar.gz
-  upload old debugsymbols:
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb${compile_variant|}-debugsymbols.tar.gz
-        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile_variant|}-${version_id}-debugsymbols.tar.gz
-        bucket: mciuploads
-        permissions: public-read
-        optional: true
-        content_type: ${content_type|application/x-gzip}
-        display_name: mongo-debugsymbols.tgz
-  ###
 
   ###
   # Compile mongo_crypt_v1 shared library
@@ -884,26 +708,6 @@ functions:
   ###
 
 tasks:
-  - name: compile
-    commands:
-      - command: manifest.load
-      - command: git.get_project
-        params:
-          directory: src
-          revisions:
-            mongo-tools: ${mongo-tools_rev}
-      - func: "compile prep old"
-      - func: "get engflow creds perf"
-      - func: "compile mongo tools old"
-      - func: "generate feature flag list old"
-      - func: "generate server params list old"
-      - func: "compile mongodb"
-      - func: "download jstests old"
-      - func: "package binary old"
-      - func: "upload binary"
-      - func: "package old debugsymbols"
-      - func: "upload old debugsymbols"
-
   - name: package_new_compile
     commands:
       - command: manifest.load
@@ -946,142 +750,6 @@ buildvariants:
       - name: generate_all_variant_auto_tasks
         activate: true
       - name: schedule_global_auto_tasks
-
-  ###
-  # Old compiles
-  # - name: compile-amazon2
-  #   display_name: Compile
-  #   modules: *modules
-  #   cron: "0 0 * * *" # Everyday at 00:00
-  #   expansions: &compile-expansions
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     tooltags: ""
-  #     use_scons_cache: true
-  #     compile_flags: >-
-  #       --ssl
-  #       --separate-debug
-  #       MONGO_DISTMOD=amazon2
-  #       -j$(grep -c ^processor /proc/cpuinfo)
-  #       --release
-  #       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-  #       --use-diagnostic-latches=off
-  #       install-mongocryptd
-  #   run_on:
-  #     - "amazon2-xlarge"
-  #   tasks:
-  #     - name: compile
-
-  # - name: compile-amazon2-streams
-  #   display_name: Compile Mongo Streams for Amazon2
-  #   modules: *modules
-  #   cron: "0 0 * * *" # Everyday at 00:00
-  #   expansions:
-  #     <<: *compile-expansions
-  #     compile_variant: -stream-x86_64
-  #     compile_flags: >-
-  #       --ssl
-  #       --separate-debug
-  #       MONGO_DISTMOD=amazon2
-  #       -j$(grep -c ^processor /proc/cpuinfo)
-  #       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-  #       --streams-release-build
-  #   run_on:
-  #     - "amazon2-xlarge"
-  #   tasks:
-  #     - name: compile
-
-  # - name: compile-amazon-linux2-arm64
-  #   display_name: Compile for Amazon Linux 2 arm64
-  #   modules: *modules
-  #   cron: "0 0 * * *" # Everyday at 00:00
-  #   expansions:
-  #     <<: *compile-expansions
-  #     compile_variant: -arm64
-  #   run_on:
-  #     - "amazon2-arm64-xlarge"
-  #   tasks:
-  #     - name: compile
-
-  # - name: compile-amazon-linux2-arm64-mongocrypt-shlib
-  #   display_name: Compile mongo_crypt_v1.so for Amazon Linux 2 arm64
-  #   modules: *modules
-  #   cron: "0 0 * * 4" # 00:00 on Thursday
-  #   expansions:
-  #     <<: *compile-expansions
-  #     compile_variant: -arm64
-  #     compile_flags: >-
-  #       --separate-debug
-  #       MONGO_DISTMOD=amazon2
-  #       -j$(grep -c ^processor /proc/cpuinfo)
-  #       --release
-  #       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-  #       --use-diagnostic-latches=off
-  #       --allocator=system
-  #       --enterprise-features=fle
-  #       --js-engine=none
-  #       --link-model=dynamic-sdk
-  #       --enable-http-client=off
-  #       --ssl=off
-  #       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-  #       CCFLAGS="-fno-gnu-unique"
-  #   run_on:
-  #     - "amazon2-arm64-large"
-  #   tasks:
-  #     - name: compile_mongocrypt_shlib
-
-  # - &compile-al2023-arm64
-  #   name: compile-al2023-arm64
-  #   display_name: Compile for Al2023 arm64
-  #   modules: *modules
-  #   cron: "0 0 * * *" # Everyday at 00:00
-  #   expansions: &compile-al2023-expansions
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     tooltags: ""
-  #     use_scons_cache: true
-  #     compile_flags: >-
-  #       --ssl
-  #       --separate-debug
-  #       MONGO_DISTMOD=rhel82
-  #       -j$(grep -c ^processor /proc/cpuinfo)
-  #       --release
-  #       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-  #       --use-diagnostic-latches=off
-  #       install-mongocryptd
-  #     compile_variant: -al2023-arm64
-  #   run_on:
-  #     - "amazon2023.0-arm64-large"
-  #   tasks:
-  #     - name: compile
-
-  # - name: compile-al2023-arm64-mongocrypt-shlib
-  #   display_name: Compile mongo_crypt_v1.so for Al2023 arm64
-  #   modules: *modules
-  #   cron: "0 0 * * 4" # 00:00 on Thursday
-  #   expansions:
-  #     <<: *compile-al2023-expansions
-  #     compile_variant: -al2023-arm64
-  #     compile_flags: >-
-  #       --separate-debug
-  #       MONGO_DISTMOD=rhel82
-  #       -j$(grep -c ^processor /proc/cpuinfo)
-  #       --release
-  #       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-  #       --use-diagnostic-latches=off
-  #       --allocator=system
-  #       --enterprise-features=fle
-  #       --js-engine=none
-  #       --link-model=dynamic-sdk
-  #       --enable-http-client=off
-  #       --ssl=off
-  #       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-  #       CCFLAGS="-fno-gnu-unique"
-  #   run_on:
-  #     - "amazon2023.0-arm64-large"
-  #   tasks:
-  #     - name: compile_mongocrypt_shlib
-  ###
 
   ###
   # New compiles
