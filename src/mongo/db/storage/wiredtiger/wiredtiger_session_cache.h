@@ -187,6 +187,22 @@ public:
         return _compiled;
     }
 
+    /**
+     * Reconfigures the session. Stores the config string that undoes this change.
+     */
+    void reconfigure(const std::string& newConfig, std::string undoConfig);
+
+    /**
+     * Reset the configurations for this session to the default. This should be done before we
+     * release this session back into the session cache, so that any recovery unit that may use this
+     * session in the future knows that the session will have the default configuration.
+     */
+    void resetSessionConfiguration();
+
+    stdx::unordered_set<std::string> getUndoConfigStrings() {
+        return _undoConfigStrings;
+    }
+
 private:
     friend class WiredTigerSessionCache;
     friend class WiredTigerKVEngine;
@@ -209,6 +225,11 @@ private:
     CompiledConfigurationsPerConnection* _compiled;  // not owned
 
     Date_t _idleExpireTime;
+
+    // A set that contains the undo config strings for any reconfigurations we might have performed
+    // on a session during the lifetime of this recovery unit. We use these to reset the session to
+    // its default configuration before returning it to the session cache.
+    stdx::unordered_set<std::string> _undoConfigStrings;
 };
 
 /**
