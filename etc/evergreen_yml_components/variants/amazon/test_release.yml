@@ -385,6 +385,7 @@ buildvariants:
   - name: streams
   - name: streams_kafka
 
+# This variant is needed to compile binaries for multiversion testing on required variants on master branch
 - name: enterprise-amazon2-arm64
   display_name: "Enterprise Amazon Linux 2 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
