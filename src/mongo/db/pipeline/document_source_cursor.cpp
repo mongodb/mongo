@@ -147,8 +147,10 @@ DocumentSource::GetNextResult DocumentSourceCursor::doGetNext() {
     else if (_resumeTrackingType == ResumeTrackingType::kNonOplog && _exec)
         _updateNonOplogResumeToken();
 
-    if (_currentBatch.isEmpty())
+    if (_currentBatch.isEmpty()) {
+        _currentBatch.clear();
         return GetNextResult::makeEOF();
+    }
 
     return _currentBatch.dequeue();
 }

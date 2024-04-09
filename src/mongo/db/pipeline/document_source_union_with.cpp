@@ -367,6 +367,7 @@ void DocumentSourceUnionWith::doDispose() {
 
         if (!_pipeline->getContext()->explain) {
             _pipeline->dispose(pExpCtx->opCtx);
+            _userPipeline.clear();
             _pipeline.reset();
         }
     }

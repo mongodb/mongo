@@ -180,7 +180,7 @@ public:
         }
 
         if (!_output->more()) {
-            _output.reset();
+            clearSortTable();
             _isEOF = true;
             return false;
         }
@@ -221,12 +221,24 @@ public:
         invariant(_paused);
         _paused = false;
         ensureSorter();
-        _output.reset();
+        clearSortTable();
         _sorter->resume();
         _isEOF = false;
     }
 
 private:
+    /*
+     * '_output' is a DocumentSorter::Iterator that can have the following iterator values:
+     * (1) InMemIterator, (2) InMemReadOnlyIterator, (3) FileIterator, or (4) MergeIterator
+     * If '_output' is an InMemIterator or an InMemReadOnlyIterator, the sort table will be cleared
+     * in memory. If '_output' is an MergeIterator, the  spilled sorted data will be cleared.
+     * However, the sort table needs to be cleared through a call to reset(). Otherwise, '_output'
+     * is a FileIterator and the sort table needs to be cleared through a call to reset().
+     */
+    void clearSortTable() {
+        _output.reset();
+    }
+
     SortOptions makeSortOptions() const {
         SortOptions opts;
         opts.moveSortedDataIntoIterator = _moveSortedDataIntoIterator;
