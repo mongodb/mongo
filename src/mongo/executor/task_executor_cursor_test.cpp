@@ -161,8 +161,8 @@ public:
         return static_cast<Derived*>(this)->scheduleSuccessfulKillCursorResponse(cursorId);
     }
 
-    TaskExecutorCursor makeTec(RemoteCommandRequest rcr,
-                               TaskExecutorCursor::Options&& options = {}) {
+    std::unique_ptr<TaskExecutorCursor> makeTec(RemoteCommandRequest rcr,
+                                                TaskExecutorCursor::Options&& options = {}) {
         return static_cast<Derived*>(this)->makeTec(rcr, std::move(options));
     }
 
@@ -188,17 +188,17 @@ public:
                                  findCmd,
                                  opCtx.get());
 
-        TaskExecutorCursor tec = makeTec(rcr);
+        auto tec = makeTec(rcr);
 
         ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId));
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
 
         ASSERT_FALSE(hasReadyRequests());
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
 
-        ASSERT_FALSE(tec.getNext(opCtx.get()));
+        ASSERT_FALSE(tec->getNext(opCtx.get()));
     }
 
     /**
@@ -215,26 +215,26 @@ public:
                                  aggCmd,
                                  opCtx.get());
 
-        TaskExecutorCursor tec = makeTec(rcr);
+        auto tec = makeTec(rcr);
 
         ASSERT_BSONOBJ_EQ(aggCmd,
                           scheduleSuccessfulMultiCursorResponse("firstBatch", 1, 2, {0, 0}));
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
 
-        ASSERT_FALSE(tec.getNext(opCtx.get()));
+        ASSERT_FALSE(tec->getNext(opCtx.get()));
 
-        auto cursorVec = tec.releaseAdditionalCursors();
+        auto cursorVec = tec->releaseAdditionalCursors();
         ASSERT_EQUALS(cursorVec.size(), 1);
         auto secondCursor = std::move(cursorVec[0]);
 
-        ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 2);
-        ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 4);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 2);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 4);
         ASSERT_FALSE(hasReadyRequests());
 
-        ASSERT_FALSE(secondCursor.getNext(opCtx.get()));
+        ASSERT_FALSE(secondCursor->getNext(opCtx.get()));
     }
     /**
      * The operation context under which we send the original cursor-establishing command
@@ -254,7 +254,7 @@ public:
                                  DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                                  aggCmd,
                                  opCtx.get());
-        TaskExecutorCursor tec = makeTec(rcr);
+        auto tec = makeTec(rcr);
         auto expected = BSON("aggregate"
                              << "test"
                              << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << true))
@@ -268,21 +268,21 @@ public:
         opCtx->setLogicalSessionId(lsid);
         // Use the new opCtx to call getNext. The child TECs should not attempt to read from the
         // now dead original opCtx.
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
 
-        ASSERT_FALSE(tec.getNext(opCtx.get()));
+        ASSERT_FALSE(tec->getNext(opCtx.get()));
 
-        auto cursorVec = tec.releaseAdditionalCursors();
+        auto cursorVec = tec->releaseAdditionalCursors();
         ASSERT_EQUALS(cursorVec.size(), 1);
         auto secondCursor = std::move(cursorVec[0]);
 
-        ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 2);
-        ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 4);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 2);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 4);
         ASSERT_FALSE(hasReadyRequests());
 
-        ASSERT_FALSE(secondCursor.getNext(opCtx.get()));
+        ASSERT_FALSE(secondCursor->getNext(opCtx.get()));
     }
 
     void MultipleCursorsGetMoreWorksTest() {
@@ -297,22 +297,22 @@ public:
                                  aggCmd,
                                  opCtx.get());
 
-        TaskExecutorCursor tec = makeTec(rcr);
+        auto tec = makeTec(rcr);
 
         ASSERT_BSONOBJ_EQ(aggCmd,
                           scheduleSuccessfulMultiCursorResponse("firstBatch", 1, 2, cursorIds));
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
 
-        auto cursorVec = tec.releaseAdditionalCursors();
+        auto cursorVec = tec->releaseAdditionalCursors();
         ASSERT_EQUALS(cursorVec.size(), 1);
 
         // If we try to getNext() at this point, we are interruptible and can timeout
         ASSERT_THROWS_CODE(opCtx->runWithDeadline(Date_t::now() + Milliseconds(100),
                                                   ErrorCodes::ExceededTimeLimit,
-                                                  [&] { tec.getNext(opCtx.get()); }),
+                                                  [&] { tec->getNext(opCtx.get()); }),
                            DBException,
                            ErrorCodes::ExceededTimeLimit);
 
@@ -324,12 +324,12 @@ public:
         // Repeat for second cursor.
         auto secondCursor = std::move(cursorVec[0]);
 
-        ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 2);
-        ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 4);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 2);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 4);
 
         ASSERT_THROWS_CODE(opCtx->runWithDeadline(Date_t::now() + Milliseconds(100),
                                                   ErrorCodes::ExceededTimeLimit,
-                                                  [&] { secondCursor.getNext(opCtx.get()); }),
+                                                  [&] { secondCursor->getNext(opCtx.get()); }),
                            DBException,
                            ErrorCodes::ExceededTimeLimit);
 
@@ -338,23 +338,23 @@ public:
                           scheduleSuccessfulCursorResponse("nextBatch", 6, 8, cursorIds[1]));
         // Read second batch, then schedule EOF on both cursors.
         // Then read final document for each.
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 3);
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 4);
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 5);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 3);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 4);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 5);
         scheduleSuccessfulCursorResponse("nextBatch", 6, 6, 0);
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 6);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 6);
 
-        ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 6);
-        ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 7);
-        ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 8);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 6);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 7);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 8);
         scheduleSuccessfulCursorResponse("nextBatch", 12, 12, 0);
-        ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 12);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 12);
 
         // Shouldn't have any more requests, both cursors are closed.
         ASSERT_FALSE(hasReadyRequests());
 
-        ASSERT_FALSE(tec.getNext(opCtx.get()));
-        ASSERT_FALSE(secondCursor.getNext(opCtx.get()));
+        ASSERT_FALSE(tec->getNext(opCtx.get()));
+        ASSERT_FALSE(secondCursor->getNext(opCtx.get()));
     }
 
     /**
@@ -370,11 +370,11 @@ public:
                                  findCmd,
                                  opCtx.get());
 
-        TaskExecutorCursor tec = makeTec(rcr);
+        auto tec = makeTec(rcr);
 
         scheduleErrorResponse(Status(ErrorCodes::BadValue, "an error"));
 
-        ASSERT_THROWS_CODE(tec.getNext(opCtx.get()), DBException, ErrorCodes::BadValue);
+        ASSERT_THROWS_CODE(tec->getNext(opCtx.get()), DBException, ErrorCodes::BadValue);
     }
 
 
@@ -392,7 +392,7 @@ public:
                                  findCmd,
                                  opCtx.get());
 
-        TaskExecutorCursor tec = makeTec(rcr, [] {
+        auto tec = makeTec(rcr, [] {
             TaskExecutorCursor::Options opts;
             opts.batchSize = 3;
             return opts;
@@ -400,16 +400,16 @@ public:
 
         scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
 
         // ASSERT(hasReadyRequests());
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
 
         // If we try to getNext() at this point, we are interruptible and can timeout
         ASSERT_THROWS_CODE(opCtx->runWithDeadline(Date_t::now() + Milliseconds(100),
                                                   ErrorCodes::ExceededTimeLimit,
-                                                  [&] { tec.getNext(opCtx.get()); }),
+                                                  [&] { tec->getNext(opCtx.get()); }),
                            DBException,
                            ErrorCodes::ExceededTimeLimit);
 
@@ -419,19 +419,19 @@ public:
                                          << "batchSize" << 3),
                           scheduleSuccessfulCursorResponse("nextBatch", 3, 5, cursorId));
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 3);
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 4);
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 5);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 3);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 4);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 5);
 
         cursorId = 0;
         scheduleSuccessfulCursorResponse("nextBatch", 6, 6, cursorId);
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 6);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 6);
 
         // We don't issue extra getmores after returning a 0 cursor id
         ASSERT_FALSE(hasReadyRequests());
 
-        ASSERT_FALSE(tec.getNext(opCtx.get()));
+        ASSERT_FALSE(tec->getNext(opCtx.get()));
     }
 
     /**
@@ -451,7 +451,7 @@ public:
                                  findCmd,
                                  opCtx.get());
 
-        TaskExecutorCursor tec = makeTec(rcr, [] {
+        auto tec = makeTec(rcr, [] {
             TaskExecutorCursor::Options opts;
             opts.batchSize = 3;
             return opts;
@@ -472,7 +472,7 @@ public:
         });
 
         // Verify that the first doc is the doc from the second batch.
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
 
         th.join();
     }
@@ -494,7 +494,7 @@ public:
                                  findCmd,
                                  opCtx.get());
 
-        TaskExecutorCursor tec = makeTec(rcr, [] {
+        auto tec = makeTec(rcr, [] {
             TaskExecutorCursor::Options opts;
             opts.batchSize = 3;
             return opts;
@@ -503,7 +503,7 @@ public:
         // Schedule a cursor response with a non-empty "firstBatch".
         ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 1, cursorId));
 
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
 
         // Schedule two consecutive cursor responses with empty "nextBatch". Use end < start so
         // we don't append any doc to "nextBatch".
@@ -530,7 +530,7 @@ public:
         });
 
         // Verify that the next doc is the doc from the fourth batch.
-        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
 
         th.join();
     }
@@ -548,19 +548,12 @@ public:
                                           << "foo"),
                                      opCtx.get());
 
-            // The lambda that will be used to augment the getMore request sent below is passed into
-            // the TEC constructor.
-            auto augmentGetMore = [](BSONObjBuilder& bob) {
-                bob.append("test", 1);
-            };
-
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
-            TaskExecutorCursor tec = makeTec(rcr, [&augmentGetMore] {
+            auto tec = makeTec(rcr, [] {
                 TaskExecutorCursor::Options opts;
                 opts.batchSize = 2;
                 opts.preFetchNextBatch = false;
-                opts.getMoreAugmentationWriter = augmentGetMore;
                 return opts;
             }());
 
@@ -568,8 +561,8 @@ public:
             scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
 
             // Exhaust the first batch.
-            ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
-            ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
+            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
+            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
 
             // Assert that the TaskExecutorCursor has not requested a GetMore. This enforces that
             // 'preFetchNextBatch' works as expected.
@@ -590,13 +583,13 @@ public:
                 // above.
                 const auto expectedGetMoreCmd = BSON("getMore" << 1LL << "collection"
                                                                << "test"
-                                                               << "batchSize" << 2 << "test" << 1);
+                                                               << "batchSize" << 2);
                 ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, recievedGetMoreCmd);
             });
 
             // Schedules the GetMore request and exhausts the cursor.
-            ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 3);
-            ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 4);
+            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 3);
+            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 4);
 
             // Joining the thread which schedules the cursor response for the GetMore here forces
             // the destructor of NetworkInterfaceMock::InNetworkGuard to run, which ensures that the
@@ -683,10 +676,10 @@ public:
         getNet()->blackHole(getNet()->getFrontOfUnscheduledQueue());
     }
 
-    TaskExecutorCursor makeTec(RemoteCommandRequest rcr,
-                               TaskExecutorCursor::Options&& options = {}) {
+    std::unique_ptr<TaskExecutorCursor> makeTec(RemoteCommandRequest rcr,
+                                                TaskExecutorCursor::Options&& options = {}) {
         options.pinConnection = false;
-        return TaskExecutorCursor(getExecutorPtr(), rcr, std::move(options));
+        return std::make_unique<TaskExecutorCursor>(getExecutorPtr(), rcr, std::move(options));
     }
 };
 
@@ -750,10 +743,10 @@ public:
         return scheduleResponse(cursorResponse);
     }
 
-    TaskExecutorCursor makeTec(RemoteCommandRequest rcr,
-                               TaskExecutorCursor::Options&& options = {}) {
+    std::unique_ptr<TaskExecutorCursor> makeTec(RemoteCommandRequest rcr,
+                                                TaskExecutorCursor::Options&& options = {}) {
         options.pinConnection = true;
-        return TaskExecutorCursor(getExecutorPtr(), rcr, std::move(options));
+        return std::make_unique<TaskExecutorCursor>(getExecutorPtr(), rcr, std::move(options));
     }
 
     bool hasReadyRequests() {
@@ -772,10 +765,10 @@ public:
 
 class NoPrefetchTaskExecutorCursorTestFixture : public NonPinningTaskExecutorCursorTestFixture {
 public:
-    TaskExecutorCursor makeTec(RemoteCommandRequest rcr,
-                               TaskExecutorCursor::Options&& options = {}) {
+    std::unique_ptr<TaskExecutorCursor> makeTec(RemoteCommandRequest rcr,
+                                                TaskExecutorCursor::Options&& options = {}) {
         options.preFetchNextBatch = false;
-        return TaskExecutorCursor(getExecutorPtr(), rcr, std::move(options));
+        return std::make_unique<TaskExecutorCursor>(getExecutorPtr(), rcr, std::move(options));
     }
 
     BSONObj scheduleSuccessfulCursorResponse(StringData fieldName,
@@ -795,11 +788,11 @@ public:
 class NoPrefetchPinnedTaskExecutorCursorTestFixture
     : public PinnedConnTaskExecutorCursorTestFixture {
 public:
-    TaskExecutorCursor makeTec(RemoteCommandRequest rcr,
-                               TaskExecutorCursor::Options&& options = {}) {
+    std::unique_ptr<TaskExecutorCursor> makeTec(RemoteCommandRequest rcr,
+                                                TaskExecutorCursor::Options&& options = {}) {
         options.preFetchNextBatch = false;
         options.pinConnection = true;
-        return TaskExecutorCursor(getExecutorPtr(), rcr, std::move(options));
+        return std::make_unique<TaskExecutorCursor>(getExecutorPtr(), rcr, std::move(options));
     }
 };
 
@@ -905,11 +898,11 @@ TEST_F(NonPinningTaskExecutorCursorTestFixture, EarlyReturnKillsCursor) {
                              opCtx.get());
 
     {
-        TaskExecutorCursor tec = makeTec(rcr);
+        auto tec = makeTec(rcr);
 
         scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
 
-        ASSERT(tec.getNext(opCtx.get()));
+        ASSERT(tec->getNext(opCtx.get()));
 
         // Black hole the pending `getMore` operation scheduled by the `TaskExecutorCursor`.
         blackHoleNextOutgoingRequest();
@@ -988,12 +981,12 @@ TEST_F(NonPinningTaskExecutorCursorTestFixture, LsidIsPassed) {
                              findCmd,
                              opCtx.get());
 
-    boost::optional<TaskExecutorCursor> tec;
-    tec.emplace(makeTec(rcr, []() {
+    std::unique_ptr<TaskExecutorCursor> tec;
+    tec = makeTec(rcr, []() {
         TaskExecutorCursor::Options opts;
         opts.batchSize = 1;
         return opts;
-    }()));
+    }());
 
     // lsid in the first batch
     ASSERT_BSONOBJ_EQ(BSON("find"

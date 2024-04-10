@@ -1412,7 +1412,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
             cursor->updateYieldPolicy(std::move(metadataYieldPolicy));
 
             additionalExecutors.push_back(uassertStatusOK(getSearchMetadataExecutorSBE(
-                expCtx->opCtx, collections, nss, *cq, std::move(*cursor))));
+                expCtx->opCtx, collections, nss, *cq, std::move(cursor))));
         }
     }
     return {std::move(executor), callback, std::move(additionalExecutors)};

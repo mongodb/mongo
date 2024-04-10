@@ -154,8 +154,8 @@ DocumentSource::GetNextResult DocumentSourceVectorSearch::doGetNext() {
 
     // If this is the first call, establish the cursor.
     if (!_cursor) {
-        _cursor.emplace(
-            search_helpers::establishVectorSearchCursor(pExpCtx, _originalSpec, _taskExecutor));
+        _cursor =
+            search_helpers::establishVectorSearchCursor(pExpCtx, _originalSpec, _taskExecutor);
     }
 
     return getNextAfterSetup();

@@ -65,7 +65,7 @@ executor::RemoteCommandRequest getRemoteCommandRequest(OperationContext* opCtx,
  * Run the given command against mongot and build one cursor object for each cursor returned from
  * mongot.
  */
-std::vector<executor::TaskExecutorCursor> establishCursors(
+std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const executor::RemoteCommandRequest& command,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
@@ -77,7 +77,7 @@ std::vector<executor::TaskExecutorCursor> establishCursors(
  * Run the given search query against mongot and build one cursor object for each
  * cursor returned from mongot.
  */
-std::vector<executor::TaskExecutorCursor> establishCursorsForSearchStage(
+std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSearchStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& query,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
@@ -91,7 +91,7 @@ std::vector<executor::TaskExecutorCursor> establishCursorsForSearchStage(
  * Parallel to establishCursorsForSearchStage() but limited to the arguments expected for
  * $searchMeta.
  */
-std::vector<executor::TaskExecutorCursor> establishCursorsForSearchMetaStage(
+std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSearchMetaStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& query,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
@@ -135,4 +135,4 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
  */
 void throwIfNotRunningWithMongotHostConfigured(
     const boost::intrusive_ptr<ExpressionContext>& expCtx);
-};  // namespace mongo::mongot_cursor
+}  // namespace mongo::mongot_cursor

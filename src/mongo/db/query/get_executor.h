@@ -118,7 +118,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
     const MultipleCollectionAccessor& collections,
     const NamespaceString& nss,
     const CanonicalQuery& cq,
-    executor::TaskExecutorCursor metadataCursor);
+    std::unique_ptr<executor::TaskExecutorCursor> metadataCursor);
 
 /**
  * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode

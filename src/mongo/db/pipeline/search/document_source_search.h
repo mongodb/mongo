@@ -134,19 +134,19 @@ public:
         return _remoteCursorVars;
     }
 
-    void setCursor(executor::TaskExecutorCursor cursor) {
-        _cursor.emplace(std::move(cursor));
+    void setCursor(std::unique_ptr<executor::TaskExecutorCursor> cursor) {
+        _cursor = std::move(cursor);
     }
 
-    boost::optional<executor::TaskExecutorCursor> getCursor() {
+    std::unique_ptr<executor::TaskExecutorCursor> getCursor() {
         return std::move(_cursor);
     }
 
-    void setMetadataCursor(executor::TaskExecutorCursor cursor) {
-        _metadataCursor.emplace(std::move(cursor));
+    void setMetadataCursor(std::unique_ptr<executor::TaskExecutorCursor> cursor) {
+        _metadataCursor = std::move(cursor);
     }
 
-    boost::optional<executor::TaskExecutorCursor> getMetadataCursor() {
+    std::unique_ptr<executor::TaskExecutorCursor> getMetadataCursor() {
         return std::move(_metadataCursor);
     }
 
@@ -205,8 +205,8 @@ private:
     // The mongot data and metadata cursors for search. We establish the cursors before query
     // planning, use this object to temporarily store the cursors, and will transfer the cursors to
     // corresponding SBE executors when build PlanExecutorSBE.
-    boost::optional<executor::TaskExecutorCursor> _cursor;
-    boost::optional<executor::TaskExecutorCursor> _metadataCursor;
+    std::unique_ptr<executor::TaskExecutorCursor> _cursor;
+    std::unique_ptr<executor::TaskExecutorCursor> _metadataCursor;
     boost::optional<BSONObj> _remoteCursorVars;
 };
 

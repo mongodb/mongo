@@ -351,11 +351,12 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
         return options;
     };
     for (unsigned int i = 1; i < cursorResponses.size(); ++i) {
-        _additionalCursors.emplace_back(_executor,
-                                        _underlyingExecutor,
-                                        uassertStatusOK(std::move(cursorResponses[i])),
-                                        freshRcr,
-                                        copyOptions());
+        _additionalCursors.push_back(
+            std::make_unique<TaskExecutorCursor>(_executor,
+                                                 _underlyingExecutor,
+                                                 uassertStatusOK(std::move(cursorResponses[i])),
+                                                 freshRcr,
+                                                 copyOptions()));
     }
 }
 

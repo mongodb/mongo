@@ -170,7 +170,7 @@ void establishSearchMetaCursorSBE(const boost::intrusive_ptr<ExpressionContext>&
                                   DocumentSource* stage,
                                   std::unique_ptr<PlanYieldPolicy>);
 
-boost::optional<executor::TaskExecutorCursor> getSearchMetadataCursor(DocumentSource* ds);
+std::unique_ptr<executor::TaskExecutorCursor> getSearchMetadataCursor(DocumentSource* ds);
 
 std::function<void(BSONObjBuilder& bob)> buildSearchGetMoreFunc(
     std::function<boost::optional<long long>()> calcDocsNeeded);

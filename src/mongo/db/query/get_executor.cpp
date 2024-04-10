@@ -1482,13 +1482,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
     const MultipleCollectionAccessor& collections,
     const NamespaceString& nss,
     const CanonicalQuery& cq,
-    executor::TaskExecutorCursor metadataCursor) {
+    std::unique_ptr<executor::TaskExecutorCursor> metadataCursor) {
     // For metadata executor, we always have only one remote cursor, any id will work.
     const size_t metadataCursorId = 0;
     auto remoteCursors = std::make_unique<RemoteCursorMap>();
-    remoteCursors->insert(
-        {metadataCursorId,
-         std::make_unique<executor::TaskExecutorCursor>(std::move(metadataCursor))});
+    remoteCursors->insert({metadataCursorId, std::move(metadataCursor)});
 
     auto sbeYieldPolicy =
         PlanYieldPolicySBE::make(opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, collections, nss);

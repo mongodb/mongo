@@ -56,7 +56,7 @@ executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
 }  // namespace
 
 namespace search_helpers {
-executor::TaskExecutorCursor establishVectorSearchCursor(
+std::unique_ptr<executor::TaskExecutorCursor> establishVectorSearchCursor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& request,
     std::shared_ptr<executor::TaskExecutor> taskExecutor) {

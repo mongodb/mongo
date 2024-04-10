@@ -128,14 +128,14 @@ executor::RemoteCommandRequest getRemoteCommandRequest(OperationContext* opCtx,
     return rcr;
 }
 
-std::vector<executor::TaskExecutorCursor> establishCursors(
+std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const executor::RemoteCommandRequest& command,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     bool preFetchNextBatch,
     std::function<void(BSONObjBuilder& bob)> augmentGetMore,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
-    std::vector<executor::TaskExecutorCursor> cursors;
+    std::vector<std::unique_ptr<executor::TaskExecutorCursor>> cursors;
     auto initialCursor = makeTaskExecutorCursor(
         expCtx->opCtx,
         taskExecutor,
@@ -143,7 +143,7 @@ std::vector<executor::TaskExecutorCursor> establishCursors(
         getSearchCursorOptions(preFetchNextBatch, augmentGetMore, std::move(yieldPolicy)),
         makeRetryOnNetworkErrorPolicy());
 
-    auto additionalCursors = initialCursor.releaseAdditionalCursors();
+    auto additionalCursors = initialCursor->releaseAdditionalCursors();
     cursors.push_back(std::move(initialCursor));
     // Preserve cursor order. Expect cursors to be labeled, so this may not be necessary.
     for (auto& thisCursor : additionalCursors) {
@@ -153,7 +153,7 @@ std::vector<executor::TaskExecutorCursor> establishCursors(
     return cursors;
 }
 
-std::vector<executor::TaskExecutorCursor> establishCursorsForSearchStage(
+std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSearchStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& query,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
@@ -184,7 +184,7 @@ std::vector<executor::TaskExecutorCursor> establishCursorsForSearchStage(
                             std::move(yieldPolicy));
 }
 
-std::vector<executor::TaskExecutorCursor> establishCursorsForSearchMetaStage(
+std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSearchMetaStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& query,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,

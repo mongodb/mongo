@@ -190,7 +190,7 @@ public:
      * Returns the vector of cursors that were returned alongside this one. Calling this claims
      * ownership of the cursors and will return an empty vector on subsequent calls.
      */
-    std::vector<TaskExecutorCursor> releaseAdditionalCursors() {
+    std::vector<std::unique_ptr<TaskExecutorCursor>> releaseAdditionalCursors() {
         return std::move(_additionalCursors);
     }
 
@@ -295,14 +295,14 @@ private:
     long long _batchNum = 0;
 
     // Cursors built from the responses returned alongside the results for this cursor.
-    std::vector<TaskExecutorCursor> _additionalCursors;
+    std::vector<std::unique_ptr<TaskExecutorCursor>> _additionalCursors;
 };
 
 // Make a new TaskExecutorCursor using the provided executor, RCR, and options. If we fail to create
 // the cursor, the retryPolicy can inspect the error and make a decision as to whether we should
 // retry. If we do retry, the error is swallowed and another attempt is made. If we don't retry,
 // this function throws the error we failed with.
-inline TaskExecutorCursor makeTaskExecutorCursor(
+inline std::unique_ptr<TaskExecutorCursor> makeTaskExecutorCursor(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     const RemoteCommandRequest& rcr,
@@ -310,8 +310,8 @@ inline TaskExecutorCursor makeTaskExecutorCursor(
     std::function<bool(Status)> retryPolicy = nullptr) {
     for (;;) {
         try {
-            TaskExecutorCursor tec(executor, rcr, options);
-            tec.populateCursor(opCtx);
+            auto tec = std::make_unique<TaskExecutorCursor>(executor, rcr, options);
+            tec->populateCursor(opCtx);
             return tec;
         } catch (const DBException& ex) {
             bool shouldRetry = retryPolicy && retryPolicy(ex.toStatus());

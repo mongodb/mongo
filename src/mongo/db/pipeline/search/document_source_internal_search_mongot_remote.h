@@ -148,8 +148,8 @@ public:
         return _taskExecutor;
     }
 
-    void setCursor(executor::TaskExecutorCursor cursor) {
-        _cursor.emplace(std::move(cursor));
+    void setCursor(std::unique_ptr<executor::TaskExecutorCursor> cursor) {
+        _cursor = std::move(cursor);
         _dispatchedQuery = true;
     }
 
@@ -179,7 +179,7 @@ public:
      * Copies everything necessary to make a mongot remote query, but does not copy the cursor.
      */
     boost::intrusive_ptr<DocumentSourceInternalSearchMongotRemote> copyForAlternateSource(
-        executor::TaskExecutorCursor cursor,
+        std::unique_ptr<executor::TaskExecutorCursor> cursor,
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) {
         tassert(6635400, "newExpCtx should not be null", newExpCtx != nullptr);
         auto newStage = boost::intrusive_ptr<DocumentSourceInternalSearchMongotRemote>(
@@ -224,7 +224,7 @@ protected:
      */
     void tryToSetSearchMetaVar();
 
-    virtual executor::TaskExecutorCursor establishCursor();
+    virtual std::unique_ptr<executor::TaskExecutorCursor> establishCursor();
 
     virtual GetNextResult getNextAfterSetup();
 
@@ -237,7 +237,7 @@ protected:
      */
     std::unique_ptr<Pipeline, PipelineDeleter> _mergingPipeline;
 
-    boost::optional<executor::TaskExecutorCursor> _cursor;
+    std::unique_ptr<executor::TaskExecutorCursor> _cursor;
 
 private:
     /**
@@ -268,7 +268,7 @@ private:
 
     /**
      * Track whether either the stage or an earlier caller issues a mongot remote request. This
-     * can be true even if '_cursor' is boost::none, which can happen if no documents are returned.
+     * can be true even if '_cursor' is nullptr, which can happen if no documents are returned.
      */
     bool _dispatchedQuery = false;
 

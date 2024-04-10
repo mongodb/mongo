@@ -37,7 +37,7 @@ namespace mongo::search_helpers {
  * Run the given vector search request against mongot and build a cursor object for the cursor
  * returned from mongot.
  */
-executor::TaskExecutorCursor establishVectorSearchCursor(
+std::unique_ptr<executor::TaskExecutorCursor> establishVectorSearchCursor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& request,
     std::shared_ptr<executor::TaskExecutor> taskExecutor);

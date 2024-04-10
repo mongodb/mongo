@@ -61,19 +61,19 @@ Value DocumentSourceSearchMeta::serialize(const SerializationOptions& opts) cons
     return DocumentSourceInternalSearchMongotRemote::serialize(opts);
 }
 
-executor::TaskExecutorCursor DocumentSourceSearchMeta::establishCursor() {
+std::unique_ptr<executor::TaskExecutorCursor> DocumentSourceSearchMeta::establishCursor() {
     auto cursors = mongot_cursor::establishCursorsForSearchMetaStage(
         pExpCtx, getSearchQuery(), getTaskExecutor(), getIntermediateResultsProtocolVersion());
     if (cursors.size() == 1) {
         const auto& cursor = *cursors.begin();
         tassert(6448010,
                 "If there's one cursor we expect to get SEARCH_META from the attached vars",
-                !getIntermediateResultsProtocolVersion() && !cursor.getType() &&
-                    cursor.getCursorVars());
+                !getIntermediateResultsProtocolVersion() && !cursor->getType() &&
+                    cursor->getCursorVars());
         return std::move(*cursors.begin());
     }
     for (auto&& cursor : cursors) {
-        auto maybeCursorType = cursor.getType();
+        auto maybeCursorType = cursor->getType();
         tassert(6448008, "Expected every mongot cursor to come back with a type", maybeCursorType);
         if (*maybeCursorType == CursorTypeEnum::SearchMetaResult) {
             // Note this may leak the other cursor(s). Should look into whether we can

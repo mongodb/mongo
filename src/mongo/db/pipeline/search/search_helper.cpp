@@ -178,23 +178,23 @@ BSONObj getSearchRemoteExplain(const ExpressionContext* expCtx,
     return builder.obj();
 }
 
-std::pair<boost::optional<executor::TaskExecutorCursor>,
-          boost::optional<executor::TaskExecutorCursor>>
-parseMongotResponseCursors(std::vector<executor::TaskExecutorCursor> cursors) {
+std::pair<std::unique_ptr<executor::TaskExecutorCursor>,
+          std::unique_ptr<executor::TaskExecutorCursor>>
+parseMongotResponseCursors(std::vector<std::unique_ptr<executor::TaskExecutorCursor>> cursors) {
     // mongot can return zero cursors for an empty collection, one without metadata, or two for
     // results and metadata.
     tassert(7856000, "Expected less than or exactly two cursors from mongot", cursors.size() <= 2);
 
-    if (cursors.size() == 1 && !cursors[0].getType()) {
-        return {std::move(cursors[0]), boost::none};
+    if (cursors.size() == 1 && !cursors[0]->getType()) {
+        return {std::move(cursors[0]), nullptr};
     }
 
-    std::pair<boost::optional<executor::TaskExecutorCursor>,
-              boost::optional<executor::TaskExecutorCursor>>
+    std::pair<std::unique_ptr<executor::TaskExecutorCursor>,
+              std::unique_ptr<executor::TaskExecutorCursor>>
         result;
 
-    for (auto it = cursors.begin(); it != cursors.end(); it++) {
-        auto maybeCursorLabel = it->getType();
+    for (auto& cursor : cursors) {
+        auto maybeCursorLabel = cursor->getType();
         // If a cursor is unlabeled mongot does not support metadata cursors. $$SEARCH_META
         // should not be supported in this query.
         tassert(
@@ -202,10 +202,10 @@ parseMongotResponseCursors(std::vector<executor::TaskExecutorCursor> cursors) {
 
         switch (*maybeCursorLabel) {
             case CursorTypeEnum::DocumentResult:
-                result.first.emplace(std::move(*it));
+                result.first = std::move(cursor);
                 break;
             case CursorTypeEnum::SearchMetaResult:
-                result.second.emplace(std::move(*it));
+                result.second = std::move(cursor);
                 break;
         }
     }
@@ -383,8 +383,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> newPipeline = nullptr;
-    for (auto it = cursors.begin(); it != cursors.end(); it++) {
-        auto maybeCursorLabel = it->getType();
+    for (auto& cursor : cursors) {
+        auto maybeCursorLabel = cursor->getType();
         if (!maybeCursorLabel) {
             // If a cursor is unlabeled mongot does not support metadata cursors. $$SEARCH_META
             // should not be supported in this query.
@@ -396,7 +396,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
         }
         switch (*maybeCursorLabel) {
             case CursorTypeEnum::DocumentResult:
-                origSearchStage->setCursor(std::move(*it));
+                origSearchStage->setCursor(std::move(cursor));
                 origPipeline->pipelineType = CursorTypeEnum::DocumentResult;
                 break;
             case CursorTypeEnum::SearchMetaResult:
@@ -420,7 +420,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
 
                     // Clone the MongotRemote stage and set the metadata cursor.
                     auto newStage =
-                        origSearchStage->copyForAlternateSource(std::move(*it), newExpCtx);
+                        origSearchStage->copyForAlternateSource(std::move(cursor), newExpCtx);
 
                     // Build a new pipeline with the metadata source as the only stage.
                     newPipeline = Pipeline::create({newStage}, newExpCtx);
@@ -461,7 +461,7 @@ void establishSearchCursorsSBE(boost::intrusive_ptr<ExpressionContext> expCtx,
 
     if (documentCursor) {
         searchStage->setRemoteCursorVars(documentCursor->getCursorVars());
-        searchStage->setCursor(std::move(*documentCursor));
+        searchStage->setCursor(std::move(documentCursor));
     }
 
     if (metaCursor) {
@@ -470,7 +470,7 @@ void establishSearchCursorsSBE(boost::intrusive_ptr<ExpressionContext> expCtx,
         tassert(7856002,
                 "Didn't expect metadata cursor from mongot",
                 !expCtx->inMongos && searchStage->getIntermediateResultsProtocolVersion());
-        searchStage->setMetadataCursor(std::move(*metaCursor));
+        searchStage->setMetadataCursor(std::move(metaCursor));
     }
 }
 
@@ -494,14 +494,14 @@ void establishSearchMetaCursorSBE(const boost::intrusive_ptr<ExpressionContext>&
     auto [documentCursor, metaCursor] = parseMongotResponseCursors(std::move(cursors));
 
     if (metaCursor) {
-        searchStage->setCursor(std::move(*metaCursor));
+        searchStage->setCursor(std::move(metaCursor));
     } else {
         tassert(7856203,
                 "If there's one cursor we expect to get SEARCH_META from the attached vars",
                 !searchStage->getIntermediateResultsProtocolVersion() &&
                     !documentCursor->getType() && documentCursor->getCursorVars());
         searchStage->setRemoteCursorVars(documentCursor->getCursorVars());
-        searchStage->setCursor(std::move(*documentCursor));
+        searchStage->setCursor(std::move(documentCursor));
     }
 }
 
@@ -532,11 +532,11 @@ bool encodeSearchForSbeCache(const boost::intrusive_ptr<ExpressionContext>& expC
     return true;
 }
 
-boost::optional<executor::TaskExecutorCursor> getSearchMetadataCursor(DocumentSource* ds) {
+std::unique_ptr<executor::TaskExecutorCursor> getSearchMetadataCursor(DocumentSource* ds) {
     if (auto search = dynamic_cast<DocumentSourceSearch*>(ds)) {
         return search->getMetadataCursor();
     }
-    return boost::none;
+    return nullptr;
 }
 
 std::function<void(BSONObjBuilder& bob)> buildSearchGetMoreFunc(
@@ -571,8 +571,7 @@ std::unique_ptr<RemoteCursorMap> getSearchRemoteCursors(
             return nullptr;
         }
         auto cursorMap = std::make_unique<RemoteCursorMap>();
-        cursorMap->insert({searchStage->getRemoteCursorId(),
-                           std::make_unique<executor::TaskExecutorCursor>(std::move(*cursor))});
+        cursorMap->insert({searchStage->getRemoteCursorId(), std::move(cursor)});
         return cursorMap;
     } else if (auto searchMetaStage = dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage)) {
         auto cursor = searchMetaStage->getCursor();
@@ -580,8 +579,7 @@ std::unique_ptr<RemoteCursorMap> getSearchRemoteCursors(
             return nullptr;
         }
         auto cursorMap = std::make_unique<RemoteCursorMap>();
-        cursorMap->insert({searchMetaStage->getRemoteCursorId(),
-                           std::make_unique<executor::TaskExecutorCursor>(std::move(*cursor))});
+        cursorMap->insert({searchMetaStage->getRemoteCursorId(), std::move(cursor)});
         return cursorMap;
     }
     return nullptr;

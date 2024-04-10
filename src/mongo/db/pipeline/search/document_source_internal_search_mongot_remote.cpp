@@ -278,7 +278,8 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextA
     return Document::fromBsonWithMetaData(response.value());
 }
 
-executor::TaskExecutorCursor DocumentSourceInternalSearchMongotRemote::establishCursor() {
+std::unique_ptr<executor::TaskExecutorCursor>
+DocumentSourceInternalSearchMongotRemote::establishCursor() {
     auto cursors = mongot_cursor::establishCursorsForSearchStage(pExpCtx,
                                                                  _searchQuery,
                                                                  _taskExecutor,
@@ -301,7 +302,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::doGetNex
     // If the collection is sharded we should have a cursor already. Otherwise establish it now.
     if (!_cursor && !_dispatchedQuery) {
         LOGV2_DEBUG(8569403, 4, "Establishing Cursor");
-        _cursor.emplace(establishCursor());
+        _cursor = establishCursor();
         _dispatchedQuery = true;
     }
     tryToSetSearchMetaVar();

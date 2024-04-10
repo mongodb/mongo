@@ -78,14 +78,14 @@ public:
         return _remoteCursorVars;
     }
 
-    boost::optional<executor::TaskExecutorCursor> getCursor() {
+    std::unique_ptr<executor::TaskExecutorCursor> getCursor() {
         return std::move(_cursor);
     }
 
 protected:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    executor::TaskExecutorCursor establishCursor() override;
+    std::unique_ptr<executor::TaskExecutorCursor> establishCursor() override;
 
 private:
     GetNextResult getNextAfterSetup() override;

@@ -110,7 +110,7 @@ private:
 
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;
 
-    boost::optional<executor::TaskExecutorCursor> _cursor;
+    std::unique_ptr<executor::TaskExecutorCursor> _cursor;
 
     // Store the cursorId. We need to store it on the document source because the id on the
     // TaskExecutorCursor will be set to zero after the final getMore after the cursor is
