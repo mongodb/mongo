@@ -348,11 +348,9 @@ buildvariants:
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
     tasks:
-      # TODO: DEVPROD-5173
-      # Add !.incompatible_all_feature_flags back when the tag is added to any task or DEVPROD-5173 is completed.
-      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant #!.incompatible_all_feature_flags
-      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant #!.incompatible_all_feature_flags
-      - name: .default !.requires_compile_variant !.incompatible_development_variant #!.incompatible_all_feature_flags
+      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .default !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
 
   - &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
     <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
