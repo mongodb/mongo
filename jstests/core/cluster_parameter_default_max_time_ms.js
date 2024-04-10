@@ -7,8 +7,6 @@
  *   # Transactions aborted upon fcv upgrade or downgrade; cluster parameters use internal txns.
  *   uses_transactions,
  *   featureFlagDefaultReadMaxTimeMS,
- *   # TODO (SERVER-88924): Re-enable the test.
- *   __TEMPORARILY_DISABLED__,
  * ]
  */
 
