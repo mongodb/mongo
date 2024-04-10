@@ -892,6 +892,29 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationCon
     return catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks);
 }
 
+BSONObj forceReadConcernLocal(OperationContext* opCtx, BSONObj& cmd) {
+    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    auto atClusterTime = readConcernArgs.getArgsAtClusterTime();
+    auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
+    BSONObjBuilder bob(cmd.removeField(ReadConcernArgs::kReadConcernFieldName));
+    BSONObjBuilder newReadConcernBuilder;
+    newReadConcernBuilder.append(ReadConcernArgs::kLevelFieldName,
+                                 repl::readConcernLevels::kLocalName);
+    // We should carry over the atClusterTime/afterClusterTime to keep causal consistency.
+    if (atClusterTime) {
+        // atClusterTime is only supported in snapshot readConcern, so we use afterClusterTime
+        // instead.
+        newReadConcernBuilder.append(ReadConcernArgs::kAfterClusterTimeFieldName,
+                                     atClusterTime->asTimestamp());
+    } else if (afterClusterTime) {
+        newReadConcernBuilder.append(ReadConcernArgs::kAfterClusterTimeFieldName,
+                                     afterClusterTime->asTimestamp());
+    }
+    bob.append(ReadConcernArgs::kReadConcernFieldName, newReadConcernBuilder.obj());
+
+    return bob.obj();
+}
+
 StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
     OperationContext* opCtx, const NamespaceString& nss, const CollectionRoutingInfo& cri) {
     auto [indexShard, listIndexesCmd] = [&]() -> std::pair<std::shared_ptr<Shard>, BSONObj> {
@@ -900,10 +923,7 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
             opCtx, true /* appendRC */, false /* appendWC */, BSON("listIndexes" << nss.coll()));
 
         // force the read concern level to "local" as other values are not supported for listIndexes
-        BSONObjBuilder bob(cmdNoVersion.removeField(ReadConcernArgs::kReadConcernFieldName));
-        bob.append(ReadConcernArgs::kReadConcernFieldName,
-                   BSON(ReadConcernArgs::kLevelFieldName << repl::readConcernLevels::kLocalName));
-        cmdNoVersion = bob.obj();
+        cmdNoVersion = forceReadConcernLocal(opCtx, cmdNoVersion);
 
         if (cm.hasRoutingTable()) {
             // For a collection that has a routing table, we must load indexes from a shard with
