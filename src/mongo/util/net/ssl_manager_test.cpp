@@ -780,6 +780,5 @@ TEST(SSLManager, InitContextNoSanWarning) {
     ASSERT_FALSE(isSanWarningWritten(getCapturedTextFormatLogMessages()));
 }
 
-
 }  // namespace
 }  // namespace mongo

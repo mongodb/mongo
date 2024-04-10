@@ -53,6 +53,7 @@
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/synchronized_value.h"
 
 /**
  * Fail unconditionally, reporting the given message.
@@ -649,7 +650,7 @@ protected:
      * Gets a vector of strings, one log line per string, captured since
      * the last call to startCapturingLogMessages() in this test.
      */
-    const std::vector<std::string>& getCapturedTextFormatLogMessages() const;
+    std::vector<std::string> getCapturedTextFormatLogMessages() const;
     std::vector<BSONObj> getCapturedBSONFormatLogMessages() const;
 
     /**
