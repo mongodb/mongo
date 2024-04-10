@@ -252,7 +252,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                                .firstElement(),
                            expCtx),
                        AssertionException,
-                       ErrorCodes::IDLFailedToParse);
+                       ErrorCodes::IDLDuplicateField);
     ASSERT_THROWS_CODE(
         DocumentSourceUnionWith::createFromBson(
             BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll() << "pipeline"
@@ -262,7 +262,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                 .firstElement(),
             expCtx),
         AssertionException,
-        ErrorCodes::IDLFailedToParse);
+        ErrorCodes::IDLDuplicateField);
     ASSERT_THROWS_CODE(
         DocumentSourceUnionWith::createFromBson(
             BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll() << "pipeline"

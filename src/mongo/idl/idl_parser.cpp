@@ -169,7 +169,7 @@ std::string IDLParserContext::getElementPath(StringData fieldName) const {
 
 void IDLParserContext::throwDuplicateField(StringData fieldName) const {
     std::string path = getElementPath(fieldName);
-    uasserted(ErrorCodes::IDLFailedToParse,
+    uasserted(ErrorCodes::IDLDuplicateField,
               str::stream() << "BSON field '" << path << "' is a duplicate field");
 }
 
