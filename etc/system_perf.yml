@@ -300,10 +300,13 @@ functions:
         # them and not run all of them, since activating all tasks is the default behavior for task
         # generation in a patch.
         script: |
+          pushd ./src/mongo
+          ~/evergreen evaluate ./etc/system_perf.yml > evaluated_project_configuration.yml
+          popd
           if [ "${is_patch|false}" = "true" ]; then
-            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf/perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf/perf_branching.yml --no-activate
+            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/evaluated_project_configuration.yml --no-activate
           else
-            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf/perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf/perf_branching.yml
+            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/evaluated_project_configuration.yml
           fi
     - command: generate.tasks
       params:
