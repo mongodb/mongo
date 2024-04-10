@@ -215,7 +215,7 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
 
     // Reset the stats counter for extended range time-series collections. This is maintained
     // outside the catalog itself.
-    catalog_stats::requiresTimeseriesExtendedRangeSupport.store(0);
+    catalog_stats::requiresTimeseriesExtendedRangeSupport.storeRelaxed(0);
 
     reopenOnFailure.dismiss();
     return previousCatalogState;

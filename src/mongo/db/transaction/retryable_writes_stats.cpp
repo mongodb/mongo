@@ -50,21 +50,21 @@ RetryableWritesStats* RetryableWritesStats::get(OperationContext* opCtx) {
 }
 
 void RetryableWritesStats::incrementRetriedCommandsCount() {
-    _retriedCommandsCount.fetchAndAdd(1);
+    _retriedCommandsCount.fetchAndAddRelaxed(1);
 }
 
 void RetryableWritesStats::incrementRetriedStatementsCount() {
-    _retriedStatementsCount.fetchAndAdd(1);
+    _retriedStatementsCount.fetchAndAddRelaxed(1);
 }
 
 void RetryableWritesStats::incrementTransactionsCollectionWriteCount() {
-    _transactionsCollectionWriteCount.fetchAndAdd(1);
+    _transactionsCollectionWriteCount.fetchAndAddRelaxed(1);
 }
 
 void RetryableWritesStats::updateStats(TransactionsStats* stats) {
-    stats->setRetriedCommandsCount(_retriedCommandsCount.load());
-    stats->setRetriedStatementsCount(_retriedStatementsCount.load());
-    stats->setTransactionsCollectionWriteCount(_transactionsCollectionWriteCount.load());
+    stats->setRetriedCommandsCount(_retriedCommandsCount.loadRelaxed());
+    stats->setRetriedStatementsCount(_retriedStatementsCount.loadRelaxed());
+    stats->setTransactionsCollectionWriteCount(_transactionsCollectionWriteCount.loadRelaxed());
 }
 
 }  // namespace mongo

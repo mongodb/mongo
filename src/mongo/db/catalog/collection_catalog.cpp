@@ -1388,7 +1388,7 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
         invariant(readTimestamp);
 
         // Scan durable catalog when we don't have accurate catalogId mapping for this timestamp.
-        gCollectionCatalogSection.numScansDueToMissingMapping.fetchAndAdd(1);
+        gCollectionCatalogSection.numScansDueToMissingMapping.fetchAndAddRelaxed(1);
         auto catalogEntry = nssOrUUID.isNamespaceString()
             ? DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nssOrUUID.nss())
             : DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid());

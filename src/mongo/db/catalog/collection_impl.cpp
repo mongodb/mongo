@@ -882,7 +882,7 @@ void CollectionImpl::setRequiresTimeseriesExtendedRangeSupport(OperationContext*
     bool expected = false;
     bool set = _shared->_requiresTimeseriesExtendedRangeSupport.compareAndSwap(&expected, true);
     if (set) {
-        catalog_stats::requiresTimeseriesExtendedRangeSupport.fetchAndAdd(1);
+        catalog_stats::requiresTimeseriesExtendedRangeSupport.fetchAndAddRelaxed(1);
         if (!timeseries::collectionHasTimeIndex(opCtx, *this)) {
             LOGV2_WARNING(
                 6679402,
