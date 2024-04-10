@@ -146,7 +146,7 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
                 dict((k, 2) for k in orig_keys[i+1:]))
 
         # Perform validation on setting the oldest and the stable timestamps:
-        # - It is a success, but a no-op, to set them behind their existing values.
+        # - It is an error, to set them behind their existing values.
         # - Oldest timestamp can't be more than the stable. It is reported as an error if an attempt
         #   is made to set that way. If forcibly set in the wrong order, a stat should indicate it.
         # - If both the oldest and the stable are provided in the same call, the test to check if
@@ -160,12 +160,15 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertTimestampsEqual(\
             self.conn.query_timestamp("get=stable_timestamp"), self.timestamp_str(300))
 
-        # Any attempt to set the oldest or stable to a value older than the current is silently
-        # ignored.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
+        # An error is generated when setting the oldest or stable to a value older than the current.
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1)),
+                '/oldest timestamp \(0, 1\) must not be older than current oldest timestamp \(0, 200\)/')
         self.assertTimestampsEqual\
             (self.conn.query_timestamp("get=oldest_timestamp"), self.timestamp_str(200))
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1)),
+                '/stable timestamp \(0, 1\) must not be older than current stable timestamp \(0, 300\)/')
         self.assertTimestampsEqual(\
             self.conn.query_timestamp("get=stable_timestamp"), self.timestamp_str(300))
 
@@ -185,15 +188,20 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
 
         # If both the oldest and the stable are provided in the same call, the behavior should be
         # consistent with providing them individually.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
-            ',stable_timestamp=' + self.timestamp_str(1))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+                                            ',stable_timestamp=' + self.timestamp_str(1)),
+                '/oldest timestamp \(0, 1\) must not be older than current oldest timestamp \(0, 201\)/')
         self.assertTimestampsEqual(\
             self.conn.query_timestamp("get=oldest_timestamp"), self.timestamp_str(201))
         self.assertTimestampsEqual(\
             self.conn.query_timestamp("get=stable_timestamp"), self.timestamp_str(301))
 
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(202) +
-            ',stable_timestamp=' + self.timestamp_str(1))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(202) +
+                                            ',stable_timestamp=' + self.timestamp_str(1)),
+                '/stable timestamp \(0, 1\) must not be older than current stable timestamp \(0, 301\)/')
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(202))
         self.assertTimestampsEqual(\
             self.conn.query_timestamp("get=oldest_timestamp"), self.timestamp_str(202))
         self.assertTimestampsEqual(\
@@ -202,7 +210,7 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(302) +
                 ',stable_timestamp=' + self.timestamp_str(1)),
-                '/oldest timestamp \(0, 302\) must not be later than stable timestamp \(0, 301\)/')
+                '/stable timestamp \(0, 1\) must not be older than current stable timestamp \(0, 301\)/')
         self.assertTimestampsEqual(\
             self.conn.query_timestamp("get=oldest_timestamp"), self.timestamp_str(202))
         self.assertTimestampsEqual(\

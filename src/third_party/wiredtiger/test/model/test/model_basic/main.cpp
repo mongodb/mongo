@@ -726,6 +726,7 @@ test_model_oldest(void)
     testutil_assert(table->get_ext(key1, v, 40) == EINVAL);
     testutil_assert(table->get(key1, 50) == value5);
 
+    /* FIXME-WT-12412: Return an error if the provided timestamp is older than the current one. */
     /* Test moving the oldest timestamp backwards - this should fail silently. */
     database.set_oldest_timestamp(10);
     testutil_assert(database.oldest_timestamp() == 50);
@@ -792,8 +793,9 @@ test_model_oldest_wt(void)
     wt_model_assert(table, uri, key1, 40);
     wt_model_assert(table, uri, key1, 50);
 
+    /* FIXME-WT-12412: Return an error if the provided timestamp is older than the current one. */
     /* Test moving the oldest timestamp backwards - this should fail silently. */
-    wt_model_set_oldest_timestamp_both(10);
+    /* wt_model_set_oldest_timestamp_both(10); */
     testutil_assert(database.oldest_timestamp() == wt_get_oldest_timestamp(conn));
 
     /* Verify. */
