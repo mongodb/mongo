@@ -12,7 +12,7 @@ export function removeShard(shardingTestOrConn, shardName, timeout) {
 
     assert.soon(function() {
         let res;
-        if (TestData.configShard && shardName == "config") {
+        if (shardName == "config") {
             // Need to use transitionToDedicatedConfigServer if trying
             // to remove config server as a shard
             res = s.adminCommand({transitionToDedicatedConfigServer: shardName});
