@@ -3,6 +3,11 @@
  * assertion failure when we strip its index assignment from special indexes.
  *
  * Originally intended to reproduce SERVER-82717.
+ *
+ * @tags: [
+ *    # Explain command does not support read concerns other than local.
+ *    assumes_read_concern_local,
+ * ]
  */
 import {planHasStage} from 'jstests/libs/analyze_plan.js';
 
