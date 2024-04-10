@@ -38,6 +38,7 @@ TimeseriesTest.run((insert) => {
         [metaFieldName]: "cpu",
         topLevelScalar: 123,
         topLevelScalarDouble: 123.8778645,
+        topLevelLargeNumber: 12345678912345,
         topLevelArray: [1, 2, 3, 4],
         arrOfObj: [{x: 1}, {x: 2}, {x: 3}, {x: 4}],
         obj: {a: 123},
@@ -749,6 +750,14 @@ TimeseriesTest.run((insert) => {
 
         assert.docEq([{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 1, "total2": 456}],
                      coll.aggregate(pipeline).toArray());
+    }
+    {
+        let pipeline = [{$match: {topLevelLargeNumber: {$mod: [1, 0]}}}, {$count: "count"}];
+
+        const res = coll.aggregate(pipeline).toArray();
+
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
     }
     {
         const res =
