@@ -707,7 +707,11 @@ public:
         // Fast path for dense case.
         if (*tryDense()) {
             storage->tags.resize(_vals.size(), TypeTag);
-            return {_presentBitset.size(), storage->tags.data(), _vals.data()};
+            return {_presentBitset.size(),
+                    storage->tags.data(),
+                    _vals.data(),
+                    storage->tag,
+                    storage->isDense};
         }
 
         storage->vals.resize(_presentBitset.size());

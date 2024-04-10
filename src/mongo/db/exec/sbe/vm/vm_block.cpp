@@ -677,10 +677,10 @@ size_t homogeneousTopBottomHelper(bool isAscending,
         // All values in the bitset were false, so we don't need to update the state.
         return bitsetVals.size();
     }
-    auto keyLess = HomogeneousSortPattern<Less, int64_t>(isAscending);
+    auto keyLess = HomogeneousSortPattern<Less, T>(isAscending);
     size_t bestIdx = firstPresent;
     for (size_t i = firstPresent; i < keyVals.size(); ++i) {
-        if (value::bitcastTo<bool>(bitsetVals[i]) && keyLess(keyVals[bestIdx], keyVals[i])) {
+        if (value::bitcastTo<bool>(bitsetVals[i]) && keyLess(keyVals[i], keyVals[bestIdx])) {
             bestIdx = i;
         }
     }
