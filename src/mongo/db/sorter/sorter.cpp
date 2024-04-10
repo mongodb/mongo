@@ -94,6 +94,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/file.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
 
@@ -1397,6 +1398,17 @@ Sorter<Key, Value>::File::~File() {
     }
 
     if (_keep) {
+        if (!_file.is_open()) {
+            return;
+        }
+        DESTRUCTOR_GUARD(_file.flush());
+
+        mongo::File fileForFsync;
+        fileForFsync.open(_path.string().c_str());
+        if (fileForFsync.is_open()) {
+            fileForFsync.fsync();
+        }
+
         return;
     }
 
