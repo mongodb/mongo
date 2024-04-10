@@ -170,6 +170,11 @@ public:
         }
         return root.obj();
     }
+
+    bool computedMetaProjFieldsContainsField(std::set<std::string>& computedMetaProjFields,
+                                             std::string field) {
+        return computedMetaProjFields.find(field) != computedMetaProjFields.end();
+    }
 };
 
 TEST_F(BucketUnpackerTest, UnpackBasicIncludeAllMeasurementFields) {
@@ -657,6 +662,76 @@ TEST_F(BucketUnpackerTest, EraseMetaFromFieldSetAndDetermineIncludeMeta) {
     ASSERT_TRUE(unpacker.includeMetaField());
     unpacker.setBucketSpec(std::move(specMetaInclude));
     ASSERT_FALSE(unpacker.includeMetaField());
+}
+
+TEST_F(BucketUnpackerTest, EraseUnneededComputedMetaProjFieldsWithInclusiveProject) {
+    auto bucket = fromjson(R"(
+{
+    control: {version: 1},
+    data: {
+        _id: {'0':4, '1':5, '2':6},
+        time: {'0':4, '1': 5, '2': 6}
+    }
+})");
+    std::set<std::string> unpackerFields{kUserDefinedTimeName.toString()};
+    auto unpacker = makeBucketUnpacker(unpackerFields,
+                                       BucketSpec::Behavior::kInclude,
+                                       std::move(bucket),
+                                       kUserDefinedMetaName.toString());
+
+    // Add fields to '_computedMetaProjFields'.
+    unpacker.addComputedMetaProjFields({"hello"_sd, "bye"_sd});
+    auto computedMetaProjFields = unpacker.bucketSpec().computedMetaProjFields();
+    ASSERT_TRUE(computedMetaProjFieldsContainsField(computedMetaProjFields, "hello"));
+    ASSERT_TRUE(computedMetaProjFieldsContainsField(computedMetaProjFields, "bye"));
+
+    auto spec = unpacker.bucketSpec();
+    std::set<std::string> includeFields{kUserDefinedTimeName.toString(), "bye"};
+    spec.setFieldSet(includeFields);
+    spec.setBehavior(BucketSpec::Behavior::kInclude);
+
+    // This calls eraseUnneededComputedMetaProjFields().
+    unpacker.setBucketSpec(std::move(spec));
+    computedMetaProjFields = unpacker.bucketSpec().computedMetaProjFields();
+    // As "hello" was not in the includes, it should be removed.
+    ASSERT_FALSE(computedMetaProjFieldsContainsField(computedMetaProjFields, "hello"));
+    // As "bye" was in the includes, it should still be in '_computedMetaProjFields'.
+    ASSERT_TRUE(computedMetaProjFieldsContainsField(computedMetaProjFields, "bye"));
+}
+
+TEST_F(BucketUnpackerTest, EraseUnneededComputedMetaProjFieldsWithExclusiveProject) {
+    auto bucket = fromjson(R"(
+{
+    control: {version: 1},
+    data: {
+        _id: {'0':4, '1':5, '2':6},
+        time: {'0':4, '1': 5, '2': 6}
+    }
+})");
+    std::set<std::string> unpackerFields{kUserDefinedTimeName.toString()};
+    auto unpacker = makeBucketUnpacker(unpackerFields,
+                                       BucketSpec::Behavior::kInclude,
+                                       std::move(bucket),
+                                       kUserDefinedMetaName.toString());
+
+    // Add fields to '_computedMetaProjFields'.
+    unpacker.addComputedMetaProjFields({"hello"_sd, "bye"_sd});
+    auto computedMetaProjFields = unpacker.bucketSpec().computedMetaProjFields();
+    ASSERT_TRUE(computedMetaProjFieldsContainsField(computedMetaProjFields, "hello"));
+    ASSERT_TRUE(computedMetaProjFieldsContainsField(computedMetaProjFields, "bye"));
+
+    auto spec = unpacker.bucketSpec();
+    std::set<std::string> excludeFields{kUserDefinedTimeName.toString(), "bye"};
+    spec.setFieldSet(excludeFields);
+    spec.setBehavior(BucketSpec::Behavior::kExclude);
+
+    // This calls eraseUnneededComputedMetaProjFields().
+    unpacker.setBucketSpec(std::move(spec));
+    computedMetaProjFields = unpacker.bucketSpec().computedMetaProjFields();
+    // As "hello" was not excluded, it should still exist.
+    ASSERT_TRUE(computedMetaProjFieldsContainsField(computedMetaProjFields, "hello"));
+    // As "bye" was in the excludes, it should be removed from '_computedMetaProjFields'.
+    ASSERT_FALSE(computedMetaProjFieldsContainsField(computedMetaProjFields, "bye"));
 }
 
 TEST_F(BucketUnpackerTest, DetermineIncludeTimeField) {
