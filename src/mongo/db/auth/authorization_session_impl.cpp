@@ -34,7 +34,6 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <cstddef>
-#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -45,7 +44,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -64,7 +62,6 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern_search_list.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/client.h"
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -75,7 +72,6 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/unordered_map.h"
@@ -89,10 +85,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
-
 namespace mongo {
 
-namespace dps = ::mongo::dotted_path_support;
 using std::vector;
 namespace {
 
@@ -1029,6 +1023,10 @@ void AuthorizationSessionImpl::verifyContract(const AuthorizationContract* contr
     // Implicitly checked often to keep mayBypassWriteBlockingMode() fast
     tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(boost::none),
                                         ActionType::bypassWriteBlockingMode));
+
+    // Operations which do not specify a maxTimeMS check if the defaultMaxTimeMS can be bypassed.
+    tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(boost::none),
+                                        ActionType::bypassDefaultMaxTimeMS));
 
     // Implicitly checked often to keep useTenant checks fast
     tempContract.addPrivilege(

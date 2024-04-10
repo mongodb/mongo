@@ -29,6 +29,7 @@
 
 #include "mongo/db/default_max_time_ms_cluster_parameter.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/default_max_time_ms_cluster_parameter_gen.h"
 
 namespace mongo {
@@ -36,29 +37,43 @@ namespace mongo {
 boost::optional<Milliseconds> getRequestOrDefaultMaxTimeMS(
     OperationContext* opCtx,
     const boost::optional<mongo::IDLAnyType>& requestMaxTimeMS,
-    bool isReadOperation) {
+    const bool isReadOperation) {
+
     // Always uses the user-defined value if it's passed in.
     if (requestMaxTimeMS) {
         return Milliseconds{uassertStatusOK(parseMaxTimeMS(requestMaxTimeMS->getElement()))};
     }
-    // TODO (SERVER-87886): Remove this block. This is a temporary hack before the privilege-based
-    // checking is implemented.
-    if (opCtx->getClient()->isInDirectClient()) {
+
+    // Currently, defaultMaxTimeMS is only applicable to read operations.
+    if (!isReadOperation) {
         return boost::none;
     }
-    // Next uses the default maxTimeMS cluster parameter if the command is a read operation.
+
+    // If the feature flag is disabled, return early.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (isReadOperation && fcvSnapshot.isVersionInitialized() &&
-        gFeatureFlagDefaultReadMaxTimeMS.isEnabled(fcvSnapshot)) {
-        auto defaultReadMaxTimeMS = [&]() {
-            auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-            auto* defaultMaxTimeMSParam =
-                clusterParameters->get<ClusterParameterWithStorage<DefaultMaxTimeMSParam>>(
-                    "defaultMaxTimeMS");
-            return defaultMaxTimeMSParam->getValue(boost::none).getReadOperations();
-        }();
-        return Milliseconds{defaultReadMaxTimeMS};
+    if (!fcvSnapshot.isVersionInitialized() ||
+        !gFeatureFlagDefaultReadMaxTimeMS.isEnabled(fcvSnapshot)) {
+        return boost::none;
     }
-    return boost::none;
+
+    // Check if the defaultMaxTimeMS can be bypassed.
+    const auto bypassDefaultMaxTimeMS =
+        AuthorizationSession::get(opCtx->getClient())
+            ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(boost::none),
+                                               ActionType::bypassDefaultMaxTimeMS);
+
+    if (bypassDefaultMaxTimeMS) {
+        return boost::none;
+    }
+
+    // Next uses the default maxTimeMS cluster parameter if the command is a read operation.
+    auto defaultReadMaxTimeMS = [&]() {
+        auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+        auto* defaultMaxTimeMSParam =
+            clusterParameters->get<ClusterParameterWithStorage<DefaultMaxTimeMSParam>>(
+                "defaultMaxTimeMS");
+        return defaultMaxTimeMSParam->getValue(boost::none).getReadOperations();
+    }();
+    return Milliseconds{defaultReadMaxTimeMS};
 }
 }  // namespace mongo

@@ -1752,18 +1752,18 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
 }
 
 TEST_F(AuthorizationSessionTest, CheckBuiltInRolesForBypassDefaultMaxTimeMS) {
-    // Verify the "root" role is authorised  for 'bypassDefaultMaxTimeMS' for all resources.
+    // Verify the "root" role is authorised  for 'bypassDefaultMaxTimeMS'.
     authzSession->assumePrivilegesForBuiltinRole(RoleName{"root", "admin"});
     ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
-        ResourcePattern::forAnyResource(boost::none), ActionType::bypassDefaultMaxTimeMS));
+        ResourcePattern::forClusterResource(boost::none), ActionType::bypassDefaultMaxTimeMS));
 
     authzSession->logoutAllDatabases(_client.get(), "Test finished");
 
-    // Verify the "__system" role is authorised  for 'bypassDefaultMaxTimeMS' for all resources.
+    // Verify the "__system" role is authorised  for 'bypassDefaultMaxTimeMS'.
     auto client = getServiceContext()->getService()->makeClient("directClient");
     authzSession->grantInternalAuthorization(client.get());
     ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
-        ResourcePattern::forAnyResource(boost::none), ActionType::bypassDefaultMaxTimeMS));
+        ResourcePattern::forClusterResource(boost::none), ActionType::bypassDefaultMaxTimeMS));
 }
 
 class SystemBucketsTest : public AuthorizationSessionTest {
