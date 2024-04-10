@@ -104,6 +104,23 @@ tasks:
             --runAllFeatureFlagTests
 
   - <<: *antithesis_task_template
+    name: antithesis_replica_sets_initsync_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_initsync_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
     name: antithesis_concurrency_sharded_with_stepdowns_and_balancer_config_shard
     tags:
       [
