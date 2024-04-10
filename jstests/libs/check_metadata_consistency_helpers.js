@@ -70,6 +70,9 @@ export var MetadataConsistencyChecker = (function() {
                 } else {
                     throw e;
                 }
+            } else {
+                // For all the other errors re-throw the exception
+                throw e;
             }
         }
     };
