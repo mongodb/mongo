@@ -73,6 +73,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
@@ -137,6 +138,16 @@ MONGO_STATIC_ASSERT(kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion);
 MONGO_STATIC_ASSERT(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion);
 
 const double kNumMSInHour = 1000 * 60 * 60;
+
+static CompiledConfiguration lowerInclusiveBoundConfig("WT_CURSOR.bound",
+                                                       "bound=lower,inclusive=true");
+static CompiledConfiguration lowerExclusiveBoundConfig("WT_CURSOR.bound",
+                                                       "bound=lower,inclusive=false");
+static CompiledConfiguration upperInclusiveBoundConfig("WT_CURSOR.bound",
+                                                       "bound=upper,inclusive=true");
+static CompiledConfiguration upperExclusiveBoundConfig("WT_CURSOR.bound",
+                                                       "bound=upper,inclusive=false");
+static CompiledConfiguration clearBoundConfig("WT_CURSOR.bound", "action=clear");
 
 void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
     StatusWith<BSONObj> appMetadata =
@@ -2237,7 +2248,7 @@ RecordId WiredTigerRecordStoreCursor::seekIdCommon(const RecordId& start,
     dassert(shard_role_details::getLocker(_opCtx)->isReadLocked());
 
     // Ensure an active transaction is open.
-    WiredTigerRecoveryUnit::get(_opCtx)->getSession();
+    auto session = WiredTigerRecoveryUnit::get(_opCtx)->getSession();
     _skipNextAdvance = false;
 
     // If the cursor is positioned, we need to reset it so that we can set bounds. This is not the
@@ -2250,17 +2261,13 @@ RecordId WiredTigerRecordStoreCursor::seekIdCommon(const RecordId& start,
     WiredTigerRecordStore::CursorKey key = makeCursorKey(start, _keyFormat);
     setKey(c, &key);
 
-    const char* config;
-    // The default bound is inclusive.
-    if (_forward) {
-        config = boundInclusion == BoundInclusion::kExclude ? "bound=lower,inclusive=false"
-                                                            : "bound=lower";
-    } else {
-        config = boundInclusion == BoundInclusion::kExclude ? "bound=upper,inclusive=false"
-                                                            : "bound=upper";
-    }
+    auto const& config = _forward
+        ? (boundInclusion == BoundInclusion::kInclude ? lowerInclusiveBoundConfig
+                                                      : lowerExclusiveBoundConfig)
+        : (boundInclusion == BoundInclusion::kInclude ? upperInclusiveBoundConfig
+                                                      : upperExclusiveBoundConfig);
 
-    invariantWTOK(c->bound(c, config), c->session);
+    invariantWTOK(c->bound(c, config.getConfig(session)), c->session);
     _boundSet = true;
 
     int ret =
@@ -2286,14 +2293,15 @@ boost::optional<Record> WiredTigerRecordStoreCursor::seekExactCommon(const Recor
     // Ensure an active transaction is open. While WiredTiger supports using cursors on a session
     // without an active transaction (i.e. an implicit transaction), that would bypass configuration
     // options we pass when we explicitly start transactions in the RecoveryUnit.
-    WiredTigerRecoveryUnit::get(_opCtx)->getSession();
+    auto session = WiredTigerRecoveryUnit::get(_opCtx)->getSession();
 
     _skipNextAdvance = false;
     WT_CURSOR* c = _cursor->get();
 
-    // Reset the cursor before using it in case it has any saved bounds from a previous seek.
+    // Before calling WT search, clear any saved bounds from a previous seek.
     if (_boundSet) {
-        resetCursor();
+        invariantWTOK(c->bound(c, clearBoundConfig.getConfig(session)), c->session);
+        _boundSet = false;
     }
 
     auto key = makeCursorKey(id, _keyFormat);
