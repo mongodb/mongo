@@ -192,6 +192,10 @@ public:
         }
     }
 
+    void deregisterMetrics() {
+        _scopedObserver.reset();
+    }
+
     BSONObj reportForCurrentOp() const noexcept override;
 
     void restoreExternallyTrackedRecipientFields(const ExternallyTrackedRecipientFields& values);
