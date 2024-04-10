@@ -87,12 +87,12 @@ public:
             cmdBuilder.subarrayStart(UpdatePositionArgs::kUpdateArrayFieldName));
         for (auto&& itr : _progressMap) {
             BSONObjBuilder entry(arrayBuilder.subobjStart());
-            itr.second.lastDurableOpTime.append(&entry,
-                                                UpdatePositionArgs::kDurableOpTimeFieldName);
+            itr.second.lastDurableOpTime.append(UpdatePositionArgs::kDurableOpTimeFieldName,
+                                                &entry);
             entry.appendDate(UpdatePositionArgs::kDurableWallTimeFieldName,
                              Date_t() + Seconds(itr.second.lastDurableOpTime.getSecs()));
-            itr.second.lastAppliedOpTime.append(&entry,
-                                                UpdatePositionArgs::kAppliedOpTimeFieldName);
+            itr.second.lastAppliedOpTime.append(UpdatePositionArgs::kAppliedOpTimeFieldName,
+                                                &entry);
             entry.appendDate(UpdatePositionArgs::kAppliedWallTimeFieldName,
                              Date_t() + Seconds(itr.second.lastAppliedOpTime.getSecs()));
             entry.append(UpdatePositionArgs::kMemberIdFieldName, itr.first);

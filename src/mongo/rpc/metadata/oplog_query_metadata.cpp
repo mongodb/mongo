@@ -148,10 +148,10 @@ StatusWith<OplogQueryMetadata> OplogQueryMetadata::readFromMetadata(const BSONOb
 
 Status OplogQueryMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     BSONObjBuilder oqMetadataBuilder(builder->subobjStart(kOplogQueryMetadataFieldName));
-    _lastOpCommitted.opTime.append(&oqMetadataBuilder, kLastOpCommittedFieldName);
+    _lastOpCommitted.opTime.append(kLastOpCommittedFieldName, &oqMetadataBuilder);
     oqMetadataBuilder.appendDate(kLastCommittedWallFieldName, _lastOpCommitted.wallTime);
-    _lastOpApplied.append(&oqMetadataBuilder, kLastOpAppliedFieldName);
-    _lastOpWritten.append(&oqMetadataBuilder, kLastOpWrittenFieldName);
+    _lastOpApplied.append(kLastOpAppliedFieldName, &oqMetadataBuilder);
+    _lastOpWritten.append(kLastOpWrittenFieldName, &oqMetadataBuilder);
     oqMetadataBuilder.append(kRBIDFieldName, _rbid);
     oqMetadataBuilder.append(kPrimaryIndexFieldName, _currentPrimaryIndex);
     oqMetadataBuilder.append(kSyncSourceIndexFieldName, _currentSyncSourceIndex);

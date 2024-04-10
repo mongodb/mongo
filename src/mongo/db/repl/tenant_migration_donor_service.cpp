@@ -471,7 +471,7 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
         bob.append("blockTimestamp", *_stateDoc.getBlockTimestamp());
     }
     if (_stateDoc.getCommitOrAbortOpTime()) {
-        _stateDoc.getCommitOrAbortOpTime()->append(&bob, "commitOrAbortOpTime");
+        _stateDoc.getCommitOrAbortOpTime()->append("commitOrAbortOpTime", &bob);
     }
     if (_stateDoc.getAbortReason()) {
         bob.append("abortReason", *_stateDoc.getAbortReason());

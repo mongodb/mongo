@@ -163,9 +163,9 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
 Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     BSONObjBuilder replMetadataBuilder(builder->subobjStart(kReplSetMetadataFieldName));
     replMetadataBuilder.append(kTermFieldName, _currentTerm);
-    _lastOpCommitted.opTime.append(&replMetadataBuilder, kLastOpCommittedFieldName);
+    _lastOpCommitted.opTime.append(kLastOpCommittedFieldName, &replMetadataBuilder);
     replMetadataBuilder.appendDate(kLastCommittedWallFieldName, _lastOpCommitted.wallTime);
-    _lastOpVisible.append(&replMetadataBuilder, kLastOpVisibleFieldName);
+    _lastOpVisible.append(kLastOpVisibleFieldName, &replMetadataBuilder);
     replMetadataBuilder.append(kConfigVersionFieldName, _configVersion);
     replMetadataBuilder.append(kConfigTermFieldName, _configTerm);
     replMetadataBuilder.append(kReplicaSetIdFieldName, _replicaSetId);

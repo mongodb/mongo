@@ -38,10 +38,10 @@ imports:
 
 types:
     optime:
-        bson_serialization_type: object
+        bson_serialization_type: any
         description: A document representing an OpTime.
         cpp_type: "OpTime"
-        serializer: OpTime::toBSON
+        serializer: OpTime::append
         deserializer: OpTime::parse
         # OpTime has only non view members.
         is_view: false

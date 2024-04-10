@@ -164,9 +164,9 @@ BSONObj UpdatePositionArgs::toBSON() const {
             BSONObjBuilder updateEntry(updateArray.subobjStart());
             updateEntry.append(kConfigVersionFieldName, update->cfgver);
             updateEntry.append(kMemberIdFieldName, update->memberId);
-            update->appliedOpTime.append(&updateEntry, kAppliedOpTimeFieldName);
-            update->writtenOpTime.append(&updateEntry, kWrittenOpTimeFieldName);
-            update->durableOpTime.append(&updateEntry, kDurableOpTimeFieldName);
+            update->appliedOpTime.append(kAppliedOpTimeFieldName, &updateEntry);
+            update->writtenOpTime.append(kWrittenOpTimeFieldName, &updateEntry);
+            update->durableOpTime.append(kDurableOpTimeFieldName, &updateEntry);
         }
         updateArray.doneFast();
     }
