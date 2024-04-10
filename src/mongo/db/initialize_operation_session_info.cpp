@@ -68,6 +68,15 @@ bool isAuthorizedForInternalClusterAction(OperationContext* opCtx,
 }
 }  // namespace
 
+/**
+ * A client is internal if the connection is a self connection, a connection from a mongos or
+ * different mongod or a direct client connection.
+ */
+bool isInternalClient(OperationContext* opCtx) {
+    return !opCtx->getClient()->session() || opCtx->getClient()->isInternalClient() ||
+        opCtx->getClient()->isInDirectClient();
+}
+
 OperationSessionInfoFromClient initializeOperationSessionInfo(
     OperationContext* opCtx,
     const boost::optional<TenantId>& validatedTenantId,
@@ -196,7 +205,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(
 
     if (osi.getTxnNumber()) {
         if (!osi.getAutocommit()) {
-            if (opCtx->getClient()->isInternalClient()) {
+            if (isInternalClient(opCtx)) {
                 internalRetryableWriteCount.increment(1);
             } else {
                 externalRetryableWriteCount.increment(1);
