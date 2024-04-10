@@ -1904,6 +1904,10 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
 void WiredTigerKVEngine::dropIdentForImport(OperationContext* opCtx, StringData ident) {
     const std::string uri = _uri(ident);
 
+    WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
+    wtRu->getSessionNoTxn()->closeAllCursors(uri);
+    _sessionCache->closeAllCursors(uri);
+
     WiredTigerSession session(_conn);
 
     // Don't wait for the global checkpoint lock to be obtained in WiredTiger as it can take a

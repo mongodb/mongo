@@ -100,6 +100,24 @@ void assertViewCatalogValid(const ViewsForDatabase& viewsForDb) {
             viewsForDb.valid());
 }
 
+ViewsForDatabase loadViewsForDatabase(OperationContext* opCtx,
+                                      const CollectionCatalog& catalog,
+                                      const DatabaseName& dbName) {
+    ViewsForDatabase viewsForDb;
+    auto systemDotViews = NamespaceString::makeSystemDotViewsNamespace(dbName);
+    if (auto status = viewsForDb.reload(
+            opCtx, CollectionPtr(catalog.lookupCollectionByNamespace(opCtx, systemDotViews)));
+        !status.isOK()) {
+        LOGV2_WARNING_OPTIONS(20326,
+                              {logv2::LogTag::kStartupWarnings},
+                              "Unable to parse views; remove any invalid views from the "
+                              "collection to restore server functionality",
+                              "error"_attr = redact(status),
+                              logAttrs(systemDotViews));
+    }
+    return viewsForDb;
+}
+
 const auto maxUuid = UUID::parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF").getValue();
 const auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
 
@@ -816,11 +834,8 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
 }
 
 void CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName& dbName) const {
-    // Two-phase locking ensures that all locks are held while a Change's commit() or
-    // rollback()function runs, for thread saftey. And, MODE_X locks always opt for two-phase
-    // locking.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString::makeSystemDotViewsNamespace(dbName), MODE_X));
+    invariantHasExclusiveAccessToCollection(opCtx,
+                                            NamespaceString::makeSystemDotViewsNamespace(dbName));
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     if (uncommittedCatalogUpdates.shouldIgnoreExternalViewChanges(dbName)) {
@@ -829,24 +844,8 @@ void CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName&
 
     LOGV2_DEBUG(22546, 1, "Reloading view catalog for database", logAttrs(dbName));
 
-    ViewsForDatabase viewsForDb;
-    auto status = viewsForDb.reload(opCtx, CollectionPtr(_lookupSystemViews(opCtx, dbName)));
-    if (!status.isOK()) {
-        // If we encountered an error while reloading views, then the 'viewsForDb' variable will be
-        // empty, and marked invalid. Any further operations that attempt to use a view will fail
-        // until the view catalog is fixed. Most of the time, this means the system.views collection
-        // needs to be dropped.
-        //
-        // Unfortunately, we don't have a good way to respond to this error, as when we're calling
-        // this function, we're in an op observer, and we expect the operation to succeed once it's
-        // gotten to that point since it's passed all our other checks. Instead, we can log this
-        // information to aid in diagnosing the problem.
-        LOGV2(7267300,
-              "Encountered an error while reloading the view catalog",
-              "error"_attr = status);
-    }
-
-    uncommittedCatalogUpdates.replaceViewsForDatabase(dbName, std::move(viewsForDb));
+    uncommittedCatalogUpdates.replaceViewsForDatabase(dbName,
+                                                      loadViewsForDatabase(opCtx, *this, dbName));
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 
@@ -1426,12 +1425,12 @@ std::shared_ptr<IndexCatalogEntry> CollectionCatalog::findDropPendingIndex(Strin
 void CollectionCatalog::onCreateCollection(OperationContext* opCtx,
                                            std::shared_ptr<Collection> coll) const {
     invariant(coll);
+    const auto& nss = coll->ns();
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, existingColl, newColl] =
-        UncommittedCatalogUpdates::lookupCollection(opCtx, coll->ns());
+    auto [found, existingColl, newColl] = UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
     uassert(31370,
-            str::stream() << "collection already exists. ns: " << coll->ns(),
+            str::stream() << "collection already exists. ns: " << nss.toStringForErrorMsg(),
             existingColl == nullptr);
 
     // When we already have a drop and recreate the collection, we want to seamlessly swap out the
@@ -1442,6 +1441,10 @@ void CollectionCatalog::onCreateCollection(OperationContext* opCtx,
         uncommittedCatalogUpdates.recreateCollection(opCtx, std::move(coll));
     } else {
         uncommittedCatalogUpdates.createCollection(opCtx, std::move(coll));
+    }
+
+    if (!storageGlobalParams.repair && nss.isSystemDotViews()) {
+        reloadViews(opCtx, nss.dbName());
     }
 
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
@@ -2163,18 +2166,8 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
     resourceCatalog.add({RESOURCE_DATABASE, nss.dbName()}, nss.dbName());
     resourceCatalog.add({RESOURCE_COLLECTION, nss}, nss);
 
-    if (!storageGlobalParams.repair && coll->ns().isSystemDotViews()) {
-        ViewsForDatabase viewsForDb;
-        if (auto status = viewsForDb.reload(
-                opCtx, CollectionPtr(_lookupSystemViews(opCtx, coll->ns().dbName())));
-            !status.isOK()) {
-            LOGV2_WARNING_OPTIONS(20326,
-                                  {logv2::LogTag::kStartupWarnings},
-                                  "Unable to parse views; remove any invalid views from the "
-                                  "collection to restore server functionality",
-                                  "error"_attr = redact(status),
-                                  logAttrs(coll->ns()));
-        }
+    if (!storageGlobalParams.repair && coll->ns().isSystemDotViews() && !twoPhase) {
+        ViewsForDatabase viewsForDb = loadViewsForDatabase(opCtx, *this, nss.dbName());
         _viewsForDatabase = _viewsForDatabase.set(coll->ns().dbName(), std::move(viewsForDb));
     }
 }
