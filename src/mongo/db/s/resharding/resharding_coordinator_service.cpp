@@ -1967,13 +1967,11 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
                 _logStatsOnCompletion(status.isOK());
             }
 
-            // Destroy metrics early so its lifetime will not be tied to the lifetime of this
-            // state machine. This is because we have future callbacks copy shared pointers to this
-            // state machine that causes it to live longer than expected and potentially overlap
-            // with a newer instance when stepping up. The commit monitor also has a shared pointer
-            // to the metrics, so release this as well.
-            _metrics.reset();
-            _commitMonitor.reset();
+            // Unregister metrics early so the cumulative metrics do not continue to track these
+            // metrics for the lifetime of this state machine. We have future callbacks copy shared
+            // pointers to this state machine that causes it to live longer than expected, and can
+            // potentially overlap with a newer instance when stepping up.
+            _metrics->deregisterMetrics();
 
             if (!status.isOK()) {
                 {
