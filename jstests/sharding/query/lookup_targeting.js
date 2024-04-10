@@ -12,6 +12,11 @@
  *   featureFlagAuthoritativeShardCollection,
  *   temp_disabled_embedded_router_uncategorized,
  *   requires_fcv_80,
+ *   # TODO (SERVER-89166) Remove the multiversion_incompatible once the bug is fixed
+ *   # Old binary version nodes are started up with different parameters than the new binary nodes,
+ *   # and this throws off the assumptions the test makes about SBE pushdown being enabled on all
+ *   # nodes
+ *   multiversion_incompatible,
  * ]
  */
 
