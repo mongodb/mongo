@@ -56,24 +56,35 @@ boost::optional<Milliseconds> getRequestOrDefaultMaxTimeMS(
         return boost::none;
     }
 
+    const boost::optional<auth::ValidatedTenancyScope>& vts =
+        auth::ValidatedTenancyScope::get(opCtx);
+    auto tenantId = vts && vts->hasTenantId() ? boost::make_optional(vts->tenantId()) : boost::none;
+
     // Check if the defaultMaxTimeMS can be bypassed.
     const auto bypassDefaultMaxTimeMS =
         AuthorizationSession::get(opCtx->getClient())
             ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(boost::none),
                                                ActionType::bypassDefaultMaxTimeMS);
-
     if (bypassDefaultMaxTimeMS) {
         return boost::none;
     }
 
-    // Next uses the default maxTimeMS cluster parameter if the command is a read operation.
-    auto defaultReadMaxTimeMS = [&]() {
-        auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-        auto* defaultMaxTimeMSParam =
-            clusterParameters->get<ClusterParameterWithStorage<DefaultMaxTimeMSParam>>(
-                "defaultMaxTimeMS");
-        return defaultMaxTimeMSParam->getValue(boost::none).getReadOperations();
-    }();
-    return Milliseconds{defaultReadMaxTimeMS};
+    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+    auto* defaultMaxTimeMSParam =
+        clusterParameters->get<ClusterParameterWithStorage<DefaultMaxTimeMSParam>>(
+            "defaultMaxTimeMS");
+    // Uses the tenant specific default value if one was set.
+    if (tenantId) {
+        auto tenantDefaultReadMaxTimeMS =
+            defaultMaxTimeMSParam->getValue(tenantId).getReadOperations();
+        if (tenantDefaultReadMaxTimeMS) {
+            return Milliseconds{tenantDefaultReadMaxTimeMS};
+        }
+    }
+
+    // Uses the global default maxTimeMS for read operations.
+    auto globalDefaultReadMaxTimeMS =
+        defaultMaxTimeMSParam->getValue(boost::none).getReadOperations();
+    return Milliseconds{globalDefaultReadMaxTimeMS};
 }
 }  // namespace mongo

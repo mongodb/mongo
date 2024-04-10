@@ -500,6 +500,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         'query/query_request',
         'server_base',
