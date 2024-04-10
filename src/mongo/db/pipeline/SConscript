@@ -872,6 +872,18 @@ env.Benchmark(
     ],
 )
 
+env.CppUnitTest(
+    target='common_sort_key_optimization_test',
+    source=[
+        'common_sort_key_optimization_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        'accumulator',
+        'pipeline',
+    ],
+)
+
 env.Benchmark(
     target='window_function_percentile_bm',
     source=[
