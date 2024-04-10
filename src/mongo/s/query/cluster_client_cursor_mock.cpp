@@ -114,6 +114,10 @@ boost::optional<std::size_t> ClusterClientCursorMock::getQueryStatsKeyHash() con
     return boost::none;
 }
 
+bool ClusterClientCursorMock::getQueryStatsWillNeverExhaust() const {
+    return false;
+}
+
 void ClusterClientCursorMock::kill(OperationContext* opCtx) {
     _killed = true;
     if (_killCallback) {
@@ -177,7 +181,7 @@ bool ClusterClientCursorMock::shouldOmitDiagnosticInformation() const {
     return false;
 }
 
-std::unique_ptr<query_stats::Key> ClusterClientCursorMock::getKey() {
+std::unique_ptr<query_stats::Key> ClusterClientCursorMock::takeKey() {
     return nullptr;
 }
 

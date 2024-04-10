@@ -405,6 +405,9 @@ public:
         boost::optional<std::size_t> keyHash;
         // True if the request was rate limited and stats should not be collected.
         bool wasRateLimited = false;
+        // True if the request was a change stream request.
+        // TODO SERVER-89058 will make it true for all tailable cursors.
+        bool willNeverExhaust = false;
         // Sometimes we need to request metrics as part of a higher-level operation without
         // actually caring about the metrics for this specific operation. In those cases, we
         // use metricsRequested to indicate we should request metrics from other nodes.

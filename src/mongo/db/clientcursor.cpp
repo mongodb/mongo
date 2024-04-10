@@ -172,6 +172,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
       _queryStatsKeyHash(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.keyHash),
       _queryStatsKey(std::move(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.key)),
+      _queryStatsWillNeverExhaust(
+          CurOp::get(operationUsingCursor)->debug().queryStatsInfo.willNeverExhaust),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),
       _opKey(operationUsingCursor->getOperationKey()) {
@@ -232,26 +234,13 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
     ExternalDataSourceScopeGuard::updateOperationContext(this, opCtx);
     _disposed = true;
 
-    // It is discouraged but technically possible for a user to enable queryStats on the mongods of
-    // a replica set. In this case, a cursor will be created for each mongod. However, the
-    // queryStatsKey is behind a unique_ptr on CurOp. The ClientCursor constructor std::moves the
-    // queryStatsKey so it uniquely owns it (and also makes the queryStatsKey on CurOp now a
-    // nullptr) and copies over the queryStatsKeyHash as the latter is a cheap copy.
 
-    // In the case of sharded $search, two cursors will be created per mongod. In this way,
-    // two cursors are part of the same thread/operation, and therefore share a OpCtx/CurOp/OpDebug.
-    // The first cursor that is created will own the queryStatsKey and have a copy of the
-    // queryStatsKeyHash. On the other hand, the second one will only have a copy of the hash since
-    // the queryStatsKey will be null on CurOp from being std::move'd in the first cursor
-    // construction call. To not trip the tassert in writeQueryStats and because all cursors are
-    // guaranteed to have a copy of the hash, we check that the cursor has a key .
-    if (_queryStatsKey && opCtx) {
-        auto snapshot = query_stats::captureMetrics(
-            opCtx, query_stats::microsecondsToUint64(_firstResponseExecutionTime), _metrics);
-
-        query_stats::writeQueryStats(
-            opCtx, _queryStatsKeyHash, std::move(_queryStatsKey), snapshot);
-    }
+    query_stats::writeQueryStatsOnCursorDisposeOrKill(opCtx,
+                                                      _queryStatsKeyHash,
+                                                      std::move(_queryStatsKey),
+                                                      _queryStatsWillNeverExhaust,
+                                                      _firstResponseExecutionTime,
+                                                      _metrics);
 }
 
 GenericCursor ClientCursor::toGenericCursor() const {
@@ -457,6 +446,25 @@ void startClientCursorMonitor() {
 
 void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCursor) {
     pinnedCursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
+
+    // For a change stream query, we want to collect and update query stats on the initial query and
+    // for every getMore.
+    // TODO SERVER-89058 Modify comment to include tailable cursors.
+    if (pinnedCursor->getQueryStatsWillNeverExhaust()) {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+
+        auto snapshot = query_stats::captureMetrics(
+            opCtx,
+            query_stats::microsecondsToUint64(opDebug.additiveMetrics.executionTime),
+            opDebug.additiveMetrics);
+
+        query_stats::writeQueryStats(opCtx,
+                                     opDebug.queryStatsInfo.keyHash,
+                                     pinnedCursor->takeKey(),
+                                     snapshot,
+                                     nullptr,
+                                     pinnedCursor->getQueryStatsWillNeverExhaust());
+    }
 }
 
 void collectQueryStatsMongod(OperationContext* opCtx,

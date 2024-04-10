@@ -186,6 +186,13 @@ public:
     ReadPreferenceSetting getReadPreferenceSetting() const {
         return _readPreferenceSetting;
     }
+    bool getQueryStatsWillNeverExhaust() const {
+        return _queryStatsWillNeverExhaust;
+    }
+
+    std::unique_ptr<query_stats::Key> takeKey() {
+        return std::move(_queryStatsKey);
+    }
 
     /**
      * Returns a pointer to the underlying query plan executor. All cursors manage a PlanExecutor,
@@ -498,6 +505,9 @@ private:
     OpDebug::AdditiveMetrics _metrics;
     // The Key used by query stats to generate the query stats store key.
     std::unique_ptr<query_stats::Key> _queryStatsKey;
+
+    // Flag for query stats on if the current cursor is used for a tailable or change stream query.
+    bool _queryStatsWillNeverExhaust{false};
 
     // Flag to decide if diagnostic information should be omitted.
     bool _shouldOmitDiagnosticInformation{false};

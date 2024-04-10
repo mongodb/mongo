@@ -562,13 +562,12 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
 
     if (exhausted) {
         opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(ccc->takeRemoteMetrics());
-        collectQueryStatsMongos(opCtx, ccc->getKey());
+        collectQueryStatsMongos(opCtx, ccc->takeKey());
     } else {
         collectQueryStatsMongos(opCtx, ccc);
     }
 
     ccc->detachFromOperationContext();
-
     CursorId clusterCursorId = 0;
     if (!exhausted) {
         auto authUser = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
