@@ -1,5 +1,7 @@
 command_type: system
 stepback: false
+exec_timeout_secs: 21600
+timeout_secs: 7200
 
 include:
   - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
