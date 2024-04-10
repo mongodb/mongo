@@ -238,6 +238,10 @@ public:
 
         return true;
     }
+
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kRead;
+    }
 };
 
 MONGO_REGISTER_COMMAND(CmdSleep).testOnly().forShard();
