@@ -285,10 +285,21 @@ void applyDefaultFilterToSink(SinkPtr&& sink) {
     sink->set_filter(ComponentSettingsFilter(mgr().getGlobalDomain(), mgr().getGlobalSettings()));
 }
 
+class Listener : public logv2::LogLineListener {
+public:
+    explicit Listener(synchronized_value<std::vector<std::string>>* sv) : _sv(sv) {}
+    void accept(const std::string& line) override {
+        _sv->synchronize()->push_back(line);
+    }
+
+private:
+    synchronized_value<std::vector<std::string>>* _sv;
+};
+
 class LogDuringInitShutdownTester {
 public:
     LogDuringInitShutdownTester() {
-        auto sink = LogCaptureBackend::create(lines, true);
+        auto sink = LogCaptureBackend::create(std::make_unique<Listener>(&syncedLines), true);
         applyDefaultFilterToSink(sink);
         // We have to leave this sink installed as it is not allowed to install sinks during
         // shutdown. Add a filter so it is only used during this test.
@@ -298,15 +309,15 @@ public:
 
         ScopeGuard enabledGuard([this] { enabled = false; });
         LOGV2(20001, "log during init");
-        ASSERT_EQUALS(lines.back(), "log during init");
+        ASSERT_EQUALS(syncedLines.synchronize()->back(), "log during init");
     }
     ~LogDuringInitShutdownTester() {
         enabled = true;
         LOGV2(4600800, "log during shutdown");
-        ASSERT_EQUALS(lines.back(), "log during shutdown");
+        ASSERT_EQUALS(syncedLines.synchronize()->back(), "log during shutdown");
     }
 
-    std::vector<std::string> lines;
+    synchronized_value<std::vector<std::string>> syncedLines;
     bool enabled = true;
 };
 
@@ -318,28 +329,32 @@ public:
     public:
         LineCapture() = delete;
         LineCapture(bool stripEol)
-            : _lines{std::make_unique<std::vector<std::string>>()},
-              _sink{LogCaptureBackend::create(*_lines, stripEol)} {}
+            : _syncedLines{synchronized_value<std::vector<std::string>>()},
+              _sink{
+                  LogCaptureBackend::create(std::make_unique<Listener>(&_syncedLines), stripEol)} {}
+        LineCapture(LineCapture&& rhs)
+            : _syncedLines(*rhs._syncedLines.synchronize()), _sink(std::move(rhs._sink)) {}
         auto& lines() {
-            return *_lines;
+            return *_syncedLines.synchronize();
         }
         auto& sink() {
             return _sink;
         }
         const std::string& back() const {
-            ASSERT_GT(_lines->size(), 0);
-            return _lines->back();
+            auto logLinesLockGuard = _syncedLines.synchronize();
+            ASSERT_GT(logLinesLockGuard->size(), 0);
+            return logLinesLockGuard->back();
         }
         void clear() {
-            return _lines->clear();
+            return _syncedLines.synchronize()->clear();
         }
         size_t size() const {
-            return _lines->size();
+            return _syncedLines.synchronize()->size();
         }
 
     private:
-        std::unique_ptr<std::vector<std::string>> _lines;
-        boost::shared_ptr<boost::log::sinks::synchronous_sink<LogCaptureBackend>> _sink;
+        synchronized_value<std::vector<std::string>> _syncedLines;
+        boost::shared_ptr<boost::log::sinks::unlocked_sink<LogCaptureBackend>> _sink;
     };
 
     LogV2Test() {
@@ -2207,8 +2222,8 @@ TEST_F(LogV2Test, MultipleDomains) {
         }
     };
     LogDomain other_domain(std::make_unique<OtherDomain>());
-    std::vector<std::string> other_lines;
-    auto other_sink = LogCaptureBackend::create(other_lines, true);
+    synchronized_value<std::vector<std::string>> other_lines;
+    auto other_sink = LogCaptureBackend::create(std::make_unique<Listener>(&other_lines), true);
     other_sink->set_filter(ComponentSettingsFilter(other_domain, mgr().getGlobalSettings()));
     other_sink->set_formatter(PlainFormatter());
     attachSink(other_sink);
@@ -2216,12 +2231,13 @@ TEST_F(LogV2Test, MultipleDomains) {
     auto global_lines = makeLineCapture(PlainFormatter());
 
     LOGV2_OPTIONS(20070, {&other_domain}, "test");
+    auto logLinesLockGuard = other_lines.synchronize();
     ASSERT(global_lines.lines().empty());
-    ASSERT(other_lines.back() == "test");
+    ASSERT(logLinesLockGuard->back() == "test");
 
     LOGV2(20060, "global domain log");
     ASSERT(global_lines.back() == "global domain log");
-    ASSERT(other_lines.back() == "test");
+    ASSERT(logLinesLockGuard->back() == "test");
 }
 
 TEST_F(LogV2Test, FileLogging) {
@@ -2273,9 +2289,10 @@ TEST_F(LogV2Test, FileLogging) {
 }
 
 TEST_F(LogV2Test, UserAssert) {
-    std::vector<std::string> lines;
+    synchronized_value<std::vector<std::string>> syncedLines;
     auto sink = wrapInSynchronousSink(wrapInCompositeBackend(
-        boost::make_shared<LogCaptureBackend>(lines, true), boost::make_shared<UserAssertSink>()));
+        boost::make_shared<LogCaptureBackend>(std::make_unique<Listener>(&syncedLines), true),
+        boost::make_shared<UserAssertSink>()));
     applyDefaultFilterToSink(sink);
     sink->set_formatter(PlainFormatter());
     attachSink(sink);
@@ -2285,31 +2302,31 @@ TEST_F(LogV2Test, UserAssert) {
     ASSERT_THROWS_WITH_CHECK(
         LOGV2_OPTIONS(4652000, {UserAssertAfterLog(ErrorCodes::BadValue)}, "uasserting log"),
         DBException,
-        [&lines](const DBException& ex) {
+        [&syncedLines](const DBException& ex) {
             ASSERT_EQUALS(ex.code(), ErrorCodes::BadValue);
             ASSERT_EQUALS(ex.reason(), "uasserting log");
-            ASSERT_EQUALS(lines.front(), ex.reason());
+            ASSERT_EQUALS(syncedLines.synchronize()->front(), ex.reason());
         });
-    lines.clear();
+    syncedLines.synchronize()->clear();
 
     ASSERT_THROWS_WITH_CHECK(LOGV2_OPTIONS(4652001,
                                            {UserAssertAfterLog(ErrorCodes::BadValue)},
                                            "uasserting log {name}",
                                            "name"_attr = 1),
                              DBException,
-                             [&lines](const DBException& ex) {
+                             [&syncedLines](const DBException& ex) {
                                  ASSERT_EQUALS(ex.code(), ErrorCodes::BadValue);
                                  ASSERT_EQUALS(ex.reason(), "uasserting log 1");
-                                 ASSERT_EQUALS(lines.front(), ex.reason());
+                                 ASSERT_EQUALS(syncedLines.synchronize()->front(), ex.reason());
                              });
-    lines.clear();
+    syncedLines.synchronize()->clear();
 
     ASSERT_THROWS_WITH_CHECK(LOGV2_OPTIONS(4716000, {UserAssertAfterLog()}, "uasserting log"),
                              DBException,
-                             [&lines](const DBException& ex) {
+                             [&syncedLines](const DBException& ex) {
                                  ASSERT_EQUALS(ex.code(), 4716000);
                                  ASSERT_EQUALS(ex.reason(), "uasserting log");
-                                 ASSERT_EQUALS(lines.front(), ex.reason());
+                                 ASSERT_EQUALS(syncedLines.synchronize()->front(), ex.reason());
                              });
 }
 
