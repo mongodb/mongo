@@ -2465,22 +2465,24 @@ tasks:
         vars:
           use_large_distro: "true"
 
-  - <<: *gen_task_template
-    name: cwrwc_wc_majority_passthrough_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "release_critical",
-        "incompatible_mac",
-        "incompatible_all_feature_flags",
-        "read_write_concern",
-        "write",
-        "secondary_read_after_majority_write",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
+  # TODO(SERVER-89135): Fix this passthrough with causal consistency or remove it.
+  # Disable this test due to wrong secondary read after majority write assumption.
+  # - <<: *gen_task_template
+  #   name: cwrwc_wc_majority_passthrough_gen
+  #   tags:
+  #     [
+  #       "assigned_to_jira_team_server_catalog_and_routing",
+  #       "release_critical",
+  #       "incompatible_mac",
+  #       "incompatible_all_feature_flags",
+  #       "read_write_concern",
+  #       "write",
+  #       "secondary_read_after_majority_write",
+  #     ]
+  #   commands:
+  #     - func: "generate resmoke tasks"
+  #       vars:
+  #         use_large_distro: "true"
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen

@@ -15,4 +15,3 @@
 - featureFlagGRPC
 - featureFlagReplicaSetEndpoint
 - featureFlagCreateCollectionInPreparedTransactions
-- featureFlagReduceMajorityWriteLatency

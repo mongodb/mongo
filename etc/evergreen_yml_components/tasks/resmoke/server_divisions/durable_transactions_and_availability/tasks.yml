@@ -1679,23 +1679,25 @@ tasks:
         vars:
           resmoke_jobs_max: 1
 
-  - <<: *gen_task_template
-    name: write_concern_majority_passthrough_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_repl",
-        "release_critical",
-        "incompatible_mac",
-        "incompatible_all_feature_flags",
-        "read_write_concern",
-        "large",
-        "write",
-        "secondary_read_after_majority_write",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
+  # TODO(SERVER-89135): Fix this passthrough with causal consistency or remove it.
+  # Disable this test due to wrong secondary read after majority write assumption.
+  # - <<: *gen_task_template
+  #   name: write_concern_majority_passthrough_gen
+  #   tags:
+  #     [
+  #       "assigned_to_jira_team_server_repl",
+  #       "release_critical",
+  #       "incompatible_mac",
+  #       "incompatible_all_feature_flags",
+  #       "read_write_concern",
+  #       "large",
+  #       "write",
+  #       "secondary_read_after_majority_write",
+  #     ]
+  #   commands:
+  #     - func: "generate resmoke tasks"
+  #       vars:
+  #         use_large_distro: "true"
 
   ################################################
   #           Storage Execution tasks            #

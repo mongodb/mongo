@@ -895,7 +895,7 @@ feature_flags:
     featureFlagReduceMajorityWriteLatency:
         description: When enabled, Secondaries acknowledge writes as durable after an oplog entry is written durably to disk, without waiting for it to be applied.
         cpp_varname: feature_flags::gReduceMajorityWriteLatency
-        default: false
+        default: true
         shouldBeFCVGated: false
 
     featureFlagReplicateVectoredInsertsTransactionally:
