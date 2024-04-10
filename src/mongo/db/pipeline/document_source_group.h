@@ -117,6 +117,29 @@ protected:
     bool pushDotRenamedMatch(Pipeline::SourceContainer::iterator itr,
                              Pipeline::SourceContainer* container);
 
+    /**
+     * This optimization combines multiple $top(N) or $bottom(N) accumulators that use the same sort
+     * pattern into one so that they generate the sort key only once at run-time. For example,
+     *
+     * {
+     *   $group: {
+     *     _id: ...,
+     *     tm: {$top: {sortBy: {time: -1}, output: "$m"}},
+     *     ti: {$top: {sortBy: {time: -1}, output: "$i"}}
+     *   }
+     * }
+     * ->
+     * {
+     *   $group: {
+     *     _id: ...,
+     *     ts: {$top: {sortBy: {time: -1}, output: {tm: "$m", ti: "$i"}}}
+     *   }
+     * },
+     * {$project: {tm: {$ifNull: ["$ts.tm", null]}}, ti: {$ifNull: ["$ts.ti", null]}}}
+     */
+    bool tryToGenerateCommonSortKey(Pipeline::SourceContainer::iterator itr,
+                                    Pipeline::SourceContainer* container);
+
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  boost::optional<int64_t> maxMemoryUsageBytes = boost::none);
@@ -139,8 +162,6 @@ private:
     GetNextResult performBlockingGroupSelf(GetNextResult input);
 
     bool _groupsReady;
-
-    const size_t _maxFirstLastRewrites;
 };
 
 }  // namespace mongo

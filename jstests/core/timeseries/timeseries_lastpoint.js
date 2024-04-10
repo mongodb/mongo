@@ -149,13 +149,6 @@ const casesNoLastpointOptimization = [
         $group: {
             _id: "$m",
             acc1: {$bottom: {sortBy: {t: 1}, output: ["$x"]}},
-            acc2: {$bottom: {sortBy: {t: 1}, output: ["$y"]}},
-        }
-    }],
-    [{
-        $group: {
-            _id: "$m",
-            acc1: {$bottom: {sortBy: {t: 1}, output: ["$x"]}},
             acc2: {$top: {sortBy: {t: -1}, output: ["$y"]}},
         }
     }],

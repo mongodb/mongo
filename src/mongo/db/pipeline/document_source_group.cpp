@@ -29,22 +29,26 @@
 
 #include "mongo/db/pipeline/document_source_group.h"
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 #include <utility>
 
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
@@ -78,9 +82,7 @@ boost::intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
 
 DocumentSourceGroup::DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          boost::optional<int64_t> maxMemoryUsageBytes)
-    : DocumentSourceGroupBase(kStageName, expCtx, maxMemoryUsageBytes),
-      _groupsReady(false),
-      _maxFirstLastRewrites(internalQueryMaxFirstLastRewrites.load()) {}
+    : DocumentSourceGroupBase(kStageName, expCtx, maxMemoryUsageBytes), _groupsReady(false) {}
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -92,6 +94,10 @@ Pipeline::SourceContainer::iterator DocumentSourceGroup::doOptimizeAt(
     invariant(*itr == this);
 
     if (pushDotRenamedMatch(itr, container)) {
+        return itr;
+    }
+
+    if (tryToGenerateCommonSortKey(itr, container)) {
         return itr;
     }
 
@@ -265,11 +271,6 @@ bool DocumentSourceGroup::tryToAbsorbTopKSort(
         return false;
     }
 
-    // TODO SERVER-88087 Improve the rewrite to support many $first/$last more efficiently.
-    if (firstLastAccumulatorIndices.size() > _maxFirstLastRewrites) {
-        return false;
-    }
-
     for (auto i : firstLastAccumulatorIndices) {
         if (accumulators[i].expr.name == AccumulatorFirst::kName) {
             accumulators[i] = makeAccStmtFor<TopBottomSense::kTop>(
@@ -281,6 +282,259 @@ bool DocumentSourceGroup::tryToAbsorbTopKSort(
     }
 
     container->erase(prospectiveSortItr);
+
+    return true;
+}
+
+namespace {
+// The key to group $top(N)/$bottom(N) with the same sort pattern and the same N into a hash table.
+struct TopBottomAccKey {
+    SortPattern sortPattern;
+    AccumulatorN::AccumulatorType accType;
+    Value n;
+};
+
+// Hasher for 'TopBottomAccKey'.
+struct Hasher {
+    Hasher(const ValueComparator& comparator) : hash(&comparator) {}
+    uint64_t operator()(const TopBottomAccKey& key) const {
+        uint64_t h1 = std::hash<AccumulatorN::AccumulatorType>()(key.accType);
+        uint64_t h2 = std::hash<std::string>()(key.sortPattern.serialize({}).toString());
+        uint64_t h3 = static_cast<uint64_t>(hash(key.n));
+        return (h1 ^ h2) ^ h3;
+    }
+
+    ValueComparator::Hasher hash;
+};
+
+// Equality comparer for 'TopBottomAccKey'.
+struct EqualTo {
+    EqualTo(const ValueComparator& comparator) : eq(&comparator) {}
+    bool operator()(const TopBottomAccKey& lhs, const TopBottomAccKey& rhs) const {
+        return lhs.accType == rhs.accType && lhs.sortPattern == rhs.sortPattern && eq(lhs.n, rhs.n);
+    }
+
+    ValueComparator::EqualTo eq;
+};
+
+// Indices for grouped accumulators into the vector of 'AccumuationStatement'.
+using AccIndices = absl::InlinedVector<size_t, 4>;
+
+// Hash table to group $top(N)/$bottom(N) with the same sort pattern.
+using TopBottomAccKeyToAccIndicesMap =
+    absl::flat_hash_map<TopBottomAccKey, AccIndices, Hasher, EqualTo>;
+
+template <TopBottomSense sense, bool single>
+SortPattern getAccSortPattern(AccumulatorN* accN) {
+    return static_cast<AccumulatorTopBottomN<sense, single>*>(accN)->getSortPattern();
+}
+
+TopBottomAccKey getTopBottomAccKey(AccumulatorN* accN) {
+    switch (accN->getAccumulatorType()) {
+        case AccumulatorN::kTop:
+            return {.sortPattern = getAccSortPattern<TopBottomSense::kTop, true>(accN),
+                    .accType = AccumulatorN::kTop,
+                    .n = Value{1}};
+        case AccumulatorN::kTopN:
+            return {.sortPattern = getAccSortPattern<TopBottomSense::kTop, false>(accN),
+                    .accType = AccumulatorN::kTopN,
+                    .n = Value(0)};
+        case AccumulatorN::kBottom:
+            return {.sortPattern = getAccSortPattern<TopBottomSense::kBottom, true>(accN),
+                    .accType = AccumulatorN::kBottom,
+                    .n = Value(1)};
+        case AccumulatorN::kBottomN:
+            return {.sortPattern = getAccSortPattern<TopBottomSense::kBottom, false>(accN),
+                    .accType = AccumulatorN::kBottomN,
+                    .n = Value(0)};
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+template <TopBottomSense sense, bool single>
+constexpr StringData getMergeFieldName() {
+    if constexpr (sense == TopBottomSense::kTop && single) {
+        return "ts"_sd;
+    } else if constexpr (sense == TopBottomSense::kTop && !single) {
+        return "tns"_sd;
+    } else if constexpr (sense == TopBottomSense::kBottom && single) {
+        return "bs"_sd;
+    } else if constexpr (sense == TopBottomSense::kBottom && !single) {
+        return "bns"_sd;
+    }
+};
+
+boost::intrusive_ptr<Expression> getOutputArgExpr(boost::intrusive_ptr<Expression> argExpr) {
+    using namespace fmt::literals;
+    auto exprObj = dynamic_cast<ExpressionObject*>(argExpr.get());
+    tassert(8808700, "Expected object-type expression", exprObj);
+    auto&& exprs = exprObj->getChildExpressions();
+    auto outputArgExprIt = std::find_if(exprs.begin(), exprs.end(), [&](auto expr) {
+        return expr.first == AccumulatorN::kFieldNameOutput;
+    });
+    tassert(8808701,
+            "'{}' field not found"_format(AccumulatorN::kFieldNameOutput),
+            outputArgExprIt != exprs.end());
+    return outputArgExprIt->second;
+};
+
+template <TopBottomSense sense, bool single>
+AccumulationStatement mergeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pExpCtx,
+                                      const std::vector<AccumulationStatement>& accStmts,
+                                      Value n,
+                                      const SortPattern& sortPattern,
+                                      const AccIndices& accIndices,
+                                      BSONObjBuilder& prjArgsBuilder) {
+    constexpr auto mergeFieldName = getMergeFieldName<sense, single>();
+
+    // To comply with any internal parsing logic for $top and $bottom accumulators, we need to
+    // compose a BSON object that represents the accumulator statement and then parse it.
+    BSONObjBuilder bob;
+    {
+        // This block opens {"tops": {...}}.
+        BSONObjBuilder accStmtObjBuilder(bob.subobjStart(mergeFieldName));
+        {
+            // This block opens {"$top(N)": {...}} or {"$bottom(N)": {...}}.
+            BSONObjBuilder accArgsBuilder(
+                accStmtObjBuilder.subobjStart(AccumulatorTopBottomN<sense, single>::getName()));
+
+            // {"$topN": {"n": ...}}
+            if (!single) {
+                n.addToBsonObj(&accArgsBuilder, AccumulatorN::kFieldNameN);
+            }
+
+            // {"$topN": {"n": ..., "sortBy": ...}}
+            accArgsBuilder.append(AccumulatorN::kFieldNameSortBy,
+                                  sortPattern.serialize({}).toBson());
+            {
+                // This block opens "output": {...} inside {"$top": {...}}
+                BSONObjBuilder outputBuilder(
+                    accArgsBuilder.subobjStart(AccumulatorN::kFieldNameOutput));
+                for (auto accIdx : accIndices) {
+                    getOutputArgExpr(accStmts[accIdx].expr.argument)
+                        ->serialize()
+                        .addToBsonObj(&outputBuilder, accStmts[accIdx].fieldName);
+                    // Recomputes the rewritten nested accumulator fields to the user-requeted
+                    // fields.
+                    {
+                        BSONObjBuilder prjExprBuilder(prjArgsBuilder.subobjStart(
+                            accStmts[accIdx].fieldName));  // user-requested field
+                        {
+                            using namespace fmt::literals;
+                            // Composes {$ifNull: ["$rewrittenField", null]}.
+                            BSONArrayBuilder ifNullExprBuilder(
+                                prjExprBuilder.subarrayStart("$ifNull"_sd));
+                            ifNullExprBuilder
+                                .append("${}.{}"_format(mergeFieldName.toString(),
+                                                        accStmts[accIdx].fieldName))
+                                .appendNull();
+                        }
+                    }
+                }
+                outputBuilder.doneFast();
+            }
+            accArgsBuilder.doneFast();
+        }
+        accStmtObjBuilder.doneFast();
+    }
+    auto accStmtObj = bob.done();
+
+    return AccumulationStatement::parseAccumulationStatement(
+        pExpCtx.get(), accStmtObj[mergeFieldName], pExpCtx->variablesParseState);
+}
+}  // namespace
+
+bool DocumentSourceGroup::tryToGenerateCommonSortKey(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) {
+    auto& accStmts = getMutableAccumulationStatements();
+
+    TopBottomAccKeyToAccIndicesMap topBottomAccKeyToAccIndicesMap(
+        0, Hasher(pExpCtx->getValueComparator()), EqualTo(pExpCtx->getValueComparator()));
+    std::vector<size_t> ineligibleAccIndices;
+    bool foundDupSortPattern = false;
+    for (size_t accIdx = 0; accIdx < accStmts.size(); ++accIdx) {
+        if (accStmts[accIdx].expr.name != AccumulatorTop::getName() &&
+            accStmts[accIdx].expr.name != AccumulatorBottom::getName() &&
+            accStmts[accIdx].expr.name != AccumulatorTopN::getName() &&
+            accStmts[accIdx].expr.name != AccumulatorBottomN::getName()) {
+            ineligibleAccIndices.push_back(accIdx);
+            continue;
+        }
+
+        // Composes the key (the sort pattern + acc type) to group the same top or bottom with the
+        // same sort pattern. Unfortunately, the sort pattern can be extracted only from
+        // 'AccumulatorN' object at this point and so we need to create one using the factory.
+        auto accN = accStmts[accIdx].expr.factory();
+        auto key = getTopBottomAccKey(dynamic_cast<AccumulatorN*>(accN.get()));
+        if (key.accType == AccumulatorN::AccumulatorType::kTopN ||
+            key.accType == AccumulatorN::AccumulatorType::kBottomN) {
+            key.n = accStmts[accIdx].expr.initializer->serialize({});
+        }
+
+        if (auto [it, inserted] =
+                topBottomAccKeyToAccIndicesMap.try_emplace(std::move(key), AccIndices{accIdx});
+            !inserted) {
+            it->second.push_back(accIdx);
+            foundDupSortPattern = true;
+        }
+    }
+
+    // Bails out early if we didn't find any duplicated sort pattern for the same accumulator type.
+    if (!foundDupSortPattern) {
+        return false;
+    }
+
+    // Moves over non-eligible accumulator statements to the new accumulators.
+    // Also prepares a $project stage to recompute the rewritten nested accumulator fields to the
+    // user-requested fields like {$project: {tm: "$ts.tm"}. Note that unoptimized fields should be
+    // included as well in the $project spec.
+    std::vector<AccumulationStatement> newAccStmts;
+    BSONObjBuilder prjArgsBuilder;
+    for (auto ineligibleAccIdx : ineligibleAccIndices) {
+        prjArgsBuilder.append(accStmts[ineligibleAccIdx].fieldName, 1);
+        newAccStmts.push_back(std::move(accStmts[ineligibleAccIdx]));
+    }
+
+    for (auto&& [key, accIndices] : topBottomAccKeyToAccIndicesMap) {
+        // This accumulator is eligible for the optimization but there's only single accumulator
+        // statement that uses the sort pattern with the same accumulator type.
+        if (accIndices.size() < 2) {
+            auto accIdx = accIndices[0];
+            prjArgsBuilder.append(accStmts[accIdx].fieldName, 1);
+            newAccStmts.push_back(std::move(accStmts[accIdx]));
+            continue;
+        }
+
+        // There are multiple accumulator statements that use the same sort pattern with the same
+        // accumulator type. We can optimize these accumulators so that they generate the sort key
+        // only once at run-time.
+        auto mergedAccStmt = [&, &key = key, &accIndices = accIndices] {
+            switch (key.accType) {
+                case AccumulatorN::AccumulatorType::kTop:
+                    return mergeAccStmtFor<TopBottomSense::kTop, true>(
+                        pExpCtx, accStmts, key.n, key.sortPattern, accIndices, prjArgsBuilder);
+                case AccumulatorN::AccumulatorType::kTopN:
+                    return mergeAccStmtFor<TopBottomSense::kTop, false>(
+                        pExpCtx, accStmts, key.n, key.sortPattern, accIndices, prjArgsBuilder);
+                case AccumulatorN::AccumulatorType::kBottom:
+                    return mergeAccStmtFor<TopBottomSense::kBottom, true>(
+                        pExpCtx, accStmts, key.n, key.sortPattern, accIndices, prjArgsBuilder);
+                case AccumulatorN::AccumulatorType::kBottomN:
+                    return mergeAccStmtFor<TopBottomSense::kBottom, false>(
+                        pExpCtx, accStmts, key.n, key.sortPattern, accIndices, prjArgsBuilder);
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }();
+        newAccStmts.push_back(std::move(mergedAccStmt));
+    }
+
+    accStmts = std::move(newAccStmts);
+    auto prjStageSpec = prjArgsBuilder.done();
+    auto prjStage = DocumentSourceProject::create(
+        std::move(prjStageSpec), pExpCtx, DocumentSourceProject::kStageName);
+    container->insert(std::next(itr), prjStage);
 
     return true;
 }

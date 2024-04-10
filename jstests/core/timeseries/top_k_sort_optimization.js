@@ -179,7 +179,13 @@ function verifySortNotAbsorbedForClassic(pipeline, explain) {
 }
 
 function verifyOptimizedForSbe(pipeline, explain) {
-    const groupStages = getPlanStages(explain, "GROUP");
+    const groupStages = (() => {
+        if (explain.hasOwnProperty("stages")) {
+            return getPlanStages(explain.stages[0].$cursor, "GROUP");
+        } else {
+            return getPlanStages(explain, "GROUP");
+        }
+    })();
     assert.eq(groupStages.length, 1, `Expected a single GROUP stage: ${D(pipeline, explain)}`);
     assert.eq(groupStages[0].inputStage.stage,
               "UNPACK_TS_BUCKET",
@@ -361,8 +367,7 @@ function runTestCase({
     });
 })();
 
-// TODO SERVER-88087 This query should be supported after SERVER-88087.
-(function testNotOptimizedManyFirstsAndLasts() {
+(function testOptimizedManyFirstsAndLasts() {
     runTestCase({
         docs: [
             doc_t1_sD_x3_y10,
@@ -394,56 +399,6 @@ function runTestCase({
             {_id: "C", fx: 5, lx: 6, fy: 9, ly: 1000},
             {_id: "D", fx: 3, lx: 20, fy: 10, ly: 3},
         ],
-        verifyThis: (pipeline, explain) => verifyOptimizedByBoundedSort(pipeline, explain)
-    });
-})();
-
-(function testOptimizedManyFirstsAndLastsByQueryKnob() {
-    let kMaxFirstLastRewritesDefault;
-    runTestCase({
-        setup: (db) => {
-            kMaxFirstLastRewritesDefault =
-                assert
-                    .commandWorked(db.adminCommand(
-                        {setParameter: 1, internalQueryMaxFirstLastRewrites: NumberInt(4)}))
-                    .was;
-        },
-        docs: [
-            doc_t1_sD_x3_y10,
-            doc_t2_sA_x10_y5,
-            doc_t3_sB_x2_y100,
-            doc_t4_sB_x5_y24,
-            doc_t5_sA_x4_y1,
-            doc_t6_sC_x5_y9,
-            doc_t7_sC_x7_y300,
-            doc_t8_sD_x20_y3,
-            doc_t9_sC_x6_y1000,
-            doc_t10_sB_x6_y1
-        ],
-        pipeline: [
-            {$sort: {t: 1}},
-            {
-                $group: {
-                    _id: "$s",
-                    fx: {$first: "$x"},
-                    lx: {$last: "$x"},
-                    fy: {$first: "$y"},
-                    ly: {$last: "$y"},
-                }
-            },
-        ],
-        expected: [
-            {_id: "A", fx: 10, lx: 4, fy: 5, ly: 1},
-            {_id: "B", fx: 2, lx: 6, fy: 100, ly: 1},
-            {_id: "C", fx: 5, lx: 6, fy: 9, ly: 1000},
-            {_id: "D", fx: 3, lx: 20, fy: 10, ly: 3},
-        ],
-        tearDown: (db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryMaxFirstLastRewrites: kMaxFirstLastRewritesDefault
-            }));
-        },
     });
 })();
 
