@@ -28,6 +28,8 @@ const measurements = [
 ];
 
 function testIntegrityCheck(turnFailpointOn) {
+    jsTestLog("turnFailpointOn {" + turnFailpointOn + "}");
+
     coll.drop();
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
@@ -57,6 +59,8 @@ function testIntegrityCheck(turnFailpointOn) {
         assert.eq(stats.timeseries.numBucketsReopened, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketInserts, 3, tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsFetched, 1, tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 1, tojson(stats.timeseries));
     } else {
         // Insert third measurement.
         assert.commandWorked(coll.insert(measurements[2]));
@@ -64,6 +68,8 @@ function testIntegrityCheck(turnFailpointOn) {
         assert.eq(stats.timeseries.numBucketsReopened, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsFrozen, 0, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketInserts, 2, tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsFetched, 1, tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 1, tojson(stats.timeseries));
     }
 }
 
