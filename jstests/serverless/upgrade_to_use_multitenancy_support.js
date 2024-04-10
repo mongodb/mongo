@@ -4,7 +4,6 @@
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {waitForState} from "jstests/replsets/rslib.js";
 
 // In production, we will upgrade to start using multitenancySupport before enabling this feature
 // flag, and this test is meant to exercise that upgrade behavior, so don't run if the feature flag
@@ -146,7 +145,7 @@ assertFindBothTenantsPrefixedDb(
 // multitenancySupport enabled.
 originalSecondary = rst.restart(originalSecondary,
                                 {startClean: false, setParameter: {'multitenancySupport': true}});
-
+rst.waitForState(originalSecondary, ReplSetTest.State.SECONDARY);
 originalSecondary.setSecondaryOk();
 assert(originalSecondary.getDB("admin").auth('admin', 'pwd'));
 
@@ -248,8 +247,8 @@ runFindUsingSecurityTokenAndPrefix(prefixedOriginalSecondary,
 originalPrimary =
     rst.restart(originalPrimary, {startClean: false, setParameter: {'multitenancySupport': true}});
 assert(originalPrimary.getDB("admin").auth('admin', 'pwd'));
-waitForState(originalSecondary, ReplSetTest.State.PRIMARY);
-waitForState(originalPrimary, ReplSetTest.State.SECONDARY);
+rst.waitForState(originalSecondary, ReplSetTest.State.PRIMARY);
+rst.waitForState(originalPrimary, ReplSetTest.State.SECONDARY);
 originalPrimary.setSecondaryOk();
 
 // Get another connecton of original primary as connection protocol cannot change once set.
