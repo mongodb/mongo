@@ -198,10 +198,10 @@ public:
                           shard_role_details::AcquiredCollection& acquiredCollection);
 
     CollectionAcquisition(const CollectionAcquisition& other);
-    CollectionAcquisition(CollectionAcquisition&& other);
+    CollectionAcquisition(CollectionAcquisition&& other) noexcept;
 
     CollectionAcquisition& operator=(const CollectionAcquisition& other);
-    CollectionAcquisition& operator=(CollectionAcquisition&& other);
+    CollectionAcquisition& operator=(CollectionAcquisition&& other) noexcept;
 
     ~CollectionAcquisition();
 
@@ -251,10 +251,10 @@ public:
                     const shard_role_details::AcquiredView& acquiredView);
 
     ViewAcquisition(const ViewAcquisition& other);
-    ViewAcquisition(ViewAcquisition&& other);
+    ViewAcquisition(ViewAcquisition&& other) noexcept;
 
     ViewAcquisition& operator=(const ViewAcquisition& other);
-    ViewAcquisition& operator=(ViewAcquisition&& other);
+    ViewAcquisition& operator=(ViewAcquisition&& other) noexcept;
 
     ~ViewAcquisition();
 
