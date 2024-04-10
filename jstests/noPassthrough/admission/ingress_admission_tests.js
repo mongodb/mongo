@@ -31,6 +31,15 @@ function waitUntilIngressAdmissionIsBlocked(db) {
 }
 
 /**
+ * Test that we are not allowed to set the pool size to a negative value.
+ */
+function testPoolSizeValidation(db) {
+    assert.commandFailedWithCode(
+        db.adminCommand({setParameter: 1, ingressAdmissionControllerTicketPoolSize: -1}),
+        ErrorCodes.BadValue);
+}
+
+/**
  * Test that the operations waiting for ingress admission can be distinguished in currentOp.
  */
 function testCurrentOp(conn, db, collName) {
@@ -172,6 +181,7 @@ function runTests() {
     const collName = `${jsTest.name()}_coll`;
     db.getCollection(collName).drop();
 
+    testPoolSizeValidation(db);
     testCurrentOp(conn, db, collName);
     testSlowQueryLog(conn, db, collName);
     testMaxTimeMS(db, collName);
