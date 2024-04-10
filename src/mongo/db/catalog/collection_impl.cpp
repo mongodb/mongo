@@ -82,6 +82,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/capped_snapshots.h"
@@ -162,9 +163,11 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
             ErrorCodes::BadValue,
             "Validation levels other than 'strict' are not allowed on encrypted collections");
     }
-    if (validationActionOrDefault(newAction) == ValidationActionEnum::warn) {
+    auto action = validationActionOrDefault(newAction);
+    if (action == ValidationActionEnum::warn || action == ValidationActionEnum::errorAndLog) {
         return Status(ErrorCodes::BadValue,
-                      "Validation action of 'warn' is not allowed on encrypted collections");
+                      "Validation action of 'warn' and 'errorAndLog' are not allowed on encrypted "
+                      "collections");
     }
     return Status::OK();
 }
@@ -629,35 +632,47 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
     status = Status(doc_validation_error::DocumentValidationFailureInfo(generatedError),
                     kValidationFailureErrorStr);
 
-    if (validationActionOrDefault(_metadata->options.validationAction) ==
-        ValidationActionEnum::warn) {
-        return {SchemaValidationResult::kWarn, status};
+    switch (validationActionOrDefault(_metadata->options.validationAction)) {
+        case ValidationActionEnum::warn:
+            return {SchemaValidationResult::kWarn, status};
+        case ValidationActionEnum::error:
+            return {SchemaValidationResult::kError, status};
+        case ValidationActionEnum::errorAndLog:
+            return {SchemaValidationResult::kErrorAndLog, status};
     }
-
-    return {SchemaValidationResult::kError, status};
+    MONGO_UNREACHABLE_TASSERT(7488702);
 }
 
 Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
                                                      const BSONObj& document) const {
     std::pair<SchemaValidationResult, Status> result = checkValidation(opCtx, document);
-
-    if (result.first == SchemaValidationResult::kPass) {
-        return Status::OK();
+    switch (result.first) {
+        case SchemaValidationResult::kPass:
+            return Status::OK();
+        case SchemaValidationResult::kWarn:
+            LOGV2_WARNING(
+                20294,
+                "Document would fail validation",
+                logAttrs(ns()),
+                "document"_attr = redact(document),
+                "errInfo"_attr =
+                    result.second.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()
+                        ->getDetails());
+            return Status::OK();
+        case SchemaValidationResult::kErrorAndLog:
+            LOGV2_WARNING(
+                7488700,
+                "Document failed validation",
+                logAttrs(ns()),
+                "document"_attr = redact(document),
+                "errInfo"_attr =
+                    result.second.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()
+                        ->getDetails());
+            return result.second;
+        case SchemaValidationResult::kError:
+            return result.second;
     }
-
-    if (result.first == SchemaValidationResult::kWarn) {
-        LOGV2_WARNING(
-            20294,
-            "Document would fail validation",
-            logAttrs(ns()),
-            "document"_attr = redact(document),
-            "errInfo"_attr =
-                result.second.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()
-                    ->getDetails());
-        return Status::OK();
-    }
-
-    return result.second;
+    MONGO_UNREACHABLE_TASSERT(7488701);
 }
 
 Collection::Validator CollectionImpl::parseValidator(
@@ -698,11 +713,13 @@ Collection::Validator CollectionImpl::parseValidator(
     // validator to apply some additional checks.
     expCtx->isParsingCollectionValidator = true;
 
-    // If the validation action is "warn" or the level is "moderate", then disallow any encryption
-    // keywords. This is to prevent any plaintext data from showing up in the logs.
-    // Also disallow if the collection has FLE2 encrypted fields.
+    // If the validation action is printing logs or the level is "moderate", then disallow any
+    // encryption keywords. This is to prevent any plaintext data from showing up in the logs. Also
+    // disallow if the collection has FLE2 encrypted fields.
     if (validationActionOrDefault(_metadata->options.validationAction) ==
             ValidationActionEnum::warn ||
+        validationActionOrDefault(_metadata->options.validationAction) ==
+            ValidationActionEnum::errorAndLog ||
         validationLevelOrDefault(_metadata->options.validationLevel) ==
             ValidationLevelEnum::moderate ||
         doImplicitValidation)
@@ -1226,7 +1243,8 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx,
     // Reparse the validator as there are some features which are only supported with certain
     // validation actions.
     auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
-    if (storedValidationAction == ValidationActionEnum::warn)
+    if (storedValidationAction == ValidationActionEnum::warn ||
+        storedValidationAction == ValidationActionEnum::errorAndLog)
         allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
 
     _validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);

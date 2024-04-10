@@ -44,11 +44,15 @@ enums:
             moderate: moderate
 
     ValidationAction:
-        description: "Determines whether to error on invalid documents or just warn about the violations but allow invalid documents to be inserted."
+        description: "Determines an action on invalid documents being written:
+            error - return an error to the client
+            warn - write a message to mongod logs
+            errorAndLog - perform both actions"
         type: string
         values:
             error: error
             warn: warn
+            errorAndLog: errorAndLog
 
 structs:
     IndexOptionDefaults:

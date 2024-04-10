@@ -83,6 +83,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/storage_stats.h"
@@ -616,6 +617,13 @@ public:
                         str::stream() << "Document validators not allowed on system collection "
                                       << nss.toStringForErrorMsg(),
                         nss != NamespaceString::kConfigSettingsNamespace);
+            }
+            if (cmd.getValidationAction() == ValidationActionEnum::errorAndLog) {
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "Validation action 'errorAndLog' is not supported with current FCV",
+                    gFeatureFlagErrorAndLogValidationAction.isEnabledUseLastLTSFCVWhenUninitialized(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             }
 
             // We do not use the serialization context for reply object serialization as the reply

@@ -64,6 +64,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -476,6 +477,13 @@ public:
                         str::stream() << "Document validators not allowed on system collection "
                                       << ns().toStringForErrorMsg(),
                         ns() != NamespaceString::kConfigSettingsNamespace);
+            }
+            if (cmd.getValidationAction() == ValidationActionEnum::errorAndLog) {
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "Validation action 'errorAndLog' is not supported with current FCV",
+                    gFeatureFlagErrorAndLogValidationAction.isEnabledUseLastLTSFCVWhenUninitialized(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             }
 
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE

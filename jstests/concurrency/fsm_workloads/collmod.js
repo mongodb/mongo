@@ -8,6 +8,9 @@
  *
  * All threads update the same TTL index on the same collection.
  */
+
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 export const $config = (function() {
     var data = {
         numDocs: 1000,
@@ -37,6 +40,15 @@ export const $config = (function() {
                     validationAction: "warn"
                 }),
                 [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.QueryFeatureNotAllowed]);
+            if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
+                assert.commandFailedWithCode(
+                    db.runCommand({
+                        collMod: this.threadCollName,
+                        validator: encryptSchema,
+                        validationAction: "errorAndLog"
+                    }),
+                    [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.QueryFeatureNotAllowed]);
+            }
         }
 
         return {collMod: collMod};

@@ -1253,6 +1253,32 @@ private:
                 catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, checkForNewRangeQueryType);
             }
         }
+
+        if (gFeatureFlagErrorAndLogValidationAction.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+                requestedVersion, originalVersion)) {
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+                catalog::forEachCollectionFromDb(
+                    opCtx,
+                    dbName,
+                    MODE_IS,
+                    [&](const Collection* collection) -> bool {
+                        uasserted(
+                            ErrorCodes::CannotDowngrade,
+                            fmt::format(
+                                "Cannot downgrade the cluster when there are collections with "
+                                "'errorAndLog' validation action. Please unset the option or "
+                                "drop the collection(s) before downgrading. First detected "
+                                "collection with 'errorAndLog' enabled: {} (UUID: {}).",
+                                collection->ns().toStringForErrorMsg(),
+                                collection->uuid().toString()));
+                    },
+                    [&](const Collection* collection) {
+                        return collection->getValidationAction() ==
+                            ValidationActionEnum::errorAndLog;
+                    });
+            }
+        }
     }
 
     // Remove cluster parameters from the clusterParameters collections which are not enabled on

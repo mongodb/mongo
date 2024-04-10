@@ -175,3 +175,9 @@ feature_flags:
         cpp_varname: gFeatureFlagDefaultReadMaxTimeMS
         default: false
         shouldBeFCVGated: true
+    featureFlagErrorAndLogValidationAction:
+        description: "Feature flag to enable errorAndLog validatio action in collection options"
+        cpp_varname: gFeatureFlagErrorAndLogValidationAction
+        default: true
+        version: 8.1
+        shouldBeFCVGated: true

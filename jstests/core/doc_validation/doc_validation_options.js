@@ -7,6 +7,7 @@
 // ]
 
 import {documentEq} from "jstests/aggregation/extras/utils.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function assertFailsValidation(res) {
@@ -22,6 +23,31 @@ const validatorExpression = {
 };
 assert.commandWorked(db.createCollection(t.getName(), {validator: validatorExpression}));
 
+const warnLogId = 20294;
+const errorAndLogId = 7488700;
+
+function checkLogsForFailedValidation(logId) {
+    // In case of sharded deployments, look on all shards and expect the log to be found on one of
+    // them.
+    const nodesToCheck = FixtureHelpers.isStandalone(db) ? [db] : FixtureHelpers.getPrimaries(db);
+
+    const errInfo = {
+        failingDocumentId: 1,
+        details: {
+            operatorName: "$eq",
+            specifiedAs: {a: 1},
+            reason: "comparison failed",
+            consideredValue: 2
+        }
+    };
+
+    assert(nodesToCheck.some((conn) => checkLog.checkContainsOnceJson(conn, logId, {
+        "errInfo": function(obj) {
+            return documentEq(obj, errInfo);
+        }
+    })));
+}
+
 assertFailsValidation(t.insert({a: 2}));
 t.insert({_id: 1, a: 1});
 assert.eq(1, t.count());
@@ -30,27 +56,25 @@ assert.eq(1, t.count());
 assertFailsValidation(t.update({}, {$set: {a: 2}}));
 assert.eq(1, t.find({a: 1}).itcount());
 
+if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
+    const res = assert.commandWorkedOrFailedWithCode(
+        t.runCommand("collMod", {validationAction: "errorAndLog"}), ErrorCodes.InvalidOptions);
+    if (res.ok) {
+        assertFailsValidation(t.update({}, {$set: {a: 2}}));
+        checkLogsForFailedValidation(errorAndLogId)
+        // make sure persisted
+        const info = db.getCollectionInfos({name: t.getName()})[0];
+        assert.eq("errorAndLog", info.options.validationAction, tojson(info));
+    }
+}
+
 // check we can do a bad update in warn mode
 assert.commandWorked(t.runCommand("collMod", {validationAction: "warn"}));
 t.update({}, {$set: {a: 2}});
 assert.eq(1, t.find({a: 2}).itcount());
-
 // check log for message. In case of sharded deployments, look on all shards and expect the log to
 // be found on one of them.
-const logId = 20294;
-const errInfo = {
-    failingDocumentId: 1,
-    details:
-        {operatorName: "$eq", specifiedAs: {a: 1}, reason: "comparison failed", consideredValue: 2}
-};
-
-const nodesToCheck = FixtureHelpers.isStandalone(db) ? [db] : FixtureHelpers.getPrimaries(db);
-assert(nodesToCheck.some((conn) => checkLog.checkContainsOnceJson(conn, logId, {
-    "errInfo": function(obj) {
-        return documentEq(obj, errInfo);
-    }
-})));
-
+checkLogsForFailedValidation(warnLogId)
 // make sure persisted
 const info = db.getCollectionInfos({name: t.getName()})[0];
 assert.eq("warn", info.options.validationAction, tojson(info));

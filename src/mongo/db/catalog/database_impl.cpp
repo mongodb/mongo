@@ -960,12 +960,13 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
         // validator to apply some additional checks.
         expCtx->isParsingCollectionValidator = true;
 
-        // If the validation action is "warn" or the level is "moderate", or if the user has
+        // If the validation action is printing logs or the level is "moderate", or if the user has
         // defined some encrypted fields in the collection options, then disallow any encryption
         // keywords. This is to prevent any plaintext data from showing up in the logs.
         auto allowedFeatures = MatchExpressionParser::kDefaultSpecialFeatures;
 
         if (collectionOptions.validationAction == ValidationActionEnum::warn ||
+            collectionOptions.validationAction == ValidationActionEnum::errorAndLog ||
             collectionOptions.validationLevel == ValidationLevelEnum::moderate ||
             collectionOptions.encryptedFieldConfig.has_value())
             allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;

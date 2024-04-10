@@ -160,10 +160,7 @@ void schemaValidationFailed(CollectionValidation::ValidateState* state,
     }
 
     state->setCollectionSchemaViolated();
-
-    if (result != Collection::SchemaValidationResult::kPass) {
-        results->warnings.push_back(kSchemaValidationFailedReason);
-    }
+    results->warnings.push_back(kSchemaValidationFailedReason);
 }
 
 // Checks that 'control.count' matches the actual number of measurements in a closed bucket.
