@@ -92,7 +92,7 @@ TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfUnrecognisedParameterSpe
     ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
                            fromjson("{$queryStats: {foo: true}}").firstElement(), getExpCtx()),
                        AssertionException,
-                       40415);
+                       ErrorCodes::IDLUnknownField);
 }
 
 TEST_F(DocumentSourceQueryStatsTest, ParseAndSerialize) {

@@ -187,13 +187,14 @@ void IDLParserContext::throwUnknownField(StringData fieldName) const {
     std::string path = getElementPath(fieldName);
     if (isMongocryptdArgument(fieldName)) {
         uasserted(
-            4662500,
+            ErrorCodes::IDLUnknownFieldPossibleMongocryptd,
             str::stream()
                 << "BSON field '" << path
                 << "' is an unknown field. This command may be meant for a mongocryptd process.");
     }
 
-    uasserted(40415, str::stream() << "BSON field '" << path << "' is an unknown field.");
+    uasserted(ErrorCodes::IDLUnknownField,
+              str::stream() << "BSON field '" << path << "' is an unknown field.");
 }
 
 void IDLParserContext::throwBadArrayFieldNumberSequence(StringData actual,

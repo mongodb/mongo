@@ -43,12 +43,18 @@ function runTest(conn) {
     // Wrong parameter name throws error.
     let pipeline = [{$queryStats: {redactFields: true}}];
     assertAdminDBErrCodeAndErrMsgContains(
-        coll, pipeline, 40415, "BSON field '$queryStats.redactFields' is an unknown field.");
+        coll,
+        pipeline,
+        ErrorCodes.IDLUnknownField,
+        "BSON field '$queryStats.redactFields' is an unknown field.");
 
     // Wrong parameter name throws error.
     pipeline = [{$queryStats: {algorithm: "hmac-sha-256"}}];
     assertAdminDBErrCodeAndErrMsgContains(
-        coll, pipeline, 40415, "BSON field '$queryStats.algorithm' is an unknown field.");
+        coll,
+        pipeline,
+        ErrorCodes.IDLUnknownField,
+        "BSON field '$queryStats.algorithm' is an unknown field.");
 
     // Wrong parameter type throws error.
     pipeline = [{$queryStats: {transformIdentifiers: {algorithm: 1}}}];
@@ -95,7 +101,7 @@ function runTest(conn) {
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
-        40415,
+        ErrorCodes.IDLUnknownField,
         "BSON field '$queryStats.transformIdentifiers.hmacStrategy' is an unknown field.");
 }
 

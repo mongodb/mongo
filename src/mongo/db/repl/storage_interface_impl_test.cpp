@@ -392,8 +392,7 @@ TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfDocumentHasBadFi
         {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId << "bad field" << 3),
          Timestamp::min()}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(badDocs)));
-    ASSERT_EQUALS(ErrorCodes::duplicateCodeForTest(40415),
-                  storage.getRollbackID(opCtx).getStatus());
+    ASSERT_EQUALS(ErrorCodes::IDLUnknownField, storage.getRollbackID(opCtx).getStatus());
 }
 
 TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfRollbackIDIsNotInt) {

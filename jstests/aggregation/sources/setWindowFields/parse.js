@@ -32,7 +32,8 @@ assert.commandWorked(
     run({$setWindowFields: {partitionBy: "$$myobj.a", output: {}}}, {let : {myobj: {a: 456}}}));
 
 // Test that parsing fails for unrecognized parameters.
-assert.commandFailedWithCode(run({$setWindowFields: {what_is_this: 1}}), 40415);
+assert.commandFailedWithCode(run({$setWindowFields: {what_is_this: 1}}),
+                             ErrorCodes.IDLUnknownField);
 
 // Test for a successful parse, ignoring the response documents.
 assert.commandWorked(run({

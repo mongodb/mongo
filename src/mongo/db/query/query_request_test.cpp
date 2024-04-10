@@ -795,8 +795,9 @@ TEST(QueryRequestTest, ParseFromCommandSlaveOkWrongType) {
         "filter:  {a: 1},"
         "slaveOk: 3, '$db': 'test'}");
 
-    ASSERT_THROWS_CODE(
-        query_request_helper::makeFromFindCommandForTests(cmdObj), DBException, 40415);
+    ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
+                       DBException,
+                       ErrorCodes::IDLUnknownField);
 }
 
 TEST(QueryRequestTest, ParseFromCommandOplogReplayWrongType) {
@@ -840,8 +841,9 @@ TEST(QueryRequestTest, ParseFromCommandExhaustWrongType) {
         "filter:  {a: 1},"
         "exhaust: 3, '$db': 'test'}");
 
-    ASSERT_THROWS_CODE(
-        query_request_helper::makeFromFindCommandForTests(cmdObj), DBException, 40415);
+    ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
+                       DBException,
+                       ErrorCodes::IDLUnknownField);
 }
 
 
@@ -1175,8 +1177,9 @@ TEST(QueryRequestTest, ParseCommandAllowMetaSortOnFieldWithoutMetaProject) {
 TEST(QueryRequestTest, ParseCommandForbidExhaust) {
     BSONObj cmdObj = fromjson("{find: 'testns', exhaust: true, '$db': 'test'}");
 
-    ASSERT_THROWS_CODE(
-        query_request_helper::makeFromFindCommandForTests(cmdObj), DBException, 40415);
+    ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
+                       DBException,
+                       ErrorCodes::IDLUnknownField);
 }
 
 // Older versions of the server supported an "ntoreturn" parameter to the find command, which was
@@ -1187,7 +1190,7 @@ TEST(QueryRequestTest, NToReturnParamFailsToParse) {
     BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test', ntoreturn: 5}");
     ASSERT_THROWS_CODE_AND_WHAT(query_request_helper::makeFromFindCommandForTests(cmdObj),
                                 DBException,
-                                40415,
+                                ErrorCodes::IDLUnknownField,
                                 "BSON field 'FindCommandRequest.ntoreturn' is an unknown field.");
 }
 
@@ -1256,8 +1259,9 @@ TEST(QueryRequestTest, ParseFromCommandForbidExtraField) {
         "{find: 'testns',"
         "foo: {a: 1}, '$db': 'test'}");
 
-    ASSERT_THROWS_CODE(
-        query_request_helper::makeFromFindCommandForTests(cmdObj), DBException, 40415);
+    ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
+                       DBException,
+                       ErrorCodes::IDLUnknownField);
 }
 
 TEST(QueryRequestTest, ParseFromCommandForbidExtraOption) {
@@ -1265,8 +1269,9 @@ TEST(QueryRequestTest, ParseFromCommandForbidExtraOption) {
         "{find: 'testns',"
         "foo: true, '$db': 'test'}");
 
-    ASSERT_THROWS_CODE(
-        query_request_helper::makeFromFindCommandForTests(cmdObj), DBException, 40415);
+    ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
+                       DBException,
+                       ErrorCodes::IDLUnknownField);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSStringValueFails) {

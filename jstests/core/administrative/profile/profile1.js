@@ -42,7 +42,7 @@ try {
 
     // expect error given unrecognized options
     assert.commandFailedWithCode(testDb.runCommand({profile: 0, unknown: {}}),
-                                 40415 /* IDL unknown field error */,
+                                 ErrorCodes.IDLUnknownField,
                                  "Expected IDL to reject unknown field for profile command.");
 
     // With pre-created system.profile (capped)

@@ -81,7 +81,7 @@ TEST(MemberConfig, ParseFailsWithIllegalFieldName) {
                                                << "frim" << 1),
                                     &tagConfig),
                        AssertionException,
-                       40415);
+                       ErrorCodes::IDLUnknownField);
 }
 
 TEST(MemberConfig, ParseFailsWithMissingIdField) {

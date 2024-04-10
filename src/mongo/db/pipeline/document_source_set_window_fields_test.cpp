@@ -84,7 +84,7 @@ TEST_F(DocumentSourceSetWindowFieldsTest, FailsToParseInvalidArgumentTypes) {
     ASSERT_THROWS_CODE(
         DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx()),
         AssertionException,
-        40415);
+        ErrorCodes::IDLUnknownField);
 }
 
 TEST_F(DocumentSourceSetWindowFieldsTest, FailsToParseIfArgumentsAreRepeated) {

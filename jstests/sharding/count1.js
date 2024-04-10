@@ -156,9 +156,11 @@ assert.commandFailedWithCode(db.runCommand({count: 'foo', skip: -2, limit: 1}), 
 ]);  // getting BadValue when binary is > 7.1, else 51024
 
 // iv. Unknown options should return error.
-assert.commandFailedWithCode(db.runCommand({count: 'foo', random: true}), 40415);
+assert.commandFailedWithCode(db.runCommand({count: 'foo', random: true}),
+                             ErrorCodes.IDLUnknownField);
 
 // v. Unknown options should return error for explain.
-assert.commandFailedWithCode(db.runCommand({explain: {count: 'foo', random: true}}), 40415);
+assert.commandFailedWithCode(db.runCommand({explain: {count: 'foo', random: true}}),
+                             ErrorCodes.IDLUnknownField);
 
 s.stop();

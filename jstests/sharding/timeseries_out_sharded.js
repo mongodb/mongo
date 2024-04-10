@@ -127,8 +127,8 @@ assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7268700);
 // Tests that an error is raised for invalid timeseries options.
 pipeline = TimeseriesAggTests.generateOutPipeline(
     targetCollName, dbName, {timeField: "time", invalidField: "invalid"});
-assert.throwsWithCode(() => inColl.aggregate(pipeline), 40415);
-assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 40415);
+assert.throwsWithCode(() => inColl.aggregate(pipeline), ErrorCodes.IDLUnknownField);
+assert.throwsWithCode(() => observerInColl.aggregate(pipeline), ErrorCodes.IDLUnknownField);
 
 // Tests that an error is raised if the user changes the 'timeField'.
 pipeline =

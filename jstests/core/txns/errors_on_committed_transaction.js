@@ -60,7 +60,7 @@ jsTestLog("Test that calling commit with invalid fields on a committed transacti
 assert.commandFailedWithCode(
     sessionDB.adminCommand(
         {commitTransaction: 1, invalidField: 1, txnNumber: txnNumber, autocommit: false}),
-    40415 /* IDL unknown field error */);
+    ErrorCodes.IDLUnknownField);
 
 // Call abort on committed transaction without shell helper.
 jsTestLog("Test that calling abort on a committed transaction fails.");
@@ -72,6 +72,6 @@ jsTestLog("Test that calling abort with invalid fields on a committed transactio
 assert.commandFailedWithCode(
     sessionDB.adminCommand(
         {abortTransaction: 1, invalidField: 1, txnNumber: txnNumber, autocommit: false}),
-    40415 /* IDL unknown field error */);
+    ErrorCodes.IDLUnknownField);
 
 session.endSession();

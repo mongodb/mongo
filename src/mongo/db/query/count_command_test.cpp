@@ -170,7 +170,7 @@ TEST(CountCommandTest, FailParseUnknownField) {
                                                        << "foo"
                                                        << "bar")),
                        AssertionException,
-                       40415);
+                       ErrorCodes::IDLUnknownField);
 }
 
 TEST(CountCommandTest, ConvertToAggregationWithHint) {

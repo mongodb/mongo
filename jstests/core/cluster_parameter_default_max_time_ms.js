@@ -32,7 +32,8 @@ assert.commandFailedWithCode(
 
 // Fails when setting an unknown subfield.
 assert.commandFailedWithCode(
-    adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {unknownField: 42}}}), 40415);
+    adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {unknownField: 42}}}),
+    ErrorCodes.IDLUnknownField);
 
 // Sets to a valid user-defined value.
 assert.commandWorked(

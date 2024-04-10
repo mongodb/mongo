@@ -33,7 +33,8 @@ assert.commandFailedWithCode(buildAndRunCommand({$fill: {output: {test: {method:
 // Fail on invalid fill specification.
 assert.commandFailedWithCode(buildAndRunCommand({$fill: {output: {test: "random"}}}), 6050200);
 assert.commandFailedWithCode(
-    buildAndRunCommand({$fill: {output: {test: {method: "locf", second: "locf"}}}}), 40415);
+    buildAndRunCommand({$fill: {output: {test: {method: "locf", second: "locf"}}}}),
+    ErrorCodes.IDLUnknownField);
 
 // Fail if both 'partitionBy' and 'partitionByFields' are specified.
 assert.commandFailedWithCode(buildAndRunCommand({

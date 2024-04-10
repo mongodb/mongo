@@ -75,7 +75,7 @@ assert.commandFailedWithCode(db.adminCommand({
     ordered: false,
     fooField: 0
 }),
-                             [40415]);
+                             [ErrorCodes.IDLUnknownField]);
 
 assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);

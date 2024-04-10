@@ -157,4 +157,4 @@ testError({$percentile: {p: ["$price"], input: "$str", method: "continuous"}},
 testError({$percentile: {input: "$str", method: "approximate"}},
           ErrorCodes.IDLFailedToParse /* IDL required field error */);
 testError({$median: {p: [0.1, 0.6], input: "$str", method: "approximate"}},
-          40415 /* IDL unknown field error */);
+          ErrorCodes.IDLUnknownField);
