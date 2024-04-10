@@ -456,17 +456,12 @@ There exists a plan cache for SBE; see the [relevant
 README](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/query/README.md#sbe-plan-cache)
 for more details.
 
-## Incomplete Sections Below (TODO)
-
 ## Runtime Planners
 
-Outline:
+See [Classic Runtime Planners for SBE
+README](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/classic_runtime_planner_for_sbe/README.md).
 
-### `MultiPlanner`
-
-### `CachedSolutionPlanner`
-
-### `SubPlanner`
+## Incomplete Sections Below (TODO)
 
 ## Virtual Machine
 
