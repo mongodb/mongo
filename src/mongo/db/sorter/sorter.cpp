@@ -64,6 +64,7 @@
 #include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/file.h"
 #include "mongo/util/str.h"
 
 // As this file is included in various places we need to handle the case of having the log header
@@ -1191,6 +1192,17 @@ Sorter<Key, Value>::File::~File() {
     }
 
     if (_keep) {
+        if (!_file.is_open()) {
+            return;
+        }
+        DESTRUCTOR_GUARD(_file.flush());
+
+        mongo::File fileForFsync;
+        fileForFsync.open(_path.string().c_str());
+        if (fileForFsync.is_open()) {
+            fileForFsync.fsync();
+        }
+
         return;
     }
 
