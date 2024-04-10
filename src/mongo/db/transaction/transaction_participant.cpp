@@ -327,6 +327,17 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                 insertStmtIdsForOplogEntry(entry);
             }
         } catch (const DBException& ex) {
+            // The 4041X codes are reasons parse failed in the IDL code.
+            if (ex.code() == 40413 || ex.code() == 40414 || ex.code() == 40415 ||
+                ex.code() == ErrorCodes::FailedToParse || ex.code() == ErrorCodes::TypeMismatch ||
+                ex.code() == ErrorCodes::BadValue) {
+                LOGV2_WARNING(
+                    8756300,
+                    "Failed to parse oplog entry during session load.  Did a downgrade happen?",
+                    "error"_attr = ex.toStatus());
+                result.hasIncompleteHistory = true;
+                break;
+            }
             if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
                 result.hasIncompleteHistory = true;
                 break;
