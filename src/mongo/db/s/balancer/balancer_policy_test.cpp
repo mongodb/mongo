@@ -70,7 +70,6 @@ auto& kDefaultMaxChunkSizeBytes = ChunkSizeSettingsType::kDefaultMaxChunkSizeByt
 PseudoRandom _random{SecureRandom().nextInt64()};
 
 const auto emptyZoneSet = std::set<std::string>();
-const std::string emptyShardVersion = "";
 const NamespaceString kNamespace =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const KeyPattern kShardKeyPattern(BSON("x" << 1));
@@ -195,7 +194,6 @@ std::pair<std::pair<ShardStatisticsVector, ShardToChunksMap>, ChunkManager> gene
                                 shardSpec.currSizeBytes,
                                 shardSpec.isDraining,
                                 shardSpec.shardZones,
-                                emptyShardVersion,
                                 ShardStatistics::use_bytes_t());
     }
 
