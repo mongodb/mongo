@@ -313,7 +313,7 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
                     return s;
                 }
 
-                if (s.code() == ErrorCodes::IDLFailedToParse) {
+                if (ErrorCodes::isIDLParseError(s.code())) {
                     // Failing here indicates that an IDL struct type may be incorrectly defined
                     // and we were unable to parse a generic reply field from the response.
                     tasserted(

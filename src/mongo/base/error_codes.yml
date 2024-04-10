@@ -27,6 +27,9 @@ error_categories:
   - CloseConnectionError
   - VersionedAPIError
   - ValidationError
+  # This category includes parsing errors caught by the IDL including unknown field, missing
+  # field, and duplicate field.  It currently does not include all errors caught by the IDL.
+  - IDLParseError
   # Codes for internal use only. The codes can be passed between servers in a cluster, but must
   # never be returned to the client in a network response.
   - InternalOnly
@@ -831,7 +834,10 @@ error_codes:
   - {code: 17280, name: OBSOLETE_KeyTooLong}
   - {code: 28769, name: NamespaceCannotBeSharded}
   - {code: 31082, name: SearchNotEnabled}
-  - {code: 40414, name: IDLFailedToParse}
+  - {code: 40413, name: IDLDuplicateField, categories: [IDLParseError]}
+  # Specifically, 40414 indicates a missing but required field.
+  - {code: 40414, name: IDLFailedToParse, categories: [IDLParseError]}
+  - {code: 40415, name: IDLUnknownField, categories: [IDLParseError]}
   - {
       code: 46841,
       name: ClientMarkedKilled,
@@ -847,3 +853,8 @@ error_codes:
   - {code: 57986, name: RetryableInternalTransactionNotSupported}
   - {code: 640570, name: IllegalChangeToExpectedShardVersion}
   - {code: 640571, name: IllegalChangeToExpectedDatabaseVersion}
+  - {
+      code: 4662500,
+      name: IDLUnknownFieldPossibleMongocryptd,
+      categories: [IDLParseError],
+    }
