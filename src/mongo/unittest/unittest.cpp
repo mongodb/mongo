@@ -193,27 +193,39 @@ public:
     void startCapturingLogMessages();
     void stopCapturingLogMessages();
     void stopCapturingLogMessagesIfNeeded();
-    const std::vector<std::string>& getCapturedTextFormatLogMessages() const;
+    const synchronized_value<std::vector<std::string>>& getCapturedTextFormatLogMessages() const {
+        return _capturedLogMessages;
+    }
     std::vector<BSONObj> getCapturedBSONFormatLogMessages() const;
     int64_t countTextFormatLogLinesContaining(const std::string& needle);
     int64_t countBSONFormatLogLinesIsSubset(const BSONObj& needle);
     void printCapturedTextFormatLogLines() const;
 
 private:
+    class Listener : public logv2::LogLineListener {
+    public:
+        explicit Listener(synchronized_value<std::vector<std::string>>* sv) : _sv(sv) {}
+        void accept(const std::string& line) override {
+            _sv->synchronize()->push_back(line);
+        }
+
+    private:
+        synchronized_value<std::vector<std::string>>* _sv;
+    };
+
     bool _isCapturingLogMessages{false};
 
     // Captures Plain Text Log
-    std::vector<std::string> _capturedLogMessages;
+    synchronized_value<std::vector<std::string>> _capturedLogMessages;
 
     // Captured BSON
-    std::vector<std::string> _capturedBSONLogMessages;
+    synchronized_value<std::vector<std::string>> _capturedBSONLogMessages;
 
     // Capture Sink for Plain Text
-    boost::shared_ptr<boost::log::sinks::synchronous_sink<logv2::LogCaptureBackend>> _captureSink;
+    boost::shared_ptr<boost::log::sinks::unlocked_sink<logv2::LogCaptureBackend>> _captureSink;
 
     // Capture Sink for BSON
-    boost::shared_ptr<boost::log::sinks::synchronous_sink<logv2::LogCaptureBackend>>
-        _captureBSONSink;
+    boost::shared_ptr<boost::log::sinks::unlocked_sink<logv2::LogCaptureBackend>> _captureBSONSink;
 };
 
 static CaptureLogs* getCaptureLogs() {
@@ -248,16 +260,18 @@ namespace {
 
 void CaptureLogs::startCapturingLogMessages() {
     invariant(!_isCapturingLogMessages);
-    _capturedLogMessages.clear();
-    _capturedBSONLogMessages.clear();
+    _capturedLogMessages.synchronize()->clear();
+    _capturedBSONLogMessages.synchronize()->clear();
 
     if (!_captureSink) {
-        _captureSink = logv2::LogCaptureBackend::create(_capturedLogMessages);
+        _captureSink =
+            logv2::LogCaptureBackend::create(std::make_unique<Listener>(&_capturedLogMessages));
         _captureSink->set_filter(
             logv2::AllLogsFilter(logv2::LogManager::global().getGlobalDomain()));
         _captureSink->set_formatter(logv2::PlainFormatter());
 
-        _captureBSONSink = logv2::LogCaptureBackend::create(_capturedBSONLogMessages);
+        _captureBSONSink =
+            logv2::LogCaptureBackend::create(std::make_unique<Listener>(&_capturedBSONLogMessages));
 
         _captureBSONSink->set_filter(
             logv2::AllLogsFilter(logv2::LogManager::global().getGlobalDomain()));
@@ -283,14 +297,11 @@ void CaptureLogs::stopCapturingLogMessagesIfNeeded() {
     }
 }
 
-const std::vector<std::string>& CaptureLogs::getCapturedTextFormatLogMessages() const {
-    return _capturedLogMessages;
-}
-
 std::vector<BSONObj> CaptureLogs::getCapturedBSONFormatLogMessages() const {
     std::vector<BSONObj> objs;
-    std::transform(_capturedBSONLogMessages.cbegin(),
-                   _capturedBSONLogMessages.cend(),
+    auto logLinesLockGuard = _capturedBSONLogMessages.synchronize();
+    std::transform(logLinesLockGuard->cbegin(),
+                   logLinesLockGuard->cend(),
                    std::back_inserter(objs),
                    [](const std::string& str) { return BSONObj(str.c_str()); });
     return objs;
@@ -298,7 +309,8 @@ std::vector<BSONObj> CaptureLogs::getCapturedBSONFormatLogMessages() const {
 void CaptureLogs::printCapturedTextFormatLogLines() const {
     LOGV2(23054,
           "****************************** Captured Lines (start) *****************************");
-    for (const auto& line : getCapturedTextFormatLogMessages()) {
+    auto logLinesLockGuard = getCapturedTextFormatLogMessages().synchronize();
+    for (const auto& line : *logLinesLockGuard) {
         LOGV2(23055, "{line}", "line"_attr = line);
     }
     LOGV2(23056,
@@ -306,9 +318,10 @@ void CaptureLogs::printCapturedTextFormatLogLines() const {
 }
 
 int64_t CaptureLogs::countTextFormatLogLinesContaining(const std::string& needle) {
-    const auto& msgs = getCapturedTextFormatLogMessages();
-    return std::count_if(
-        msgs.begin(), msgs.end(), [&](const std::string& s) { return stringContains(s, needle); });
+    auto msgs = getCapturedTextFormatLogMessages().synchronize();
+    return std::count_if(msgs->begin(), msgs->end(), [&](const std::string& s) {
+        return stringContains(s, needle);
+    });
 }
 
 bool isSubset(BSONObj haystack, BSONObj needle) {
@@ -360,8 +373,8 @@ void Test::startCapturingLogMessages() {
 void Test::stopCapturingLogMessages() {
     getCaptureLogs()->stopCapturingLogMessages();
 }
-const std::vector<std::string>& Test::getCapturedTextFormatLogMessages() const {
-    return getCaptureLogs()->getCapturedTextFormatLogMessages();
+std::vector<std::string> Test::getCapturedTextFormatLogMessages() const {
+    return getCaptureLogs()->getCapturedTextFormatLogMessages().get();
 }
 std::vector<BSONObj> Test::getCapturedBSONFormatLogMessages() const {
     return getCaptureLogs()->getCapturedBSONFormatLogMessages();

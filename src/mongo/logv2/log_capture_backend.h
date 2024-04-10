@@ -37,24 +37,38 @@
 #include <string>
 #include <vector>
 
+#include "mongo/platform/atomic_word.h"
+
 namespace mongo::logv2 {
+
+/*
+ * LogLineListener is a wrapper class used in the LogCaptureBackend that defines what to do with
+ * log lines upon consumption.
+ */
+class LogLineListener {
+public:
+    virtual ~LogLineListener() = default;
+    virtual void accept(const std::string& line) = 0;
+};
+
 class LogCaptureBackend
     : public boost::log::sinks::
-          basic_formatted_sink_backend<char, boost::log::sinks::synchronized_feeding> {
+          basic_formatted_sink_backend<char, boost::log::sinks::concurrent_feeding> {
 public:
-    LogCaptureBackend(std::vector<std::string>& lines) : _logLines(lines) {}
+    LogCaptureBackend(std::unique_ptr<LogLineListener> logListener)
+        : _logListener{std::move(logListener)} {}
 
-    static boost::shared_ptr<boost::log::sinks::synchronous_sink<LogCaptureBackend>> create(
-        std::vector<std::string>& lines) {
-        return boost::make_shared<boost::log::sinks::synchronous_sink<LogCaptureBackend>>(
-            boost::make_shared<LogCaptureBackend>(lines));
+    static boost::shared_ptr<boost::log::sinks::unlocked_sink<LogCaptureBackend>> create(
+        std::unique_ptr<LogLineListener> logListener) {
+        return boost::make_shared<boost::log::sinks::unlocked_sink<LogCaptureBackend>>(
+            boost::make_shared<LogCaptureBackend>(std::move(logListener)));
     }
 
     void consume(boost::log::record_view const& rec, string_type const& formatted_string) {
-        _logLines.push_back(formatted_string);
+        _logListener->accept(formatted_string);
     }
 
 private:
-    std::vector<std::string>& _logLines;
+    std::unique_ptr<LogLineListener> _logListener;
 };
 }  // namespace mongo::logv2
