@@ -612,10 +612,10 @@ roles:
     privileges:
       - matchType: any
         actions:
-          - bypassDefaultMaxTimeMS
           - validate
       - matchType: cluster
         actions:
+          - bypassDefaultMaxTimeMS
           - useTenant # Specify tenant id with unsigned security token on commands
       - matchType: exact_namespace
         db: "config"

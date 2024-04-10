@@ -481,6 +481,7 @@ env.Library(
         'default_max_time_ms_cluster_parameter.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         'query/query_request',
         'server_base',
