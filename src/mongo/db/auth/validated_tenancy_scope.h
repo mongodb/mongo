@@ -78,20 +78,19 @@ public:
     bool hasTenantId() const {
         return visit(OverloadedVisitor{
                          [](const std::monostate&) { return false; },
-                         [](const UserName& userName) { return !!userName.getTenant(); },
+                         [](const UserName& userName) { return !!userName.tenantId(); },
                          [](const TenantId& tenant) { return true; },
                      },
                      _tenantOrUser);
     }
 
-    const TenantId& tenantId() const {
-        return visit(
-            OverloadedVisitor{
-                [](const std::monostate&) -> const TenantId& { MONGO_UNREACHABLE; },
-                [](const UserName& userName) -> decltype(auto) { return *userName.getTenant(); },
-                [](const TenantId& tenant) -> decltype(auto) { return tenant; },
-            },
-            _tenantOrUser);
+    TenantId tenantId() const {
+        return visit(OverloadedVisitor{
+                         [](const std::monostate&) -> TenantId { MONGO_UNREACHABLE; },
+                         [](const UserName& userName) { return *userName.tenantId(); },
+                         [](const TenantId& tenant) { return tenant; },
+                     },
+                     _tenantOrUser);
     }
 
     StringData getOriginalToken() const {

@@ -91,7 +91,7 @@ Status AuthorizationSessionTestFixture::createUser(const UserName& username,
     rolesBSON.doneFast();
 
     return managerState->insert(_opCtx.get(),
-                                NamespaceString::makeTenantUsersCollection(username.getTenant()),
+                                NamespaceString::makeTenantUsersCollection(username.tenantId()),
                                 userDoc.obj(),
                                 {});
 }

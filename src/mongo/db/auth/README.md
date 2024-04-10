@@ -361,11 +361,11 @@ The [AuthName](auth_name.h) template
 provides the generic implementation for `UserName` and `RoleName` implementations.
 Each of these objects is made up of three component pieces of information.
 
-| Field     | Accessor      | Use                                                                                            |
-| --------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| `_name`   | `getName()`   | The symbolic name associated with the user or role, (e.g. 'Alice')                             |
-| `_db`     | `getDB()`     | The authentication database associated with the named auth identifier (e.g. 'admin' or 'test') |
-| `_tenant` | `getTenant()` | When used in multitenancy mode, this value retains a `TenantId` for authorization checking.    |
+| Field     | Accessor     | Use                                                                                            |
+| --------- | ------------ | ---------------------------------------------------------------------------------------------- |
+| `_name`   | `getName()`  | The symbolic name associated with the user or role, (e.g. 'Alice')                             |
+| `_db`     | `getDB()`    | The authentication database associated with the named auth identifier (e.g. 'admin' or 'test') |
+| `_tenant` | `tenantId()` | When used in multitenancy mode, this value retains a `TenantId` for authorization checking.    |
 
 [`UserName`](user_name.h) and [`RoleName`](role_name.h) specializations are CRTP defined
 to include additional `getUser()` and `getRole()` accessors which proxy to `getName()`,

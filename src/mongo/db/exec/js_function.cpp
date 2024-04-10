@@ -54,7 +54,7 @@ std::string getAuthenticatedUserNamesToken(Client* client) {
     auto as = AuthorizationSession::get(client);
     if (auto name = as->getAuthenticatedUserName()) {
         // Using a NUL byte which isn't valid in usernames to separate them.
-        if (const auto& tenant = name->getTenant()) {
+        if (const auto& tenant = name->tenantId()) {
             sb << '\0' << tenant->toString();
         }
         sb << '\0' << name->getUnambiguousName();

@@ -86,7 +86,7 @@ void checkValueAssertions(const T& obj,
     ASSERT_EQ(obj.getDB(), db);
     ASSERT_EQ(obj.getName(), name);
     ASSERT_EQ(getName(obj), name);
-    ASSERT_EQ(obj.getTenant(), tenant);
+    ASSERT_EQ(obj.tenantId(), tenant);
 
     std::string expectDisplay, expectUnique;
     if (!expectEmpty) {

@@ -377,7 +377,7 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UsersInfoCommand& r
         invariant(arg.isExact());
         auto activeTenant = getActiveTenant(opCtx);
         for (const auto& userName : arg.getElements(dbname)) {
-            if (userName.getTenant() != boost::none) {
+            if (userName.tenantId() != boost::none) {
                 // Only connection based cluster administrators may specify tenant in query.
                 uassert(ErrorCodes::Unauthorized,
                         "May not specify tenant in usersInfo query",

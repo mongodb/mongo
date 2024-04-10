@@ -290,7 +290,7 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::create(
     body.setIssuer(kTestOnlyIssuer);
     body.setSubject(userName.getUnambiguousName());
     body.setAudience(kTestOnlyAudience.toString());
-    body.setTenantId(userName.getTenant());
+    body.setTenantId(userName.tenantId());
     body.setExpiration(std::move(expiration));
     body.setExpectPrefix(protocol == ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
 

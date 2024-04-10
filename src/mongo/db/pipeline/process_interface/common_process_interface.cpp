@@ -108,9 +108,9 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
                 // to it.
                 if (auto expCtxTenantId = expCtx->ns.tenantId()) {
                     auto userName = AuthorizationSession::get(client)->getAuthenticatedUserName();
-                    if ((userName && userName->getTenant() &&
-                         userName->getTenant() != expCtxTenantId) ||
-                        (userName && !userName->getTenant() &&
+                    if ((userName && userName->tenantId() &&
+                         userName->tenantId() != expCtxTenantId) ||
+                        (userName && !userName->tenantId() &&
                          !CurOp::currentOpBelongsToTenant(client, *expCtxTenantId))) {
                         continue;
                     }

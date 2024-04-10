@@ -449,7 +449,7 @@ Status insertRoleDocument(OperationContext* opCtx,
 Status updateRoleDocument(OperationContext* opCtx, const RoleName& role, const BSONObj& updateObj) {
     Status status = updateOneAuthzDocument(
         opCtx,
-        rolesNSS(role.getTenant()),
+        rolesNSS(role.tenantId()),
         BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
              << role.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()),
         updateObj,
@@ -511,7 +511,7 @@ Status updatePrivilegeDocument(OperationContext* opCtx,
     dassert(queryObj.hasField(AuthorizationManager::USER_DB_FIELD_NAME));
 
     const auto status =
-        updateOneAuthzDocument(opCtx, usersNSS(user.getTenant()), queryObj, updateObj, false);
+        updateOneAuthzDocument(opCtx, usersNSS(user.tenantId()), queryObj, updateObj, false);
 
     if (status.code() == ErrorCodes::NoMatchingDocument) {
         return {ErrorCodes::UserNotFound, str::stream() << "User " << user << " not found"};
@@ -1219,7 +1219,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
                          authRestrictionsArray);
 
     // Must invalidate even on bad status
-    auto status = insertPrivilegeDocument(opCtx, userObj, userName.getTenant());
+    auto status = insertPrivilegeDocument(opCtx, userObj, userName.tenantId());
     AuthorizationManager::get(opCtx->getService())->invalidateUserByName(userName);
     uassertStatusOK(status);
 }
@@ -1348,7 +1348,7 @@ void CmdUMCTyped<DropUserCommand>::Invocation::typedRun(OperationContext* opCtx)
         opCtx,
         BSON(AuthorizationManager::USER_NAME_FIELD_NAME
              << userName.getUser() << AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
-        userName.getTenant());
+        userName.tenantId());
 
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
     AuthorizationManager::get(opCtx->getService())->invalidateUserByName(userName);
@@ -1672,7 +1672,7 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
 
     audit::logCreateRole(client, roleName, resolvedRoleNames, privileges, bsonAuthRestrictions);
 
-    uassertStatusOK(insertRoleDocument(opCtx, roleObjBuilder.done(), roleName.getTenant()));
+    uassertStatusOK(insertRoleDocument(opCtx, roleObjBuilder.done(), roleName.tenantId()));
 }
 
 MONGO_REGISTER_COMMAND(CmdUMCTyped<UpdateRoleCommand>).forShard();
@@ -2486,7 +2486,7 @@ void _processUsers(OperationContext* opCtx,
         for (const auto& userName : usersToDrop) {
             audit::logDropUser(opCtx->getClient(), userName);
             auto numRemoved = uassertStatusOK(
-                removePrivilegeDocuments(opCtx, userName.toBSON(), userName.getTenant()));
+                removePrivilegeDocuments(opCtx, userName.toBSON(), userName.tenantId()));
             dassert(numRemoved == 1);
         }
     }
@@ -2551,7 +2551,7 @@ void _addRole(OperationContext* opCtx,
         }
     } else {
         _auditCreateOrUpdateRole(roleObj, true);
-        Status status = insertRoleDocument(opCtx, roleObj, roleName.getTenant());
+        Status status = insertRoleDocument(opCtx, roleObj, roleName.tenantId());
         if (!status.isOK()) {
             // Match the behavior of mongorestore to continue on failure
             LOGV2_WARNING(20513,
@@ -2613,8 +2613,8 @@ void _processRoles(OperationContext* opCtx,
     if (drop) {
         for (const auto& roleName : rolesToDrop) {
             audit::logDropRole(Client::getCurrent(), roleName);
-            auto numRemoved = uassertStatusOK(
-                removeRoleDocuments(opCtx, roleName.toBSON(), roleName.getTenant()));
+            auto numRemoved =
+                uassertStatusOK(removeRoleDocuments(opCtx, roleName.toBSON(), roleName.tenantId()));
             dassert(numRemoved == 1);
         }
     }

@@ -484,7 +484,7 @@ PrivilegeVector AuthorizationSessionImpl::_getDefaultPrivileges() {
 }
 
 boost::optional<TenantId> AuthorizationSessionImpl::getUserTenantId() const {
-    return _authenticatedUser ? _authenticatedUser.value()->getName().getTenant() : boost::none;
+    return _authenticatedUser ? _authenticatedUser.value()->getName().tenantId() : boost::none;
 }
 
 bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(const BSONElement& element) {
@@ -859,7 +859,7 @@ bool AuthorizationSessionImpl::_isAuthorizedForPrivilege(const Privilege& privil
 
     const auto& user = _authenticatedUser.value();
     // Safeguard that cross-tenant privileges are only granted when users have cluster-useTenant.
-    if (!MONGO_unlikely(_mayUseTenant) && user->getName().getTenant() != rp.tenantId()) {
+    if (!MONGO_unlikely(_mayUseTenant) && user->getName().tenantId() != rp.tenantId()) {
         return unmetRequirements.empty();
     }
     return std::any_of(search.cbegin(), search.cend(), [&](const auto& pattern) {

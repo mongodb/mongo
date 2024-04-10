@@ -163,8 +163,10 @@ void AuthName<T>::serializeToBSON(BSONArrayBuilder* bob) const {
 template <typename T>
 void AuthName<T>::appendToBSON(BSONObjBuilder* bob, bool encodeTenant) const {
     *bob << T::kFieldName << getName() << "db"_sd << getDB();
-    if (encodeTenant && _tenant) {
-        *bob << kTenantFieldName << _tenant.value();
+    if (encodeTenant) {
+        if (auto tenant = _dbname.tenantId()) {
+            *bob << kTenantFieldName << *tenant;
+        }
     }
 }
 

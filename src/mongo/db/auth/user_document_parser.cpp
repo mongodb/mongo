@@ -452,7 +452,7 @@ Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSON
         auto pp = auth::ParsedPrivilege::parse(IDLParserContext("userPrivilegeDoc"), element.Obj());
         std::vector<std::string> unrecognizedActions;
         auto privilege = Privilege::resolvePrivilegeWithTenant(
-            user->getName().getTenant(), pp, &unrecognizedActions);
+            user->getName().tenantId(), pp, &unrecognizedActions);
         if (unrecognizedActions.size()) {
             std::string unrecognizedActionsString;
             str::joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');

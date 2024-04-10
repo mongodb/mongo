@@ -63,26 +63,19 @@ class AuthName {
 public:
     AuthName() = default;
 
-    template <typename Name, typename DB>
-    AuthName(Name name, DB db, boost::optional<TenantId> tenant = boost::none) {
+    template <typename Name>
+    AuthName(Name name, DatabaseName dbname) {
         if constexpr (std::is_same_v<Name, std::string>) {
             _name = std::move(name);
         } else {
             _name = StringData(name).toString();
         }
-
-        if constexpr (std::is_same_v<DB, std::string>) {
-            _db = std::move(db);
-        } else {
-            _db = StringData(db).toString();
-        }
-
-        _tenant = std::move(tenant);
+        _dbname = std::move(dbname);
     }
 
     template <typename Name>
-    AuthName(Name name, const DatabaseName& dbname)
-        : AuthName(name, dbname.serializeWithoutTenantPrefix_UNSAFE(), dbname.tenantId()) {}
+    AuthName(Name name, StringData db, boost::optional<TenantId> tenantId = boost::none)
+        : AuthName(std::move(name), DatabaseName(std::move(tenantId), std::move(db))) {}
 
     /**
      * Parses a string of the form "db.name" into an AuthName object with an optional tenant.
@@ -116,19 +109,19 @@ public:
     /**
      * Gets the database name part of an AuthName.
      */
-    const std::string& getDB() const {
-        return _db;
+    StringData getDB() const {
+        return _dbname.db(OmitTenant{});
     }
 
-    DatabaseName getDatabaseName() const {
-        return DatabaseName(std::move(_tenant), _db);
+    const DatabaseName& getDatabaseName() const {
+        return _dbname;
     }
 
     /**
      * Gets the TenantId, if any, associated with this AuthName.
      */
-    const boost::optional<TenantId>& getTenant() const {
-        return _tenant;
+    boost::optional<TenantId> tenantId() const {
+        return _dbname.tenantId();
     }
 
     /**
@@ -138,7 +131,7 @@ public:
         if (empty()) {
             return "";
         }
-        return str::stream() << _name << "@" << _db;
+        return str::stream() << _name << "@" << getDB();
     }
 
     /**
@@ -148,7 +141,7 @@ public:
         if (empty()) {
             return 0;
         }
-        return _db.size() + 1 + _name.size();
+        return getDB().size() + 1 + _name.size();
     }
 
     /**
@@ -158,18 +151,18 @@ public:
         if (empty()) {
             return "";
         }
-        return str::stream() << _db << "." << _name;
+        return str::stream() << getDB() << "." << _name;
     }
 
     /**
      * True if the username, dbname, and tenant have not been set.
      */
     bool empty() const {
-        return _db.empty() && _name.empty() && !_tenant;
+        return _dbname.isEmpty() && !_dbname.tenantId() && _name.empty();
     }
 
     bool operator==(const AuthName& rhs) const {
-        return (_name == rhs._name) && (_db == rhs._db) && (_tenant == rhs._tenant);
+        return (_name == rhs._name) && (_dbname == rhs._dbname);
     }
 
     bool operator!=(const AuthName& rhs) const {
@@ -177,10 +170,8 @@ public:
     }
 
     bool operator<(const AuthName& rhs) const {
-        if (_tenant != rhs._tenant) {
-            return _tenant < rhs._tenant;
-        } else if (_db != rhs._db) {
-            return _db < rhs._db;
+        if (_dbname != rhs._dbname) {
+            return _dbname < rhs._dbname;
         } else {
             return _name < rhs._name;
         }
@@ -188,17 +179,12 @@ public:
 
     template <typename H>
     friend H AbslHashValue(H h, const AuthName& name) {
-        auto state = std::move(h);
-        if (name._tenant) {
-            state = H::combine(std::move(state), TenantId::Hasher()(name._tenant.get()), '_');
-        }
-        return H::combine(std::move(state), name._db, '.', name._name);
+        return H::combine(std::move(h), name._dbname, '.', name._name);
     }
 
 private:
     std::string _name;
-    std::string _db;
-    boost::optional<TenantId> _tenant;
+    DatabaseName _dbname;
 };
 
 template <typename Stream, typename T>

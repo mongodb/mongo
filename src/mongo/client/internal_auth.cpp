@@ -145,7 +145,7 @@ std::string getInternalAuthDB() {
 
     auto systemUser = internalSecurity.getUser();
     if (systemUser && *systemUser) {
-        return (*systemUser)->getName().getDB();
+        return (*systemUser)->getName().getDB().toString();
     }
 
     return "admin";

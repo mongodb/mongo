@@ -527,7 +527,7 @@ void AuthorizationManagerImpl::invalidateUsersByTenant(const boost::optional<Ten
     LOGV2_DEBUG(6323600, 2, "Invalidating tenant users", "tenant"_attr = tenant);
     _authSchemaVersionCache.invalidateAll();
     _userCache.invalidateKeyIf(
-        [&](const UserRequest& userRequest) { return userRequest.name.getTenant() == tenant; });
+        [&](const UserRequest& userRequest) { return userRequest.name.tenantId() == tenant; });
     _updateCacheGeneration();
 }
 
