@@ -365,9 +365,14 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
             continue;
         }
 
-        if (!_catalog->isUserDataIdent(it)) {
+        if (_catalog->isSystemDataIdent(it))
+        {
             continue;
         }
+
+        // if (!_catalog->isUserDataIdent(it)) {
+        //     continue;
+        // }
 
         // In repair context, any orphaned collection idents from the engine should already be
         // recovered in the catalog in loadCatalog().

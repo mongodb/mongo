@@ -98,6 +98,8 @@ public:
     std::vector<std::string> getAllIdentsForDB(StringData db) const;
     std::vector<std::string> getAllIdents(OperationContext* opCtx) const;
 
+    bool isSystemDataIdent(StringData ident) const;
+
     bool isUserDataIdent(StringData ident) const;
 
     bool isCollectionIdent(StringData ident) const;

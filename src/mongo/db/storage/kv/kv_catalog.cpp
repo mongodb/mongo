@@ -553,7 +553,8 @@ void KVCatalog::putMetaData(OperationContext* opCtx,
                 continue;
             }
             // missing, create new
-            newIdentMap.append(name, ns);
+            std::string uniqueIdent = ns.toString().append(".").append(name);
+            newIdentMap.append(name, uniqueIdent);
         }
         b.append("idxIdent", newIdentMap.obj());
 
@@ -660,6 +661,11 @@ std::vector<std::string> KVCatalog::getAllIdents(OperationContext* opCtx) const 
     return v;
 }
 
+bool KVCatalog::isSystemDataIdent(StringData ident) const {
+    return ident.find("admin.system.version") == 0 || ident.find("featureDocument") == 0 ||
+        ident.find("local.startup_log") == 0;
+}
+
 bool KVCatalog::isUserDataIdent(StringData ident) const {
     MONGO_UNREACHABLE;
     return ident.find("index-") != std::string::npos || ident.find("index/") != std::string::npos ||
@@ -735,7 +741,7 @@ BSONObj KVCatalog::_buildMetadata(OperationContext* opCtx,
     md.prefix = prefix;
     md.indexes.emplace_back(idIndexSpec, true, RecordId{}, false, prefix, false);
     b.append("md", md.toBSON());
-    
+
     {
         BSONObjBuilder indexIdentsBuilder;
         for (const auto& index : md.indexes) {
