@@ -201,7 +201,8 @@ function testInsertCmd(rst) {
     // Verify that no mongods support persisting sampled insert queries. Specifically, "sampleId"
     // is an unknown field for insert commands.
     assert.commandFailedWithCode(
-        db.runCommand({insert: collName, documents: [{a: 0}], sampleId: UUID()}), 40415);
+        db.runCommand({insert: collName, documents: [{a: 0}], sampleId: UUID()}),
+        ErrorCodes.IDLUnknownField);
 }
 
 {

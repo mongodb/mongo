@@ -38,7 +38,7 @@ assert.eq(1, coll.find({a: true, b: false}).count());
 assert.eq(1, coll.find({b: false, a: true}).count());
 
 // Make sure that invalid options passed into the shell count helper generate errors.
-assert.eq(assert.throws(() => coll.count({}, {random: true})).code, 40415);
+assert.eq(assert.throws(() => coll.count({}, {random: true})).code, ErrorCodes.IDLUnknownField);
 
 // Test that a string passed into count will be converted into a $where clause.
 assert.eq(1, coll.count("this.a"));

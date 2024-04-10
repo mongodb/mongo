@@ -13,7 +13,8 @@ import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 // "create" command rejects invalid options.
 assert.commandWorked(db.runCommand({drop: "create_collection"}));
-assert.commandFailedWithCode(db.createCollection("create_collection", {unknown: 1}), 40415);
+assert.commandFailedWithCode(db.createCollection("create_collection", {unknown: 1}),
+                             ErrorCodes.IDLUnknownField);
 
 // Cannot create a collection with null characters.
 assert.commandFailedWithCode(db.createCollection("\0ab"), ErrorCodes.InvalidNamespace);

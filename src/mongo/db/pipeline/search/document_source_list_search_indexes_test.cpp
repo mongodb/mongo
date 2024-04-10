@@ -71,7 +71,7 @@ TEST_F(ListSearchIndexesTest, ShouldFailToParse) {
     ASSERT_THROWS_CODE(
         DocumentSourceListSearchIndexes::createFromBson(specObj.firstElement(), getExpCtx()),
         AssertionException,
-        40415 /* IDL unknown field error */);
+        ErrorCodes::IDLUnknownField);
 
     // Test parsing with not an object.
     specObj = BSON("$listSearchIndexes" << 1999);

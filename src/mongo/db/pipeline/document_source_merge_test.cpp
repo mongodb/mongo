@@ -179,19 +179,19 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsAnEmptyString) {
 TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsObjectWithInvalidFields) {
     auto spec = BSON("$merge" << BSON("into" << BSON("a"
                                                      << "b")));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 40415);
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::IDLUnknownField);
 
     spec = BSON("$merge" << BSON("into" << BSON("coll"
                                                 << "target_collection"
                                                 << "a"
                                                 << "b")));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 40415);
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::IDLUnknownField);
 
     spec = BSON("$merge" << BSON("into" << BSON("db"
                                                 << "target_db"
                                                 << "a"
                                                 << "b")));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 40415);
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::IDLUnknownField);
 }
 
 TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsObjectWithEmptyCollectionName) {

@@ -13,4 +13,4 @@ assert.commandFailedWithCode(db.runCommand({
     collMod: collName,
     index: {keyPattern: {a: 1}, expireAfterSeconds: 200, invalidOption: 1}
 }),
-                             40415 /* IDL unknown field error */);
+                             ErrorCodes.IDLUnknownField);

@@ -321,7 +321,8 @@ TEST_F(CanonicalDistinctTest, FailsToParseDistinctWithUnknownFields) {
         unknown: 1
     })");
 
-    ASSERT_THROWS_CODE(bsonToParsedDistinct(expCtx, cmdObj), DBException, 40415);
+    ASSERT_THROWS_CODE(
+        bsonToParsedDistinct(expCtx, cmdObj), DBException, ErrorCodes::IDLUnknownField);
 }
 
 TEST_F(CanonicalDistinctTest, FailsToParseDistinctWithMissingKey) {

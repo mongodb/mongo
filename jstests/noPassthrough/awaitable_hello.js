@@ -161,7 +161,7 @@ function runTest(db, cmd, logFailpoint, failpointName) {
         },
         maxAwaitTimeMS: 0
     }),
-                                 40415);
+                                 ErrorCodes.IDLUnknownField);
 
     // A client following the awaitable hello/isMaster protocol must include topologyVersion in
     // their request if and only if they include maxAwaitTimeMS. Check that the command fails if

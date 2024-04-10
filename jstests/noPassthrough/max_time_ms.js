@@ -319,7 +319,7 @@ function executeTest(db, isMongos) {
 
         // Verify that the server rejects invalid command argument $maxTimeMS.
         assert.commandFailed(t.getDB().runCommand({ping: 1, $maxTimeMS: 0}),
-                             [ErrorCodes.InvalidOptions, 40415]);
+                             [ErrorCodes.InvalidOptions, ErrorCodes.IDLUnknownField]);
     })();
 
     //

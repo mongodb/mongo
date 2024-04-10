@@ -235,13 +235,13 @@ TEST(JSONSchemaParserEncryptTest, FailsToParseIfEncryptHasBadFieldName) {
     BSONObj schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("keyIdx"
                                                                                << "/pointer"))));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
-    ASSERT_EQ(result.getStatus().code(), 40415);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::IDLUnknownField);
     schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType"
                                                                        << "bool"
                                                                        << "keyIdx"
                                                                        << "/pointer"))));
     result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
-    ASSERT_EQ(result.getStatus().code(), 40415);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::IDLUnknownField);
 }
 
 TEST(JSONSchemaParserEncryptTest, FailsToParseWithBadKeyIdArray) {

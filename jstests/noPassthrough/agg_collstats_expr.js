@@ -171,7 +171,7 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     stDb.runCommand(
         {aggregate: doesNotExistName, pipeline: [{"$collStats": {"unknown": {}}}], cursor: {}}),
-    40415);
+    ErrorCodes.IDLUnknownField);
 
 assert.commandFailedWithCode(stDb.runCommand({
     aggregate: doesNotExistName,
@@ -205,7 +205,7 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     standaloneDb.runCommand(
         {aggregate: doesNotExistName, pipeline: [{"$collStats": {"unknown": {}}}], cursor: {}}),
-    40415);
+    ErrorCodes.IDLUnknownField);
 
 assert.commandFailedWithCode(standaloneDb.runCommand({
     aggregate: doesNotExistName,

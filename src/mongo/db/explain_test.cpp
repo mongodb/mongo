@@ -118,7 +118,7 @@ TEST(ExplainTest, ParsingFailsIfUnknownFieldInCommandObject) {
             IDLParserContext("explain"),
             fromjson("{explain: {}, verbosity: 'queryPlanner', unknownField: true}")),
         DBException,
-        40415);
+        ErrorCodes::IDLUnknownField);
 }
 
 TEST(ExplainTest, CanParseGenericCommandArguments) {

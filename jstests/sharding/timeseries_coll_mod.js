@@ -30,9 +30,9 @@ function runBasicTest() {
 
     // Updates for timeField and metaField are disabled.
     assert.commandFailedWithCode(db.runCommand({collMod: collName, timeseries: {timeField: 'x'}}),
-                                 40415 /* Failed to parse */);
+                                 ErrorCodes.IDLUnknownField);
     assert.commandFailedWithCode(db.runCommand({collMod: collName, timeseries: {metaField: 'x'}}),
-                                 40415 /* Failed to parse */);
+                                 ErrorCodes.IDLUnknownField);
 
     // Normal collMod commands works for the unsharded time-series collection.
     assert.commandWorked(db[collName].createIndex({[metaField]: 1}, {name: indexName}));

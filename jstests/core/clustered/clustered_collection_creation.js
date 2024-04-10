@@ -261,7 +261,7 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     replicatedDB.createCollection(replicatedColl.getName(),
                                   {clusteredIndex: {key: {_id: 1}, unique: true, randField: 1}}),
-    40415);
+    ErrorCodes.IDLUnknownField);
 
 assert.commandFailedWithCode(
     replicatedDB.createCollection(replicatedColl.getName(),
@@ -370,4 +370,4 @@ nonReplicatedDB.runCommand({drop: nonReplicatedColl.getName()});
 assert.commandFailedWithCode(
     nonReplicatedDB.createCollection(nonReplicatedColl.getName(),
                                      {clusteredIndex: {key: {ts: 1}, unique: true, randField: 1}}),
-    40415);
+    ErrorCodes.IDLUnknownField);

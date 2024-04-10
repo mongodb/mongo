@@ -119,6 +119,6 @@ assert.commandFailedWithCode(coll.runCommand({
     cursor: {},
     allowPartialResults: true
 }),
-                             [ErrorCodes.FailedToParse, 40415]);
+                             [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownField]);
 
 st.stop();

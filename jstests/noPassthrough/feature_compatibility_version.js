@@ -89,7 +89,7 @@ checkFCV(adminDB, latestFCV);
 // Setting an unknown field.
 assert.writeErrorWithCode(adminDB.system.version.update({_id: "featureCompatibilityVersion"},
                                                         {$set: {unknownField: "unknown"}}),
-                          40415);
+                          ErrorCodes.IDLUnknownField);
 checkFCV(adminDB, latestFCV);
 
 MongoRunner.stopMongod(conn);

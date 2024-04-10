@@ -200,7 +200,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfUnrecognisedParameterSpec
     const auto specObj = fromjson("{$currentOp:{foo:true}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
-                       40415);  // Location40415: BSON field '$currentOp.foo' is an unknown field.
+                       ErrorCodes::IDLUnknownField);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeAllExplicitlySpecifiedArguments) {

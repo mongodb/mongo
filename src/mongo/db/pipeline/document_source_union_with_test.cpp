@@ -272,7 +272,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                 .firstElement(),
             expCtx),
         AssertionException,
-        40415);
+        ErrorCodes::IDLUnknownField);
     ASSERT_THROWS_CODE(DocumentSourceUnionWith::createFromBson(
                            BSON("$unionWith" << BSON(
                                     "coll" << nsToUnionWith.coll() << "pipeline"

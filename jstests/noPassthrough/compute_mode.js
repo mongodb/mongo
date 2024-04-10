@@ -22,7 +22,7 @@ const configsvrOption = {
     const db = conn.getDB(jsTestName());
 
     assert.commandFailedWithCode(db.createCollection("a", {virtual: {}}),
-                                 40415,
+                                 ErrorCodes.IDLUnknownField,
                                  "ERROR from virtual collection creation in regular mode");
 
     MongoRunner.stopMongod(conn);
@@ -45,7 +45,7 @@ const configsvrOption = {
     assert(warningMsgFound, "ERROR from warning message match");
 
     assert.commandFailedWithCode(db.createCollection("a", {virtual: {}}),
-                                 40415,
+                                 ErrorCodes.IDLUnknownField,
                                  "ERROR from virtual collection creation in compute mode");
 
     MongoRunner.stopMongod(conn);

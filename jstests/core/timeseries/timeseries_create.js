@@ -173,7 +173,7 @@ testInvalidTimeseriesOptions("", ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: 100}, ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: "time", metaField: 100}, ErrorCodes.TypeMismatch);
 
-testInvalidTimeseriesOptions({timeField: "time", invalidOption: {}}, 40415);
+testInvalidTimeseriesOptions({timeField: "time", invalidOption: {}}, ErrorCodes.IDLUnknownField);
 testInvalidTimeseriesOptions({timeField: "sub.time"}, ErrorCodes.InvalidOptions);
 testInvalidTimeseriesOptions({timeField: "time", metaField: "sub.meta"}, ErrorCodes.InvalidOptions);
 testInvalidTimeseriesOptions({timeField: "time", metaField: "time"}, ErrorCodes.InvalidOptions);
