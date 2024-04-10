@@ -95,8 +95,6 @@ buildvariants:
     modules: *perf_modules
     expansions:
       <<: *linux_arm64_generic_expansions
-      idle_timeout_factor: 1.5
-      exec_timeout_factor: 1.5
       mongodb_setup_release: 2022-11
       mongodb_setup: single-replica
       infrastructure_provisioning_release: 2023-09
@@ -154,8 +152,6 @@ buildvariants:
     modules: *perf_modules
     expansions:
       <<: *amazon2_x86_expansions
-      idle_timeout_factor: 1.5
-      exec_timeout_factor: 1.5
       mongodb_setup_release: 2022-11
       mongodb_setup: standalone-classic-query-engine
       infrastructure_provisioning_release: 2023-09
@@ -2244,8 +2240,6 @@ buildvariants:
     modules: *perf_modules
     expansions:
       <<: *linux_arm64_generic_expansions
-      idle_timeout_factor: 1.5
-      exec_timeout_factor: 1.5
       mongodb_setup_release: 2022-11
       mongodb_setup: shard-one-node-default-sharding
       infrastructure_provisioning_release: 2023-09
