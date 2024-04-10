@@ -476,10 +476,12 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
     tasks:
-      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
-      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
-      - name: .default !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
-      - name: .non_deterministic !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+      # TODO: DEVPROD-5173
+      # Add !.incompatible_all_feature_flags back when the tag is added to any task or DEVPROD-5173 is completed.
+      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan #!.incompatible_all_feature_flags
+      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan #!.incompatible_all_feature_flags
+      - name: .default !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan #!.incompatible_all_feature_flags
+      - name: .non_deterministic !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan #!.incompatible_all_feature_flags
 
   - &enterprise-rhel80-debug-tsan-template
     name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan
