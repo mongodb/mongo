@@ -145,10 +145,12 @@ tasks:
   ## Standalone generational fuzzer for multiversion aggregation expressions ##
   - <<: *jstestfuzz_template
     name: aggregation_expression_multiversion_fuzzer_gen
+    # TODO SERVER-82766: multiversion fuzzers had been timing out on TSAN builds.
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
         "non_deterministic",
+        "incompatible_tsan",
         "aggfuzzer",
         "multiversion",
         "require_npm",
@@ -201,10 +203,12 @@ tasks:
   ## Standalone generational fuzzer for multiversion aggregation pipelines ##
   - <<: *jstestfuzz_template
     name: aggregation_multiversion_fuzzer_gen
+    # TODO SERVER-82766: multiversion fuzzers had been timing out on TSAN builds.
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
         "non_deterministic",
+        "incompatible_tsan",
         "aggfuzzer",
         "common",
         "multiversion",

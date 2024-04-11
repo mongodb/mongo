@@ -566,98 +566,22 @@ buildvariants:
       - name: compile_test_serial_TG
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
-      - name: check_feature_flag_tags
-      # TODO SERVER-82766: timeseries, multiversion, and optimization fuzzers had been timing out on TSAN builds.
-      - name: .aggfuzzer !.feature_flag_guarded !.timeseries !.multiversion !.optimization !.no_debug_mode
-      - name: .aggregation !.feature_flag_guarded
-      - name: audit
-      - name: .auth
-      - name: buildscripts_test
-      - name: unittest_shell_hang_analyzer_gen
-      - name: .config_fuzzer
-      - name: config_fuzzer_jsCore
-      - name: .causally_consistent !.sharding
-      - name: .change_streams
-      - name: .change_stream_fuzzer
-      - name: .misc_js
-      - name: .concurrency !.large !.no_txns !.feature_flag_guarded
-      - name: .concurrency .large !.no_txns !.feature_flag_guarded
+      - name: .development_critical !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
         distros:
           - rhel80-xlarge
-      - name: disk_wiredtiger
-      - name: .encrypt
-      - name: external_auth
-      - name: initial_sync_fuzzer_gen
-      - name: jsCore
+      - name: .release_critical !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+      - name: .release_critical .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
         distros:
           - rhel80-xlarge
-      - name: .jscore .common !jsCore
-      - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
-      - name: jsCore_txns_large_txns_format
-      - name: json_schema
-      - name: .jstestfuzz !.feature_flag_guarded !.flow_control # Flow control jstestfuzz take longer.
-      - name: .multi_shard
-      - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-      - name: .query_fuzzer !.feature_flag_guarded
-      - name: query_golden_classic
-      - name: .read_write_concern .large
-        distros:
-          - rhel80-medium
-      - name: .read_write_concern !.large
-      - name: .replica_sets !.encrypt !.auth
+      - name: .default !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+      - name: .default .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
         distros:
           - rhel80-xlarge
-      - name: replica_sets_api_version_jscore_passthrough_gen
-      - name: replica_sets_reconfig_jscore_passthrough_gen
-      - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+      - name: .non_deterministic !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+      - name: .non_deterministic .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
         distros:
           - rhel80-xlarge
-      - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
-        distros:
-          - rhel80-xlarge
-      - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-        distros:
-          - rhel80-xlarge
-      - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
-        distros:
-          - rhel80-xlarge
-      - name: change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough_gen
-        distros:
-          - rhel80-xlarge
-      - name: change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough_gen
-        distros:
-          - rhel80-xlarge
-      - name: retryable_writes_jscore_passthrough_gen
-      - name: retryable_writes_jscore_stepdown_passthrough_gen
-        distros:
-          - rhel80-medium
-      - name: .read_only
-      - name: .rollbackfuzzer
-      - name: sasl
-      - name: search
-      - name: search_auth
-      - name: search_pinned_connections_auth
-      - name: search_ssl
-      - name: session_jscore_passthrough
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
-      - name: sharding_api_version_jscore_passthrough_gen
-      - name: .sharding .txns
-      - name: .sharding .common !.feature_flag_guarded
-      - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
-      - name: .stitch
-      - name: secondary_reads_passthrough_gen
-      - name: server_discovery_and_monitoring_json_test
-      - name: .serverless
-        distros:
-          - rhel80-xlarge
-      - name: server_selection_json_test
-        distros:
-          - rhel80-xlarge
-      - name: streams
-      - name: vector_search
-      - name: vector_search_auth
-      - name: vector_search_ssl
-      - name: generate_buildid_to_debug_symbols_mapping
 
   - name: &enterprise-rhel80-unoptimized-64-bit enterprise-rhel80-unoptimized-64-bit
     display_name: "~ Enterprise RHEL 8.0 DEBUG (Unoptimized)"

@@ -643,6 +643,7 @@ tasks:
         "incompatible_windows",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_tsan",
       ]
     commands:
       - func: "do setup"
@@ -734,14 +735,26 @@ tasks:
 
   - <<: *task_template
     name: serverless
-    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "serverless",
+        "requires_large_host_tsan",
+      ]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: serverless_MTM
-    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "serverless",
+        "requires_large_host_tsan",
+      ]
     commands:
       - func: "do setup"
       - func: "run tests"
