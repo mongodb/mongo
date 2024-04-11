@@ -292,7 +292,15 @@ void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(
         "admin",
         BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
         res);
-    uassert(ErrorCodes::InvalidOptions, res["errmsg"].str(), success);
+
+    // checkShardingIndex may return UnknownError if a compatible shard key index cannot be
+    // found when the command is executed on a node with an old binary. In this case, we should
+    // return InvalidOptions to correspond with the shardCollection behavior.
+    const auto status = getStatusFromCommandResult(res);
+    if (status == ErrorCodes::UnknownError) {
+        uassert(ErrorCodes::InvalidOptions, res["errmsg"].str(), success);
+    }
+    uassertStatusOK(status);
 }
 
 void ValidationBehaviorsShardCollection::verifyCanCreateShardKeyIndex(const NamespaceString& nss,
@@ -342,7 +350,7 @@ std::vector<BSONObj> ValidationBehaviorsRefineShardKey::loadIndexes(
 
 void ValidationBehaviorsRefineShardKey::verifyUsefulNonMultiKeyIndex(
     const NamespaceString& nss, const BSONObj& proposedKey) const {
-    auto checkShardingIndexRes = uassertStatusOK(_indexShard->runCommand(
+    auto res = uassertStatusOK(_indexShard->runCommand(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         "admin",
@@ -350,13 +358,14 @@ void ValidationBehaviorsRefineShardKey::verifyUsefulNonMultiKeyIndex(
             BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
             _cm.getVersion(_indexShard->getId())),
         Shard::RetryPolicy::kIdempotent));
-    if (checkShardingIndexRes.commandStatus == ErrorCodes::UnknownError) {
-        // CheckShardingIndex returns UnknownError if a compatible shard key index cannot be found,
-        // but we return InvalidOptions to correspond with the shardCollection behavior.
-        uasserted(ErrorCodes::InvalidOptions, checkShardingIndexRes.response["errmsg"].str());
+
+    // checkShardingIndex may return UnknownError if a compatible shard key index cannot be
+    // found when the command is executed on a node with an old binary. In this case, we should
+    // return InvalidOptions to correspond with the shardCollection behavior.
+    if (res.commandStatus == ErrorCodes::UnknownError) {
+        uasserted(ErrorCodes::InvalidOptions, res.response["errmsg"].str());
     }
-    // Rethrow any other error to allow retries on retryable errors.
-    uassertStatusOK(checkShardingIndexRes.commandStatus);
+    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(res));
 }
 
 void ValidationBehaviorsRefineShardKey::verifyCanCreateShardKeyIndex(const NamespaceString& nss,
