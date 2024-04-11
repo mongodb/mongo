@@ -73,6 +73,7 @@ class _TransitionThread(threading.Thread):
     _NAMESPACE_NOT_FOUND = 26
     _INTERRUPTED = 11601
     _CONFLICTING_OPERATION_IN_PROGRESS = 117
+    _BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE = 12587
     _ILLEGAL_OPERATION = 20
     _SHARD_NOT_FOUND = 70
     _OPERATION_FAILED = 96
@@ -171,34 +172,49 @@ class _TransitionThread(threading.Thread):
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
 
-    # Moves databases and any unsplittable collections off the config shard. Note this only moves
-    # unsplittable collections if at least one database is owned by the config shard so it will not
-    # work if random balancing may put unsplittable collections on shards other than the db primary.
-    def _move_from_config_no_random_balancer(self, dbs_to_move):
-        non_config_shard_id = self._get_non_config_shard_id()
-        for db in dbs_to_move:
-            try:
-                colls_in_db = list(self._client.config.collections.find())
-                for coll in colls_in_db:
-                    if "unsplittable" in coll:
-                        coll_ns = coll["_id"]
-                        msg = "running moveCollection for: " + str(coll_ns)
-                        self.logger.info(msg)
-                        self._client.admin.command(
-                            {"moveCollection": coll_ns, "toShard": non_config_shard_id})
-                self._client.admin.command({"movePrimary": db, "to": non_config_shard_id})
-            except pymongo.errors.OperationFailure as err:
-                # A concurrent dropDatabase could have removed the database before we run movePrimary/moveCollection.
-                if err.code not in [self._NAMESPACE_NOT_FOUND]:
-                    raise err
+    def _is_expected_move_error_code(self, code):
+        if code == self._NAMESPACE_NOT_FOUND:
+            # A concurrent drop Database could have removed the database before we run movePrimary/moveCollection.
+            return True
 
-    # Moves databases off the config shard. Assumes the balancer will move any chunks or
-    # unsplittable collections off it, the latter requires the random balancing fail point to be on.
-    def _move_from_config(self, res):
-        non_config_shard_id = self._get_non_config_shard_id()
+        if code == self._CONFLICTING_OPERATION_IN_PROGRESS:
+            # Tests with interruptions may interrupt the transition thread while running
+            # movePrimary, leading the thread to retry and hit ConflictingOperationInProgress.
+            return True
 
-        # Find and log all chunks/collections owned by the config server to help debugging.
-        colls_with_chunks_on_config = list(
+        if code == self._BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE:
+            # Ongoing background operations (e.g. index builds) will prevent moveCollection until they complete.
+            return True
+
+        if code == 7120202:
+            # Tests with stepdowns might interrupt the movePrimary during the cloning phase,
+            # but the _shardsvrClongCatalogData command is not idempotent so the coordinator
+            # will fail the request if cloning has started.
+            return True
+
+        return False
+
+    def _is_expected_transition_error_code(self, code):
+        if code == self._INTERRUPTED:
+            # Some workloads kill sessions which may interrupt the transition.
+            return True
+
+        if code == self._CONFLICTING_OPERATION_IN_PROGRESS:
+            # Trying to update the cluster cardinality parameter in addShard or
+            # removeShard will fail with this error if there is another
+            # setClusterParameter command already running.
+            return True
+
+        if code == 8955101:
+            # If there is a failover during _shardsvrJoinMigrations, removeShard will fail with
+            # anonymous error 8955101.
+            # TODO SERVER-90212 remove this exception for 8955101.
+            return True
+
+        return False
+
+    def _get_collections_with_chunks_on_config(self):
+        return list(
             self._client.config.collections.aggregate([
                 {
                     "$lookup": {
@@ -220,27 +236,37 @@ class _TransitionThread(threading.Thread):
                 },
                 {"$match": {"chunksOnConfig": {"$ne": []}}}
             ]))
-        msg = "collections with chunks on config server: " + str(colls_with_chunks_on_config)
-        self.logger.info(msg)
 
-        if res["dbsToMove"]:
-            for db in res["dbsToMove"]:
-                try:
-                    self._client.admin.command({"movePrimary": db, "to": non_config_shard_id})
-                except pymongo.errors.OperationFailure as err:
-                    # A concurrent dropDatabase could have removed the database before we run
-                    # movePrimary/moveCollection.
-                    # Tests with interruptions may interrupt the transition thread while running
-                    # movePrimary, leading the thread to retry and hit
-                    # ConflictingOperationInProgress.
-                    # Tests with stepdowns might interrupt the movePrimary during the cloning phase,
-                    # but the _shardsvrClongCatalogData command is not idempotent so the coordinator
-                    # will fail the request if cloning has started.
-                    if err.code not in [
-                            self._NAMESPACE_NOT_FOUND, self._CONFLICTING_OPERATION_IN_PROGRESS,
-                            7120202
-                    ]:
-                        raise err
+    def _move_collection_all_from_config(self, collections):
+        for collection in collections:
+            namespace = collection["_id"]
+            destination = self._get_non_config_shard_id()
+            self.logger.info("Running moveCollection for " + namespace + " to " + destination)
+            self._client.admin.command({"moveCollection": namespace, "toShard": destination})
+
+    def _move_primary_all_from_config(self, databases):
+        for database in databases:
+            destination = self._get_non_config_shard_id()
+            self.logger.info("Running movePrimary for " + database + " to " + destination)
+            self._client.admin.command({"movePrimary": database, "to": destination})
+
+    def _drain_config_for_ongoing_transition(self, transition_result):
+        colls_with_chunks_on_config = self._get_collections_with_chunks_on_config()
+        self.logger.info("Collections with chunks on config server: " +
+                         str(colls_with_chunks_on_config))
+        try:
+            if not self._random_balancer_on:
+                # Chunk migration will not move the chunk for an
+                # unsplittable collection unless random balancing is on,
+                # so we need to move them ourselves.
+                colls_to_move = [
+                    coll for coll in colls_with_chunks_on_config if "unsplittable" in coll
+                ]
+                self._move_collection_all_from_config(colls_to_move)
+            self._move_primary_all_from_config(transition_result["dbsToMove"])
+        except pymongo.errors.OperationFailure as err:
+            if not self._is_expected_move_error_code(err.code):
+                raise err
 
     def _get_balancer_status_on_shard_not_found(self, prev_round_interrupted):
         try:
@@ -316,14 +342,7 @@ class _TransitionThread(threading.Thread):
                     if self._client.config.chunks.count_documents({"shard": "config"}) == 0:
                         self._should_wait_for_balancer_round = True
                 elif res["state"] == "ongoing":
-                    if self._random_balancer_on:
-                        # With random balancing, the balancer will move unsplittable collections
-                        # from draining shards.
-                        self._move_from_config(res)
-                    elif res["dbsToMove"]:
-                        # Without random balancing, the hook must move them manually, which
-                        # currently requires dbsToMove being set.
-                        self._move_from_config_no_random_balancer(res["dbsToMove"])
+                    self._drain_config_for_ongoing_transition(res)
 
                 prev_round_interrupted = False
                 time.sleep(1)
@@ -375,11 +394,7 @@ class _TransitionThread(threading.Thread):
                             "transition to dedicated finished on previous transition request.")
                         return True
 
-                # Some workloads kill sessions which may interrupt the transition.
-                # If there is a failover during _shardsvrJoinMigrations, removeShard will fail with
-                # anonymous error 8955101.
-                # TODO SERVER-90212 remove this exception for 8955101.
-                if err.code not in [self._INTERRUPTED, 8955101]:
+                if not self._is_expected_transition_error_code(err.code):
                     raise err
 
                 prev_round_interrupted = True
@@ -412,10 +427,8 @@ class _TransitionThread(threading.Thread):
                     continue
 
                 # Some workloads kill sessions which may interrupt the transition.
-                if err.code not in [self._INTERRUPTED]:
-                    self.logger.info("not interrupted :(): " + str(err))
+                if not self._is_expected_transition_error_code(err.code):
                     raise err
-
                 self.logger.info("Ignoring error transitioning to config shard: " + str(err))
 
     def _get_non_config_shard_id(self):

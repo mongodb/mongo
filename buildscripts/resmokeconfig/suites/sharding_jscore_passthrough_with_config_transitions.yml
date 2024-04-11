@@ -43,6 +43,14 @@ selector:
     # will conflict with tests that explicitly set cluster parameters.
     - jstests/core/query/query_settings/**/*.js
 
+    # If we get a MovePrimaryInProgress error while trying to implicitly create
+    # a collection during a movePrimary while we also set up a failCommand with
+    # a writeConcernError, we will get the writeConcernError from the failpoint
+    # along with the MovePrimaryInProgress error. Since this test sets times: n
+    # for some of the failpoints, by the time we retry, the failpoint will no
+    # longer be active and the test will fail.
+    - jstests/core/failcommand_failpoint.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
@@ -53,6 +61,12 @@ selector:
     - config_shard_incompatible
     # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
     - assumes_balancer_off
+    # TODO SERVER-90239: Remove this tag after project completes.
+    - requires_timeseries
+    # MoveCollection changes the collection uuid.
+    - assumes_stable_collection_uuid
+    # TODO SERVER-89342: Remove this tag after moveCollection works on capped collections.
+    - requires_capped
 
     # TODO SERVER-90239 Enable time series tests.
     - requires_timeseries
@@ -63,7 +77,11 @@ executor:
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
-  config: {}
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_config_transition_errors.js");
   hooks:
     - class: ContinuousConfigShardTransition
       random_balancer_on: false
@@ -75,7 +93,8 @@ executor:
       n: 20
   fixture:
     class: ShardedClusterFixture
-    num_shards: 2
+    config_shard: "any"
+    num_shards: 3
     mongos_options:
       set_parameters:
         enableTestCommands: 1

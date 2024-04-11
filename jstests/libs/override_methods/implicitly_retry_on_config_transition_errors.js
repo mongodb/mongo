@@ -11,13 +11,37 @@ const kInterval = 200;
 const kNoRetry = true;
 const kRetry = false;
 
-// TODO SERVER-89555: Remove when operations on tracked unsharded collections don't hit
-// MovePrimaryInProgress errors.
-const kRetryableErrors = [ErrorCodes.MovePrimaryInProgress];
+// TODO SERVER-89555: Remove ErrorCodes.MovePrimaryInProgress when operations on tracked unsharded
+// collections don't hit MovePrimaryInProgress errors.
+const kRetryableErrors = [
+    {code: ErrorCodes.MovePrimaryInProgress},
+    {
+        code: ErrorCodes.ConflictingOperationInProgress,
+        errmsg: "Another ConfigsvrCoordinator with different arguments is already running"
+    }
+];
 
 // Commands known not to work with transitions so tests can fail immediately with a clear error.
 // Empty for now.
 const kDisallowedCommands = [];
+
+function matchesRetryableError(error, retryableError) {
+    for (const key of Object.keys(retryableError)) {
+        if (!error.hasOwnProperty(key) || error[key] != retryableError[key]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function isRetryableError(error) {
+    for (const retryableError of kRetryableErrors) {
+        if (matchesRetryableError(error, retryableError)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 function shouldRetry(cmdObj, res) {
     if (cmdObj.hasOwnProperty("autocommit")) {
@@ -25,13 +49,13 @@ function shouldRetry(cmdObj, res) {
         return false;
     }
 
-    if (res.hasOwnProperty("code") && kRetryableErrors.includes(res.code)) {
+    if (isRetryableError(res)) {
         return true;
     }
 
     if (res.hasOwnProperty("writeErrors")) {
-        for (let writeError of res.writeErrors) {
-            if (kRetryableErrors.includes(writeError.code)) {
+        for (const writeError of res.writeErrors) {
+            if (isRetryableError(writeError)) {
                 return true;
             }
         }
