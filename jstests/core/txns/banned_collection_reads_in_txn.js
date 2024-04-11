@@ -27,7 +27,9 @@ assert.commandFailedWithCode(testDB.runCommand({find: "system.profile", filter: 
                              ErrorCodes.OperationNotSupportedInTransaction);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-if (FixtureHelpers.isMongos(testDB)) {
+// The following tests a {find: uuid} command which is not supported on mongos or with replica set
+// endpoints.
+if (FixtureHelpers.isMongos(testDB) || TestData.testingReplicaSetEndpoint) {
     quit();
 }
 
