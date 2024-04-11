@@ -1207,4 +1207,49 @@ TEST(BSONValidateColumn, BSONColumnBadExtendedSelector) {
     ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
 }
 
+TEST(BSONValidateColumn, BSONColumnWithCodeWScope) {
+    BSONObj obj = BSON("a" << BSONCodeWScope("code", BSON("c" << 1)));
+    BSONColumnBuilder cb;
+    cb.append(obj.getField("a"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+    ASSERT_FALSE(
+        validateBSONColumn((char*)columnData.data, columnData.length, BSONValidateMode::kExtended)
+            .isOK());
+    ASSERT_FALSE(
+        validateBSONColumn((char*)columnData.data, columnData.length, BSONValidateMode::kFull)
+            .isOK());
+}
+
+TEST(BSONValidateColumn, BSONColumnWithArrayNestedCodeWScope) {
+    BSONObj obj = BSON("a" << BSONCodeWScope("code", BSON("c" << 1)));
+    BSONArrayBuilder array;
+    array.append(obj);
+    array.done();
+    BSONColumnBuilder cb;
+    cb.append(array.arr());
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+    ASSERT_FALSE(
+        validateBSONColumn((char*)columnData.data, columnData.length, BSONValidateMode::kExtended)
+            .isOK());
+    ASSERT_FALSE(
+        validateBSONColumn((char*)columnData.data, columnData.length, BSONValidateMode::kFull)
+            .isOK());
+}
+
+TEST(BSONValidateColumn, BSONColumnWithObjectNestedCodeWScope) {
+    BSONObj obj = BSON("a" << BSONCodeWScope("code", BSON("c" << 1)));
+    BSONColumnBuilder cb;
+    cb.append(BSON("a" << obj));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+    ASSERT_FALSE(
+        validateBSONColumn((char*)columnData.data, columnData.length, BSONValidateMode::kExtended)
+            .isOK());
+    ASSERT_FALSE(
+        validateBSONColumn((char*)columnData.data, columnData.length, BSONValidateMode::kFull)
+            .isOK());
+}
+
 }  // namespace
