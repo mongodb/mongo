@@ -83,6 +83,9 @@ constexpr ErrorCodes::Error InvalidBSON = ErrorCodes::InvalidBSON;
 constexpr ErrorCodes::Error NonConformantBSON = ErrorCodes::NonConformantBSON;
 
 template <bool precise>
+Status _doValidateColumn(const char* originalBuffer, uint64_t maxLength);
+
+template <bool precise>
 class ValidateBuffer {
 public:
     ValidateBuffer(const char* data, uint64_t maxLength) : _data(data), _maxLength(maxLength) {
@@ -127,30 +130,21 @@ public:
 
         // Handle one element without using iterative loop, and without expecting
         // multiple instances or an EOO.  Only resume with the iterative loop if
-        // the frame stack has been incremented, meaning we have nested objects
+        // we have nested objects
+        _currElem = _data;
+        const char* ptr = _validateElem<false>(Cursor{_data + 2, _data + _maxLength}, *_data);
 
-        // Save pointer to currFrame->end so we can fill it in once we know the size
-        const char** preEnd = &(_currFrame->end);
-        const char* ptr = _validateElem(Cursor{_data + 2, _data + _maxLength}, *_data);
-
-        if (_currFrame != _frames.begin()) {
-            // We know that type was kObject or kArray, so size is fieldname, type,
-            // and a stored int
+        if (_firstFrameUpdated) {
+            // We know that type was kObject/kArray/kCodeWScope
+            // Size is fieldname, type, and a stored int
             int64_t size =
                 static_cast<int64_t>(ConstDataView(_data + 2).read<LittleEndian<int32_t>>()) + 2;
             uassert(InvalidBSON,
                     "BSON literal content exceeds buffer size",
                     (size_t)size <= _maxLength);
-            *preEnd = _data + size;
-            const char* internalEnd = _currFrame->end;
-            _popFrame();
-            uassert(InvalidBSON,
-                    "BSON literal nested content does not end at external end",
-                    _currFrame->end == internalEnd);
             _validateIterative(Cursor{ptr, _data + size});
             return size;
         } else {
-            *preEnd = ptr;
             return ptr - _data;
         }
     }
@@ -216,7 +210,10 @@ private:
         uassert(ErrorCodes::Overflow,
                 "BSONObj exceeds maximum nested object depth",
                 ++_currFrame != _frames.end());
+        return _updateFrame(cursor);
+    }
 
+    const char* _updateFrame(Cursor cursor) {
         auto obj = cursor.ptr;
         auto len = cursor.template read<int32_t>();
         uassert(ErrorCodes::InvalidBSON, "Nested BSON object has to be at least 5 bytes", len >= 5);
@@ -247,7 +244,7 @@ private:
                     /* do not pass down cursor; we want to reset the nesting depth */
                     uassert(NonConformantBSON,
                             "Invalid BSON column",
-                            validateBSONColumn(columnStart, count).isOK());
+                            _doValidateColumn<precise>(columnStart, count).isOK());
                 }
                 break;
             }
@@ -274,10 +271,15 @@ private:
         return cursor.ptr;
     }
 
+    template <bool nestedFrame>
     const char* _pushCodeWithScope(Cursor cursor) {
-        cursor.ptr = _pushFrame(cursor);  // Push a dummy frame to check the CodeWScope size.
-        cursor.skipString();              // Now skip the BSON UTF8 string containing the code.
-        _currElem = cursor.ptr - 1;       // Use the terminating NUL as adummy scope element.
+        // Push a dummy frame to check the CodeWScope size.
+        if constexpr (nestedFrame)
+            cursor.ptr = _pushFrame(cursor);
+        else
+            cursor.ptr = _updateFrame(cursor);
+        cursor.skipString();         // Now skip the BSON UTF8 string containing the code.
+        _currElem = cursor.ptr - 1;  // Use the terminating NUL as a dummy scope element.
         return _pushFrame(cursor);
     }
 
@@ -291,21 +293,30 @@ private:
         }
     }
 
+    template <bool nestedFrame>
     const char* _validateElem(Cursor cursor, uint8_t type) {
         if (MONGO_unlikely(type > JSTypeMax))
             return _validateSpecial(cursor, type);
 
         auto style = kTypeInfoTable[type];
-        if (MONGO_likely(style <= kSkip16))
+        if (MONGO_likely(style <= kSkip16)) {
             cursor.skip(style * 4);
-        else if (MONGO_likely(style == kString))
+        } else if (MONGO_likely(style == kString)) {
             cursor.skipString();
-        else if (MONGO_likely(style == kObjectOrArray))
-            cursor.ptr = _pushFrame(cursor);
-        else if (MONGO_unlikely(precise && type == CodeWScope))
-            cursor.ptr = _pushCodeWithScope(cursor);
-        else
+        } else if (MONGO_likely(style == kObjectOrArray)) {
+            if constexpr (nestedFrame) {
+                cursor.ptr = _pushFrame(cursor);
+            } else {
+                cursor.ptr = _updateFrame(cursor);
+                _firstFrameUpdated = true;
+            }
+        } else if (MONGO_unlikely(precise && type == CodeWScope)) {
+            cursor.ptr = _pushCodeWithScope<nestedFrame>(cursor);
+            if constexpr (!nestedFrame)
+                _firstFrameUpdated = true;
+        } else {
             cursor.ptr = _validateSpecial(cursor, type);
+        }
 
         return cursor.ptr;
     }
@@ -319,7 +330,7 @@ private:
                 uint8_t type = *cursor.ptr;
                 _currElem = cursor.ptr;
                 cursor.ptr += len + 1;
-                cursor.ptr = _validateElem(cursor, type);
+                cursor.ptr = _validateElem<true>(cursor, type);
 
                 if constexpr (precise) {
                     // See if the _id field was just validated. If so, set the global scope element.
@@ -361,8 +372,10 @@ private:
     const char* _currElem = nullptr;  // Element to validate: only the name is known to be good.
     typename Frames::iterator _currFrame;  // Frame currently being validated.
     Frames _frames;  // Has end pointers to check and the containing element for precise mode.
+    bool _firstFrameUpdated = false;  // Has the first frame received nested while measuring an elem
 };
 
+template <bool precise>
 class ColumnValidator {
 public:
     static Status doValidateBSONColumn(const char* originalBuffer, int maxLength) noexcept {
@@ -398,7 +411,7 @@ public:
                         return Status::OK();
                     }
                 } else if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
-                    ptr += ValidateBuffer<false>(ptr, end - ptr).validateAndMeasureElem();
+                    ptr += ValidateBuffer<precise>(ptr, end - ptr).validateAndMeasureElem();
                 } else if (bsoncolumn::isInterleavedStartControlByte(control)) {
                     // interleaved objects begin with a reference object, and then a series
                     // of diff blocks for followup objects, ending with an EOO. Nesting interleaved
@@ -430,6 +443,22 @@ public:
         return Status(NonConformantBSON, "Missing terminating EOO");
     }
 };
+
+template <bool precise>
+Status _doValidateColumn(const char* originalBuffer, uint64_t maxLength) {
+    if constexpr (precise) {
+        // First try validating using the fast but less precise version. That version will return
+        // a not-OK status for objects with CodeWScope or nesting exceeding 32 levels. These cases
+        // and actual failures will rerun the precise version that gives a detailed error context.
+        if (MONGO_likely(
+                ColumnValidator<false>::doValidateBSONColumn(originalBuffer, maxLength).isOK()))
+            return Status::OK();
+
+        return ColumnValidator<true>::doValidateBSONColumn(originalBuffer, maxLength);
+    } else {
+        return ColumnValidator<false>::doValidateBSONColumn(originalBuffer, maxLength);
+    }
+}
 }  // namespace
 
 Status validateBSON(const char* originalBuffer, uint64_t maxLength) noexcept {
@@ -443,7 +472,7 @@ Status validateBSON(const char* originalBuffer, uint64_t maxLength) noexcept {
 }
 
 Status validateBSONColumn(const char* originalBuffer, int maxLength) noexcept {
-    return ColumnValidator::doValidateBSONColumn(originalBuffer, maxLength);
+    return _doValidateColumn<true>(originalBuffer, maxLength);
 }
 
 }  // namespace mongo

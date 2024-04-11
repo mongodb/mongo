@@ -694,4 +694,12 @@ TEST_F(BSONValidateColumn, BSONColumnBadExtendedSelector) {
     ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
 }
 
+TEST(BSONValidateColumn, BSONColumnWithCodeWScope) {
+    BSONObj obj = BSON("a" << BSONCodeWScope("code", BSON("c" << 1)));
+    BSONColumnBuilder cb("");
+    cb.append(obj.getField("a"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+}
+
 }  // namespace
