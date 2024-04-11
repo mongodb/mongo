@@ -1601,11 +1601,6 @@ function appendSetParameterArgs(argArray) {
                         argArray.push(...['--wiredTigerIndexConfigString',
                                           jsTest.options().wiredTigerIndexConfigString]);
                     }
-                } else if (jsTest.options().storageEngine === "rocksdb") {
-                    if (jsTest.options().storageEngineCacheSizeGB) {
-                        argArray.push(
-                            ...['--rocksdbCacheSizeGB', jsTest.options().storageEngineCacheSizeGB]);
-                    }
                 } else if (jsTest.options().storageEngine === "inMemory") {
                     if (jsTest.options().storageEngineCacheSizeGB &&
                         !argArrayContains("--inMemorySizeGB")) {

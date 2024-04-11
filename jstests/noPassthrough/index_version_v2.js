@@ -5,7 +5,7 @@
  * collation and that index version v=2 is required to index decimal data on storage engines using
  * the KeyString format.
  */
-const storageEnginesUsingKeyString = new Set(["wiredTiger", "inMemory", "rocksdb"]);
+const storageEnginesUsingKeyString = new Set(["wiredTiger", "inMemory"]);
 
 function getIndexSpecByName(coll, indexName) {
     const indexes = coll.getIndexes();
