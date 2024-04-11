@@ -68,6 +68,7 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
@@ -207,6 +208,9 @@ private:
          */
         void tryFinish(Status status) noexcept;
 
+        /** Remove this command from the interface's in progress queue. */
+        void done();
+
         /**
          * Run the NetworkInterface's MetadataHook on a given request if this Command isn't already
          * finished.
@@ -244,9 +248,12 @@ private:
 
         std::unique_ptr<RequestManager> requestManager;
 
-        // TODO replace the finishLine with an atomic bool. It is no longer tracking allowed
-        // failures accurately.
-        StrongWeakFinishLine finishLine;
+        // The thread that sets this bit must subsequently call fulfillFinalPromise() exactly once.
+        // Once it is set, no other thread may call fulfillFinalPromise().
+        Atomic<bool> promiseFulfilling{false};
+
+        // Set from fulfillFinalPromise to indicate that the promise has been fulfilled.
+        Notification<void> promiseFulfilled;
 
         boost::optional<UUID> operationKey;
 

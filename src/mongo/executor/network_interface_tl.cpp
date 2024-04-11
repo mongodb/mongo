@@ -349,11 +349,16 @@ void NetworkInterfaceTL::shutdown() {
             continue;
         }
 
-        if (!cmdState->finishLine.arriveStrongly()) {
-            continue;
+        if (!cmdState->promiseFulfilling.swap(true)) {
+            cmdState->fulfillFinalPromise(kNetworkInterfaceShutdownInProgress);
         }
 
-        cmdState->fulfillFinalPromise(kNetworkInterfaceShutdownInProgress);
+        // Ensure each command has its future's promise fulfilled before shutting down the reactor.
+        // Future continuations may try to schedule guaranteed work on the reactor, and if it's
+        // shutdown, the work will be rejected leading to an invariant. If we fulfilled the promise
+        // above, this will return immediately; otherwise, it will block on the thread that claimed
+        // responsibility for fulfilling the promise.
+        cmdState->promiseFulfilled.get();
     }
 
     // Stop the reactor/thread first so that nothing runs on a partially dtor'd pool.
@@ -401,7 +406,6 @@ NetworkInterfaceTL::CommandStateBase::CommandStateBase(
       requestOnAny(std::move(request_)),
       cbHandle(cbHandle_),
       timer(interface->_reactor->makeTimer()),
-      finishLine(1),
       operationKey(requestOnAny.operationKey) {}
 
 NetworkInterfaceTL::CommandState::CommandState(NetworkInterfaceTL* interface_,
@@ -487,8 +491,7 @@ void NetworkInterfaceTL::CommandStateBase::setTimer(std::shared_ptr<RequestState
             if (!status.isOK()) {
                 return;
             }
-            if (!finishLine.arriveStrongly()) {
-                // If we didn't cross the command finishLine first, the promise is already fulfilled
+            if (promiseFulfilling.swap(true)) {
                 return;
             }
 
@@ -523,7 +526,7 @@ void NetworkInterfaceTL::RequestState::returnConnection(Status status) noexcept 
 }
 
 void NetworkInterfaceTL::CommandStateBase::tryFinish(Status status) noexcept {
-    invariant(finishLine.isReady());
+    invariant(promiseFulfilling.load());
 
     LOGV2_DEBUG(
         4646302, 2, "Finished request", "requestId"_attr = requestOnAny.id, "status"_attr = status);
@@ -534,12 +537,6 @@ void NetworkInterfaceTL::CommandStateBase::tryFinish(Status status) noexcept {
     if (interface->_counters) {
         // Increment our counters for the integration test
         interface->_counters->recordResult(status);
-    }
-
-    {
-        // We've finished, we're not in progress anymore
-        stdx::lock_guard lk(interface->_inProgressMutex);
-        interface->_inProgress.erase(cbHandle);
     }
 
     invariant(requestManager);
@@ -570,6 +567,12 @@ void NetworkInterfaceTL::CommandStateBase::tryFinish(Status status) noexcept {
 
         return false;
     });
+}
+
+void NetworkInterfaceTL::CommandStateBase::done() {
+    // We've finished, we're not in progress anymore
+    stdx::lock_guard lk(interface->_inProgressMutex);
+    interface->_inProgress.erase(cbHandle);
 }
 
 void NetworkInterfaceTL::RequestState::cancel() noexcept {
@@ -671,8 +674,13 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                         "response"_attr =
                             redact(rs.isOK() ? rs.data.toString() : rs.status.toString()));
             catchingInvoke([&] { onFinish(std::move(rs)); },
-                           [&](Status& err) { cmdState->fulfillFinalPromise(err); },
-                           "The finish callback failed. Aborting exhaust command");
+                           [&](Status& err) {
+                               if (!cmdState->promiseFulfilling.swap(true)) {
+                                   cmdState->fulfillFinalPromise(err);
+                               }
+                           },
+                           "The finish callback failed. Aborting command.");
+            cmdState->done();
         });
 
     if (MONGO_unlikely(networkInterfaceDiscardCommandsBeforeAcquireConn.shouldFail())) {
@@ -741,7 +749,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequest(
 
 void NetworkInterfaceTL::CommandStateBase::doMetadataHook(
     const RemoteCommandOnAnyResponse& response) {
-    if (auto& hook = interface->_metadataHook; hook && !finishLine.isReady()) {
+    if (auto& hook = interface->_metadataHook; hook && !promiseFulfilling.load()) {
         invariant(response.target);
 
         uassertStatusOK(hook->readReplyMetadata(nullptr, response.data));
@@ -751,6 +759,7 @@ void NetworkInterfaceTL::CommandStateBase::doMetadataHook(
 void NetworkInterfaceTL::CommandState::fulfillFinalPromise(
     StatusWith<RemoteCommandOnAnyResponse> response) {
     promise.setFrom(std::move(response));
+    promiseFulfilled.set();
 }
 
 NetworkInterfaceTL::RequestManager::RequestManager(CommandStateBase* cmdState_)
@@ -851,7 +860,7 @@ void NetworkInterfaceTL::RequestManager::trySend(
         }
 
         // We're the last one, set the promise if it hasn't already been set via cancel or timeout
-        if (cmdState->finishLine.arriveStrongly()) {
+        if (!cmdState->promiseFulfilling.swap(true)) {
             if (swConn.getStatus() == ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit) {
                 cmdState->connTimeoutWaitTime = cmdState->stopwatch.elapsed();
             }
@@ -973,7 +982,7 @@ void NetworkInterfaceTL::RequestManager::trySend(
     // An attempt to avoid sending a request after its command has been canceled or already executed
     // using another connection. Just a best effort to mitigate unnecessary resource consumption if
     // possible, and allow deterministic cancellation of requests in testing.
-    if (cmdState->finishLine.isReady()) {
+    if (cmdState->promiseFulfilling.load()) {
         LOGV2_DEBUG(5813901,
                     2,
                     "Skipping request as it has already been fulfilled or canceled",
@@ -1027,7 +1036,7 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
                 }
             }
 
-            if (!cmdState->finishLine.arriveStrongly()) {
+            if (cmdState->promiseFulfilling.swap(true)) {
                 LOGV2_DEBUG(4754301,
                             2,
                             "Skipping the response because it was already received from other node",
@@ -1075,6 +1084,7 @@ auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface
         .getAsync([state](Status status) {
             state->tryFinish(
                 Status{ErrorCodes::ExhaustCommandFinished, "Exhaust command finished"});
+            state->done();
         });
 
     state->requestManager = std::make_unique<RequestManager>(state.get());
@@ -1118,6 +1128,7 @@ void NetworkInterfaceTL::ExhaustCommandState::fulfillFinalPromise(
             return response.status;
         return getStatusFromCommandResult(response.data);
     }());
+    promiseFulfilled.set();
 }
 
 void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
@@ -1224,32 +1235,29 @@ Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandl
 
 void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                        const BatonHandle&) {
-    stdx::unique_lock<Latch> lk(_inProgressMutex);
-    auto it = _inProgress.find(cbHandle);
-    if (it == _inProgress.end()) {
-        return;
-    }
-    auto cmdStateToCancel = it->second.lock();
-    if (!cmdStateToCancel) {
-        return;
-    }
-
-    _inProgress.erase(it);
-    lk.unlock();
-
-    if (!cmdStateToCancel->finishLine.arriveStrongly()) {
-        // If we didn't cross the command finishLine first, the promise is already fulfilled
-        return;
+    std::shared_ptr<NetworkInterfaceTL::CommandStateBase> cmdStateToCancel;
+    {
+        stdx::unique_lock<Latch> lk(_inProgressMutex);
+        auto it = _inProgress.find(cbHandle);
+        if (it == _inProgress.end()) {
+            return;
+        }
+        cmdStateToCancel = it->second.lock();
+        if (!cmdStateToCancel) {
+            return;
+        }
     }
 
-    LOGV2_DEBUG(22599,
-                2,
-                "Canceling operation for request",
-                "request"_attr = redact(cmdStateToCancel->requestOnAny.toString()));
-    cmdStateToCancel->fulfillFinalPromise(
-        {ErrorCodes::CallbackCanceled,
-         str::stream() << "Command canceled; original request was: "
-                       << redact(cmdStateToCancel->requestOnAny.toString())});
+    if (!cmdStateToCancel->promiseFulfilling.swap(true)) {
+        LOGV2_DEBUG(22599,
+                    2,
+                    "Canceling operation for request",
+                    "request"_attr = redact(cmdStateToCancel->requestOnAny.toString()));
+        cmdStateToCancel->fulfillFinalPromise(
+            {ErrorCodes::CallbackCanceled,
+             str::stream() << "Command canceled; original request was: "
+                           << redact(cmdStateToCancel->requestOnAny.toString())});
+    }
 }
 
 Status NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill, size_t idx) try {
