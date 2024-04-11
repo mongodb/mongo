@@ -7,6 +7,7 @@
 buildvariants:
   - name: windows
     display_name: Windows
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - windows-vsCurrent-small
@@ -45,8 +46,8 @@ buildvariants:
   - &enterprise-windows-template
     name: &enterprise-windows enterprise-windows
     display_name: "Enterprise Windows"
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     tags: ["bazel_check"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - windows-vsCurrent-small
     expansions:
@@ -96,6 +97,7 @@ buildvariants:
   - <<: *enterprise-windows-template
     name: enterprise-windows-security
     display_name: Enterprise Windows Security
+    tags: []
     depends_on:
       - name: archive_dist_test_debug
         variant: *enterprise-windows

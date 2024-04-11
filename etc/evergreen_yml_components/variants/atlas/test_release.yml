@@ -7,6 +7,7 @@
 buildvariants:
   - name: enterprise-rhel-79-64-bit
     display_name: "Enterprise RHEL 7.9"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel7.9-small

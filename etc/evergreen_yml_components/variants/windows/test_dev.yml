@@ -48,7 +48,7 @@ variables:
 buildvariants:
   - name: &windows-compile-required windows-compile-required
     display_name: "! Windows Enterprise Compile"
-    tags: ["bazel_check"]
+    tags: ["required", "bazel_check"]
     run_on:
       - windows-vsCurrent-xxlarge
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
@@ -85,6 +85,7 @@ buildvariants:
     <<: *windows_compile_variant_dependency
     name: &enterprise-windows-suggested enterprise-windows-suggested
     display_name: "* Enterprise Windows"
+    tags: ["suggested"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - windows-vsCurrent-small

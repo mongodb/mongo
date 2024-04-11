@@ -51,6 +51,7 @@ buildvariants:
   - <<: *generic_linux_compile_params
     name: &linux-x86-dynamic-debug-wtdevelop-compile linux-x86-dynamic-debug-wtdevelop-compile
     display_name: "~ Linux WiredTiger develop DEBUG Compile"
+    tags: []
     activate: false
     modules:
       - wtdevelop
@@ -61,6 +62,7 @@ buildvariants:
 
   - name: &linux-64-debug-wtdevelop linux-64-debug-wtdevelop
     display_name: "~ Linux DEBUG WiredTiger develop"
+    tags: []
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel80-medium
@@ -128,6 +130,7 @@ buildvariants:
 
   - name: &enterprise-windows-wtdevelop enterprise-windows-wtdevelop
     display_name: "~ Enterprise Windows WiredTiger develop"
+    tags: []
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - windows-vsCurrent-small

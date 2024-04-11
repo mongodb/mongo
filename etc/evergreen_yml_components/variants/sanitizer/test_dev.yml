@@ -118,6 +118,7 @@ buildvariants:
   - <<: *generic_linux_compile_params
     name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required # TODO: replace with Sanitizer.
     display_name: "! Linux x86 Shared Library DEBUG Compile"
+    tags: ["required"]
     stepback: false
     expansions:
       <<: *linux_debug_community_compile_expansions
@@ -131,6 +132,7 @@ buildvariants:
   - <<: *generic_linux_compile_params
     name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
     display_name: "! Linux x86 Shared Library {A,UB}SAN Enterprise Compile"
+    tags: ["required"]
     expansions:
       <<: *generic_linux_compile_expansions
       separate_debug: off
@@ -156,6 +158,7 @@ buildvariants:
     <<: *linux_x86_dynamic_debug_compile_variant_dependency
     name: &linux-64-debug-required linux-64-debug-required
     display_name: "! Linux x86 Shared Library DEBUG"
+    tags: ["required"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel80-medium
@@ -177,6 +180,7 @@ buildvariants:
     <<: *linux_debug_aubsan_compile_variant_dependency
     name: &rhel80-debug-aubsan-lite rhel80-debug-aubsan-lite
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
+    tags: ["suggested"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel80-build
@@ -189,6 +193,7 @@ buildvariants:
 
   - name: rhel80-asan
     display_name: ~ ASAN RHEL 8.0
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-build
@@ -225,6 +230,7 @@ buildvariants:
 
   - name: rhel80-debug-asan
     display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-build
@@ -315,8 +321,8 @@ buildvariants:
 
   - name: rhel80-debug-ubsan
     display_name: ~ UBSAN Enterprise RHEL 8.0 DEBUG
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     tags: ["bazel_check"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-build
     stepback: false
@@ -400,6 +406,7 @@ buildvariants:
   - &rhel80-debug-aubsan-lite_fuzzer-template
     name: &rhel80-debug-aubsan-lite_fuzzer rhel80-debug-aubsan-lite_fuzzer
     display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-build

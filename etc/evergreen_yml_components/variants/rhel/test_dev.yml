@@ -131,6 +131,7 @@ buildvariants:
   - <<: *linux-x86-dynamic-compile-params
     name: &linux-x86-dynamic-compile linux-x86-dynamic-compile
     display_name: "* Linux x86 Enterprise Shared Library"
+    tags: ["suggested"]
     expansions:
       <<: *linux-x86-dynamic-enterprise-compile-expansions
       compile_variant: *linux-x86-dynamic-compile
@@ -147,6 +148,7 @@ buildvariants:
     <<: *linux_x86_dynamic_compile_variant_dependency
     name: &enterprise-rhel-80-64-bit-dynamic enterprise-rhel-80-64-bit-dynamic
     display_name: "* Shared Library Enterprise RHEL 8.0"
+    tags: ["suggested"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel80-small
@@ -171,6 +173,7 @@ buildvariants:
     <<: *linux_x86_dynamic_compile_variant_dependency
     name: enterprise-rhel-80-64-bit-dynamic-config-shard
     display_name: "* Shared Library Enterprise RHEL 8.0 (Config Shard)"
+    tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-small
@@ -219,6 +222,7 @@ buildvariants:
     <<: *linux_x86_dynamic_compile_variant_dependency
     name: enterprise-rhel-80-64-bit-dynamic-classic-engine
     display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-small
@@ -344,6 +348,7 @@ buildvariants:
   - <<: *linux_debug_aubsan_compile_variant_dependency
     name: &rhel80-debug-aubsan-classic-engine rhel80-debug-aubsan-classic-engine
     display_name: "* {A,UB}SAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
+    tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-build

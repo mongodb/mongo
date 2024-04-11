@@ -7,6 +7,7 @@
 buildvariants:
   - name: enterprise-suse15-64
     display_name: Enterprise SLES 15
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - suse15-test
@@ -48,8 +49,8 @@ buildvariants:
 
   - name: suse15
     display_name: SUSE 15
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     tags: ["bazel_check"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - suse15-test
     expansions:

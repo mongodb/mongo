@@ -23,8 +23,9 @@ variables:
 buildvariants:
   - <<: *enterprise-ubuntu2204-64-libvoidstar-template
     name: &enterprise-ubuntu2204-64-libvoidstar enterprise-ubuntu2204-64-libvoidstar
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     display_name: "~ Enterprise Ubuntu 22.04 w/ libvoidstar"
+    tags: []
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       compile_variant: *enterprise-ubuntu2204-64-libvoidstar
@@ -39,8 +40,9 @@ buildvariants:
 
   - <<: *enterprise-ubuntu2204-64-libvoidstar-template
     name: &enterprise-ubuntu2204-64-aubsan-libvoidstar enterprise-ubuntu2204-64-aubsan-libvoidstar
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     display_name: "~ {A,UB}SAN Enterprise Ubuntu 22.04 w/ libvoidstar"
+    tags: []
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       antithesis_build_type: aubsan
@@ -69,8 +71,9 @@ buildvariants:
   # TODO SERVER-83727 After a toolchain upgrade, we should add -shared-libsan
   - <<: *enterprise-ubuntu2204-64-libvoidstar-template
     name: &enterprise-ubuntu2204-64-tsan-libvoidstar enterprise-ubuntu2204-64-tsan-libvoidstar
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     display_name: "~ TSAN Enterprise Ubuntu 22.04 w/ libvoidstar"
+    tags: []
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       antithesis_build_type: tsan

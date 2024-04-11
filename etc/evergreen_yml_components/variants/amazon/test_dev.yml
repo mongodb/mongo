@@ -76,7 +76,7 @@ buildvariants:
   - <<: *linux-arm64-dynamic-compile-params
     name: &amazon-linux2-arm64-crypt-compile amazon-linux2-arm64-crypt-compile
     display_name: "! Amazon Linux 2 arm64 Crypt Compile"
-    tags: ["bazel_check"]
+    tags: ["required", "bazel_check"]
     expansions:
       <<: *linux-arm64-dynamic-enterprise-compile-expansions
       compile_variant: *amazon-linux2-arm64-crypt-compile
@@ -87,7 +87,7 @@ buildvariants:
   - <<: *linux-arm64-dynamic-compile-params
     name: &amazon-linux2-arm64-dynamic-compile amazon-linux2-arm64-dynamic-compile
     display_name: "! Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis"
-    tags: ["bazel_check"]
+    tags: ["required", "bazel_check"]
     expansions:
       <<: *linux-arm64-dynamic-enterprise-compile-expansions
       clang_tidy_toolchain: v4
@@ -109,6 +109,7 @@ buildvariants:
     <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
     name: &enterprise-amazon-linux2-arm64 enterprise-amazon-linux2-arm64
     display_name: "* Amazon Linux 2 arm64 Enterprise"
+    tags: ["suggested"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - amazon2-arm64-small
@@ -133,8 +134,8 @@ buildvariants:
 
   - name: &commit-queue commit-queue
     display_name: "~ Commit Queue"
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
     tags: ["bazel_check"]
+    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
     run_on:
       - amazon2-arm64-small
     stepback: false
@@ -178,6 +179,7 @@ buildvariants:
   - <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
     name: amazon-linux2-arm64-try-sbe-engine
     display_name: "Amazon Linux 2 arm64 Enterprise Query Patch Only (trySbeEngine)"
+    tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     run_on:
       - amazon2-arm64-small

@@ -116,6 +116,7 @@ buildvariants:
 
   - name: &enterprise-rhel-80-64-bit-dynamic-debug-mode enterprise-rhel-80-64-bit-dynamic-debug-mode
     display_name: "Shared Library Enterprise RHEL 8.0 Debug Mode"
+    tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
     run_on:
       - rhel80-small
@@ -257,6 +258,7 @@ buildvariants:
 
   - name: &windows-debug-suggested windows-debug-suggested
     display_name: "* Windows DEBUG"
+    tags: ["suggested"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - windows-vsCurrent-small
@@ -297,6 +299,7 @@ buildvariants:
 
   - name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
     display_name: "Enterprise Windows DEBUG (Unoptimized)"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - windows-vsCurrent-small
@@ -344,6 +347,7 @@ buildvariants:
   - &macos-debug-template
     name: &macos-debug-suggested macos-debug-suggested
     display_name: "* macOS DEBUG"
+    tags: ["suggested"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - macos-1100
@@ -372,6 +376,7 @@ buildvariants:
 
   - name: &enterprise-macos enterprise-macos
     display_name: "Enterprise macOS DEBUG"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - macos-1100
@@ -408,6 +413,7 @@ buildvariants:
   - &rhel80-debug-ubsan-all-feature-flags-template
     name: &rhel80-debug-ubsan-all-feature-flags rhel80-debug-ubsan-all-feature-flags
     display_name: "* Shared Library UBSAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
+    tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-build
@@ -450,6 +456,7 @@ buildvariants:
     <<: *linux_debug_aubsan_compile_variant_dependency
     name: &rhel80-debug-aubsan-lite-all-feature-flags-required rhel80-debug-aubsan-lite-all-feature-flags-required
     display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
+    tags: ["required"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel80-build
@@ -468,6 +475,7 @@ buildvariants:
   - <<: *rhel80-debug-aubsan-lite-all-feature-flags-required-template
     name: &rhel80-debug-aubsan-all-feature-flags rhel80-debug-aubsan-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
+    tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
     expansions:
       <<: *aubsan-lite-required-expansions
@@ -486,6 +494,7 @@ buildvariants:
   - &enterprise-rhel80-debug-tsan-template
     name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan
     display_name: "* TSAN Enterprise RHEL 8.0 DEBUG"
+    tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-large
@@ -630,8 +639,8 @@ buildvariants:
 
   - name: &enterprise-rhel80-unoptimized-64-bit enterprise-rhel80-unoptimized-64-bit
     display_name: "~ Enterprise RHEL 8.0 DEBUG (Unoptimized)"
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     tags: ["bazel_check"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
       compile_flags: >-
         MONGO_DISTMOD=rhel80

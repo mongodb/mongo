@@ -7,8 +7,8 @@
 buildvariants:
   - name: enterprise-debian10-64
     display_name: Jepsen Tests on Enterprise Debian 10
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     tags: ["bazel_check"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - debian10-test
     expansions:
@@ -30,8 +30,8 @@ buildvariants:
 
   - name: debian12
     display_name: Debian 12
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     tags: ["bazel_check"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - debian12-small
     expansions:
@@ -70,6 +70,7 @@ buildvariants:
 
   - name: enterprise-debian12-64
     display_name: Enterprise Debian 12
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - debian12-small

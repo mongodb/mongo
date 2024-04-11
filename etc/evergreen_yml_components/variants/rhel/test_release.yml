@@ -7,6 +7,7 @@
 buildvariants:
   - name: ubi8
     display_name: "UBI 8"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubi8
@@ -38,6 +39,7 @@ buildvariants:
 
   - name: rhel80
     display_name: RHEL 8.0
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-build
@@ -77,6 +79,7 @@ buildvariants:
 
   - name: enterprise-rhel-80-64-bit
     display_name: "Enterprise RHEL 8.0"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-small
@@ -165,6 +168,7 @@ buildvariants:
 
   - name: enterprise-rhel-82-arm64
     display_name: "Enterprise RHEL 8.2 arm64"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel82-arm64-small
@@ -206,8 +210,8 @@ buildvariants:
 
   - name: rhel90
     display_name: RHEL 9.0
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     tags: ["bazel_check"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel90-build
     expansions:
@@ -246,6 +250,7 @@ buildvariants:
 
   - name: enterprise-rhel-90-64-bit
     display_name: "Enterprise RHEL 9.0"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel90-small
@@ -286,8 +291,8 @@ buildvariants:
 
   - name: rhel90-arm64
     display_name: RHEL 9.0 arm64
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     tags: ["bazel_check"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel90-arm64-small
     expansions:
@@ -323,6 +328,7 @@ buildvariants:
 
   - name: enterprise-rhel-90-arm64
     display_name: "Enterprise RHEL 9.0 arm64"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel90-arm64-small
@@ -365,6 +371,7 @@ buildvariants:
 
   - name: enterprise-rhel-82-arm64-grpc
     display_name: "Enterprise RHEL 8.2 arm64 GRPC"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel82-arm64-large

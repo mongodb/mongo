@@ -7,6 +7,7 @@
 buildvariants:
   - name: &enterprise-windows-build-metrics enterprise-windows-build-metrics
     display_name: "~ Build Metrics Enterprise Windows"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     stepback: false
     run_on:
@@ -24,6 +25,7 @@ buildvariants:
 
   - name: &macos-enterprise-build-metrics macos-enterprise-build-metrics
     display_name: "~ Build Metrics Enterprise MacOS"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     stepback: false
     run_on:
@@ -41,6 +43,7 @@ buildvariants:
 
   - name: &enterprise-rhel-80-64-bit-build-metrics enterprise-rhel-80-64-bit-build-metrics
     display_name: "~ Build Metrics Enterprise RHEL 8.0 "
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
     stepback: false
     run_on:
@@ -59,6 +62,7 @@ buildvariants:
 
   - name: &enterprise-rhel-80-aarch64-build-metrics enterprise-rhel-80-aarch64-build-metrics
     display_name: "~ Build Metrics Enterprise AL22 ARM"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
     stepback: false
     run_on:
@@ -76,6 +80,7 @@ buildvariants:
 
   - name: &shared-scons-cache-pruning shared-scons-cache-pruning
     display_name: "Shared SCons Cache Pruning"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2204-small
@@ -85,6 +90,7 @@ buildvariants:
 
   - name: &windows-shared-scons-cache-pruning windows-shared-scons-cache-pruning
     display_name: "Windows shared SCons Cache Pruning"
+    tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - windows-vsCurrent-small
@@ -96,6 +102,7 @@ buildvariants:
 
   - name: &stm-daily-cron stm-daily-cron
     display_name: "* STM Daily Cron"
+    tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-small
