@@ -177,7 +177,8 @@ feature_flags:
   featureFlagFailOnDirectShardOperations:
     description: "Feature flag for erroring when a direct shard operation is detected."
     cpp_varname: feature_flags::gFailOnDirectShardOperations
-    default: false
+    default: true
+    version: 7.3
     shouldBeFCVGated: true
   # TODO (SERVER-87196): remove the flag below after 8.0 is released
   featureFlagEnforceRoutingByNamespace:
