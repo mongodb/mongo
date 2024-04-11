@@ -1,6 +1,7 @@
 # These paths are relative to the directory containing this configuration file
 files:
   - evaluated_evergreen.yml
+  - evaluated_evergreen_nightly.yml
 help_url: https://wiki.corp.mongodb.com/pages/viewpage.action?pageId=133273894
 
 rules:
@@ -91,3 +92,14 @@ rules:
           - assigned_to_jira_team_streams
         min_num_of_tags: 1
         max_num_of_tags: 1
+
+  - rule: "enforce-tags-for-variants"
+    tags:
+      # Required variants should have "required" tag
+      - tag_name: "required"
+        variant_config:
+          display_name_regex: "^!.+$"
+      # Suggested variants should have "suggested" tag
+      - tag_name: "suggested"
+        variant_config:
+          display_name_regex: "^\\*.+$"
