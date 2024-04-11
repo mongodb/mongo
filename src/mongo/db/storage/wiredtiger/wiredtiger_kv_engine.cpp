@@ -1225,11 +1225,22 @@ private:
         int wtRet;
         bool fileUnchangedFlag = false;
         if (!_wtBackup->dupCursor) {
-            wtRet = (_session)->open_cursor(
-                _session, nullptr, _wtBackup->cursor, config.c_str(), &_wtBackup->dupCursor);
-            if (wtRet != 0) {
-                return wtRCToStatus(wtRet, _session);
-            }
+            size_t attempt = 0;
+            do {
+                wtRet = _session->open_cursor(
+                    _session, nullptr, _wtBackup->cursor, config.c_str(), &_wtBackup->dupCursor);
+
+                if (wtRet == EBUSY) {
+                    logAndBackoff(8927900,
+                                  ::mongo::logv2::LogComponent::kStorage,
+                                  logv2::LogSeverity::Debug(1),
+                                  ++attempt,
+                                  "Opening duplicate backup cursor returned EBUSY, retrying",
+                                  "config"_attr = config);
+                } else if (wtRet != 0) {
+                    return wtRCToStatus(wtRet, _session);
+                }
+            } while (wtRet == EBUSY);
             fileUnchangedFlag = true;
         }
 
