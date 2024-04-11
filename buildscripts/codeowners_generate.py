@@ -117,12 +117,17 @@ def process_owners_file(output_lines: list[str], directory: str) -> None:
                         # approver is github username, need to prefix with @
                         owners.add(f"@{owner}")
 
-                for approver in approvers:
-                    if approver in aliases:
-                        for member in aliases[approver]:
-                            process_owner(member)
-                    else:
-                        process_owner(approver)
+                NOOWNERS_NAME = "NOOWNERS-DO-NOT-USE-DEPRECATED-2024-07-01"
+                if NOOWNERS_NAME in approvers:
+                    assert len(approvers
+                               ) == 1, f"{NOOWNERS_NAME} must be the only approver when it is used."
+                else:
+                    for approver in approvers:
+                        if approver in aliases:
+                            for member in aliases[approver]:
+                                process_owner(member)
+                        else:
+                            process_owner(approver)
 
                 add_owner_line(output_lines, directory, pattern, owners)
     output_lines.append("")
