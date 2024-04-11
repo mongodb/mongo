@@ -120,10 +120,8 @@ public:
                                                            keyPattern,
                                                            /*requireSingleKey=*/true,
                                                            &tmpErrMsg);
-        if (!shardKeyIdx) {
-            errmsg = tmpErrMsg;
-            return false;
-        }
+
+        uassert(ErrorCodes::InvalidOptions, str::stream() << tmpErrMsg, shardKeyIdx);
 
         return true;
     }
