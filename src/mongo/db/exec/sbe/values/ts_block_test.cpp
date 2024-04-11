@@ -610,6 +610,70 @@ TEST_F(SbeValueTest, FillType) {
     }
 }
 
+const BSONObj kBucketWithArrs = fromjson(R"(
+{
+    "_id" : ObjectId("64a33d9cdf56a62781061048"),
+    "control" : {
+        "version" : 1,
+        "min": {
+            "_id": 0,
+            "time": {$date: "2023-06-30T21:29:00.000Z"},
+            "num": NumberLong(123),
+            "arr": [2, 3, 3]
+        },
+        "max": {
+            "_id": 2,
+            "time": {$date: "2023-06-30T21:29:15.088Z"},
+            "num": NumberLong(789),
+            "arr": [0, 1, 0]
+        }
+    },
+    "meta" : "A",
+    "data" : {
+        "_id" : {"0" : 0, "1": 1, "2" : 2},
+        "time" : {
+            "0" : {$date: "2023-06-30T21:29:00.568Z"},
+            "1" : {$date: "2023-06-30T21:29:09.968Z"},
+            "2" : {$date: "2023-06-30T21:29:15.088Z"}
+        },
+        num: {"0": NumberLong(123),
+              "1": NumberLong(456),
+              "2": NumberLong(789)},
+        arr: {"0": [1, 2, 3],
+              "1": [0, 1, 2],
+              "2": [2, 3, 0]}
+    }
+})");
+
+TEST_F(SbeValueTest, TsBlockMiscTest) {
+    {
+        // Tests on the "time" field.
+        auto timeBlock = makeTsBlockFromBucket(kBucketWithArrs, "time");
+
+        ASSERT_EQ(timeBlock->tryDense(), boost::optional<bool>(true));
+        ASSERT(timeBlock->hasNoObjsOrArrays());
+    }
+
+    {
+        // Test on the "num" field.
+        auto numBlock = makeTsBlockFromBucket(kBucketWithArrs, "num");
+
+        ASSERT_EQ(numBlock->tryDense(), boost::optional<bool>(false));
+        ASSERT(numBlock->hasNoObjsOrArrays());
+    }
+
+    {
+        // Test on the "arr" field.
+        auto arrBlock = makeTsBlockFromBucket(kBucketWithArrs, "arr");
+
+        ASSERT_EQ(arrBlock->tryDense(), boost::optional<bool>(false));
+        ASSERT(!arrBlock->hasNoObjsOrArrays());
+        // We do not use control min/max when they are arrays.
+        ASSERT_EQ(arrBlock->tryLowerBound().first, value::TypeTags::Nothing);
+        ASSERT_EQ(arrBlock->tryMax().first, value::TypeTags::Nothing);
+    }
+}
+
 const BSONObj kBucketWithBigScalars = fromjson(R"(
 {
     "_id" : ObjectId("64a33d9cdf56a62781061048"),

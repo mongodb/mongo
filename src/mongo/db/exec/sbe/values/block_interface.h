@@ -238,11 +238,6 @@ struct ValueBlock {
     virtual std::unique_ptr<ValueBlock> clone() const = 0;
 
     /**
-     * Returns the number of values in this block in O(1) time, otherwise returns boost::none.
-     */
-    virtual boost::optional<size_t> tryCount() const = 0;
-
-    /**
      * Returns an upper bound for the values in this block. This may be the maximum value, but
      * it's not necessarily.
      */
@@ -259,17 +254,9 @@ struct ValueBlock {
     }
 
     /**
-     * Returns the number of values in this block. If this cannot be done in O(1) then the values
-     * will be extracted and the count will be returned.
+     * Returns the number of values in this block.
      */
-    size_t count() {
-        auto elsNum = tryCount();
-        if (elsNum.has_value()) {
-            return elsNum.get();
-        }
-
-        return this->extract().count();
-    }
+    virtual size_t count() = 0;
 
     /**
      * Returns the minimum value in the block in O(1) time, otherwise returns Nothing value.
@@ -431,7 +418,7 @@ public:
         return {_count, storage->tags.data(), storage->vals.data(), storage->tag, storage->isDense};
     }
 
-    boost::optional<size_t> tryCount() const override {
+    size_t count() override {
         return _count;
     }
 
@@ -511,7 +498,7 @@ class HeterogeneousBlock : public ValueBlock {
 public:
     HeterogeneousBlock() = default;
 
-    HeterogeneousBlock(const HeterogeneousBlock& o) : ValueBlock(o), _isDense(o._isDense) {
+    HeterogeneousBlock(const HeterogeneousBlock& o) : ValueBlock(o) {
         _vals.resize(o._vals.size(), Value{0u});
         _tags.resize(o._tags.size(), TypeTags::Nothing);
 
@@ -523,16 +510,13 @@ public:
     }
 
     HeterogeneousBlock(HeterogeneousBlock&& o)
-        : ValueBlock(std::move(o)),
-          _vals(std::move(o._vals)),
-          _tags(std::move(o._tags)),
-          _isDense(o._isDense) {
+        : ValueBlock(std::move(o)), _vals(std::move(o._vals)), _tags(std::move(o._tags)) {
         o._vals = {};
         o._tags = {};
     }
 
-    HeterogeneousBlock(std::vector<TypeTags> tags, std::vector<Value> vals, bool isDense = false)
-        : _vals(std::move(vals)), _tags(std::move(tags)), _isDense(isDense) {}
+    HeterogeneousBlock(std::vector<TypeTags> tags, std::vector<Value> vals)
+        : _vals(std::move(vals)), _tags(std::move(tags)) {}
 
     ~HeterogeneousBlock() override {
         release();
@@ -559,16 +543,12 @@ public:
         push_back(tv.first, tv.second);
     }
 
-    boost::optional<size_t> tryCount() const override {
+    size_t count() override {
         return _vals.size();
     }
 
-    boost::optional<bool> tryDense() const override {
-        return _isDense;
-    }
-
     DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) override {
-        return {_vals.size(), _tags.data(), _vals.data(), TypeTags::Nothing, _isDense};
+        return {_vals.size(), _tags.data(), _vals.data()};
     }
 
     std::unique_ptr<ValueBlock> clone() const override {
@@ -588,9 +568,6 @@ private:
     // All values are owned.
     std::vector<Value> _vals;
     std::vector<TypeTags> _tags;
-
-    // True if all values are non-nothing.
-    bool _isDense = false;
 };
 
 template <typename T, value::TypeTags TypeTag>
@@ -670,10 +647,6 @@ public:
         _presentBitset.reserve(n);
     }
 
-    size_t size() const {
-        return _presentBitset.size();
-    }
-
     void push_back(T v) {
         _vals.push_back(value::bitcastFrom<T>(v));
         _presentBitset.push_back(true);
@@ -688,8 +661,8 @@ public:
         _presentBitset.push_back(false);
     }
 
-    boost::optional<size_t> tryCount() const override {
-        return size();
+    size_t count() override {
+        return _presentBitset.size();
     }
 
     boost::optional<bool> tryDense() const override {
@@ -750,10 +723,13 @@ public:
                                          Value fillVal) override;
 
     std::unique_ptr<ValueBlock> exists() override {
-        if (_presentBitset.all()) {
+        if (*tryDense()) {
             return std::make_unique<MonoBlock>(
                 _presentBitset.size(), TypeTags::Boolean, value::bitcastFrom<bool>(true));
-        } else if (_presentBitset.none()) {
+        }
+        // If _vals.size() is 0, then we know all values in the block (if there are any to begin
+        // with) must be Nothings.
+        else if (_vals.size() == 0) {
             return std::make_unique<MonoBlock>(
                 _presentBitset.size(), TypeTags::Boolean, value::bitcastFrom<bool>(false));
         }
@@ -768,7 +744,7 @@ public:
     }
 
     boost::optional<bool> allFalse() const override {
-        if (TypeTag != TypeTags::Boolean || !_presentBitset.all()) {
+        if (TypeTag != TypeTags::Boolean || !*tryDense()) {
             return boost::none;
         }
         for (size_t i = 0; i < _vals.size(); ++i) {
@@ -780,7 +756,7 @@ public:
     }
 
     boost::optional<bool> allTrue() const override {
-        if (TypeTag != TypeTags::Boolean || !_presentBitset.all()) {
+        if (TypeTag != TypeTags::Boolean || !*tryDense()) {
             return boost::none;
         }
         for (size_t i = 0; i < _vals.size(); ++i) {
