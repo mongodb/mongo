@@ -127,7 +127,10 @@ buildvariants:
       - name: compile_test_parallel_core_stream_TG
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_dbtest_stream_TG
-      - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel80-xlarge
 
   - <<: *generic_linux_compile_params
     name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
@@ -152,7 +155,10 @@ buildvariants:
       - name: compile_test_parallel_core_stream_TG
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_dbtest_stream_TG
-      - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel80-xlarge
 
   - &linux-64-debug-required-template
     <<: *linux_x86_dynamic_debug_compile_variant_dependency
@@ -173,8 +179,14 @@ buildvariants:
       core_analyzer_distro_name: rhel80-xlarge
       compile_variant: *linux_x86_dynamic_debug_compile_variant_name
     tasks:
-      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
-      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
+        distros:
+          - rhel80-medium
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
+        distros:
+          - rhel80-medium
 
   - &rhel80-debug-aubsan-lite-template
     <<: *linux_debug_aubsan_compile_variant_dependency

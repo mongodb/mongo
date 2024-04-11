@@ -49,8 +49,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
-      - name: .development_critical
-      - name: .release_critical !publish_packages
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - amazon2-openssl111-large
+      - name: .release_critical !.requires_large_host !publish_packages
+      - name: .release_critical .requires_large_host !publish_packages
+        distros:
+          - amazon2-openssl111-large
 
   - name: enterprise-amazon2-arm64-openssl111
     display_name: "Enterprise Amazon Linux 2 arm64 (openssl 1.1.1)"
@@ -98,8 +104,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu1804-arm64-build
-      - name: .development_critical
-      - name: .release_critical !publish_packages
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - amazon2-arm64-openssl111-large
+      - name: .release_critical !.requires_large_host !publish_packages
+      - name: .release_critical .requires_large_host !publish_packages
+        distros:
+          - amazon2-arm64-openssl111-large
 
   - name: amazon2023
     display_name: Amazon Linux 2023
@@ -136,8 +148,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
-      - name: .development_critical !.incompatible_community
-      - name: .release_critical !.incompatible_community
+      - name: .development_critical !.requires_large_host !.incompatible_community
+      - name: .development_critical .requires_large_host !.incompatible_community
+        distros:
+          - amazon2023.0-large
+      - name: .release_critical !.requires_large_host !.incompatible_community
+      - name: .release_critical .requires_large_host !.incompatible_community
+        distros:
+          - amazon2023.0-large
 
   - name: enterprise-amazon2023
     display_name: "Enterprise Amazon Linux 2023"
@@ -177,8 +195,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
-      - name: .development_critical
-      - name: .release_critical
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - amazon2023.0-large
+      - name: .release_critical !.requires_large_host
+      - name: .release_critical .requires_large_host
+        distros:
+          - amazon2023.0-large
 
   # This variant is a special variant to test LTO.
   # We just want it to bake for a while before considering that we turn it on by default.
@@ -223,8 +247,14 @@ buildvariants:
       # - name: test_packages
       #   distros:
       #   - amazon2023.0-large
-      - name: .development_critical
-      - name: .release_critical !publish_packages !push !crypt_push
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - amazon2023.0-large
+      - name: .release_critical !.requires_large_host !publish_packages !push !crypt_push
+      - name: .release_critical .requires_large_host !publish_packages !push !crypt_push
+        distros:
+          - amazon2023.0-large
 
   - name: amazon2023-arm64
     display_name: Amazon Linux 2023 arm64
@@ -262,8 +292,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-arm64-large
-      - name: .development_critical !.incompatible_community
-      - name: .release_critical !.incompatible_community
+      - name: .development_critical !.requires_large_host !.incompatible_community
+      - name: .development_critical .requires_large_host !.incompatible_community
+        distros:
+          - amazon2023.0-arm64-large
+      - name: .release_critical !.requires_large_host !.incompatible_community
+      - name: .release_critical .requires_large_host !.incompatible_community
+        distros:
+          - amazon2023.0-arm64-large
 
   - name: enterprise-amazon2023-arm64
     display_name: "Enterprise Amazon Linux 2023 arm64"
@@ -303,8 +339,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-arm64-large
-      - name: .development_critical
-      - name: .release_critical
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - amazon2023.0-arm64-large
+      - name: .release_critical !.requires_large_host
+      - name: .release_critical .requires_large_host
+        distros:
+          - amazon2023.0-arm64-large
 
   # This variant is a special variant to test LTO.
   # We just want it to bake for a while before considering that we turn it on by default.
@@ -349,8 +391,14 @@ buildvariants:
       # - name: test_packages
       #   distros:
       #   - ubuntu2204-arm64-large
-      - name: .development_critical
-      - name: .release_critical !publish_packages !push !crypt_push
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - amazon2023.0-arm64-large
+      - name: .release_critical !.requires_large_host !publish_packages !push !crypt_push
+      - name: .release_critical .requires_large_host !publish_packages !push !crypt_push
+        distros:
+          - amazon2023.0-arm64-large
 
   - name: enterprise-amazon2-streams
     display_name: "Amazon Linux 2 enterprise build with streams"
@@ -387,7 +435,13 @@ buildvariants:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
           - amazon2-build
-      - name: .development_critical
-      - name: .release_critical !crypt_push
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - amazon2-large
+      - name: .release_critical !.requires_large_host !crypt_push
+      - name: .release_critical .requires_large_host !crypt_push
+        distros:
+          - amazon2-large
       - name: streams
       - name: streams_kafka

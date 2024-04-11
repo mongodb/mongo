@@ -102,8 +102,14 @@ buildvariants:
       - name: .development_critical_single_variant .requires_large_host
         distros:
           - amazon2-arm64-xlarge
-      - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
-      - name: .default .requires_compile_variant !.incompatible_development_variant
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - amazon2-arm64-xlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
+        distros:
+          - amazon2-arm64-xlarge
 
   - &enterprise-amazon-linux2-arm64-template
     <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
@@ -128,9 +134,18 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
     tasks:
-      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
-      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
-      - name: .default !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - amazon2-arm64-large
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - amazon2-arm64-large
+      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - amazon2-arm64-large
 
   - name: &commit-queue commit-queue
     display_name: "~ Commit Queue"
@@ -172,6 +187,10 @@ buildvariants:
         distros:
           - amazon2-arm64-xlarge-commitqueue
       - name: .development_critical_single_variant !.requires_large_host !.clang_tidy !libdeps_graph_linting
+      - name: .development_critical_single_variant .requires_large_host !.clang_tidy !libdeps_graph_linting
+        distros:
+          - amazon2-arm64-large
+      - name: .development_critical !.requires_large_host_commit_queue
       - name: .development_critical .requires_large_host_commit_queue
         distros:
           - amazon2-arm64-large

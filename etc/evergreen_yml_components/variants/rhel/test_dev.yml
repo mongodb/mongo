@@ -141,8 +141,14 @@ buildvariants:
       - name: compile_test_parallel_core_stream_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
-      - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
-      - name: .default .requires_compile_variant !.incompatible_development_variant
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel80-xlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
+        distros:
+          - rhel80-xlarge
 
   - &enterprise-rhel-80-64-bit-dynamic-template
     <<: *linux_x86_dynamic_compile_variant_dependency
@@ -163,9 +169,18 @@ buildvariants:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     tasks:
-      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
-      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
-      - name: .default !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - rhel80-medium
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - rhel80-medium
+      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - rhel80-medium
 
   # TODO (SERVER-75884): Remove this variant once we switch to config shard as the default.
   # This build variant is used to test suites that use sharded cluster fixture with config shard mode.

@@ -295,11 +295,18 @@ buildvariants:
       #     omit_generated_tasks: true
       #   - name: archive_dist_test_debug
       #     variant: *linux_x86_dynamic_compile_variant_name
-      # TODO: DEVPROD-5173
-      # Add !.incompatible_all_feature_flags back when the tag is added to any task or DEVPROD-5173 is completed.
-      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant #!.incompatible_all_feature_flags
-      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant #!.incompatible_all_feature_flags
-      - name: .default !.requires_compile_variant !.incompatible_development_variant #!.incompatible_all_feature_flags
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+        distros:
+          - rhel80-medium
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+        distros:
+          - rhel80-medium
+      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+        distros:
+          - rhel80-medium
 
   # This build variant is used to test suites that use sharded cluster fixture with embedded router mode.
   # Also supports ProgramRunner/ShardingTest driven suites that look for an embedded router flag in TestData.

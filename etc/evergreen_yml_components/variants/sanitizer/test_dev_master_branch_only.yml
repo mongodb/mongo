@@ -294,8 +294,14 @@ buildvariants:
       - name: compile_integration_and_test_no_audit_parallel_stream_TG
         distros:
           - windows-vsCurrent-xlarge
-      - name: .development_critical !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
-      - name: .release_critical !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
+      - name: .development_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
+        distros:
+          - windows-vsCurrent-large
+      - name: .release_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
+      - name: .release_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
+        distros:
+          - windows-vsCurrent-large
 
   - name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
     display_name: "Enterprise Windows DEBUG (Unoptimized)"
@@ -371,8 +377,14 @@ buildvariants:
     tasks:
       - name: compile_test_serial_TG
       - name: compile_test_parallel_unittest_stream_TG
-      - name: .development_critical !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
-      - name: .release_critical !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
+      - name: .development_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
+        distros:
+          - macos-1100
+      - name: .release_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
+      - name: .release_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
+        distros:
+          - macos-1100
 
   - name: &enterprise-macos enterprise-macos
     display_name: "Enterprise macOS DEBUG"
@@ -484,12 +496,22 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
     tasks:
-      # TODO: DEVPROD-5173
-      # Add !.incompatible_all_feature_flags back when the tag is added to any task or DEVPROD-5173 is completed.
-      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan #!.incompatible_all_feature_flags
-      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan #!.incompatible_all_feature_flags
-      - name: .default !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan #!.incompatible_all_feature_flags
-      - name: .non_deterministic !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan #!.incompatible_all_feature_flags
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+        distros:
+          - rhel80-large
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+        distros:
+          - rhel80-large
+      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+        distros:
+          - rhel80-large
+      - name: .non_deterministic !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+      - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+        distros:
+          - rhel80-large
 
   - &enterprise-rhel80-debug-tsan-template
     name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan

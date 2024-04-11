@@ -168,10 +168,14 @@ buildvariants:
       #     omit_generated_tasks: true
       #   - name: archive_dist_test_debug
       #     variant: *windows_compile_variant_name
-      # TODO: DEVPROD-5173
-      # Add !.incompatible_all_feature_flags back when the tag is added to any task or DEVPROD-5173 is completed.
-      - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows #!.incompatible_all_feature_flags
-      - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows #!.incompatible_all_feature_flags
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
+        distros:
+          - windows-vsCurrent-large
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
+        distros:
+          - windows-vsCurrent-large
 
   - name: &enterprise-windows-benchmarks enterprise-windows-benchmarks
     display_name: "* Enterprise Windows (Benchmarks)"

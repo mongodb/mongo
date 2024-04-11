@@ -65,8 +65,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
-      - name: .development_critical !.incompatible_community
-      - name: .release_critical !.incompatible_community
+      - name: .development_critical !.requires_large_host !.incompatible_community
+      - name: .development_critical .requires_large_host !.incompatible_community
+        distros:
+          - debian12-large
+      - name: .release_critical !.requires_large_host !.incompatible_community
+      - name: .release_critical .requires_large_host !.incompatible_community
+        distros:
+          - debian12-large
 
   - name: enterprise-debian12-64
     display_name: Enterprise Debian 12
@@ -109,5 +115,11 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
-      - name: .development_critical
-      - name: .release_critical
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - debian12-large
+      - name: .release_critical !.requires_large_host
+      - name: .release_critical .requires_large_host
+        distros:
+          - debian12-large

@@ -31,8 +31,14 @@ buildvariants:
     tasks:
       - name: compile_test_and_package_serial_TG
       - name: compile_test_parallel_unittest_stream_TG
-      - name: .development_critical !.incompatible_community !.incompatible_mac
-      - name: .release_critical !.incompatible_community !.incompatible_mac !publish_packages
+      - name: .development_critical !.requires_large_host !.incompatible_community !.incompatible_mac
+      - name: .development_critical .requires_large_host !.incompatible_community !.incompatible_mac
+        distros:
+          - macos-1100
+      - name: .release_critical !.requires_large_host !.incompatible_community !.incompatible_mac !publish_packages
+      - name: .release_critical .requires_large_host !.incompatible_community !.incompatible_mac !publish_packages
+        distros:
+          - macos-1100
 
   - name: macos-arm64
     display_name: macOS arm64
@@ -60,8 +66,14 @@ buildvariants:
     tasks:
       - name: compile_test_and_package_serial_TG
       - name: compile_test_parallel_unittest_stream_TG
-      - name: .development_critical !.incompatible_community !.incompatible_mac
-      - name: .release_critical !.incompatible_community !.incompatible_mac !publish_packages
+      - name: .development_critical !.requires_large_host !.incompatible_community !.incompatible_mac
+      - name: .development_critical .requires_large_host !.incompatible_community !.incompatible_mac
+        distros:
+          - macos-1100-arm64
+      - name: .release_critical !.requires_large_host !.incompatible_community !.incompatible_mac !publish_packages
+      - name: .release_critical .requires_large_host !.incompatible_community !.incompatible_mac !publish_packages
+        distros:
+          - macos-1100-arm64
 
   - name: enterprise-macos
     display_name: Enterprise macOS
@@ -89,8 +101,14 @@ buildvariants:
     tasks:
       - name: compile_test_and_package_serial_TG
       - name: compile_test_parallel_unittest_stream_TG
-      - name: .development_critical !.incompatible_mac
-      - name: .release_critical !.incompatible_mac !publish_packages
+      - name: .development_critical !.requires_large_host !.incompatible_mac
+      - name: .development_critical .requires_large_host !.incompatible_mac
+        distros:
+          - macos-1100
+      - name: .release_critical !.requires_large_host !.incompatible_mac !publish_packages
+      - name: .release_critical .requires_large_host !.incompatible_mac !publish_packages
+        distros:
+          - macos-1100
 
   - name: enterprise-macos-arm64
     display_name: Enterprise macOS arm64
@@ -118,5 +136,11 @@ buildvariants:
     tasks:
       - name: compile_test_and_package_serial_TG
       - name: compile_test_parallel_unittest_stream_TG
-      - name: .development_critical !.incompatible_mac
-      - name: .release_critical !.incompatible_mac !publish_packages
+      - name: .development_critical !.requires_large_host !.incompatible_mac
+      - name: .development_critical .requires_large_host !.incompatible_mac
+        distros:
+          - macos-1100-arm64
+      - name: .release_critical !.requires_large_host !.incompatible_mac !publish_packages
+      - name: .release_critical .requires_large_host !.incompatible_mac !publish_packages
+        distros:
+          - macos-1100-arm64

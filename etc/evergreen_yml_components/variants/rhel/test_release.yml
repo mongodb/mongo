@@ -74,8 +74,14 @@ buildvariants:
         distros:
           - ubuntu2204-large
       - name: selinux_rhel8_org
-      - name: .development_critical !.incompatible_community
-      - name: .release_critical !.incompatible_community
+      - name: .development_critical !.requires_large_host !.incompatible_community
+      - name: .development_critical .requires_large_host !.incompatible_community
+        distros:
+          - rhel80-large
+      - name: .release_critical !.requires_large_host !.incompatible_community
+      - name: .release_critical .requires_large_host !.incompatible_community
+        distros:
+          - rhel80-large
 
   - name: enterprise-rhel-80-64-bit
     display_name: "Enterprise RHEL 8.0"
@@ -126,8 +132,14 @@ buildvariants:
         distros:
           - ubuntu2204-large
       - name: selinux_rhel8_enterprise
-      - name: .development_critical
-      - name: .release_critical
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - rhel80-large
+      - name: .release_critical !.requires_large_host
+      - name: .release_critical .requires_large_host
+        distros:
+          - rhel80-large
 
   - name: rhel-82-arm64
     display_name: RHEL 8.2 arm64
@@ -163,8 +175,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu1804-arm64-build
-      - name: .development_critical !.incompatible_community
-      - name: .release_critical !.incompatible_community
+      - name: .development_critical !.requires_large_host !.incompatible_community
+      - name: .development_critical .requires_large_host !.incompatible_community
+        distros:
+          - rhel82-arm64-large
+      - name: .release_critical !.requires_large_host !.incompatible_community
+      - name: .release_critical .requires_large_host !.incompatible_community
+        distros:
+          - rhel82-arm64-large
 
   - name: enterprise-rhel-82-arm64
     display_name: "Enterprise RHEL 8.2 arm64"
@@ -205,8 +223,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu1804-arm64-build
-      - name: .development_critical
-      - name: .release_critical
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - rhel82-arm64-large
+      - name: .release_critical !.requires_large_host
+      - name: .release_critical .requires_large_host
+        distros:
+          - rhel82-arm64-large
 
   - name: rhel90
     display_name: RHEL 9.0
@@ -245,8 +269,14 @@ buildvariants:
         distros:
           - ubuntu2204-large
       - name: selinux_rhel9_org
-      - name: .development_critical !.incompatible_community
-      - name: .release_critical !.incompatible_community
+      - name: .development_critical !.requires_large_host !.incompatible_community
+      - name: .development_critical .requires_large_host !.incompatible_community
+        distros:
+          - rhel90-large
+      - name: .release_critical !.requires_large_host !.incompatible_community
+      - name: .release_critical .requires_large_host !.incompatible_community
+        distros:
+          - rhel90-large
 
   - name: enterprise-rhel-90-64-bit
     display_name: "Enterprise RHEL 9.0"
@@ -286,8 +316,14 @@ buildvariants:
         distros:
           - ubuntu2204-large
       - name: selinux_rhel9_enterprise
-      - name: .development_critical
-      - name: .release_critical
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - rhel90-large
+      - name: .release_critical !.requires_large_host
+      - name: .release_critical .requires_large_host
+        distros:
+          - rhel90-large
 
   - name: rhel90-arm64
     display_name: RHEL 9.0 arm64
@@ -323,8 +359,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-arm64-small
-      - name: .development_critical !.incompatible_community
-      - name: .release_critical !.incompatible_community
+      - name: .development_critical !.requires_large_host !.incompatible_community
+      - name: .development_critical .requires_large_host !.incompatible_community
+        distros:
+          - rhel90-arm64-large
+      - name: .release_critical !.requires_large_host !.incompatible_community
+      - name: .release_critical .requires_large_host !.incompatible_community
+        distros:
+          - rhel90-arm64-large
 
   - name: enterprise-rhel-90-arm64
     display_name: "Enterprise RHEL 9.0 arm64"
@@ -366,8 +408,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-arm64-small
-      - name: .development_critical
-      - name: .release_critical
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - rhel90-arm64-large
+      - name: .release_critical !.requires_large_host
+      - name: .release_critical .requires_large_host
+        distros:
+          - rhel90-arm64-large
 
   - name: enterprise-rhel-82-arm64-grpc
     display_name: "Enterprise RHEL 8.2 arm64 GRPC"
