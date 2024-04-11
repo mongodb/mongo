@@ -74,6 +74,24 @@ mongo_cc_library(
         ],
         "//conditions:default": ["-Wno-unused-result"],
     }),
+    includes = select({
+        "@//bazel/config:linux_aarch64": [
+            "platform/linux_aarch64/include",
+        ],
+        "@//bazel/config:linux_x86_64": [
+            "platform/linux_x86_64/include",
+        ],
+        "@//bazel/config:linux_ppc64le": [
+            "platform/linux_ppc64le/include",
+        ],
+        "@//bazel/config:linux_s390x": [
+            "platform/linux_s390x/include",
+        ],
+        "@//bazel/config:windows_x86_64": [
+            "platform/windows_x86_64/include",
+        ],
+        "//conditions:default": [],
+    }),
     local_defines = [
         "NO_HEAP_CHECK",
     ] + select({
@@ -103,10 +121,8 @@ mongo_cc_library(
         "libunwind",
     ],
     target_compatible_with = select({
-        "@platforms//os:linux": [],
-        "@platforms//os:windows": [],
+        # Only enable on Windows & Linux, and only when selected.
+        "//bazel/config:tcmalloc_gperf_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
 )
-
-# TODO(SERVER-80619): conditionally inject gperftools/platform/$os_$arch/include to dependents.
