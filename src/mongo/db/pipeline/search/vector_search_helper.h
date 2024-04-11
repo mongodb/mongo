@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/search/document_source_vector_search_gen.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 
 namespace mongo::search_helpers {
@@ -39,13 +39,13 @@ namespace mongo::search_helpers {
  */
 executor::TaskExecutorCursor establishVectorSearchCursor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const VectorSearchSpec& request,
+    const BSONObj& request,
     std::shared_ptr<executor::TaskExecutor> taskExecutor);
 
 /**
  * Wrapper function to run getExplainResponse with vectorSearch command.
  */
 BSONObj getVectorSearchExplainResponse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       const VectorSearchSpec& request,
+                                       const BSONObj& request,
                                        executor::TaskExecutor* taskExecutor);
 }  // namespace mongo::search_helpers

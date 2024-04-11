@@ -117,7 +117,7 @@ const responseOk = 1;
 })();
 
 // $vectorSearch populates {$meta: score}.
-(function testVectorSearchPopulatesScoreeMetaField() {
+(function testVectorSearchPopulatesScoreMetaField() {
     const pipeline = [
         {$vectorSearch: {queryVector, path, numCandidates, limit}},
         {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}}
@@ -128,6 +128,26 @@ const responseOk = 1;
     const history = [{
         expectedCommand: mongotCommandForVectorSearchQuery(
             {queryVector, path, numCandidates, limit, collName, dbName, collectionUUID}),
+        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+    }];
+    mongotMock.setMockResponses(history, cursorId);
+    assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
+})();
+
+// Test that all fields are passed through to mongot.
+(function testVectorSearchPassesAllFields() {
+    const pipeline = [
+        {$vectorSearch: {queryVector, path, numCandidates, limit, "extraField": true}},
+        {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}}
+    ];
+    const mongotResponseBatch = [{_id: 0, $vectorSearchScore: 1.234}];
+    const expectedDocs = [{_id: 0, score: 1.234}];
+
+    let localExpectedCommand = mongotCommandForVectorSearchQuery(
+        {queryVector, path, numCandidates, limit, collName, dbName, collectionUUID});
+    localExpectedCommand["extraField"] = true;
+    const history = [{
+        expectedCommand: localExpectedCommand,
         response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
     }];
     mongotMock.setMockResponses(history, cursorId);

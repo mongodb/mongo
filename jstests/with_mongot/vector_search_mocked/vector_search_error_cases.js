@@ -57,15 +57,9 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(runPipeline([{$facet: {originalPipeline: [makeVectorSearchStage()]}}]),
                              40600);
 
-// $vectorSearch does not support $search options (e.g. $$SEARCH_META, 'returnStoredSource').
+// $vectorSearch does not support $SEARCH_META.
 assert.commandFailedWithCode(
     runPipeline([makeVectorSearchStage(), {$project: {_id: 1, meta: "$$SEARCH_META"}}]), 6347902);
-assert.commandFailedWithCode(
-    runPipeline([{
-        $vectorSearch:
-            {queryVector: [1.0], path: "x", numCandidates: 10, limit: 5, returnStoredSource: true}
-    }]),
-    40415);
 
 // $vectorSearch cannot be used inside a transaction.
 let session = testDB.getMongo().startSession({readConcern: {level: "local"}});

@@ -31,7 +31,6 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/search/document_source_vector_search_gen.h"
 #include "mongo/executor/task_executor_cursor.h"
 
 namespace mongo {
@@ -43,10 +42,12 @@ class DocumentSourceVectorSearch : public DocumentSource {
 public:
     const BSONObj kSortSpec = BSON("$vectorSearchScore" << -1);
     static constexpr StringData kStageName = "$vectorSearch"_sd;
+    static constexpr StringData kLimitFieldName = "limit"_sd;
+    static constexpr StringData kFilterFieldName = "filter"_sd;
 
-    DocumentSourceVectorSearch(VectorSearchSpec&& request,
-                               const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               std::shared_ptr<executor::TaskExecutor> taskExecutor);
+    DocumentSourceVectorSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               std::shared_ptr<executor::TaskExecutor> taskExecutor,
+                               BSONObj originalSpec);
 
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -58,7 +59,9 @@ public:
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         DistributedPlanLogic logic;
         logic.shardsStage = this;
-        logic.mergingStages = {DocumentSourceLimit::create(pExpCtx, _limit)};
+        if (_limit) {
+            logic.mergingStages = {DocumentSourceLimit::create(pExpCtx, *_limit)};
+        }
         logic.mergeSortPattern = kSortSpec;
         return logic;
     }
@@ -68,8 +71,7 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
-        return make_intrusive<DocumentSourceVectorSearch>(
-            VectorSearchSpec(_request), expCtx, _taskExecutor);
+        return make_intrusive<DocumentSourceVectorSearch>(expCtx, _taskExecutor, BSONObj());
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -104,8 +106,6 @@ private:
     // results are held here. Otherwise, this is an empty object.
     BSONObj _explainResponse;
 
-    const VectorSearchSpec _request;
-
     const std::unique_ptr<MatchExpression> _filterExpr;
 
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;
@@ -122,6 +122,10 @@ private:
     // This allows us to limit the documents that are returned from the shards as much as possible
     // without adding complicated rules for pipeline splitting.
     // The limit that we send to mongot is received and stored on the '_request' object above.
-    long long _limit;
+    boost::optional<long long> _limit;
+
+    // Keep track of the original request BSONObj's extra fields in case there were fields mongod
+    // doesn't know about that mongot will need later.
+    BSONObj _originalSpec;
 };
 }  // namespace mongo
