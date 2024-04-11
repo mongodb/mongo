@@ -3,11 +3,7 @@
  * cursor has already been taken by magic_restore_backup.js.
  */
 
-import {
-    _copyFileHelper,
-    _runMagicRestoreNode,
-    _writeObjsToMagicRestorePipe
-} from "jstests/libs/backup_utils.js";
+import {MagicRestoreUtils} from "jstests/libs/backup_utils.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 // Starts up a new node on dbpath where a backup cursor has already been written from sourceConn.
@@ -63,8 +59,9 @@ function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
                 jsTestLog("Magic Restore: Writing " + currentBatchSize.toString() +
                           " bytes to pipe.");
 
-                _writeObjsToMagicRestorePipe(
-                    currentBatch, MongoRunner.dataDir + "/" + name, true /* persistPipe */);
+                MagicRestoreUtils.writeObjsToMagicRestorePipe(
+                    MongoRunner.dataDir + "/" + name, currentBatch, true /* persistPipe */);
+
                 currentBatch = [];
                 currentBatchSize = 0;
 
@@ -80,8 +77,8 @@ function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
 
         // If non-empty batch remains push it into batches.
         if (currentBatch.length != 0) {
-            _writeObjsToMagicRestorePipe(
-                currentBatch, MongoRunner.dataDir + "/" + name, true /* persistPipe */);
+            MagicRestoreUtils.writeObjsToMagicRestorePipe(
+                MongoRunner.dataDir + "/" + name, currentBatch, true /* persistPipe */);
         }
     } else {
         const objs = [{
@@ -89,10 +86,10 @@ function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
             "replicaSetConfig": expectedConfig,
             "maxCheckpointTs": checkpointTimestamp,
         }];
-        _writeObjsToMagicRestorePipe(objs, MongoRunner.dataDir + "/" + name);
+        MagicRestoreUtils.writeObjsToMagicRestorePipe(MongoRunner.dataDir + "/" + name, objs);
     }
 
-    _runMagicRestoreNode(dbpath, MongoRunner.dataDir + "/" + name, options);
+    MagicRestoreUtils.runMagicRestoreNode(MongoRunner.dataDir + "/" + name, dbpath, options);
 }
 
 // Performs a data consistency check between two nodes. The `local` database is ignored due to
