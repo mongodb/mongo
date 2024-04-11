@@ -138,8 +138,8 @@ void ReplSetRequestVotesArgs::addToBSON(BSONObjBuilder* builder) const {
     builder->appendNumber(kCandidateIndexFieldName, _candidateIndex);
     builder->appendNumber(kConfigVersionFieldName, _cfgVer);
     builder->appendNumber(kConfigTermFieldName, _cfgTerm);
-    _lastWrittenOpTime.append(kLastWrittenOpTimeFieldName, builder);
-    _lastAppliedOpTime.append(kLastAppliedOpTimeFieldName, builder);
+    _lastWrittenOpTime.append(builder, kLastWrittenOpTimeFieldName);
+    _lastAppliedOpTime.append(builder, kLastAppliedOpTimeFieldName);
 }
 
 std::string ReplSetRequestVotesArgs::toString() const {

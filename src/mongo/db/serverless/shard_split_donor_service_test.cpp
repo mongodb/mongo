@@ -517,7 +517,7 @@ protected:
 auto makeHelloReply(const std::string& setName,
                     const repl::OpTime& lastWriteOpTime = repl::OpTime(Timestamp(100, 1), 1)) {
     BSONObjBuilder opTimeBuilder;
-    lastWriteOpTime.append("opTime", &opTimeBuilder);
+    lastWriteOpTime.append(&opTimeBuilder, "opTime");
     return BSON("setName" << setName << "lastWrite" << opTimeBuilder.obj());
 };
 

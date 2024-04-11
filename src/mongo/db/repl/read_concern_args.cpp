@@ -318,7 +318,7 @@ void ReadConcernArgs::_appendInfoInner(BSONObjBuilder* builder) const {
     }
 
     if (_opTime) {
-        _opTime->append(kAfterOpTimeFieldName, builder);
+        _opTime->append(builder, kAfterOpTimeFieldName.toString());
     }
 
     if (_afterClusterTime) {

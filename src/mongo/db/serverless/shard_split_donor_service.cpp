@@ -537,10 +537,10 @@ boost::optional<BSONObj> ShardSplitDonorService::DonorStateMachine::reportForCur
         bob.append("tenantIds", tenantIdsAsStrings);
     }
     if (_stateDoc.getBlockOpTime()) {
-        _stateDoc.getBlockOpTime()->append("blockOpTime", &bob);
+        _stateDoc.getBlockOpTime()->append(&bob, "blockOpTime");
     }
     if (_stateDoc.getCommitOrAbortOpTime()) {
-        _stateDoc.getCommitOrAbortOpTime()->append("commitOrAbortOpTime", &bob);
+        _stateDoc.getCommitOrAbortOpTime()->append(&bob, "commitOrAbortOpTime");
     }
     if (_stateDoc.getAbortReason()) {
         bob.append("abortReason", *_stateDoc.getAbortReason());

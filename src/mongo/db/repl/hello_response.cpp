@@ -211,11 +211,12 @@ void HelloResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponseFie
     if (_lastWrite || _lastMajorityWrite) {
         BSONObjBuilder lastWrite(builder->subobjStart(kLastWriteFieldName));
         if (_lastWrite) {
-            _lastWrite->opTime.append(kLastWriteOpTimeFieldName, &lastWrite);
+            lastWrite.append(kLastWriteOpTimeFieldName, _lastWrite->opTime.toBSON());
             lastWrite.appendTimeT(kLastWriteDateFieldName, _lastWrite->value);
         }
         if (_lastMajorityWrite) {
-            _lastMajorityWrite->opTime.append(kLastMajorityWriteOpTimeFieldName, &lastWrite);
+            lastWrite.append(kLastMajorityWriteOpTimeFieldName,
+                             _lastMajorityWrite->opTime.toBSON());
             lastWrite.appendTimeT(kLastMajorityWriteDateFieldName, _lastMajorityWrite->value);
         }
     }
