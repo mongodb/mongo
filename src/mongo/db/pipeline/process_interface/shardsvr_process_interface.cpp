@@ -134,7 +134,9 @@ Status ShardServerProcessInterface::insert(
 
     BatchedCommandRequest batchInsertCommand(std::move(insertCommand));
 
-    batchInsertCommand.setWriteConcern(wc.toBSON());
+    const auto originalWC = expCtx->opCtx->getWriteConcern();
+    ScopeGuard resetWCGuard([&] { expCtx->opCtx->setWriteConcern(originalWC); });
+    expCtx->opCtx->setWriteConcern(wc);
 
     cluster::write(expCtx->opCtx, batchInsertCommand, &stats, &response, targetEpoch);
 
@@ -153,7 +155,10 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
     BatchWriteExecStats stats;
 
     BatchedCommandRequest batchUpdateCommand(std::move(updateCommand));
-    batchUpdateCommand.setWriteConcern(wc.toBSON());
+
+    const auto originalWC = expCtx->opCtx->getWriteConcern();
+    ScopeGuard resetWCGuard([&] { expCtx->opCtx->setWriteConcern(originalWC); });
+    expCtx->opCtx->setWriteConcern(wc);
 
     cluster::write(expCtx->opCtx, batchUpdateCommand, &stats, &response, targetEpoch);
 

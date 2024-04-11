@@ -1640,10 +1640,13 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
             }()});
             return updateOp;
         }());
-        request.setWriteConcern(ShardingCatalogClient::kLocalWriteConcern.toBSON());
 
-        auto response = _localConfigShard->runBatchWriteCommand(
-            opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
+        auto response =
+            _localConfigShard->runBatchWriteCommand(opCtx,
+                                                    Shard::kDefaultConfigCommandTimeout,
+                                                    request,
+                                                    ShardingCatalogClient::kLocalWriteConcern,
+                                                    Shard::RetryPolicy::kIdempotent);
         uassertStatusOK(response.toStatus());
 
         uassert(ErrorCodes::Error(5760502),
@@ -2372,10 +2375,13 @@ bool ShardingCatalogManager::clearChunkEstimatedSize(OperationContext* opCtx, co
         }()});
         return updateOp;
     }());
-    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
-    auto response = _localConfigShard->runBatchWriteCommand(
-        opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
+    auto response =
+        _localConfigShard->runBatchWriteCommand(opCtx,
+                                                Shard::kDefaultConfigCommandTimeout,
+                                                request,
+                                                ShardingCatalogClient::kMajorityWriteConcern,
+                                                Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOK(response.toStatus());
     return response.getN() > 0;

@@ -1080,12 +1080,14 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
         insertOp.setDocuments({doc});
         return insertOp;
     }());
-    request.setWriteConcern(writeConcern.toBSON());
 
     const auto configShard = _getConfigShard(opCtx);
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
-        auto response = configShard->runBatchWriteCommand(
-            opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kNoRetry);
+        auto response = configShard->runBatchWriteCommand(opCtx,
+                                                          Shard::kDefaultConfigCommandTimeout,
+                                                          request,
+                                                          writeConcern,
+                                                          Shard::RetryPolicy::kNoRetry);
 
         Status status = response.toStatus();
 
@@ -1186,10 +1188,9 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
         }()});
         return updateOp;
     }());
-    request.setWriteConcern(writeConcern.toBSON());
 
     auto response = _getConfigShard(opCtx)->runBatchWriteCommand(
-        opCtx, maxTimeMs, request, Shard::RetryPolicy::kIdempotent);
+        opCtx, maxTimeMs, request, writeConcern, Shard::RetryPolicy::kIdempotent);
 
     Status status = response.toStatus();
     if (!status.isOK()) {
@@ -1221,10 +1222,13 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
         }()});
         return deleteOp;
     }());
-    request.setWriteConcern(writeConcern.toBSON());
 
-    auto response = _getConfigShard(opCtx)->runBatchWriteCommand(
-        opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
+    auto response =
+        _getConfigShard(opCtx)->runBatchWriteCommand(opCtx,
+                                                     Shard::kDefaultConfigCommandTimeout,
+                                                     request,
+                                                     writeConcern,
+                                                     Shard::RetryPolicy::kIdempotent);
     return response.toStatus();
 }
 

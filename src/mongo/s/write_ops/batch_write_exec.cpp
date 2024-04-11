@@ -109,6 +109,26 @@ bool hasTransientTransactionError(const BatchedCommandResponse& response) {
 // applies when no writes are occurring and metadata is not changing on reload.
 const int kMaxRoundsWithoutProgress(5);
 
+/**
+ * Provides the write concern with which child batches have to be internally submitted.
+ */
+boost::optional<WriteConcernOptions> getWriteConcernForChildBatch(OperationContext* opCtx) {
+    // Per-operation write concern is not supported in transactions.
+    if (TransactionRouter::get(opCtx)) {
+        return boost::none;
+    }
+
+    // Retrieve the WC specified by the remote client; in case of "fire and forget" request, the WC
+    // needs to be upgraded to "w: 1" for the sharding protocol to correctly handle internal
+    // writeErrors.
+    auto wc = opCtx->getWriteConcern();
+    if (!wc.requiresWriteAcknowledgement()) {
+        wc.w = 1;
+    }
+
+    return wc;
+}
+
 // Helper to parse all of the childBatches and construct the proper requests to send using the
 // AsyncRequestSender.
 std::vector<AsyncRequestsSender::Request> constructARSRequestsToSend(
@@ -120,6 +140,7 @@ std::vector<AsyncRequestsSender::Request> constructARSRequestsToSend(
     BatchWriteOp& batchOp,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
     std::vector<AsyncRequestsSender::Request> requests;
+    const auto wcForChildBatch = getWriteConcernForChildBatch(opCtx);
     // Get as many batches as we can at once
     for (auto&& childBatch : childBatches) {
         auto nextBatch = std::move(childBatch.second);
@@ -141,6 +162,11 @@ std::vector<AsyncRequestsSender::Request> constructARSRequestsToSend(
 
             BSONObjBuilder requestBuilder;
             shardBatchRequest.serialize(&requestBuilder);
+            if (wcForChildBatch) {
+                requestBuilder.append(WriteConcernOptions::kWriteConcernField,
+                                      wcForChildBatch->toBSON());
+            }
+
             logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &requestBuilder);
 
             return requestBuilder.obj();
@@ -413,11 +439,17 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
         return childBatches.begin()->second.get();
     }();
 
-    auto cmdObj = batchOp
-                      .buildBatchRequest(*targetedWriteBatch,
-                                         targeter,
-                                         allowShardKeyUpdatesWithoutFullShardKeyInQuery)
-                      .toBSON();
+    auto cmdObj = [&] {
+        const auto shardBatchRequest = batchOp.buildBatchRequest(
+            *targetedWriteBatch, targeter, allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+        BSONObjBuilder requestBuilder;
+        shardBatchRequest.serialize(&requestBuilder);
+        if (const auto wcForChildBatch = getWriteConcernForChildBatch(opCtx)) {
+            requestBuilder.append(WriteConcernOptions::kWriteConcernField,
+                                  wcForChildBatch->toBSON());
+        }
+        return requestBuilder.obj();
+    }();
 
     auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
         opCtx, clientRequest.getNS(), std::move(cmdObj));

@@ -657,18 +657,6 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
     if (dbVersion)
         request.setDbVersion(*dbVersion);
 
-    if (!TransactionRouter::get(_opCtx)) {
-        // Append the write concern from the opCtx extracted during command setup.
-        const auto wc = _opCtx->getWriteConcern();
-        if (wc.requiresWriteAcknowledgement()) {
-            request.setWriteConcern(wc.toBSON());
-        } else {
-            // Mongos needs to send to the shard with w > 0 so it will be able to see the
-            // writeErrors
-            request.setWriteConcern(upgradeWriteConcern(wc.toBSON()));
-        }
-    }
-
     return request;
 }
 

@@ -44,7 +44,6 @@ namespace mongo {
 namespace {
 
 const int kOnErrorNumRetries = 3;
-
 }  // namespace
 
 Status Shard::CommandResponse::getEffectiveStatus(
@@ -247,36 +246,6 @@ StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
     MONGO_UNREACHABLE;
 }
 
-BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* opCtx,
-                                                   const Milliseconds maxTimeMS,
-                                                   const BatchedCommandRequest& batchRequest,
-                                                   RetryPolicy retryPolicy) {
-    const StringData dbname = batchRequest.getNS().db();
-    const BSONObj cmdObj = batchRequest.toBSON();
-
-    for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
-        // Note: write commands can only be issued against a primary.
-        auto swResponse = _runCommand(
-            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, dbname, maxTimeMS, cmdObj);
-
-        BatchedCommandResponse batchResponse;
-        auto writeStatus = CommandResponse::processBatchWriteResponse(swResponse, &batchResponse);
-        if (retry < kOnErrorNumRetries && isRetriableError(writeStatus.code(), retryPolicy)) {
-            LOGV2_DEBUG(22721,
-                        2,
-                        "Batch write command to shard {shardId} failed with retryable error "
-                        "and will be retried. Caused by {error}",
-                        "Batch write command failed with retryable error and will be retried",
-                        "shardId"_attr = getId(),
-                        "error"_attr = redact(writeStatus));
-            continue;
-        }
-
-        return batchResponse;
-    }
-    MONGO_UNREACHABLE;
-}
-
 StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
@@ -302,5 +271,35 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     }
     MONGO_UNREACHABLE;
 }
+
+BatchedCommandResponse Shard::_submitBatchWriteCommand(OperationContext* opCtx,
+                                                       const BSONObj& serialisedBatchRequest,
+                                                       const DatabaseName& dbName,
+                                                       Milliseconds maxTimeMS,
+                                                       RetryPolicy retryPolicy) {
+    for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
+        // Note: write commands can only be issued against a primary.
+        auto swResponse = _runCommand(opCtx,
+                                      ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                      dbName.toString(),
+                                      maxTimeMS,
+                                      serialisedBatchRequest);
+
+        BatchedCommandResponse batchResponse;
+        auto writeStatus = CommandResponse::processBatchWriteResponse(swResponse, &batchResponse);
+        if (retry < kOnErrorNumRetries && isRetriableError(writeStatus.code(), retryPolicy)) {
+            LOGV2_DEBUG(22721,
+                        2,
+                        "Batch write command failed with retryable error and will be retried",
+                        "shardId"_attr = getId(),
+                        "error"_attr = redact(writeStatus));
+            continue;
+        }
+
+        return batchResponse;
+    }
+    MONGO_UNREACHABLE;
+}
+
 
 }  // namespace mongo

@@ -39,8 +39,6 @@
 namespace mongo {
 namespace {
 
-const auto kWriteConcern = "writeConcern"_sd;
-
 template <class T>
 BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request) {
     auto batchRequest = BatchedCommandRequest{T::parse(request)};
@@ -52,11 +50,6 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
             batchRequest.setDbVersion(DatabaseVersion(request.body));
         }
         batchRequest.setShardVersion(shardVersion);
-    }
-
-    auto writeConcernField = request.body[kWriteConcern];
-    if (!writeConcernField.eoo()) {
-        batchRequest.setWriteConcern(writeConcernField.Obj());
     }
 
     // The 'isTimeseriesNamespace' is an internal parameter used for communication between mongos
@@ -194,10 +187,6 @@ void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
 
     if (_dbVersion) {
         builder->append("databaseVersion", _dbVersion->toBSON());
-    }
-
-    if (_writeConcern) {
-        builder->append(kWriteConcern, *_writeConcern);
     }
 }
 
