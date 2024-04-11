@@ -166,6 +166,11 @@ struct ReadPreferenceSetting {
     }
 
     /**
+     * Returns the IDL-struct representation of this object's inner BSON serialized form.
+     */
+    ReadPreferenceIdl toReadPreferenceIdl() const;
+
+    /**
      * Serializes this ReadPreferenceSetting as a containing BSON document. (The document containing
      * a $readPreference element)
      *
@@ -196,6 +201,14 @@ struct ReadPreferenceSetting {
      */
     static StatusWith<ReadPreferenceSetting> fromInnerBSON(const BSONObj& readPrefSettingObj);
     static StatusWith<ReadPreferenceSetting> fromInnerBSON(const BSONElement& readPrefSettingObj);
+
+    /**
+     * Parse a ReadPreferenceSetting from an IDL-struct representation of a read preference's inner
+     * BSON document.
+     *
+     * This method validates the combination of fields specified on the provided IDL-struct.
+     */
+    static StatusWith<ReadPreferenceSetting> fromReadPreferenceIdl(const ReadPreferenceIdl& rp);
 
     /**
         Utilized by IDL types in order to get the unwrapped ReadPreferenceSetting object.
