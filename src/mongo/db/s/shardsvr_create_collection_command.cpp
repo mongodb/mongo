@@ -84,16 +84,14 @@ bool isAlwaysUntracked(OperationContext* opCtx,
     bool isFromCreateCommand = !request.getIsFromCreateUnsplittableCollectionTestCommand();
     bool isTimeseries = request.getTimeseries().has_value();
     bool isView = request.getViewOn().has_value();
-    bool isEncryptedCollection =
-        request.getEncryptedFields().has_value() || nss.isFLE2StateCollection();
     bool hasApiParams = APIParameters::get(opCtx).getParamsPassed();
 
     // TODO SERVER-83878 Remove isFromCreateCommand && isTimeseries
-    // TODO SERVER-79248 or SERVER-79254 remove isEncryptedCollection once we both cleanup
-    // and compaction coordinator work on unsplittable collections
+    // TODO SERVER-83713 Reconsider isFLE2StateCollection check
+    // TODO SERVER-83714 Reconsider isFLE2StateCollection check
     // TODO SERVER-86018 Remove hasApiParams
-    return isView || nss.isNamespaceAlwaysUntracked() || (isFromCreateCommand && isTimeseries) ||
-        isEncryptedCollection || hasApiParams;
+    return isView || nss.isFLE2StateCollection() || nss.isNamespaceAlwaysUntracked() ||
+        (isFromCreateCommand && isTimeseries) || hasApiParams;
 }
 
 class ShardsvrCreateCollectionCommand final : public TypedCommand<ShardsvrCreateCollectionCommand> {
