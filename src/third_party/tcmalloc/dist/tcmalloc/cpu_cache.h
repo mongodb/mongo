@@ -945,6 +945,7 @@ inline void CpuCache<Forwarder>::Activate() {
   //
   if (max_cache_size == kMaxCpuCacheSize) {
     max_cache_size = getMongoMaxCpuCacheSize(num_cpus);
+    SetCacheLimit(max_cache_size);
   }
 
 //////// END MONGO HACK

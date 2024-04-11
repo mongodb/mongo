@@ -334,9 +334,9 @@ namespace {
 
 MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults, (), ("BeginStartupOptionHandling"))
 (InitializerContext*) {
+#ifdef MONGO_CONFIG_TCMALLOC_GPERF
     ProcessInfo pi;
     size_t systemMemorySizeMB = pi.getMemSizeMB();
-#ifdef MONGO_CONFIG_TCMALLOC_GPERF
     // Before processing the command line options, if the user has not specified a value in via
     // the environment, set tcmalloc.max_total_thread_cache_bytes to its default value.
     if (getenv("TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES")) {
@@ -356,22 +356,6 @@ MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults, (), ("BeginStartupOptio
     }
 
 #elif defined(MONGO_CONFIG_TCMALLOC_GOOGLE)
-    size_t numCores = pi.getNumAvailableCores();
-    // 1024MB in bytes spread across cores.
-    size_t defaultTcMallocPerCPUCacheSize = (1024 * 1024 * 1024) / numCores;
-    size_t derivedTcMallocPerCPUCacheSize =
-        ((systemMemorySizeMB / 8) * 2 * 1024 * 1024) / numCores;  // 1/4 of system memory in bytes
-
-    size_t perCPUCacheSize =
-        std::min(defaultTcMallocPerCPUCacheSize, derivedTcMallocPerCPUCacheSize);
-
-    try {
-        setTcmallocProperty(kMaxPerCPUCacheSizePropertyName, perCPUCacheSize);
-    } catch (const ExceptionFor<ErrorCodes::InternalError>& ex) {
-        LOGV2_ERROR(
-            8815000, "Could not set tcmallocMaxPerCPUCacheSize", "reason"_attr = ex.toString());
-    }
-
     tcmalloc::MallocExtension::SetProfileSamplingRate(0);
 #endif  // MONGO_CONFIG_TCMALLOC_GPERF
 }
