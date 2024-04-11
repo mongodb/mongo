@@ -51,7 +51,8 @@ elif [[ $ARCH == "s390x" ]]; then
 fi
 
 # Print command being run to file that can be uploaded
-echo "$BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${args} ${target}" > bazel-invocation.txt
+echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
+echo "bazel run --verbose_failures $LOCAL_ARG ${args} ${target}" >> bazel-invocation.txt
 
 # Run bazel command
 eval $BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${args} ${target}
