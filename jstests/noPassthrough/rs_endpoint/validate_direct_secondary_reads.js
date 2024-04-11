@@ -68,6 +68,7 @@ const secondary3TestDB = secondaries[3].getDB(dbName);
     jsTest.log("Testing no unexpected reads in user database");
     enableProfiling(rst, dbName);
     assert.commandWorked(primaryTestDB.runCommand({insert: collName, documents: [{x: 1}]}));
+    rst.awaitReplication();
     assert.commandWorked(secondary0TestDB.runCommand({find: collName, filter: {}}));
     assert.commandWorked(secondary1TestDB.runCommand({find: collName, filter: {}}));
     assert.commandWorked(secondary2TestDB.runCommand({find: collName, filter: {}}));
@@ -100,6 +101,7 @@ const secondary3TestDB = secondaries[3].getDB(dbName);
     jsTest.log("Testing unexpected reads in user database on non-excluded secondary");
     enableProfiling(rst, dbName);
     assert.commandWorked(primaryTestDB.runCommand({insert: collName, documents: [{x: 1}]}));
+    rst.awaitReplication();
     assert.commandWorked(
         secondary0TestDB.runCommand({find: collName, filter: {}, comment: hostDocs[3].comment}));
 
@@ -121,6 +123,7 @@ const secondary3TestDB = secondaries[3].getDB(dbName);
     jsTest.log("Testing unexpected reads in user database on excluded secondary");
     enableProfiling(rst, dbName);
     assert.commandWorked(primaryTestDB.runCommand({insert: collName, documents: [{x: 1}]}));
+    rst.awaitReplication();
     assert.commandWorked(
         secondary1TestDB.runCommand({find: collName, filter: {}, comment: hostDocs[3].comment}));
 
