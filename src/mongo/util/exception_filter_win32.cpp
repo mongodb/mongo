@@ -41,7 +41,6 @@
 #include <ostream>
 
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
@@ -105,13 +104,7 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
         MiniDumpWithFullMemory;
 #else
         static_cast<MINIDUMP_TYPE>(MiniDumpNormal | MiniDumpWithIndirectlyReferencedMemory |
-                                   MiniDumpWithProcessThreadData | MiniDumpWithThreadInfo |
-                                   MiniDumpWithUnloadedModules | MiniDumpIgnoreInaccessibleMemory |
-                                   MiniDumpWithTokenInformation);
-    // Override for test-builds
-    if (getTestCommandsEnabled()) {
-        miniDumpType = MiniDumpWithFullMemory;
-    }
+                                   MiniDumpWithProcessThreadData);
 #endif
     LOGV2(23132,
           "Writing minidump diagnostic file",

@@ -922,7 +922,7 @@ bool BSONObj::coerceVector(std::vector<T>* out) const {
 /**
  * Types used to represent BSONElement memory in the Visual Studio debugger
  */
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && defined(_DEBUG)
 struct BSONElementData {
     char type;
     char name;
@@ -938,6 +938,6 @@ struct BSONElementDBRefType {
 } bsonElementDBPointerType;
 struct BSONElementCodeWithScopeType {
 } bsonElementCodeWithScopeType;
-#endif  // defined(_MSC_VER)
+#endif  // defined(_MSC_VER) && defined(_DEBUG)
 
 }  // namespace mongo
