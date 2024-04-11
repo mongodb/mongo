@@ -52,6 +52,7 @@ function serverSupportsTfo(db) {
 
 /** Test tcpFastOpenServer by setting the flag and connecting to it as a TFO client. */
 function testTcpFastOpenServer() {
+    let exitEarly = false;
     for (let [expect, params] of [         //
              [1, {}],                      //
              [1, {tcpFastOpenServer: 1}],  //
@@ -60,7 +61,8 @@ function testTcpFastOpenServer() {
         jsTestLog(`==Running testTcpFastOpenServer test ${JSON.stringify(params)} => ${expect}`);
         const conn = MongoRunner.runMongod({setParameter: params});
         const db = conn.getDB(jsTestName());
-        if (!serverSupportsTfo(db)) {
+        exitEarly = !serverSupportsTfo(db);
+        if (exitEarly) {
             jsTestLog("==Skipping test, the mongod server doesn't support TFO");
         } else {
             let tfoStatusRecords = [];
@@ -85,6 +87,10 @@ function testTcpFastOpenServer() {
             jsTestLog("==Ran test");
         }
         MongoRunner.stopMongod(conn);
+        if (exitEarly) {
+            // The server doesn't support TFO, we should just exit early.
+            return;
+        }
     }
 }
 
