@@ -171,6 +171,24 @@ buildvariants:
         distros:
           - ubuntu1804-xlarge
 
+  # This variant simulates a developer workstation build by using both icecream and remote
+  # execution. This is to track how the bazel conversion affects developer build times.
+  - name: ubuntu2204-ninja-bazel-icecc
+    display_name: "Ninja Bazel Icecc: Ubuntu 22.04"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubuntu2204-arm64-icecc
+    stepback: false
+    expansions:
+      compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo)
+      repo_edition: enterprise
+      has_packages: false
+      compile_variant: ubuntu2204-ninja-build-profiles
+      ninja_jobs: 300
+      ninja_retries: 3
+    tasks:
+      - name: compile_ninja_fast_icecc_TG
+
   - name: enterprise-rhel-80-64-bit-dynamic-ninja
     display_name: "Ninja Build: Enterprise RHEL 8.0"
     tags: []

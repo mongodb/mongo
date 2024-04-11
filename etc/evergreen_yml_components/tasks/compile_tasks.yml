@@ -735,6 +735,28 @@ tasks:
           ninja_file: "fast.ninja"
           targets: "install-devcore compiledb"
 
+  - name: compile_ninja_fast_icecc
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "scons compile"
+        vars:
+          generating_for_ninja: true
+          separate_debug: off
+          task_compile_flags: >-
+            --build-profile=fast
+            BAZEL_BUILD_ENABLED=1
+            BAZEL_INTEGRATION_DEBUG=1
+            CCACHE=
+            ICECC=icecc
+      - func: "f_expansions_write"
+      - func: "ninja compile"
+        vars:
+          ninja_file: "fast.ninja"
+          targets: "install-devcore compiledb"
+
   - name: compile_ninja_san_profile
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
@@ -2742,6 +2764,12 @@ task_groups:
     name: compile_ninja_fast_profile_TG
     tasks:
       - compile_ninja_fast_profile
+
+  - <<: *compile_task_group_template
+    name: compile_ninja_fast_icecc_TG
+    tags: []
+    tasks:
+      - compile_ninja_fast_icecc
 
   - <<: *compile_task_group_template
     name: compile_ninja_compiledb_profile_TG
