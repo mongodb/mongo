@@ -122,6 +122,7 @@ const primaryAdminDb = originalPrimary.getDB('admin');
 let secondaryAdminDb = originalSecondary.getDB('admin');
 assert.commandWorked(primaryAdminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
 assert(primaryAdminDb.auth('admin', 'pwd'));
+rst.awaitReplication();
 assert(secondaryAdminDb.auth('admin', 'pwd'));
 
 // Insert data for two different tenants - multitenancySupport is not yet enabled, so we use a
@@ -139,6 +140,7 @@ assert.commandWorked(originalPrimary.getDB(tenant2DbPrefixed)
 
 assertFindBothTenantsPrefixedDb(
     originalPrimary, tenant1DbPrefixed, tenant2DbPrefixed, kCollName, tenant1Docs, tenant2Docs);
+rst.awaitReplication();
 assertFindBothTenantsPrefixedDb(
     originalSecondary, tenant1DbPrefixed, tenant2DbPrefixed, kCollName, tenant1Docs, tenant2Docs);
 
@@ -196,7 +198,7 @@ assertFindBothTenantsPrefixedDb(originalPrimary,
                                 allTenant2Docs);
 // The token must be used on the secondary.
 assertTokenMustBeUsed(originalSecondary, tenant1DbPrefixed, tenant2DbPrefixed, kCollName);
-
+rst.awaitReplication();
 // Assert both tenants find the new doc on the secondary using token.
 assertFindBothTenantsUsingSecurityToken(
     originalSecondary, kDbName, kCollName, kToken1, kToken2, allTenant1Docs, allTenant2Docs);
