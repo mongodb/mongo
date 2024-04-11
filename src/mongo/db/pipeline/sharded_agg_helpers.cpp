@@ -1809,7 +1809,7 @@ StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* op
     // present, then $changeStream should immediately return an empty cursor just as other
     // aggregations do when the database does not exist.
     const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    if (shardIds.empty() && !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+    if (shardIds.empty()) {
         return {ErrorCodes::ShardNotFound, "No shards are present in the cluster"};
     }
 
