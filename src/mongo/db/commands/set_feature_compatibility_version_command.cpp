@@ -65,6 +65,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
@@ -436,6 +437,27 @@ public:
                 // 'kUpgrading' or 'kDowngrading' state, respectively.
                 const auto fcvChangeRegion(
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
+
+                // If configShard is enabled and there is an entry in config.shards with _id:
+                // ShardId::kConfigServerId then the config server is a config shard.
+                auto isConfigShard =
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+                    !ShardingCatalogManager::get(opCtx)
+                         ->findOneConfigDocument(opCtx,
+                                                 NamespaceString::kConfigsvrShardsNamespace,
+                                                 BSON("_id" << ShardId::kConfigServerId.toString()))
+                         .isEmpty();
+
+                uassert(
+                    ErrorCodes::CannotDowngrade,
+                    "Cannot downgrade featureCompatibilityVersion to {} "
+                    "with a config shard as it is not supported in earlier versions. "
+                    "Please transition the config server to dedicated mode using the "
+                    "transitionToDedicatedConfigServer command."_format(
+                        multiversion::toString(requestedVersion)),
+                    !isConfigShard ||
+                        gFeatureFlagTransitionToCatalogShard.isEnabledOnVersion(requestedVersion));
 
                 uassert(ErrorCodes::Error(6744303),
                         "Failing setFeatureCompatibilityVersion before reaching the FCV "

@@ -79,10 +79,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
             uassert(8454804,
                     "The transition to config shard feature is disabled",
-                    gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
+                    gFeatureFlagTransitionToCatalogShard.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             ConfigsvrTransitionFromDedicatedConfigServer cmdToSend;
             cmdToSend.setDbName(DatabaseName::kAdmin);

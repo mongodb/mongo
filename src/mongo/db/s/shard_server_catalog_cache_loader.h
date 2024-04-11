@@ -116,6 +116,8 @@ public:
 
     void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) override;
 
+    void onFCVChanged() override;
+
 private:
     // Differentiates the server's role in the replica set so that the chunk loader knows whether to
     // load metadata locally or remotely.

@@ -2,8 +2,11 @@
  * Concurrently performs CRUD operations, DDL commands and FCV changes and verifies guarantees are
  * not broken.
  *
+ * This test is config shard incompatible because we do not currently allow downgrading the FCV
+ * while there is a config shard.
  * @tags: [
  *   requires_sharding,
+ *   config_shard_incompatible,
  *   assumes_balancer_off,
  *   does_not_support_causal_consistency,
  *   # TODO (SERVER-56879): Support add/remove shards in new DDL paths

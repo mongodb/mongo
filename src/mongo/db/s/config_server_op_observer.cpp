@@ -136,6 +136,17 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
         return;
     }
 
+    if (coll->ns().isServerConfigurationCollection()) {
+        auto idElement = begin->doc["_id"];
+        if (idElement.type() == BSONType::String &&
+            idElement.String() == multiversion::kParameterName) {
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                [](OperationContext* opCtx, boost::optional<Timestamp>) mutable {
+                    CatalogCacheLoader::get(opCtx).onFCVChanged();
+                });
+        }
+    }
+
     // When doing a magic restore, we want to be able to write config.shards without triggering the
     // below.
     if (storageGlobalParams.magicRestore) {
@@ -196,6 +207,17 @@ void ConfigServerOpObserver::onUpdate(OperationContext* opCtx,
                                       OpStateAccumulator* opAccumulator) {
     if (args.coll->ns() != NamespaceString::kConfigsvrShardsNamespace) {
         return;
+    }
+
+    if (args.coll->ns().isServerConfigurationCollection()) {
+        auto idElement = args.updateArgs->updatedDoc["_id"];
+        if (idElement.type() == BSONType::String &&
+            idElement.String() == multiversion::kParameterName) {
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                [](OperationContext* opCtx, boost::optional<Timestamp>) mutable {
+                    CatalogCacheLoader::get(opCtx).onFCVChanged();
+                });
+        }
     }
 
     const auto& updateDoc = args.updateArgs->update;

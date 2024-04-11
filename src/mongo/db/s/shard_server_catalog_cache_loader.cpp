@@ -48,6 +48,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -444,6 +445,20 @@ void performNoopMajorityWriteLocally(OperationContext* opCtx, StringData msg) {
                             &writeConcernResult));
 }
 
+bool shouldSkipStoringLocally() {
+    // Note: cannot use isExclusivelyConfigSvrRole as it ignores the feature flag.
+    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+        return false;
+    }
+
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+
+    // Note: it is possible for fcv to become uninitialized temporarily during initial sync.
+    uassert(
+        7918300, "feature compatibility version is not initialized", fcv.isVersionInitialized());
+    return !gFeatureFlagTransitionToCatalogShard.isEnabled(fcv);
+}
+
 }  // namespace
 
 ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
@@ -633,6 +648,13 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
                               << " because the node's replication role changed.",
                 _role == ReplicaSetRole::Primary && _term == initialTerm);
 
+        uassert(StaleConfigInfo(nss,
+                                ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                                boost::none,
+                                getSelfShardId(opCtx)),
+                "config server is not storing cached metadata",
+                !shouldSkipStoringLocally());
+
         auto it = _collAndChunkTaskLists.find(nss);
 
         // If there are no tasks for the specified namespace, everything must have been completed
@@ -679,7 +701,7 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
             opCtx->waitForConditionOrInterrupt(*condVar, lg, [&]() {
                 const auto it = _collAndChunkTaskLists.find(nss);
                 return it == _collAndChunkTaskLists.end() || it->second.empty() ||
-                    it->second.front().taskNum != activeTaskNum;
+                    it->second.front().taskNum != activeTaskNum || shouldSkipStoringLocally();
             });
         }
     }
@@ -699,6 +721,10 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
                               << dbName.toStringForErrorMsg()
                               << " because the node's replication role changed.",
                 _role == ReplicaSetRole::Primary && _term == initialTerm);
+
+        uassert(StaleDbRoutingVersion(dbName, DatabaseVersion::makeFixed(), boost::none),
+                "config server is not storing cached metadata",
+                !shouldSkipStoringLocally());
 
         auto it = _dbTaskLists.find(dbName);
 
@@ -747,7 +773,7 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
             opCtx->waitForConditionOrInterrupt(*condVar, lg, [&]() {
                 const auto it = _dbTaskLists.find(dbName);
                 return it == _dbTaskLists.end() || it->second.empty() ||
-                    it->second.front().taskNum != activeTaskNum;
+                    it->second.front().taskNum != activeTaskNum || shouldSkipStoringLocally();
             });
         }
     }
@@ -757,6 +783,11 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion) {
+
+    if (shouldSkipStoringLocally()) {
+        return _configServerLoader->getChunksSince(nss, catalogCacheSinceVersion).getNoThrow();
+    }
+
     Timer t;
     auto nssNotif = _forcePrimaryCollectionRefreshAndWaitForReplication(opCtx, nss);
     LOGV2_FOR_CATALOG_REFRESH(5965800,
@@ -777,8 +808,16 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
     long long termScheduled) {
+    const auto decidedToSkipStoringLocally = shouldSkipStoringLocally();
+
     // Get the max version the loader has.
     const auto maxLoaderVersion = [&] {
+        // If we are not storing locally, use the requested version to prevent fetching the entire
+        // routing table everytime.
+        if (decidedToSkipStoringLocally) {
+            return catalogCacheSinceVersion;
+        }
+
         {
             stdx::lock_guard<Latch> lock(_mutex);
             auto taskListIt = _collAndChunkTaskLists.find(nss);
@@ -799,7 +838,8 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     auto swCollectionAndChangedChunks =
         _configServerLoader->getChunksSince(nss, maxLoaderVersion).getNoThrow();
 
-    if (swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound) {
+    if (swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound &&
+        !decidedToSkipStoringLocally) {
         _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
             opCtx,
             nss,
@@ -831,8 +871,9 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
                           << "'."};
     }
 
-    if (collAndChunks.changedChunks.back().getVersion().isNotComparableWith(maxLoaderVersion) ||
-        maxLoaderVersion.isOlderThan(collAndChunks.changedChunks.back().getVersion())) {
+    if (!decidedToSkipStoringLocally &&
+        (collAndChunks.changedChunks.back().getVersion().isNotComparableWith(maxLoaderVersion) ||
+         maxLoaderVersion.isOlderThan(collAndChunks.changedChunks.back().getVersion()))) {
         _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
             opCtx,
             nss,
@@ -846,6 +887,10 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
                               "oldCollectionPlacementVersion"_attr = maxLoaderVersion,
                               "refreshedCollectionPlacementVersion"_attr =
                                   collAndChunks.changedChunks.back().getVersion());
+
+    if (decidedToSkipStoringLocally) {
+        return swCollectionAndChangedChunks;
+    }
 
     // Metadata was found remotely
     // -- otherwise we would have received NamespaceNotFound rather than Status::OK().
@@ -884,6 +929,10 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
 
 StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase(
     OperationContext* opCtx, const DatabaseName& dbName) {
+    if (shouldSkipStoringLocally()) {
+        return _configServerLoader->getDatabase(dbName).getNoThrow();
+    }
+
     Timer t;
     forcePrimaryDatabaseRefreshAndWaitForReplication(opCtx, dbName);
     LOGV2_FOR_CATALOG_REFRESH(5965801,
@@ -1092,6 +1141,9 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChun
 
 void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(
     OperationContext* opCtx, const DatabaseName& dbName, DBTask task) {
+    if (shouldSkipStoringLocally()) {
+        return;
+    }
 
     // Ensure that this node is primary before using or persisting the information fetched from the
     // config server. This prevents using incorrect filtering information in split brain scenarios.
@@ -1615,6 +1667,12 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
         }
     }
     return collAndChunks;
+}
+
+void ShardServerCatalogCacheLoader::onFCVChanged() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    _contexts.interrupt(ErrorCodes::Interrupted);
+    ++_term;
 }
 
 }  // namespace mongo

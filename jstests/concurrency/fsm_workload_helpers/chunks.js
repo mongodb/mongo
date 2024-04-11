@@ -94,6 +94,8 @@ export var ChunkHelper = (function() {
             res => (res.code === ErrorCodes.ConflictingOperationInProgress ||
                     res.code === ErrorCodes.ChunkRangeCleanupPending ||
                     res.code === ErrorCodes.LockTimeout ||
+                    // setFCV can cause catalog cache refresh to get interrupted.
+                    res.code === ErrorCodes.Interrupted ||
                     // The chunk migration has surely been aborted if the startCommit of the
                     // procedure was interrupted by a stepdown.
                     (runningWithStepdowns && res.code === ErrorCodes.CommandFailed &&

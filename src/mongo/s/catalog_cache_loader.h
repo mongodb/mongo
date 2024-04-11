@@ -185,6 +185,8 @@ public:
 
     virtual void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
+    virtual void onFCVChanged() {}
+
 protected:
     CatalogCacheLoader();
 };

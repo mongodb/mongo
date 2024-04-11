@@ -82,6 +82,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/placement_history_cleaner.h"
@@ -1606,5 +1607,23 @@ Status ShardingCatalogManager::upgradeDowngradeConfigSettings(OperationContext* 
     return _initConfigSettings(opCtx);
 }
 
+
+void ShardingCatalogManager::_performLocalNoopWriteWithWAllWriteConcern(OperationContext* opCtx,
+                                                                        StringData msg) {
+    tenant_migration_access_blocker::performNoopWrite(opCtx, msg);
+
+    auto allMembersWriteConcern =
+        WriteConcernOptions(repl::ReplSetConfig::kConfigAllWriteConcernName,
+                            WriteConcernOptions::SyncMode::NONE,
+                            // Defaults to no timeout if none was set.
+                            opCtx->getWriteConcern().wTimeout);
+
+    const auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+    auto awaitReplicationResult = repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
+        opCtx, replClient.getLastOp(), allMembersWriteConcern);
+    uassertStatusOKWithContext(awaitReplicationResult.status,
+                               str::stream() << "Waiting for replication of noop with message: \""
+                                             << msg << "\" failed");
+}
 
 }  // namespace mongo

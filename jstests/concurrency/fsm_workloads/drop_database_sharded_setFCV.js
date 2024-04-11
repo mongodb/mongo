@@ -1,8 +1,11 @@
 /**
  * Repeatedly creates and drops a database in concurrency with FCV changes
  *
+ * This test is config shard incompatible because we do not currently allow downgrading the FCV
+ * while there is a config shard.
  * @tags: [
  *   requires_sharding,
+ *   config_shard_incompatible,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
  *   # TODO (SERVER-88539) Remove the 'assumes_balancer_off' tag

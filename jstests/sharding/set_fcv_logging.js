@@ -5,9 +5,12 @@
  *      FCV is upgrading or downgrading     (6744301)
  *      FCV upgrade or downgrade success    (6744302).
  *
+ * This test is config shard incompatible because we do not currently allow downgrading the FCV
+ * while there is a config shard.
  * @tags: [
  *   multiversion_incompatible,
  *   does_not_support_stepdowns,
+ *   config_shard_incompatible,
  * ]
  */
 

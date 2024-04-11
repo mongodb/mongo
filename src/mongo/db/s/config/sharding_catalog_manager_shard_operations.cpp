@@ -1024,6 +1024,19 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             collList = std::move(listStatus.getValue());
         }
 
+        if (isConfigShard) {
+            // At this point we know the config primary is in the latest FCV, but secondaries may
+            // not yet have replicated the FCV update, so write a noop and wait for it to replicate
+            // to all nodes in the config server to guarantee they have replicated up to the latest
+            // FCV.
+            //
+            // This guarantees all secondaries use the shard server method to refresh their
+            // metadata, which contains synchronization to prevent secondaries from serving reads
+            // for owned chunks that have not yet replicated to them.
+            _performLocalNoopWriteWithWAllWriteConcern(
+                opCtx, "w:all write barrier in transitionToCatalogShard");
+        }
+
         // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
         uassert(5563603,
                 "Cannot add shard while in upgrading/downgrading FCV state",

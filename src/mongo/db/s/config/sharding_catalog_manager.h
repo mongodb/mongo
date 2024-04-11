@@ -919,6 +919,11 @@ private:
     Status _updateClusterCardinalityParameterAfterRemoveShardIfNeeded(const Lock::ExclusiveLock&,
                                                                       OperationContext* opCtx);
 
+    /**
+     * Performs a noop write locally on the current process and waits for all nodes to replicate it.
+     */
+    void _performLocalNoopWriteWithWAllWriteConcern(OperationContext* opCtx, StringData msg);
+
     // The owning service context
     ServiceContext* const _serviceContext;
 

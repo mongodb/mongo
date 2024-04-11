@@ -2,8 +2,11 @@
  * Concurrently performs DDL commands and FCV changes and verifies guarantees are
  * not broken.
  *
+ * This test is config shard incompatible because we do not currently allow downgrading the FCV
+ * while there is a config shard.
  * @tags: [
  *   requires_sharding,
+ *   config_shard_incompatible,
  *   # TODO (SERVER-56879) Support add/remove shards in new DDL paths
  *   does_not_support_add_remove_shards,
  *   # Requires all nodes to be running the latest binary.

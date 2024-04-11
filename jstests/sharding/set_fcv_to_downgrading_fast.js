@@ -2,12 +2,13 @@
  * Tests that FCV downgrade will reach the transitional kDowngrading state quickly (within a few
  * seconds).
  *
- * Config shard incompatible because we do not currently allow downgrading FCV with a catalog
- * shard.
+ * This test is config shard incompatible because we do not currently allow downgrading the FCV
+ * while there is a config shard.
  * @tags: [
  *   requires_fcv_70,
  *   multiversion_incompatible,
  *   does_not_support_stepdowns,
+ *   config_shard_incompatible,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

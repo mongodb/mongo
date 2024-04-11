@@ -11,6 +11,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
@@ -350,6 +351,39 @@ const newShardName =
         st.s.adminCommand({moveChunk: indexedNs, find: {_id: 0}, to: configShardName}));
     assert.sameMembers(st.configRS.getPrimary().getCollection(indexedNs).getIndexKeys(),
                        [{_id: 1}, {oldKey: 1}, {newKey: 1}]);
+}
+
+{
+    //
+    // transitionFromDedicatedConfigServer requires replication to all config server nodes.
+    //
+
+    // Transition to dedicated mode so the config server can transition back to catalog shard mode.
+    let removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.eq("started", removeRes.state);
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: ns, find: {skey: 0}, to: newShardName, _waitForDelete: true}));
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: ns, find: {skey: 5}, to: newShardName, _waitForDelete: true}));
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: indexedNs, find: {_id: 0}, to: newShardName, _waitForDelete: true}));
+    assert.commandWorked(
+        st.s.adminCommand({moveCollection: "directDB.onConfig", toShard: newShardName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: "directDB", to: newShardName}));
+    assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
+
+    // transitionFromDedicatedConfigServer times out with a lagged config secondary despite having a
+    // majority of its set still replicating.
+    const laggedSecondary = st.configRS.getSecondary();
+    st.configRS.awaitReplication();
+    stopServerReplication(laggedSecondary);
+    assert.commandFailedWithCode(
+        st.s.adminCommand({transitionFromDedicatedConfigServer: 1, maxTimeMS: 1000}),
+        ErrorCodes.MaxTimeMSExpired);
+    restartServerReplication(laggedSecondary);
+
+    // Now it succeeds.
+    assert.commandWorked(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
 }
 
 st.stop();

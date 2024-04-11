@@ -2,7 +2,14 @@
  * Tests that the global indexes collections are dropped on FCV downgrade and recreated after
  * upgrading.
  *
- * @tags: [multiversion_incompatible, featureFlagGlobalIndexesShardingCatalog, requires_fcv_70]
+ * This test is config shard incompatible because we do not currently allow downgrading the FCV
+ * while there is a config shard.
+ * @tags: [
+ *    multiversion_incompatible,
+ *    featureFlagGlobalIndexesShardingCatalog,
+ *    requires_fcv_70,
+ *    config_shard_incompatible,
+ * ]
  */
 
 const st = new ShardingTest({shards: 1});
