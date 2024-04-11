@@ -70,7 +70,6 @@ namespace mongo {
 class PlanExecutorSBE final : public PlanExecutor {
 public:
     struct MetaDataAccessor {
-        template <typename BSONTraits = BSONObj::DefaultSizeTrait>
         BSONObj appendToBson(BSONObj doc) const;
         Document appendToDocument(Document doc) const;
         // Only for $search queries, holds the metadata returned from mongot.
@@ -322,11 +321,7 @@ private:
  *
  * This common logic can be used by various consumers which need to fetch data using an SBE
  * PlanStage tree, such as PlanExecutor or RuntimePlanner.
- *
- * BSONTraits template parameter can be set to BSONObj::LargeSizeTrait if we want to allow resulting
- * BSONObj to be larged than 16 MB.
  */
-template <typename BSONTraits = BSONObj::DefaultSizeTrait>
 sbe::PlanState fetchNext(sbe::PlanStage* root,
                          sbe::value::SlotAccessor* resultSlot,
                          sbe::value::SlotAccessor* recordIdSlot,

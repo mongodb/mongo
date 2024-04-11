@@ -527,7 +527,7 @@ TEST(BSONObjBuilderTest, SizeChecks) {
 
     // But a size is in fact being enforced.
     {
-        auto largeBuffer = generateBuffer(50 * 1024 * 1024);
+        auto largeBuffer = generateBuffer(40 * 1024 * 1024);
         BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
         BSONObjBuilder builder;
         ASSERT_THROWS(

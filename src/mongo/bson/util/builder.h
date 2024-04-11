@@ -79,16 +79,10 @@ const int BSONObjMaxUserSize = 16 * 1024 * 1024;
 */
 const int BSONObjMaxInternalSize = BSONObjMaxUserSize + (16 * 1024);
 
-/**
- * Maximum size of a builder buffer and for BSONObj with BsonLargeSizeTrait. Limiting it to 27 bits
- * because SharedBuffer::Holder might bit pack information. Setting it to 125 MB to have some
- * wiggle room before size crosses 27 bits.
- */
-const int BufferMaxSize = 125 * 1024 * 1024;
-static_assert(BufferMaxSize < (1 << 27));
+const int BufferMaxSize = 64 * 1024 * 1024;
 
 /**
- * This is the maximum size of a buffer needed for storing a BSON object in a response message.
+ * This is the maximum size size of a buffer needed for storing a BSON object in a response message.
  */
 const int kOpMsgReplyBSONBufferMaxSize = BSONObjMaxUserSize + (64 * 1024);
 
@@ -517,8 +511,7 @@ protected:
         // Going beyond the maximum buffer size is not likely.
         if (MONGO_unlikely(minSize > BufferMaxSize)) {
             std::stringstream ss;
-            ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the "
-               << (BufferMaxSize / (1024 * 1024)) << "MB limit.";
+            ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the 64MB limit.";
             msgasserted(13548, ss.str().c_str());
         }
 
@@ -546,9 +539,9 @@ protected:
         } else if (MONGO_unlikely(reallocSize < 64)) {
             // The minimum allocation is 64 bytes.
             reallocSize = 64;
-        } else if (MONGO_unlikely(reallocSize + BufferAllocator::kBuffHolderSize > BufferMaxSize)) {
-            // If adding 'kBuffHolderSize' to 'reallocSize' pushes it beyond 'BufferMaxSize', then
-            // we'll allocate enough memory according to the 'BufferMaxSize'.
+        } else if (MONGO_unlikely(minSize > BufferMaxSize)) {
+            // If adding 'kBuffHolderSize' to 'minSize' pushes it beyond 'BufferMaxSize', then we'll
+            // allocate enough memory according to the 'BufferMaxSize'.
             reallocSize = BufferMaxSize + BufferAllocator::kBuffHolderSize;
         }
 

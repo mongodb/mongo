@@ -314,7 +314,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
     return result;
 }
 
-template <typename ObjectType, typename BSONTraits = BSONObj::DefaultSizeTrait>
+template <typename ObjectType>
 sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
                              sbe::value::SlotAccessor* resultSlot,
                              sbe::value::SlotAccessor* recordIdSlot,
@@ -671,7 +671,6 @@ void PlanExecutorSBE::initializeAccessors(
     }
 }
 
-template <typename BSONTraits>
 BSONObj PlanExecutorSBE::MetaDataAccessor::appendToBson(BSONObj doc) const {
     if (metadataSearchScore || metadataSearchHighlights || metadataSearchDetails ||
         metadataSearchSortValues || sortKey || metadataSearchSequenceToken) {
@@ -704,15 +703,10 @@ BSONObj PlanExecutorSBE::MetaDataAccessor::appendToBson(BSONObj doc) const {
             auto [tag, val] = metadataSearchSequenceToken->getViewOfValue();
             sbe::bson::appendValueToBsonObj(bb, Document::metaFieldSearchSequenceToken, tag, val);
         }
-        return bb.obj<BSONTraits>();
+        return bb.obj();
     }
     return doc;
 }
-
-template BSONObj PlanExecutorSBE::MetaDataAccessor::appendToBson<BSONObj::DefaultSizeTrait>(
-    BSONObj doc) const;
-template BSONObj PlanExecutorSBE::MetaDataAccessor::appendToBson<BSONObj::LargeSizeTrait>(
-    BSONObj doc) const;
 
 Document PlanExecutorSBE::MetaDataAccessor::appendToDocument(Document doc) const {
     if (metadataSearchScore || metadataSearchHighlights || metadataSearchDetails ||
@@ -778,7 +772,7 @@ Document PlanExecutorSBE::MetaDataAccessor::appendToDocument(Document doc) const
     return doc;
 }
 
-template <typename ObjectType, typename BSONTraits>
+template <typename ObjectType>
 sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
                              sbe::value::SlotAccessor* resultSlot,
                              sbe::value::SlotAccessor* recordIdSlot,
@@ -808,7 +802,7 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
             if constexpr (isBson) {
                 BSONObjBuilder bb;
                 sbe::bson::convertToBsonObj(bb, sbe::value::getObjectView(val));
-                *out = bb.obj<BSONTraits>();
+                *out = bb.obj();
             } else {
                 *out = convertToDocument(*sbe::value::getObjectView(val));
             }
@@ -824,7 +818,7 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
                     result = BSONObj{std::move(sharedBuf)};
                 }
             } else {
-                result = BSONObj(sbe::value::bitcastTo<const char*>(val), BSONTraits{});
+                result = BSONObj{sbe::value::bitcastTo<const char*>(val)};
             }
 
             if constexpr (isBson) {
@@ -840,7 +834,7 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
             if constexpr (isDocument) {
                 *out = metadata->appendToDocument(std::move(*out));
             } else {
-                *out = metadata->appendToBson<BSONTraits>(std::move(*out));
+                *out = metadata->appendToBson(std::move(*out));
             }
         }
     }
@@ -855,23 +849,13 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
     return state;
 }
 
-template sbe::PlanState fetchNextImpl<BSONObj, BSONObj::DefaultSizeTrait>(
-    sbe::PlanStage* root,
-    sbe::value::SlotAccessor* resultSlot,
-    sbe::value::SlotAccessor* recordIdSlot,
-    BSONObj* out,
-    RecordId* dlOut,
-    bool returnOwnedBson,
-    const PlanExecutorSBE::MetaDataAccessor* metadata);
-
-template sbe::PlanState fetchNextImpl<BSONObj, BSONObj::LargeSizeTrait>(
-    sbe::PlanStage* root,
-    sbe::value::SlotAccessor* resultSlot,
-    sbe::value::SlotAccessor* recordIdSlot,
-    BSONObj* out,
-    RecordId* dlOut,
-    bool returnOwnedBson,
-    const PlanExecutorSBE::MetaDataAccessor* metadata);
+template sbe::PlanState fetchNextImpl<BSONObj>(sbe::PlanStage* root,
+                                               sbe::value::SlotAccessor* resultSlot,
+                                               sbe::value::SlotAccessor* recordIdSlot,
+                                               BSONObj* out,
+                                               RecordId* dlOut,
+                                               bool returnOwnedBson,
+                                               const PlanExecutorSBE::MetaDataAccessor* metadata);
 
 template sbe::PlanState fetchNextImpl<Document>(sbe::PlanStage* root,
                                                 sbe::value::SlotAccessor* resultSlot,
@@ -883,7 +867,6 @@ template sbe::PlanState fetchNextImpl<Document>(sbe::PlanStage* root,
 
 // NOTE: We intentionally do not expose overload for the 'Document' type. The only interface to get
 // result from plan in 'Document' type is to call 'PlanExecutorSBE::getNextDocument()'.
-template <typename BSONTraits>
 sbe::PlanState fetchNext(sbe::PlanStage* root,
                          sbe::value::SlotAccessor* resultSlot,
                          sbe::value::SlotAccessor* recordIdSlot,
@@ -892,23 +875,6 @@ sbe::PlanState fetchNext(sbe::PlanStage* root,
                          bool returnOwnedBson) {
     // Sending an empty MetaDataAccessor because we currently only deal with search related
     // metadata, and search query won't reach here.
-    return fetchNextImpl<BSONObj, BSONTraits>(
-        root, resultSlot, recordIdSlot, out, dlOut, returnOwnedBson, nullptr);
+    return fetchNextImpl(root, resultSlot, recordIdSlot, out, dlOut, returnOwnedBson, nullptr);
 }
-
-template sbe::PlanState fetchNext<BSONObj::DefaultSizeTrait>(sbe::PlanStage* root,
-                                                             sbe::value::SlotAccessor* resultSlot,
-                                                             sbe::value::SlotAccessor* recordIdSlot,
-                                                             BSONObj* out,
-                                                             RecordId* dlOut,
-                                                             bool returnOwnedBson);
-
-template sbe::PlanState fetchNext<BSONObj::LargeSizeTrait>(sbe::PlanStage* root,
-                                                           sbe::value::SlotAccessor* resultSlot,
-                                                           sbe::value::SlotAccessor* recordIdSlot,
-                                                           BSONObj* out,
-                                                           RecordId* dlOut,
-                                                           bool returnOwnedBson);
-
-
 }  // namespace mongo

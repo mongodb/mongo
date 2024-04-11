@@ -58,14 +58,12 @@ bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candida
         BSONObj obj;
         RecordId recordId;
 
-        // SBE plan might be followed by an non-pushed down aggregation pipeline. In that case we
-        // allow intermediate document to be large.
-        auto state = fetchNext<BSONObj::LargeSizeTrait>(candidate->root.get(),
-                                                        resultSlot,
-                                                        recordIdSlot,
-                                                        &obj,
-                                                        recordIdSlot ? &recordId : nullptr,
-                                                        true /* must return owned BSON */);
+        auto state = fetchNext(candidate->root.get(),
+                               resultSlot,
+                               recordIdSlot,
+                               &obj,
+                               recordIdSlot ? &recordId : nullptr,
+                               true /* must return owned BSON */);
         if (state == PlanState::IS_EOF) {
             candidate->root->close();
             return false;

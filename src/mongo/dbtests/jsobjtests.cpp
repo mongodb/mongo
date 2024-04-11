@@ -219,8 +219,8 @@ public:
         BufBuilder b;
         unsigned int written = 0;
         try {
-            for (; written <= mongo::BufferMaxSize + 1; ++written)
-                // (re)alloc past the buffer limit
+            for (; written <= 64 * 1024 * 1024 + 1; ++written)
+                // (re)alloc past the buffer 64mb limit
                 b.appendStr("a");
         } catch (const AssertionException&) {
         }
