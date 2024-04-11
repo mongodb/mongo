@@ -2,12 +2,15 @@
  * Tests that when resharding on a shard key not covered by a secondary index, the new shard-key
  * index can be successfully created if the recipient shard is restarted during building-index
  * stage.
- *
+ * Multiversion testing does not support tests that kill and restart nodes. So we had to add the
+ * 'multiversion_incompatible' tag.
  * This test restarts a replica set node, which requires persistence.
  * @tags: [
  *  requires_fcv_72,
  *  featureFlagReshardingImprovements,
  *  requires_persistence,
+ * # TODO (SERVER-89180) Remove multiversion_incompatible tag
+ *  multiversion_incompatible,
  * ]
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
