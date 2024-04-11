@@ -406,8 +406,6 @@ class MongodLauncher(object):
 
         if self.config.STORAGE_ENGINE == "inMemory":
             shortcut_opts["inMemorySizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
-        elif self.config.STORAGE_ENGINE == "rocksdb":
-            shortcut_opts["rocksdbCacheSizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
         elif self.config.STORAGE_ENGINE == "wiredTiger" or self.config.STORAGE_ENGINE is None:
             shortcut_opts["wiredTigerCacheSizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
 
