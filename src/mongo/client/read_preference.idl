@@ -61,25 +61,31 @@ enums:
 
 structs:
 
-  ReadPreferenceStruct:
-      description: Stores commonly used values for ReadPreferenceSetting.
+  ReadPreferenceIdl:
+      description: "An object representing a read preference document, used only for mapping to
+                    and from BSON."
       strict: false
-      unsafe_dangerous_disable_extra_field_duplicate_checks: true
       fields:
         mode:
           description: Read preference mode.
           type: ReadPreference
-        hedge:
-          description: Hedging mode determines whether or not hedging is enabled.
-          type: HedgingMode
-          optional: true
         tags:
           description: List of tags requested by $readPreference.
           type: array
           optional: true
+        hedge:
+          description: Hedging mode determines whether or not hedging is enabled.
+          type: HedgingMode
+          optional: true
         maxStalenessSeconds:
           description: Specifies a maximum replication lag for reads from secondaries.
           type: safeInt64
-          default: 0
+          optional: true
           validator:
             callback: validateMaxStalenessSecondsExternal
+        $_isPretargeted:
+          description: "Used by the replica set endpoint in sharding to mark commands that it
+                        forces to go through the router as needing to target the local mongod."
+          cpp_name: isPretargeted
+          type: bool
+          optional: true

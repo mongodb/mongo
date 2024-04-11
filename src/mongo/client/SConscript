@@ -46,18 +46,30 @@ env.Library(
 )
 
 env.Library(
+    target='read_preference_idl',
+    source=[
+        'hedging_mode.idl',
+        'read_preference.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'read_preference_validators',
+    ],
+)
+
+env.Library(
     target=[
         'read_preference',
     ],
     source=[
         'read_preference.cpp',
-        'hedging_mode.idl',
-        'read_preference.idl',
+        'read_preference_setting.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/service_context',
-        'read_preference_validators',
+        'read_preference_idl',
     ],
 )
 
