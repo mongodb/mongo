@@ -41,6 +41,9 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/executor/connection_pool_stats.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/framework.h"
@@ -54,6 +57,11 @@ namespace {
 class ConnectionPoolTest : public unittest::Test {
 public:
     void setUp() override {
+        auto& settings = logv2::LogManager::global().getGlobalSettings();
+        _originalSeverity = settings.getMinimumLogSeverity(logv2::LogComponent::kNetwork).toInt();
+        settings.setMinimumLoggedSeverity(logv2::LogComponent::kNetwork,
+                                          logv2::LogSeverity::Debug(1));
+
         ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
         _mockServer = std::make_unique<MockRemoteDBServer>(_hostName);
         MockConnRegistry::get()->addServer(_mockServer.get());
@@ -61,6 +69,10 @@ public:
 
     void tearDown() override {
         MockConnRegistry::get()->removeServer(_hostName);
+
+        auto& settings = logv2::LogManager::global().getGlobalSettings();
+        settings.setMinimumLoggedSeverity(logv2::LogComponent::kNetwork,
+                                          logv2::LogSeverity::cast(_originalSeverity));
     }
 
     auto getServerHostAndPort() const {
@@ -70,6 +82,7 @@ public:
 private:
     std::string _hostName = "$local";
     std::unique_ptr<MockRemoteDBServer> _mockServer;
+    int _originalSeverity;
 };
 
 TEST_F(ConnectionPoolTest, ConnectionPoolHistogramStats) {
