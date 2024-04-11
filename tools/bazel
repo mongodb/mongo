@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# Whenever Bazel is invoked, it first calls this script setting "BAZEL_REAL" to the path of the real Bazel binary.
+# Use this file as a wrapper for any logic that should run before bazel itself is executed.
+
+if [[ -z "${BAZELISK_SKIP_WRAPPER}" ]]; then
+    echo "You're not using Bazelisk, which is recommended for a consistent build environment." >&2
+    echo "Your version of Bazel may be mismatched with the version intended to be used to build MongoDB." >&2
+    echo "Please run the following command to install Bazelisk:" >&2
+    echo "" >&2
+    echo "python buildscripts/install_bazel.py" >&2
+    exit 0
+fi
+
+$BAZEL_REAL "$@"

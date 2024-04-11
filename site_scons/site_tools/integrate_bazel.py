@@ -18,6 +18,7 @@ import urllib.request
 import requests
 from retry import retry
 import sys
+from buildscripts.install_bazel import install_bazel
 
 import SCons
 
@@ -544,35 +545,11 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         # === Bazelisk ===
         bazel_bin_dir = env.GetOption("evergreen-tmp-dir") if env.GetOption(
-            "evergreen-tmp-dir") else "build"
+            "evergreen-tmp-dir") else os.path.expanduser("~/.local/bin")
         if not os.path.exists(bazel_bin_dir):
             os.makedirs(bazel_bin_dir)
 
-        # TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
-        bazel_executable = os.path.join(bazel_bin_dir, "bazel") if normalized_arch in [
-            "ppc64le", "s390x"
-        ] else os.path.join(bazel_bin_dir, "bazelisk")
-
-        if not os.path.exists(bazel_executable):
-            print(f"Downloading {bazel_executable}...")
-            # TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
-            if normalized_arch in ["ppc64le", "s390x"]:
-                s3_path = f"https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-{normalized_arch}"
-            else:
-                ext = ".exe" if normalized_os == "windows" else ""
-                os_str = normalized_os.replace("macos", "darwin")
-                s3_path = f"https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-{os_str}-{normalized_arch}{ext}"
-
-            download_path_with_retry(s3_path, bazel_executable)
-            verify_s3_hash(s3_path, bazel_executable)
-
-            print(f"Downloaded {bazel_executable}")
-            # Bazel is a self-extracting zip launcher and needs read perms on the executable to read the zip from itself.
-            os.chmod(
-                bazel_executable, stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH | stat.S_IRUSR
-                | stat.S_IRGRP | stat.S_IROTH)
-        else:
-            print("Skipped downloading bazelisk", bazel_executable)
+        bazel_executable = install_bazel(bazel_bin_dir)
 
         # === Build settings ===
 

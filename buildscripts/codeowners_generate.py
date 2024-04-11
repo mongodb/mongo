@@ -171,6 +171,8 @@ def main():
         "# This is a generated file do not make changes to this file.",
         "# This is generated from various OWNERS.yml files across the repo.",
         "# To regenerate this file run `bazel run //:codeowners`",
+        "# If bazel is not installed, run the following:",
+        "#  python buildscripts/install_bazel.py",
         "# The documentation for the OWNERS.yml files can be found here:",
         "# https://github.com/10gen/mongo/blob/master/docs/owners_format.md",
         "",
@@ -201,6 +203,8 @@ def main():
             print(
                 "If you are seeing this message in CI you likely need to run `bazel run //:codeowners`"
             )
+            print("If bazel is not installed, run the following:\n")
+            print("python buildscripts/install_bazel.py")
             return 1
 
         print("CODEOWNERS file is up to date")
