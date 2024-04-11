@@ -406,10 +406,6 @@ private:
     bool _lexOnly;
 };
 
-// TODO: Sane-ify core std::string functionality
-// For now, this needs to be near the LexNumCmp or else
-int versionCmp(StringData rhs, StringData lhs);
-
 /**
  * A method to escape whitespace and control characters in strings. For example, the string "\t"
  * goes to "\\t". If `escape_slash` is true, then "/" goes to "\\/".
