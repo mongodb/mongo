@@ -646,18 +646,6 @@ functions:
         working_dir: src
         script: |
           tar czf mongodb${compile_variant|}.tar.gz mongodb
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          if [ -n "${reuse_compile_from}" ] && [ "${is_patch|false}" = "true" ]; then
-            set -o errexit
-            set -o verbose
-
-            source "${workdir}/compile_venv/bin/activate"
-            python buildscripts/download_sys_perf_binaries.py -v ${reuse_compile_from} -b ${build_variant} -u ${evergreen_api_user} -k ${evergreen_api_key}
-            mv binary.tar.gz mongodb${compile_variant|}.tar.gz
-          fi
   upload binary:
     - command: s3.put
       params:
