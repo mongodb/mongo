@@ -111,6 +111,9 @@ public:
     // incoming measurements.
     bool crossedLargeMeasurementThreshold = false;
 
+    // True if the bucket already exists and was reopened.
+    bool isReopened = false;
+
     // Whether the bucket was created while the always used compressed buckets feature flag was
     // enabled.
     // TODO SERVER-70605: remove this boolean.

@@ -13,12 +13,14 @@
 // Turn off the TestingProctor, since the data integrity check will invariant in testing
 // but not in production.
 TestData.testingDiagnosticsEnabled = false;
-const conn = MongoRunner.runMongod();
+const rst = new ReplSetTest({nodes: 1});
+rst.startSet();
+rst.initiate();
 
 const dbName = "test";
 const collName = "ts";
 const timeFieldName = "time";
-const testDB = conn.getDB(dbName);
+const testDB = rst.getPrimary().getDB(dbName);
 const coll = testDB[collName];
 
 const measurements = [
@@ -75,4 +77,4 @@ function testIntegrityCheck(turnFailpointOn) {
 
 testIntegrityCheck(/*turnFailpointOn=*/ false);
 testIntegrityCheck(/*turnFailPointOn=*/ true);
-MongoRunner.stopMongod(conn);
+rst.stopSet();

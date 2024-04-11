@@ -105,6 +105,9 @@ struct WriteBatch {
 
     bool generateCompressedDiff = false;
 
+    // True if the bucket already exists and was reopened.
+    bool isReopened = false;
+
     // Whether the measurements in the bucket are sorted by timestamp or not.
     // True by default, if a v2 buckets gets promoted to v3 this is set to false.
     // It should not be used for v1 buckets. v2 buckets are preferred over v3 for improved

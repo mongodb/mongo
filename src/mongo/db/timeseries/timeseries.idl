@@ -34,14 +34,23 @@ imports:
     - "mongo/db/basic_types.idl"
 
 server_parameters:
-    "performTimeseriesCompressionIntermediateDataIntegrityCheck":
-        description: "Whether or not to perform data integrity checks when inserting
-                      measurements into compressed time-series buckets. On by default,
-                      can be turned off for a performance boost."
+    "performTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening":
+        description: "Whether or not to perform data integrity checks when inserting measurements 
+                      into compressed time-series buckets that are reopened. On by default, can be
+                      turned off for a performance boost."
         set_at: [ startup, runtime ]
         cpp_vartype: "AtomicWord<bool>"
-        cpp_varname: "gPerformTimeseriesCompressionIntermediateDataIntegrityCheck"
+        cpp_varname: "gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening"
         default: true
+        redact: false
+
+    "performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert":
+        description: "Whether or not to perform data integrity checks when inserting measurements
+                      into compressed time-series buckets."
+        set_at: [ startup, runtime ]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: "gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert"
+        default: false
         redact: false
 
     "timeseriesBucketMaxCount":

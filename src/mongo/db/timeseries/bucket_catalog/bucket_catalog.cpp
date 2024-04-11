@@ -120,6 +120,7 @@ void prepareWriteBatchForCommit(TrackingContext& trackingContext,
     batch.measurementMap = std::move(bucket.measurementMap);
     batch.bucketIsSortedByTime = bucket.bucketIsSortedByTime;
     batch.generateCompressedDiff = bucket.usingAlwaysCompressedBuckets;
+    batch.isReopened = bucket.isReopened;
 }
 
 /**

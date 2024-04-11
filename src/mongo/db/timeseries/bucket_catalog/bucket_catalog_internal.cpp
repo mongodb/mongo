@@ -431,6 +431,8 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
         feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
+    bucket->isReopened = true;
+
     // Initialize the remaining member variables from the bucket document.
     bucket->size = bucketDoc.objsize();
 

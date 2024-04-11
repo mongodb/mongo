@@ -385,7 +385,9 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     // Verifier function that will be called when we apply the diff to our bucket and verify that
     // the measurements we inserted appear correctly in the resulting bucket's BSONColumns.
     doc_diff::VerifierFunc verifierFunction = nullptr;
-    if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheck.load()) {
+    if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load() ||
+        (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening.load() &&
+         batch->isReopened)) {
         verifierFunction =
             makeVerifierFunction(sortedMeasurements, batch, OperationSource::kTimeseriesUpdate);
     }
@@ -970,6 +972,8 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
     const NamespaceString& bucketsNs,
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds) {
+    invariant(!batch->isReopened);
+
     BSONObj bucketToInsert;
     BucketDocument bucketDoc;
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
@@ -988,7 +992,7 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
             makeTimeseriesInsertCompressedBucketDocument(batch, metadata, intermediates);
 
         // Extra verification that the insert op decompresses to the same values put in.
-        if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheck.load()) {
+        if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load()) {
             auto verifierFunction =
                 makeVerifierFunction(sortedMeasurements, batch, OperationSource::kTimeseriesInsert);
             verifierFunction(bucketToInsert);

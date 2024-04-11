@@ -3423,6 +3423,11 @@ var ReplSetTest = function ReplSetTest(opts) {
                 options.setParameter.disableTransitionFromLatestToLastContinuous || false;
         }
 
+        if (jsTestOptions().performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert) {
+            options.setParameter
+                .performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert = true;
+        }
+
         if (this.useAutoBootstrapProcedure) {
             options.setParameter.featureFlagAllMongodsAreSharded = true;
         }
@@ -3435,6 +3440,14 @@ var ReplSetTest = function ReplSetTest(opts) {
                                            MongoRunner.getBinVersionFor(options.binVersion)) === 1;
         if (olderThan73) {
             delete options.setParameter.featureFlagClusteredConfigTransactions;
+        }
+
+        const olderThan81 =
+            MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(options.binVersion),
+                                           MongoRunner.getBinVersionFor('8.1')) === -1;
+        if (olderThan81) {
+            delete options.setParameter
+                .performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert;
         }
 
         if (tojson(options) != tojson({}))

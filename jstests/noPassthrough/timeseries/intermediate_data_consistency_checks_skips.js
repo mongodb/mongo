@@ -8,8 +8,11 @@
  * ]
  */
 
-const conn = MongoRunner.runMongod();
-const testDB = conn.getDB(jsTestName());
+const rst = new ReplSetTest({nodes: 1});
+rst.startSet();
+rst.initiate();
+
+const testDB = rst.getPrimary().getDB(jsTestName());
 const coll = testDB.coll;
 const bucketsColl = testDB.system.buckets.coll;
 const time = ISODate("2024-01-16T20:48:39.448Z");
@@ -44,4 +47,4 @@ assert.commandWorked(coll.insertMany([
     {t: time, m: 2, a: 2, b: 2, c: 2, d: 2, e: 5},  // Bucket 2
 ]));
 
-MongoRunner.stopMongod(conn);
+rst.stopSet();
