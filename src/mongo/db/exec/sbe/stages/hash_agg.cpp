@@ -327,8 +327,8 @@ void HashAggStage::open(bool reOpen) {
                 newKey = true;
                 value::MaterializedRow keyCopy(key);
                 keyCopy.makeOwned();
-                auto [it, _] = _ht->emplace(std::move(keyCopy), value::MaterializedRow{0});
-                it->second.resize(_outAggAccessors.size());
+                auto [it, _] = _ht->emplace(std::move(keyCopy),
+                                            value::MaterializedRow{_outAggAccessors.size()});
 
                 _htIt = it;
 
