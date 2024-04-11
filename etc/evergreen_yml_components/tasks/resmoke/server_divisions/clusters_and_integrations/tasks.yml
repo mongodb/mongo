@@ -445,7 +445,8 @@ tasks:
         "assigned_to_jira_team_server_servicearch",
         "default",
         "incompatible_mac",
-        "incompatible_ibm",
+        "incompatible_ppc",
+        "incompatible_s390x",
         "concurrency",
         "common",
         "read_concern_maj",
@@ -559,7 +560,8 @@ tasks:
 
   - <<: *task_template
     name: integration_tests_replset
-    tags: ["assigned_to_jira_team_server_servicearch", "integration"]
+    tags:
+      ["assigned_to_jira_team_server_servicearch", "auxiliary", "integration"]
     depends_on:
       - name: compile_integration_test
     commands:
@@ -570,7 +572,8 @@ tasks:
 
   - <<: *task_template
     name: integration_tests_replset_ssl_auth
-    tags: ["assigned_to_jira_team_server_servicearch", "integration"]
+    tags:
+      ["assigned_to_jira_team_server_servicearch", "auxiliary", "integration"]
     depends_on:
       - name: compile_integration_test
     commands:
@@ -581,7 +584,13 @@ tasks:
 
   - <<: *task_template
     name: integration_tests_sharded
-    tags: ["assigned_to_jira_team_server_servicearch", "integration", "sharded"]
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "auxiliary",
+        "integration",
+        "sharded",
+      ]
     depends_on:
       - name: compile_integration_test
     commands:
@@ -593,7 +602,12 @@ tasks:
   - <<: *task_template
     name: integration_tests_standalone
     tags:
-      ["assigned_to_jira_team_server_servicearch", "integration", "standalone"]
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "auxiliary",
+        "integration",
+        "standalone",
+      ]
     depends_on:
       - name: compile_integration_test
     commands:
@@ -604,7 +618,13 @@ tasks:
 
   - <<: *task_template
     name: integration_tests_standalone_audit
-    tags: ["assigned_to_jira_team_server_servicearch", "integration", "audit"]
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "auxiliary",
+        "integration",
+        "audit",
+      ]
     depends_on:
       - name: compile_integration_test
     commands:
@@ -1094,7 +1114,7 @@ tasks:
 
   ## fetch_and_run_libfuzzertests - get input corpora from s3 and run libfuzzertests ##
   - name: fetch_and_run_libfuzzertests
-    tags: ["assigned_to_jira_team_server_security"]
+    tags: ["assigned_to_jira_team_server_security", "experimental"]
     commands:
       - func: "fetch corpus"
       - func: "run tests"
@@ -2150,6 +2170,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
+        "default",
         "replica_sets",
         "common",
         "san",

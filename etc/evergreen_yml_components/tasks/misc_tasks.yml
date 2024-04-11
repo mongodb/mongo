@@ -241,7 +241,7 @@ tasks:
             --runAllFeatureFlagTests
 
   - name: build_metrics_tasks_gen
-    tags: ["assigned_to_jira_team_devprod_build", "experimental"]
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
@@ -319,7 +319,7 @@ tasks:
             - "./src/evergreen/todos_check.sh"
 
   - name: daily_task_scanner
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - func: "f_expansions_write"
       - command: manifest.load
@@ -339,7 +339,7 @@ tasks:
             - "-f=task_errors.txt"
 
   - name: determine_patch_tests
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - func: "f_expansions_write"
       - command: subprocess.exec
@@ -750,7 +750,7 @@ tasks:
 
   # Check that the mutational fuzzer can parse all JS filess.
   - name: lint_fuzzer_sanity_all
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - command: manifest.load
       - func: "git get project and add git tag"
@@ -964,7 +964,7 @@ tasks:
             - "src/evergreen/lint_yaml.sh"
 
   - name: monitor_mongo_fork_10gen
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - command: manifest.load
       - func: "git get project and add git tag"
@@ -1312,7 +1312,7 @@ tasks:
           test_list: jstests/selinux/*.js
 
   - name: sync_repo_with_copybara
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - command: manifest.load
       - func: "git get project and add git tag"
@@ -1349,7 +1349,7 @@ tasks:
             - "src/evergreen/check_idl_compat.sh"
 
   - name: test_packages
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     depends_on:
       - name: package
     commands:
@@ -1365,7 +1365,7 @@ tasks:
           docker_password: ${dockerhub_password}
 
   - name: test_packages_release
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
@@ -1411,7 +1411,7 @@ tasks:
 
   - name: version_burn_in_gen
     run_on: ubuntu2004-medium
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - command: manifest.load
       - func: "git get project"
@@ -1425,7 +1425,7 @@ tasks:
 
   - &version_expansions_gen
     name: version_expansions_gen
-    tags: ["assigned_to_jira_team_devprod_build", "experimental"]
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     commands:
       - command: manifest.load
       - func: "git get project"
@@ -1443,7 +1443,7 @@ tasks:
 
   - name: version_gen
     run_on: ubuntu2004-medium
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - command: manifest.load
       - func: "git get project"

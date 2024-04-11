@@ -414,13 +414,13 @@ tasks:
       [
         "assigned_to_jira_team_server_repl",
         "default",
+        "incompatible_inmemory",
         "concurrency",
         "stepdowns",
         "initsync",
         "large",
         "sharded",
         "no_debug_mode",
-        "requires_wt",
       ]
     commands:
       - func: "generate resmoke tasks"

@@ -53,16 +53,11 @@ rules:
 
   - rule: "enforce-tags-for-tasks"
     tag_groups:
-      # All tasks should have team assignment tags
+      # Every task should have team assignment tag
       - group_name: "team_assignment_tags"
         tag_regex: assigned_to_jira_team_.+
-        # Team names (the part after "assigned_to_jira_team_") should match `evergreen_tag_name`
-        # from team configurations in mothra: https://github.com/10gen/mothra/tree/main/mothra/teams
-        #
-        # If the tag list is missing your team:
-        #   1) make sure that your team configuration exists or add it in mothra
-        #   2) make sure that your team configuration has `evergreen_tag_name`
-        #   3) update the tag list with `assigned_to_jira_team_{evergreen_tag_name}` for your team
+        # Before changing anything in this list, please read
+        # https://github.com/10gen/mongo/blob/master/docs/evergreen-testing/yaml_configuration/task_ownership_tags.md
         tag_list:
           # https://github.com/10gen/mothra/blob/main/mothra/teams/database.yaml
           - assigned_to_jira_team_server_catalog_and_routing
@@ -92,6 +87,41 @@ rules:
           - assigned_to_jira_team_streams
         min_num_of_tags: 1
         max_num_of_tags: 1
+      # Every task should have required selection tag
+      - group_name: "required_selection_tags"
+        tag_regex: (development_critical|development_critical_single_variant|release_critical|default|non_deterministic|experimental|auxiliary)
+        # Before changing anything in this list, please read
+        # https://github.com/10gen/mongo/blob/master/docs/evergreen-testing/yaml_configuration/task_selection_tags.md
+        tag_list:
+          - development_critical
+          - development_critical_single_variant
+          - release_critical
+          - default
+          - non_deterministic
+          - experimental
+          - auxiliary
+        min_num_of_tags: 1
+        max_num_of_tags: 1
+      - group_name: "optional_selection_tags"
+        tag_regex: (incompatible_.+|requires_.+)
+        # Before changing anything in this list, please read
+        # https://github.com/10gen/mongo/blob/master/docs/evergreen-testing/yaml_configuration/task_selection_tags.md
+        tag_list:
+          - incompatible_community
+          - incompatible_windows
+          - incompatible_mac
+          - incompatible_ppc
+          - incompatible_s390x
+          - incompatible_aubsan
+          - incompatible_tsan
+          - incompatible_inmemory
+          - incompatible_all_feature_flags
+          - incompatible_development_variant
+          - requires_compile_variant
+          - requires_large_host
+          - requires_large_host_tsan
+          - requires_large_host_commit_queue
+          - requires_all_feature_flags
 
   - rule: "enforce-tags-for-variants"
     tags:

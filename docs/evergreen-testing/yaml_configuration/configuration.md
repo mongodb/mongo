@@ -6,7 +6,7 @@ This document describes the continuous integration (CI) configuration for MongoD
 
 There are a number of Evergreen projects supporting MongoDB's CI. For more information on
 Evergreen-specific terminology used in this document, please refer to the
-[Project Configuration](https://github.com/evergreen-ci/evergreen/wiki/Project-Configuration-Files)
+[Project Configuration](https://docs.devprod.prod.corp.mongodb.com/evergreen/Project-Configuration/Project-Configuration-Files/)
 section of the Evergreen wiki.
 
 ### `mongodb-mongo-master`
@@ -15,7 +15,7 @@ The main project for testing MongoDB's dev environments with a number build vari
 each one corresponding to a particular compile or testing environment to support development.
 Each build variant runs a set of tasks; each task ususally runs one or more tests.
 
-### `mongodb-mongo-master-nightly
+### `mongodb-mongo-master-nightly`
 
 Tracks the same branch as `mongodb-mongo-master`, each build variant corresponds to a
 (version, OS, architecure) triplet for a supported MongoDB nightly release.
@@ -23,10 +23,6 @@ Tracks the same branch as `mongodb-mongo-master`, each build variant corresponds
 ### `sys_perf`
 
 The system performance project.
-
-### `microbenchmarks`
-
-Performance unittests, used mainly for validating areas related to the Query system.
 
 ## Project configurations
 
@@ -43,8 +39,6 @@ The above Evergreen projects are defined in the following files:
   variants for public nightly builds, imports similar components as evergreen.yml to ensure consistency.
 
 - `etc/sys_perf.yml`. Configuration file for the system performance project.
-
-- `etc/perf.yml`. Configuration for the microbenchmark project.
 
 ## Release Branching Process
 
