@@ -4,7 +4,7 @@
  * @tags: [
  *   multiversion_incompatible,
  *   featureFlagDeprioritizeLowPriorityOperations,
- *   requires_fcv_80,
+ *   requires_fcv_70,
  * ]
  * TODO SERVER-79365 Remove multiversion_incompatible tag for v8.0. This test cannot run
  * in multiversion tests involving v7.0 binaries because the flag

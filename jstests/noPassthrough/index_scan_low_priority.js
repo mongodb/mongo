@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   featureFlagDeprioritizeLowPriorityOperations,
- *   requires_fcv_80,
+ *   requires_fcv80,
  *   requires_wiredtiger,
  * ]
  */
