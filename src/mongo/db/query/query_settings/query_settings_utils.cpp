@@ -547,16 +547,9 @@ void validateQuerySettingsIndexHints(const auto& indexHints) {
         return;
     }
 
-    const auto& hints = visit(
-        OverloadedVisitor{
-            [](const std::vector<mongo::query_settings::IndexHintSpec>& hints) { return hints; },
-            [](const mongo::query_settings::IndexHintSpec& hints) { return std::vector{hints}; },
-        },
-        *indexHints);
-
     stdx::unordered_map<NamespaceString, mongo::query_settings::IndexHintSpec>
         collectionsWithAppliedIndexHints;
-    for (const auto& hint : hints) {
+    for (const auto& hint : *indexHints) {
         uassert(8727500,
                 "invalid index hint: 'ns.db' field is missing",
                 hint.getNs().getDb().has_value());
@@ -644,28 +637,17 @@ void simplifyQuerySettings(QuerySettings& settings) {
     }
 
     // Remove index hints where list of allowed indexes is empty.
-    std::visit(OverloadedVisitor{
-                   [&](const IndexHintSpec& indexHintSpec) {
-                       if (indexHintSpec.getAllowedIndexes().empty()) {
-                           settings.setIndexHints(boost::none);
-                       }
-                   },
-                   [&](const std::vector<IndexHintSpec>& indexHints) {
-                       std::vector<IndexHintSpec> simplifiedIndexHints;
-                       std::copy_if(
-                           indexHints.begin(),
-                           indexHints.end(),
-                           std::back_inserter(simplifiedIndexHints),
-                           [](const auto& spec) { return !spec.getAllowedIndexes().empty(); });
+    IndexHintSpecs simplifiedIndexHints;
+    std::copy_if(indexes->begin(),
+                 indexes->end(),
+                 std::back_inserter(simplifiedIndexHints),
+                 [](const auto& spec) { return !spec.getAllowedIndexes().empty(); });
 
-                       if (simplifiedIndexHints.empty()) {
-                           settings.setIndexHints(boost::none);
-                       } else {
-                           settings.setIndexHints({{std::move(simplifiedIndexHints)}});
-                       }
-                   },
-               },
-               *indexes);
+    if (simplifiedIndexHints.empty()) {
+        settings.setIndexHints(boost::none);
+    } else {
+        settings.setIndexHints({{std::move(simplifiedIndexHints)}});
+    }
 }
 
 }  // namespace utils

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,24 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_settings/query_settings_hash.h"
+#pragma once
 
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo::query_settings {
+class IndexHintSpec;
 
-size_t hash(const QuerySettings& querySettings) {
-    size_t hash = 0;
-    if (auto version = querySettings.getQueryFramework()) {
-        boost::hash_combine(hash, absl::Hash<QueryFrameworkControlEnum>{}(*version));
-    }
-    if (auto indexHints = querySettings.getIndexHints()) {
-        for (const auto& hintSpec : *indexHints) {
-            for (const auto& hint : hintSpec.getAllowedIndexes()) {
-                boost::hash_combine(hash, hint.hash());
-            }
-        }
-    }
-    return hash;
-}
+/**
+ * Type alias for the collection of IndexHintSpec, which represent index hints per collection in
+ * QuerySettings. As in most of the cases users will be setting index hints on a single collection,
+ * the default vector size is 1.
+ */
+using IndexHintSpecs = absl::InlinedVector<IndexHintSpec, 1>;
+
+namespace index_hints {
+void serialize(const IndexHintSpecs& indexHints,
+               StringData fieldName,
+               BSONObjBuilder* builder,
+               const SerializationContext& context);
+
+IndexHintSpecs parse(boost::optional<TenantId> tenantId,
+                     const BSONElement& element,
+                     const SerializationContext& context);
+}  // namespace index_hints
 }  // namespace mongo::query_settings

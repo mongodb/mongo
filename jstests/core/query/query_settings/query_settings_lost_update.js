@@ -27,7 +27,7 @@ if (!FixtureHelpers.isMongos(db) && !db.runCommand({hello: 1}).hasOwnProperty('s
 const testConn = db.getMongo();
 // (Re)create the collection - will be sharded if required.
 const collName = jsTestName();
-const coll = assertDropAndRecreateCollection(db, collName);
+assertDropAndRecreateCollection(db, collName);
 const ns = {
     db: db.getName(),
     coll: collName

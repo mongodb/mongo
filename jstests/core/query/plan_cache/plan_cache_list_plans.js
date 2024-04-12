@@ -239,7 +239,6 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings") && !FixtureHelpers.
 
     // Ensure plan cache entry contains 'settings'.
     const planCacheEntry = getPlansForCacheEntry(filter);
-    assert.eq(settings, planCacheEntry.querySettings, planCacheEntry);
-
+    qsutils.assertEqualSettings(settings, planCacheEntry.querySettings, planCacheEntry);
     qsutils.removeAllQuerySettings();
 }

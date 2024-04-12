@@ -7,6 +7,7 @@ env = env.Clone()
 env.Library(
     target='query_settings',
     source=[
+        'index_hints_serialization.cpp',
         'query_framework_serialization.cpp',
         'query_settings.idl',
     ],
@@ -49,6 +50,18 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/canonical_query',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         'manager',
+    ],
+)
+
+env.CppUnitTest(
+    target='query_settings_serialization_test',
+    source=[
+        'index_hints_serialization_test.cpp',
+        'query_framework_serialization_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'query_settings',
     ],
 )
 

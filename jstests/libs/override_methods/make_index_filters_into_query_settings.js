@@ -118,7 +118,7 @@ function planCacheListFiltersToDollarQuerySettings(conn, cmdObj) {
             query: queryShapeConfig.representativeQuery.filter,
             // Remove the previously added '$natural' hints to ensure that the results match the
             // expected output.
-            indexes: queryShapeConfig.settings.indexHints.allowedIndexes.filter(isNotNaturalHint)
+            indexes: queryShapeConfig.settings.indexHints[0].allowedIndexes.filter(isNotNaturalHint)
         };
         addOptionalQueryFields(queryShapeConfig.representativeQuery, indexFilter);
         return indexFilter;
