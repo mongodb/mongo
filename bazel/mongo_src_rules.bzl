@@ -679,7 +679,10 @@ SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE = (
 
 ADDRESS_SANITIZER_COPTS = select(
     {
-        ("//bazel/config:sanitize_address_required_settings"): ["-fsanitize=address"],
+        "//bazel/config:sanitize_address_required_settings": [
+            "-fsanitize=address",
+            "-fsanitize-blacklist=$(location //etc:asan_denylist_h)",
+        ],
         "//bazel/config:asan_disabled": [],
     },
     no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE,
@@ -687,7 +690,7 @@ ADDRESS_SANITIZER_COPTS = select(
 
 ADDRESS_SANITIZER_LINKFLAGS = select(
     {
-        ("//bazel/config:sanitize_address_required_settings"): ["-fsanitize=address"],
+        "//bazel/config:sanitize_address_required_settings": ["-fsanitize=address"],
         "//bazel/config:asan_disabled": [],
     },
     no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE,
@@ -709,8 +712,12 @@ ADDRESS_SANITIZER_DEFINES = select(
 # Makes it easier to debug memory failures at the cost of some perf: -fsanitize-memory-track-origins
 MEMORY_SANITIZER_COPTS = select(
     {
-        ("//bazel/config:sanitize_memory_required_settings"): ["-fsanitize=memory", "-fsanitize-memory-track-origins"],
-        ("//bazel/config:msan_disabled"): [],
+        "//bazel/config:sanitize_memory_required_settings": [
+            "-fsanitize=memory",
+            "-fsanitize-memory-track-origins",
+            "-fsanitize-blacklist=$(location //etc:msan_denylist_h)",
+        ],
+        "//bazel/config:msan_disabled": [],
     },
     no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE,
 )
@@ -772,8 +779,11 @@ THREAD_SANITIZER_ERROR_MESSAGE = (
 )
 
 THREAD_SANITIZER_COPTS = select({
-    ("//bazel/config:sanitize_thread_required_settings"): ["-fsanitize=thread"],
-    ("//bazel/config:tsan_disabled"): [],
+    "//bazel/config:sanitize_thread_required_settings": [
+        "-fsanitize=thread",
+        "-fsanitize-blacklist=$(location //etc:tsan_denylist_h)",
+    ],
+    "//bazel/config:tsan_disabled": [],
 }, no_match_error = THREAD_SANITIZER_ERROR_MESSAGE)
 
 THREAD_SANITIZER_LINKFLAGS = select({
@@ -803,8 +813,11 @@ UNDEFINED_SANITIZER_COPTS = select({
     ("//bazel/config:sanitize_undefined_dynamic_link_settings"): ["-fno-sanitize=vptr"],
     ("//conditions:default"): [],
 }) + select({
-    ("//bazel/config:ubsan_enabled"): ["-fsanitize=undefined"],
-    ("//bazel/config:ubsan_disabled"): [],
+    "//bazel/config:ubsan_enabled": [
+        "-fsanitize=undefined",
+        "-fsanitize-blacklist=$(location //etc:ubsan_denylist_h)",
+    ],
+    "//bazel/config:ubsan_disabled": [],
 }, no_match_error = GENERIC_SANITIZER_ERROR_MESSAGE + "undefined")
 
 UNDEFINED_SANITIZER_LINKFLAGS = select({
@@ -819,6 +832,23 @@ REQUIRED_SETTINGS_DYNAMIC_LINK_ERROR_MESSAGE = (
     "\nError:\n" +
     "    linking mongo dynamically is not currently supported on Windows"
 )
+
+# This is a hack to work around the fact that the cc_library flag additional_compiler_inputs doesn't
+# exist in cc_binary. Instead, we add the denylists to srcs as header files to make them visible to
+# the compiler executable.
+SANITIZER_DENYLIST_HEADERS = select({
+    "//bazel/config:asan_enabled": ["//etc:asan_denylist_h"],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:msan_enabled": ["//etc:msan_denylist_h"],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:tsan_enabled": ["//etc:tsan_denylist_h"],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:ubsan_enabled": ["//etc:ubsan_denylist_h"],
+    "//conditions:default": [],
+})
 
 LINKSTATIC_ENABLED = select({
     "//bazel/config:linkstatic_enabled": True,
@@ -1121,7 +1151,7 @@ def mongo_cc_library(
     # Create a cc_library entry to generate a shared archive of the target.
     native.cc_library(
         name = name + SHARED_ARCHIVE_SUFFIX,
-        srcs = srcs,
+        srcs = srcs + SANITIZER_DENYLIST_HEADERS,
         hdrs = hdrs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS,
         deps = deps,
         visibility = visibility,
@@ -1142,7 +1172,7 @@ def mongo_cc_library(
 
     native.cc_library(
         name = name + WITH_DEBUG_SUFFIX,
-        srcs = srcs,
+        srcs = srcs + SANITIZER_DENYLIST_HEADERS,
         hdrs = hdrs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS,
         deps = deps,
         visibility = visibility,
@@ -1252,7 +1282,7 @@ def mongo_cc_binary(
 
     native.cc_binary(
         name = name + WITH_DEBUG_SUFFIX,
-        srcs = srcs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS,
+        srcs = srcs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS + SANITIZER_DENYLIST_HEADERS,
         deps = all_deps,
         visibility = visibility,
         testonly = testonly,
@@ -1364,4 +1394,27 @@ idl_generator = rule(
     doc = "Generates header/source files from IDL files.",
     toolchains = ["@bazel_tools//tools/python:toolchain_type"],
     fragments = ["py"],
+)
+
+def symlink_impl(ctx):
+    output = ctx.actions.declare_file(ctx.bin_dir.path + "/" + ctx.attr.output.files.to_list()[0].path)
+    ctx.actions.symlink(
+        output = output,
+        target_file = ctx.attr.input.files.to_list()[0],
+    )
+
+    return [DefaultInfo(files = depset([output]))]
+
+symlink = rule(
+    symlink_impl,
+    attrs = {
+        "input": attr.label(
+            doc = "The File that the output symlink will point to.",
+            allow_single_file = True,
+        ),
+        "output": attr.label(
+            doc = "The output of this rule.",
+            allow_single_file = True,
+        ),
+    },
 )
