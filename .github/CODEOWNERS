@@ -55,3 +55,7 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./site_scons/OWNERS.yml
 /site_scons/**/* @10gen/devprod-build
+
+# The following patterns are parsed from ./src/third_party/OWNERS.yml
+/src/third_party/**/SConscript @10gen/devprod-build
+/src/third_party/**/*.bazel @10gen/devprod-build
