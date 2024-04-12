@@ -334,10 +334,16 @@ struct ValueBlock {
         return boost::none;
     }
 
+    /**
+     * Returns the index of the minimum element in the block, otherwise returns boost::none.
+     */
     virtual boost::optional<size_t> argMin() {
         return boost::none;
     }
 
+    /**
+     * Returns the index of the maximum element in the block, otherwise returns boost::none.
+     */
     virtual boost::optional<size_t> argMax() {
         return boost::none;
     }
