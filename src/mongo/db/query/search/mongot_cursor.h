@@ -70,7 +70,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     const executor::RemoteCommandRequest& command,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     bool preFetchNextBatch,
-    std::function<void(BSONObjBuilder& bob)> augmentGetMore = nullptr,
+    std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr);
 
 /**
@@ -82,7 +82,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     const BSONObj& query,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     boost::optional<long long> docsRequested = boost::none,
-    std::function<void(BSONObjBuilder& bob)> augmentGetMore = nullptr,
+    std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
     const boost::optional<int>& protocolVersion = boost::none,
     bool requiresSearchSequenceToken = false,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr);

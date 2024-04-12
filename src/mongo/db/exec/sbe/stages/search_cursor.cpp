@@ -284,10 +284,7 @@ void SearchCursorStage::open(bool reOpen) {
         }
     }
 
-    if (_cursor && _limit != 0) {
-        _cursor->updateGetMoreFunc(
-            search_helpers::buildSearchGetMoreFunc([this] { return calcDocsNeeded(); }));
-    }
+    // TODO SERVER-88598 Make SBE coordinate with mongot cursor to compute docs needed.
 
     if (_sortSpecAccessor) {
         auto [sortTag, sortVal] = _sortSpecAccessor->getViewOfValue();

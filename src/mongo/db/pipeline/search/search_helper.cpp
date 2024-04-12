@@ -370,7 +370,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
         origSearchStage->getSearchQuery(),
         origSearchStage->getTaskExecutor(),
         origSearchStage->getMongotDocsRequested(),
-        buildSearchGetMoreFunc([origSearchStage] { return origSearchStage->calcDocsNeeded(); }),
+        [origSearchStage] { return origSearchStage->calcDocsNeeded(); },
         origSearchStage->getIntermediateResultsProtocolVersion(),
         origSearchStage->getPaginationFlag());
 
@@ -537,23 +537,6 @@ std::unique_ptr<executor::TaskExecutorCursor> getSearchMetadataCursor(DocumentSo
         return search->getMetadataCursor();
     }
     return nullptr;
-}
-
-std::function<void(BSONObjBuilder& bob)> buildSearchGetMoreFunc(
-    std::function<boost::optional<long long>()> calcDocsNeeded) {
-    if (!calcDocsNeeded) {
-        return nullptr;
-    }
-    return [calcDocsNeeded](BSONObjBuilder& bob) {
-        auto docsNeeded = calcDocsNeeded();
-        // (Ignore FCV check): This feature is enabled on an earlier FCV.
-        if (feature_flags::gFeatureFlagSearchBatchSizeLimit.isEnabledAndIgnoreFCVUnsafe() &&
-            docsNeeded.has_value()) {
-            BSONObjBuilder cursorOptionsBob(bob.subobjStart(mongot_cursor::kCursorOptionsField));
-            cursorOptionsBob.append(mongot_cursor::kDocsRequestedField, docsNeeded.get());
-            cursorOptionsBob.doneFast();
-        }
-    };
 }
 
 std::unique_ptr<RemoteCursorMap> getSearchRemoteCursors(

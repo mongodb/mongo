@@ -157,14 +157,11 @@ TEST_F(TaskExecutorCursorFixture, Basic) {
                                   << "batchSize" << 10),
                              opCtx.get());
 
-    TaskExecutorCursor tec(executor(), rcr, [] {
-        TaskExecutorCursor::Options opts;
-        opts.batchSize = 10;
-        return opts;
-    }());
+    executor::TaskExecutorCursorOptions opts(/*batchSize*/ 10);
+    auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 
     size_t count = 0;
-    while (auto doc = tec.getNext(opCtx.get())) {
+    while (auto doc = tec->getNext(opCtx.get())) {
         count++;
     }
 
@@ -184,16 +181,14 @@ TEST_F(TaskExecutorCursorFixture, BasicPinned) {
                                   << "test"
                                   << "batchSize" << 10),
                              opCtx.get());
-
-    TaskExecutorCursor tec(executor(), rcr, [this] {
-        TaskExecutorCursor::Options opts;
-        opts.batchSize = 10;
-        opts.pinConnection = true;
-        return opts;
-    }());
+    executor::TaskExecutorCursorOptions opts(/*batchSize*/ 10,
+                                             /*preFetchNextBatch*/ true,
+                                             /*planYieldPolicy*/ nullptr,
+                                             /*pinConnection*/ true);
+    auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 
     size_t count = 0;
-    while (auto doc = tec.getNext(opCtx.get())) {
+    while (auto doc = tec->getNext(opCtx.get())) {
         count++;
     }
 
@@ -214,13 +209,12 @@ TEST_F(TaskExecutorCursorFixture, PinnedExecutorDestroyedOnUnderlying) {
                                   << "batchSize" << 10),
                              opCtx.get());
 
-    boost::optional<TaskExecutorCursor> tec;
-    tec.emplace(executor(), rcr, [] {
-        TaskExecutorCursor::Options opts;
-        opts.batchSize = 10;
-        opts.pinConnection = true;
-        return opts;
-    }());
+    executor::TaskExecutorCursorOptions opts(/*batchSize*/ 10,
+                                             /*preFetchNextBatch*/ true,
+                                             /*planYieldPolicy*/ nullptr,
+                                             /*pinConnection*/ true);
+    auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
+
     // Fetch a documents to make sure the TEC was initialized properly.
     ASSERT(tec->getNext(opCtx.get()));
     // Enable the failpoint in the integration test process.
@@ -310,13 +304,10 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
                                       << "batchSize" << 10),
                                  opCtx.get());
 
-        TaskExecutorCursor tec(executor(), rcr, [] {
-            TaskExecutorCursor::Options opts;
-            opts.batchSize = 10;
-            return opts;
-        }());
+        executor::TaskExecutorCursorOptions opts(/*batchSize*/ 10);
+        auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 
-        tec.populateCursor(opCtx.get());
+        tec->populateCursor(opCtx.get());
 
         // At least one of the connections is busy running the initial `getMore` command to populate
         // the cursor. The command is blocked on the remote host and does not return until after the
