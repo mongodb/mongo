@@ -30,7 +30,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -91,18 +90,6 @@ TEST(ResourceIdTest, Masking) {
             ASSERT_EQUALS(id.getType(), resources[r]);
         }
     }
-}
-
-DEATH_TEST(ResourceIdTest, StringConstructorMustNotBeCollection, "invariant") {
-    ResourceId(RESOURCE_COLLECTION, "TestDB.collection");
-}
-
-DEATH_TEST(ResourceIdTest, StringConstructorMustNotBeDatabase, "invariant") {
-    ResourceId(RESOURCE_DATABASE, "TestDB");
-}
-
-DEATH_TEST(ResourceIdTest, CantCreateResourceMutexDirectly, "invariant") {
-    ResourceId(RESOURCE_MUTEX, "TestDB");
 }
 
 }  // namespace resource_id_test

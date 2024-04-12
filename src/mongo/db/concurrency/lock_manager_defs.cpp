@@ -62,4 +62,25 @@ std::string ResourceId::toString() const {
     return ss.str();
 }
 
+void LockRequest::initNew(Locker* locker, LockGrantNotification* notify) {
+    this->locker = locker;
+    this->notify = notify;
+
+    enqueueAtFront = false;
+    compatibleFirst = false;
+    partitioned = false;
+
+    status = STATUS_NEW;
+    mode = MODE_NONE;
+
+    unlockPending = 0;
+    recursiveCount = 1;
+
+    lock = nullptr;
+    partitionedLock = nullptr;
+
+    prev = nullptr;
+    next = nullptr;
+}
+
 }  // namespace mongo

@@ -30,7 +30,6 @@
 #include <string>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -50,25 +49,6 @@
 
 namespace mongo {
 namespace {
-
-/**
- * Dumps the contents of all locks into a BSON object
- * to be used in lockInfo command in the shell.
- * Adds a "lockInfo" element to the `result` object:
- *     "lockInfo": [
- *         // object for each lock in the LockManager (in any bucket),
- *         {
- *             "resourceId": <string>,
- *             "granted": [ {...}, ... ],  // array of lock requests
- *             "pending": [ {...}, ... ],  // array of lock requests
- *         },
- *         ...
- *     ]
- */
-void getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap, BSONObjBuilder* result) {
-
-    ;
-}
 
 class CmdLockInfo : public TypedCommand<CmdLockInfo> {
 public:
