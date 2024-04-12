@@ -52,7 +52,8 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const DatabaseNam
     }
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (ShardingState::get(opCtx)->enabled() && fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFailOnDirectShardOperations.isEnabled(fcvSnapshot)) {
+        (feature_flags::gCheckForDirectShardOperations.isEnabled(fcvSnapshot) ||
+         feature_flags::gFailOnDirectShardOperations.isEnabled(fcvSnapshot))) {
         bool clusterHasTwoOrMoreShards = [&]() {
             auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
             auto* clusterCardinalityParam =
@@ -74,12 +75,21 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const DatabaseNam
 
             if (!directShardOperationsAllowed) {
                 ShardingStatistics::get(opCtx).unauthorizedDirectShardOperations.addAndFetch(1);
-                LOGV2_ERROR_OPTIONS(
-                    8679600,
-                    {logv2::UserAssertAfterLog(ErrorCodes::Unauthorized)},
-                    "You are connecting to a sharded cluster improperly by connecting directly to "
-                    "a shard. Please connect to the cluster via a router (mongos).",
-                    "command"_attr = CurOp::get(opCtx)->getCommand()->getName());
+                if (feature_flags::gFailOnDirectShardOperations.isEnabled(fcvSnapshot)) {
+                    LOGV2_ERROR_OPTIONS(
+                        8679600,
+                        {logv2::UserAssertAfterLog(ErrorCodes::Unauthorized)},
+                        "You are connecting to a sharded cluster improperly by connecting directly "
+                        "to a shard. Please connect to the cluster via a router (mongos).",
+                        "command"_attr = CurOp::get(opCtx)->getCommand()->getName());
+                } else if (feature_flags::gCheckForDirectShardOperations.isEnabled(fcvSnapshot)) {
+                    LOGV2_DEBUG(
+                        7553700,
+                        ShardingState::get(opCtx)->directConnectionLogSeverity().toInt(),
+                        "You are connecting to a sharded cluster improperly by connecting directly "
+                        "to a shard. Please connect to the cluster via a router (mongos).",
+                        "command"_attr = CurOp::get(opCtx)->getCommand()->getName());
+                }
             }
         }
     }

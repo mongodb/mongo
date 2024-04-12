@@ -671,11 +671,6 @@ private:
     bool _refreshedCatalogCache = false;
 
     boost::optional<Ticket> _admissionTicket;
-
-    // Keep a static variable to track the last time a warning about direct shard connections was
-    // logged.
-    static Mutex _staticMutex;
-    static Date_t _lastDirectConnectionWarningTime;
 };
 
 class RunCommandImpl {
@@ -1412,9 +1407,6 @@ void RunCommandAndWaitForWriteConcern::_checkWriteConcern() {
     }
 }
 
-Mutex ExecCommandDatabase::_staticMutex = MONGO_MAKE_LATCH("DirectShardConnectionTimer");
-Date_t ExecCommandDatabase::_lastDirectConnectionWarningTime = Date_t();
-
 /**
  * Given the specified command, returns an effective read concern which should be used or an error
  * if the read concern is not valid for the command.
@@ -1828,57 +1820,6 @@ void ExecCommandDatabase::_initiateCommand() {
 
     // Once API params and txn state are set on opCtx, enforce the "requireApiVersion" setting.
     enforceRequireAPIVersion(opCtx, command);
-
-    // Check that the client has the directShardOperations role if this is a direct operation to a
-    // shard. This code is only used for warnings, errors will be emitted by the checks in the
-    // AutoGetX and AcquireX checks if featureFlagFailOnDirectShardOperations is enabled.
-    //
-    // TODO (SERVER-87190) Remove once 8.0 becomes last-lts. We will rely on the checks in the auto
-    // getters and collection acquisitions.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (command->requiresAuth() && ShardingState::get(opCtx)->enabled() &&
-        fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gCheckForDirectShardOperations.isEnabled(fcvSnapshot) &&
-        !feature_flags::gFailOnDirectShardOperations.isEnabled(fcvSnapshot)) {
-        bool clusterHasTwoOrMoreShards = [&]() {
-            auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-            auto* clusterCardinalityParam =
-                clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
-                    "shardedClusterCardinalityForDirectConns");
-            return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
-        }();
-        if (clusterHasTwoOrMoreShards && !command->shouldSkipDirectConnectionChecks()) {
-            const bool authIsEnabled = AuthorizationManager::get(opCtx->getService()) &&
-                AuthorizationManager::get(opCtx->getService())->isAuthEnabled();
-
-            const bool hasDirectShardOperations = !authIsEnabled ||
-                ((AuthorizationSession::get(opCtx->getClient()) != nullptr &&
-                  AuthorizationSession::get(opCtx->getClient())
-                      ->isAuthorizedForActionsOnResource(
-                          ResourcePattern::forClusterResource(dbName.tenantId()),
-                          ActionType::issueDirectShardOperations)));
-
-            if (!hasDirectShardOperations) {
-                bool timeUpdated = false;
-                auto currentTime = opCtx->getServiceContext()->getFastClockSource()->now();
-                {
-                    stdx::lock_guard<Latch> lk(_staticMutex);
-                    if ((currentTime - _lastDirectConnectionWarningTime) > Hours(1)) {
-                        _lastDirectConnectionWarningTime = currentTime;
-                        timeUpdated = true;
-                    }
-                }
-                if (timeUpdated) {
-                    LOGV2_WARNING(
-                        7553700,
-                        "Command should not be run via a direct connection to a shard without the "
-                        "directShardOperations role. Please connect via a router.",
-                        "command"_attr = request.getCommandName());
-                }
-                ShardingStatistics::get(opCtx).unauthorizedDirectShardOperations.addAndFetch(1);
-            }
-        }
-    }
 
     if (!opCtx->getClient()->isInDirectClient()) {
         const boost::optional<ShardVersion>& shardVersion = _requestArgs.getShardVersion();

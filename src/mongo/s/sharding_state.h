@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
@@ -147,6 +148,14 @@ public:
     void setRecoveryCompleted(RecoveredClusterRole role);
     void setRecoveryFailed(Status failedStatus);
 
+    /**
+     * Returns the severity the direct shard operation warnings should be logged at. This is
+     * determined by the amount of time that has passed since the last warning was logged.
+     */
+    logv2::LogSeverity directConnectionLogSeverity() {
+        return _directConnectionLogSuppressor();
+    }
+
 private:
     const bool _inMaintenanceMode;
 
@@ -156,6 +165,10 @@ private:
     SharedPromise<RecoveredClusterRole> _awaitClusterRoleRecoveryPromise;
     Promise<RecoveredClusterRole> _promise;
     Future<RecoveredClusterRole> _future;
+
+    // Log severity suppressor for direct connection checks
+    logv2::SeveritySuppressor _directConnectionLogSuppressor{
+        Hours{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
 };
 
 }  // namespace mongo
