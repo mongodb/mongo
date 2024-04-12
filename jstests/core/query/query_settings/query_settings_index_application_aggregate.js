@@ -129,10 +129,8 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
 
     // Ensure that providing query settings with an invalid index result in the same plan as no
     // query settings being set.
-    // NOTE: The fallback is not tested when hinting secondary collections, as instead of fallback,
-    // hash join or nlj will be used.
-    // TODO: SERVER-88629 Add support for $natural hints on secondary collections.
     qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsFallback(aggregateCmd, secondaryNs);
 
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);

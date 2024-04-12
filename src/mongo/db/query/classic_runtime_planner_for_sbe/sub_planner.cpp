@@ -57,28 +57,22 @@ SubPlanner::SubPlanner(PlannerDataForSBE plannerData) : PlannerBase(std::move(pl
     uassertStatusOK(_subplanStage->pickBestPlan(plannerParams(),
                                                 trialPeriodYieldPolicy.get(),
                                                 false /* shouldConstructClassicExecutableTree */));
+
+    _solution = extendSolutionWithPipeline(_subplanStage->extractBestWholeQuerySolution());
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery) {
-    std::unique_ptr<QuerySolution> solution = _subplanStage->extractBestWholeQuerySolution();
-
-    // Extend the winning solution with the agg pipeline and build the execution tree.
-    if (!cq()->cqPipeline().empty()) {
-        solution = QueryPlanner::extendWithAggPipeline(
-            *cq(), std::move(solution), plannerParams().secondaryCollectionsInfo);
-    }
-
-    auto sbePlanAndData = prepareSbePlanAndData(*solution);
+    auto sbePlanAndData = prepareSbePlanAndData(*_solution);
     plan_cache_util::updatePlanCache(opCtx(),
                                      collections(),
                                      *cq(),
-                                     *solution,
+                                     *_solution,
                                      *sbePlanAndData.first.get(),
                                      sbePlanAndData.second);
 
     return prepareSbePlanExecutor(std::move(canonicalQuery),
-                                  std::move(solution),
+                                  std::move(_solution),
                                   std::move(sbePlanAndData),
                                   false /*isFromPlanCache*/,
                                   cachedPlanHash(),
