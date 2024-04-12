@@ -1092,7 +1092,7 @@ env_vars.Add(
     help=
     'Enables/disables building with bazel. Note that this project is in flight, and thus subject to breaking changes. See https://jira.mongodb.org/browse/PM-3332 for details.',
     converter=functools.partial(bool_var_converter, var='BAZEL_BUILD_ENABLED'),
-    default="1",
+    default="0",
 )
 
 env_vars.Add(
@@ -2166,7 +2166,6 @@ else:
 
 if env['MONGO_ALLOCATOR'] == "tcmalloc-google":
     env.Append(CPPDEFINES=["ABSL_ALLOCATOR_NOTHROW"])
-    env.Append(CXXFLAGS=['-faligned-new=8'])
 
 if has_option("cache"):
     if has_option("gcov"):
