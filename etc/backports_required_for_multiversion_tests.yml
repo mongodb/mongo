@@ -477,6 +477,8 @@ last-continuous:
     ticket: SERVER-88173
   - test_file: jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
     ticket: SERVER-79049
+  - test_file: jstests/core/timeseries/timeseries_collmod.js
+    ticket: SERVER-83370
   suites: null
 last-lts:
   all:
@@ -1002,4 +1004,6 @@ last-lts:
     ticket: SERVER-88173
   - test_file: jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
     ticket: SERVER-79049
+  - test_file: jstests/core/timeseries/timeseries_collmod.js
+    ticket: SERVER-83370
   suites: null
