@@ -333,19 +333,17 @@ TEST(ReadAfterParse, BadLevelType) {
 
 TEST(ReadAfterParse, BadLevelValue) {
     ReadConcernArgs readConcern;
-    ASSERT_EQ(ErrorCodes::FailedToParse,
-              readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSON(ReadConcernArgs::kLevelFieldName
-                                                  << "seven is not a real level"))));
+    ASSERT_NOT_OK(readConcern.initialize(BSON("find"
+                                              << "test" << ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(ReadConcernArgs::kLevelFieldName
+                                                      << "seven is not a real level"))));
 }
 
 TEST(ReadAfterParse, BadOption) {
     ReadConcernArgs readConcern;
-    ASSERT_EQ(ErrorCodes::InvalidOptions,
-              readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSON("asdf" << 1))));
+    ASSERT_NOT_OK(readConcern.initialize(BSON("find"
+                                              << "test" << ReadConcernArgs::kReadConcernFieldName
+                                              << BSON("asdf" << 1))));
 }
 
 TEST(ReadAfterParse, AtClusterTimeAndAfterClusterTime) {

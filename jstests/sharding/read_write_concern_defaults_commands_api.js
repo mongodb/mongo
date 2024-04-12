@@ -96,7 +96,7 @@ function verifyDefaultRWCommandsInvalidInput(conn) {
     // Non-existent level.
     assert.commandFailedWithCode(
         conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "dummy"}}),
-        ErrorCodes.FailedToParse);
+        [ErrorCodes.FailedToParse, ErrorCodes.BadValue]);
 
     // Unsupported level.
     assert.commandFailedWithCode(

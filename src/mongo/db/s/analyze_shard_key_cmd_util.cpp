@@ -318,7 +318,8 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
     aggRequest.setCollation(CollationSpec::kSimpleSpec);
     // Use readConcern "available" to avoid shard filtering since it is expensive.
     aggRequest.setReadConcern(
-        BSON(repl::ReadConcernArgs::kLevelFieldName << repl::readConcernLevels::kAvailableName));
+        BSON(repl::ReadConcernArgs::kLevelFieldName
+             << repl::readConcernLevels::toString(repl::ReadConcernLevel::kAvailableReadConcern)));
 
     return aggRequest;
 }

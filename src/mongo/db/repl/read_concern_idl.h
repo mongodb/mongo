@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,21 +29,15 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/repl/read_concern_gen.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/logical_time.h"
 
 namespace mongo {
-namespace repl {
 
-using ReadConcernLevel = ReadConcernLevelEnum;
+// Helpers for IDL parsing
+LogicalTime deserializeReadConcernLogicalTime(BSONElement e);
+void serializeReadConcernLogicalTime(const LogicalTime& w,
+                                     StringData fieldName,
+                                     BSONObjBuilder* builder);
 
-namespace readConcernLevels {
-
-StringData toString(ReadConcernLevel level);
-
-}  // namespace readConcernLevels
-
-}  // namespace repl
 }  // namespace mongo

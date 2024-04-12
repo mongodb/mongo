@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,23 +27,26 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <boost/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/repl/read_concern_gen.h"
+#include "mongo/db/repl/read_concern_idl.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 
 namespace mongo {
-namespace repl {
 
-using ReadConcernLevel = ReadConcernLevelEnum;
+LogicalTime deserializeReadConcernLogicalTime(BSONElement e) {
+    uassert(ErrorCodes::TypeMismatch,
+            fmt::format("\"{}\" had the wrong type. Expected {}, found {}",
+                        e.fieldNameStringData(),
+                        BSONType::bsonTimestamp,
+                        typeName(e.type())),
+            e.type() == BSONType::bsonTimestamp);
 
-namespace readConcernLevels {
+    return LogicalTime(Timestamp(e.timestampValue()));
+}
 
-StringData toString(ReadConcernLevel level);
-
-}  // namespace readConcernLevels
-
-}  // namespace repl
+void serializeReadConcernLogicalTime(const LogicalTime& w,
+                                     StringData fieldName,
+                                     BSONObjBuilder* builder) {
+    builder->append(fieldName, w.asTimestamp());
+}
 }  // namespace mongo

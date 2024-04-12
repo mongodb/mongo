@@ -41,11 +41,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/json.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/util/assert_util_core.h"
 
@@ -55,14 +56,15 @@ namespace repl {
 class ReadConcernArgs {
 public:
     static constexpr StringData kReadConcernFieldName = "readConcern"_sd;
-    static constexpr StringData kAfterOpTimeFieldName = "afterOpTime"_sd;
-    static constexpr StringData kAfterClusterTimeFieldName = "afterClusterTime"_sd;
-    static constexpr StringData kAtClusterTimeFieldName = "atClusterTime"_sd;
-    static constexpr StringData kLevelFieldName = "level"_sd;
+    static constexpr StringData kAfterOpTimeFieldName = ReadConcernIdl::kAfterOpTimeFieldName;
+    static constexpr StringData kAfterClusterTimeFieldName =
+        ReadConcernIdl::kAfterClusterTimeFieldName;
+    static constexpr StringData kAtClusterTimeFieldName = ReadConcernIdl::kAtClusterTimeFieldName;
+    static constexpr StringData kLevelFieldName = ReadConcernIdl::kLevelFieldName;
     static constexpr StringData kAllowTransactionTableSnapshot =
-        "$_allowTransactionTableSnapshot"_sd;
+        ReadConcernIdl::kAllowTransactionTableSnapshotFieldName;
     static constexpr StringData kWaitLastStableRecoveryTimestamp =
-        "$_waitLastStableRecoveryTimestamp"_sd;
+        ReadConcernIdl::kWaitLastStableRecoveryTimestampFieldName;
 
     static const BSONObj kImplicitDefault;
     static const BSONObj kLocal;
@@ -92,6 +94,7 @@ public:
 
     ReadConcernArgs(boost::optional<LogicalTime> afterClusterTime,
                     boost::optional<ReadConcernLevel> level);
+
     /**
      * Format:
      * {
@@ -121,7 +124,14 @@ public:
      */
     Status parse(const BSONObj& readConcernObj);
 
+    /**
+     * Initializes the object by parsing the IDL representation of the actual readConcern
+     * sub-object.
+     */
+    Status parse(ReadConcernIdl inner);
+
     static ReadConcernArgs fromBSONThrows(const BSONObj& readConcernObj);
+    static ReadConcernArgs fromIDLThrows(ReadConcernIdl readConcern);
 
     /**
      * Sets the mechanism we should use to satisfy 'majority' reads.
@@ -199,6 +209,11 @@ public:
      */
     BSONObj toBSONInner() const;
     std::string toString() const;
+
+    /**
+     * Returns the IDL-struct representation of this object's inner BSON serialized form.
+     */
+    ReadConcernIdl toReadConcernIdl() const;
 
     ReadWriteConcernProvenance& getProvenance() {
         return _provenance;

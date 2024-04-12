@@ -964,16 +964,29 @@ env.Library(
 )
 
 env.Library(
+    target='read_concern_idl',
+    source=[
+        'read_concern.idl',
+        'read_concern_idl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/read_write_concern_provenance',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'optime',
+    ],
+)
+
+env.Library(
     'read_concern_args',
     source=[
         'read_concern_args.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/read_write_concern_provenance',
         'optime',
+        'read_concern_idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/server_base',
     ],
 )
@@ -1243,8 +1256,9 @@ env.Library(
         'optime_base.idl',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 

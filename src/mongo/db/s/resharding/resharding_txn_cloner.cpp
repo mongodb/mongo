@@ -154,10 +154,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_targetAggregati
     AggregateCommandRequest request(NamespaceString::kSessionTransactionsTableNamespace,
                                     pipeline.serializeToBson());
 
-    request.setReadConcern(BSON(repl::ReadConcernArgs::kLevelFieldName
-                                << repl::readConcernLevels::kSnapshotName
-                                << repl::ReadConcernArgs::kAtClusterTimeFieldName << _fetchTimestamp
-                                << repl::ReadConcernArgs::kAllowTransactionTableSnapshot << true));
+    request.setReadConcern(
+        BSON(repl::ReadConcernArgs::kLevelFieldName
+             << repl::readConcernLevels::toString(repl::ReadConcernLevel::kSnapshotReadConcern)
+             << repl::ReadConcernArgs::kAtClusterTimeFieldName << _fetchTimestamp
+             << repl::ReadConcernArgs::kAllowTransactionTableSnapshot << true));
     request.setWriteConcern(WriteConcernOptions());
     request.setHint(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
     request.setUnwrappedReadPref(ReadPreferenceSetting{ReadPreference::Nearest}.toContainingBSON());

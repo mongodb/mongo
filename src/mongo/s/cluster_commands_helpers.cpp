@@ -57,6 +57,7 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/tenant_id.h"
@@ -897,20 +898,23 @@ BSONObj forceReadConcernLocal(OperationContext* opCtx, BSONObj& cmd) {
     auto atClusterTime = readConcernArgs.getArgsAtClusterTime();
     auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
     BSONObjBuilder bob(cmd.removeField(ReadConcernArgs::kReadConcernFieldName));
-    BSONObjBuilder newReadConcernBuilder;
-    newReadConcernBuilder.append(ReadConcernArgs::kLevelFieldName,
-                                 repl::readConcernLevels::kLocalName);
+
+    repl::ReadConcernIdl newReadConcern;
+    newReadConcern.setLevel(ReadConcernLevel::kLocalReadConcern);
     // We should carry over the atClusterTime/afterClusterTime to keep causal consistency.
     if (atClusterTime) {
         // atClusterTime is only supported in snapshot readConcern, so we use afterClusterTime
         // instead.
-        newReadConcernBuilder.append(ReadConcernArgs::kAfterClusterTimeFieldName,
-                                     atClusterTime->asTimestamp());
+        newReadConcern.setAfterClusterTime(atClusterTime);
     } else if (afterClusterTime) {
-        newReadConcernBuilder.append(ReadConcernArgs::kAfterClusterTimeFieldName,
-                                     afterClusterTime->asTimestamp());
+        newReadConcern.setAfterClusterTime(afterClusterTime);
     }
-    bob.append(ReadConcernArgs::kReadConcernFieldName, newReadConcernBuilder.obj());
+
+    {
+        BSONObjBuilder newReadConcernBuilder(
+            bob.subobjStart(ReadConcernArgs::kReadConcernFieldName));
+        newReadConcern.serialize(&newReadConcernBuilder);
+    }
 
     return bob.obj();
 }
