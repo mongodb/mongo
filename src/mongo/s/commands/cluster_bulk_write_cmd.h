@@ -228,20 +228,23 @@ public:
                                              summaryFields.nDeleted);
             }
 
-            ClusterClientCursorParams params(cursorNss,
-                                             APIParameters::get(opCtx),
-                                             ReadPreferenceSetting::get(opCtx),
-                                             repl::ReadConcernArgs::get(opCtx),
-                                             [&] {
-                                                 if (!opCtx->getLogicalSessionId())
-                                                     return OperationSessionInfoFromClient();
-                                                 // TODO (SERVER-80525): This code path does not
-                                                 // clear the setAutocommit field on the presence of
-                                                 // TransactionRouter::get
-                                                 return OperationSessionInfoFromClient(
-                                                     *opCtx->getLogicalSessionId(),
-                                                     opCtx->getTxnNumber());
-                                             }());
+            ClusterClientCursorParams params(
+                cursorNss,
+                APIParameters::get(opCtx),
+                ReadPreferenceSetting::get(opCtx),
+                repl::ReadConcernArgs::get(opCtx),
+                [&] {
+                    if (!opCtx->getLogicalSessionId())
+                        return OperationSessionInfoFromClient();
+                    // TODO (SERVER-80525): This code path does not
+                    // clear the setAutocommit field on the presence of
+                    // TransactionRouter::get
+                    return OperationSessionInfoFromClient(
+                        *opCtx->getLogicalSessionId(),
+                        // Retryable writes will have a txnNumber we do not want to associate with
+                        // the cursor. We only want to set this field for transactions.
+                        opCtx->inMultiDocumentTransaction() ? opCtx->getTxnNumber() : boost::none);
+                }());
 
             long long batchSize = std::numeric_limits<long long>::max();
             if (req.getCursor() && req.getCursor()->getBatchSize()) {
