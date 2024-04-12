@@ -68,15 +68,22 @@ using std::vector;
 using unittest::assertGet;
 
 std::ostream& operator<<(std::ostream& stream, const PlanCacheKeyInfo& key) {
-    stream << key.toString();
+    stream << key.toString() << " settings: " << key.querySettings().toBSON().toString();
     return stream;
 }
+
+auto makeDbName(StringData dbName) {
+    return DatabaseNameUtil::deserialize(
+        boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
+}
+
 
 namespace {
 using PlanCacheKeyInfoTest = CanonicalQueryTest;
 
 PlanCacheKeyInfo makeKey(const CanonicalQuery& cq,
-                         const std::vector<CoreIndexInfo>& indexCores = {}) {
+                         const std::vector<CoreIndexInfo>& indexCores = {},
+                         const query_settings::QuerySettings& settings = {}) {
     PlanCacheIndexabilityState indexabilityState;
     indexabilityState.updateDiscriminators(indexCores);
 
@@ -84,7 +91,7 @@ PlanCacheKeyInfo makeKey(const CanonicalQuery& cq,
     plan_cache_detail::encodeIndexability(
         cq.getPrimaryMatchExpression(), indexabilityState, &indexabilityKeyBuilder);
 
-    return {cq.encodeKey(), indexabilityKeyBuilder.str(), query_settings::QuerySettings()};
+    return {cq.encodeKey(), indexabilityKeyBuilder.str(), settings};
 }
 
 /**
@@ -137,6 +144,68 @@ void assertPlanCacheKeysUnequalDueToDiscriminators(const PlanCacheKeyInfo& a,
 }
 
 }  // namespace
+
+TEST_F(PlanCacheKeyInfoTest, EqualityOperator) {
+    unique_ptr<CanonicalQuery> cqEqZero(canonicalize("{a: 0}}"));
+    unique_ptr<CanonicalQuery> cqEqOne(canonicalize("{a: 1}}"));
+
+    NamespaceSpec nsSpec;
+    nsSpec.setDb(makeDbName("db"));
+    nsSpec.setColl("coll"_sd);
+    query_settings::QuerySettings settingsA1IndexKeyPattern;
+    settingsA1IndexKeyPattern.setIndexHints(
+        {{query_settings::IndexHintSpec(nsSpec, {IndexHint(BSON("a" << 1))})}});
+    query_settings::QuerySettings settingsA1IndexName;
+    settingsA1IndexKeyPattern.setIndexHints(
+        {{query_settings::IndexHintSpec(nsSpec, {IndexHint("a_1")})}});
+    query_settings::QuerySettings settingsB1IndexKeyPattern;
+    settingsB1IndexKeyPattern.setIndexHints(
+        {{query_settings::IndexHintSpec(nsSpec, {IndexHint(BSON("b" << 1))})}});
+
+    auto keyWithoutSettingsZero = makeKey(*cqEqZero, {} /*indexCores=*/);
+    auto keyWithSettingsZeroA1IndexKeyPattern =
+        makeKey(*cqEqZero, {} /*indexCores=*/, settingsA1IndexKeyPattern);
+    auto keyWithSettingsZeroA1IndexName =
+        makeKey(*cqEqZero, {} /*indexCores=*/, settingsA1IndexName);
+    auto keyWithSettingsOneA1IndexKeyPattern =
+        makeKey(*cqEqOne, {} /*indexCores=*/, settingsA1IndexKeyPattern);
+    auto keyWithSettingsOneA1IndexName = makeKey(*cqEqOne, {} /*indexCores=*/, settingsA1IndexName);
+    auto keyWithSettingsOneB1IndexKeyPattern =
+        makeKey(*cqEqOne, {} /*indexCores=*/, settingsB1IndexKeyPattern);
+
+    // Ensure that presence of query settings results in different hash and makes equality fail.
+    ASSERT_NE(keyWithoutSettingsZero.planCacheKeyHash(),
+              keyWithSettingsZeroA1IndexKeyPattern.planCacheKeyHash());
+    ASSERT_NE(keyWithoutSettingsZero, keyWithSettingsZeroA1IndexKeyPattern);
+
+    ASSERT_NE(keyWithoutSettingsZero.planCacheKeyHash(),
+              keyWithSettingsOneA1IndexKeyPattern.planCacheKeyHash());
+    ASSERT_NE(keyWithoutSettingsZero, keyWithSettingsOneA1IndexKeyPattern);
+
+    // Ensure that keys with same query settings and equivalent query hash results in same hash and
+    // passes equality check.
+    ASSERT_EQ(keyWithSettingsOneA1IndexName.planCacheKeyHash(),
+              keyWithSettingsZeroA1IndexName.planCacheKeyHash());
+    ASSERT_EQ(keyWithSettingsOneA1IndexName, keyWithSettingsZeroA1IndexName);
+
+    ASSERT_EQ(keyWithSettingsOneA1IndexKeyPattern.planCacheKeyHash(),
+              keyWithSettingsZeroA1IndexKeyPattern.planCacheKeyHash());
+    ASSERT_EQ(keyWithSettingsOneA1IndexKeyPattern, keyWithSettingsZeroA1IndexKeyPattern);
+
+    // Ensure that if settings are different, both hashes are different and keys are considered
+    // unequal.
+    ASSERT_NE(keyWithSettingsOneA1IndexKeyPattern.planCacheKeyHash(),
+              keyWithSettingsZeroA1IndexName.planCacheKeyHash());
+    ASSERT_NE(keyWithSettingsOneA1IndexKeyPattern, keyWithSettingsZeroA1IndexName);
+
+    ASSERT_NE(keyWithSettingsOneA1IndexKeyPattern.planCacheKeyHash(),
+              keyWithSettingsOneA1IndexName.planCacheKeyHash());
+    ASSERT_NE(keyWithSettingsOneA1IndexKeyPattern, keyWithSettingsOneA1IndexName);
+
+    ASSERT_NE(keyWithSettingsOneA1IndexKeyPattern.planCacheKeyHash(),
+              keyWithSettingsOneB1IndexKeyPattern.planCacheKeyHash());
+    ASSERT_NE(keyWithSettingsOneA1IndexKeyPattern, keyWithSettingsOneB1IndexKeyPattern);
+}
 
 // When a sparse index is present, computeKey() should generate different keys depending on
 // whether or not the predicates in the given query can use the index.
