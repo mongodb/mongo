@@ -154,10 +154,10 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::kNoWaiting);
 
 BSONObj makeLocalReadConcernWithAfterClusterTime(Timestamp afterClusterTime) {
-    return BSON(repl::ReadConcernArgs::kReadConcernFieldName
-                << BSON(repl::ReadConcernArgs::kLevelFieldName
-                        << repl::readConcernLevels::kLocalName
-                        << repl::ReadConcernArgs::kAfterClusterTimeFieldName << afterClusterTime));
+    return BSON(repl::ReadConcernArgs::kReadConcernFieldName << BSON(
+                    repl::ReadConcernArgs::kLevelFieldName
+                    << repl::readConcernLevels::toString(repl::ReadConcernLevel::kLocalReadConcern)
+                    << repl::ReadConcernArgs::kAfterClusterTimeFieldName << afterClusterTime));
 }
 
 void checkOutSessionAndVerifyTxnState(OperationContext* opCtx) {

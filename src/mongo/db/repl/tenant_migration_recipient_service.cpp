@@ -939,10 +939,11 @@ boost::optional<OpTime> TenantMigrationRecipientService::Instance::_getOldestAct
     // config.transactions collection aren't coalesced for multi-statement transactions during
     // secondary oplog application, unlike the retryable writes where updates to config.transactions
     // collection are coalesced on secondaries.
-    findCmd.setReadConcern(BSON(repl::ReadConcernArgs::kLevelFieldName
-                                << repl::readConcernLevels::kSnapshotName
-                                << repl::ReadConcernArgs::kAtClusterTimeFieldName << ReadTimestamp
-                                << repl::ReadConcernArgs::kAllowTransactionTableSnapshot << true));
+    findCmd.setReadConcern(
+        BSON(repl::ReadConcernArgs::kLevelFieldName
+             << repl::readConcernLevels::toString(repl::ReadConcernLevel::kSnapshotReadConcern)
+             << repl::ReadConcernArgs::kAtClusterTimeFieldName << ReadTimestamp
+             << repl::ReadConcernArgs::kAllowTransactionTableSnapshot << true));
 
     auto earliestOpenTransactionBson = _client->findOne(std::move(findCmd), _readPreference);
     LOGV2_DEBUG(4880602,
