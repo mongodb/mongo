@@ -352,13 +352,11 @@ private:
                     // Return a pointer to one byte past the sbeTag in the inner BinData.
                     return {false, TypeTags::bsonBinData, bitcastFrom<uint8_t*>(binData + 1)};
                 }
-                case TypeTags::ksValue: {
-                    // Read the KeyString size after the 'sbeTag' byte. This gets written to the
-                    // buffer in 'key_string::Value::serialize'.
-                    auto ks =
-                        key_string::Value::deserialize(buf, key_string::Version::kLatestVersion);
-                    auto [ksTag, ksVal] = makeCopyKeyString(ks);
-                    return {true, ksTag, ksVal};
+                case TypeTags::keyString: {
+                    // Read the KeyString after the 'sbeTag' byte. This gets written to the
+                    // buffer in 'KeyStringEntry::serialize'.
+                    auto ks = value::KeyStringEntry::deserialize(buf);
+                    return {true, TypeTags::keyString, bitcastFrom<value::KeyStringEntry*>(ks)};
                 }
                 case TypeTags::RecordId: {
                     auto [tag, val] = makeCopyRecordId(RecordId::deserializeToken(buf));

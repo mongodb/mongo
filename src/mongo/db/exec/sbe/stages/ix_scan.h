@@ -125,11 +125,11 @@ protected:
     };
 
     // Seeks and returns the first/next index KeyStringEntry or boost::none if no such key exists.
-    virtual boost::optional<KeyStringEntry> seek() = 0;
+    virtual SortedDataKeyValueView seek() = 0;
     // Returns true if the 'key' is within the bounds and false otherwise. Implementations may set
     // state internally to reflect whether the scan is done, or whether a new seek point should be
     // used.
-    virtual bool validateKey(const boost::optional<KeyStringEntry>& key) = 0;
+    virtual bool validateKey(const SortedDataKeyValueView& key) = 0;
 
     void doSaveState(bool relinquishCursor) override;
     void doRestoreState(bool relinquishCursor) final;
@@ -187,7 +187,10 @@ protected:
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
     const IndexCatalogEntry* _entry{nullptr};
     boost::optional<Ordering> _ordering{boost::none};
-    boost::optional<KeyStringEntry> _nextRecord;
+    KeyFormat _ridFormat;
+    SortedDataKeyValueView _nextKeyString;
+    value::KeyStringEntry _key;
+    RecordId _nextRid;
 
     // This buffer stores values that are projected out of the index entry. Values in the
     // '_accessors' list that are pointers point to data in this buffer.
@@ -247,12 +250,12 @@ public:
 
 protected:
     void doSaveState(bool relinquishCursor) override;
-    boost::optional<KeyStringEntry> seek() override;
-    bool validateKey(const boost::optional<KeyStringEntry>& key) override;
+    SortedDataKeyValueView seek() override;
+    bool validateKey(const SortedDataKeyValueView& key) override;
 
 private:
     const key_string::Value& getSeekKeyLow() const;
-    const key_string::Value* getSeekKeyHigh() const;
+    const key_string::Value& getSeekKeyHigh() const;
 
     std::unique_ptr<EExpression> _seekKeyLow;
     std::unique_ptr<EExpression> _seekKeyHigh;
@@ -313,8 +316,8 @@ public:
     size_t estimateCompileTimeSize() const override;
 
 protected:
-    boost::optional<KeyStringEntry> seek() override;
-    bool validateKey(const boost::optional<KeyStringEntry>& key) override;
+    SortedDataKeyValueView seek() override;
+    bool validateKey(const SortedDataKeyValueView& key) override;
 
     const GenericIndexScanStageParams _params;
 

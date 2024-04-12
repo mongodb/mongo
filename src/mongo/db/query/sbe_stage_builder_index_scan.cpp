@@ -575,12 +575,10 @@ generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
 
     auto lowKeyExpr = !lowKey
         ? makeVariable(*lowKeySlot)
-        : makeConstant(sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<key_string::Value*>(lowKey.release()));
+        : makeConstant(sbe::value::TypeTags::keyString, sbe::value::makeKeyString(*lowKey).second);
     auto highKeyExpr = !highKey
         ? makeVariable(*highKeySlot)
-        : makeConstant(sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<key_string::Value*>(highKey.release()));
+        : makeConstant(sbe::value::TypeTags::keyString, sbe::value::makeKeyString(*highKey).second);
 
     auto [stage, outputs] = generateSingleIntervalIndexScan(state,
                                                             collection,
@@ -868,12 +866,10 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
         auto obj = sbe::value::getObjectView(val);
         sbe::value::ValueGuard guard{tag, val};
         obj->reserve(2);
-        obj->push_back("l"_sd,
-                       sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<key_string::Value*>(lowKey.release()));
-        obj->push_back("h"_sd,
-                       sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<key_string::Value*>(highKey.release()));
+        obj->push_back(
+            "l"_sd, sbe::value::TypeTags::keyString, sbe::value::makeKeyString(*lowKey).second);
+        obj->push_back(
+            "h"_sd, sbe::value::TypeTags::keyString, sbe::value::makeKeyString(*highKey).second);
         guard.reset();
         arr->push_back(tag, val);
     }

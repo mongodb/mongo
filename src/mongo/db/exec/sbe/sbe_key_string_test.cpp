@@ -145,6 +145,7 @@ TEST_F(SBEKeyStringTest, Basic) {
         for (auto j = i; j < endBound; ++j) {
             keyStringBuilder.appendBSONElement(elements[j]);
         }
+        keyStringBuilder.appendRecordId(RecordId{0});
         keyStringQueue.emplace(keyStringBuilder.getValueCopy(), ordering, endBound - i);
     }
 
@@ -187,7 +188,18 @@ TEST_F(SBEKeyStringTest, Basic) {
 
             builder.reset();
             keyStringValues.resize(size);
-            readKeyStringValueIntoAccessors(keyString, ordering, &builder, &keyStringValues);
+            auto keySize = static_cast<int32_t>(key_string::getKeySize(
+                keyString.getBuffer(), keyString.getSize(), ordering, keyString.getVersion()));
+            auto b = keyString.getTypeBitsView();
+            SortedDataKeyValueView view{keyString.getBuffer(),
+                                        keySize,
+                                        keyString.getBuffer() + keySize,
+                                        static_cast<int32_t>(keyString.getSize() - keySize),
+                                        b.data(),
+                                        static_cast<int32_t>(b.size()),
+                                        keyString.getVersion(),
+                                        true};
+            readKeyStringValueIntoAccessors(view, ordering, &builder, &keyStringValues);
         }
 
         auto [componentTag, componentVal] = keyStringValues.front().getViewOfValue();
@@ -213,7 +225,7 @@ TEST(SBEKeyStringTest, KeyComponentInclusion) {
     keyStringBuilder.appendString(
         "I know the kings of England, and I quote the fights historical"_sd);  // Included
     keyStringBuilder.appendString("From Marathon to Waterloo, in order categorical");
-    auto keyString = keyStringBuilder.getValueCopy();
+    keyStringBuilder.appendRecordId(RecordId{0});
 
     IndexKeysInclusionSet indexKeysToInclude;
     indexKeysToInclude.set(0);
@@ -222,9 +234,22 @@ TEST(SBEKeyStringTest, KeyComponentInclusion) {
     std::vector<value::OwnedValueAccessor> accessors;
     accessors.resize(2);
 
+    auto keySize = static_cast<int32_t>(key_string::getKeySize(keyStringBuilder.getBuffer(),
+                                                               keyStringBuilder.getSize(),
+                                                               key_string::ALL_ASCENDING,
+                                                               keyStringBuilder.version));
+    auto b = keyStringBuilder.getTypeBits();
+    SortedDataKeyValueView view{keyStringBuilder.getBuffer(),
+                                keySize,
+                                keyStringBuilder.getBuffer() + keySize,
+                                static_cast<int32_t>(keyStringBuilder.getSize() - keySize),
+                                b.getBuffer(),
+                                b.getSize(),
+                                keyStringBuilder.version,
+                                true};
     BufBuilder builder;
     readKeyStringValueIntoAccessors(
-        keyString, key_string::ALL_ASCENDING, &builder, &accessors, indexKeysToInclude);
+        view, key_string::ALL_ASCENDING, &builder, &accessors, indexKeysToInclude);
 
     auto value = accessors[0].getViewOfValue();
     ASSERT(value::TypeTags::NumberInt64 == value.first &&

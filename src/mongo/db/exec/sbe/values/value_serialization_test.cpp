@@ -175,7 +175,7 @@ TEST(ValueSerializeForSorter, Serialize) {
     keyStringBuilder.appendNumberLong(1);
     keyStringBuilder.appendNumberLong(2);
     keyStringBuilder.appendNumberLong(3);
-    auto [keyStringTag, keyStringVal] = value::makeCopyKeyString(keyStringBuilder.getValueCopy());
+    auto [keyStringTag, keyStringVal] = value::makeKeyString(keyStringBuilder.getValueCopy());
     testData->push_back(keyStringTag, keyStringVal);
 
     auto [plainCodeTag, plainCodeVal] =
@@ -444,7 +444,7 @@ TEST_F(ValueSerializeForKeyString, KeyString) {
     keyStringBuilder.appendNumberLong(3);
     keyStringBuilder.appendString("aaa");
     auto ks = keyStringBuilder.getValueCopy();
-    auto [keyStringTag, keyStringVal] = value::makeCopyKeyString(ks);
+    auto [keyStringTag, keyStringVal] = value::makeKeyString(ks);
     sbe::value::ValueGuard testGuard{keyStringTag, keyStringVal};
 
     runTest({{keyStringTag, keyStringVal}});

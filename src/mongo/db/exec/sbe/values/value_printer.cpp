@@ -145,7 +145,7 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
         case TypeTags::bsonUndefined:
             stream << "bsonUndefined";
             break;
-        case TypeTags::ksValue:
+        case TypeTags::keyString:
             stream << "KeyString";
             break;
         case TypeTags::pcreRegex:
@@ -541,9 +541,9 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         case TypeTags::LocalLambda:
             stream << "LocalLambda";
             break;
-        case TypeTags::ksValue: {
-            auto ks = getKeyStringView(val);
-            stream << "KS(" << ks->toString() << ")";
+        case TypeTags::keyString: {
+            auto ks = getKeyString(val);
+            stream << "KS(" << hexblob::encode(ks->getKeyStringView()) << ")";
             break;
         }
         case TypeTags::Timestamp: {
