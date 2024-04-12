@@ -154,7 +154,11 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _nss(std::move(params.nss)),
       _authenticatedUser(std::move(params.authenticatedUser)),
       _lsid(operationUsingCursor->getLogicalSessionId()),
-      _txnNumber(operationUsingCursor->getTxnNumber()),
+      // Retryable writes will have a txnNumber we do not want to associate with the cursor. We only
+      // want to set this field for transactions.
+      _txnNumber(operationUsingCursor->inMultiDocumentTransaction()
+                     ? operationUsingCursor->getTxnNumber()
+                     : boost::none),
       _apiParameters(std::move(params.apiParameters)),
       _writeConcernOptions(std::move(params.writeConcernOptions)),
       _readConcernArgs(std::move(params.readConcernArgs)),
