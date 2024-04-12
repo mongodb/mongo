@@ -216,6 +216,7 @@ let testCases = {
     streams_updateFeatureFlags: {skip: "internal command"},
     streams_testOnlyGetFeatureFlags: {skip: "internal command"},
     streams_writeCheckpoint: {skip: "internal command"},
+    streams_sendEvent: {skip: "internal command"},
     _transferMods: {skip: "internal command"},
     _vectorClockPersist: {skip: "internal command"},
     abortMoveCollection: {skip: "does not accept read or write concern"},
