@@ -55,12 +55,12 @@ function testRegexAggException(inputObj, exceptionCode, expression) {
     // are 'n' characters in the input, it would result to 'n' individual matches. If the
     // pattern further has 'k' capture groups, then the output document will have 'n * k'
     // sub-strings representing the captures.
-    const pattern = "(".repeat(150) + ")".repeat(150);
-    // If the intermediate document size exceeds 64MB at any point, we will stop further
+    const pattern = "(".repeat(150) + ")".repeat(150) + "(".repeat(150) + ")".repeat(150);
+    // If the intermediate document size exceeds BufferMaxSize at any point, we will stop further
     // evaluation and throw an error.
     testRegexAggException({input: "$z", regex: pattern}, 51151, "$regexFindAll");
 
-    const pattern2 = "()".repeat(150);
+    const pattern2 = "()".repeat(300);
     testRegexAggException({input: "$z", regex: pattern2}, 51151, "$regexFindAll");
 })();
 

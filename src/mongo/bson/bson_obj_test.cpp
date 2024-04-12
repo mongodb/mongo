@@ -790,7 +790,7 @@ TEST(BSONObj, sizeChecks) {
     // But a size is in fact being enforced.
     ASSERT_THROWS_CODE(
         [&]() {
-            auto hugeBuffer = generateBuffer(70 * 1024 * 1024);
+            auto hugeBuffer = generateBuffer(130 * 1024 * 1024);
             BSONObj obj(hugeBuffer.data(), BSONObj::LargeSizeTrait{});
         }(),
         DBException,
