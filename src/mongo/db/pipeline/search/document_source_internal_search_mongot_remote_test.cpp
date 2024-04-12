@@ -58,6 +58,22 @@ TEST_F(InternalSearchMongotRemoteTest, SearchMongotRemoteNotAllowedInTransaction
                        ErrorCodes::OperationNotSupportedInTransaction);
 }
 
+TEST_F(InternalSearchMongotRemoteTest, SearchMongotRemoteAllowsUnknownFields) {
+    auto expCtx = getExpCtx();
+    globalMongotParams.host = "localhost:27027";
+    globalMongotParams.enabled = true;
+    auto specObj = BSON("$_internalSearchMongotRemote"
+                        << BSON("mongotQuery" << BSONObj() << "metadataMergeProtocolVersion" << 1
+                                              << "unknownField" << BSONObj()));
+    auto spec = specObj.firstElement();
+
+    // Because internalSearchMongotRemoteSpec is {strict: false}, the superfluous fields on the
+    // request should be ignored and the DocumentSourceInternalSearchMongotRemote stage should be
+    // serialized successfully.
+    auto mongotRemoteStage = DocumentSourceInternalSearchMongotRemote::createFromBson(spec, expCtx);
+    ASSERT_TRUE(mongotRemoteStage->getNext().isEOF());
+}
+
 TEST_F(InternalSearchMongotRemoteTest, SearchMongotRemoteReturnsEOFWhenCollDoesNotExist) {
     auto expCtx = getExpCtx();
     globalMongotParams.host = "localhost:27027";
