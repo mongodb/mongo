@@ -97,7 +97,7 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
                                               .allowedFeatures =
                                                   MatchExpressionParser::kBanAllSpecialFeatures},
     });
-    boost::optional<AutoGetOplogFastPath> oplogRead;
+    boost::optional<AutoGetOplog> oplogRead;
     boost::optional<AutoGetChangeCollection> changeCollectionRead;
     const CollectionPtr* collPtr;
     if (tenantId) {

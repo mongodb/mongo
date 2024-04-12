@@ -622,7 +622,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
                             << ", is non-empty but not equal to count: " << count);
 
     // Use OplogAccessMode::kLogOp to avoid recursive locking.
-    AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kLogOp);
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kLogOp);
 
     WriteUnitOfWork wuow(opCtx);
 

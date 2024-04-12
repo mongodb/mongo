@@ -96,7 +96,7 @@ void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opC
     auto const serviceContext = opCtx->getClient()->getServiceContext();
 
     writeConflictRetry(opCtx, "RefineCollectionShardKey", NamespaceString::kRsOplogNamespace, [&] {
-        AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         WriteUnitOfWork uow(opCtx);
         serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
                                                              collNss,

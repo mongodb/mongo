@@ -637,7 +637,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     LOGV2(6015309, "Logging transition to primary to oplog on stepup");
     writeConflictRetry(
         opCtx, "logging transition to primary to oplog", NamespaceString::kRsOplogNamespace, [&] {
-            AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
+            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
             WriteUnitOfWork wuow(opCtx);
             opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
                 opCtx,
@@ -921,7 +921,7 @@ Timestamp ReplicationCoordinatorExternalStateImpl::getGlobalTimestamp(ServiceCon
 }
 
 bool ReplicationCoordinatorExternalStateImpl::oplogExists(OperationContext* opCtx) {
-    return static_cast<bool>(LocalOplogInfo::get(opCtx)->getRecordStore());
+    return static_cast<bool>(LocalOplogInfo::get(opCtx)->getCollection());
 }
 
 StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndWallTime(

@@ -295,12 +295,12 @@ public:
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
         auto earliestOplogTimestampFetch = [&]() -> Timestamp {
-            boost::optional<AutoGetOplogFastPath> oplog = boost::none;
+            boost::optional<AutoGetOplog> oplog = boost::none;
             try {
                 oplog.emplace(opCtx,
                               OplogAccessMode::kRead,
                               Date_t::now(),
-                              AutoGetOplogFastPathOptions{.skipRSTLLock = true});
+                              AutoGetOplogOptions{.skipRSTLLock = true});
             } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
             } catch (const ExceptionFor<ErrorCodes::MaxTimeMSExpired>&) {
             }

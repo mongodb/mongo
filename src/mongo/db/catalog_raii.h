@@ -486,19 +486,13 @@ private:
 };
 
 /**
- * RAII-style class to acquire the oplog using special oplog locking rules.
- *
- * IMPORTANT: this acquisition is optimized for fast-path access and is only suitable for
- * reading or writing to the oplog table. This acquisition can return a stale view of the oplog
- * metadata if interleaving with a DDL operation like an oplog resize. For consistent lookups,
- * use a conventional acquisition API like mongo::acquireCollection.
+ * RAII-style class to acquire proper locks using special oplog locking rules for oplog accesses.
  *
  * Only the global lock is acquired:
  * | OplogAccessMode | Global Lock |
  * +-----------------+-------------|
  * | kRead           | MODE_IS     |
  * | kWrite          | MODE_IX     |
- * | kLogOp          | -           |
  *
  * kLogOp is a special mode for replication operation logging and it behaves similar to kWrite. The
  * difference between kWrite and kLogOp is that kLogOp invariants that global IX lock is already
@@ -510,20 +504,19 @@ private:
  */
 enum class OplogAccessMode { kRead, kWrite, kLogOp };
 
-struct AutoGetOplogFastPathOptions {
+struct AutoGetOplogOptions {
     bool skipRSTLLock = false;
 };
 
-class AutoGetOplogFastPath {
-    AutoGetOplogFastPath(const AutoGetOplogFastPath&) = delete;
-    AutoGetOplogFastPath& operator=(const AutoGetOplogFastPath&) = delete;
+class AutoGetOplog {
+    AutoGetOplog(const AutoGetOplog&) = delete;
+    AutoGetOplog& operator=(const AutoGetOplog&) = delete;
 
 public:
-    AutoGetOplogFastPath(
-        OperationContext* opCtx,
-        OplogAccessMode mode,
-        Date_t deadline = Date_t::max(),
-        const AutoGetOplogFastPathOptions& options = AutoGetOplogFastPathOptions());
+    AutoGetOplog(OperationContext* opCtx,
+                 OplogAccessMode mode,
+                 Date_t deadline = Date_t::max(),
+                 const AutoGetOplogOptions& options = AutoGetOplogOptions());
 
     /**
      * Return a pointer to the per-service-context LocalOplogInfo.
