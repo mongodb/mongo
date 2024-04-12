@@ -3,15 +3,12 @@
  * after FCV downgrade.  This behavior and test can be removed when SERVER-87563 is in all versions
  * which could be downgraded to.
  *
- * TODO(SERVER-84271): Remove this test when featureFlagReplicateVectoredInsertsTransactionally is
- * removed.
  */
 
 import "jstests/multiVersion/libs/multi_rs.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // This test fails when clustered config transactions are not supported in last-LTS
-// TODO(SERVER-84073): Remove this when last-LTS is 8.0 or later.
 TestData.nonClusteredConfigTransactions = true;
 
 // Start up a replica set with the latest binary version and the
@@ -36,7 +33,7 @@ const collName = TestData.testName;
 // Confirm feature flag is enabled.
 assert(FeatureFlagUtil.isEnabled(admin, "ReplicateVectoredInsertsTransactionally"));
 
-// Create some retryable writes with multiOpType:1, which can't be parsed by old versions.
+// Create some retryable writes with multiOpType:1, which can't be parsed by 7.0.
 const lsid0 = {
     "id": UUID()
 };
@@ -77,18 +74,44 @@ replSet.upgradeSet({binVersion: 'last-lts'})
 
 primary = replSet.getPrimary();
 testDB = primary.getDB('test');
-// Retry should fail with incomplete transaction history.
-assert.commandFailedWithCode(
-    testDB.runCommand({insert: collName, documents: docs0, lsid: lsid0, txnNumber: NumberLong(10)}),
-    ErrorCodes.IncompleteTransactionHistory);
-assert.commandFailedWithCode(
-    testDB.runCommand({insert: collName, documents: docs1, lsid: lsid1, txnNumber: NumberLong(20)}),
-    ErrorCodes.IncompleteTransactionHistory);
+let buildInfo = assert.commandWorked(primary.adminCommand({buildInfo: 1}));
+if (buildInfo["versionArray"][2] >= 10) {  // 7.0.10 or later
+    // Retry should fail with incomplete transaction history.
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            {insert: collName, documents: docs0, lsid: lsid0, txnNumber: NumberLong(10)}),
+        ErrorCodes.IncompleteTransactionHistory);
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            {insert: collName, documents: docs1, lsid: lsid1, txnNumber: NumberLong(20)}),
+        ErrorCodes.IncompleteTransactionHistory);
 
-// The sessions should still be usable with later transaction numbers.
-assert.commandWorked(testDB.runCommand(
-    {insert: collName, documents: docs2, lsid: lsid0, txnNumber: NumberLong(11)}));
-assert.commandWorked(testDB.runCommand(
-    {insert: collName, documents: docs3, lsid: lsid1, txnNumber: NumberLong(21)}));
+    // The sessions should still be usable with later transaction numbers.
+    assert.commandWorked(testDB.runCommand(
+        {insert: collName, documents: docs2, lsid: lsid0, txnNumber: NumberLong(11)}));
+    assert.commandWorked(testDB.runCommand(
+        {insert: collName, documents: docs3, lsid: lsid1, txnNumber: NumberLong(21)}));
+} else {
+    jsTestLog(
+        "Test is running with a 7.0 version prior to SERVER-87563.  Retryable write sessions are NOT reusable after FCV downgrade");
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            {insert: collName, documents: docs0, lsid: lsid0, txnNumber: NumberLong(10)}),
+        40415);
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            {insert: collName, documents: docs1, lsid: lsid1, txnNumber: NumberLong(20)}),
+        40415);
+
+    // The sessions do not work with later transaction numbers.
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            {insert: collName, documents: docs2, lsid: lsid0, txnNumber: NumberLong(11)}),
+        40415);
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            {insert: collName, documents: docs3, lsid: lsid1, txnNumber: NumberLong(21)}),
+        40415);
+}
 
 replSet.stopSet();

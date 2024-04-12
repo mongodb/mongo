@@ -668,50 +668,19 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
 
     const auto lsid =
         LogicalSessionId::parse(IDLParserContext("lsid"), singleSessionDoc["_id"].Obj());
-    // For inserts and updates, the in-storage txnNum will be available, though it is
-    // not available for deletes.
-    TxnNumber txnNum = kUninitializedTxnNumber;
-    auto txnNumElem = singleSessionDoc[SessionTxnRecord::kTxnNumFieldName];
-    // We can't use safeNumberLong here because 0 is a valid transaction number.
-    if (txnNumElem.type() == NumberLong) {
-        txnNum = txnNumElem.numberLong();
-    }
-
     catalog->scanSession(lsid, [&, ti = _ti.get()](const ObservableSession& session) {
         uassert(ErrorCodes::PreparedTransactionInProgress,
                 str::stream() << "Cannot modify the entry for session " << lsid.getId()
                               << " because it is in the prepared state",
                 !ti->isTransactionPrepared(session));
 
-        // For updates of external sessions, we can know if we already started a newer transaction
-        // or retryable write than the one in storage, and in that case there is no need to
-        // invalidate the session.
-        //
-        // TODO(SERVER-84271): This case is specifically for the update introduced for
-        // downgrading featureFlagReplicateVectoredInsertsTransactionally and can be removed with
-        // that flag.
-        bool startedNewerTxn = txnNum != kUninitializedTxnNumber &&
-            !isInternalSessionForRetryableWrite(lsid) &&
-            txnNum < session.getLastClientTxnNumberStarted();
-        if (startedNewerTxn) {
-            LOGV2_DEBUG(
-                8674101,
-                1,
-                "Skipping a session kill on direct update because a newer transaction has started",
-                "lsid"_attr = lsid,
-                "storedTxnNum"_attr = txnNum,
-                "sessionCacheTxnNum"_attr = session.getLastClientTxnNumberStarted());
-        }
-
         // Internal sessions for an old retryable write are marked as reapable as soon as a
         // retryable write or transaction with a newer txnNumber starts. Therefore, when deleting
         // the config.transactions doc for such internal sessions, the corresponding transaction
         // sessions should not be interrupted since they are guaranteed to be performing a
         // transaction or retryable write for newer txnNumber.
-        bool shouldRegisterKill =
-            (!isInternalSessionForRetryableWrite(lsid) ||
-             *lsid.getTxnNumber() >= session.getLastClientTxnNumberStarted()) &&
-            !startedNewerTxn;
+        bool shouldRegisterKill = !isInternalSessionForRetryableWrite(lsid) ||
+            *lsid.getTxnNumber() >= session.getLastClientTxnNumberStarted();
         if (shouldRegisterKill) {
             shard_role_details::getRecoveryUnit(opCtx)->registerChange(
                 std::make_unique<KillSessionTokenOnCommit>(ti,
