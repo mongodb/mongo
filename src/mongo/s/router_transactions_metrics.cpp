@@ -246,16 +246,16 @@ CommitTypeStats RouterTransactionsMetrics::_constructCommitTypeStats(const Commi
 }
 
 void RouterTransactionsMetrics::updateStats(RouterTransactionsStats* stats) {
-    stats->setCurrentOpen(_currentOpen.load());
-    stats->setCurrentActive(_currentActive.load());
-    stats->setCurrentInactive(_currentInactive.load());
+    stats->setCurrentOpen(_currentOpen.loadRelaxed());
+    stats->setCurrentActive(_currentActive.loadRelaxed());
+    stats->setCurrentInactive(_currentInactive.loadRelaxed());
 
-    stats->setTotalStarted(_totalStarted.load());
-    stats->setTotalCommitted(_totalCommitted.load());
-    stats->setTotalAborted(_totalAborted.load());
-    stats->setTotalContactedParticipants(_totalContactedParticipants.load());
-    stats->setTotalParticipantsAtCommit(_totalParticipantsAtCommit.load());
-    stats->setTotalRequestsTargeted(_totalRequestsTargeted.load());
+    stats->setTotalStarted(_totalStarted.loadRelaxed());
+    stats->setTotalCommitted(_totalCommitted.loadRelaxed());
+    stats->setTotalAborted(_totalAborted.loadRelaxed());
+    stats->setTotalContactedParticipants(_totalContactedParticipants.loadRelaxed());
+    stats->setTotalParticipantsAtCommit(_totalParticipantsAtCommit.loadRelaxed());
+    stats->setTotalRequestsTargeted(_totalRequestsTargeted.loadRelaxed());
 
     CommitTypes commitTypes;
     commitTypes.setNoShards(_constructCommitTypeStats(_noShardsCommitStats));

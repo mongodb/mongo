@@ -54,42 +54,44 @@ ShardingStatistics& ShardingStatistics::get(OperationContext* opCtx) {
 }
 
 void ShardingStatistics::report(BSONObjBuilder* builder) const {
-    builder->append("countStaleConfigErrors", countStaleConfigErrors.load());
+    builder->append("countStaleConfigErrors", countStaleConfigErrors.loadRelaxed());
 
-    builder->append("countDonorMoveChunkStarted", countDonorMoveChunkStarted.load());
-    builder->append("countDonorMoveChunkCommitted", countDonorMoveChunkCommitted.load());
-    builder->append("countDonorMoveChunkAborted", countDonorMoveChunkAborted.load());
-    builder->append("totalDonorMoveChunkTimeMillis", totalDonorMoveChunkTimeMillis.load());
-    builder->append("totalDonorChunkCloneTimeMillis", totalDonorChunkCloneTimeMillis.load());
+    builder->append("countDonorMoveChunkStarted", countDonorMoveChunkStarted.loadRelaxed());
+    builder->append("countDonorMoveChunkCommitted", countDonorMoveChunkCommitted.loadRelaxed());
+    builder->append("countDonorMoveChunkAborted", countDonorMoveChunkAborted.loadRelaxed());
+    builder->append("totalDonorMoveChunkTimeMillis", totalDonorMoveChunkTimeMillis.loadRelaxed());
+    builder->append("totalDonorChunkCloneTimeMillis", totalDonorChunkCloneTimeMillis.loadRelaxed());
     builder->append("totalCriticalSectionCommitTimeMillis",
-                    totalCriticalSectionCommitTimeMillis.load());
-    builder->append("totalCriticalSectionTimeMillis", totalCriticalSectionTimeMillis.load());
+                    totalCriticalSectionCommitTimeMillis.loadRelaxed());
+    builder->append("totalCriticalSectionTimeMillis", totalCriticalSectionTimeMillis.loadRelaxed());
     builder->append("totalRecipientCriticalSectionTimeMillis",
-                    totalRecipientCriticalSectionTimeMillis.load());
-    builder->append("countDocsClonedOnRecipient", countDocsClonedOnRecipient.load());
-    builder->append("countBytesClonedOnRecipient", countBytesClonedOnRecipient.load());
+                    totalRecipientCriticalSectionTimeMillis.loadRelaxed());
+    builder->append("countDocsClonedOnRecipient", countDocsClonedOnRecipient.loadRelaxed());
+    builder->append("countBytesClonedOnRecipient", countBytesClonedOnRecipient.loadRelaxed());
     builder->append("countDocsClonedOnCatchUpOnRecipient",
-                    countDocsClonedOnCatchUpOnRecipient.load());
+                    countDocsClonedOnCatchUpOnRecipient.loadRelaxed());
     builder->append("countBytesClonedOnCatchUpOnRecipient",
-                    countBytesClonedOnCatchUpOnRecipient.load());
-    builder->append("countDocsClonedOnDonor", countDocsClonedOnDonor.load());
-    builder->append("countBytesClonedOnDonor", countBytesClonedOnDonor.load());
-    builder->append("countRecipientMoveChunkStarted", countRecipientMoveChunkStarted.load());
-    builder->append("countDocsDeletedByRangeDeleter", countDocsDeletedByRangeDeleter.load());
-    builder->append("countBytesDeletedByRangeDeleter", countBytesDeletedByRangeDeleter.load());
-    builder->append("countDonorMoveChunkLockTimeout", countDonorMoveChunkLockTimeout.load());
+                    countBytesClonedOnCatchUpOnRecipient.loadRelaxed());
+    builder->append("countDocsClonedOnDonor", countDocsClonedOnDonor.loadRelaxed());
+    builder->append("countBytesClonedOnDonor", countBytesClonedOnDonor.loadRelaxed());
+    builder->append("countRecipientMoveChunkStarted", countRecipientMoveChunkStarted.loadRelaxed());
+    builder->append("countDocsDeletedByRangeDeleter", countDocsDeletedByRangeDeleter.loadRelaxed());
+    builder->append("countBytesDeletedByRangeDeleter",
+                    countBytesDeletedByRangeDeleter.loadRelaxed());
+    builder->append("countDonorMoveChunkLockTimeout", countDonorMoveChunkLockTimeout.loadRelaxed());
     builder->append("countDonorMoveChunkAbortConflictingIndexOperation",
-                    countDonorMoveChunkAbortConflictingIndexOperation.load());
+                    countDonorMoveChunkAbortConflictingIndexOperation.loadRelaxed());
     builder->append("unfinishedMigrationFromPreviousPrimary",
-                    unfinishedMigrationFromPreviousPrimary.load());
+                    unfinishedMigrationFromPreviousPrimary.loadRelaxed());
     // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
     if (mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCVUnsafe())
-        builder->append("chunkMigrationConcurrency", chunkMigrationConcurrencyCnt.load());
+        builder->append("chunkMigrationConcurrency", chunkMigrationConcurrencyCnt.loadRelaxed());
     // The serverStatus command is run before the FCV is initialized so we ignore it when
     // checking whether the direct shard operations feature flag is enabled.
     if (mongo::feature_flags::gCheckForDirectShardOperations.isEnabledUseLatestFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        builder->append("unauthorizedDirectShardOps", unauthorizedDirectShardOperations.load());
+        builder->append("unauthorizedDirectShardOps",
+                        unauthorizedDirectShardOperations.loadRelaxed());
     }
 }
 
