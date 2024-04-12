@@ -1426,6 +1426,7 @@ tasks:
   - &version_expansions_gen
     name: version_expansions_gen
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    priority: 10
     commands:
       - command: manifest.load
       - func: "git get project"
