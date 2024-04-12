@@ -63,10 +63,5 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     };
 
-    // TODO SERVER-84271: The downgrade for featureFlagReplicateVectoredInsertsTransactionally is
-    // what causes the Interrupted error, so this can be removed when that feature flag is removed.
-    $config.data.movePrimaryAllowedErrorCodes =
-        [...$super.data.movePrimaryAllowedErrorCodes, ErrorCodes.Interrupted];
-
     return $config;
 });
