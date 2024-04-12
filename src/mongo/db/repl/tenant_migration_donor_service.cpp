@@ -865,8 +865,15 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
                        << RecipientSyncData::kReturnAfterReachingDonorTimestampFieldName;
             errMsg << " failed";
 
-            return async_rpc::unpackRPCStatusIgnoringWriteConcernAndWriteErrors(status).addContext(
-                errMsg.str());
+            auto underlyingError =
+                async_rpc::unpackRPCStatusIgnoringWriteConcernAndWriteErrors(status);
+            if (ErrorCodes::isNotPrimaryError(underlyingError) ||
+                ErrorCodes::isShutdownError(underlyingError)) {
+                errMsg << " :: Merge recipient service interrupted; not resilient to stepdowns or "
+                          "node restarts";
+                return Status(ErrorCodes::TenantMigrationAborted, errMsg.str());
+            }
+            return underlyingError.addContext(errMsg.str());
         });
 }
 
