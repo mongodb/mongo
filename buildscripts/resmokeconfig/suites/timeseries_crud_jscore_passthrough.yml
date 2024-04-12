@@ -241,8 +241,6 @@ selector:
     - jstests/core/system_js_access.js
     - jstests/core/system_js_drop.js
     - jstests/core/write/find_and_modify/find_and_modify_where.js
-    # TODO (SERVER-88078): Remove this exclusion.
-    - jstests/core/type_bracket.js
     # TODO(SERVER-85322): Try to include this test(s).
     - jstests/core/resume_query.js
     - jstests/core/resume_query_from_non_existent_record.js
