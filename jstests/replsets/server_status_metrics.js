@@ -17,7 +17,8 @@ import {
 /**
  * Test replication metrics
  */
-function _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOpsReceived) {
+function _testSecondaryMetricsHelper(
+    secondary, opCount, baseOpsApplied, baseOpsReceived, baseOpsWritten) {
     var ss = secondary.getDB("test").serverStatus();
     jsTestLog(`Secondary ${secondary.host} metrics: ${tojson(ss.metrics)}`);
 
@@ -75,7 +76,7 @@ function _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOps
 
     if (FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency")) {
         assert.eq(ss.metrics.repl.write.batchSize,
-                  opCount + baseOpsReceived,
+                  opCount + baseOpsWritten,
                   "write ops batch size mismatch");
         assert(ss.metrics.repl.write.batches.num > 0, "no write batches");
         assert(ss.metrics.repl.write.batches.totalMillis >= 0, "missing write batch time");
@@ -86,10 +87,11 @@ function _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOps
 
 // Metrics are racy, e.g. repl.buffer.apply.count could over- or under-reported briefly. Retry on
 // error.
-function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceived) {
+function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceived, baseOpsWritten) {
     assert.soon(() => {
         try {
-            _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOpsReceived);
+            _testSecondaryMetricsHelper(
+                secondary, opCount, baseOpsApplied, baseOpsReceived, baseOpsWritten);
             return true;
         } catch (exc) {
             jsTestLog(`Caught ${exc}, retrying`);
@@ -135,6 +137,10 @@ var ss = secondary.getDB("test").serverStatus();
 // optime is greater than OplogApplier::Options::beginApplyingOpTime.
 var secondaryBaseOplogOpsApplied = ss.metrics.repl.apply.ops;
 var secondaryBaseOplogOpsReceived = ss.metrics.repl.apply.batchSize;
+var secondaryBaseOplogOpsWritten =
+    FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency")
+    ? ss.metrics.repl.write.batchSize
+    : undefined;
 
 // Disable batching of inserts so each one creates an oplog entry.
 assert.commandWorked(testDB.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 1}));
@@ -146,12 +152,20 @@ for (let x = 0; x < 1000; x++) {
 }
 assert.commandWorked(bulk.execute({w: 2}));
 
-testSecondaryMetrics(secondary, 1000, secondaryBaseOplogOpsApplied, secondaryBaseOplogOpsReceived);
+testSecondaryMetrics(secondary,
+                     1000,
+                     secondaryBaseOplogOpsApplied,
+                     secondaryBaseOplogOpsReceived,
+                     secondaryBaseOplogOpsWritten);
 
 var options = {writeConcern: {w: 2}, multi: true, upsert: true};
 assert.commandWorked(testDB.a.update({}, {$set: {d: new Date()}}, options));
 
-testSecondaryMetrics(secondary, 2000, secondaryBaseOplogOpsApplied, secondaryBaseOplogOpsReceived);
+testSecondaryMetrics(secondary,
+                     2000,
+                     secondaryBaseOplogOpsApplied,
+                     secondaryBaseOplogOpsReceived,
+                     secondaryBaseOplogOpsWritten);
 
 // Test that the number of oplog getMore requested by the secondary and processed by the primary has
 // increased since the start of the test.
