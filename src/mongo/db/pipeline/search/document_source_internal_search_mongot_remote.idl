@@ -66,9 +66,6 @@ structs:
         optional: true
         type: long
       requiresSearchMetaCursor:
-        description: "Currently this field is not used in this branch but is here so the presence
-                      of the field doesn't cause errors during upgrade/downgrade (see SERVER-86757
-                      for details)."
+        description: "If false, we will ignore the metadata cursor returned from mongot and not establish a search metadata pipeline."
         optional: true
         type: bool
-

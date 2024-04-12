@@ -1,10 +1,7 @@
 /*
- * For now, this tests that if mongod gets an aggregation command from a mongos with a $search stage
- * it will return two cursors. It also ensures that mongod accepts the requiresSearchMetaCursor
- * field without erroring.
- *
- * TODO SERVER-86757 will enable this test to also check that when requiresSearchMetaCursor is
- * explicitly false, mongod only returns one cursor,
+ * Test that if a mongod gets an aggregation command from a mongoS with a $search stage it will
+ * return two cursors by default or when requiresSearchMetaCursor is explicitly true, and will
+ * only return one cursor when requiresSearchMetaCursor is explicitly false.
  */
 
 import "jstests/libs/sbe_assert_error_override.js";
@@ -192,23 +189,22 @@ function runTestRequiresMetaCursorOnConn(shardDB, searchStage, expectedDocs, exp
 }
 
 /**
- * TODO SERVER-86757 will enable this helper to be useful for the case described here:
  * Tests that mongod returns just the results cursor when requiresSearchMetaCursor is explicitly set
  * to false.
  */
-// function runTestNoMetaCursorOnConn(shardDB, expectedDocs) {
-//     // Run the command that explicitly says no meta cursor is needed.
-//     commandObj.pipeline = [shardPipelineDoesntRequireMetaCursor];
-//     const shardResponse = shardDB.runCommand(commandObj);
-//     let cursor = validateInitialResponse(shardResponse);
+function runTestNoMetaCursorOnConn(shardDB, expectedDocs) {
+    // Run the command that explicitly says no meta cursor is needed.
+    commandObj.pipeline = [shardPipelineDoesntRequireMetaCursor];
+    const shardResponse = shardDB.runCommand(commandObj);
+    let cursor = validateInitialResponse(shardResponse);
 
-//     // Iterate the cursor.
-//     const getMoreRes = shardDB.runCommand({getMore: cursor.id, collection: collName});
+    // Iterate the cursor.
+    const getMoreRes = shardDB.runCommand({getMore: cursor.id, collection: collName});
 
-//     // Cursor is now exhausted.
-//     const getMoreResults = validateGetMoreResponse(getMoreRes, 0);
-//     assert.sameMembers(expectedDocs, getMoreResults);
-// }
+    // Cursor is now exhausted.
+    const getMoreResults = validateGetMoreResponse(getMoreRes, 0);
+    assert.sameMembers(expectedDocs, getMoreResults);
+}
 
 // Run queries against a specific shard to see what a mongod response to a search query looks like.
 // Since we are running a pipeline with $_internalSearchMongotRemote we need to use an internal
@@ -230,9 +226,7 @@ mockShardZero();
 runTestRequiresMetaCursorOnConn(
     shardZeroDB, shardPipelineRequiresMetaCursorExplicit, expectedDocs, expectedMetaResults);
 mockShardZero();
-// TODO SERVER-86757 this last case should use runTestNoMetaCursorOnConn instead
-runTestRequiresMetaCursorOnConn(
-    shardZeroDB, shardPipelineDoesntRequireMetaCursor, expectedDocs, expectedMetaResults);
+runTestNoMetaCursorOnConn(shardZeroDB, expectedDocs);
 
 // Repeat for second shard.
 expectedDocs = [
@@ -250,9 +244,7 @@ mockShardOne();
 runTestRequiresMetaCursorOnConn(
     shardOneDB, shardPipelineRequiresMetaCursorExplicit, expectedDocs, expectedMetaResults);
 mockShardOne();
-// TODO SERVER-86757 this last case should use runTestNoMetaCursorOnConn instead
-runTestRequiresMetaCursorOnConn(
-    shardOneDB, shardPipelineDoesntRequireMetaCursor, expectedDocs, expectedMetaResults);
+runTestNoMetaCursorOnConn(shardOneDB, expectedDocs);
 
 // Check that if exchange is set on a search query it fails.
 commandObj = {
