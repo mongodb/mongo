@@ -1,19 +1,12 @@
-import {getQueryPlanners, getWinningPlan, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
+import {everyWinningPlan, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
+import {
+    getCollectionName,
+    getCommandName,
+    getExplainCommand,
+    getInnerCommand
+} from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
-
-function hasSupportedHint(cmdObj) {
-    return "hint" in cmdObj;
-}
-
-function getCommandType(cmdObj) {
-    const supportedCommands = ["aggregate", "distinct", "find"];
-    return supportedCommands.find((key) => (key in cmdObj));
-}
-
-function isSupportedCommandType(cmdObj) {
-    return getCommandType(cmdObj) !== undefined;
-}
 
 function isMinMaxQuery(cmdObj) {
     // When using min()/max() a hint of which index to use must be provided.
@@ -26,27 +19,14 @@ function requestsResumeToken(cmdObj) {
     return "$_requestResumeToken" in cmdObj && cmdObj["$_requestResumeToken"] === true;
 }
 
-function isIdHackQuery(db, cmdObj) {
-    const {hint, ...queryWithoutHint} = cmdObj;
-    const explain = db.runCommand({explain: queryWithoutHint});
-    const queryPlanners = getQueryPlanners(explain);
-    return queryPlanners.every(queryPlanner => isIdhackOrExpress(db, getWinningPlan(queryPlanner)));
-}
-
-function getInnerCommand(cmdObj) {
-    // In most cases, the command is wrapped in an explain object.
-    return "explain" in cmdObj && typeof cmdObj.explain === "object" ? cmdObj.explain : cmdObj;
-}
-
 function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {
     // Execute the original command and return the result immediately if it failed. This allows test
     // cases which assert on thrown error codes to still pass.
     const originalResponse = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-    try {
-        assert.commandWorked(
-            originalResponse,
-            "Skipped converting cursor hints into query settings because the original command ended in an error.");
-    } catch (e) {
+    if (!OverrideHelpers.commandMaybeWorked(originalResponse)) {
+        jsTestLog(
+            `Skipped converting cursor hints into query settings because the original command ` +
+            `${tojson(cmdObj)} was not successful.`)
         return originalResponse;
     }
 
@@ -54,9 +34,17 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     // exit early with the original command response.
     const db = conn.getDB(dbName);
     const innerCmd = getInnerCommand(cmdObj);
-    const shouldApplyQuerySettings = hasSupportedHint(innerCmd) &&
-        isSupportedCommandType(innerCmd) && !requestsResumeToken(innerCmd) &&
-        !isMinMaxQuery(innerCmd) && !isIdHackQuery(db, innerCmd);
+    const shouldApplyQuerySettings =
+        // Only intercept commands with cursor hints.
+        "hint" in innerCmd &&
+        // Only intercept command types supported by query settings.
+        QuerySettingsUtils.isSupportedCommand(getCommandName(innerCmd)) &&
+        // TODO SERVER-88948: Recover from query settings application failure on queries containing
+        // min/max fields.
+        !isMinMaxQuery(innerCmd) &&
+        // TODO SERVER-89207: Ensure that the fallback mechanism works for '$_requestResumeToken'
+        // queries.
+        !requestsResumeToken(innerCmd);
     if (!shouldApplyQuerySettings) {
         return originalResponse;
     }
@@ -65,27 +53,25 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     // build the representative query.
     const allowedIndexes = [innerCmd.hint];
     delete innerCmd.hint;
-    const commandType = getCommandType(innerCmd);
 
-    // If the collection used is a view, determine the underyling collection.
-    const collInfos = db.getCollectionInfos({name: innerCmd[commandType]});
-    if (!collInfos) {
+    const explainCmd = getExplainCommand(innerCmd);
+    const explain = assert.commandWorked(db.runCommand(explainCmd));
+    const isIdHackQuery =
+        explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
+    if (isIdHackQuery) {
+        // Query settings cannot be set over IDHACK or express queries.
         return originalResponse;
     }
-    const collectionName = collInfos[0].options.viewOn || innerCmd[commandType];
+
+    // If the collection used is a view, determine the underlying collection.
+    const collectionName = getCollectionName(innerCmd);
+    if (!collectionName) {
+        return originalResponse;
+    }
 
     const settings = {indexHints: {ns: {db: dbName, coll: collectionName}, allowedIndexes}};
     const qsutils = new QuerySettingsUtils(db, collectionName);
-    const representativeQuery = (function() {
-        switch (commandType) {
-            case "find":
-                return qsutils.makeFindQueryInstance(innerCmd);
-            case "aggregate":
-                return qsutils.makeAggregateQueryInstance(innerCmd);
-            case "distinct":
-                return qsutils.makeDistinctQueryInstance(innerCmd);
-        }
-    })();
+    const representativeQuery = qsutils.makeQueryInstance(innerCmd);
 
     // Set the equivalent query settings, execute the original command without the hint, and finally
     // remove all the settings.

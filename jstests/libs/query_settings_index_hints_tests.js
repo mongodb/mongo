@@ -1,10 +1,18 @@
 import {
+    everyWinningPlan,
+    flattenQueryPlanTree,
     getAggPlanStages,
+    getEngine,
     getPlanStages,
     getQueryPlanners,
-    getWinningPlan
+    getWinningPlan,
+    isAlwaysFalsePlan,
+    isEofPlan,
+    isIdhackOrExpress,
+    planHasStage,
 } from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 /**
  * Class containing common test functions used in query_settings_index_application_* tests.
@@ -27,16 +35,28 @@ export class QuerySettingsIndexHintsTests {
     assertQuerySettingsInCacheForCommand(command,
                                          querySettings,
                                          collOrViewName = this.qsutils.collName) {
-        // Single solution plans are not cached in classic, therefore do not perform plan cache
-        // checks for classic.
         const db = this.qsutils.db;
-        if (!checkSbeFullyEnabled(db)) {
-            return;
-        }
+        const explainCmd = getExplainCommand(command);
+        const explain = assert.commandWorked(db.runCommand(explainCmd));
+        const isIdhackQuery =
+            everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
+        const isTriviallyFalse = everyWinningPlan(
+            explain, (winningPlan) => isEofPlan(db, winningPlan) || isAlwaysFalsePlan(winningPlan));
+        const shouldCheckPlanCache =
+            // Checking plan cache for query settings doesn't work reliably if collections are moved
+            // between shards randomly because that causes plan cache invalidation.
+            !TestData.runningWithBalancer &&
+            // Single solution plans are not cached in classic, therefore do not perform plan cache
+            // checks for classic.
+            getEngine(explain) === "sbe" &&
+            // Express or IDHACK optimized queries are not cached.
+            !isIdhackQuery &&
+            // Similarly, trivially false plans are not cached.
+            !isTriviallyFalse &&
+            // Subplans are cached differently from normal plans.
+            !planHasStage(db, explain, "OR");
 
-        // Checking plan cache for query settings doesn't work reliably if collections are moved
-        // between shards randomly because that causes plan cache invalidation.
-        if (TestData.runningWithBalancer) {
+        if (!shouldCheckPlanCache) {
             return;
         }
 
@@ -366,15 +386,21 @@ export class QuerySettingsIndexHintsTests {
     assertQuerySettingsFallback(querySettingsQuery, ns) {
         const query = this.qsutils.withoutDollarDB(querySettingsQuery);
         const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
-        const explainWithoutQuerySettings = assert.commandWorked(db.runCommand({explain: query}));
+        const getWinningStages = (explain) =>
+            getQueryPlanners(explain).flatMap(getWinningPlan).flatMap(flattenQueryPlanTree);
 
+        // It's not guaranteed for all the queries to preserve the order of the stages when
+        // replanning (namely in the case of subplanning with $or statements). Flatten the plan tree
+        // & sort the stages according to 'bsonWoCompare()' to accommodate this behavior and avoid
+        // potential failures.
+        const explainWithoutQuerySettings = assert.commandWorked(db.runCommand({explain: query}));
+        const winningStagesWithoutQuerySettings = getWinningStages(explainWithoutQuerySettings);
+        winningStagesWithoutQuerySettings.sort(bsonWoCompare);
         this.qsutils.withQuerySettings(querySettingsQuery, settings, () => {
             const explainWithQuerySettings = assert.commandWorked(db.runCommand({explain: query}));
-            const winningPlansWithQuerySettings =
-                getQueryPlanners(explainWithQuerySettings).map(getWinningPlan);
-            const winningPlansWithoutQuerySettings =
-                getQueryPlanners(explainWithoutQuerySettings).map(getWinningPlan);
-            assert.eq(winningPlansWithQuerySettings, winningPlansWithoutQuerySettings);
+            const winningStagesWithQuerySettings = getWinningStages(explainWithQuerySettings);
+            winningStagesWithQuerySettings.sort(bsonWoCompare);
+            assert.eq(winningStagesWithQuerySettings, winningStagesWithoutQuerySettings);
             this.assertQuerySettingsInCacheForCommand(query, settings);
         });
     }

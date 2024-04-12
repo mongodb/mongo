@@ -1,4 +1,5 @@
-import {getWinningPlan, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
+import {everyWinningPlan, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
+import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 function addOptionalQueryFields(src, dst) {
@@ -49,8 +50,10 @@ function planCacheSetFilterToSetQuerySettings(conn, dbName, cmdObj) {
 
     // Setting index filters on idhack query is no-op for index filter command, but is a failure
     // for query settings command, therefore avoid specifying query settings and return success.
-    const explain = db.runCommand({explain: queryInstance});
-    if (isIdhackOrExpress(db, getWinningPlan(explain.queryPlanner))) {
+    const explain = assert.commandWorked(getExplainCommand(queryInstance));
+    const isIdHackQuery =
+        explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
+    if (isIdHackQuery) {
         return {ok: 1};
     }
 
@@ -130,27 +133,36 @@ function planCacheListFiltersToDollarQuerySettings(conn, cmdObj) {
 }
 
 function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {
-    if (cmdName == "drop") {
-        // Remove all query settings associated with that collection upon collection drop. This is
-        // the semantics of index filters.
-        planCacheClearFiltersToRemoveAllQuerySettings(conn, {planCacheClearFilters: cmdObj.drop})
+    switch (cmdName == "drop") {
+        case "drop": {
+            // Remove all query settings associated with that collection upon collection drop. This
+            // is the semantics of index filters.
+            planCacheClearFiltersToRemoveAllQuerySettings(conn,
+                                                          {planCacheClearFilters: cmdObj.drop})
 
-        // Drop the collection.
-        return clientFunction.apply(conn, makeFuncArgs(cmdObj));
-    } else if (cmdName == "aggregate") {
-        let response = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-        return processAggregateResponse(cmdObj, response);
-    } else if (cmdName == "explain") {
-        const response = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-        return populateIndexFilterSetIfQuerySettingsArePresent(response);
-    } else if (cmdName == "planCacheSetFilter") {
-        return planCacheSetFilterToSetQuerySettings(conn, dbName, cmdObj);
-    } else if (cmdName == "planCacheClearFilters") {
-        return planCacheClearFiltersToRemoveAllQuerySettings(conn, cmdObj);
-    } else if (cmdName == "planCacheListFilters") {
-        return planCacheListFiltersToDollarQuerySettings(conn, cmdObj);
-    } else {
-        return clientFunction.apply(conn, makeFuncArgs(cmdObj));
+            // Drop the collection.
+            return clientFunction.apply(conn, makeFuncArgs(cmdObj));
+        }
+        case "aggregate": {
+            let response = clientFunction.apply(conn, makeFuncArgs(cmdObj));
+            return processAggregateResponse(cmdObj, response);
+        }
+        case "explain": {
+            const response = clientFunction.apply(conn, makeFuncArgs(cmdObj));
+            return populateIndexFilterSetIfQuerySettingsArePresent(response);
+        }
+        case "planCacheSetFilter": {
+            return planCacheSetFilterToSetQuerySettings(conn, dbName, cmdObj);
+        }
+        case "planCacheClearFilters": {
+            return planCacheClearFiltersToRemoveAllQuerySettings(conn, cmdObj);
+        }
+        case "planCacheListFilters": {
+            return planCacheListFiltersToDollarQuerySettings(conn, cmdObj);
+        }
+        default: {
+            return clientFunction.apply(conn, makeFuncArgs(cmdObj));
+        }
     }
 }
 

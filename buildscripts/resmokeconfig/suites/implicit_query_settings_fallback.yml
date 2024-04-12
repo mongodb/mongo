@@ -1,0 +1,94 @@
+# This test suite adds "bad" query settings to compatible commands in order to introduce planning failures to
+# validate the fallback mechanism. It expects the overridden commands to have the same winning plans after a
+# failure happened.
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/aggregation/**/*.js
+  exclude_files:
+    # TODO SERVER-86996: Apply QuerySettings for queries involving timeseries collections.
+    - jstests/core/timeseries/**/*.js
+
+    # TODO SERVER-88977: Apply QuerySettings for queries involving columnstore indexes.
+    - jstests/core/columnstore/**/*.js
+    - jstests/core/query/project/projection_semantics.js
+
+    # TODO SERVER-89344: Fix explain output for '$unionWith' queries.
+    - jstests/aggregation/sources/unionWith/unionWith_explain.js
+
+    # TODO SERVER-89207: Ensure that the fallback mechanism works for '$_requestResumeToken'
+    # queries.
+    - jstests/core/find_with_resume_after_param.js
+
+    # Test which overcomes the imposed 16Mb query settings limit making the 'setQuerySettings' command fail.
+    - jstests/aggregation/query_limits_test.js
+
+    # Test which asserts on the number of execution metrics. The additional commands emitted by
+    # this suite might cause the test to fail.
+    - jstests/aggregation/sources/geonear/geonear_hint.js
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+    - jstests/core/administrative/current_op/**/*.js
+    - jstests/core/operation_latency_histogram.js
+
+    # Cannot clear the plan cache due to timeseries lock.
+    - jstests/core/write/bulk/bulk_write_timeseries_basic.js
+
+    # This suite clears the plan cache and emits additional explains alongside the tested command. This interferes
+    # with the number of expected plan cache entries.
+    - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
+    - jstests/core/index/index_stats.js
+    - jstests/core/index/wildcard/wildcard_index_cached_plans.js
+    - jstests/core/query/explain/explain_plan_cache.js
+    - jstests/core/query/in_expression_plan_cache.js
+    - jstests/core/query/introspect_hidden_index_plan_cache_entries.js
+    - jstests/core/query/partial_index_logical.js
+    - jstests/core/query/plan_cache/**/*.js
+    - jstests/core/query/sbe_plan_cache_autoparameterize_ixscan.js
+    - jstests/core/sbe/plan_cache_sbe_with_or_queries.js
+    - jstests/core/sbe_plan_cache_autoparameterize_collscan.js
+    - jstests/core/sbe_plan_cache_duplicate_or_clauses.js
+
+    # This test performs an '{_id: <id>}' query with a collator. This will not pass query settings validation. This
+    # is a design decision due to mongos lacking collation information.
+    - jstests/aggregation/sources/bucket/collation_bucket.js
+    - jstests/core/clustered/clustered_collection_collation.js
+
+    # Tests which already use query settings or index filters, which could be overridden by this suite.
+    - jstests/core/index/express.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/query/query_settings/**/*.js
+    - jstests/core/queryable_encryption/query_settings_fle.js
+
+    - jstests/core/txns/**/*.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - requires_getmore
+    - requires_profiling
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+      eval: >-
+        globalThis.testingReplication = true;
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
+  hooks:
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnNamespaceNotFound: false
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 2
