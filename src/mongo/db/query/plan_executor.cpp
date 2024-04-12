@@ -68,6 +68,36 @@ void PlanExecutor::checkFailPointPlanExecAlwaysFails() {
     }
 }
 
+size_t PlanExecutor::getNextBatch(const size_t batchSize, AppendBSONObjFn append) {
+    // Subclasses may override this in order to provide a more optimized loop.
+    uint64_t numResults = 0;
+    BSONObj obj;
+    PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
+
+    while (numResults < batchSize) {
+        state = getNext(&obj, nullptr);
+        if (state == PlanExecutor::IS_EOF) {
+            break;
+        }
+
+        if (!append(obj, getPostBatchResumeToken(), numResults)) {
+            stashResult(obj);
+            break;
+        }
+        numResults++;
+    }
+
+    return numResults;
+}
+
+void PlanExecutor::executeExhaustive() {
+    // Subclasses may override this in order to provide a more optimized loop.
+    BSONObj obj;
+    while (getNext(&obj, nullptr) == PlanExecutor::ADVANCED) {
+        // Discard the resulting documents.
+    }
+}
+
 void PlanExecutor::releaseAllAcquiredResources() {
     auto opCtx = getOpCtx();
     invariant(opCtx);

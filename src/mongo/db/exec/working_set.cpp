@@ -77,17 +77,6 @@ WorkingSetID WorkingSet::allocate() {
     return id;
 }
 
-void WorkingSet::free(WorkingSetID i) {
-    MemberHolder& holder = _data[i];
-    MONGO_verify(i < _data.size());            // ID has been allocated.
-    MONGO_verify(holder.nextFreeOrSelf == i);  // ID currently in use.
-
-    // Free resources and push this WSM to the head of the freelist.
-    holder.member.clear();
-    holder.nextFreeOrSelf = _freeList;
-    _freeList = i;
-}
-
 void WorkingSet::clear() {
     _data.clear();
 
@@ -143,10 +132,6 @@ void WorkingSetMember::clear() {
     _state = WorkingSetMember::INVALID;
 }
 
-WorkingSetMember::MemberState WorkingSetMember::getState() const {
-    return _state;
-}
-
 void WorkingSetMember::transitionToOwnedObj() {
     invariant(doc.value().isOwned());
     _state = OWNED_OBJ;
@@ -154,18 +139,6 @@ void WorkingSetMember::transitionToOwnedObj() {
 
 void WorkingSetMember::transitionToRecordIdAndObj() {
     _state = WorkingSetMember::RID_AND_OBJ;
-}
-
-bool WorkingSetMember::hasRecordId() const {
-    return _state == RID_AND_IDX || _state == RID_AND_OBJ;
-}
-
-bool WorkingSetMember::hasObj() const {
-    return _state == OWNED_OBJ || _state == RID_AND_OBJ;
-}
-
-bool WorkingSetMember::hasOwnedObj() const {
-    return _state == OWNED_OBJ || _state == RID_AND_OBJ;
 }
 
 void WorkingSetMember::makeObjOwnedIfNeeded() {
