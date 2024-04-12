@@ -97,7 +97,6 @@ void writeChangeStreamPreImagesForApplyOpsEntries(
  */
 void writeChangeStreamPreImagesForTransaction(
     OperationContext* opCtx,
-    const std::vector<OplogSlot>& reservedSlots,
     const std::vector<repl::ReplOperation>& operations,
     const OpObserver::ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     Date_t operationTime) {
@@ -112,9 +111,11 @@ void writeChangeStreamPreImagesForTransaction(
                 applyOpsEntriesIt != applyOpsOperationAssignment.applyOpsEntries.end());
         const auto& applyOpsEntry = *applyOpsEntriesIt++;
         const auto operationSequenceEnd = operationIter + applyOpsEntry.operations.size();
-        const auto& oplogSlot = reservedSlots[applyOpsEntry.oplogSlotIndex];
-        writeChangeStreamPreImagesForApplyOpsEntries(
-            opCtx, operationIter, operationSequenceEnd, oplogSlot.getTimestamp(), operationTime);
+        writeChangeStreamPreImagesForApplyOpsEntries(opCtx,
+                                                     operationIter,
+                                                     operationSequenceEnd,
+                                                     applyOpsEntry.oplogSlot.getTimestamp(),
+                                                     operationTime);
         operationIter = operationSequenceEnd;
     }
 }
@@ -228,18 +229,17 @@ void ChangeStreamPreImagesOpObserver::onUnpreparedTransactionCommit(
     // entry.
     const auto& statements = transactionOperations.getOperationsForOpObserver();
     writeChangeStreamPreImagesForTransaction(
-        opCtx, reservedSlots, statements, applyOpsOperationAssignment, opTimeBundle.wallClockTime);
+        opCtx, statements, applyOpsOperationAssignment, opTimeBundle.wallClockTime);
 }
 
 void ChangeStreamPreImagesOpObserver::preTransactionPrepare(
     OperationContext* opCtx,
-    const std::vector<OplogSlot>& reservedSlots,
     const TransactionOperations& transactionOperations,
     const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     Date_t wallClockTime) {
     const auto& statements = transactionOperations.getOperationsForOpObserver();
     writeChangeStreamPreImagesForTransaction(
-        opCtx, reservedSlots, statements, applyOpsOperationAssignment, wallClockTime);
+        opCtx, statements, applyOpsOperationAssignment, wallClockTime);
 }
 
 }  // namespace mongo

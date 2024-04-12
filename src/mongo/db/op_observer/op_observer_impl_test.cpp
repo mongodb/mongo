@@ -193,11 +193,6 @@ void commitUnpreparedTransaction(OperationContext* opCtx, OpObserverType& opObse
     ASSERT_EQUALS(txnOps->getNumberOfPrePostImagesToWrite(),
                   txnParticipant.getNumberOfPrePostImagesToWriteForTest());
 
-    auto applyOpsOplogSlotAndOperationAssignment =
-        txnOps->getApplyOpsInfo(getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
-                                getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
-                                /*prepare=*/false);
-
     // OpObserverImpl no longer reserves optimes when committing unprepared transactions.
     // This is now done in TransactionParticipant::Participant::commitUnpreparedTransaction()
     // prior to notifying the OpObserver. For test coverage specific to empty unprepared
@@ -205,9 +200,14 @@ void commitUnpreparedTransaction(OperationContext* opCtx, OpObserverType& opObse
     std::vector<OplogSlot> reservedSlots;
     if (!txnOps->isEmpty()) {
         reservedSlots = repl::getNextOpTimes(
-            opCtx, applyOpsOplogSlotAndOperationAssignment.numberOfOplogSlotsRequired);
+            opCtx, txnOps->numOperations() + txnOps->getNumberOfPrePostImagesToWrite());
     }
 
+    auto applyOpsOplogSlotAndOperationAssignment =
+        txnOps->getApplyOpsInfo(reservedSlots,
+                                getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
+                                getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
+                                /*prepare=*/false);
     opObserver.onUnpreparedTransactionCommit(
         opCtx, reservedSlots, *txnOps, applyOpsOplogSlotAndOperationAssignment);
 }
@@ -1321,19 +1321,17 @@ protected:
         return *_txnParticipant;
     }
 
-    std::vector<OplogSlot> prepareTransaction(size_t numberOfPrePostImagesToWrite = 0) {
+    void prepareTransaction(const std::vector<OplogSlot>& reservedSlots,
+                            repl::OpTime prepareOpTime,
+                            size_t numberOfPrePostImagesToWrite = 0) {
         auto txnOps = txnParticipant().retrieveCompletedTransactionOperations(opCtx());
         auto currentTime = Date_t::now();
         auto applyOpsAssignment =
-            txnOps->getApplyOpsInfo(getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
+            txnOps->getApplyOpsInfo(reservedSlots,
+                                    getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
                                     getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
                                     /*prepare=*/true);
-        auto reservedSlots =
-            reserveOpTimesInSideTransaction(opCtx(), applyOpsAssignment.numberOfOplogSlotsRequired);
-        const auto& prepareOpTime = reservedSlots.back();
-        txnParticipant().transitionToPreparedforTest(opCtx(), prepareOpTime);
-        opObserver().preTransactionPrepare(
-            opCtx(), reservedSlots, *txnOps, applyOpsAssignment, currentTime);
+        opObserver().preTransactionPrepare(opCtx(), *txnOps, applyOpsAssignment, currentTime);
         shard_role_details::getRecoveryUnit(opCtx())->setPrepareTimestamp(
             prepareOpTime.getTimestamp());
 
@@ -1356,7 +1354,6 @@ protected:
         }
 
         opObserver().postTransactionPrepare(opCtx(), reservedSlots, *txnOps);
-        return reservedSlots;
     }
 
 private:
@@ -1498,8 +1495,11 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     opObserver().aboutToDelete(opCtx(), *autoColl1, docToDelete, &args);
     opObserver().onDelete(opCtx(), *autoColl1, 0, docToDelete, args);
 
-    auto reservedSlots = prepareTransaction();
+    // One reserved slot for each statement, plus the prepare.
+    auto reservedSlots = reserveOpTimesInSideTransaction(opCtx(), 5);
     auto prepareOpTime = reservedSlots.back();
+    txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
+    prepareTransaction(reservedSlots, prepareOpTime);
 
     ASSERT_EQ(prepareOpTime.getTimestamp(),
               shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
@@ -1563,8 +1563,11 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
                                /*fromMigrate=*/std::vector<bool>(insert.size(), false),
                                /*defaultFromMigrate=*/false);
 
-        auto reservedSlots = prepareTransaction();
-        prepareTimestamp = reservedSlots.back().getTimestamp();
+        const auto prepareSlot = reserveOpTimeInSideTransaction(opCtx());
+        txnParticipant.transitionToPreparedforTest(opCtx(), prepareSlot);
+        prepareTimestamp = prepareSlot.getTimestamp();
+        prepareTransaction({prepareSlot}, prepareSlot);
+
         commitSlot = reserveOpTimeInSideTransaction(opCtx());
     }
 
@@ -1633,7 +1636,9 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
                                /*fromMigrate=*/std::vector<bool>(insert.size(), false),
                                /*defaultFromMigrate=*/false);
 
-        prepareTransaction();
+        const auto prepareSlot = reserveOpTimeInSideTransaction(opCtx());
+        txnParticipant.transitionToPreparedforTest(opCtx(), prepareSlot);
+        prepareTransaction({prepareSlot}, prepareSlot);
         abortSlot = reserveOpTimeInSideTransaction(opCtx());
     }
 
@@ -1714,8 +1719,9 @@ TEST_F(OpObserverTransactionTest,
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        auto reservedSlots = prepareTransaction();
-        prepareOpTime = reservedSlots.back();
+        prepareOpTime = reserveOpTimeInSideTransaction(opCtx());
+        txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
+        prepareTransaction({prepareOpTime}, prepareOpTime);
     }
     ASSERT_EQ(prepareOpTime.getTimestamp(),
               shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
@@ -1745,8 +1751,10 @@ TEST_F(OpObserverTransactionTest, PreparingTransactionWritesToTransactionTable) 
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        auto reservedSlots = prepareTransaction();
-        prepareOpTime = reservedSlots.back();
+        OplogSlot slot = reserveOpTimeInSideTransaction(opCtx());
+        txnParticipant.transitionToPreparedforTest(opCtx(), slot);
+        prepareOpTime = slot;
+        prepareTransaction({slot}, prepareOpTime);
     }
 
     ASSERT_EQ(prepareOpTime.getTimestamp(),
@@ -1776,7 +1784,10 @@ TEST_F(OpObserverTransactionTest, AbortingPreparedTransactionWritesToTransaction
     OplogSlot abortSlot;
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
-        prepareTransaction();
+        WriteUnitOfWork wuow(opCtx());
+        OplogSlot slot = reserveOpTimeInSideTransaction(opCtx());
+        prepareTransaction({slot}, slot);
+        txnParticipant.transitionToPreparedforTest(opCtx(), slot);
         abortSlot = reserveOpTimeInSideTransaction(opCtx());
     }
 
@@ -1851,8 +1862,10 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        auto reservedSlots = prepareTransaction();
-        prepareOpTime = reservedSlots.back();
+        OplogSlot slot = reserveOpTimeInSideTransaction(opCtx());
+        prepareOpTime = slot;
+        prepareTransaction({slot}, slot);
+        txnParticipant.transitionToPreparedforTest(opCtx(), slot);
     }
 
     OplogSlot commitSlot = reserveOpTimeInSideTransaction(opCtx());
@@ -2489,7 +2502,14 @@ public:
 
 protected:
     void commit() final {
-        prepareTransaction(txnParticipant().getNumberOfPrePostImagesToWriteForTest());
+        const auto reservedOplogSlots = reserveOpTimesInSideTransaction(
+            opCtx(), 1 + txnParticipant().getNumberOfPrePostImagesToWriteForTest());
+        invariant(reservedOplogSlots.size() >= 1);
+        const auto prepareSlot = reservedOplogSlots.back();
+        txnParticipant().transitionToPreparedforTest(opCtx(), prepareSlot);
+        prepareTransaction(reservedOplogSlots,
+                           prepareSlot,
+                           txnParticipant().getNumberOfPrePostImagesToWriteForTest());
         TransactionParticipant::get(opCtx()).stashTransactionResources(opCtx());
     };
 
@@ -4315,8 +4335,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertPrepareTest) {
                            /*fromMigrate=*/std::vector<bool>(inserts2.size(), false),
                            /*defaultFromMigrate=*/false);
 
-    auto reservedSlots = prepareTransaction();
+    auto reservedSlots = reserveOpTimesInSideTransaction(opCtx(), 4);
     auto prepareOpTime = reservedSlots.back();
+    txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
+    prepareTransaction(reservedSlots, prepareOpTime);
 
     ASSERT_EQ(prepareOpTime.getTimestamp(),
               shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
@@ -4404,8 +4426,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
     opObserver().onUpdate(opCtx(), update1);
     opObserver().onUpdate(opCtx(), update2);
 
-    auto reservedSlots = prepareTransaction();
+    auto reservedSlots = reserveOpTimesInSideTransaction(opCtx(), 2);
     auto prepareOpTime = reservedSlots.back();
+    txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
+    prepareTransaction(reservedSlots, prepareOpTime);
 
     ASSERT_EQ(prepareOpTime.getTimestamp(),
               shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
@@ -4467,8 +4491,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeletePrepareTest) {
     opObserver().aboutToDelete(opCtx(), *autoColl2, doc2, &args);
     opObserver().onDelete(opCtx(), *autoColl2, 0, doc2, args);
 
-    auto reservedSlots = prepareTransaction();
+    auto reservedSlots = reserveOpTimesInSideTransaction(opCtx(), 2);
     auto prepareOpTime = reservedSlots.back();
+    txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
+    prepareTransaction(reservedSlots, prepareOpTime);
 
     ASSERT_EQ(prepareOpTime.getTimestamp(),
               shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
@@ -4528,8 +4554,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
                            /*fromMigrate=*/std::vector<bool>(inserts1.size(), false),
                            /*defaultFromMigrate=*/false);
 
-    auto reservedSlots = prepareTransaction();
+    auto reservedSlots = reserveOpTimesInSideTransaction(opCtx(), 2);
     auto prepareOpTime = reservedSlots.back();
+    txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
+    prepareTransaction(reservedSlots, prepareOpTime);
 
     txnParticipant.stashTransactionResources(opCtx());
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
@@ -4610,8 +4638,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
                            /*fromMigrate=*/std::vector<bool>(inserts1.size(), false),
                            /*defaultFromMigrate=*/false);
 
-    auto reservedSlots = prepareTransaction();
+    auto reservedSlots = reserveOpTimesInSideTransaction(opCtx(), 1);
     auto prepareOpTime = reservedSlots.back();
+    txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
+    prepareTransaction(reservedSlots, prepareOpTime);
 
     txnParticipant.stashTransactionResources(opCtx());
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 1);
@@ -4754,7 +4784,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPackingTest) {
                            /*fromMigrate=*/std::vector<bool>(inserts2.size(), false),
                            /*defaultFromMigrate=*/false);
 
-    auto reservedSlots = prepareTransaction();
+    auto reservedSlots = reserveOpTimesInSideTransaction(opCtx(), 4);
+    auto prepareOpTime = reservedSlots.back();
+    txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
+    prepareTransaction(reservedSlots, prepareOpTime);
 
     txnParticipant.stashTransactionResources(opCtx());
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
@@ -4814,8 +4847,10 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedPackingTest) {
                            /*fromMigrate=*/std::vector<bool>(inserts1.size(), false),
                            /*defaultFromMigrate=*/false);
 
-    auto reservedSlots = prepareTransaction();
+    auto reservedSlots = reserveOpTimesInSideTransaction(opCtx(), 2);
     auto prepareOpTime = reservedSlots.back();
+    txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
+    prepareTransaction(reservedSlots, prepareOpTime);
 
     txnParticipant.stashTransactionResources(opCtx());
     auto oplogEntryObjs = getNOplogEntries(opCtx(), 1);

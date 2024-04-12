@@ -533,16 +533,12 @@ public:
 
     void preTransactionPrepare(
         OperationContext* opCtx,
-        const std::vector<OplogSlot>& reservedSlots,
         const TransactionOperations& transactionOperations,
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         Date_t wallClockTime) override {
         for (auto&& observer : _observers) {
-            observer->preTransactionPrepare(opCtx,
-                                            reservedSlots,
-                                            transactionOperations,
-                                            applyOpsOperationAssignment,
-                                            wallClockTime);
+            observer->preTransactionPrepare(
+                opCtx, transactionOperations, applyOpsOperationAssignment, wallClockTime);
         }
     }
 

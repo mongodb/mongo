@@ -560,9 +560,6 @@ public:
      * This method is called before an atomic transaction is prepared. It must be called when a
      * transaction is active.
      *
-     * 'reservedSlots' is a list of oplog slots reserved for the oplog entries in a transaction. The
-     * last reserved slot represents the prepareOpTime used for the prepare oplog entry.
-     *
      * The 'transactionOperations' contains the list of CRUD operations to be applied in this
      * transaction. The operations may be modified by setting pre-image and post-image oplog entry
      * timestamps.
@@ -575,7 +572,6 @@ public:
      */
     virtual void preTransactionPrepare(
         OperationContext* opCtx,
-        const std::vector<OplogSlot>& reservedSlots,
         const TransactionOperations& transactionOperations,
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         Date_t wallClockTime) = 0;

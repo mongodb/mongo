@@ -271,52 +271,26 @@ TEST(TransactionOperationsTest, GetCollectionUUIDsIgnoresNoopOperations) {
 
 TEST(TransactionOperationsTest, GetApplyOpsInfoEmptyOps) {
     TransactionOperations ops;
-    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
+    auto info = ops.getApplyOpsInfo(/*oplogSlots=*/{},
+                                    kOplogEntryCountLimit,
                                     kOplogEntrySizeLimitBytes,
                                     /*prepare=*/false);
     ASSERT_EQ(info.applyOpsEntries.size(), 0);
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 0);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 0);
     ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
 }
 
 DEATH_TEST(TransactionOperationsTest,
-           LogOplogEntriesInsufficientSlots,
-           "Wrong number of oplogSlots reserved") {
+           GetApplyOpsInfoInsufficientSlots,
+           "Insufficient number of oplogSlots") {
     TransactionOperations ops;
     TransactionOperations::TransactionOperation op;
     ASSERT_OK(ops.addOperation(op));
-    auto applyOpsInfo = ops.getApplyOpsInfo(kOplogEntryCountLimit,
-                                            kOplogEntrySizeLimitBytes,
-                                            /*prepare=*/false);
-    boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    ops.logOplogEntries(/*oplogSlots=*/{},
-                        applyOpsInfo,
-                        kWallClockTime,
-                        WriteUnitOfWork::OplogEntryGroupType::kDontGroup,
-                        doNothingLogApplyOpsFn,
-                        &imageToWrite);
-}
-
-DEATH_TEST(TransactionOperationsTest,
-           LogOplogEntriesTooManySlots,
-           "Wrong number of oplogSlots reserved") {
-    TransactionOperations ops;
-    TransactionOperations::TransactionOperation op;
-    ASSERT_OK(ops.addOperation(op));
-    auto applyOpsInfo = ops.getApplyOpsInfo(kOplogEntryCountLimit,
-                                            kOplogEntrySizeLimitBytes,
-                                            /*prepare=*/false);
-    std::vector<OplogSlot> oplogSlots;
-    oplogSlots.push_back(OplogSlot{Timestamp(1, 1), /*term=*/1LL});
-    oplogSlots.push_back(OplogSlot{Timestamp(1, 2), /*term=*/1LL});
-    boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    ops.logOplogEntries(oplogSlots,
-                        applyOpsInfo,
-                        kWallClockTime,
-                        WriteUnitOfWork::OplogEntryGroupType::kDontGroup,
-                        doNothingLogApplyOpsFn,
-                        &imageToWrite);
+    ops.getApplyOpsInfo(/*oplogSlots=*/{},
+                        kOplogEntryCountLimit,
+                        kOplogEntrySizeLimitBytes,
+                        /*prepare=*/false);
 }
 
 TEST(TransactionOperationsTest, GetApplyOpsInfoReturnsOneEntryContainingTwoOperations) {
@@ -336,16 +310,23 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoReturnsOneEntryContainingTwoOpera
     op2.setObject(BSON("_id" << 2));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op2));
 
-    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
+    // We have to allocate as many oplog slots as operations even though only
+    // one applyOps entry will be generated.
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    kOplogEntryCountLimit,
                                     kOplogEntrySizeLimitBytes,
                                     /*prepare=*/false);
 
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 1U);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 1U);
     ASSERT_EQ(info.applyOpsEntries.size(), 1U);
     ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
 
-    ASSERT_EQ(info.applyOpsEntries[0].oplogSlotIndex, 0);
+    ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[0]);  // first oplog slot
     ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 2U);
     ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op1.toBSON());
     ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[1], op2.toBSON());
@@ -368,24 +349,31 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationCountLimit) {
     op2.setObject(BSON("_id" << 2));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op2));
 
+    // We have to allocate as many oplog slots as operations even though only
+    // one applyOps entry will be generated.
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
     // Restrict each applyOps entry to holding at most one operation.
     auto info = ops.getApplyOpsInfo(
+        oplogSlots,
         /*oplogEntryCountLimit=*/1U,
         /*oplogEntrySizeLimitBytes=*/static_cast<std::size_t>(BSONObjMaxUserSize),
         /*prepare=*/false);
 
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 2U);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 2U);
     ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
 
     // Check first applyOps entry.
-    ASSERT_EQ(info.applyOpsEntries[0].oplogSlotIndex, 0);
+    ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[0]);
     ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 1U);
     ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op1.toBSON());
 
     // Check second applyOps entry.
-    ASSERT_EQ(info.applyOpsEntries[1].oplogSlotIndex, 1);
+    ASSERT_EQ(info.applyOpsEntries[1].oplogSlot, oplogSlots[1]);
     ASSERT_EQ(info.applyOpsEntries[1].operations.size(), 1U);
     ASSERT_BSONOBJ_EQ(info.applyOpsEntries[1].operations[0], op2.toBSON());
 }
@@ -407,27 +395,60 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationSizeLimit) {
     op2.setObject(BSON("_id" << 2));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op2));
 
+    // We have to allocate as many oplog slots as operations even though only
+    // one applyOps entry will be generated.
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
     // Restrict each applyOps entry to holding at most one operation.
     auto info = ops.getApplyOpsInfo(
+        oplogSlots,
         /*oplogEntryCountLimit=*/100U,
         /*oplogEntrySizeLimitBytes=*/repl::DurableOplogEntry::getDurableReplOperationSize(op1) +
             TransactionOperations::ApplyOpsInfo::kBSONArrayElementOverhead,
         /*prepare=*/false);
 
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 2U);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 2U);
     ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
 
     // Check first applyOps entry.
-    ASSERT_EQ(info.applyOpsEntries[0].oplogSlotIndex, 0);
+    ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[0]);
     ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 1U);
     ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op1.toBSON());
 
     // Check second applyOps entry.
-    ASSERT_EQ(info.applyOpsEntries[1].oplogSlotIndex, 1);
+    ASSERT_EQ(info.applyOpsEntries[1].oplogSlot, oplogSlots[1]);
     ASSERT_EQ(info.applyOpsEntries[1].operations.size(), 1U);
     ASSERT_BSONOBJ_EQ(info.applyOpsEntries[1].operations[0], op2.toBSON());
+}
+
+DEATH_TEST(TransactionOperationsTest,
+           GetApplyOpsInfoInsufficientSlotsDueToPreImage,
+           "Unexpected end of oplog slot vector") {
+    TransactionOperations ops;
+
+    // Setting the "needs retry image" flag on 'op' forces getApplyOpsInfo()
+    // to request an additional slot, which will not be available due to an
+    // insufficiently sized 'oplogSlots' array.
+    TransactionOperations::TransactionOperation op;
+    op.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
+    op.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
+    op.setNss(NamespaceString::createNamespaceString_forTest(
+        "test.t"));                  // required for DurableReplOperation::serialize()
+    op.setObject(BSON("_id" << 1));  // required for DurableReplOperation::serialize()
+    ASSERT_OK(ops.addOperation(op));
+
+    // We allocated a slot for the operation but not for the pre-image.
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+
+    ops.getApplyOpsInfo(oplogSlots,
+                        kOplogEntryCountLimit,
+                        kOplogEntrySizeLimitBytes,
+                        /*prepare=*/false);
 }
 
 TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsPreImageSlotBeforeOperation) {
@@ -444,27 +465,64 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsPreImageSlotBeforeOperatio
     op.setObject(BSON("_id" << 1));  // required for DurableReplOperation::serialize()
     ASSERT_OK(ops.addOperation(op));
 
-    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
+    // We allocated a slot for the operation but not for the pre-image.
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    kOplogEntryCountLimit,
                                     kOplogEntrySizeLimitBytes,
                                     /*prepare=*/false);
 
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 2U);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 1U);
     ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 1U);
     ASSERT_FALSE(info.prepare);
 
-    ASSERT_EQ(info.applyOpsEntries[0].oplogSlotIndex, 1);
+    ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[1]);
     ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 1U);
     ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op.toBSON());
+}
+
+TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsLastOplogSlotForPrepare) {
+    TransactionOperations ops;
+
+    TransactionOperations::TransactionOperation op;
+    op.setOpType(repl::OpTypeEnum::kInsert);  // required for DurableReplOperation::serialize()
+    op.setNss(NamespaceString::createNamespaceString_forTest(
+        "test.t"));                  // required for DurableReplOperation::serialize()
+    op.setObject(BSON("_id" << 1));  // required for DurableReplOperation::serialize()
+    ASSERT_OK(ops.addOperation(op));
+
+    // We allocate two oplog slots and confirm that the second oplog slot is assigned
+    // to the only applyOps entry
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/true);
+
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 1U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+    ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[1]);  // last oplog slot
+    ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 1U);
+    ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op.toBSON());
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
+    ASSERT(info.prepare);
 }
 
 TEST(TransactionOperationsTest, LogOplogEntriesDoesNothingOnEmptyOperations) {
     TransactionOperations ops;
     std::vector<OplogSlot> oplogSlots;
-    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    kOplogEntryCountLimit,
                                     kOplogEntrySizeLimitBytes,
                                     /*prepare=*/false);
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 0);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 0);
     ASSERT_EQ(info.applyOpsEntries.size(), 0);
     ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
@@ -506,16 +564,17 @@ TEST(TransactionOperationsTest, LogOplogEntriesSingleOperation) {
     op.setStatementIds(stmtIds);
     ASSERT_OK(ops.addOperation(op));
 
-    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    kOplogEntryCountLimit,
                                     kOplogEntrySizeLimitBytes,
                                     /*prepare=*/false);
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 1U);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 1U);
     ASSERT_EQ(info.applyOpsEntries.size(), 1U);
     ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
-
-    std::vector<OplogSlot> oplogSlots;
-    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
 
     // Check applyOps oplog entry to ensure it has all the basic details.
     auto logApplyOpsFn = [op,
@@ -593,18 +652,19 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
     op3.setStatementIds(stmtIds3);
     ASSERT_OK(ops.addOperation(op3));
 
-    auto info = ops.getApplyOpsInfo(1U,  // one operation per applyOps entry
-                                    kOplogEntrySizeLimitBytes,
-                                    /*prepare=*/false);
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 3U);
-    ASSERT_EQ(info.applyOpsEntries.size(), 3U);
-    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
-    ASSERT_FALSE(info.prepare);
-
     std::vector<OplogSlot> oplogSlots;
     oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(3, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    1U,  // one operation per applyOps entry
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 3U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 3U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
+    ASSERT_FALSE(info.prepare);
 
     // Check applyOps oplog entry to ensure it has all the basic details.
     std::size_t numEntriesLogged = 0;
@@ -720,18 +780,19 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
     op3.setStatementIds(stmtIds3);
     ASSERT_OK(ops.addOperation(op3));
 
-    auto info = ops.getApplyOpsInfo(1U,  // one operation per applyOps entry
-                                    kOplogEntrySizeLimitBytes,
-                                    /*prepare=*/true);
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 3U);
-    ASSERT_EQ(info.applyOpsEntries.size(), 3U);
-    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
-    ASSERT(info.prepare);
-
     std::vector<OplogSlot> oplogSlots;
     oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(3, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    1U,  // one operation per applyOps entry
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/true);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 3U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 3U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
+    ASSERT(info.prepare);
 
     // Check applyOps oplog entry to ensure it has all the basic details.
     std::size_t numEntriesLogged = 0;
@@ -848,18 +909,19 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsRetryableWrite)
     op3.setStatementIds(stmtIds3);
     ASSERT_OK(ops.addOperation(op3));
 
-    auto info = ops.getApplyOpsInfo(1U,  // one operation per applyOps entry
-                                    kOplogEntrySizeLimitBytes,
-                                    /*prepare=*/false);
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 3U);
-    ASSERT_EQ(info.applyOpsEntries.size(), 3U);
-    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
-    ASSERT_FALSE(info.prepare);
-
     std::vector<OplogSlot> oplogSlots;
     oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(3, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    1U,  // one operation per applyOps entry
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 3U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 3U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
+    ASSERT_FALSE(info.prepare);
 
     // Check applyOps oplog entry to ensure it has all the basic details.
     std::size_t numEntriesLogged = 0;
@@ -935,10 +997,12 @@ DEATH_TEST(TransactionOperationsTest,
            LogOplogEntriesInsufficientApplyOpsEntries,
            "Not enough \\\"applyOps\\\" entries") {
     TransactionOperations ops;
-    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
+    std::vector<OplogSlot> oplogSlots;
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    kOplogEntryCountLimit,
                                     kOplogEntrySizeLimitBytes,
                                     /*prepare=*/false);
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 0);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 0);
     ASSERT_EQ(info.applyOpsEntries.size(), 0);
     ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
@@ -948,7 +1012,6 @@ DEATH_TEST(TransactionOperationsTest,
     TransactionOperations::TransactionOperation op;
     ASSERT_OK(ops.addOperation(op));
 
-    std::vector<OplogSlot> oplogSlots;
     // This should set off a tripwire assertion.
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
     ops.logOplogEntries(oplogSlots,
@@ -967,6 +1030,7 @@ DEATH_TEST(TransactionOperationsTest,
 TEST(TransactionOperationsTest,
      LogOplogEntriesThrowsTransactionToolargeIfSingleEntrySizeLimitExceeded) {
     TransactionOperations ops;
+    std::vector<OplogSlot> oplogSlots;
 
     // Add two large 15 MB operations.
     for (int i = 0; i < 2; i++) {
@@ -975,21 +1039,22 @@ TEST(TransactionOperationsTest,
         op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
         op.setObject(BSON("_id" << i << "x" << std::string(15 * 1024 * 1024, 'x')));
         ASSERT_OK(ops.addOperation(op));
+
+        oplogSlots.push_back(OplogSlot{Timestamp(i + 1, 0), /*term=*/1LL});
     }
 
     // Provide a size limit that is twice what the BSONObjBuilder can accommodate
     // to getApplyOps() so that both large operations will be allocated to the
     // same applyOps entry.
-    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    kOplogEntryCountLimit,
                                     kOplogEntrySizeLimitBytes * 2,
                                     /*prepare=*/false);
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 1U);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 1U);
     ASSERT_EQ(info.applyOpsEntries.size(), 1U);
     ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
 
-    std::vector<OplogSlot> oplogSlots;
-    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
     ASSERT_THROWS(ops.logOplogEntries(oplogSlots,
                                       info,
@@ -1012,18 +1077,19 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPreImage) {
     op.setPreImage(BSON("_id" << 1));
     ASSERT_OK(ops.addOperation(op));
 
-    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
-                                    kOplogEntrySizeLimitBytes,
-                                    /*prepare=*/false);
-    // getApplyOpsInfos() expects 2 slots to be used because of pre/post images.
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 2U);
-    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
-    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 1U);
-    ASSERT_FALSE(info.prepare);
-
     std::vector<OplogSlot> oplogSlots;
     oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    // getApplyOpsInfos() expects 2 slots to be used because of pre/post images.
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 1U);
+    ASSERT_FALSE(info.prepare);
 
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
     auto writeOpTime = oplogSlots.back();
@@ -1040,7 +1106,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPreImage) {
                                   WriteUnitOfWork::kDontGroup,
                                   logApplyOps,
                                   &imageToWrite),
-              info.numberOfOplogSlotsRequired);
+              info.numberOfOplogSlotsUsed);
 
     // Check image bundle.
     // Timestamp in image bundle should be based on optime returned by 'logApplyOps'.
@@ -1062,18 +1128,19 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPostImage) {
     op.setPostImage(BSON("_id" << 1));
     ASSERT_OK(ops.addOperation(op));
 
-    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
-                                    kOplogEntrySizeLimitBytes,
-                                    /*prepare=*/false);
-    // getApplyOpsInfos() expects 2 slots to be used because of pre/post images.
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 2U);
-    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
-    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 1U);
-    ASSERT_FALSE(info.prepare);
-
     std::vector<OplogSlot> oplogSlots;
     oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    // getApplyOpsInfos() expects 2 slots to be used because of pre/post images.
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 1U);
+    ASSERT_FALSE(info.prepare);
 
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
     auto writeOpTime = oplogSlots.back();
@@ -1090,7 +1157,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPostImage) {
                                   WriteUnitOfWork::kDontGroup,
                                   logApplyOps,
                                   &imageToWrite),
-              info.numberOfOplogSlotsRequired);
+              info.numberOfOplogSlotsUsed);
 
     // Check image bundle.
     // Timestamp in image bundle should be based on optime returned by 'logApplyOps'.
@@ -1121,18 +1188,19 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInSameEntry)
     op2.setPostImage(BSON("_id" << 2));
     ASSERT_OK(ops.addOperation(op2));
 
-    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
-                                    kOplogEntrySizeLimitBytes,
-                                    /*prepare=*/false);
-    // getApplyOpsInfos() expects 2 slots to be used because of pre/post images.
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 2U);
-    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
-    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 2U);
-    ASSERT_FALSE(info.prepare);
-
     std::vector<OplogSlot> oplogSlots;
     oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    // getApplyOpsInfos() expects 2 slots to be used because of pre/post images.
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 2U);
+    ASSERT_FALSE(info.prepare);
 
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
     ASSERT_THROWS_CODE(ops.logOplogEntries(oplogSlots,
@@ -1166,23 +1234,24 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInDifferentE
     op2.setPostImage(BSON("_id" << 2));
     ASSERT_OK(ops.addOperation(op2));
 
-    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
-                                    kOplogEntrySizeLimitBytes,
-                                    /*prepare=*/false);
-    // getApplyOpsInfos() expects four slots to be used because of pre/post images and
-    // multiple applyOps entries.
-    ASSERT_EQ(info.numberOfOplogSlotsRequired, 4U);
-    ASSERT_EQ(info.applyOpsEntries.size(), 2U);
-    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 2U);
-    ASSERT_FALSE(info.prepare);
-
-    // Need four oplog slots because getApplyOpsInfo() assigned one for each
+    // Need four oplog slots because getApplyOpsInfo() needs two for each
     // applyOps entry and one for each image.
     std::vector<OplogSlot> oplogSlots;
     oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(3, 0), /*term=*/1LL});
     oplogSlots.push_back(OplogSlot{Timestamp(4, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    // getApplyOpsInfos() expects four slots to be used because of pre/post images and
+    // multiple applyOps entries.
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 4U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 2U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 2U);
+    ASSERT_FALSE(info.prepare);
 
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
     ASSERT_THROWS_CODE(ops.logOplogEntries(oplogSlots,
