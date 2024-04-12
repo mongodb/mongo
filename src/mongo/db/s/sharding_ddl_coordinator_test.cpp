@@ -147,10 +147,7 @@ TEST_F(ShardingDDLCoordinatorTest, AcquiresDDLLocks) {
 
         for (const auto& expectedCollLock : expectedCollLocks) {
             ASSERT_TRUE(coordinator->_locker->isLockHeldForMode(
-                ResourceId{RESOURCE_DDL_COLLECTION,
-                           NamespaceStringUtil::serialize(expectedCollLock,
-                                                          SerializationContext::stateDefault())},
-                MODE_X));
+                ResourceId{RESOURCE_DDL_COLLECTION, expectedCollLock}, MODE_X));
         }
     };
 

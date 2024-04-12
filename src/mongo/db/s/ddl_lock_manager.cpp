@@ -30,8 +30,6 @@
 
 #include "mongo/db/s/ddl_lock_manager.h"
 
-#include <mutex>
-#include <ratio>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -43,7 +41,6 @@
 #include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -59,13 +56,13 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-MONGO_FAIL_POINT_DEFINE(overrideDDLLockTimeout);
-
 namespace mongo {
 using namespace fmt::literals;
 namespace {
 
 const auto ddlLockManagerDecorator = ServiceContext::declareDecoration<DDLLockManager>();
+
+MONGO_FAIL_POINT_DEFINE(overrideDDLLockTimeout);
 
 }  // namespace
 
@@ -285,19 +282,17 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
 
 DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      Locker* locker,
-                                                     const NamespaceString& ns,
+                                                     const NamespaceString& nss,
                                                      StringData reason,
                                                      LockMode mode,
                                                      bool waitForRecovery)
-    : ScopedBaseDDLLock(
-          opCtx,
-          locker,
-          NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault()),
-          ResourceId{RESOURCE_DDL_COLLECTION,
-                     NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault())},
-          reason,
-          mode,
-          waitForRecovery) {}
+    : ScopedBaseDDLLock(opCtx,
+                        locker,
+                        NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()),
+                        ResourceId{RESOURCE_DDL_COLLECTION, nss},
+                        reason,
+                        mode,
+                        waitForRecovery) {}
 
 DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      Locker* locker,

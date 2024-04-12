@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <memory>
+#include <absl/container/flat_hash_map.h>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -38,11 +38,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -58,7 +56,7 @@ class DDLLockManager {
     public:
         ScopedBaseDDLLock(OperationContext* opCtx,
                           Locker* locker,
-                          const NamespaceString& ns,
+                          const NamespaceString& nss,
                           StringData reason,
                           LockMode mode,
                           bool waitForRecovery);
@@ -183,17 +181,7 @@ public:
     static DDLLockManager* get(OperationContext* opCtx);
 
 protected:
-    struct NSLock {
-        NSLock(StringData reason) : reason(reason.toString()) {}
-
-        stdx::condition_variable cvLocked;
-        int numWaiting = 1;
-        bool isInProgress = true;
-        std::string reason;
-    };
-
     Mutex _mutex = MONGO_MAKE_LATCH("DDLLockManager::_mutex");
-    StringMap<std::shared_ptr<NSLock>> _inProgressMap;
 
     enum class State {
         /**

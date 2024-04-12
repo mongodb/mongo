@@ -792,30 +792,6 @@ PartitionedLockHead* LockManager::Partition::findOrInsert(ResourceId resId) {
 }
 
 //
-// LockRequest
-//
-
-void LockRequest::initNew(Locker* locker, LockGrantNotification* notify) {
-    this->locker = locker;
-    this->notify = notify;
-
-    enqueueAtFront = false;
-    compatibleFirst = false;
-    partitioned = false;
-
-    status = STATUS_NEW;
-    mode = MODE_NONE;
-    unlockPending = 0;
-    recursiveCount = 1;
-
-    lock = nullptr;
-    partitionedLock = nullptr;
-
-    prev = nullptr;
-    next = nullptr;
-}
-
-//
 // Helper calls
 //
 

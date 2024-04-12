@@ -247,19 +247,12 @@ public:
     enum { resourceTypeBits = 4 };
     MONGO_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
 
-    ResourceId() : _fullHash(0) {}
     ResourceId(ResourceType type, const NamespaceString& nss)
         : _fullHash(fullHash(type, hashStringData(nss.toStringForResourceId()))) {
         verifyNoResourceMutex(type);
     }
     ResourceId(ResourceType type, const DatabaseName& dbName)
         : _fullHash(fullHash(type, hashStringData(dbName.toStringForResourceId()))) {
-        verifyNoResourceMutex(type);
-    }
-    ResourceId(ResourceType type, StringData str) : _fullHash(fullHash(type, hashStringData(str))) {
-        // Resources of type database, collection, or tenant must never be passed as a raw string.
-        invariant(type != RESOURCE_DATABASE && type != RESOURCE_COLLECTION &&
-                  type != RESOURCE_TENANT);
         verifyNoResourceMutex(type);
     }
     ResourceId(ResourceType type, uint64_t hashId) : _fullHash(fullHash(type, hashId)) {
@@ -269,6 +262,7 @@ public:
         : _fullHash{fullHash(type, hashStringData(tenantId.toString()))} {
         verifyNoResourceMutex(type);
     }
+    constexpr ResourceId() : _fullHash(0) {}
 
     bool isValid() const {
         return getType() != RESOURCE_INVALID;
@@ -303,7 +297,7 @@ private:
 
     ResourceId(uint64_t fullHash) : _fullHash(fullHash) {}
 
-    void verifyNoResourceMutex(ResourceType type) {
+    static void verifyNoResourceMutex(ResourceType type) {
         invariant(
             type != RESOURCE_MUTEX,
             "Can't create a ResourceMutex directly, use Lock::ResourceMutex::ResourceMutex().");

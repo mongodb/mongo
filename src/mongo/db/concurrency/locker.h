@@ -39,7 +39,6 @@
 #include "mongo/db/concurrency/cond_var_lock_grant_notification.h"
 #include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
-#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/database_name.h"
@@ -55,6 +54,7 @@
 
 namespace mongo {
 
+class LockManager;
 class OperationContext;
 namespace admission {
 class TicketHolderManager;
