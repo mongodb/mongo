@@ -9,7 +9,7 @@ env.Append(CPPDEFINES=["HAVE_STDARG_H"])
 if not env.TargetOSIs('windows'):
     env.Append(CPPDEFINES=["HAVE_UNISTD_H"])
 
-env.Library(
+env.BazelLibrary(
     target="zlib",
     source=[
         'adler32.c',
