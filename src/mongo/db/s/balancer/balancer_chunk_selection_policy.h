@@ -42,10 +42,18 @@
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
+namespace balancer_policy_utils {
+/*
+ * Helper to check if a collection is explicitly disabled for balancing
+ */
+bool canBalanceCollection(const CollectionType& coll);
+
+}  // namespace balancer_policy_utils
 /**
  * Class used by the balancer for selecting chunks, which need to be moved around in order for
  * the sharded cluster to be balanced.
