@@ -335,6 +335,15 @@ public:
                     // _finishCreate will take the lock again.
                     lk.unlock();
 
+                    if constexpr (kDebugBuild) {
+                        LOGV2_DEBUG(7591400,
+                                    1,
+                                    "Creating a new connection",
+                                    "target"_attr = host,
+                                    "timeout"_attr = timeout,
+                                    "requestedAt"_attr = connRequestedAt);
+                    }
+
                     // Create a new connection and return. All Connect functions
                     // should throw if they cannot create a connection.
                     auto c = connect();
