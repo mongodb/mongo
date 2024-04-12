@@ -41,6 +41,8 @@ class TestBranchFunctions(unittest.TestCase):
         """
         os.chdir(repo_directory)
         sync_repo_with_copybara.run_command('git init')
+        sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
+        sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
         # Used to store commit hashes
         commit_hashes = []
         for i in range(num_commits):
