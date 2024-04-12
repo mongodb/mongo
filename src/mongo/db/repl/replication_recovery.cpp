@@ -967,7 +967,7 @@ void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAft
 Timestamp ReplicationRecoveryImpl::_adjustStartPointIfNecessary(OperationContext* opCtx,
                                                                 Timestamp startPoint) {
     // Set up read on oplog collection.
-    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+    AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
     const auto& oplogCollection = oplogRead.getCollection();
     if (!oplogCollection) {
         LOGV2_FATAL_NOTRACE(

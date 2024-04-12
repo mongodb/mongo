@@ -608,7 +608,7 @@ void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringDat
     }
 
     {
-        AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         uassert(ErrorCodes::NotWritablePrimary,
                 "Not primary when performing noop write for {}"_format(msg),
                 replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));

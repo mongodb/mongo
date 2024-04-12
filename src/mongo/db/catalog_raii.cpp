@@ -642,10 +642,10 @@ ReadSourceScope::~ReadSourceScope() {
     }
 }
 
-AutoGetOplogFastPath::AutoGetOplogFastPath(OperationContext* opCtx,
-                                           OplogAccessMode mode,
-                                           Date_t deadline,
-                                           const AutoGetOplogFastPathOptions& options) {
+AutoGetOplog::AutoGetOplog(OperationContext* opCtx,
+                           OplogAccessMode mode,
+                           Date_t deadline,
+                           const AutoGetOplogOptions& options) {
     auto lockMode = (mode == OplogAccessMode::kRead) ? MODE_IS : MODE_IX;
     if (mode == OplogAccessMode::kLogOp) {
         // Invariant that global lock is already held for kLogOp mode.
@@ -659,8 +659,7 @@ AutoGetOplogFastPath::AutoGetOplogFastPath(OperationContext* opCtx,
     }
 
     _oplogInfo = LocalOplogInfo::get(opCtx);
-    _oplog = CollectionPtr(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-        opCtx, NamespaceString::kRsOplogNamespace));
+    _oplog = CollectionPtr(_oplogInfo->getCollection());
     _oplog.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _oplog));
 }
 

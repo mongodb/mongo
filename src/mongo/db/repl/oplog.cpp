@@ -549,7 +549,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     }
 
     // Use OplogAccessMode::kLogOp to avoid recursive locking.
-    AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kLogOp);
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kLogOp);
     auto oplogInfo = oplogWrite.getOplogInfo();
 
     // If an OpTime is not specified (i.e. isNull), a new OpTime will be assigned to the oplog entry
@@ -572,7 +572,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
         oplogEntry->setOpTime(slot);
     }
 
-    const auto& oplog = oplogWrite.getCollection();
+    const auto& oplog = oplogInfo->getCollection();
     auto wallClockTime = oplogEntry->getWallClockTime();
 
     auto bsonOplogEntry = oplogEntry->toBSON();
@@ -587,7 +587,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
                     oplogEntry->getNss(),
                     &records,
                     timestamps,
-                    oplog,
+                    CollectionPtr(oplog),
                     slot,
                     wallClockTime,
                     isAbortIndexBuild);
@@ -2582,26 +2582,24 @@ void initTimestampFromOplog(OperationContext* opCtx, const NamespaceString& oplo
 }
 
 void clearLocalOplogPtr(ServiceContext* service) {
-    LocalOplogInfo::get(service)->resetRecordStore();
+    LocalOplogInfo::get(service)->resetCollection();
 }
 
 void acquireOplogCollectionForLogging(OperationContext* opCtx) {
-    AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IX);
-    if (oplog) {
-        LocalOplogInfo::get(opCtx)->setRecordStore(oplog->getRecordStore());
-    }
+    AutoGetCollection autoColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_IX);
+    LocalOplogInfo::get(opCtx)->setCollection(autoColl.getCollection().get());
 }
 
-void establishOplogRecordStoreForLogging(OperationContext* opCtx, RecordStore* rs) {
+void establishOplogCollectionForLogging(OperationContext* opCtx, const Collection* oplog) {
     invariant(shard_role_details::getLocker(opCtx)->isW());
-    invariant(rs);
-    LocalOplogInfo::get(opCtx)->setRecordStore(rs);
+    invariant(oplog);
+    LocalOplogInfo::get(opCtx)->setCollection(oplog);
 }
 
 void signalOplogWaiters() {
-    const auto& oplog = LocalOplogInfo::get(getGlobalServiceContext())->getRecordStore();
+    const auto& oplog = LocalOplogInfo::get(getGlobalServiceContext())->getCollection();
     if (oplog) {
-        oplog->getCappedInsertNotifier()->notifyAll();
+        oplog->getRecordStore()->getCappedInsertNotifier()->notifyAll();
     }
 }
 

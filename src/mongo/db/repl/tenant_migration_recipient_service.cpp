@@ -1125,7 +1125,7 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     sessionTxnRecord.setStartOpTime(boost::none);
     sessionTxnRecord.setLastWriteDate(noopEntry.getWallClockTime());
 
-    AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
     writeConflictRetry(
         opCtx, "writeDonorCommittedTxnEntry", NamespaceString::kRsOplogNamespace, [&] {
             WriteUnitOfWork wuow(opCtx);

@@ -420,7 +420,7 @@ void performNoopMajorityWriteLocally(OperationContext* opCtx, StringData msg) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     {
-        AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         uassert(ErrorCodes::NotWritablePrimary,
                 "Not primary when performing noop write for {}"_format(msg),
                 replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));
