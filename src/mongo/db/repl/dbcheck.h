@@ -80,18 +80,21 @@ std::string renderForHealthLog(DbCheckValidationModeEnum validateMode);
  * DbCheckOplogStartStop health log entries. DbCheckOplogStartStop entries will use boost::none
  * for both nss and collectionUUID.
  */
-std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<NamespaceString>& nss,
-                                                      const boost::optional<UUID>& collectionUUID,
-                                                      SeverityEnum severity,
-                                                      const std::string& msg,
-                                                      ScopeEnum scope,
-                                                      OplogEntriesEnum operation,
-                                                      const boost::optional<BSONObj>& data);
+std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(
+    const boost::optional<SecondaryIndexCheckParameters>& parameters,
+    const boost::optional<NamespaceString>& nss,
+    const boost::optional<UUID>& collectionUUID,
+    SeverityEnum severity,
+    const std::string& msg,
+    ScopeEnum scope,
+    OplogEntriesEnum operation,
+    const boost::optional<BSONObj>& data);
 
 /**
  * Logs an error into 'local.system.healthLog'.
  */
 std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
+    const boost::optional<SecondaryIndexCheckParameters>& parameters,
     const boost::optional<NamespaceString>& nss,
     const boost::optional<UUID>& collectionUUID,
     const std::string& msg,
@@ -101,6 +104,7 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
     const BSONObj& context = BSONObj());
 
 std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
+    const boost::optional<SecondaryIndexCheckParameters>& parameters,
     const NamespaceString& nss,
     const boost::optional<UUID>& collectionUUID,
     const std::string& msg,
@@ -112,6 +116,7 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
  * Get a HealthLogEntry for a dbCheck batch.
  */
 std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
+    const boost::optional<SecondaryIndexCheckParameters>& parameters,
     const boost::optional<UUID>& batchId,
     const NamespaceString& nss,
     const boost::optional<UUID>& collectionUUID,

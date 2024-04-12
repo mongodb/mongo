@@ -172,13 +172,15 @@ std::string renderForHealthLog(DbCheckValidationModeEnum validateMode) {
 /**
  * Fills in the timestamp and scope, which are always the same for dbCheck's entries.
  */
-std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<NamespaceString>& nss,
-                                                      const boost::optional<UUID>& collectionUUID,
-                                                      SeverityEnum severity,
-                                                      const std::string& msg,
-                                                      ScopeEnum scope,
-                                                      OplogEntriesEnum operation,
-                                                      const boost::optional<BSONObj>& data) {
+std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(
+    const boost::optional<SecondaryIndexCheckParameters>& parameters,
+    const boost::optional<NamespaceString>& nss,
+    const boost::optional<UUID>& collectionUUID,
+    SeverityEnum severity,
+    const std::string& msg,
+    ScopeEnum scope,
+    OplogEntriesEnum operation,
+    const boost::optional<BSONObj>& data) {
     auto entry = std::make_unique<HealthLogEntry>();
     if (nss) {
         entry->setNss(*nss);
@@ -192,7 +194,14 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<Name
     entry->setMsg(msg);
     entry->setOperation(renderForHealthLog(operation));
     if (data) {
-        entry->setData(*data);
+        BSONObj dataBSON = data.get();
+        if (parameters) {
+            dataBSON =
+                dataBSON.addField(BSON("dbCheckParameters" << parameters->toBSON()).firstElement());
+        }
+        entry->setData(dataBSON);
+    } else if (parameters) {
+        entry->setData(BSON("dbCheckParameters" << parameters->toBSON()));
     }
     return entry;
 }
@@ -201,6 +210,7 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<Name
  * Get an error message if the check fails.
  */
 std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
+    const boost::optional<SecondaryIndexCheckParameters>& parameters,
     const boost::optional<NamespaceString>& nss,
     const boost::optional<UUID>& collectionUUID,
     const std::string& msg,
@@ -209,6 +219,7 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
     const Status& err,
     const BSONObj& context) {
     return dbCheckHealthLogEntry(
+        parameters,
         nss,
         collectionUUID,
         SeverityEnum::Error,
@@ -219,6 +230,7 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
 }
 
 std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
+    const boost::optional<SecondaryIndexCheckParameters>& parameters,
     const NamespaceString& nss,
     const boost::optional<UUID>& collectionUUID,
     const std::string& msg,
@@ -227,6 +239,7 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
     const Status& err,
     const BSONObj& context) {
     return dbCheckHealthLogEntry(
+        parameters,
         nss,
         collectionUUID,
         SeverityEnum::Warning,
@@ -240,6 +253,7 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
  * Get a HealthLogEntry for a dbCheck batch.
  */
 std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
+    const boost::optional<SecondaryIndexCheckParameters>& parameters,
     const boost::optional<UUID>& batchId,
     const NamespaceString& nss,
     const boost::optional<UUID>& collectionUUID,
@@ -300,7 +314,8 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     std::string msg =
         "dbCheck batch " + (hashesMatch ? std::string("consistent") : std::string("inconsistent"));
 
-    return dbCheckHealthLogEntry(nss,
+    return dbCheckHealthLogEntry(parameters,
+                                 nss,
                                  collectionUUID,
                                  severity,
                                  msg,
@@ -669,6 +684,7 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
             const auto msg = "Error fetching record from record id";
             const auto status = Status(ErrorCodes::KeyNotFound, msg);
             const auto logEntry = dbCheckErrorHealthLogEntry(
+                _secondaryIndexCheckParameters,
                 collPtr->ns(),
                 collPtr->uuid(),
                 msg,
@@ -700,7 +716,8 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                 std::unique_ptr<HealthLogEntry> logEntry;
                 if (status.code() != ErrorCodes::NonConformantBSON) {
                     logEntry =
-                        dbCheckErrorHealthLogEntry(collPtr->ns(),
+                        dbCheckErrorHealthLogEntry(_secondaryIndexCheckParameters,
+                                                   collPtr->ns(),
                                                    collPtr->uuid(),
                                                    msg,
                                                    ScopeEnum::Document,
@@ -713,7 +730,8 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                     // kDefault), the error code would be NonConformantBSON. We log a warning
                     // instead because the kExtended/kFull modes were recently added, so users may
                     // have non-conformant documents that exist before the checks.
-                    logEntry = dbCheckWarningHealthLogEntry(collPtr->ns(),
+                    logEntry = dbCheckWarningHealthLogEntry(_secondaryIndexCheckParameters,
+                                                            collPtr->ns(),
                                                             collPtr->uuid(),
                                                             msg,
                                                             ScopeEnum::Document,
@@ -747,6 +765,7 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
             if (!status.isOK()) {
                 const auto msg = "Document has missing index keys";
                 const auto logEntry = dbCheckErrorHealthLogEntry(
+                    _secondaryIndexCheckParameters,
                     collPtr->ns(),
                     collPtr->uuid(),
                     msg,
@@ -865,7 +884,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
 
         if (!acquisition.coll.exists()) {
             const auto msg = "Collection under dbCheck no longer exists";
-            auto logEntry = dbCheckHealthLogEntry(entry.getNss(),
+            auto logEntry = dbCheckHealthLogEntry(entry.getSecondaryIndexCheckParameters(),
+                                                  entry.getNss(),
                                                   boost::none,
                                                   SeverityEnum::Info,
                                                   "dbCheck failed",
@@ -877,23 +897,6 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         }
 
         const auto& collection = acquisition.coll.getCollectionPtr();
-
-        // TODO SERVER-78399: Clean up handling minKey/maxKey once feature flag is removed.
-        // If the dbcheck oplog entry doesn't contain batchStart, convert minKey to a BSONObj to
-        // be used as batchStart.
-        BSONObj batchStart;
-        if (!entry.getBatchStart()) {
-            batchStart = BSON("_id" << entry.getMinKey().elem());
-        } else {
-            batchStart = entry.getBatchStart().get();
-        }
-
-        BSONObj batchEnd;
-        if (!entry.getBatchEnd()) {
-            batchEnd = BSON("_id" << entry.getMaxKey().elem());
-        } else {
-            batchEnd = entry.getBatchEnd().get();
-        }
 
         // TODO SERVER-78399: Clean up this check once feature flag is removed.
         const boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters =
@@ -920,7 +923,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                         std::string msg = "cannot find index " + indexName + " for ns " +
                             entry.getNss().toStringForErrorMsg();
                         const auto logEntry =
-                            dbCheckHealthLogEntry(entry.getNss(),
+                            dbCheckHealthLogEntry(secondaryIndexCheckParameters,
+                                                  entry.getNss(),
                                                   boost::none,
                                                   SeverityEnum::Error,
                                                   "dbCheck failed",
@@ -966,7 +970,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             const auto status = hasher->hashForCollectionCheck(opCtx, collection);
             if (!status.isOK() && status.code() == ErrorCodes::KeyNotFound) {
                 std::unique_ptr<HealthLogEntry> healthLogEntry =
-                    dbCheckErrorHealthLogEntry(entry.getNss(),
+                    dbCheckErrorHealthLogEntry(secondaryIndexCheckParameters,
+                                               entry.getNss(),
                                                collection->uuid(),
                                                "Error fetching record from record id",
                                                ScopeEnum::Index,
@@ -999,6 +1004,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                              (secondaryIndexCheckParameters.get().getValidateMode() ==
                               mongo::DbCheckValidationModeEnum::extraIndexKeysCheck));
         auto logEntry = dbCheckBatchEntry(
+            secondaryIndexCheckParameters,
             entry.getBatchId(),
             entry.getNss(),
             collection->uuid(),
@@ -1029,7 +1035,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         }
     } catch (const DBException& exception) {
         // In case of an error, report it to the health log,
-        auto logEntry = dbCheckErrorHealthLogEntry(entry.getNss(),
+        auto logEntry = dbCheckErrorHealthLogEntry(entry.getSecondaryIndexCheckParameters(),
+                                                   entry.getNss(),
                                                    boost::none,
                                                    msg,
                                                    ScopeEnum::Cluster,
@@ -1125,13 +1132,15 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             if (!batchId.isEmpty()) {
                 data.append("batchId", batchId);
             }
-            auto healthLogEntry = mongo::dbCheckHealthLogEntry(invocation.getNss(),
-                                                               boost::none /*collectionUUID*/,
-                                                               SeverityEnum::Warning,
-                                                               warningMsg,
-                                                               ScopeEnum::Cluster,
-                                                               type,
-                                                               data.obj());
+            auto healthLogEntry =
+                mongo::dbCheckHealthLogEntry(invocation.getSecondaryIndexCheckParameters(),
+                                             invocation.getNss(),
+                                             boost::none /*collectionUUID*/,
+                                             SeverityEnum::Warning,
+                                             warningMsg,
+                                             ScopeEnum::Cluster,
+                                             type,
+                                             data.obj());
 
             HealthLogInterface::get(Client::getCurrent()->getServiceContext())
                 ->log(*healthLogEntry);
@@ -1146,20 +1155,14 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
         case OplogEntriesEnum::Stop:
             const auto invocation = DbCheckOplogStartStop::parse(ctx, cmd);
             auto healthLogEntry = mongo::dbCheckHealthLogEntry(
-                boost::none /*nss*/,
-                boost::none /*collectionUUID*/,
+                invocation.getSecondaryIndexCheckParameters(),
+                invocation.getNss(),
+                invocation.getUuid(),
                 skipDbCheck ? SeverityEnum::Warning : SeverityEnum::Info,
                 skipDbCheck ? "cannot execute dbcheck due to ongoing " + oplogApplicationMode : "",
                 ScopeEnum::Cluster,
                 type,
                 boost::none /*data*/);
-            const auto secondaryIndexCheckParameters =
-                invocation.getSecondaryIndexCheckParameters();
-            if (secondaryIndexCheckParameters) {
-                healthLogEntry->setData(secondaryIndexCheckParameters.value().toBSON());
-                healthLogEntry->setNss(invocation.getNss());
-                healthLogEntry->setCollectionUUID(invocation.getUuid());
-            }
             HealthLogInterface::get(Client::getCurrent()->getServiceContext())
                 ->log(*healthLogEntry);
             return Status::OK();

@@ -6,48 +6,76 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const defaultSnapshotSize = 1000;
 export const logQueries = {
-    allErrorsOrWarningsQuery: {$or: [{"severity": "warning"}, {"severity": "error"}]},
+    allErrorsOrWarningsQuery: {
+        $or: [{"severity": "warning"}, {"severity": "error"}],
+        "data.dbCheckParameters": {$exists: true}
+    },
     recordNotFoundQuery: {
         "severity": "error",
         "msg": "found extra index key entry without corresponding document",
-        "data.context.indexSpec": {$exists: true}
+        "data.context.indexSpec": {$exists: true},
+        "data.dbCheckParameters": {$exists: true}
     },
     missingIndexKeysQuery: {
         "severity": "error",
         "msg": "Document has missing index keys",
         "data.context.missingIndexKeys": {$exists: true},
+        "data.dbCheckParameters": {$exists: true}
     },
     recordDoesNotMatchQuery: {
         "severity": "error",
         "msg":
             "found index key entry with corresponding document/keystring set that does not contain the expected key string",
-        "data.context.indexSpec": {$exists: true}
+        "data.context.indexSpec": {$exists: true},
+        "data.dbCheckParameters": {$exists: true}
     },
     collNotFoundWarningQuery: {
         severity: "warning",
-        "msg": "abandoning dbCheck extra index keys check because collection no longer exists"
+        "msg": "abandoning dbCheck extra index keys check because collection no longer exists",
+        "data.dbCheckParameters": {$exists: true}
     },
     indexNotFoundWarningQuery: {
         severity: "warning",
-        "msg": "abandoning dbCheck extra index keys check because index no longer exists"
+        "msg": "abandoning dbCheck extra index keys check because index no longer exists",
+        "data.dbCheckParameters": {$exists: true}
     },
     duringInitialSyncQuery:
         {severity: "warning", "msg": "cannot execute dbcheck due to ongoing initial sync"},
     duringStableRecovery:
         {severity: "warning", "msg": "cannot execute dbcheck due to ongoing stable recovering"},
-    errorQuery: {"severity": "error"},
-    warningQuery: {"severity": "warning"},
-    infoOrErrorQuery:
-        {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]},
-    infoBatchQuery: {"severity": "info", "operation": "dbCheckBatch"},
-    inconsistentBatchQuery: {"severity": "error", "msg": "dbCheck batch inconsistent"},
+    errorQuery: {"severity": "error", "data.dbCheckParameters": {$exists: true}},
+    warningQuery: {"severity": "warning", "data.dbCheckParameters": {$exists: true}},
+    infoOrErrorQuery: {
+        $or: [
+            {
+                "severity": "info",
+                "operation": "dbCheckBatch",
+                "data.dbCheckParameters": {$exists: true}
+            },
+            {"severity": "error", "data.dbCheckParameters": {$exists: true}}
+        ]
+    },
+    infoBatchQuery: {
+        "severity": "info",
+        "operation": "dbCheckBatch",
+        "data.dbCheckParameters": {$exists: true}
+    },
+    inconsistentBatchQuery: {
+        "severity": "error",
+        "msg": "dbCheck batch inconsistent",
+        "data.dbCheckParameters": {$exists: true}
+    },
     startStopQuery: {
         $or: [
             {"operation": "dbCheckStart", "severity": "info"},
             {"operation": "dbCheckStop", "severity": "info"}
         ]
     },
-    writeConcernErrorQuery: {severity: "error", "msg": "dbCheck failed waiting for writeConcern"},
+    writeConcernErrorQuery: {
+        severity: "error",
+        "msg": "dbCheck failed waiting for writeConcern",
+        "data.dbCheckParameters": {$exists: true}
+    },
     skipApplyingBatchOnSecondaryQuery: {
         severity: "warning",
         "msg":

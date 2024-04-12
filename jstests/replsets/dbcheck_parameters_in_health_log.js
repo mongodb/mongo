@@ -43,10 +43,12 @@ function testParametersInHealthlog() {
         namespace: dbName + "." + colName,
         collectionUUID: getUUIDFromListCollections(db, colName),
         data: {
-            validateMode: "dataConsistency",
-            secondaryIndex: "",
-            skipLookupForExtraKeys: false,
-            bsonValidateMode: "kDefault"
+            dbCheckParameters: {
+                validateMode: "dataConsistency",
+                secondaryIndex: "",
+                skipLookupForExtraKeys: false,
+                bsonValidateMode: "kDefault"
+            }
         }
     };
     checkHealthLog(primaryHealthlog, query, 2);
@@ -66,10 +68,12 @@ function testParametersInHealthlog() {
         namespace: dbName + "." + colName,
         collectionUUID: getUUIDFromListCollections(db, colName),
         data: {
-            validateMode: "dataConsistencyAndMissingIndexKeysCheck",
-            secondaryIndex: "",
-            skipLookupForExtraKeys: false,
-            bsonValidateMode: "kExtended"
+            dbCheckParameters: {
+                validateMode: "dataConsistencyAndMissingIndexKeysCheck",
+                secondaryIndex: "",
+                skipLookupForExtraKeys: false,
+                bsonValidateMode: "kExtended"
+            }
         }
     };
     checkHealthLog(primaryHealthlog, query, 2);
@@ -92,10 +96,12 @@ function testParametersInHealthlog() {
         namespace: dbName + "." + colName,
         collectionUUID: getUUIDFromListCollections(db, colName),
         data: {
-            validateMode: "extraIndexKeysCheck",
-            secondaryIndex: "secondaryIndex",
-            skipLookupForExtraKeys: true,
-            bsonValidateMode: "kDefault"
+            dbCheckParameters: {
+                validateMode: "extraIndexKeysCheck",
+                secondaryIndex: "secondaryIndex",
+                skipLookupForExtraKeys: true,
+                bsonValidateMode: "kDefault"
+            }
         }
     };
     checkHealthLog(primaryHealthlog, query, 2);

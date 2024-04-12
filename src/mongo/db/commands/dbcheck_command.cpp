@@ -210,7 +210,8 @@ DbCheckStartAndStopLogger::DbCheckStartAndStopLogger(OperationContext* opCtx,
         oplogEntry.setNss(nss);
         oplogEntry.setType(OplogEntriesEnum::Start);
 
-        auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*nss*/,
+        auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*parameters*/,
+                                                    boost::none /*nss*/,
                                                     boost::none /*collectionUUID*/,
                                                     SeverityEnum::Info,
                                                     "",
@@ -225,7 +226,9 @@ DbCheckStartAndStopLogger::DbCheckStartAndStopLogger(OperationContext* opCtx,
         if (_info && _info.value().secondaryIndexCheckParameters) {
             oplogEntry.setSecondaryIndexCheckParameters(
                 _info.value().secondaryIndexCheckParameters.value());
-            healthLogEntry->setData(_info.value().secondaryIndexCheckParameters.value().toBSON());
+            healthLogEntry->setData(
+                BSON("dbCheckParameters"
+                     << _info.value().secondaryIndexCheckParameters.value().toBSON()));
 
             oplogEntry.setNss(_info.value().nss);
             healthLogEntry->setNss(_info.value().nss);
@@ -252,7 +255,8 @@ DbCheckStartAndStopLogger::~DbCheckStartAndStopLogger() {
         oplogEntry.setNss(nss);
         oplogEntry.setType(OplogEntriesEnum::Stop);
 
-        auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*nss*/,
+        auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*parameters*/,
+                                                    boost::none /*nss*/,
                                                     boost::none /*collectionUUID*/,
                                                     SeverityEnum::Info,
                                                     "",
@@ -267,7 +271,9 @@ DbCheckStartAndStopLogger::~DbCheckStartAndStopLogger() {
         if (_info && _info.value().secondaryIndexCheckParameters) {
             oplogEntry.setSecondaryIndexCheckParameters(
                 _info.value().secondaryIndexCheckParameters.value());
-            healthLogEntry->setData(_info.value().secondaryIndexCheckParameters.value().toBSON());
+            healthLogEntry->setData(
+                BSON("dbCheckParameters"
+                     << _info.value().secondaryIndexCheckParameters.value().toBSON()));
 
             oplogEntry.setNss(_info.value().nss);
             healthLogEntry->setNss(_info.value().nss);
@@ -548,6 +554,7 @@ void DbCheckJob::run() {
                 // acquireCollectionMaybeLockFree throws CommandNotSupportedOnView if the
                 // coll was dropped and a view with the same name was created.
                 logEntry = dbCheckWarningHealthLogEntry(
+                    info->secondaryIndexCheckParameters,
                     coll.nss,
                     coll.uuid,
                     "abandoning dbCheck batch because collection no longer exists, but "
@@ -559,6 +566,7 @@ void DbCheckJob::run() {
                            "with the identical name"));
             } else if (ErrorCodes::isA<ErrorCategory::NotPrimaryError>(errCode)) {
                 logEntry = dbCheckWarningHealthLogEntry(
+                    info->secondaryIndexCheckParameters,
                     coll.nss,
                     coll.uuid,
                     "abandoning dbCheck batch due to stepdown.",
@@ -566,7 +574,8 @@ void DbCheckJob::run() {
                     OplogEntriesEnum::Batch,
                     Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated due to stepdown"));
             } else {
-                logEntry = dbCheckErrorHealthLogEntry(coll.nss,
+                logEntry = dbCheckErrorHealthLogEntry(info->secondaryIndexCheckParameters,
+                                                      coll.nss,
                                                       coll.uuid,
                                                       "dbCheck failed",
                                                       ScopeEnum::Cluster,
@@ -671,6 +680,7 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
             Status status = Status(ErrorCodes::NoSuchKey,
                                    "could not create batch bounds because of error while batching");
             const auto logEntry = dbCheckErrorHealthLogEntry(
+                _info.secondaryIndexCheckParameters,
                 _info.nss,
                 _info.uuid,
                 "abandoning dbCheck extra index keys check because of error with batching",
@@ -749,7 +759,8 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
     }
 
     auto logEntry =
-        dbCheckBatchEntry(batchStats->batchId,
+        dbCheckBatchEntry(_info.secondaryIndexCheckParameters,
+                          batchStats->batchId,
                           _info.nss,
                           _info.uuid,
                           batchStats->nHasherKeys,
@@ -783,7 +794,8 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
 
         // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors
         // in one location.
-        auto entry = dbCheckErrorHealthLogEntry(_info.nss,
+        auto entry = dbCheckErrorHealthLogEntry(_info.secondaryIndexCheckParameters,
+                                                _info.nss,
                                                 _info.uuid,
                                                 "dbCheck failed waiting for writeConcern",
                                                 ScopeEnum::Collection,
@@ -815,6 +827,7 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
                                                  << _info.nss.toStringForErrorMsg() << " and uuid "
                                                  << _info.uuid.toString());
             const auto logEntry = dbCheckWarningHealthLogEntry(
+                _info.secondaryIndexCheckParameters,
                 _info.nss,
                 _info.uuid,
                 "abandoning dbCheck extra index keys check because collection no longer exists",
@@ -844,6 +857,7 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
                                                  << _info.nss.toStringForErrorMsg() << " and uuid "
                                                  << _info.uuid.toString());
             const auto logEntry = dbCheckWarningHealthLogEntry(
+                _info.secondaryIndexCheckParameters,
                 _info.nss,
                 _info.uuid,
                 "abandoning dbCheck extra index keys check because index no longer exists",
@@ -1024,6 +1038,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                             << "cannot find collection for ns " << _info.nss.toStringForErrorMsg()
                             << " and uuid " << _info.uuid.toString());
         const auto logEntry = dbCheckWarningHealthLogEntry(
+            _info.secondaryIndexCheckParameters,
             _info.nss,
             _info.uuid,
             "abandoning dbCheck extra index keys check because collection no longer exists",
@@ -1048,6 +1063,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                                       << _info.nss.toStringForErrorMsg() << " and uuid "
                                       << _info.uuid.toString());
         const auto logEntry = dbCheckWarningHealthLogEntry(
+            _info.secondaryIndexCheckParameters,
             _info.nss,
             _info.uuid,
             "abandoning dbCheck extra index keys check because index no longer exists",
@@ -1077,6 +1093,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                                       << " for ns " << _info.nss.toStringForErrorMsg()
                                       << " and uuid " << _info.uuid.toString());
         const auto logEntry = dbCheckWarningHealthLogEntry(
+            _info.secondaryIndexCheckParameters,
             _info.nss,
             _info.uuid,
             "abandoning dbCheck extra index keys check because index type is not supported",
@@ -1199,7 +1216,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         BSONObjBuilder context;
         context.append("indexSpec", index->infoObj());
         const auto logEntry =
-            dbCheckWarningHealthLogEntry(_info.nss,
+            dbCheckWarningHealthLogEntry(_info.secondaryIndexCheckParameters,
+                                         _info.nss,
                                          _info.uuid,
                                          "abandoning dbCheck extra index keys check because "
                                          "there are no keys left in the index",
@@ -1490,7 +1508,8 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
 
         // TODO SERVER-79301: Update scope enums for health log entries.
         auto logEntry =
-            dbCheckErrorHealthLogEntry(_info.nss,
+            dbCheckErrorHealthLogEntry(_info.secondaryIndexCheckParameters,
+                                       _info.nss,
                                        _info.uuid,
                                        "found extra index key entry without corresponding document",
                                        ScopeEnum::Index,
@@ -1565,7 +1584,8 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
     context.append("indexSpec", indexSpec);
 
     // TODO SERVER-79301: Update scope enums for health log entries.
-    auto logEntry = dbCheckErrorHealthLogEntry(_info.nss,
+    auto logEntry = dbCheckErrorHealthLogEntry(_info.secondaryIndexCheckParameters,
+                                               _info.nss,
                                                _info.uuid,
                                                "found index key entry with corresponding "
                                                "document/keystring set that does not "
@@ -1620,6 +1640,7 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
             // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors
             // in one location.
             const auto entry = dbCheckWarningHealthLogEntry(
+                _info.secondaryIndexCheckParameters,
                 _info.nss,
                 _info.uuid,
                 "abandoning dbCheck batch because collection no longer exists",
@@ -1704,14 +1725,16 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
             // Cannot retry. Write a health log entry and return from the batch.
             std::unique_ptr<HealthLogEntry> entry;
             if (logError) {
-                entry = dbCheckErrorHealthLogEntry(_info.nss,
+                entry = dbCheckErrorHealthLogEntry(_info.secondaryIndexCheckParameters,
+                                                   _info.nss,
                                                    _info.uuid,
                                                    msg,
                                                    ScopeEnum::Collection,
                                                    OplogEntriesEnum::Batch,
                                                    result.getStatus());
             } else {
-                entry = dbCheckWarningHealthLogEntry(_info.nss,
+                entry = dbCheckWarningHealthLogEntry(_info.secondaryIndexCheckParameters,
+                                                     _info.nss,
                                                      _info.uuid,
                                                      msg,
                                                      ScopeEnum::Collection,
@@ -1724,7 +1747,8 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
 
         const auto stats = result.getValue();
 
-        auto entry = dbCheckBatchEntry(stats.batchId,
+        auto entry = dbCheckBatchEntry(_info.secondaryIndexCheckParameters,
+                                       stats.batchId,
                                        _info.nss,
                                        _info.uuid,
                                        stats.nCount,
@@ -1752,7 +1776,8 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
             context.append("lastKey", stats.lastKey);
             // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors
             // in one location.
-            auto entry = dbCheckErrorHealthLogEntry(_info.nss,
+            auto entry = dbCheckErrorHealthLogEntry(_info.secondaryIndexCheckParameters,
+                                                    _info.nss,
                                                     _info.uuid,
                                                     "dbCheck failed waiting for writeConcern",
                                                     ScopeEnum::Collection,
@@ -1840,7 +1865,8 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
             // dbCheck should still continue if we get an error fetching a record.
             if (status.code() == ErrorCodes::NoSuchKey) {
                 std::unique_ptr<HealthLogEntry> healthLogEntry =
-                    dbCheckErrorHealthLogEntry(_info.nss,
+                    dbCheckErrorHealthLogEntry(_info.secondaryIndexCheckParameters,
+                                               _info.nss,
                                                _info.uuid,
                                                "Error fetching record from record id",
                                                ScopeEnum::Index,
