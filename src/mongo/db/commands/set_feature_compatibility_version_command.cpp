@@ -129,8 +129,10 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/migration_blocking_operation/migration_blocking_operation_feature_flags_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
@@ -1027,6 +1029,77 @@ private:
         }
     }
 
+
+    void _untrackUnsplittableCollections(OperationContext* opCtx) {
+        auto role = ShardingState::get(opCtx)->pollClusterRole();
+        invariant(role->has(ClusterRole::ConfigServer));
+
+        std::vector<NamespaceString> namespacesToUntrack;
+
+        {
+            DBDirectClient client(opCtx);
+            FindCommandRequest findCmd{NamespaceString::kConfigsvrCollectionsNamespace};
+            findCmd.setFilter(BSON(CollectionType::kUnsplittableFieldName << true));
+            auto cursor = client.find(std::move(findCmd));
+            while (cursor->more()) {
+                const auto doc = cursor->next();
+                auto nssString = doc.getField(CollectionType::kNssFieldName).String();
+                namespacesToUntrack.push_back(NamespaceStringUtil::deserialize(
+                    boost::none, nssString, SerializationContext::stateDefault()));
+            }
+        }
+
+        auto logUntrackUnsplittableCollectionsProgress = [&]() {
+            LOGV2_INFO(
+                8630900,
+                "Unregistering unsharded collections from the sharding catalog because they are "
+                "only tracked on the local catalog(s) in versions older than v8.0.",
+                "numRemainingCollectionsToUnregister"_attr = namespacesToUntrack.size());
+        };
+
+        logUntrackUnsplittableCollectionsProgress();
+
+        auto nss = namespacesToUntrack.begin();
+        while (nss != namespacesToUntrack.end()) {
+            ShardsvrUntrackUnsplittableCollection shardsvrRequest(*nss);
+            shardsvrRequest.setDbName(NamespaceString::kAdminCommandNamespace.dbName());
+
+            try {
+                sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss->dbName());
+                router.route(
+                    opCtx,
+                    "untrackCollection",
+                    [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                        auto cmdResponse = executeDDLCoordinatorCommandAgainstDatabasePrimary(
+                            opCtx,
+                            DatabaseName::kAdmin,
+                            dbInfo,
+                            CommandHelpers::appendMajorityWriteConcern(shardsvrRequest.toBSON({}),
+                                                                       opCtx->getWriteConcern()),
+                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                            Shard::RetryPolicy::kIdempotent);
+
+                        const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                        uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                    });
+            } catch (const ExceptionFor<ErrorCodes::OperationFailed>& ex) {
+                // The untrack collection coordinator throws OperationFailed when it is not possible
+                // to untrack the collection. Wrapping the exception because users expect
+                // `CannotDowngrade` to be thrown when manual intervention is needed during
+                // downgrade.
+                uasserted(ErrorCodes::CannotDowngrade, ex.toString());
+            }
+
+            nss = namespacesToUntrack.erase(nss);
+
+            if (namespacesToUntrack.size() % 10 == 0 && namespacesToUntrack.size() > 0) {
+                logUntrackUnsplittableCollectionsProgress();
+            }
+        }
+
+        LOGV2_INFO(8630901, "Unregistered all unsharded collections from the sharding catalog");
+    }
+
     void _createShardingIndexCatalogIndexes(
         OperationContext* opCtx,
         const multiversion::FeatureCompatibilityVersion requestedVersion,
@@ -1138,6 +1211,14 @@ private:
         // roles aren't mutually exclusive.
         if (role && role->has(ClusterRole::ConfigServer)) {
             // Config server role actions.
+            {
+                // Untracking may fail if at least one unsplittable collection resides on a shard
+                // different than the db primary.
+                // Performing this step in the PREPARE phase so that the user is allowed to react by
+                // setting the FCV back to 8.0 and move the collection before retrying to downgrade.
+                // It is not possible to set the FCV back to v8.0 after the PREPARE phase.
+                _untrackUnsplittableCollections(opCtx);
+            }
         }
 
         if (role && role->has(ClusterRole::ShardServer)) {
@@ -1402,6 +1483,15 @@ private:
                 NamespaceString::kShardIndexCatalogNamespace);
 
             abortAllMultiUpdateCoordinators(opCtx, requestedVersion, originalVersion);
+
+            // Drain before completing downgrade because pre-v8.0 binaries are not able to resume
+            // untrack coordinators. This is necessary because the config server may step down while
+            // a coordinator has already untracked the collection but is still alive: on step-up,
+            // the config server would find no unsplittable collection and potentially fully
+            // downgrade the FCV without waiting for untrack coordinator documents to be removed.
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kUntrackUnsplittableCollection);
         } else {
             _updateAuditConfigOnDowngrade(opCtx, requestedVersion);
         }
