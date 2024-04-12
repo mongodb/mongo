@@ -674,6 +674,10 @@ public:
         return _apiParameters;
     }
 
+    void setShouldThrowOnStaleConfigError(bool value) {
+        _shouldThrowOnStaleConfigError = value;
+    }
+
     void setAlwaysAppendDollarTenant_forTest() {
         _alwaysAppendDollarTenant = true;
     }
@@ -711,6 +715,11 @@ protected:
     long long _connectionId;  // unique connection id for this connection
 
     std::vector<std::string> _saslMechsForAuth;
+
+    // Unless explicitly opted out, a DBClientBase should throw on a StaleConfig error so that the
+    // error can be handled internally if applicable rather than propagated to the external client
+    // right away.
+    bool _shouldThrowOnStaleConfigError = true;
 
 private:
     virtual void _call(Message& toSend, Message& response, std::string* actualServer) = 0;

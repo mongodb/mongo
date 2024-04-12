@@ -86,6 +86,12 @@ bool ErrorLabelBuilder::isRetryableWriteError() const {
             return true;
         }
 
+        // StaleConfig error for a direct shard operation is retryable because StaleConfig triggers
+        // a sharding metadata refresh. As a result, a subsequent retry will probably succeed.
+        if (!_isComingFromRouter && _code && _code.value() == ErrorCodes::StaleConfig) {
+            return true;
+        }
+
         // mongos should not attach RetryableWriteError label to retryable errors thrown by the
         // config server or targeted shards.
         return !_isMongos &&
@@ -193,6 +199,7 @@ BSONObj getErrorLabels(OperationContext* opCtx,
                        boost::optional<ErrorCodes::Error> wcCode,
                        bool isInternalClient,
                        bool isMongos,
+                       bool isComingFromRouter,
                        const repl::OpTime& lastOpBeforeRun,
                        const repl::OpTime& lastOpAfterRun) {
     if (MONGO_unlikely(errorLabelsOverride(opCtx))) {
@@ -214,6 +221,7 @@ BSONObj getErrorLabels(OperationContext* opCtx,
                                    wcCode,
                                    isInternalClient,
                                    isMongos,
+                                   isComingFromRouter,
                                    lastOpBeforeRun,
                                    lastOpAfterRun);
     labelBuilder.build(labelArray);

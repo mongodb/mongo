@@ -51,6 +51,7 @@ public:
                       boost::optional<ErrorCodes::Error> wcCode,
                       bool isInternalClient,
                       bool isMongos,
+                      bool isComingFromRouter,
                       const repl::OpTime& lastOpBeforeRun,
                       const repl::OpTime& lastOpAfterRun)
         : _opCtx(opCtx),
@@ -60,6 +61,7 @@ public:
           _wcCode(wcCode),
           _isInternalClient(isInternalClient),
           _isMongos(isMongos),
+          _isComingFromRouter(isComingFromRouter),
           _lastOpBeforeRun(lastOpBeforeRun),
           _lastOpAfterRun(lastOpAfterRun) {}
 
@@ -80,6 +82,7 @@ private:
     boost::optional<ErrorCodes::Error> _wcCode;
     bool _isInternalClient;
     bool _isMongos;
+    bool _isComingFromRouter;
     repl::OpTime _lastOpBeforeRun;
     repl::OpTime _lastOpAfterRun;
 };
@@ -94,6 +97,7 @@ BSONObj getErrorLabels(OperationContext* opCtx,
                        boost::optional<ErrorCodes::Error> wcCode,
                        bool isInternalClient,
                        bool isMongos,
+                       bool isComingFromRouter,
                        const repl::OpTime& lastOpBeforeRun,
                        const repl::OpTime& lastOpAfterRun);
 
