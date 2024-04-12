@@ -1,6 +1,6 @@
 Import("env")
 
-env.Library(
+env.BazelLibrary(
     target='murmurhash3',
     source=['MurmurHash3.cpp'],
 )
