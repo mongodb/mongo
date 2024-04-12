@@ -304,6 +304,23 @@ void getSplitCandidatesToEnforceZoneRanges(const ChunkManager& cm,
 
 }  // namespace
 
+bool balancer_policy_utils::canBalanceCollection(const CollectionType& coll) {
+    if (!coll.getAllowBalance() || !coll.getAllowMigrations() || !coll.getPermitMigrations() ||
+        coll.getDefragmentCollection()) {
+        LOGV2_DEBUG(5966401,
+                    1,
+                    "Not balancing explicitly disabled collection",
+                    logAttrs(coll.getNss()),
+                    "allowBalance"_attr = coll.getAllowBalance(),
+                    "allowMigrations"_attr = coll.getAllowMigrations(),
+                    "permitMigrations"_attr = coll.getPermitMigrations(),
+                    "defragmentCollection"_attr = coll.getDefragmentCollection(),
+                    "unsplittable"_attr = coll.getUnsplittable());
+        return false;
+    }
+    return true;
+}
+
 BalancerChunkSelectionPolicy::BalancerChunkSelectionPolicy(ClusterStatistics* clusterStats)
     : _clusterStats(clusterStats) {}
 
@@ -420,23 +437,6 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicy::selectChunksToMove(
         return std::make_pair(*collIt, collIt);
     };
 
-    // Lambda function to check if a collection is explicitly disabled for balancing
-    const auto canBalanceCollection = [](const CollectionType& coll) -> bool {
-        if (!coll.getAllowBalance() || !coll.getAllowMigrations() || !coll.getPermitMigrations() ||
-            coll.getDefragmentCollection()) {
-            LOGV2_DEBUG(5966401,
-                        1,
-                        "Not balancing explicitly disabled collection",
-                        logAttrs(coll.getNss()),
-                        "allowBalance"_attr = coll.getAllowBalance(),
-                        "allowMigrations"_attr = coll.getAllowMigrations(),
-                        "permitMigrations"_attr = coll.getPermitMigrations(),
-                        "defragmentCollection"_attr = coll.getDefragmentCollection());
-            return false;
-        }
-        return true;
-    };
-
     // Lambda function to select migrate candidates from a batch of collections
     const auto processBatch = [&](std::vector<CollectionType>& collBatch) {
         const auto collsDataSizeInfo = getDataSizeInfoForCollections(opCtx, collBatch);
@@ -490,7 +490,8 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicy::selectChunksToMove(
 
         const auto& [imbalancedColl, collIt] = getCollectionTypeByNss(*imbalancedNssIt);
 
-        if (!imbalancedColl.has_value() || !canBalanceCollection(imbalancedColl.value())) {
+        if (!imbalancedColl.has_value() ||
+            !balancer_policy_utils::canBalanceCollection(imbalancedColl.value())) {
             // The collection was dropped or is no longer enabled for balancing.
             imbalancedCollectionsCachePtr->erase(imbalancedNssIt++);
             continue;
@@ -508,7 +509,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicy::selectChunksToMove(
     std::shuffle(collections.begin(), collections.end(), client->getPrng().urbg());
     for (const auto& coll : collections) {
 
-        if (canBalanceCollection(coll)) {
+        if (balancer_policy_utils::canBalanceCollection(coll)) {
             collBatch.push_back(coll);
         }
 

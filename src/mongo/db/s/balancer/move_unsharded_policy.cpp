@@ -32,6 +32,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -116,7 +117,8 @@ boost::optional<std::pair<NamespaceString, ChunkType>> getRandomUnsplittableColl
         opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern, noSort);
     std::vector<CollectionType*> unsplittableCollections;
     for (auto& collection : collections) {
-        if (collection.getUnsplittable()) {
+        if (collection.getUnsplittable() &&
+            balancer_policy_utils::canBalanceCollection(collection)) {
             unsplittableCollections.emplace_back(&collection);
         }
     }
