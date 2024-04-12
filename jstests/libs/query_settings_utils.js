@@ -169,14 +169,14 @@ export class QuerySettingsUtils {
      * Remove all query settings for the current tenant.
      */
     removeAllQuerySettings() {
-        let settingsArray = this.getQuerySettings();
+        let settingsArray = this.getQuerySettings({showQueryShapeHash: true});
         while (settingsArray.length > 0) {
             const setting = settingsArray.pop();
             assert.commandWorked(
-                this.adminDB.runCommand({removeQuerySettings: setting.representativeQuery}));
-            // Check that the given setting has indeed been removed.
-            this.assertQueryShapeConfiguration(settingsArray);
+                this.adminDB.runCommand({removeQuerySettings: setting.queryShapeHash}));
         }
+        // Check that all setting have indeed been removed.
+        this.assertQueryShapeConfiguration([]);
     }
 
     /**
@@ -191,7 +191,7 @@ export class QuerySettingsUtils {
                                    .queryShapeHash;
         assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 1));
         const result = runTest();
-        assert.commandWorked(db.adminCommand({removeQuerySettings: representativeQuery}));
+        assert.commandWorked(this.db.adminCommand({removeQuerySettings: representativeQuery}));
         assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 0));
         return result;
     }
