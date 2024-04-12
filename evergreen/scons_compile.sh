@@ -92,18 +92,21 @@ if [ -n "${build_patch_id}" ]; then
     extra_db_contrib_args="${extra_db_contrib_args} --platform=${BASH_REMATCH[1]}"
   fi
 
+  download_dir="./tmp_db_contrib_tool_download_dir"
+  rm -rf ${download_dir}
+
   if [ "${task_name}" = "archive_dist_test" ]; then
     file_name="mongodb-binaries.${ext}"
     invocation="db-contrib-tool setup-repro-env ${build_patch_id} \
       --variant=${compile_variant} --extractDownloads=False \
-      --binariesName=${file_name} --installDir=./ ${extra_db_contrib_args}"
+      --binariesName=${file_name} --installDir=${download_dir} ${extra_db_contrib_args}"
   fi
 
   if [ "${task_name}" = "archive_dist_test_debug" ]; then
     file_name="mongo-debugsymbols.${ext}"
     invocation="db-contrib-tool setup-repro-env ${build_patch_id} \
       --variant=${compile_variant} --extractDownloads=False \
-      --debugsymbolsName=${file_name} --installDir=./ \
+      --debugsymbolsName=${file_name} --installDir=${download_dir} \
       --skipBinaries --downloadSymbols ${extra_db_contrib_args}"
   fi
 
@@ -116,8 +119,9 @@ if [ -n "${build_patch_id}" ]; then
       echo "Could not retrieve files with db-contrib-tool"
       exit 1
     fi
-    echo "Downloaded: ${file_name}"
-    mv "${build_patch_id}/${file_name}" "${file_name}"
+    file_location=$(find "${download_dir}" -name "${file_name}")
+    echo "Downloaded: ${file_location}"
+    mv "${file_location}" "${file_name}"
     echo "Moved ${file_name} to the correct location"
     echo "Skipping ${task_name} compile"
     exit 0
