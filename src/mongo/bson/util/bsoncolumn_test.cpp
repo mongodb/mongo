@@ -634,7 +634,6 @@ public:
                              bool testReopen = true) {
         ASSERT_EQ(columnBinary.type, BinDataType::Column);
 
-
         auto buf = expected.buf();
         ASSERT_EQ(columnBinary.length, expected.len());
         for (int i = 0; i < columnBinary.length; ++i) {
@@ -3816,6 +3815,26 @@ TEST_F(BSONColumnTest, NonZeroRLETwoControlBlocks) {
     verifyBinary(binData, expected, false);
     verifyDecompression(binData, elems);
     verifyColumnReopenFromBinary(reinterpret_cast<const char*>(binData.data), binData.length);
+}
+
+TEST_F(BSONColumnTest, InterleavedNonZeroRLETwoControlBlocks) {
+    // The same test as above, but the data is wrapped in an object to test interleaved mode, and
+    // the fast implementation of the block API.
+
+    size_t num = 1 + /*first non-RLE*/ 30 + /*RLE*/ 1920 * 12 + /*non-RLE at end*/ 59;
+    std::vector<BSONElement> elems;
+    for (size_t i = 0; i < num; ++i) {
+        elems.push_back(createElementObj(BSON("x" << int32_t(i))));
+    }
+
+    for (auto elem : elems) {
+        cb.append(elem);
+    }
+    auto binData = cb.finalize();
+
+    verifyDecompression(binData, elems);
+    TestPath testPathX{{"x"}};
+    verifyDecompressPathFast(binData, elems, testPathX);
 }
 
 TEST_F(BSONColumnTest, RLEAfterMixedValueBlock) {
