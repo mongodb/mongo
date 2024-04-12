@@ -284,6 +284,7 @@ export function runGetClusterParameterReplicaSet(rst,
         numMatches++;
     }
 
+    rst.awaitReplication();
     rst.getSecondaries().forEach(function(secondary) {
         if (runGetClusterParameterNode(secondary,
                                        getClusterParameterArgs,

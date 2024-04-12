@@ -125,7 +125,7 @@ function should_fail_find(testdb, testcol) {
     });
 }
 
-function run_tests(granter, verifier) {
+function run_tests(granter, verifier, rst) {
     setup_users(granter);
     setup_dbs_and_cols(granter);
 
@@ -138,36 +138,44 @@ function run_tests(granter, verifier) {
                  "a.b": should_fail_find,
                  "b.a": should_fail_find,
                  "b.b": should_fail_find
-             });
+             },
+             rst);
 
     run_test(
         "glob_collection",
         granter,
         verifier,
         [{resource: {db: "a", collection: ""}, actions: ["find"]}],
-        {"a.a": should_find, "a.b": should_find, "b.a": should_fail_find, "b.b": should_fail_find});
+        {"a.a": should_find, "a.b": should_find, "b.a": should_fail_find, "b.b": should_fail_find},
+        rst);
 
     run_test(
         "glob_database",
         granter,
         verifier,
         [{resource: {db: "", collection: "a"}, actions: ["find"]}],
-        {"a.a": should_find, "a.b": should_fail_find, "b.a": should_find, "b.b": should_fail_find});
+        {"a.a": should_find, "a.b": should_fail_find, "b.a": should_find, "b.b": should_fail_find},
+        rst);
 
     run_test("glob_all",
              granter,
              verifier,
              [{resource: {db: "", collection: ""}, actions: ["find"]}],
-             {"a.a": should_find, "a.b": should_find, "b.a": should_find, "b.b": should_find});
+             {"a.a": should_find, "a.b": should_find, "b.a": should_find, "b.b": should_find},
+             rst);
 
-    run_test(
-        "any_resource", granter, verifier, [{resource: {anyResource: true}, actions: ["find"]}], {
-            "a.a": should_find,
-            "a.b": should_find,
-            "b.a": should_find,
-            "b.b": should_find,
-            "c.a": should_find
-        });
+    run_test("any_resource",
+             granter,
+             verifier,
+             [{resource: {anyResource: true}, actions: ["find"]}],
+             {
+                 "a.a": should_find,
+                 "a.b": should_find,
+                 "b.a": should_find,
+                 "b.b": should_find,
+                 "c.a": should_find
+             },
+             rst);
 
     run_test("no_global_access",
              granter,
@@ -180,7 +188,8 @@ function run_tests(granter, verifier) {
                      if (r["ok"])
                          throw ("db.$.cmd shouldn't give a.stats()");
                  }
-             });
+             },
+             rst);
 
     run_test_bad_resource("empty_resource", granter, {});
     run_test_bad_resource("users_collection_any_db", granter, {collection: "users"});
@@ -213,7 +222,8 @@ function run_tests(granter, verifier) {
                      should_insert(testdb, testcol);
                      should_fail_find(testdb, testcol);
                  },
-             });
+             },
+             rst);
 }
 
 const keyfile = "jstests/libs/key1";
