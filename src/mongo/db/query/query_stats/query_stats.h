@@ -218,6 +218,7 @@ struct QueryStatsSnapshot {
 
     uint64_t keysExamined;
     uint64_t docsExamined;
+    int64_t workingTimeMillis;
     bool hasSortStage;
     bool usedDisk;
     bool fromMultiPlanner;

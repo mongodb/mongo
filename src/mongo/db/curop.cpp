@@ -399,13 +399,24 @@ void CurOp::setGenericOpRequestDetails(NamespaceString nss,
 
 void CurOp::setEndOfOpMetrics(long long nreturned) {
     _debug.additiveMetrics.nreturned = nreturned;
-    // A non-none queryStatsInfo.keyHash indicates the current query is being tracked for queryStats
-    // and therefore the executionTime needs to be recorded as part of that effort. executionTime is
-    // set with the final executionTime in completeAndLogOperation, but for query stats collection
-    // we want it set before incrementing cursor metrics using OpDebug's AdditiveMetrics. The value
-    // set here will be overwritten later in completeAndLogOperation.
-    if (_debug.queryStatsInfo.keyHash) {
-        _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
+    // A non-none queryStatsInfo.keyHash indicates the current query is being tracked locally for
+    // queryStats, and a metricsRequested being true indicates the query is being tracked remotely
+    // via the metrics included in cursor responses. In either case, we need to add the current
+    // working time into clusterWorkingTime, as it is both recorded in the query stats store and
+    // returned in cursor responses. When tracking locally, we also need to record executionTime.
+    // executionTime is set with the final executionTime in completeAndLogOperation, but
+    // for query stats collection we want it set before incrementing cursor metrics using OpDebug's
+    // AdditiveMetrics. The value of executionTime set here will be overwritten later in
+    // completeAndLogOperation.
+    const auto& info = _debug.queryStatsInfo;
+    if (info.keyHash || info.metricsRequested) {
+        auto& metrics = _debug.additiveMetrics;
+        auto elapsed = elapsedTimeExcludingPauses();
+        // We don't strictly need to record executionTime unless keyHash is non-none, but there's
+        // no harm in recording it since we've already computed the value.
+        metrics.executionTime = elapsed;
+        metrics.clusterWorkingTime = metrics.clusterWorkingTime.value_or(Milliseconds(0)) +
+            (duration_cast<Milliseconds>(elapsed - (_sumBlockedTimeTotal() - _blockedTimeAtStart)));
     }
 }
 
@@ -2053,6 +2064,8 @@ CursorMetrics OpDebug::getCursorMetrics() const {
 
     metrics.setKeysExamined(additiveMetrics.keysExamined.value_or(0));
     metrics.setDocsExamined(additiveMetrics.docsExamined.value_or(0));
+    metrics.setWorkingTimeMillis(
+        additiveMetrics.clusterWorkingTime.value_or(Milliseconds(0)).count());
 
     metrics.setHasSortStage(additiveMetrics.hasSortStage);
     metrics.setUsedDisk(additiveMetrics.usedDisk);
@@ -2144,6 +2157,7 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     nUpserted = addOptionals(nUpserted, otherMetrics.nUpserted);
     keysInserted = addOptionals(keysInserted, otherMetrics.keysInserted);
     keysDeleted = addOptionals(keysDeleted, otherMetrics.keysDeleted);
+    clusterWorkingTime = addOptionals(clusterWorkingTime, otherMetrics.clusterWorkingTime);
     prepareReadConflicts.fetchAndAdd(otherMetrics.prepareReadConflicts.load());
     writeConflicts.fetchAndAdd(otherMetrics.writeConflicts.load());
     temporarilyUnavailableErrors.fetchAndAdd(otherMetrics.temporarilyUnavailableErrors.load());
@@ -2165,6 +2179,7 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     const query_stats::DataBearingNodeMetrics& metrics) {
     keysExamined = keysExamined.value_or(0) + metrics.keysExamined;
     docsExamined = docsExamined.value_or(0) + metrics.docsExamined;
+    clusterWorkingTime = clusterWorkingTime.value_or(Milliseconds(0)) + metrics.clusterWorkingTime;
     hasSortStage = hasSortStage || metrics.hasSortStage;
     usedDisk = usedDisk || metrics.usedDisk;
     fromMultiPlanner = fromMultiPlanner || metrics.fromMultiPlanner;
@@ -2188,6 +2203,7 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
     aggregateDataBearingNodeMetrics(
         query_stats::DataBearingNodeMetrics{static_cast<uint64_t>(metrics.getKeysExamined()),
                                             static_cast<uint64_t>(metrics.getDocsExamined()),
+                                            Milliseconds(metrics.getWorkingTimeMillis()),
                                             metrics.getHasSortStage(),
                                             metrics.getUsedDisk(),
                                             metrics.getFromMultiPlanner(),

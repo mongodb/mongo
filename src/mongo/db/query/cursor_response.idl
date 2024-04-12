@@ -58,6 +58,10 @@ structs:
                 description: "Number of documents examined by the query."
                 type: long
                 stability: unstable
+            workingTimeMillis:
+                description: "Amount of time spent executing the query, not including time spent blocked."
+                type: long
+                stability: unstable
             hasSortStage:
                 description: "Boolean value that is true if the query plan involves an in-memory sort."
                 type: bool
