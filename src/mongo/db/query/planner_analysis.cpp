@@ -959,18 +959,21 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
         return boost::none;
     }();
 
-    // TODO SERVER-88629 Throw 'ErrorCodes::NoQueryExecutionPlans' if 'NO_TABLE_SCAN' option is set
-    // for HashJoin and NestedLoopJoin.
     if (foreignIndex) {
         // $natural hinted scan direction is not relevant for IndexedLoopJoin, but is passed here
         // for consistency.
         return {
             EqLookupNode::LookupStrategy::kIndexedLoopJoin, std::move(foreignIndex), scanDirection};
-    } else if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {
-        return {EqLookupNode::LookupStrategy::kHashJoin, boost::none, scanDirection};
-    } else {
-        return {EqLookupNode::LookupStrategy::kNestedLoopJoin, boost::none, scanDirection};
     }
+    const bool tableScanForbidden =
+        foreignCollItr->second.options & QueryPlannerParams::NO_TABLE_SCAN;
+    uassert(ErrorCodes::NoQueryExecutionPlans,
+            "No foreign index and table scan disallowed",
+            !tableScanForbidden);
+    if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {
+        return {EqLookupNode::LookupStrategy::kHashJoin, boost::none, scanDirection};
+    }
+    return {EqLookupNode::LookupStrategy::kNestedLoopJoin, boost::none, scanDirection};
 }
 
 // static

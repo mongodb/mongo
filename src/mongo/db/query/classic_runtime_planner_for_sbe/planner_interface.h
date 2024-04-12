@@ -201,6 +201,8 @@ private:
     std::unique_ptr<MultiPlanStage> _multiPlanStage;
     PlanCachingMode _cachingMode;
     boost::optional<std::string> _replanReason;
+    // Temporary owner of query solution; ownership is surrenderred in makeExecutor().
+    std::unique_ptr<QuerySolution> _winningSolution;
 };
 
 class SubPlanner final : public PlannerBase {
@@ -217,6 +219,8 @@ public:
 
 private:
     std::unique_ptr<SubplanStage> _subplanStage;
+    // Temporary owner of query solution; ownership is surrenderred in makeExecutor().
+    std::unique_ptr<QuerySolution> _solution;
 };
 
 /**

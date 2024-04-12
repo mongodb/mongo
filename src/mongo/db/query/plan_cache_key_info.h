@@ -60,7 +60,10 @@ public:
     }
 
     bool operator==(const PlanCacheKeyInfo& other) const {
-        return other._lengthOfQueryShape == _lengthOfQueryShape && other._key == _key;
+        // TODO: SERVER-89072 - provide equality operators for all required types to remove the
+        // toBSON() here. This can then be defaulted.
+        return other._lengthOfQueryShape == _lengthOfQueryShape && other._key == _key &&
+            other._querySettings.toBSON().woCompare(_querySettings.toBSON()) == 0;
     }
 
     bool operator!=(const PlanCacheKeyInfo& other) const {
