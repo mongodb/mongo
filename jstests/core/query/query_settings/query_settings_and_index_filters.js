@@ -63,7 +63,7 @@ function assertExplain(findCmd, {indexFilterSet, querySettings, expectedIndexSca
 
     getQueryPlanners(explain).forEach((queryPlanner) => {
         assert.eq(queryPlanner.indexFilterSet, indexFilterSet, queryPlanner);
-        assert.eq(queryPlanner.querySettings, querySettings, queryPlanner);
+        qsutils.assertEqualSettings(queryPlanner.querySettings, querySettings, queryPlanner);
         assertIndexScan(queryPlanner, expectedIndexScan);
     });
 }

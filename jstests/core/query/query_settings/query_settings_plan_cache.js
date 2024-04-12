@@ -60,12 +60,12 @@ function assertEmptyPlanCache() {
  * 'expectedQuerySettings'.
  */
 function assertPlanCacheEntryWithQuerySettings(planCacheKeyHash, expectedQuerySettings) {
-    const correspondingPlanCacheEntry =
+    const correspondingPlanCacheEntries =
         coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: planCacheKeyHash}}])
             .toArray();
-    assert.gte(correspondingPlanCacheEntry.length, 1, getAllPlanCacheEntries());
-    correspondingPlanCacheEntry.forEach(entry => {
-        assert.eq(entry.querySettings, expectedQuerySettings, correspondingPlanCacheEntry);
+    assert.gte(correspondingPlanCacheEntries.length, 1, getAllPlanCacheEntries());
+    correspondingPlanCacheEntries.forEach(entry => {
+        qsutils.assertEqualSettings(expectedQuerySettings, entry.querySettings, entry);
     });
 }
 

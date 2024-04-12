@@ -30,7 +30,7 @@ global:
   cpp_namespace: "mongo::query_settings"
   cpp_includes:
     - "mongo/db/query/query_settings/query_framework_serialization.h"
-
+    - "mongo/db/query/query_settings/index_hints_serialization.h"
 
 imports:
   - "mongo/db/basic_types.idl"
@@ -49,6 +49,14 @@ types:
     deserializer: "::mongo::query_settings::query_framework::parse"
     serializer: "::mongo::query_settings::query_framework::serialize"
     is_view: false
+  IndexHintSpecs:
+    description: Array representing the index hints specified for different collections.
+    bson_serialization_type : any
+    cpp_type: "query_settings::IndexHintSpecs"
+    serializer: "::mongo::query_settings::index_hints::serialize"
+    deserializer: "::mongo::query_settings::index_hints::parse"
+    deserialize_with_tenant: true
+    is_view: false
 
 structs:
   IndexHintSpec:
@@ -66,8 +74,7 @@ structs:
       Struct representing possible settings that may be applied to a given query.
     fields:
       indexHints:
-        type:
-          variant: [IndexHintSpec, array<IndexHintSpec>]
+        type: IndexHintSpecs
         optional: true
         stability: unstable
       queryFramework:

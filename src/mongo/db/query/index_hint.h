@@ -52,7 +52,7 @@ using IndexName = std::string;
  * - specify a natural sort when running a find operation against a view.
  */
 struct NaturalOrderHint {
-    enum class Direction {
+    enum class Direction : int8_t {
         kForward = 1,
         kBackward = -1,
     };

@@ -345,34 +345,22 @@ void QueryPlannerParams::applyQuerySettingsNaturalHintsForCollection(
 void QueryPlannerParams::applyQuerySettingsForCollection(
     const CanonicalQuery& canonicalQuery,
     const CollectionPtr& collection,
-    const std::variant<std::vector<mongo::query_settings::IndexHintSpec>,
-                       mongo::query_settings::IndexHintSpec>& indexHintSpecs,
+    const query_settings::IndexHintSpecs& hintSpecs,
     CollectionInfo& collectionInfo) {
     // Retrieving the allowed indexes for the given collection.
-    auto getHintNamespace = [](const auto& hint) {
-        return NamespaceStringUtil::deserialize(*hint.getNs().getDb(), *hint.getNs().getColl());
-    };
-    auto allowedIndexes = visit(
-        OverloadedVisitor{
-            [&](const std::vector<mongo::query_settings::IndexHintSpec>& hints) {
-                auto isHintForCollection = [&](const auto& hint) {
-                    return getHintNamespace(hint) == collection->ns();
-                };
+    auto allowedIndexes = [&]() {
+        auto isHintForCollection = [&](const auto& hint) {
+            auto hintNs =
+                NamespaceStringUtil::deserialize(*hint.getNs().getDb(), *hint.getNs().getColl());
+            return hintNs == collection->ns();
+        };
 
-                if (auto hintIt = std::find_if(hints.begin(), hints.end(), isHintForCollection);
-                    hintIt != hints.end()) {
-                    return hintIt->getAllowedIndexes();
-                }
-                return std::vector<mongo::IndexHint>();
-            },
-            [&](const mongo::query_settings::IndexHintSpec& hint) {
-                if (getHintNamespace(hint) == collection->ns()) {
-                    return hint.getAllowedIndexes();
-                }
-                return std::vector<mongo::IndexHint>();
-            },
-        },
-        indexHintSpecs);
+        if (auto hintIt = std::find_if(hintSpecs.begin(), hintSpecs.end(), isHintForCollection);
+            hintIt != hintSpecs.end()) {
+            return hintIt->getAllowedIndexes();
+        }
+        return std::vector<mongo::IndexHint>();
+    }();
 
     // Users can not define empty allowedIndexes vector, therefore early exit if no hints are
     // defined for the given collection.

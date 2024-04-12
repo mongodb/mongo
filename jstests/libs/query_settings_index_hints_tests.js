@@ -54,7 +54,9 @@ export class QuerySettingsIndexHintsTests {
                    1,
                    "Expecting at least 1 entry in query plan cache");
         planCacheStatsAfterRunningCmd.forEach(
-            plan => assert.docEq(querySettings, plan.querySettings, plan));
+            plan => assert.docEq(this.qsutils.wrapIndexHintsIntoArrayIfNeeded(querySettings),
+                                 plan.querySettings,
+                                 plan));
     }
 
     assertIndexUse(cmd, expectedIndex, stagesExtractor, expectedStrategy) {
