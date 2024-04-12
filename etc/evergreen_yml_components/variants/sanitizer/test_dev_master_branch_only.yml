@@ -444,6 +444,7 @@ buildvariants:
         --opt=on
         --sanitize=undefined
         --ssl
+        --allocator=tcmalloc-gperf
         -j$(grep -c ^processor /proc/cpuinfo)
         --use-diagnostic-latches=on
       compile_variant: *rhel80-debug-ubsan-all-feature-flags
