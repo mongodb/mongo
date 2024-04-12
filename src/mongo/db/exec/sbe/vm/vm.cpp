@@ -9183,8 +9183,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinM
     ArityType arity) {
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
     value::ValueGuard stateGuard{stateTag, stateVal};
-    auto [elTag, elVal] = moveOwnedFromStack(1);
-    value::ValueGuard elGuard{elTag, elVal};
+    auto [_, elTag, elVal] = getFromStack(1);
 
     if (value::isNullish(elTag)) {
         stateGuard.reset();
@@ -9205,7 +9204,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinM
     stateArr->setAt(static_cast<size_t>(AggAccumulatorNElems::kMemUsage),
                     value::TypeTags::NumberInt32,
                     value::bitcastFrom<int32_t>(memUsage - elSize));
-    elGuard.reset();
     tassert(8178116, "Element was not removed", accMultiSet->remove(elTag, elVal));
 
     stateGuard.reset();
