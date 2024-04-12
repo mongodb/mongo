@@ -119,14 +119,20 @@ void endProcessWithSignal(int signalNum) {
 #else
 
 void endProcessWithSignal(int signalNum) {
-    // This works by restoring the system-default handler for the given signal and re-raising
-    // it, in order to get the system default termination behavior (i.e., dumping core, or just
-    // exiting).
+    // This works by restoring the system-default handler for the given signal, unblocking the
+    // signal, and re-raising it, in order to get the system default termination behavior (i.e.,
+    // dumping core, or just exiting).
     struct sigaction defaultedSignals;
     memset(&defaultedSignals, 0, sizeof(defaultedSignals));
     defaultedSignals.sa_handler = SIG_DFL;
     sigemptyset(&defaultedSignals.sa_mask);
     invariant(sigaction(signalNum, &defaultedSignals, nullptr) == 0);
+
+    sigset_t unblockSignalMask;
+    invariant(sigemptyset(&unblockSignalMask) == 0);
+    invariant(sigaddset(&unblockSignalMask, signalNum) == 0);
+    invariant(sigprocmask(SIG_UNBLOCK, &unblockSignalMask, nullptr) == 0);
+
     raise(signalNum);
 }
 
