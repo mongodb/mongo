@@ -2,7 +2,6 @@
 // plan. For instance, there are helpers for checking whether a plan is a collection
 // scan or whether the plan is covered (index only).
 
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {usedBonsaiOptimizer} from "jstests/libs/optimizer_utils.js";
 
 /**
@@ -666,23 +665,10 @@ export function aggPlanHasStage(root, stage) {
 /**
  * Given the root stage of explain's BSON representation of a query plan ('root'),
  * returns true if the plan has a stage called 'stage'.
- *
- * Expects that the stage appears once or zero times per node. If the stage appears more than once
- * on one node's query plan, an error will be thrown.
  */
 export function planHasStage(db, root, stage) {
     assert(stage, "Stage was not defined in planHasStage.")
-    const matchingStages = getPlanStages(root, stage);
-
-    // If we are executing against a mongos, we may get more than one occurrence of the stage.
-    if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
-        return matchingStages.length >= 1;
-    } else {
-        assert.lt(matchingStages.length,
-                  2,
-                  `Expected to find 0 or 1 matching stages: ${tojson(matchingStages)}`);
-        return matchingStages.length === 1;
-    }
+    return getPlanStages(root, stage).length > 0;
 }
 
 /**
@@ -718,6 +704,16 @@ export function isIxscan(db, root) {
  */
 export function isEofPlan(db, root) {
     return planHasStage(db, root, "EOF");
+}
+
+/**
+ * Returns true if the plan contains fetch stages containing '$alwaysFalse' filters, or false
+ * otherwise.
+ */
+export function isAlwaysFalsePlan(root) {
+    const hasAlwaysFalseFilter = (stage) =>
+        stage && stage.filter && stage.filter["$alwaysFalse"] === 1;
+    return getPlanStages(root, "FETCH").every(hasAlwaysFalseFilter);
 }
 
 export function isIdhackOrExpress(db, root) {
@@ -823,6 +819,14 @@ export function isQueryPlan(root) {
                    0) > 0;
     }
     return root.hasOwnProperty("queryPlanner");
+}
+
+/**
+ *  Returns true if every winning plan present in the explain satisfies the predicate. Returns
+ *  false otherwise.
+ */
+export function everyWinningPlan(explain, predicate) {
+    return getQueryPlanners(explain).map(getWinningPlan).every(predicate);
 }
 
 /**

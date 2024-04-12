@@ -8,6 +8,7 @@ import {
     getQueryPlanners,
     getWinningPlanFromExplain
 } from "jstests/libs/analyze_plan.js";
+import {getCommandName, getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 
 export class QuerySettingsUtils {
     /**
@@ -17,6 +18,30 @@ export class QuerySettingsUtils {
         this.db = db;
         this.adminDB = this.db.getSiblingDB("admin");
         this.collName = collName;
+    }
+
+    /**
+     * Returns 'true' if the given command name is supported by query settings.
+     */
+    static isSupportedCommand(commandName) {
+        return ["find", "aggregate", "distinct"].includes(commandName);
+    }
+
+    /**
+     * Makes an query instance for the given command if supported.
+     */
+    makeQueryInstance(cmdObj) {
+        const commandName = getCommandName(cmdObj);
+        switch (commandName) {
+            case "find":
+                return this.makeFindQueryInstance(cmdObj);
+            case "aggregate":
+                return this.makeAggregateQueryInstance(cmdObj);
+            case "distinct":
+                return this.makeDistinctQueryInstance(cmdObj);
+            default:
+                assert(false, "Cannot create query instance for command with name " + commandName);
+        }
     }
 
     /**
@@ -130,18 +155,8 @@ export class QuerySettingsUtils {
     assertExplainQuerySettings(query, expectedQuerySettings) {
         // Pass query without the $db field to explain command, because it injects the $db field
         // inside the query before processing.
-        const queryWithoutDollarDb = this.withoutDollarDB(query);
-        const explain = (() => {
-            if (query.find || query.distinct) {
-                return assert.commandWorked(this.db.runCommand({explain: queryWithoutDollarDb}));
-            } else if (query.aggregate) {
-                return assert.commandWorked(
-                    this.db.runCommand({explain: {...queryWithoutDollarDb, cursor: {}}}));
-            } else {
-                assert(false,
-                       `Attempting to run explain for unknown query type. Query: ${tojson(query)}`);
-            }
-        })();
+        const explainCmd = getExplainCommand(this.withoutDollarDB(query));
+        const explain = assert.commandWorked(this.db.runCommand(explainCmd));
         if (explain) {
             getQueryPlanners(explain).forEach(queryPlanner => {
                 this.assertEqualSettings(
