@@ -1841,6 +1841,7 @@ env.Library(
         'exec/sbe/values/bson.cpp',
         'exec/sbe/values/bson_block.cpp',
         'exec/sbe/values/cell_interface.cpp',
+        'exec/sbe/values/key_string_entry.cpp',
         'exec/sbe/values/row.cpp',
         'exec/sbe/values/slot_printer.cpp',
         'exec/sbe/values/ts_block.cpp',

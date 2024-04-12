@@ -494,6 +494,10 @@ public:
         return {_tbData, static_cast<StringData::size_type>(_tbSize)};
     }
 
+    StringData getRecordIdView() const {
+        return {_ridData, static_cast<StringData::size_type>(_ridSize)};
+    }
+
     key_string::Version getVersion() const {
         return _version;
     }
@@ -517,18 +521,8 @@ public:
      * Create a Value copy from this view including all components.
      */
     key_string::Value getValueCopy() const {
-        const auto bufSize = _ksSize + _ridSize + (_tbSize > 0 ? _tbSize : 1);
-        BufBuilder buf(bufSize);
-        buf.appendBuf(_ksData, _ksSize);
-        buf.appendBuf(_ridData, _ridSize);
-        if (_tbSize == 0) {
-            buf.appendChar(0);
-        } else {
-            buf.appendBuf(_tbData, _tbSize);
-        }
-
-        invariant(bufSize == buf.len());
-        return {_version, _ksSize + _ridSize, SharedBufferFragment(buf.release(), bufSize)};
+        return std::move(*key_string::Value::makeValue(
+            _version, getKeyStringWithoutRecordIdView(), getRecordIdView(), getTypeBitsView()));
     }
 
     bool isEmpty() const {

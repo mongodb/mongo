@@ -433,13 +433,13 @@ void bindSingleIntervalPlanSlots(const stage_builder::IndexBoundsEvaluationInfo&
         get<mongo::stage_builder::ParameterizedIndexScanSlots::SingleIntervalPlan>(
             indexBoundsInfo.slots.slots);
     runtimeEnvironment->resetSlot(singleInterval.lowKey,
-                                  sbe::value::TypeTags::ksValue,
-                                  sbe::value::bitcastFrom<key_string::Value*>(lowKey.release()),
+                                  sbe::value::TypeTags::keyString,
+                                  sbe::value::makeKeyString(std::move(lowKey)).second,
                                   /* owned */ true);
 
     runtimeEnvironment->resetSlot(singleInterval.highKey,
-                                  sbe::value::TypeTags::ksValue,
-                                  sbe::value::bitcastFrom<key_string::Value*>(highKey.release()),
+                                  sbe::value::TypeTags::keyString,
+                                  sbe::value::makeKeyString(std::move(highKey)).second,
                                   /* owned */ true);
 }
 

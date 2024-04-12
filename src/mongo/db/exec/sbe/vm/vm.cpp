@@ -2361,11 +2361,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinKeyStringToStrin
     auto [owned, tagInKey, valInKey] = getFromStack(0);
 
     // We operate only on keys.
-    if (tagInKey != value::TypeTags::ksValue) {
+    if (tagInKey != value::TypeTags::keyString) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto key = value::getKeyStringView(valInKey);
+    auto key = value::getKeyString(valInKey);
 
     auto [tagStr, valStr] = value::makeNewString(key->toString());
 
@@ -2557,9 +2557,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericNewKeyString(
 
     kb.appendDiscriminator(ksDiscriminator);
 
-    return {true,
-            value::TypeTags::ksValue,
-            value::bitcastFrom<key_string::Value*>(new key_string::Value(kb.release()))};
+    return {true, value::TypeTags::keyString, value::makeKeyString(kb.release()).second};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(ArityType arity) {
@@ -5468,9 +5466,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey(
     }();
 
     return {true,
-            value::TypeTags::ksValue,
-            value::bitcastFrom<key_string::Value*>(
-                new key_string::Value(sortSpec->generateSortKey(bsonObj, collator)))};
+            value::TypeTags::keyString,
+            value::makeKeyString(sortSpec->generateSortKey(bsonObj, collator)).second};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponentVectorGetElement(

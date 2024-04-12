@@ -171,9 +171,13 @@ std::pair<TypeTags, Value> makeNewBsonCodeWScope(StringData code, const char* sc
     return {TypeTags::bsonCodeWScope, bitcastFrom<char*>(buffer.release())};
 }
 
-std::pair<TypeTags, Value> makeCopyKeyString(const key_string::Value& inKey) {
-    auto k = new key_string::Value(inKey);
-    return {TypeTags::ksValue, bitcastFrom<key_string::Value*>(k)};
+std::pair<TypeTags, Value> makeKeyString(std::unique_ptr<key_string::Value> inKey) {
+    return {TypeTags::keyString,
+            bitcastFrom<value::KeyStringEntry*>(new value::KeyStringEntry{std::move(inKey)})};
+}
+
+std::pair<TypeTags, Value> makeKeyString(const key_string::Value& inKey) {
+    return makeKeyString(std::make_unique<key_string::Value>(inKey));
 }
 
 std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz) {
@@ -256,8 +260,8 @@ void releaseValueDeep(TypeTags tag, Value val) noexcept {
         case TypeTags::bsonObject:
             UniqueBuffer::reclaim(getRawPointerView(val));
             break;
-        case TypeTags::ksValue:
-            delete getKeyStringView(val);
+        case TypeTags::keyString:
+            delete getKeyString(val);
             break;
         case TypeTags::collator:
             delete getCollatorView(val);
@@ -453,8 +457,8 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
                 tag == TypeTags::ObjectId ? getObjectIdView(val)->data() : bitcastTo<uint8_t*>(val);
             return hashObjectId(objId);
         }
-        case TypeTags::ksValue:
-            return getKeyStringView(val)->hash();
+        case TypeTags::keyString:
+            return getKeyString(val)->hash();
         case TypeTags::Array:
         case TypeTags::ArraySet:
         case TypeTags::ArrayMultiSet:
@@ -728,8 +732,8 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                              getRawPointerView(rhsValue) + sizeof(uint32_t),
                              lsz + 1);
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
-    } else if (lhsTag == TypeTags::ksValue && rhsTag == TypeTags::ksValue) {
-        auto result = getKeyStringView(lhsValue)->compare(*getKeyStringView(rhsValue));
+    } else if (lhsTag == TypeTags::keyString && rhsTag == TypeTags::keyString) {
+        auto result = getKeyString(lhsValue)->compare(*getKeyString(rhsValue));
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else if (lhsTag == TypeTags::Nothing && rhsTag == TypeTags::Nothing) {
         // Special case for Nothing in a hash table (group) and sort comparison.
@@ -905,7 +909,7 @@ StringData ObjectEnumerator::getFieldName() const {
     }
 }
 
-void readKeyStringValueIntoAccessors(const key_string::Value& keyString,
+void readKeyStringValueIntoAccessors(const SortedDataKeyValueView& keyString,
                                      const Ordering& ordering,
                                      BufBuilder* valueBufferBuilder,
                                      std::vector<OwnedValueAccessor>* accessors,
@@ -913,9 +917,13 @@ void readKeyStringValueIntoAccessors(const key_string::Value& keyString,
     OwnedValueAccessorValueBuilder valBuilder(valueBufferBuilder);
     invariant(!indexKeysToInclude || indexKeysToInclude->count() == accessors->size());
 
-    BufReader reader(keyString.getBuffer(), keyString.getSize());
-    key_string::TypeBits typeBits(keyString.getTypeBits());
-    key_string::TypeBits::Reader typeBitsReader(typeBits);
+    auto ks = keyString.getKeyStringWithoutRecordIdView();
+    BufReader reader(ks.data(), ks.size());
+
+    auto typeBits = keyString.getTypeBitsView();
+    BufReader typeBitsBr(typeBits.data(), typeBits.size());
+    auto typeBitsReader =
+        key_string::TypeBits::getReaderFromBuffer(keyString.getVersion(), &typeBitsBr);
 
     bool keepReading = true;
     size_t componentIndex = 0;
@@ -928,7 +936,7 @@ void readKeyStringValueIntoAccessors(const key_string::Value& keyString,
             : false;
 
         keepReading = key_string::readSBEValue(
-            &reader, &typeBitsReader, inverted, typeBits.version, &valBuilder);
+            &reader, &typeBitsReader, inverted, keyString.getVersion(), &valBuilder);
 
         invariant(componentIndex < Ordering::kMaxCompoundIndexKeys || !keepReading);
 

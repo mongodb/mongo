@@ -573,14 +573,13 @@ generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
                                       sbe::value::TypeTags::Nothing, 0, true, slotIdGenerator))
                                 : boost::none;
 
-    auto lowKeyExpr = !lowKey
-        ? makeVariable(*lowKeySlot)
-        : makeConstant(sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<key_string::Value*>(lowKey.release()));
+    auto lowKeyExpr = !lowKey ? makeVariable(*lowKeySlot)
+                              : makeConstant(sbe::value::TypeTags::keyString,
+                                             sbe::value::makeKeyString(std::move(lowKey)).second);
     auto highKeyExpr = !highKey
         ? makeVariable(*highKeySlot)
-        : makeConstant(sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<key_string::Value*>(highKey.release()));
+        : makeConstant(sbe::value::TypeTags::keyString,
+                       sbe::value::makeKeyString(std::move(highKey)).second);
 
     auto [stage, outputs] = generateSingleIntervalIndexScan(state,
                                                             collection,
@@ -869,11 +868,13 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
         sbe::value::ValueGuard guard{tag, val};
         obj->reserve(2);
         obj->push_back("l"_sd,
-                       sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<key_string::Value*>(lowKey.release()));
+                       sbe::value::TypeTags::keyString,
+                       sbe::value::bitcastFrom<sbe::value::KeyStringEntry*>(
+                           new sbe::value::KeyStringEntry{std::move(lowKey)}));
         obj->push_back("h"_sd,
-                       sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<key_string::Value*>(highKey.release()));
+                       sbe::value::TypeTags::keyString,
+                       sbe::value::bitcastFrom<sbe::value::KeyStringEntry*>(
+                           new sbe::value::KeyStringEntry{std::move(highKey)}));
         guard.reset();
         arr->push_back(tag, val);
     }

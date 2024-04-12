@@ -94,7 +94,7 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
 
         key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberInt(int32Value);
-        auto [expectedTag, expectedVal] = value::makeCopyKeyString(kb.getValueCopy());
+        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
         value::ValueGuard expectedGuard(expectedTag, expectedVal);
 
         runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
@@ -107,7 +107,7 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
 
         key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberLong(int64Value);
-        auto [expectedTag, expectedVal] = value::makeCopyKeyString(kb.getValueCopy());
+        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
         value::ValueGuard expectedGuard(expectedTag, expectedVal);
 
         runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
@@ -119,7 +119,7 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
 
         key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberDouble(doubleValue);
-        auto [expectedTag, expectedVal] = value::makeCopyKeyString(kb.getValueCopy());
+        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
         value::ValueGuard expectedGuard(expectedTag, expectedVal);
 
         runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
@@ -131,7 +131,7 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
 
         key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberDecimal(dec128Value);
-        auto [expectedTag, expectedVal] = value::makeCopyKeyString(kb.getValueCopy());
+        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
         value::ValueGuard expectedGuard(expectedTag, expectedVal);
 
         runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);

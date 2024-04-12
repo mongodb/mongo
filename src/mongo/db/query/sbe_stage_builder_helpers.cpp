@@ -552,18 +552,21 @@ void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
             const auto msgKsTag = ksTag;
             tassert(5113706,
                     str::stream() << "KeyString is of wrong type: " << msgKsTag,
-                    ksTag == sbe::value::TypeTags::ksValue);
+                    ksTag == sbe::value::TypeTags::keyString);
 
             const auto msgKpTag = kpTag;
             tassert(5113707,
                     str::stream() << "Index key pattern is of wrong type: " << msgKpTag,
                     kpTag == sbe::value::TypeTags::bsonObject);
 
-            auto keyString = sbe::value::getKeyStringView(ksVal);
+            auto keyString = sbe::value::getKeyString(ksVal);
             tassert(5113708, "KeyString does not exist", keyString);
 
             BSONObj bsonKeyPattern(sbe::value::bitcastTo<const char*>(kpVal));
-            auto bsonKeyString = key_string::toBson(*keyString, Ordering::make(bsonKeyPattern));
+            auto bsonKeyString = key_string::toBson(keyString->getKeyStringView(),
+                                                    Ordering::make(bsonKeyPattern),
+                                                    keyString->getTypeBitsView(),
+                                                    keyString->getVersion());
             auto hydratedKey = IndexKeyEntry::rehydrateKey(bsonKeyPattern, bsonKeyString);
 
             HealthLogEntry entry;
@@ -632,9 +635,9 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
             const auto msgKsTag = ksTag;
             tassert(5290710,
                     str::stream() << "KeyString is of wrong type: " << msgKsTag,
-                    ksTag == sbe::value::TypeTags::ksValue);
+                    ksTag == sbe::value::TypeTags::keyString);
 
-            auto keyString = sbe::value::getKeyStringView(ksVal);
+            auto keyString = sbe::value::getKeyString(ksVal);
             auto indexIdent = sbe::value::getStringView(identTag, identVal);
             tassert(5290712, "KeyString does not exist", keyString);
 
@@ -686,7 +689,7 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
                          multikeyPaths,
                          nextRecord.id);
 
-            return keys->count(*keyString);
+            return keys->count(keyString->getValueCopy());
         }
     }
 

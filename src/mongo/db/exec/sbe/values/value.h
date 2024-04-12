@@ -58,6 +58,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/exec/sbe/values/key_string_entry.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/matcher/expression.h"
@@ -67,6 +68,7 @@
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"
@@ -205,8 +207,8 @@ enum class TypeTags : uint8_t {
     // Local lambda value
     LocalLambda,
 
-    // key_string::Value
-    ksValue,
+    // The index key string.
+    keyString,
 
     // Pointer to a timezone database object.
     timeZoneDB,
@@ -1683,6 +1685,10 @@ inline key_string::Value* getKeyStringView(Value val) noexcept {
     return reinterpret_cast<key_string::Value*>(val);
 }
 
+inline value::KeyStringEntry* getKeyString(Value val) noexcept {
+    return reinterpret_cast<value::KeyStringEntry*>(val);
+}
+
 std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz);
 
 std::pair<TypeTags, Value> makeCopyValueBlock(const ValueBlock& block);
@@ -1845,7 +1851,8 @@ inline std::pair<TypeTags, Value> makeCopyBsonCodeWScope(const BsonCodeWScope& c
     return makeNewBsonCodeWScope(cws.code, cws.scope);
 }
 
-std::pair<TypeTags, Value> makeCopyKeyString(const key_string::Value& inKey);
+std::pair<TypeTags, Value> makeKeyString(std::unique_ptr<key_string::Value> inKey);
+std::pair<TypeTags, Value> makeKeyString(const key_string::Value& inKey);
 
 std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator);
 
@@ -1924,8 +1931,6 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             memcpy(dst, binData, size + sizeof(uint32_t) + 1);
             return {TypeTags::bsonBinData, reinterpret_cast<Value>(dst)};
         }
-        case TypeTags::ksValue:
-            return makeCopyKeyString(*getKeyStringView(val));
         case TypeTags::bsonRegex:
             return makeCopyBsonRegex(getBsonRegexView(val));
         case TypeTags::bsonJavascript:
@@ -1950,6 +1955,9 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
         case TypeTags::makeObjSpec:
         case TypeTags::indexBounds:
             return getExtendedTypeOps(tag)->makeCopy(val);
+        case TypeTags::keyString:
+            return {TypeTags::keyString,
+                    bitcastFrom<value::KeyStringEntry*>(getKeyString(val)->makeCopy().release())};
         default:
             break;
     }

@@ -3048,6 +3048,26 @@ size_t Value::getApproximateSize() const {
     return size;
 }
 
+std::unique_ptr<Value> Value::makeValue(Version version,
+                                        StringData ks,
+                                        StringData rid,
+                                        StringData typeBits) {
+    const auto bufSize = ks.size() + rid.size() + (typeBits.size() > 0 ? typeBits.size() : 1);
+    BufBuilder buf(bufSize);
+    buf.appendBuf(ks.data(), ks.size());
+    buf.appendBuf(rid.data(), rid.size());
+    if (typeBits.size() == 0) {
+        buf.appendChar(0);
+    } else {
+        buf.appendBuf(typeBits.data(), typeBits.size());
+    }
+
+    invariant(bufSize == static_cast<unsigned long>(buf.len()));
+    return std::make_unique<Value>(version,
+                                   static_cast<int32_t>(ks.size() + rid.size()),
+                                   SharedBufferFragment(buf.release(), bufSize));
+}
+
 template class BuilderBase<Builder>;
 template class BuilderBase<HeapBuilder>;
 template class BuilderBase<PooledBuilder>;
