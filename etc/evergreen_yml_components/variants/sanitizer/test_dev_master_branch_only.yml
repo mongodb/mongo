@@ -555,7 +555,7 @@ buildvariants:
       resmoke_jobs_factor: 0.3
       scons_cache_scope: shared
       separate_debug: off
-      large_distro_name: rhel80-xlarge
+      large_distro_name: &enterprise-rhel80-debug-tsan-large-distro-name rhel80-xlarge
       xlarge_distro_name: rhel80-xxlarge
       core_analyzer_distro_name: rhel80-xxlarge
       multiversion_platform: rhel80
@@ -566,22 +566,34 @@ buildvariants:
       - name: compile_test_serial_TG
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
-      - name: .development_critical !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+      - name: .development_critical !.requires_large_host !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+        distros:
+          - *enterprise-rhel80-debug-tsan-large-distro-name
       - name: .development_critical .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
         distros:
-          - rhel80-xlarge
-      - name: .release_critical !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+          - *enterprise-rhel80-debug-tsan-large-distro-name
+      - name: .release_critical !.requires_large_host !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+      - name: .release_critical .requires_large_host !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+        distros:
+          - *enterprise-rhel80-debug-tsan-large-distro-name
       - name: .release_critical .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
         distros:
-          - rhel80-xlarge
-      - name: .default !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+          - *enterprise-rhel80-debug-tsan-large-distro-name
+      - name: .default !.requires_large_host !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+      - name: .default .requires_large_host !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+        distros:
+          - *enterprise-rhel80-debug-tsan-large-distro-name
       - name: .default .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
         distros:
-          - rhel80-xlarge
-      - name: .non_deterministic !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+          - *enterprise-rhel80-debug-tsan-large-distro-name
+      - name: .non_deterministic !.requires_large_host !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+      - name: .non_deterministic .requires_large_host !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+        distros:
+          - *enterprise-rhel80-debug-tsan-large-distro-name
       - name: .non_deterministic .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
         distros:
-          - rhel80-xlarge
+          - *enterprise-rhel80-debug-tsan-large-distro-name
 
   - name: &enterprise-rhel80-unoptimized-64-bit enterprise-rhel80-unoptimized-64-bit
     display_name: "~ Enterprise RHEL 8.0 DEBUG (Unoptimized)"
