@@ -512,6 +512,7 @@ private:
         int lastBufLength = 0;
         // Finalized state of last control byte written out by the previous intermediate() call.
         uint8_t lastControl;
+        uint8_t lastControlOffset = 0;
     };
 
     // Internal helper to perform reopen/initialization of this class from a BSONColumn binary.

@@ -677,10 +677,12 @@ public:
                 BufBuilder buffer;
                 BSONColumnBuilder cb;
                 BSONColumnBuilder reference;
+                std::vector<BSONElement> elems;
 
                 BSONColumn c(columnBinary);
                 bool empty = true;
                 for (auto&& elem : c) {
+                    elems.push_back(elem);
                     cb.append(elem);
                     reference.append(elem);
 
@@ -689,6 +691,10 @@ public:
                     ASSERT_GTE(buffer.len(), diff.offset());
                     buffer.setlen(diff.offset());
                     buffer.appendBuf(diff.data(), diff.size());
+                    if (testReopen) {
+                        verifyDecompressionBasic(buffer, elems);
+                    }
+
                     empty = false;
                 }
 
@@ -710,11 +716,13 @@ public:
                 BufBuilder buffer;
                 BSONColumnBuilder cb;
                 BSONColumnBuilder reference;
+                std::vector<BSONElement> elems;
 
                 BSONColumn c(columnBinary);
 
                 int num = 0;
                 for (auto it = c.begin(); it != c.end(); ++it, ++num) {
+                    elems.push_back(*it);
                     cb.append(*it);
                     reference.append(*it);
 
@@ -726,6 +734,9 @@ public:
                     ASSERT_GTE(buffer.len(), diff.offset());
                     buffer.setlen(diff.offset());
                     buffer.appendBuf(diff.data(), diff.size());
+                    if (testReopen) {
+                        verifyDecompressionBasic(buffer, elems);
+                    }
                 }
 
                 // One last intermediate to ensure all data is put into binary
@@ -803,6 +814,19 @@ public:
                 verifyColumnReopenFromBinary(reinterpret_cast<const char*>(intermediate.data),
                                              intermediate.length);
             }
+        }
+    }
+
+    static void verifyDecompressionBasic(const BufBuilder& columnBinary,
+                                         const std::vector<BSONElement>& expected) {
+        BSONColumn col(columnBinary.buf(), columnBinary.len());
+
+        auto it = col.begin();
+        for (auto elem : expected) {
+            BSONElement other = *it;
+            ASSERT(elem.binaryEqualValues(other));
+            ASSERT_TRUE(it.more());
+            ++it;
         }
     }
 
@@ -1933,6 +1957,7 @@ TEST_F(BSONColumnTest, DoubleRescaleFirstRescaledIsSkip) {
                                       createElementDouble(0.0),
                                       createElementDouble(0.0),
                                       BSONElement(),
+                                      createElementDouble(std::numeric_limits<double>::infinity()),
                                       createElementDouble(std::numeric_limits<double>::infinity())};
 
     for (auto&& elem : elems) {
@@ -4251,6 +4276,45 @@ TEST_F(BSONColumnTest, RLELargeValueExtendedSelector) {
     appendSimple8bBlocks64(
         expected, deltaInt64(elems.begin() + 1, elems.begin() + 6, elems.front()), 1);
     appendSimple8bRLE(expected, 120);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, PendingRLECreateNewControlAtFinalize) {
+    BSONColumnBuilder cb;
+
+    // This test has multiple pending RLE eligible values that are flushed out when a non RLE
+    // eligible value is appended at the end. This cause a new control block to be written. Make
+    // sure intermediate can return correct diffs in this case.
+    std::vector<BSONElement> elems = {createElementInt64(0)};
+    elems.insert(elems.end(), 7, createElementInt64(2));
+    elems.insert(elems.end(), 1, createElementInt64(65282));
+    elems.insert(elems.end(), 30, createElementInt64(2));
+    elems.insert(elems.end(), 1, createElementInt64(258));
+    elems.insert(elems.end(), 96, createElementInt64(2));
+    elems.insert(elems.end(), 1, createElementInt64(65282));
+    elems.insert(elems.end(), 34, createElementInt64(2));
+    elems.insert(elems.end(), 1, createElementInt64(258));
+    elems.insert(elems.end(), 92, createElementInt64(2));
+    elems.insert(elems.end(), 1, createElementInt64(65282));
+    elems.insert(elems.end(), 117, createElementInt64(2));
+    elems.insert(elems.end(), 1, createElementInt64(258));
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks64(
+        expected, deltaInt64(elems.begin() + 1, elems.begin() + 356, elems.front()), 16);
+    appendSimple8bControl(expected, 0b1000, 0b0001);
+    appendSimple8bBlocks64(
+        expected, deltaInt64(elems.begin() + 356, elems.end(), elems.at(355)), 2);
     appendEOO(expected);
 
     auto binData = cb.finalize();

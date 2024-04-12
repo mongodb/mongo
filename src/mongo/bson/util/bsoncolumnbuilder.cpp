@@ -407,7 +407,8 @@ private:
                            Encoder64& encoder,
                            BufBuilderType& buffer,
                            int& offset,
-                           uint8_t& lastControl) const;
+                           uint8_t& lastControl,
+                           uint8_t& lastControlOffset) const;
     void _reopen128BitTypes(EncodingState<BufBuilderType, Allocator>& regular,
                             Encoder128& encoder,
                             BufBuilderType& buffer,
@@ -669,8 +670,12 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::re
         auto& encoder = std::get<Encoder64>(regular._encoder);
         encoder.scaleIndex = current.scaleIndex;
 
-        _reopen64BitTypes(
-            regular, encoder, builder._bufBuilder, builder._is.offset, builder._is.lastControl);
+        _reopen64BitTypes(regular,
+                          encoder,
+                          builder._bufBuilder,
+                          builder._is.offset,
+                          builder._is.lastControl,
+                          builder._is.lastControlOffset);
     } else {
         auto& encoder = regular._encoder.template emplace<Encoder128>(allocator);
         _reopen128BitTypes(
@@ -686,7 +691,8 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
     Encoder64& encoder,
     BufBuilderType& buffer,
     int& offset,
-    uint8_t& lastControl) const {
+    uint8_t& lastControl,
+    uint8_t& lastControlOffset) const {
     // The main difficulty with re-initializing the compressor from a compressed binary is
     // to undo the 'finalize()' call where pending values are flushed out to simple8b
     // blocks. We need to undo this operation by putting values back into the pending state.
@@ -740,7 +746,6 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
 
     // If we have not yet overflowed then continue the same operation from the previous
     // simple8b block
-    bool doubleRescale = false;
     if (!overflow && last.control) {
         auto blocks = numSimple8bBlocksForControlByte(*last.control);
         // Append values from control block to detect overflow. If the scale indices are
@@ -830,19 +835,17 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
                         // We could re-scale. Treat this as a special overflow where we append the
                         // necessary overflow data but mark the state as no overflow. We will then
                         // append all remaining values and the state will be setup accordingly
-                        buffer.appendBuf(last.control, sizeof(uint64_t) * blocks + 1);
+                        lastControlOffset = sizeof(uint64_t) * blocks + 1;
+
+                        buffer.appendBuf(last.control, lastControlOffset);
 
                         // offset will temporarily set to a negative value to compensate for the
                         // buffer we wrote above even when there's no overflow. Later on we will add
                         // a larger value which will make it positive again.
-                        offset -= sizeof(uint64_t) * blocks + 1;
+
+                        offset -= lastControlOffset;
 
                         regular._controlByteOffset = 0;
-                        lastControl = *last.control;
-
-                        // Record that this code path was taken, this will prevent code later from
-                        // overwriting some state we've just set.
-                        doubleRescale = true;
                     }
                 }
 
@@ -871,7 +874,6 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
         // Set binary offset to this control byte (the binary starts with it, see the copy above)
         regular._controlByteOffset = 0;
         offset = control - scannedBinary;
-        lastControl = *control;
 
         // Update count inside last control byte
         char* lastControlToUpdate = buffer.buf() + regular._controlByteOffset;
@@ -902,13 +904,6 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
             Simple8b<uint64_t>(extraS8b + 1,
                                numSimple8bBlocksForControlByte(*extraS8b) * sizeof(uint64_t),
                                lastForS8b));
-    }
-
-    // If we did not overflow earlier we might have written a control byte when appending all
-    // pending values, if this was the case make sure it is recorded. If we have rescaled, skip
-    // this step as the correct control byte has already been recorded.
-    if (regular._controlByteOffset != kNoSimple8bControl && !doubleRescale) {
-        lastControl = *control;
     }
 
     // Reset last value if RLE is not possible due to the values appended above
@@ -970,10 +965,8 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
         // the last simple8b of the 'last' control block.
         offset += buffer.len();
         buffer.setlen(0);
-        lastControl = kInvalidControlByte;
-    } else if (lastControl == bsoncolumn::kInvalidControlByte) {
-        // Set last control to current if still unset. This can happen if we never overflowed but
-        // created a control byte when appending the pending values.
+    } else {
+        // Set last control to current
         lastControl = *control;
     }
 }
@@ -1165,7 +1158,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
         offset += buffer.len();
         buffer.setlen(0);
     } else {
-        // Set last control to current if still unset.
+        // Set last control to current
         lastControl = *control;
     }
 }
@@ -1601,22 +1594,44 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::intermediate() {
         newState.offset += controlOffset;
         newState.lastBufLength = length - controlOffset;
 
-        // Compare the control byte at the beginning of the finalized binary against state of last
+        // Extract new control byte from finalized state
+        ptrdiff_t finalizedControlOffset =
+            visit(OverloadedVisitor{[](const typename InternalState::Regular& regular) {
+                                        return regular._controlByteOffset;
+                                    },
+                                    [](const typename InternalState::Interleaved&) {
+                                        return kNoSimple8bControl;
+                                    }},
+                  _is.state);
+        uint8_t finalizedLastControlByte = finalizedControlOffset != kNoSimple8bControl
+            ? *(_bufBuilder.buf() + finalizedControlOffset)
+            : 0;
+
+        // Compare the control byte from the finalized binary against state of last
         // finalized binary. If they are the same we can advance the point of the first byte that
         // changed to the user. However, if this is the first time we call intermediate, make sure
         // we return the full binary.
         if (_is.lastControl != kInvalidControlByte) {
-            // When lastControl has been set, the control byte we're working on is always at the
-            // beginning of the binary.
-            uint8_t controlByteThisBinary = *_bufBuilder.buf();
-            /* TODO (SERVER-87383): Determine a safe optimization to minimize diffs
-            if (prevOffset != 0 && _is.lastControl == controlByteThisBinary &&
-                _is.lastBufLength > controlOffset) {
+            // If control byte did not change compared to last intermediate call then we may skip
+            // including these bytes in our diff.
+            if (prevOffset != 0 && _is.lastControlOffset == finalizedControlOffset &&
+                _is.lastControl == finalizedLastControlByte) {
                 identicalBytes = _is.lastBufLength - controlOffset;
-            }*/
-            newState.lastControl = controlByteThisBinary;
+                invariant(identicalBytes >= 0);
+            }
+        }
+
+        // Record the finalized state of our control byte. If a new control byte was written during
+        // finalize with a different scale factor we must use this byte instead.
+        uint8_t lastFinalizedLastControlByte = *(_bufBuilder.buf() + controlOffset);
+        if (finalizedControlOffset != kNoSimple8bControl &&
+            scaleIndexForControlByte(finalizedLastControlByte) !=
+                scaleIndexForControlByte(lastFinalizedLastControlByte)) {
+            newState.lastControl = finalizedLastControlByte;
+            newState.lastControlOffset = finalizedControlOffset - controlOffset;
         } else {
-            newState.lastControl = *(_bufBuilder.buf() + controlOffset);
+            newState.lastControl = lastFinalizedLastControlByte;
+            newState.lastControlOffset = 0;
         }
 
         return buffer;
@@ -2585,6 +2600,9 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::isInternalStateI
         return false;
     }
     if (_is.lastControl != other._is.lastControl) {
+        return false;
+    }
+    if (_is.lastControlOffset != other._is.lastControlOffset) {
         return false;
     }
 
