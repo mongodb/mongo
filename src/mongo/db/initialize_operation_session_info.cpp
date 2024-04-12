@@ -36,8 +36,19 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
+
+/**
+ * A client is internal if the connection is a self connection, a connection from a mongos or
+ * different mongod or a direct client connection.
+ */
+bool isInternalClient(OperationContext* opCtx) {
+    return !opCtx->getClient()->session() ||
+        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient) ||
+        opCtx->getClient()->isInDirectClient();
+}
 
 OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* opCtx,
                                                               const BSONObj& requestBody,
@@ -164,6 +175,20 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
         uassert(ErrorCodes::InvalidOptions,
                 "Specifying startTransaction=false is not allowed.",
                 osi.getStartTransaction().value());
+    }
+
+    if (osi.getTxnNumber()) {
+        if (!osi.getAutocommit()) {
+            if (isInternalClient(opCtx)) {
+                internalRetryableWriteCount.increment(1);
+            } else {
+                externalRetryableWriteCount.increment(1);
+            }
+        } else {
+            if (osi.getSessionId()->getTxnNumber() && osi.getSessionId()->getTxnUUID()) {
+                retryableInternalTransactionCount.increment(1);
+            }
+        }
     }
 
     return osi;

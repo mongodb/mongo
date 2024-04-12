@@ -351,4 +351,16 @@ Counter64 deleteManyCount;
 ServerStatusMetricField<Counter64> displayDeleteManyCount("query.deleteManyCount",
                                                           &deleteManyCount);
 
+Counter64 internalRetryableWriteCount;
+ServerStatusMetricField<Counter64> displayInternalRetryableWriteCount(
+    "query.internalRetryableWriteCount", &internalRetryableWriteCount);
+
+Counter64 externalRetryableWriteCount;
+ServerStatusMetricField<Counter64> displayExternalRetryableWriteCount(
+    "query.externalRetryableWriteCount", &externalRetryableWriteCount);
+
+Counter64 retryableInternalTransactionCount;
+ServerStatusMetricField<Counter64> displayRetryableInternalTransactionCount(
+    "query.retryableInternalTransactionCount", &retryableInternalTransactionCount);
+
 }  // namespace mongo

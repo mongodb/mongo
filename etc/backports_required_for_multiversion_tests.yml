@@ -335,6 +335,8 @@ last-continuous:
     ticket: SERVER-87987
   - test_file: jstests/core/query/bittest.js
     ticket: SERVER-88173
+  - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
+    ticket: SERVER-86253
   suites: null
 last-lts:
   all:
@@ -716,4 +718,6 @@ last-lts:
     ticket: SERVER-87987
   - test_file: jstests/core/query/bittest.js
     ticket: SERVER-88173
+  - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
+    ticket: SERVER-86253
   suites: null
