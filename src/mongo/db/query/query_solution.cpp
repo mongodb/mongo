@@ -1060,52 +1060,38 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
                                     const CollatorInterface* queryCollator,
                                     const std::set<StringData>& multikeyFields,
                                     const std::vector<interval_evaluation_tree::IET>* iets) {
-    BSONObj sortPatternProvidedByIndex = index.keyPattern;
-
     // If 'index' is the result of expanding a wildcard index, then its key pattern should look like
-    // {$_path: 1, <field>: 1}. The "$_path" prefix stores the value of the path associated with the
-    // key as opposed to real user data. We shouldn't report any sort orders including "$_path". In
-    // fact, $-prefixed path components are illegal in queries in most contexts, so misinterpreting
-    // this as a path in user-data could trigger subsequent assertions.
+    // {<optional non-wildcard prefix>, $_path: 1, <field>: 1, <optional non-wildcard suffix>}. The
+    // "$_path" field stores the path(s) to be examined inside the wildcard index, as opposed to
+    // real user data. We shouldn't report any sort orders including "$_path". In fact, $-prefixed
+    // path components are illegal in queries in most contexts, so misinterpreting this as a path in
+    // user-data could trigger subsequent assertions.
     //
-    // An expanded compound wildcard index can be used to answer queries on non-wildcard prefix
-    // fields, in this case, the wildcard field is unknown. This expanded IndexEntry holds a key
-    // pattern with the wildcard field being the reserved path, "$_path". All following regular
-    // fields should not support any sort operation, therefore, we should strip all fields starting
-    // from the first "$_path" field.
-    if (index.type == IndexType::INDEX_WILDCARD) {
+    // A compound wildcard index can provide sorts on non-wildcard prefix fields. For example, index
+    // {a: 1, "b.$**": 1} can provide a sort on "a".
+    //
+    // A compound wildcard index can also provide sorts on the wildcard field and suffix fields
+    // under some conditions. For example, index {"b.$**": 1, c: 1} can provide the sort {c: 1}
+    // given query {"b.d": {$eq: 1}}.
+    //
+    // However, there are restrictions on the wildcard + suffix fields support:
+    // - Example: index {"b.$**": 1, c: 1} with query {"b.d": {$exists: true}} cannot provide a sort
+    //   on {"b.d": 1} or {"b.d": 1, c: 1}. That's because the bounds for "$_path" are [["b.d",
+    //   "b.d"], ["b.d.", "b.d/")], where the second bound is there so that keys from documents
+    //   where "b.d" is a nested object are in bounds. This does not produce sorted order for "b.d",
+    //   since all of the nested objects will be returned last by the scan.
+    // - The same is true when the query does not contain a predicate on a wildcard field. Example:
+    //   index {a: 1, "b.$**": 1, c: 1} cannot provide a sort on {"b.d": 1, c: 1} if there is no
+    //   predicate on "b.d". That's because the bounds for "$_path" are [[MinKey, MinKey], ["",
+    //   {})]. This captures both documents that don't have a "b" field and documents that do. As
+    //   above, this scan will not return documents in "b.d" sorted order.
+    // In summary, the restrction is: when the bounds for "$_path" are not an equality, we truncate
+    // the provided sort starting with the "$_path" field.
+    const bool isWildcardIndex = index.type == IndexType::INDEX_WILDCARD;
+    if (isWildcardIndex) {
         tassert(7246700,
                 "The bounds did not have as many fields as the key pattern.",
                 static_cast<size_t>(index.keyPattern.nFields()) == bounds.fields.size());
-
-        BSONObjBuilder sortPatternStripped;
-        // Strip '$_path' and following fields out of 'sortPattern' and then proceed with regular
-        // sort analysis.
-        // (Ignore FCV check): This is intentional because we want clusters which have wildcard
-        // indexes still be able to use the feature even if the FCV is downgraded.
-        for (auto elem : sortPatternProvidedByIndex) {
-            if (elem.fieldNameStringData() == "$_path"_sd) {
-                tassert(7767200,
-                        "The bounds cannot be empty.",
-                        bounds.fields[index.wildcardFieldPos - 1].intervals.size() > 0u);
-
-                auto allValuePath = wcp::makeAllValuesForPath();
-                // No sorts on the following fields should be provided if it's full scan on the
-                // '$_path' field or the bounds for '$_path' consist of multiple intervals. This
-                // can happen for existence queries. For example, {a: {$exists: true}} results
-                // in bounds [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents
-                // where "a" is a nested object are in bounds.
-                if (bounds.fields[index.wildcardFieldPos - 1].intervals.size() != 1u ||
-                    std::equal(bounds.fields[index.wildcardFieldPos - 1].intervals.begin(),
-                               bounds.fields[index.wildcardFieldPos - 1].intervals.end(),
-                               allValuePath.begin())) {
-                    break;
-                }
-            } else {
-                sortPatternStripped.append(elem);
-            }
-        }
-        sortPatternProvidedByIndex = sortPatternStripped.obj();
     }
 
     //
@@ -1177,27 +1163,63 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
             }
         }
     }
-    // Remove all equality predicates from sort object since they do not contribute in changing the
-    // sort order.
-    sortPatternProvidedByIndex = QueryPlannerAnalysis::getSortPattern(
-        sortPatternProvidedByIndex.removeFields(equalityFields));
-    if (direction == -1) {
-        sortPatternProvidedByIndex = QueryPlannerCommon::reverseSortObj(sortPatternProvidedByIndex);
-    }
 
-    BSONObjBuilder prefixBob;
-    for (auto&& elem : sortPatternProvidedByIndex) {
-        if (ignoreFields.count(elem.fieldNameStringData())) {
+    // Iterate through the index key pattern and determine the "maximal sort" that this index can
+    // provide. The constructed sort pattern is in normalized form (all elements have value 1 or
+    // -1). Very similar to QueryPlannerAnalysis::getSortPattern(), with the additional logic for
+    // wildcard indexes, collation, and multikey indexes, as described above.
+    const bool reverse = (direction == -1);
+    BSONObjBuilder sortBob;
+    BSONObjIterator kpIt(index.keyPattern);
+    while (kpIt.more()) {
+        BSONElement elt = kpIt.next();
+        const auto& fieldName = elt.fieldNameStringData();
+
+        // Exclude the "$_path" field, which shouldn't end up in the sort order.
+        if (isWildcardIndex && fieldName == "$_path"_sd) {
+            // If the bounds for the "$_path" field are multi-interval then we can't provide sorts
+            // on any following fields.
+            tassert(7767200,
+                    "The bounds cannot be empty.",
+                    bounds.fields[index.wildcardFieldPos - 1].intervals.size() > 0u);
+            if (bounds.fields[index.wildcardFieldPos - 1].intervals.size() != 1u) {
+                break;
+            }
+            // At this point we know the bounds are an equality.
             continue;
         }
-        // Once a multi-key/collator field is encountered we cannot provide sort the the later
-        // fields.
-        if (unsupportedFields.find(elem.fieldNameStringData()) != unsupportedFields.end()) {
+
+        // Equality fields can be ignored for the purposes of sort order; see above.
+        if (equalityFields.contains(fieldName.toString())) {
+            continue;
+        }
+
+        // "Hashed" fields (or other special kinds of index) prohibit sorts on the later fields,
+        // unless there is an equality on the hashed field (handled above).
+        if (elt.type() == mongo::String) {
             break;
         }
-        prefixBob.append(elem);
+
+        // Ignored fields should be excluded. The index scan does not provide these fields in sorted
+        // order but we may still be able to provide a sort on subsequent fields; see comment above.
+        if (ignoreFields.contains(fieldName)) {
+            continue;
+        }
+
+        // Unsupported fields (due to multikeyness or collation) prohibit sorts on the later fields.
+        if (unsupportedFields.contains(fieldName)) {
+            break;
+        }
+
+        // The canonical check as to whether a key pattern element is "ascending" or
+        // "descending" is (elt.number() >= 0). This is defined by the Ordering class.
+        int sortOrder = (elt.number() >= 0) ? 1 : -1;
+        if (reverse)
+            sortOrder *= -1;
+        sortBob.append(fieldName, sortOrder);
     }
-    return ProvidedSortSet(prefixBob.obj(), std::move(equalityFields));
+
+    return ProvidedSortSet(sortBob.obj(), std::move(equalityFields));
 }
 
 /**

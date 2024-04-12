@@ -57,6 +57,7 @@ enum AvailableIndexType {
     kSingleFieldIndex,       // {a: 1}
     kTwoFieldCompoundIndex,  // {a: 1, b: 1}
     kTwoIndexes,             // {a: 1} and {b: 1}
+    kManyFieldCompoundIndex  // {a: 1, a<long string>0: 1, a<long string>1: 1, ... /* repeated */}
 };
 
 // The type of filter that will be part of the generated find command for the test case.
@@ -162,6 +163,16 @@ BSONObj createManyFieldFilter() {
     }
 
     return result.obj();
+}
+
+// Builds index key {a: 1, a<long string>0: 1, a<long string>1: 1, ... a<long string>29: 1}.
+BSONObj createManyFieldIndexKey() {
+    BSONObjBuilder bob;
+    bob << "a" << 1;
+    for (int i = 0; i < 30; i++) {
+        bob << (std::string(500, 'a') + std::to_string(i)) << 1;
+    }
+    return bob.obj();
 }
 
 std::unique_ptr<FindCommandRequest> makeFindFromBmParams(
@@ -287,6 +298,11 @@ QueryPlannerParams extractFromBmParams(PlanCacheClassicBenchmarkParameters param
                 qpp.mainCollectionInfo.options = QueryPlannerParams::INDEX_INTERSECTION;
             }
             break;
+        case kManyFieldCompoundIndex: {
+            qpp.mainCollectionInfo.indexes.push_back(
+                createIndexEntry(createManyFieldIndexKey(), "a_1_many_fields"));
+            break;
+        }
     }
     return qpp;
 }
@@ -349,12 +365,15 @@ void BM_PlanCacheClassic(benchmark::State& state) {
     auto collectionsAccessor = MultipleCollectionAccessor(collectionPtr);
 
     // If there is an index specified, add it to the IndexCatalogMock.
-    if (bmParams.index == kSingleFieldIndex || bmParams.index == kTwoFieldCompoundIndex) {
+    if (bmParams.index == kSingleFieldIndex || bmParams.index == kTwoFieldCompoundIndex ||
+        bmParams.index == kManyFieldCompoundIndex) {
         IndexSpec ixSpec;
         if (bmParams.index == kSingleFieldIndex) {
             ixSpec.version(1).name("a_1").addKeys(BSON("a" << 1));
-        } else {
+        } else if (bmParams.index == kTwoFieldCompoundIndex) {
             ixSpec.version(1).name("a_1_b_1").addKeys(BSON("a" << 1 << "b" << 1));
+        } else {
+            ixSpec.version(1).name("a_1_many_fields").addKeys(createManyFieldIndexKey());
         }
 
         IndexDescriptor ixDescriptor(IndexNames::BTREE, ixSpec.toBSON());
@@ -521,6 +540,18 @@ BENCHMARK_TEMPLATE(BM_PlanCacheClassic, EqFilterTwoFieldIndexSortLimitSkip)
         SortType::kSort,                            /* sort */
         SkipType::kSkip,                            /* skip */
         LimitType::kLimit                           /* limit */
+    });
+
+// Eq filter, many-field index, sort, limit, skip.
+class EqFilterSingleManyFieldIndexSortLimitSkip;
+BENCHMARK_TEMPLATE(BM_PlanCacheClassic, EqFilterSingleManyFieldIndexSortLimitSkip)
+    ->Args({
+        AvailableIndexType::kManyFieldCompoundIndex, /* index */
+        FilterType::kFieldEqFilter,                  /* filter */
+        ProjType::kNoProj,                           /* proj */
+        SortType::kSort,                             /* sort */
+        SkipType::kSkip,                             /* skip */
+        LimitType::kLimit                            /* limit */
     });
 
 // Id filter.

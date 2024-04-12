@@ -42,54 +42,21 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/wildcard_test_utils.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 
 namespace mongo::wildcard_planning {
-namespace {
-
-/**
- * Owns WildcardProjection object for CoreIndexInfo since the latter holds only reference to it.
- */
-struct IndexEntryMock {
-    IndexEntryMock(BSONObj keyPattern, BSONObj wp, std::set<FieldRef> multiKeyPathSet)
-        : emptyMultiKeyPaths{},
-          wildcardProjection{WildcardKeyGenerator::createProjectionExecutor(keyPattern, wp)},
-          indexEntry{} {
-        std::string indexName{"wc_1"};
-        const auto type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
-        indexEntry = std::make_unique<IndexEntry>(keyPattern,
-                                                  type,
-                                                  IndexDescriptor::kLatestIndexVersion,
-                                                  false,
-                                                  emptyMultiKeyPaths,
-                                                  multiKeyPathSet,
-                                                  true,
-                                                  false,
-                                                  CoreIndexInfo::Identifier{indexName},
-                                                  nullptr,
-                                                  BSONObj(),
-                                                  nullptr,
-                                                  &wildcardProjection);
-    }
-
-    MultikeyPaths emptyMultiKeyPaths;
-    WildcardProjection wildcardProjection;
-    std::unique_ptr<IndexEntry> indexEntry;
-};
-}  // namespace
 
 TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithProjection) {
-    IndexEntryMock wildcardIndex{BSON("$**" << 1), BSON("a" << 1), {FieldRef{"a"_sd}}};
+    WildcardIndexEntryMock wildcardIndex{BSON("$**" << 1), BSON("a" << 1), {FieldRef{"a"_sd}}};
 
     stdx::unordered_set<std::string> fields{"a", "b"};
     std::vector<IndexEntry> expandedIndexes{};
@@ -102,7 +69,7 @@ TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithProjection) {
 }
 
 TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithoutProjection) {
-    IndexEntryMock wildcardIndex{BSON("$**" << 1), BSONObj{}, {FieldRef{"a"_sd}}};
+    WildcardIndexEntryMock wildcardIndex{BSON("$**" << 1), BSONObj{}, {FieldRef{"a"_sd}}};
 
     stdx::unordered_set<std::string> fields{"a", "b"};
     std::vector<IndexEntry> expandedIndexes{};
@@ -126,7 +93,7 @@ TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithoutProjection) {
 }
 
 TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithProjection) {
-    IndexEntryMock wildcardIndex{
+    WildcardIndexEntryMock wildcardIndex{
         BSON("e.f" << 1 << "$**" << 1 << "m.n" << 1), BSON("a" << 1), {FieldRef{"a"_sd}}};
 
     stdx::unordered_set<std::string> fields{"a.c", "b"};
@@ -143,9 +110,10 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithProjection) {
 }
 
 TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithoutProjection) {
-    IndexEntryMock wildcardIndex{BSON("e.f" << 1 << "b.d" << 1 << "prefix.$**" << 1 << "m.n" << 1),
-                                 BSONObj{},
-                                 {FieldRef{"prefix.a"_sd}}};
+    WildcardIndexEntryMock wildcardIndex{
+        BSON("e.f" << 1 << "b.d" << 1 << "prefix.$**" << 1 << "m.n" << 1),
+        BSONObj{},
+        {FieldRef{"prefix.a"_sd}}};
 
     stdx::unordered_set<std::string> fields{"prefix.a", "prefix.b"};
     std::vector<IndexEntry> expandedIndexes{};
@@ -174,7 +142,7 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithoutProjection)
 }
 
 TEST(PlannerWildcardHelpersTest, FinalizeBasicPatternInCompoundWildcardIndexScanConfiguration) {
-    IndexEntryMock wildcardIndex{
+    WildcardIndexEntryMock wildcardIndex{
         BSON("a" << 1 << "$**" << 1 << "c" << 1), BSON("b" << 1), {FieldRef{"b"_sd}}};
     std::vector<IndexEntry> expandedIndexes{};
     stdx::unordered_set<std::string> fields{"b"};
@@ -207,7 +175,7 @@ TEST(PlannerWildcardHelpersTest, FinalizeBasicPatternInCompoundWildcardIndexScan
 }
 
 TEST(PlannerWildcardHelpersTest, AddSubpathBoundsIfBoundsOverlapWithObjects) {
-    IndexEntryMock wildcardIndex{BSON("$**" << 1 << "b" << 1), BSON("a" << 1), {}};
+    WildcardIndexEntryMock wildcardIndex{BSON("$**" << 1 << "b" << 1), BSON("a" << 1), {}};
     std::vector<IndexEntry> expandedIndexes{};
     stdx::unordered_set<std::string> fields{"a"};
     expandWildcardIndexEntry(*wildcardIndex.indexEntry, fields, &expandedIndexes);
@@ -234,21 +202,22 @@ TEST(PlannerWildcardHelpersTest, AddSubpathBoundsIfBoundsOverlapWithObjects) {
 }
 
 TEST(PlannerWildcardHelpersTest, GetCorrectWildcardElement) {
-    IndexEntryMock wildcardIndex{BSON("$**" << 1 << "b" << 1), BSON("a" << 1), {}};
+    WildcardIndexEntryMock wildcardIndex{BSON("$**" << 1 << "b" << 1), BSON("a" << 1), {}};
     wildcardIndex.indexEntry->wildcardFieldPos = 0;
     auto elem = getWildcardField(*wildcardIndex.indexEntry);
     ASSERT_EQ(0, elem.woCompare(BSON("$**" << 1).firstElement()));
 
-    IndexEntryMock wildcardIndex2{BSON("a" << 1 << "$**" << 1 << "b" << 1), BSON("c" << 1), {}};
+    WildcardIndexEntryMock wildcardIndex2{
+        BSON("a" << 1 << "$**" << 1 << "b" << 1), BSON("c" << 1), {}};
     wildcardIndex2.indexEntry->wildcardFieldPos = 1;
     elem = getWildcardField(*wildcardIndex2.indexEntry);
     ASSERT_EQ(0, elem.woCompare(BSON("$**" << 1).firstElement()));
 }
 
 TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_NumericComponents) {
-    IndexEntryMock wildcardIndex{BSON("e.f" << 1 << "$**" << 1 << "m.n" << 1),
-                                 BSON("a.0" << 1 << "b" << 1),
-                                 {FieldRef{"a"_sd}}};
+    WildcardIndexEntryMock wildcardIndex{BSON("e.f" << 1 << "$**" << 1 << "m.n" << 1),
+                                         BSON("a.0" << 1 << "b" << 1),
+                                         {FieldRef{"a"_sd}}};
 
     stdx::unordered_set<std::string> fields{"a.0.b", "b"};
     std::vector<IndexEntry> expandedIndexes{};
