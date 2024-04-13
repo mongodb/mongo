@@ -34,74 +34,96 @@ env.Benchmark(
     LIBDEPS=[],
 )
 
-if not get_option("link-model") == "dynamic":
-    Return()
+if get_option("link-model") == "dynamic":
 
-env.BazelLibrary(
-    target="visibility_test_libcommon",
-    source=[
-        "visibility_test_libcommon.cpp",
-    ],
-    LIBDEPS=[],
-    MONGO_API_NAME="visibility_test_libcommon",
-)
+    env.BazelLibrary(
+        target="visibility_test_libcommon",
+        source=[
+            "visibility_test_libcommon.cpp",
+        ],
+        LIBDEPS=[],
+        MONGO_API_NAME="visibility_test_libcommon",
+    )
 
-env.BazelLibrary(
-    target="visibility_test_lib1",
-    source=[
-        "visibility_test_lib1.cpp",
-    ],
-    LIBDEPS=[],
-    LIBDEPS_PRIVATE=[
-        "visibility_test_libcommon",
-    ],
-    MONGO_API_NAME="visibility_test_lib1",
-)
+    env.BazelLibrary(
+        target="visibility_test_lib1",
+        source=[
+            "visibility_test_lib1.cpp",
+        ],
+        LIBDEPS=[],
+        LIBDEPS_PRIVATE=[
+            "visibility_test_libcommon",
+        ],
+        MONGO_API_NAME="visibility_test_lib1",
+    )
 
-env.BazelLibrary(
-    target="visibility_test_lib2",
+    env.BazelLibrary(
+        target="visibility_test_lib2",
+        source=[
+            "visibility_test_lib2.cpp",
+        ],
+        LIBDEPS=[
+            "visibility_test_lib1",
+        ],
+        LIBDEPS_PRIVATE=[
+            "visibility_test_libcommon",
+        ],
+        MONGO_API_NAME="visibility_test_lib2",
+    )
+
+    visibility_test1 = env.BazelProgram(
+        target="visibility_test1",
+        source=[
+            "visibility_test1.cpp",
+        ],
+        LIBDEPS=[
+            "visibility_test_lib1",
+        ],
+        AIB_COMPONENT="visibility-test",
+        AIB_COMPONENTS_EXTRA=[
+            "unittests",
+            "tests",
+            "first-quarter-unittests",
+        ],
+    )
+    env.RegisterTest("$UNITTEST_LIST", visibility_test1[0])
+
+    visibility_test2 = env.Program(
+        target="visibility_test2",
+        source=[
+            "visibility_test2.cpp",
+        ],
+        LIBDEPS=[
+            "visibility_test_lib2",
+        ],
+        AIB_COMPONENT="visibility-test",
+        AIB_COMPONENTS_EXTRA=[
+            "unittests",
+            "tests",
+            "first-quarter-unittests",
+        ],
+    )
+    env.RegisterTest("$UNITTEST_LIST", visibility_test2[0])
+
+env.CppUnitTest(
+    target='rwmutex_test',
     source=[
-        "visibility_test_lib2.cpp",
+        'rwmutex_test.cpp',
     ],
     LIBDEPS=[
-        "visibility_test_lib1",
+        '$BUILD_DIR/mongo/base',
     ],
-    LIBDEPS_PRIVATE=[
-        "visibility_test_libcommon",
-    ],
-    MONGO_API_NAME="visibility_test_lib2",
 )
 
-visibility_test1 = env.BazelProgram(
-    target="visibility_test1",
+env.Benchmark(
+    target='rwmutex_bm',
     source=[
-        "visibility_test1.cpp",
+        'rwmutex_bm.cpp',
     ],
     LIBDEPS=[
-        "visibility_test_lib1",
-    ],
-    AIB_COMPONENT="visibility-test",
-    AIB_COMPONENTS_EXTRA=[
-        "unittests",
-        "tests",
-        "first-quarter-unittests",
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/service_context_non_d',
+        '$BUILD_DIR/mongo/util/processinfo',
     ],
 )
-env.RegisterTest("$UNITTEST_LIST", visibility_test1[0])
-
-visibility_test2 = env.Program(
-    target="visibility_test2",
-    source=[
-        "visibility_test2.cpp",
-    ],
-    LIBDEPS=[
-        "visibility_test_lib2",
-    ],
-    AIB_COMPONENT="visibility-test",
-    AIB_COMPONENTS_EXTRA=[
-        "unittests",
-        "tests",
-        "first-quarter-unittests",
-    ],
-)
-env.RegisterTest("$UNITTEST_LIST", visibility_test2[0])

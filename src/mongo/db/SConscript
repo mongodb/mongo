@@ -728,7 +728,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/processinfo',
         'server_base',
-        'storage/storage_change_lock',
         'storage/write_unit_of_work',
     ],
 )

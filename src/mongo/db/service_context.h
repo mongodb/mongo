@@ -47,10 +47,10 @@
 #include "mongo/db/baton.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/storage/storage_change_lock.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
@@ -529,9 +529,7 @@ public:
         _storageEngine = nullptr;
     }
 
-    // TODO SERVER-86656: replace this with the reader-optimized `rwmutex`. Also, remove source
-    // files and the build target for `StorageChangeLock`.
-    using StorageChangeMutexType = StorageChangeLock;
+    using StorageChangeMutexType = WriteRarelyRWMutex;
 
     StorageChangeMutexType& getStorageChangeMutex() {
         return _storageChangeMutex;
