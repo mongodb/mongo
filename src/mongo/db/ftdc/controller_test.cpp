@@ -183,10 +183,6 @@ public:
         builder.append("key4", static_cast<double>(counter * static_cast<int>(log10f(counter))));
     }
     void generateExpectedDocument(BSONObjBuilder& builder, std::uint32_t counter) final {
-        if (_multiService || !counter) {
-            generateDocument(builder, counter);
-            return;
-        }
         std::string newName = "joeconfig";
         int32_t newKey3 = 10 * counter + 2;
         double newKey4 = counter * static_cast<int>(log10f(counter));
