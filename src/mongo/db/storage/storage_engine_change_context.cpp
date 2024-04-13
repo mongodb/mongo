@@ -96,11 +96,11 @@ void StorageEngineChangeOperationContextDoneNotifier::setNotifyWhenDone(ServiceC
     _service = service;
 }
 
-stdx::unique_lock<ServiceContext::StorageChangeMutexType>
-StorageEngineChangeContext::killOpsForStorageEngineChange(ServiceContext* service) {
+WriteRarelyRWMutex::WriteLock StorageEngineChangeContext::killOpsForStorageEngineChange(
+    ServiceContext* service) {
     invariant(this == StorageEngineChangeContext::get(service));
     // Prevent new operations from being created.
-    stdx::unique_lock storageChangeLk(service->getStorageChangeMutex());
+    auto storageChangeLk = service->getStorageChangeMutex().writeLock();
     stdx::unique_lock lk(_mutex);
     {
         ServiceContext::LockedClientsCursor clientCursor(service);
@@ -137,10 +137,9 @@ StorageEngineChangeContext::killOpsForStorageEngineChange(ServiceContext* servic
     return storageChangeLk;
 }
 
-void StorageEngineChangeContext::changeStorageEngine(
-    ServiceContext* service,
-    stdx::unique_lock<ServiceContext::StorageChangeMutexType> lk,
-    std::unique_ptr<StorageEngine> engine) {
+void StorageEngineChangeContext::changeStorageEngine(ServiceContext* service,
+                                                     WriteRarelyRWMutex::WriteLock lk,
+                                                     std::unique_ptr<StorageEngine> engine) {
     invariant(this == StorageEngineChangeContext::get(service));
     service->setStorageEngine(std::move(engine));
     // The lock is released at end of scope, allowing OperationContexts to be created again.

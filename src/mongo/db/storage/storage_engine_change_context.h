@@ -30,12 +30,11 @@
 #pragma once
 
 #include <memory>
-#include <shared_mutex>
 
 #include "mongo/db/operation_id.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_change_lock.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
@@ -52,15 +51,14 @@ public:
      * code, free the existing storage engine, and block any new operation contexts from being
      * created while the returned lock is in scope.
      */
-    stdx::unique_lock<ServiceContext::StorageChangeMutexType> killOpsForStorageEngineChange(
-        ServiceContext* service);
+    WriteRarelyRWMutex::WriteLock killOpsForStorageEngineChange(ServiceContext* service);
 
     /**
      * Finish changing the storage engine for the associated ServiceContext.  This will change the
      * storage engine and allow operation contexts to again be created.
      */
     void changeStorageEngine(ServiceContext* service,
-                             stdx::unique_lock<ServiceContext::StorageChangeMutexType>,
+                             WriteRarelyRWMutex::WriteLock,
                              std::unique_ptr<StorageEngine> engine);
 
     /**

@@ -194,6 +194,7 @@ baseEnv.Library(
         'platform/posix_fadvise.cpp',
         'platform/process_id.cpp',
         'platform/random.cpp',
+        'platform/rwmutex.cpp',
         'platform/shared_library.cpp',
         'platform/shared_library_${TARGET_OS_FAMILY}.cpp',
         'platform/stack_locator.cpp',
