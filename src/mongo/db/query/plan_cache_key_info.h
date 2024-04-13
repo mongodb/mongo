@@ -59,8 +59,16 @@ public:
         return std::string(_key, 0, _lengthOfQueryShape);
     }
 
-    bool operator==(const PlanCacheKeyInfo& other) const = default;
-    bool operator!=(const PlanCacheKeyInfo& other) const = default;
+    bool operator==(const PlanCacheKeyInfo& other) const {
+        // TODO: SERVER-89072 - provide equality operators for all required types to remove the
+        // toBSON() here. This can then be defaulted.
+        return other._lengthOfQueryShape == _lengthOfQueryShape && other._key == _key &&
+            other._querySettings.toBSON().woCompare(_querySettings.toBSON()) == 0;
+    }
+
+    bool operator!=(const PlanCacheKeyInfo& other) const {
+        return !(*this == other);
+    }
 
     uint32_t queryHash() const {
         return canonical_query_encoder::computeHash(getQueryShapeStringData());

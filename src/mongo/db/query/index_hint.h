@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <compare>
 #include <string>
 #include <type_traits>
 #include <variant>
@@ -42,6 +41,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 
 namespace mongo {
+
 using IndexKeyPattern = BSONObj;
 using IndexName = std::string;
 
@@ -59,10 +59,10 @@ struct NaturalOrderHint {
 
     explicit NaturalOrderHint(Direction direction) : direction(direction) {}
 
-    auto operator<=>(const NaturalOrderHint& other) const = default;
-
     Direction direction;
 };
+
+bool isForward(NaturalOrderHint::Direction dir);
 
 namespace detail {
 // Concept to avoid ambiguity with BSON builder types which implement differing streaming operators.
@@ -83,7 +83,6 @@ auto& operator<<(detail::string_builder auto& os, NaturalOrderHint::Direction di
 }
 
 std::string toString(NaturalOrderHint::Direction dir);
-bool isForward(NaturalOrderHint::Direction dir);
 
 /**
  * Class represents all possible index hint definitions. Index hint may be specified as:
@@ -109,13 +108,11 @@ public:
     boost::optional<const IndexName&> getIndexName() const;
     boost::optional<const NaturalOrderHint&> getNaturalHint() const;
 
-    std::strong_ordering operator<=>(const IndexHint& other) const;
-    bool operator==(const IndexHint& other) const;
-    bool operator!=(const IndexHint& other) const = default;
-
     size_t hash() const;
 
 private:
     std::variant<IndexKeyPattern, IndexName, NaturalOrderHint> _hint;
 };  // namespace index_hint
+
+
 }  // namespace mongo

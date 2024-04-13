@@ -61,7 +61,6 @@ types:
 structs:
   IndexHintSpec:
     description: "Struct representing the index hint spec."
-    generate_comparison_operators : true
     fields:
       ns:
         type: NamespaceSpec
@@ -73,7 +72,6 @@ structs:
   QuerySettings:
     description: >-
       Struct representing possible settings that may be applied to a given query.
-    generate_comparison_operators : true
     fields:
       indexHints:
         type: IndexHintSpecs

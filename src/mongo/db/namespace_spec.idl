@@ -38,7 +38,6 @@ structs:
   NamespaceSpec:
     description: A document used to specify a namespace.
     strict: true
-    generate_comparison_operators : true
     fields:
       db:
         type: database_name

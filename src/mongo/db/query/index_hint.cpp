@@ -42,19 +42,6 @@
 namespace mongo {
 namespace {
 static constexpr auto kNaturalFieldName = "$natural"_sd;
-
-std::strong_ordering compare(const IndexKeyPattern& a, const IndexKeyPattern& b) {
-    return a.woCompare(b) <=> 0;
-}
-
-std::strong_ordering compare(const IndexName& a, const IndexName& b) {
-    return a <=> b;
-}
-
-std::strong_ordering compare(const NaturalOrderHint& a, const NaturalOrderHint& b) {
-    return a <=> b;
-}
-
 };  // namespace
 
 bool isForward(NaturalOrderHint::Direction dir) {
@@ -144,22 +131,4 @@ size_t IndexHint::hash() const {
         _hint);
 }
 
-std::strong_ordering IndexHint::operator<=>(const IndexHint& other) const {
-    if (auto cmp = _hint.valueless_by_exception() <=> other._hint.valueless_by_exception();
-        !std::is_eq(cmp)) {
-        return cmp;
-    }
-
-    if (auto cmp = _hint.index() <=> other._hint.index(); !std::is_eq(cmp)) {
-        return cmp;
-    }
-
-    return std::visit(
-        [&other](auto&& a) { return compare(a, std::get<std::decay_t<decltype(a)>>(other._hint)); },
-        _hint);
-};
-
-bool IndexHint::operator==(const IndexHint& other) const {
-    return std::is_eq(*this <=> other);
-}
 };  // namespace mongo
