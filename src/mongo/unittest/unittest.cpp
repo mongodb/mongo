@@ -232,7 +232,7 @@ private:
     public:
         explicit Listener(synchronized_value<std::vector<std::string>>* sv) : _sv(sv) {}
         void accept(const std::string& line) override {
-            _sv->synchronize()->push_back(line);
+            (***_sv).push_back(line);
         }
 
     private:
@@ -286,8 +286,8 @@ namespace {
 
 void CaptureLogs::startCapturingLogMessages() {
     invariant(!_isCapturingLogMessages);
-    _capturedLogMessages.synchronize()->clear();
-    _capturedBSONLogMessages.synchronize()->clear();
+    (**_capturedLogMessages).clear();
+    (**_capturedBSONLogMessages).clear();
 
     if (!_captureSink) {
         _captureSink = logv2::LogCaptureBackend::create(
@@ -330,7 +330,7 @@ void CaptureLogs::stopCapturingLogMessagesIfNeeded() {
 
 std::vector<BSONObj> CaptureLogs::getCapturedBSONFormatLogMessages() const {
     std::vector<BSONObj> objs;
-    auto logLinesLockGuard = _capturedBSONLogMessages.synchronize();
+    auto logLinesLockGuard = *_capturedBSONLogMessages;
     std::transform(logLinesLockGuard->cbegin(),
                    logLinesLockGuard->cend(),
                    std::back_inserter(objs),
@@ -340,7 +340,7 @@ std::vector<BSONObj> CaptureLogs::getCapturedBSONFormatLogMessages() const {
 void CaptureLogs::printCapturedTextFormatLogLines() const {
     LOGV2(23054,
           "****************************** Captured Lines (start) *****************************");
-    auto logLinesLockGuard = getCapturedTextFormatLogMessages().synchronize();
+    auto logLinesLockGuard = *getCapturedTextFormatLogMessages();
     for (const auto& line : *logLinesLockGuard) {
         LOGV2(23055, "{line}", "line"_attr = line);
     }
@@ -349,7 +349,7 @@ void CaptureLogs::printCapturedTextFormatLogLines() const {
 }
 
 int64_t CaptureLogs::countTextFormatLogLinesContaining(const std::string& needle) {
-    auto msgs = getCapturedTextFormatLogMessages().synchronize();
+    auto msgs = *getCapturedTextFormatLogMessages();
     return std::count_if(msgs->begin(), msgs->end(), [&](const std::string& s) {
         return stringContains(s, needle);
     });
