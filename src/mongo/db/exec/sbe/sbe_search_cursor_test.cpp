@@ -118,8 +118,8 @@ std::unique_ptr<executor::TaskExecutorCursor> mockTaskExecutorCursor(OperationCo
         batchVec.push_back(ele.Obj());
     }
 
-    executor::TaskExecutorCursorOptions opts(/*batchSize*/ boost::none,
-                                             /*preFetchNextBatch*/ false);
+    executor::TaskExecutorCursor::Options opts;
+    opts.preFetchNextBatch = false;
     return std::make_unique<executor::TaskExecutorCursor>(
         testExecutor,
         nullptr /* underlyingExec */,

@@ -60,7 +60,7 @@ MONGO_FAIL_POINT_DEFINE(blockBeforePinnedExecutorIsDestroyedOnUnderlying);
 
 TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
                                        const RemoteCommandRequest& rcr,
-                                       TaskExecutorCursorOptions options)
+                                       Options options)
     : _rcr(rcr), _options(std::move(options)), _batchIter(_batch.end()) {
 
     if (rcr.opCtx) {
@@ -80,7 +80,7 @@ TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> e
                                        std::shared_ptr<executor::TaskExecutor> underlyingExec,
                                        CursorResponse&& response,
                                        RemoteCommandRequest& rcr,
-                                       TaskExecutorCursorOptions&& options)
+                                       Options&& options)
     : _executor(std::move(executor)),
       _underlyingExecutor(std::move(underlyingExec)),
       _rcr(rcr),
@@ -267,7 +267,7 @@ void TaskExecutorCursor::_processResponse(OperationContext* opCtx, CursorRespons
 
     // If the previous response contained a cursorId and pre-fetching is enabled, schedule the
     // getMore.
-    if ((_cursorId != kClosedCursorId) && _options.getMoreStrategy->shouldPrefetch()) {
+    if ((_cursorId != kClosedCursorId) && _options.preFetchNextBatch) {
         _scheduleGetMore(opCtx);
     }
 }
@@ -277,15 +277,26 @@ void TaskExecutorCursor::_scheduleGetMore(OperationContext* opCtx) {
     invariant(_cursorId >= kMinLegalCursorId);
     // There cannot be an existing in-flight request.
     invariant(!_cmdState);
-    _runRemoteCommand(
-        _createRequest(opCtx, _options.getMoreStrategy->createGetMoreRequest(_cursorId, _ns)));
+    GetMoreCommandRequest getMoreRequest(_cursorId, _ns.coll().toString());
+    getMoreRequest.setBatchSize(_options.batchSize);
+
+    if (_options.getMoreAugmentationWriter) {
+        // Prefetching must be disabled to use the augmenting functionality.
+        invariant(!_options.preFetchNextBatch);
+        BSONObjBuilder getMoreBob;
+        getMoreRequest.serialize({}, &getMoreBob);
+        _options.getMoreAugmentationWriter(getMoreBob);
+        _runRemoteCommand(_createRequest(opCtx, getMoreBob.obj()));
+    } else {
+        _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON({})));
+    }
 }
 
 void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     // If we don't have an in-flight request, schedule one. This will occur when the
-    // getMoreStrategy's 'shouldPrefetch()' is false.
+    // 'preFetchNextBatch' option is false.
     if (!_cmdState) {
-        invariant(!_options.getMoreStrategy->shouldPrefetch());
+        invariant(!_options.preFetchNextBatch);
         _scheduleGetMore(opCtx);
     }
 
@@ -333,7 +344,7 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     // Ensure we update the RCR we give to each 'child cursor' with the current opCtx.
     auto freshRcr = _createRequest(opCtx, _rcr.cmdObj);
     auto copyOptions = [&] {
-        TaskExecutorCursorOptions options;
+        TaskExecutorCursor::Options options;
         // In the case that pinConnection is true, we need to ensure that additional cursors also
         // pin their connection to the same socket as the original cursor.
         options.pinConnection = _options.pinConnection;

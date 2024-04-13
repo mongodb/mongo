@@ -10,7 +10,6 @@ env.Library(
     target='mongot_cursor',
     source=[
         'mongot_cursor.cpp',
-        'mongot_cursor_getmore_strategy.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
@@ -18,19 +17,6 @@ env.Library(
         '$BUILD_DIR/mongo/executor/task_executor_cursor',
         'mongot_options',
         'search_task_executors',
-    ],
-)
-
-env.CppUnitTest(
-    target='mongot_cursor_test',
-    source=[
-        'mongot_cursor_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/network_interface_mock',
-        '$BUILD_DIR/mongo/executor/network_interface_tl',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        'mongot_cursor',
     ],
 )
 

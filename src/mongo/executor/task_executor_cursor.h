@@ -53,7 +53,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/executor/task_executor_cursor_options.h"
+#include "mongo/executor/task_executor_cursor_parameters_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -83,6 +83,27 @@ public:
     constexpr static CursorId kClosedCursorId = 0;
     constexpr static CursorId kMinLegalCursorId = 1;
 
+    struct Options {
+        boost::optional<int64_t> batchSize;
+        bool pinConnection{gPinTaskExecCursorConns.load()};
+        // If true, we will fetch the next batch as soon as the current one is recieved.
+        // If false, we will fetch the next batch when the current batch is exhausted and
+        // 'getNext()' is invoked.
+        bool preFetchNextBatch{true};
+
+        // This function, if specified, may modify a getMore request to include additional
+        // information.
+        std::function<void(BSONObjBuilder& bob)> getMoreAugmentationWriter;
+
+        // Optional yield policy allows us to yield(release storage resources) during remote call.
+        // Using shared_ptr to allow tries on network failure, don't share the pointer on other
+        // purpose. In practice, this will always be of type PlanYieldPolicyRemoteCursor, but
+        // for dependency reasons, we must use the generic PlanYieldPolicy here.
+        std::shared_ptr<PlanYieldPolicy> yieldPolicy{nullptr};
+
+        Options() {}
+    };
+
     /**
      * Construct the cursor with a RemoteCommandRequest wrapping the initial command.
      *
@@ -96,7 +117,7 @@ public:
      */
     TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
                        const RemoteCommandRequest& rcr,
-                       TaskExecutorCursorOptions options = {});
+                       Options options = {});
 
     /**
      * Construct the cursor from a cursor response from a previously executed RemoteCommandRequest.
@@ -110,7 +131,7 @@ public:
                        std::shared_ptr<executor::TaskExecutor> underlyingExec,
                        CursorResponse&& response,
                        RemoteCommandRequest& rcr,
-                       TaskExecutorCursorOptions&& options = {});
+                       Options&& options = {});
 
     /**
      * Move constructor to enable storing cursors in vectors.
@@ -177,6 +198,10 @@ public:
         return _additionalCursors.size();
     }
 
+    void updateGetMoreFunc(std::function<void(BSONObjBuilder& bob)> func) {
+        _options.getMoreAugmentationWriter = func;
+    }
+
     void updateYieldPolicy(std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
         _options.yieldPolicy = std::move(yieldPolicy);
     }
@@ -230,7 +255,7 @@ private:
     // Used as a scratch pad for the successive scheduleRemoteCommand calls
     RemoteCommandRequest _rcr;
 
-    TaskExecutorCursorOptions _options;
+    Options _options;
 
     // If the opCtx is in our initial request, re-use it for all subsequent operations
     boost::optional<LogicalSessionId> _lsid;
@@ -281,11 +306,11 @@ inline std::unique_ptr<TaskExecutorCursor> makeTaskExecutorCursor(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     const RemoteCommandRequest& rcr,
-    TaskExecutorCursorOptions options = {},
+    TaskExecutorCursor::Options options = {},
     std::function<bool(Status)> retryPolicy = nullptr) {
     for (;;) {
         try {
-            auto tec = std::make_unique<TaskExecutorCursor>(executor, rcr, std::move(options));
+            auto tec = std::make_unique<TaskExecutorCursor>(executor, rcr, options);
             tec->populateCursor(opCtx);
             return tec;
         } catch (const DBException& ex) {
