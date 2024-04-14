@@ -90,3 +90,13 @@ parameters:
   - key: evergreen_config_file_path
     value: "etc/evergreen.yml"
     description: "path to this file"
+
+commit_queue_aliases:
+  - variant: "commit-queue"
+    task: "^(bazel_.*|run_.*|compile_.*|lint_.*|jsCore|version_gen_validation|validate_commit_message|resmoke_validation_tests)$"
+    variant_tags: []
+    task_tags: []
+  - variant: "^(amazon-linux2-arm64-dynamic-compile|linux-x86-dynamic-compile-required)$"
+    task: "clang_tidy.*"
+    variant_tags: []
+    task_tags: []

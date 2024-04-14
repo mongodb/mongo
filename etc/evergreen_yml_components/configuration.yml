@@ -58,16 +58,6 @@ patch_aliases:
     variant: "^(.*security-patch-only|linux-x86-dynamic-compile|windows-compile-required)$"
     task: ".*"
 
-commit_queue_aliases:
-  - variant: "commit-queue"
-    task: "^(bazel_.*|run_.*|compile_.*|lint_.*|validate_commit_message|jsCore|version_gen_validation|resmoke_validation_tests)$"
-    variant_tags: []
-    task_tags: []
-  - variant: "^(amazon-linux2-arm64-dynamic-compile|linux-x86-dynamic-compile-required)$"
-    task: "clang_tidy.*"
-    variant_tags: []
-    task_tags: []
-
 #######################################
 #               Modules               #
 #######################################
