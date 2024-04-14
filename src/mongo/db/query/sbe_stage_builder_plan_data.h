@@ -232,12 +232,6 @@ struct PlanStageStaticData {
     // SBE Slots. The slots are registered in the 'RuntimeEnvironment'.
     VariableIdToSlotMap variableIdToSlotMap;
 
-    // Stores variables that are not global/part of the runtime environment, but are temporarily
-    // injected when translating a specific expression. This is useful if we're translating an MQL
-    // expression as part of translating some larger entity (e.g. a match expression).
-    stdx::unordered_map<Variables::Id, std::pair<sbe::FrameId, sbe::value::SlotId>>
-        injectedVariables;
-
     // Stores auxiliary data to restore index bounds for a cached auto-parameterized SBE plan
     // for every index used by the plan.
     std::vector<IndexBoundsEvaluationInfo> indexBoundsEvaluationInfos;

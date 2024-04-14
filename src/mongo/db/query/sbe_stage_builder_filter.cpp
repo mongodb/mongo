@@ -45,6 +45,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
@@ -999,7 +1000,9 @@ public:
     }
 
     void translateExprComparison(const ComparisonMatchExpressionBase* expr) {
-        ExpressionCompare::CmpOp cmp = [&]() {
+        SbExprBuilder b(_context->state);
+
+        ExpressionCompare::CmpOp cmpOp = [&]() {
             switch (expr->matchType()) {
                 case MatchExpression::MatchType::INTERNAL_EXPR_EQ:
                     return ExpressionCompare::CmpOp::EQ;
@@ -1017,75 +1020,38 @@ public:
             }
         }();
 
-        auto expCtx = _context->state.expCtx;
-        invariant(expCtx);
-
-        // We want to translate this into an SBE expression that returns 'true' any time '$a.b.c'
-        // is an array, and {<cmpExpr>: ["$a.b.c", <rhs>]} otherwise. (<cmpExpr> is $eq, $lt, $gt
-        // etc).
-        // First we're going to create an agg expression that of the form:
-        // {$eq: ['$$INTERNAL_FIELD_PATH_EXPR_FOR_INTERNAL_EXPR_*', <rhs>]}
-        // We'll then translate this into an SBE expression, placing the result of the LHS field
-        // path expression into the internal variable.
+        // We want to translate this into an SBE expression that returns true if LHS is
+        // an array, and otherwise returns the result of the comparison.
         //
-        // '$$INTERNAL_FIELD_PATH_EXPR_FOR_INTERNAL_EXPR' <=== the output of '$a.b.c'
-        //
-        // We can then generate an expression of the form:
-        //
-        // let l1 = <expression for '$a.b.c.'>
-        //   if (isArray(l1)) true // Return true any time we see an array
-        //   else <expression for $eq: [l1, <rhs>]>
-        //
-        // We then coerce this to boolean, and we're done.
+        // We accomplish by generating the following expression:
+        //   let [l1.0 = <lhs>] in
+        //     (isArray(l1.0) ?: false) || <<expr for {$cmpOp: [l1.0, <rhs>]}>>
         auto& state = _context->state;
 
-        // Generate a variable name that won't conflict with anything else. Note that in agg, all
-        // variable names starting with a capital letter are reserved for internal use, so there is
-        // no risk of conflict with a user-chosen variable name.
-        const std::string aggVarName = str::stream()
-            << "INTERNAL_FIELD_PATH_EXPR_FOR_INTERNAL_EXPR_"
-            << std::to_string(state.slotIdGenerator->generate());
-        auto aggVarId = expCtx->variablesParseState.defineVariable(aggVarName);
-
-        SbExprBuilder b(state);
         const auto frameId = state.frameIdGenerator->generate();
-        const sbe::value::SlotId frameSlotId = 0;
-        auto lhsVar = b.makeVariable(frameId, frameSlotId);
+        auto lhsVar = b.makeVariable(frameId, 0);
 
-        // Inject the internal variable into the stage builder state, so that the expression stage
-        // builder knows that INTERNAL_FIELD_PATH_EXPR* points to the frameId/slot we generated.
-        state.data->injectedVariables.emplace(aggVarId, std::pair(frameId, frameSlotId));
-        ON_BLOCK_EXIT([&]() { state.data->injectedVariables.erase(aggVarId); });
+        auto [rhsTag, rhsVal] = sbe::value::makeValue(Value(expr->getData()));
 
-        // Generate an agg expression which does the comparison, referencing the internal variable.
-        auto cmpAggExpr = ExpressionCompare::create(
-            expCtx.get(),
-            cmp,
-            ExpressionFieldPath::createVarFromString(
-                expCtx.get(), aggVarName, expCtx->variablesParseState),
-            ExpressionConstant::create(expCtx.get(), Value(expr->getData())));
+        // Generate the comparison expression and coerce the result to boolean.
+        auto translatedCmpExpr =
+            generateExpressionCompare(state, cmpOp, lhsVar.clone(), b.makeConstant(rhsTag, rhsVal));
 
-        // Translate the agg expression to SBE.
-        auto translatedCmpExpr = generateExpression(
-            _context->state, cmpAggExpr.get(), _context->rootSlot, *_context->slots);
-
-        auto isArrayExpr = b.makeIf(b.makeFillEmptyTrue(b.makeFunction("isArray", lhsVar.clone())),
-                                    b.makeBoolConstant(true),
-                                    std::move(translatedCmpExpr));
+        auto isArrayExpr =
+            b.makeBinaryOp(sbe::EPrimBinary::logicOr,
+                           b.makeFillEmptyFalse(b.makeFunction("isArray", lhsVar.clone())),
+                           std::move(translatedCmpExpr));
 
         // Now generate the actual field path expression for the LHS.
-        auto fieldPathExpr = ExpressionFieldPath::createPathFromString(
-            expCtx.get(), expr->fieldRef()->dottedField().toString(), expCtx->variablesParseState);
-        auto translatedFieldPathExpr = generateExpression(
-            _context->state, fieldPathExpr.get(), _context->rootSlot, *_context->slots);
+        FieldPath fp("CURRENT." + expr->fieldRef()->dottedField().toString());
 
-        // Put the LHS into the slot we generated in a let statement.
+        auto translatedFieldPathExpr = generateExpressionFieldPath(
+            _context->state, fp, boost::none, _context->rootSlot, *_context->slots);
+
         auto cmpWArrayCheckExpr = b.makeLet(
             frameId, SbExpr::makeSeq(std::move(translatedFieldPathExpr)), std::move(isArrayExpr));
 
-        // Convert the result of the '{$expr: ..}' expression to a boolean value.
-        _context->topFrame().pushExpr(
-            b.makeFillEmptyFalse(b.makeFunction("coerceToBool"_sd, std::move(cmpWArrayCheckExpr))));
+        _context->topFrame().pushExpr(std::move(cmpWArrayCheckExpr));
     }
 
     void visit(const InternalExprEqMatchExpression* expr) final {

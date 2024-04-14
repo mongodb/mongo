@@ -4440,14 +4440,12 @@ public:
                        const PlanStageReqs& forwardingReqs,
                        const PlanStageSlots& outputs,
                        const WindowNode* wn,
-                       ExpressionContext* expCtx,
                        bool allowDiskUse,
                        SbSlotVector currSlotsIn)
         : state(state),
           forwardingReqs(forwardingReqs),
           outputs(outputs),
           windowNode(wn),
-          expCtx(expCtx),
           allowDiskUse(allowDiskUse),
           b(state, wn->nodeId()),
           currSlots(std::move(currSlotsIn)) {
@@ -4561,18 +4559,18 @@ public:
             tassert(7914602,
                     "Expected to have a single sort component",
                     windowNode->sortBy && windowNode->sortBy->size() == 1);
-            const auto& part = windowNode->sortBy->front();
+
+            FieldPath fp("CURRENT." + windowNode->sortBy->front().fieldPath->fullPath());
 
             auto rootSlotOpt = outputs.getResultObjIfExists();
-            auto fieldPathExpr = ExpressionFieldPath::createPathFromString(
-                expCtx, part.fieldPath->fullPath(), expCtx->variablesParseState);
-
-            auto sortByExpr = generateExpression(state, fieldPathExpr.get(), rootSlotOpt, outputs);
+            auto sortByExpr =
+                generateExpressionFieldPath(state, fp, boost::none, rootSlotOpt, outputs);
 
             auto [outStage, _] =
                 b.makeProject(std::move(stage), std::pair(std::move(sortByExpr), *sortBySlot));
             stage = std::move(outStage);
         }
+
         auto sortBySlotIdx = ensureSlotInBuffer(*sortBySlot);
         return {std::move(stage), *sortBySlot, boundTestingSlots[sortBySlotIdx]};
     }
@@ -5180,7 +5178,6 @@ private:
     const PlanStageReqs& forwardingReqs;
     const PlanStageSlots& outputs;
     const WindowNode* windowNode;
-    ExpressionContext* expCtx;
     const bool allowDiskUse;
     SbBuilder b;
 
@@ -5335,13 +5332,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         currSlots.emplace_back(SbSlot{slotId});
     }
 
-    ExpressionContext* expCtx = _cq.getExpCtxRaw();
     const bool allowDiskUse = _cq.getExpCtx()->allowDiskUse;
 
     // Create a WindowStageBuilder and call the build() method on it. This will generate all
     // the SBE expressions and SBE stages needed to implement the window stage.
     WindowStageBuilder builder(
-        _state, forwardingReqs, outputs, windowNode, expCtx, allowDiskUse, std::move(currSlots));
+        _state, forwardingReqs, outputs, windowNode, allowDiskUse, std::move(currSlots));
 
     auto [outStage, windowFields, windowFinalSlots, outputPathMap] =
         builder.build(std::move(stage));
