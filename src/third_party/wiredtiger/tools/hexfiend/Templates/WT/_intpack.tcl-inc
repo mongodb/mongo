@@ -74,7 +74,7 @@ proc vint {} {
     for {set len [expr {$byte & 0x0f}]} {$len > 0} {incr len -1} {
       set x [expr {($x << 8) | [uint8]}]
     }
-    return $x  ;# ??? + 
+    return $x  ;# ??? +
   }
   return [vuint $byte]
 }
@@ -92,6 +92,7 @@ proc unpack_int8 {} { expr {([int8] - 0x80) & 0xff} }    ;#  b
 proc unpack_x {size} { move +$size }    ;#  x
 #  s - null-terminated C string. for "s#" use "S"
 proc unpack_s_utf8 {} { cstr "utf8" }
+proc unpack_s_ascii {} { cstr "ascii" }
 #  S - C string must have size
 proc unpack_S_ascii {size} { ascii $size }
 proc unpack_S_utf8 {size} { str $size utf8 }
