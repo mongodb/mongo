@@ -46,7 +46,7 @@ proc read_record {name} {
     set _start [pos]
     set len [log_record]
     set desc "\[[xd $len]\]"
-    if {$len < 16} { goto [len]; return 0 }
+    if {$len < 16} { sectionname "record:end"; error "end" }
     ssection record {
       xentry -varname rectype_fmt rectype {
         format_enum [set rectype [vuint]] $WT_LOGREC_n
@@ -78,88 +78,90 @@ proc read_record {name} {
           $WT_LOGREC_COMMIT {
             xentry txnid { unpack_I }
             # __txn_op_apply -> __wt_logop_read
-            ssection op {
-              set _opstart [pos]
-              xentry -varname optype_fmt optype { format_enum [set optype [unpack_I]] $WT_LOGOP_n }
-              set optype_fmt [strcut $optype_fmt WT_LOGOP_]
-              set desc $optype_fmt
-              sectionvalue $optype_fmt
-              xentry -var opsize { unpack_I }
-              # __txn_op_apply
-              if {$optype & $WT_LOGOP_IGNORE} {
-                entry "WT_LOGOP_IGNORE" ""
-                set desc "WT_LOGOP_IGNORE | [format_enum [expr {$optype & ~$WT_LOGOP_IGNORE}] $WT_LOGOP_n]"
-                sectionvalue $desc
-                goto [expr {$_opstart + $opsize}]
-              } else {
+            while {[peek uint8]} {
+              ssection -collapsed op {
+                set _opstart [pos]
+                xentry -varname optype_fmt optype { format_enum [set optype [unpack_I]] $WT_LOGOP_n }
+                set optype_fmt [strcut $optype_fmt WT_LOGOP_]
+                set desc $optype_fmt
+                sectionvalue $optype_fmt
+                xentry -var opsize { unpack_I }
                 # __txn_op_apply
-                nswitch $optype {
-                  $WT_LOGOP_COL_MODIFY | $WT_LOGOP_COL_PUT {
-                    # __txn_op_apply -> __wt_logop_col_modify_unpack
-                    xentry fileid { unpack_I }
-                    xentry recno { unpack_r }
-                    #xentry value { unpack_U }
-                    xentry value { unpack_u_ascii [remaining $_opstart $opsize] }
+                if {$optype & $WT_LOGOP_IGNORE} {
+                  entry "WT_LOGOP_IGNORE" ""
+                  set desc "WT_LOGOP_IGNORE | [format_enum [expr {$optype & ~$WT_LOGOP_IGNORE}] $WT_LOGOP_n]"
+                  sectionvalue $desc
+                  goto [expr {$_opstart + $opsize}]
+                } else {
+                  # __txn_op_apply
+                  nswitch $optype {
+                    $WT_LOGOP_COL_MODIFY | $WT_LOGOP_COL_PUT {
+                      # __txn_op_apply -> __wt_logop_col_modify_unpack
+                      xentry fileid { unpack_I }
+                      xentry recno { unpack_r }
+                      #xentry value { unpack_U }
+                      xentry value { unpack_u_ascii [remaining $_opstart $opsize] }
+                    }
+                    $WT_LOGOP_COL_REMOVE {
+                      # __txn_op_apply
+                      xentry fileid { unpack_I }
+                      xentry recno { unpack_r }
+                    }
+                    $WT_LOGOP_COL_TRUNCATE {
+                      # __txn_op_apply
+                      xentry fileid { unpack_I }
+                      xentry start_recno { unpack_r }
+                      xentry stop_recno { unpack_r }
+                    }
+                    $WT_LOGOP_ROW_PUT | $WT_LOGOP_ROW_MODIFY {
+                      # __txn_op_apply -> __wt_logop_row_put_unpack
+                      xentry fileid { unpack_I }
+                      #xentry key { unpack_U_ascii }
+                      set key [struct_U_ascii key]
+                      #xentry value { unpack_U_ascii }
+                      #xentry value { unpack_u_ascii [expr {$len - ([pos] - $_start)}] }
+                      # last 'u' goes as 'U' with the remaining size
+                      xentry value { unpack_u_ascii [remaining $_opstart $opsize] }
+                      sectionvalue "$optype_fmt $key"
+                      set desc "$desc $key"
+                    }
+                    $WT_LOGOP_ROW_REMOVE {
+                      # __txn_op_apply -> __wt_logop_row_put_unpack
+                      xentry fileid { unpack_I }
+                      #xentry key { unpack_U_ascii }
+                      #set key [struct_U_ascii key]
+                      # last 'u' goes as 'U' with the remaining size
+                      xentry key { unpack_u_ascii [remaining $_opstart $opsize] }
+                      sectionvalue "$optype_fmt $key"
+                      set desc "$desc $key"
+                    }
+                    $WT_LOGOP_ROW_TRUNCATE {
+                      # __txn_op_apply -> __wt_logop_row_truncate_unpack
+                      xentry fileid { unpack_I }
+                      set start_key [struct_U_ascii key]
+                      set stop_key [struct_U_ascii key]
+                      set mode_fmt [valev mode { format_enum [unpack_I] $WT_TXN_TRUNC_MODE }]
+                      sectionvalue "$optype_fmt [strcut $mode_fmt WT_TXN_TRUNC_] $start_key $stop_key"
+                      set desc "$desc $start_key $stop_key"
+                    }
+                    $WT_LOGOP_TXN_TIMESTAMP {
+                      # __txn_op_apply -> __wt_logop_txn_timestamp_unpack
+                      xentry -var t_sec { unpack_Q }
+                      xentry -var t_nsec { unpack_Q }
+                      xentry -var commit { unpack_Q }
+                      xentry -var durable { unpack_Q }
+                      xentry -var first_commit { unpack_Q }
+                      xentry -var prepare { unpack_Q }
+                      xentry -var read { unpack_Q }
+                      sectionvalue "$optype_fmt s:$t_sec ns:$t_nsec c:$commit d:$durable f:$first_commit p:$prepare r:$read"
+                    }
+                    default {}
                   }
-                  $WT_LOGOP_COL_REMOVE {
-                    # __txn_op_apply
-                    xentry fileid { unpack_I }
-                    xentry recno { unpack_r }
-                  }
-                  $WT_LOGOP_COL_TRUNCATE {
-                    # __txn_op_apply
-                    xentry fileid { unpack_I }
-                    xentry start_recno { unpack_r }
-                    xentry stop_recno { unpack_r }
-                  }
-                  $WT_LOGOP_ROW_PUT | $WT_LOGOP_ROW_MODIFY {
-                    # __txn_op_apply -> __wt_logop_row_put_unpack
-                    xentry fileid { unpack_I }
-                    #xentry key { unpack_U_ascii }
-                    set key [struct_U_ascii key]
-                    #xentry value { unpack_U_ascii }
-                    #xentry value { unpack_u_ascii [expr {$len - ([pos] - $_start)}] }
-                    # last 'u' goes as 'U' with the remaining size
-                    xentry value { unpack_u_ascii [remaining $_opstart $opsize] }
-                    sectionvalue "$optype_fmt $key"
-                    set desc "$desc $key"
-                  }
-                  $WT_LOGOP_ROW_REMOVE {
-                    # __txn_op_apply -> __wt_logop_row_put_unpack
-                    xentry fileid { unpack_I }
-                    #xentry key { unpack_U_ascii }
-                    #set key [struct_U_ascii key]
-                    # last 'u' goes as 'U' with the remaining size
-                    xentry key { unpack_u_ascii [remaining $_opstart $opsize] }
-                    sectionvalue "$optype_fmt $key"
-                    set desc "$desc $key"
-                  }
-                  $WT_LOGOP_ROW_TRUNCATE {
-                    # __txn_op_apply -> __wt_logop_row_truncate_unpack
-                    xentry fileid { unpack_I }
-                    set start_key [struct_U_ascii key]
-                    set stop_key [struct_U_ascii key]
-                    set mode_fmt [valev mode { format_enum [unpack_I] $WT_TXN_TRUNC_MODE }]
-                    sectionvalue "$optype_fmt [strcut $mode_fmt WT_TXN_TRUNC_] $start_key $stop_key"
-                    set desc "$desc $start_key $stop_key"
-                  }
-                  $WT_LOGOP_TXN_TIMESTAMP {
-                    # __txn_op_apply -> __wt_logop_txn_timestamp_unpack
-                    xentry -var t_sec { unpack_Q }
-                    xentry -var t_nsec { unpack_Q }
-                    xentry -var commit { unpack_Q }
-                    xentry -var durable { unpack_Q }
-                    xentry -var first_commit { unpack_Q }
-                    xentry -var prepare { unpack_Q }
-                    xentry -var read { unpack_Q }
-                    sectionvalue "$optype_fmt s:$t_sec ns:$t_nsec c:$commit d:$durable f:$first_commit p:$prepare r:$read"
-                  }
-                  default {}
+                  #pad $_opstart $opsize
+                  gotoend $_opstart $opsize
                 }
-                #pad $_opstart $opsize
                 gotoend $_opstart $opsize
               }
-              gotoend $_opstart $opsize
             }
           }
           $WT_LOGREC_FILE_SYNC {
