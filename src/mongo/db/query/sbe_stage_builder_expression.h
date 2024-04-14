@@ -49,4 +49,16 @@ SbExpr generateExpression(StageBuilderState& state,
                           const Expression* expr,
                           boost::optional<SbSlot> rootSlot,
                           const PlanStageSlots& slots);
+
+SbExpr generateExpressionFieldPath(StageBuilderState& state,
+                                   const FieldPath& fieldPath,
+                                   boost::optional<Variables::Id> variableId,
+                                   boost::optional<SbSlot> rootSlot,
+                                   const PlanStageSlots& slots,
+                                   std::map<Variables::Id, sbe::FrameId>* environment = nullptr);
+
+SbExpr generateExpressionCompare(StageBuilderState& state,
+                                 ExpressionCompare::CmpOp op,
+                                 SbExpr lhs,
+                                 SbExpr rhs);
 }  // namespace mongo::stage_builder
