@@ -227,27 +227,20 @@ class test_truncate_timestamp(wttest.WiredTigerTestCase):
         ('table', dict(type='table:'))
     ])
 
-    # The next two functions assume that truncate maps to a fast truncate, which requires timestamps.
-    # Prevent these from running under a hook that is also adding timestamps to transactions.
-    # Also prevent these from running under a hook that will cause truncate to use a slow path.
-    @wttest.prevent(["timestamp", "slow_truncate"])  # prevent the use of hooks that manage timestamps
+    # Prevent these from running under a hook that will cause truncate to use a slow path.
+    # Test truncation of an object without a timestamp, expect success.
+    @wttest.prevent(["slow_truncate"])
     def test_truncate_no_ts(self):
-        # Truncate with no timestamps is not allowed only in standalone builds.
-        if not wiredtiger.standalone_build():
-            self.skipTest('requires a standalone build')
-
         uri = self.type + self.name
-        msg = '/truncate operations may not yet be included/'
 
         ds = SimpleDataSet(self, uri, 100, config='log=(enabled=false)')
         ds.populate()
 
         self.session.begin_transaction("no_timestamp=true")
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: ds.truncate(uri, None, None, None), msg)
+        ds.truncate(uri, None, None, None)
 
     # Test truncation of a logged object without a timestamp, expect success.
-    @wttest.prevent(["timestamp", "slow_truncate"])  # prevent the use of hooks that manage timestamps
+    @wttest.prevent(["slow_truncate"])
     def test_truncate_log_no_ts(self):
         uri = self.type + self.name
 
