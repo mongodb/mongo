@@ -348,5 +348,8 @@ OperatorCounters operatorCountersWindowAccumulatorExpressions{
     "operatorCounters.windowAccumulators."};
 CounterMetric updateManyCount("query.updateManyCount");
 CounterMetric deleteManyCount("query.deleteManyCount");
+CounterMetric internalRetryableWriteCount("query.internalRetryableWriteCount");
+CounterMetric externalRetryableWriteCount("query.externalRetryableWriteCount");
+CounterMetric retryableInternalTransactionCount("query.retryableInternalTransactionCount");
 
 }  // namespace mongo

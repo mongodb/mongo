@@ -571,5 +571,10 @@ extern OperatorCounters operatorCountersWindowAccumulatorExpressions;
 extern CounterMetric updateManyCount;
 // Track the number of deleteMany calls.
 extern CounterMetric deleteManyCount;
-
+// Track the number of internal retryable writes
+extern CounterMetric internalRetryableWriteCount;
+// Track the number of external retryable writes
+extern CounterMetric externalRetryableWriteCount;
+// Track the number of internal transactions for retryable writes
+extern CounterMetric retryableInternalTransactionCount;
 }  // namespace mongo
