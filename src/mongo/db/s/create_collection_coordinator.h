@@ -98,6 +98,7 @@ CreateCommand makeCreateCommand(OperationContext* opCtx,
 // served by different types of Coordinator)
 class CreateCollectionResponseProvider {
 public:
+    virtual const ShardsvrCreateCollectionRequest& getOriginalRequest() = 0;
     virtual CreateCollectionResponse getResult(OperationContext* opCtx) = 0;
     virtual ~CreateCollectionResponseProvider() {}
 };
@@ -140,6 +141,10 @@ public:
      */
     CreateCollectionResponse getResult(OperationContext* opCtx) override;
 
+    const ShardsvrCreateCollectionRequest& getOriginalRequest() override {
+        return _request;
+    };
+
 protected:
     const NamespaceString& nss() const override;
 
@@ -158,7 +163,7 @@ private:
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
 
-    mongo::ShardsvrCreateCollectionRequest _request;
+    const mongo::ShardsvrCreateCollectionRequest _request;
 
     const BSONObj _critSecReason;
 
@@ -200,6 +205,10 @@ public:
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
     CreateCollectionResponse getResult(OperationContext* opCtx) override;
+
+    const ShardsvrCreateCollectionRequest& getOriginalRequest() override {
+        return _request;
+    };
 
 protected:
     const NamespaceString& nss() const override;
@@ -286,7 +295,7 @@ private:
                                       const CancellationToken& token,
                                       const std::vector<ShardId>& shardIds);
 
-    mongo::ShardsvrCreateCollectionRequest _request;
+    const mongo::ShardsvrCreateCollectionRequest _request;
 
     const BSONObj _critSecReason;
 
