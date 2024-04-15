@@ -3,3 +3,18 @@ filters:
   - "mock_dbclient_conn_test.cpp":
     approvers:
       - 10gen/server-service-architecture
+  - "indexupdatetests.cpp":
+    approvers:
+      - 10gen/server-storage-execution
+  - "insert_test.cpp":
+    approvers:
+      - 10gen/server-storage-execution
+  - "jsobjtests.cpp":
+    approvers:
+      - 10gen/server-storage-execution
+  - "storage_debug_util*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "validate_tests.cpp":
+    approvers:
+      - 10gen/server-storage-execution

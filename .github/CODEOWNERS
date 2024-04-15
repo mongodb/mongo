@@ -94,8 +94,36 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/base/**/* @10gen/server-service-architecture
 /src/mongo/base/**/error_codes.yml
 
+# The following patterns are parsed from ./src/mongo/bson/OWNERS.yml
+/src/mongo/bson/**/* @10gen/server-storage-execution
+
 # The following patterns are parsed from ./src/mongo/client/OWNERS.yml
 /src/mongo/client/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/db/OWNERS.yml
+/src/mongo/db/**/*index_build* @10gen/server-storage-execution
+/src/mongo/db/**/record_id* @10gen/server-storage-execution
+/src/mongo/db/**/repair* @10gen/server-storage-execution
+/src/mongo/db/**/ttl* @10gen/server-storage-execution
+
+# The following patterns are parsed from ./src/mongo/db/catalog/OWNERS.yml
+/src/mongo/db/catalog/**/capped* @10gen/server-storage-execution
+/src/mongo/db/catalog/**/collection_validation* @10gen/server-storage-execution
+/src/mongo/db/catalog/**/collection_write_path* @10gen/server-storage-execution
+/src/mongo/db/catalog/**/commit_quorum* @10gen/server-storage-execution
+/src/mongo/db/catalog/**/import* @10gen/server-storage-execution
+/src/mongo/db/catalog/**/index_build* @10gen/server-storage-execution
+/src/mongo/db/catalog/**/index_consistency* @10gen/server-storage-execution
+/src/mongo/db/catalog/**/index_repair* @10gen/server-storage-execution
+/src/mongo/db/catalog/**/multi_index_block* @10gen/server-storage-execution
+/src/mongo/db/catalog/**/throttle_cursor* @10gen/server-storage-execution
+/src/mongo/db/catalog/**/validate* @10gen/server-storage-execution
+
+# The following patterns are parsed from ./src/mongo/db/commands/OWNERS.yml
+/src/mongo/db/commands/**/create_indexes* @10gen/server-storage-execution
+/src/mongo/db/commands/**/fsync* @10gen/server-storage-execution
+/src/mongo/db/commands/**/validate.cpp @10gen/server-storage-execution
+/src/mongo/db/commands/**/vote*index_build* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./src/mongo/db/concurrency/OWNERS.yml
 /src/mongo/db/concurrency/**/exception_util* @10gen/server-service-architecture
@@ -103,11 +131,32 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/ftdc/OWNERS.yml
 /src/mongo/db/ftdc/**/* @10gen/server-service-architecture
 
+# The following patterns are parsed from ./src/mongo/db/index/OWNERS.yml
+/src/mongo/db/index/**/index_access_method* @10gen/server-storage-execution
+/src/mongo/db/index/**/index_build_interceptor* @10gen/server-storage-execution
+
 # The following patterns are parsed from ./src/mongo/db/process_health/OWNERS.yml
 /src/mongo/db/process_health/**/* @10gen/server-service-architecture
 
+# The following patterns are parsed from ./src/mongo/db/sorter/OWNERS.yml
+/src/mongo/db/sorter/**/* @10gen/server-storage-execution
+
+# The following patterns are parsed from ./src/mongo/db/stats/OWNERS.yml
+/src/mongo/db/stats/**/storage_stats* @10gen/server-storage-execution
+
+# The following patterns are parsed from ./src/mongo/db/storage/OWNERS.yml
+/src/mongo/db/storage/**/* @10gen/server-storage-execution
+
+# The following patterns are parsed from ./src/mongo/db/timeseries/OWNERS.yml
+/src/mongo/db/timeseries/**/* @10gen/server-storage-execution
+
 # The following patterns are parsed from ./src/mongo/dbtests/OWNERS.yml
 /src/mongo/dbtests/**/mock_dbclient_conn_test.cpp @10gen/server-service-architecture
+/src/mongo/dbtests/**/indexupdatetests.cpp @10gen/server-storage-execution
+/src/mongo/dbtests/**/insert_test.cpp @10gen/server-storage-execution
+/src/mongo/dbtests/**/jsobjtests.cpp @10gen/server-storage-execution
+/src/mongo/dbtests/**/storage_debug_util* @10gen/server-storage-execution
+/src/mongo/dbtests/**/validate_tests.cpp @10gen/server-storage-execution
 
 # The following patterns are parsed from ./src/mongo/dbtests/mock/OWNERS.yml
 /src/mongo/dbtests/mock/**/mock_conn_registry.* @10gen/server-service-architecture

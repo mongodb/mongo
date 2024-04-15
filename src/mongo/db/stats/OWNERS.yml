@@ -1,0 +1,5 @@
+version: 1.0.0
+filters:
+  - "storage_stats*":
+    approvers:
+      - 10gen/server-storage-execution

@@ -1,0 +1,35 @@
+version: 1.0.0
+filters:
+  - "capped*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "collection_validation*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "collection_write_path*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "commit_quorum*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "import*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "index_build*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "index_consistency*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "index_repair*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "multi_index_block*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "throttle_cursor*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "validate*":
+    approvers:
+      - 10gen/server-storage-execution

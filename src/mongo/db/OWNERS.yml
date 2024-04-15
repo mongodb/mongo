@@ -1,0 +1,14 @@
+version: 1.0.0
+filters:
+  - "*index_build*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "record_id*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "repair*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "ttl*":
+    approvers:
+      - 10gen/server-storage-execution

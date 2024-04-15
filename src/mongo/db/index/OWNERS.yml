@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "index_access_method*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "index_build_interceptor*":
+    approvers:
+      - 10gen/server-storage-execution

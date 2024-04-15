@@ -1,0 +1,14 @@
+version: 1.0.0
+filters:
+  - "create_indexes*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "fsync*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "validate.cpp":
+    approvers:
+      - 10gen/server-storage-execution
+  - "vote*index_build*":
+    approvers:
+      - 10gen/server-storage-execution
