@@ -8,7 +8,6 @@
 		"clangd.arguments": [
 			"--query-driver=/opt/mongodbtoolchain/v4/bin/*",
 			"--header-insertion=never",
-			"-j=4"
 		],
 		"clangd.checkUpdates": true,
 		"clang-format.executable": "/opt/mongodbtoolchain/v4/bin/clang-format",
