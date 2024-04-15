@@ -61,7 +61,7 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
             EC.presence_of_element_located((By.XPATH, "//input[@name='passwd'][@placeholder='Password']"))
         )
         verify_button = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "//input[@type='submit'][@value='Sign in']"))
+            EC.presence_of_element_located((By.ID, "idSIButton9"))
         )
 
         # Enter password.
