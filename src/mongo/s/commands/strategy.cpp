@@ -511,6 +511,7 @@ void ParseAndRunCommand::_updateStatsAndApplyErrorLabels(const Status& status) {
                                       boost::none,
                                       false /* isInternalClient */,
                                       true /* isMongos */,
+                                      false /* isComingFromRouter */,
                                       repl::OpTime{},
                                       repl::OpTime{});
     _errorBuilder->appendElements(errorLabels);
