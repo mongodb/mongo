@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/query_stats/agg_key.h"
 
+#include "mongo/db/query/explain_options.h"
 #include <absl/container/node_hash_set.h>
 #include <boost/cstdint.hpp>
 #include <functional>
@@ -59,15 +60,19 @@ AggCmdComponents::AggCmdComponents(const AggregateCommandRequest& request_,
                                    stdx::unordered_set<NamespaceString> involvedNamespaces_)
     : involvedNamespaces(std::move(involvedNamespaces_)),
       _bypassDocumentValidation(request_.getBypassDocumentValidation().value_or(false)),
+      _verbosity(request_.getExplain()),
       _hasField{.batchSize = request_.getCursor().getBatchSize().has_value(),
-                .bypassDocumentValidation = request_.getBypassDocumentValidation().has_value()} {}
+                .bypassDocumentValidation = request_.getBypassDocumentValidation().has_value(),
+                .explain = request_.getExplain().has_value()} {}
 
 
 void AggCmdComponents::HashValue(absl::HashState state) const {
     state = absl::HashState::combine(std::move(state),
                                      _bypassDocumentValidation,
                                      _hasField.batchSize,
-                                     _hasField.bypassDocumentValidation);
+                                     _hasField.bypassDocumentValidation,
+                                     _verbosity,
+                                     _hasField.explain);
     // We don't need to add 'involvedNamespaces' here since they are already tracked/duplicated in
     // the Pipeline component of the query shape. We just expose them here for ease of
     // analysis/querying.
@@ -104,6 +109,13 @@ void AggCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions&
         BSONObjBuilder cursorInfo = bob.subobjStart(AggregateCommandRequest::kCursorFieldName);
         opts.appendLiteral(&cursorInfo, SimpleCursorOptions::kBatchSizeFieldName, 0ll);
         cursorInfo.doneFast();
+    }
+
+    if (_hasField.explain) {
+        // The verbosity can be explicitly set by using the .explain() command, but when using the
+        // flag {explain: true} it is set to 'queryPlanner'.
+        bob.append(AggregateCommandRequest::kExplainFieldName,
+                   ExplainOptions::verbosityString(_verbosity.value()));
     }
 }
 
