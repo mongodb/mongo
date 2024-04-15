@@ -55,7 +55,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/transport/asio/asio_reactor.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_synchronous.h"
@@ -92,6 +91,69 @@ constexpr auto kWorkerThreadRunTime = Milliseconds{1000};
 constexpr auto kShutdownTime = Milliseconds{kWorkerThreadRunTime.count() + 50};
 
 using unittest::JoinThread;
+
+/* This implements the portions of the transport::Reactor based on ASIO, but leaves out
+ * the methods not needed by ServiceExecutors.
+ *
+ * TODO Maybe use AsioTransportLayer's Reactor?
+ */
+class AsioReactor : public transport::Reactor {
+public:
+    AsioReactor() : _ioContext() {}
+
+    void run() noexcept final {
+        MONGO_UNREACHABLE;
+    }
+
+    void runFor(Milliseconds time) noexcept final {
+        asio::io_context::work work(_ioContext);
+
+        try {
+            _ioContext.run_for(time.toSystemDuration());
+        } catch (...) {
+            LOGV2_FATAL(50476, "Uncaught exception in reactor", "error"_attr = exceptionToStatus());
+        }
+    }
+
+    void stop() final {
+        _ioContext.stop();
+    }
+
+    void drain() final {
+        _ioContext.restart();
+        while (_ioContext.poll()) {
+            LOGV2_DEBUG(22984, 1, "Draining remaining work in reactor.");
+        }
+        _ioContext.stop();
+    }
+
+    std::unique_ptr<ReactorTimer> makeTimer() final {
+        MONGO_UNREACHABLE;
+    }
+
+    Date_t now() final {
+        MONGO_UNREACHABLE;
+    }
+
+    void schedule(Task task) final {
+        asio::post(_ioContext, [task = std::move(task)] { task(Status::OK()); });
+    }
+
+    void dispatch(Task task) final {
+        asio::dispatch(_ioContext, [task = std::move(task)] { task(Status::OK()); });
+    }
+
+    bool onReactorThread() const final {
+        return false;
+    }
+
+    operator asio::io_context&() {
+        return _ioContext;
+    }
+
+private:
+    asio::io_context _ioContext;
+};
 
 class ServiceExecutorInlineTest : public unittest::Test {
 public:
