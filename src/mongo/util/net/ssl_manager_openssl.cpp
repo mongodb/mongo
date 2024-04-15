@@ -3068,12 +3068,22 @@ void SSLManagerOpenSSL::_flushNetworkBIO(SSLConnectionOpenSSL* conn) {
         }
         int fromBIO = BIO_read(conn->networkBIO, buffer, wantWrite);
 
+        constexpr std::size_t kMaxRetries = 5;
+        std::size_t retries = 0;
         int writePos = 0;
         do {
             int numWrite = fromBIO - writePos;
             numWrite = send(conn->socket->rawFD(), buffer + writePos, numWrite, portSendFlags);
             if (numWrite < 0) {
+                // handleSendError() typically throws but may return on E_INTR.
+                // Retry up to {kMaxRetries} times before bailing out.
                 conn->socket->handleSendError(numWrite, "");
+                if (++retries > kMaxRetries) {
+                    throwSocketError(SocketErrorKind::SEND_ERROR,
+                                     conn->socket->remoteString(),
+                                     "Failed during network send");
+                }
+                continue;
             }
             writePos += numWrite;
         } while (writePos < fromBIO);
