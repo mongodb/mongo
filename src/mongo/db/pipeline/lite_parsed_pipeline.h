@@ -135,6 +135,13 @@ public:
     }
 
     /**
+     * Returns true if the pipeline ends with a write stage.
+     */
+    bool endsWithWriteStage() const {
+        return !_stageSpecs.empty() && _stageSpecs.back()->isWriteStage();
+    }
+
+    /**
      * Returns true if the pipeline has a $changeStream stage.
      */
     bool hasChangeStream() const {

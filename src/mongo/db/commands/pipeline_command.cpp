@@ -232,11 +232,9 @@ public:
         }
 
         bool isReadOperation() const override {
-            if (auto&& pipeline = _aggregationRequest.getPipeline(); !pipeline.empty()) {
-                auto&& lastStage = pipeline.back();
-                return !lastStage.hasField("$out"_sd) && !lastStage.hasField("$merge"_sd);
-            }
-            return true;
+            // Only checks for the last stage since currently write stages are only allowed to be at
+            // the end of the pipeline.
+            return !_liteParsedPipeline.endsWithWriteStage();
         }
 
     private:

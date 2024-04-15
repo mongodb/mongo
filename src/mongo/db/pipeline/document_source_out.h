@@ -120,6 +120,10 @@ public:
                   "{} cannot be used with a 'linearizable' read concern level"_format(kStageName)}},
                 Status::OK()};
         }
+
+        bool isWriteStage() const override {
+            return true;
+        }
     };
 
     ~DocumentSourceOut() override;

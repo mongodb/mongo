@@ -105,6 +105,12 @@ public:
               _liteParsedPipeline(LiteParsedPipeline(_aggregationRequest)),
               _privileges(std::move(privileges)) {}
 
+        bool isReadOperation() const override {
+            // Only checks for the last stage since currently write stages are only allowed to be at
+            // the end of the pipeline.
+            return !_liteParsedPipeline.endsWithWriteStage();
+        }
+
     private:
         bool supportsWriteConcern() const override {
             return true;
