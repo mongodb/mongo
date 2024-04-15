@@ -100,10 +100,11 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
          * that behavior.
          */
         (void)__wt_atomic_addv32(&((WT_BTREE *)pe->dhandle->handle)->prefetch_busy, 1);
-        __wt_spin_unlock(session, &conn->prefetch_lock);
 
         WT_PREFETCH_ASSERT(
-          session, F_ISSET(pe->ref, WT_REF_FLAG_PREFETCH), prefetch_skipped_no_flag_set);
+          session, F_ISSET_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH), prefetch_skipped_no_flag_set);
+        F_CLR_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH);
+        __wt_spin_unlock(session, &conn->prefetch_lock);
 
         /*
          * It's a weird case, but if verify is utilizing prefetch and encounters a corrupted block,
@@ -117,11 +118,6 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
         if (!F_ISSET(conn, WT_CONN_DATA_CORRUPTION) && pe->ref->page_del == NULL)
             WT_WITH_DHANDLE(session, pe->dhandle, ret = __wt_prefetch_page_in(session, pe));
 
-        /*
-         * We don't take the prefetch lock here as the lock protects the queue, not the
-         * prefetch_busy flag.
-         */
-        F_CLR(pe->ref, WT_REF_FLAG_PREFETCH);
         (void)__wt_atomic_subv32(&((WT_BTREE *)pe->dhandle->handle)->prefetch_busy, 1);
         WT_ERR(ret);
 
@@ -158,7 +154,7 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
         WT_ERR(EBUSY);
     }
 
-    F_SET(ref, WT_REF_FLAG_PREFETCH);
+    F_SET_ATOMIC_8(ref, WT_REF_FLAG_PREFETCH);
     TAILQ_INSERT_TAIL(&conn->pfqh, pe, q);
     ++conn->prefetch_queue_count;
     __wt_spin_unlock(session, &conn->prefetch_lock);
@@ -204,7 +200,7 @@ __wt_conn_prefetch_clear_tree(WT_SESSION_IMPL *session, bool all)
     {
         if (all || pe->dhandle == dhandle) {
             TAILQ_REMOVE(&conn->pfqh, pe, q);
-            F_CLR(pe->ref, WT_REF_FLAG_PREFETCH);
+            F_CLR_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH);
             __wt_free(session, pe);
             --conn->prefetch_queue_count;
         }

@@ -77,7 +77,7 @@ __wt_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
          * session transaction snapshot.
          */
         if (WT_REF_GET_STATE(next_ref) == WT_REF_DISK && F_ISSET(next_ref, WT_REF_FLAG_LEAF) &&
-          next_ref->page_del == NULL && !F_ISSET(next_ref, WT_REF_FLAG_PREFETCH)) {
+          next_ref->page_del == NULL && !F_ISSET_ATOMIC_8(next_ref, WT_REF_FLAG_PREFETCH)) {
             ret = __wt_conn_prefetch_queue_push(session, next_ref);
             if (ret == EBUSY) {
                 ret = 0;

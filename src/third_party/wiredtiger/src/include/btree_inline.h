@@ -1985,7 +1985,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * satisfactory workaround has been found for ensuring certain eviction flows don't invalidate
      * refs on the pre-fetch queue.
      */
-    if (F_ISSET(ref, WT_REF_FLAG_PREFETCH))
+    if (F_ISSET_ATOMIC_8(ref, WT_REF_FLAG_PREFETCH))
         return (false);
 
     return (true);
