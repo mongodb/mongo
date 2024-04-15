@@ -690,7 +690,7 @@ env.Library(
     target='oplog_application_interface',
     source=[
         'oplog_applier.cpp',
-        'oplog_batcher.cpp',
+        'oplog_applier_batcher.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/task_executor_interface',
@@ -1858,7 +1858,7 @@ if wiredtiger:
             'multiapplier_test.cpp',
             'oplog_applier_impl_test.cpp',
             'oplog_applier_test.cpp',
-            'oplog_batcher_test_fixture.cpp',
+            'oplog_applier_batcher_test_fixture.cpp',
             'oplog_buffer_batched_queue_test.cpp',
             'oplog_buffer_blocking_queue_test.cpp',
             'oplog_buffer_collection_test.cpp',

@@ -452,8 +452,8 @@ protected:
     /*
      * Populates the migration state document to simulate a recipient service restart where cloning
      * has already finished. This requires the oplog buffer to contain an oplog entry with the
-     * optime to resume from. Otherwise, oplog application will fail when the OplogBatcher seeks
-     * to the resume timestamp.
+     * optime to resume from. Otherwise, oplog application will fail when the OplogApplierBatcher
+     * seeks to the resume timestamp.
      */
     void updateStateDocToCloningFinished(TenantMigrationRecipientDocument& initialStateDoc,
                                          OpTime cloneFinishedRecipientOpTime,

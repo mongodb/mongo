@@ -64,8 +64,8 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/initial_syncer.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
-#include "mongo/db/repl/oplog_batcher.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_writer_impl.h"
 #include "mongo/db/repl/replication_metrics.h"
@@ -516,7 +516,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
             ? new ApplyBatchFinalizer(_replCoord)
             : new ApplyBatchFinalizerForJournal(_replCoord)};
 
-    while (true) {  // Exits on message from OplogBatcher.
+    while (true) {  // Exits on message from OplogApplierBatcher.
         // Use a new operation context each iteration, as otherwise we may appear to use a single
         // collection name to refer to collections with different UUIDs.
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();

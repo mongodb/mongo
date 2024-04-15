@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/repl/oplog_batcher.h"
+#include "mongo/db/repl/oplog_applier_batcher.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -73,13 +73,13 @@ namespace repl {
 MONGO_FAIL_POINT_DEFINE(skipOplogBatcherWaitForData);
 MONGO_FAIL_POINT_DEFINE(oplogBatcherPauseAfterSuccessfulPeek);
 
-OplogBatcher::OplogBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer)
+OplogApplierBatcher::OplogApplierBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer)
     : _oplogApplier(oplogApplier), _oplogBuffer(oplogBuffer), _ops() {}
-OplogBatcher::~OplogBatcher() {
+OplogApplierBatcher::~OplogApplierBatcher() {
     invariant(!_thread);
 }
 
-OplogApplierBatch OplogBatcher::getNextBatch(Seconds maxWaitTime) {
+OplogApplierBatch OplogApplierBatcher::getNextBatch(Seconds maxWaitTime) {
     stdx::unique_lock<Latch> lk(_mutex);
     // _ops can indicate the following cases:
     // 1. A new batch is ready to consume.
@@ -102,18 +102,18 @@ OplogApplierBatch OplogBatcher::getNextBatch(Seconds maxWaitTime) {
     return ops;
 }
 
-void OplogBatcher::startup(StorageInterface* storageInterface) {
+void OplogApplierBatcher::startup(StorageInterface* storageInterface) {
     _thread = std::make_unique<stdx::thread>([this, storageInterface] { _run(storageInterface); });
 }
 
-void OplogBatcher::shutdown() {
+void OplogApplierBatcher::shutdown() {
     if (_thread) {
         _thread->join();
         _thread.reset();
     }
 }
 
-std::size_t OplogBatcher::getOpCount(const OplogEntry& entry) {
+std::size_t OplogApplierBatcher::getOpCount(const OplogEntry& entry) {
     // Get the number of operations enclosed in 'applyOps'. The 'count' field only exists in
     // the last applyOps oplog entry of a large transaction that has multiple oplog entries,
     // and when not present, we fallback to get the count by using BSONObj::nFields() which
@@ -131,9 +131,8 @@ std::size_t OplogBatcher::getOpCount(const OplogEntry& entry) {
     return 1U;
 }
 
-StatusWith<OplogApplierBatch> OplogBatcher::getNextApplierBatch(OperationContext* opCtx,
-                                                                const BatchLimits& batchLimits,
-                                                                Milliseconds waitToFillBatch) {
+StatusWith<OplogApplierBatch> OplogApplierBatcher::getNextApplierBatch(
+    OperationContext* opCtx, const BatchLimits& batchLimits, Milliseconds waitToFillBatch) {
     if (batchLimits.ops == 0) {
         return Status(ErrorCodes::InvalidOptions, "Batch size must be greater than 0.");
     }
@@ -152,7 +151,7 @@ StatusWith<OplogApplierBatch> OplogBatcher::getNextApplierBatch(OperationContext
 
         if (entry.shouldLogAsDDLOperation() && !serverGlobalParams.quiet.load()) {
             LOGV2(7360109,
-                  "Processing DDL command oplog entry in OplogBatcher",
+                  "Processing DDL command oplog entry in OplogApplierBatcher",
                   "oplogEntry"_attr = entry.toBSONForLogging());
         }
 
@@ -264,18 +263,18 @@ StatusWith<OplogApplierBatch> OplogBatcher::getNextApplierBatch(OperationContext
  *    it refers to the end of a large transaction (> 16MB) or a transaction that contains DDL
  *    commands, which have to be processed individually (see SERVER-45565).
  */
-OplogBatcher::BatchAction OplogBatcher::_getBatchActionForEntry(const OplogEntry& entry,
-                                                                const BatchStats& batchStats) {
+OplogApplierBatcher::BatchAction OplogApplierBatcher::_getBatchActionForEntry(
+    const OplogEntry& entry, const BatchStats& batchStats) {
     // Used by non-commit and non-abort entries to cut the batch if it already contains any
     // commit or abort entries.
     auto continueOrStartNewBatch = [&] {
-        return batchStats.commitOrAbortOps > 0 ? OplogBatcher::BatchAction::kStartNewBatch
-                                               : OplogBatcher::BatchAction::kContinueBatch;
+        return batchStats.commitOrAbortOps > 0 ? OplogApplierBatcher::BatchAction::kStartNewBatch
+                                               : OplogApplierBatcher::BatchAction::kContinueBatch;
     };
 
     if (!entry.isCommand()) {
         return entry.getNss().mustBeAppliedInOwnOplogBatch()
-            ? OplogBatcher::BatchAction::kProcessIndividually
+            ? OplogApplierBatcher::BatchAction::kProcessIndividually
             : continueOrStartNewBatch();
     }
 
@@ -284,12 +283,13 @@ OplogBatcher::BatchAction OplogBatcher::_getBatchActionForEntry(const OplogEntry
             // Grouping too many prepare ops in a batch may have performance implications,
             // so we break the batch when it contains enough prepare ops.
             return batchStats.prepareOps >= kMaxPrepareOpsPerBatch
-                ? OplogBatcher::BatchAction::kStartNewBatch
+                ? OplogApplierBatcher::BatchAction::kStartNewBatch
                 : continueOrStartNewBatch();
         }
         if (entry.isPreparedCommitOrAbort()) {
-            return batchStats.commitOrAbortOps == 0 ? OplogBatcher::BatchAction::kStartNewBatch
-                                                    : OplogBatcher::BatchAction::kContinueBatch;
+            return batchStats.commitOrAbortOps == 0
+                ? OplogApplierBatcher::BatchAction::kStartNewBatch
+                : OplogApplierBatcher::BatchAction::kContinueBatch;
         }
     }
 
@@ -297,14 +297,14 @@ OplogBatcher::BatchAction OplogBatcher::_getBatchActionForEntry(const OplogEntry
     // reading from a consistent snapshot. However, it can be batched with any subsequent oplog that
     // is batchable.
     if (entry.getCommandType() == OplogEntry::CommandType::kDbCheck) {
-        return OplogBatcher::BatchAction::kStartNewBatch;
+        return OplogApplierBatcher::BatchAction::kStartNewBatch;
     }
 
     bool processIndividually = (entry.getCommandType() != OplogEntry::CommandType::kApplyOps) ||
         entry.shouldPrepare() || entry.isSingleOplogEntryTransactionWithCommand() ||
         entry.isEndOfLargeTransaction();
 
-    return processIndividually ? OplogBatcher::BatchAction::kProcessIndividually
+    return processIndividually ? OplogApplierBatcher::BatchAction::kProcessIndividually
                                : continueOrStartNewBatch();
 }
 
@@ -312,7 +312,7 @@ OplogBatcher::BatchAction OplogBatcher::_getBatchActionForEntry(const OplogEntry
  * If secondaryDelaySecs is enabled, this function calculates the most recent timestamp of any oplog
  * entries that can be be returned in a batch.
  */
-boost::optional<Date_t> OplogBatcher::_calculateSecondaryDelaySecsLatestTimestamp() {
+boost::optional<Date_t> OplogApplierBatcher::_calculateSecondaryDelaySecsLatestTimestamp() {
     auto service = cc().getServiceContext();
     auto replCoord = ReplicationCoordinator::get(service);
     auto secondaryDelaySecs = replCoord->getSecondaryDelaySecs();
@@ -323,7 +323,7 @@ boost::optional<Date_t> OplogBatcher::_calculateSecondaryDelaySecsLatestTimestam
     return fastClockSource->now() - secondaryDelaySecs;
 }
 
-void OplogBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
+void OplogApplierBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
     // This is just to get the op off the buffer; it's been peeked at and queued for application
     // already.
     // If we failed to get an op off the buffer, this means that shutdown() was called between the
@@ -334,13 +334,13 @@ void OplogBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
     invariant(oplogBuffer->tryPop(opCtx, &opToPopAndDiscard) || _oplogApplier->inShutdown());
 }
 
-void OplogBatcher::_run(StorageInterface* storageInterface) {
+void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
     Client::initThread("ReplBatcher",
                        getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
     {
-        // The OplogBatcher's thread has its own shutdown sequence triggered by the OplogApplier,
-        // so we don't want it to be killed in other ways.
+        // The OplogApplierBatcher's thread has its own shutdown sequence triggered by the
+        // OplogApplier, so we don't want it to be killed in other ways.
         stdx::lock_guard<Client> lk(cc());
         cc().setSystemOperationUnkillableByStepdown(lk);
     }
@@ -414,9 +414,9 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             }
         }
 
-        // The applier may be in its 'Draining' state. Determines if the OplogBatcher has finished
-        // draining the OplogBuffer and should notify the OplogApplier to signal draining is
-        // complete.
+        // The applier may be in its 'Draining' state. Determines if the OplogApplierBatcher has
+        // finished draining the OplogBuffer and should notify the OplogApplier to signal draining
+        // is complete.
         if (ops.empty() && !ops.mustShutdown()) {
             // Draining state guarantees the producer has already been fully stopped and no more
             // operations will be pushed in to the oplog buffer until the applier state changes.
