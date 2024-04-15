@@ -51,22 +51,6 @@ functions:
               export LD_LIBRARY_PATH=$WT_BUILDDIR
             fi
 
-            # Utilize tcmalloc through preloading in the environment.
-            #
-            if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]]; then
-
-              # ASan is not designed to work with tcmalloc:
-              # https://github.com/gperftools/gperftools/issues/810#issuecomment-230168100
-              #
-              if [[ "${CMAKE_BUILD_TYPE|}" =~ ASan ]]; then
-                echo "Do not enable tcmalloc for ASan builds."
-                exit 1
-              fi
-
-              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$WT_TOPDIR/TCMALLOC_LIB/lib"
-              export LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
-            fi
-
             # Create the common sanitizer options and export the specific sanitizer environment
             # variables.
             COMMON_SAN_OPTIONS="abort_on_error=1:disable_coredump=0"
@@ -223,6 +207,10 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger"
+      include_expansions_in_env:
+       - "s3_bucket_tcmalloc"
+       - "s3_access_key"
+       - "s3_secret_key"
       shell: bash
       script: |
         set -o errexit
@@ -307,11 +295,22 @@ functions:
           powershell.exe  -NonInteractive '.\test\evergreen\build_windows.ps1' -configure 1 $DEFINED_EVERGREEN_CONFIG_FLAGS ${windows_configure_flags|}
         else
           echo "Using config flags $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|}"
-          # Fetch the gperftools library if needed. This will also get tcmalloc.
+
           if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]]; then
-            is_cmake_build=true
-            . ../automation-scripts/evergreen/find_gperftools.sh ${s3_access_key} ${s3_secret_key} ${build_variant} $is_cmake_build
+            # Preclude use of tcmalloc with sanitizer builds.
+            if [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS" =~ (CMAKE_BUILD_TYPE=([AMT]|UB)San) ]]; then
+              echo "tcmalloc incompatible with build variant: ${build_variant} and cmake build type ${CMAKE_BUILD_TYPE}"
+              exit 1
+            fi
+            # Run this script in its own process as it depends on managing
+            # shell options.
+            /bin/bash test/evergreen/tcmalloc_install_or_build.sh ${build_variant}
+
+            # Preload tcmalloc in the Evergreen environment: this will affect
+            # ALL binaries.
+            export LD_PRELOAD=$PWD/TCMALLOC_LIB/libtcmalloc.so
           fi
+
           # Compiling with CMake.
           echo "Find CMake"
           . test/evergreen/find_cmake.sh
@@ -1414,6 +1413,7 @@ variables:
   # Configure flags for address sanitizer for stable mongodb toolchain clang (include builtins).
   - &configure_flags_address_sanitizer_mongodb_stable_clang_with_builtins
     <<: *configure_flags_with_builtins
+    ENABLE_TCMALLOC: 0
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
@@ -5347,7 +5347,6 @@ buildvariants:
     ENABLE_TCMALLOC: 0
     additional_env_vars: |
       export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
-      export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     # Exclude this test for ASan builds, as it results in a false positives owing
     # to deliberate killing of processes to invoke corruption.
@@ -5367,7 +5366,6 @@ buildvariants:
     ENABLE_TCMALLOC: 0
     additional_env_vars: |
       export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:history_size=7:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/tsan_warnings.supp"
-      export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: examples-c-tsan
@@ -5402,9 +5400,7 @@ buildvariants:
     # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
     # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
-    ENABLE_TCMALLOC: 1
-    additional_env_vars: |
-      export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
+    ENABLE_TCMALLOC: 0
     # We don't run C++ memory sanitized testing as it creates false positives. MSAN also causes
     # some csuite tests to take an extended amount of time. These are excluded from the
     # make-check-test task and are covered by the csuite-long-running task.
@@ -5435,8 +5431,7 @@ buildvariants:
     # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
     # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
-    ENABLE_TCMALLOC: 1
-    additional_env_vars: export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
+    ENABLE_TCMALLOC: 0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: clang-analyzer
@@ -5466,7 +5461,6 @@ buildvariants:
   - ubuntu2004-small
   expansions:
     ENABLE_TCMALLOC: 1
-    additional_env_vars: export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: ".stress-test-1"
@@ -5491,7 +5485,6 @@ buildvariants:
   - ubuntu2004-arm64-large
   expansions:
     ENABLE_TCMALLOC: 1
-    additional_env_vars: export LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: ".stress-test-1"
@@ -5541,7 +5534,6 @@ buildvariants:
   - rhel80-test
   expansions:
     ENABLE_TCMALLOC: 0
-    additional_env_vars: export LD_PRELOAD="/usr/local/lib/libeatmydata.so:$LD_PRELOAD"
     cmake_generator: "Unix Makefiles"
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc.cmake
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
@@ -5820,7 +5812,6 @@ buildvariants:
   tasks:
     - name: ".stress-test-1"
     - name: ".stress-test-2"
-    - name: ".stress-test-sanitizer"
     - name: format-abort-recovery-stress-test
     - name: format-predictable-test
 
@@ -5862,7 +5853,6 @@ buildvariants:
   - ubuntu2004-small
   expansions:
     ENABLE_TCMALLOC: 1
-    additional_env_vars: export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
   tasks:
@@ -5905,7 +5895,6 @@ buildvariants:
   - ubuntu2004-arm64-large
   expansions:
     ENABLE_TCMALLOC: 1
-    additional_env_vars: export LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
     unit_test_variant_args: "--hook nonstandalone"
