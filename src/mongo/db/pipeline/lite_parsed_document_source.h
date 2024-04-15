@@ -183,6 +183,13 @@ public:
     }
 
     /**
+     * Returns true if this is a write stage.
+     */
+    virtual bool isWriteStage() const {
+        return false;
+    }
+
+    /**
      * Returns true if this desugars to a pipeline starting with a $queue stage.
      */
     virtual bool startsWithQueue() const {

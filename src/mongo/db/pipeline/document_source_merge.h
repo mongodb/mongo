@@ -141,6 +141,10 @@ public:
             return true;
         }
 
+        bool isWriteStage() const override {
+            return true;
+        }
+
     private:
         MergeWhenMatchedModeEnum _whenMatched;
         MergeWhenNotMatchedModeEnum _whenNotMatched;
