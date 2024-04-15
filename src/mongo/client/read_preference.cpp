@@ -72,6 +72,8 @@ TagSet defaultTagSetForMode(ReadPreference mode) {
 
 }  // namespace
 
+const BSONArray TagSet::kMatchAny = BSON_ARRAY(BSONObj());
+
 Status validateReadPreferenceMode(const std::string& prefStr, const boost::optional<TenantId>&) {
     try {
         ReadPreference_parse(IDLParserContext(kModeFieldName), prefStr);
@@ -145,13 +147,13 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromReadPreferenceIdl(
         // '[{}]' is the same as not passing a TagSet at all. Furthermore, passing an empty
         // TagSet with a non-primary ReadPreference is equivalent to passing the wildcard
         // ReadPreference.
-        if (tags == TagSet() || tags == TagSet::primaryOnly()) {
+        if (tags.isMatchAnyNode() || tags.isPrimaryOnly()) {
             tags = defaultTagSetForMode(rp.getMode());
         }
 
         // If we are using a user supplied TagSet, check that it is compatible with
         // the readPreference mode.
-        else if (ReadPreference::PrimaryOnly == rp.getMode() && (tags != TagSet::primaryOnly())) {
+        else if (ReadPreference::PrimaryOnly == rp.getMode() && (!tags.isPrimaryOnly())) {
             return Status(ErrorCodes::BadValue,
                           "Only empty tags are allowed with primary read preference");
         }
