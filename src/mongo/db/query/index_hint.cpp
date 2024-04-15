@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/index_hint.h"
 
+#include <boost/container_hash/extensions.hpp>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -124,11 +126,15 @@ size_t IndexHint::hash() const {
             [&](const IndexKeyPattern& keyPattern) {
                 return SimpleBSONObjComparator::kInstance.hash(keyPattern);
             },
-            [&](const IndexName& indexName) { return absl::Hash<std::string>{}(indexName); },
+            [&](const IndexName& indexName) { return boost::hash<std::string>{}(indexName); },
             [&](const NaturalOrderHint& naturalOrderHint) {
-                return absl::Hash<NaturalOrderHint::Direction>{}(naturalOrderHint.direction);
+                return boost::hash<NaturalOrderHint::Direction>{}(naturalOrderHint.direction);
             }},
         _hint);
+}
+
+size_t hash_value(const IndexHint& hint) {
+    return hint.hash();
 }
 
 };  // namespace mongo

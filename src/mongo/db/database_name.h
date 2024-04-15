@@ -306,6 +306,9 @@ public:
             std::string_view{obj.view().substr(0, obj.sizeWithTenant() + kDataOffset)});
     }
 
+    // Adds support for boost::Hash.
+    friend size_t hash_value(const DatabaseName& dbn);
+
     friend auto logAttrs(const DatabaseName& obj) {
         return "db"_attr = obj;
     }

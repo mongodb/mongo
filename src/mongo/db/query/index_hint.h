@@ -112,7 +112,10 @@ public:
 
 private:
     std::variant<IndexKeyPattern, IndexName, NaturalOrderHint> _hint;
-};  // namespace index_hint
+};
+
+// Helper for boost::hash.
+size_t hash_value(const IndexHint& hint);
 
 
 }  // namespace mongo

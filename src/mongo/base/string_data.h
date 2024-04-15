@@ -365,6 +365,9 @@ private:
     std::string_view _sv;
 };
 
+// Adds support for boost::Hash.
+size_t hash_value(StringData sd);
+
 #if MONGO_STRING_DATA_CXX20
 inline constexpr auto operator<=>(StringData a, StringData b) noexcept {
     return std::string_view{a} <=> std::string_view{b};
