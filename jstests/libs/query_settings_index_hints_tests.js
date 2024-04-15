@@ -40,6 +40,7 @@ export class QuerySettingsIndexHintsTests {
         const explain = assert.commandWorked(db.runCommand(explainCmd));
         const isIdhackQuery =
             everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
+        const isMinMaxQuery = "min" in command || "max" in command;
         const isTriviallyFalse = everyWinningPlan(
             explain, (winningPlan) => isEofPlan(db, winningPlan) || isAlwaysFalsePlan(winningPlan));
         const shouldCheckPlanCache =
@@ -51,6 +52,8 @@ export class QuerySettingsIndexHintsTests {
             getEngine(explain) === "sbe" &&
             // Express or IDHACK optimized queries are not cached.
             !isIdhackQuery &&
+            // Min/max queries are not cached.
+            !isMinMaxQuery &&
             // Similarly, trivially false plans are not cached.
             !isTriviallyFalse &&
             // Subplans are cached differently from normal plans.

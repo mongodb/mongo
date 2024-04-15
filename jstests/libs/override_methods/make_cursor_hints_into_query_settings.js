@@ -39,12 +39,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
         "hint" in innerCmd &&
         // Only intercept command types supported by query settings.
         QuerySettingsUtils.isSupportedCommand(getCommandName(innerCmd)) &&
-        // TODO SERVER-88948: Recover from query settings application failure on queries containing
-        // min/max fields.
-        !isMinMaxQuery(innerCmd) &&
-        // TODO SERVER-89207: Ensure that the fallback mechanism works for '$_requestResumeToken'
-        // queries.
-        !requestsResumeToken(innerCmd);
+        !isMinMaxQuery(innerCmd) && !requestsResumeToken(innerCmd);
     if (!shouldApplyQuerySettings) {
         return originalResponse;
     }

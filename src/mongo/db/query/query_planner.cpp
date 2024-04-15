@@ -1341,7 +1341,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         !query.getFindCommandRequest().getMax().isEmpty()) {
 
         if (!hintedIndexEntry) {
-            return Status(ErrorCodes::Error(51173),
+            return Status(ErrorCodes::NoQueryExecutionPlans,
                           "When using min()/max() a hint of which index to use must be provided");
         }
 

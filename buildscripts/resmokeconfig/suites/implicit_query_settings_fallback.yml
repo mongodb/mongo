@@ -15,19 +15,6 @@ selector:
     - jstests/core/columnstore/**/*.js
     - jstests/core/query/project/projection_semantics.js
 
-    # TODO SERVER-88948: Ensure that the fallback mechanism works for min/max errors.
-    - jstests/core/index/wildcard/wildcard_index_minmax.js
-    - jstests/core/min_max_bounds.js
-    - jstests/core/min_max_hashed_index.js
-    - jstests/core/query/explain/explain_find.js
-    - jstests/core/query/explain/explain_shell_helpers.js
-    - jstests/core/query/idhack.js
-    - jstests/core/query/minmax.js
-    - jstests/core/query/minmax_edge.js
-    - jstests/core/server9547.js
-    - jstests/core/testminmax.js
-    - jstests/core/write/update/update_affects_indexes.js
-
     # TODO SERVER-89344: Fix explain output for '$unionWith' queries.
     - jstests/aggregation/sources/unionWith/unionWith_explain.js
 
