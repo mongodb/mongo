@@ -2070,7 +2070,8 @@ __wt_btcur_skip_page(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool 
           (previous_state == WT_REF_MEM && !__wt_page_is_modified(ref->page))) &&
       __wt_ref_addr_copy(session, ref, &addr) && addr.ta.newest_stop_txn != WT_TXN_MAX &&
       addr.ta.newest_stop_ts != WT_TS_MAX &&
-      __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts))
+      __wt_txn_snap_min_visible(
+        session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts, addr.ta.newest_stop_durable_ts))
         *skipp = true;
 
     WT_REF_UNLOCK(ref, previous_state);
