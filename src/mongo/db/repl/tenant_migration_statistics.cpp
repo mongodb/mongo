@@ -67,10 +67,12 @@ void TenantMigrationStatistics::incTotalMigrationDonationsAborted() {
 }
 
 void TenantMigrationStatistics::appendInfoForServerStatus(BSONObjBuilder* builder) const {
-    builder->append("currentMigrationsDonating", _currentMigrationsDonating.load());
-    builder->append("currentMigrationsReceiving", _currentMigrationsReceiving.load());
-    builder->append("totalMigrationDonationsCommitted", _totalMigrationDonationsCommitted.load());
-    builder->append("totalMigrationDonationsAborted", _totalMigrationDonationsAborted.load());
+    builder->append("currentMigrationsDonating", _currentMigrationsDonating.loadRelaxed());
+    builder->append("currentMigrationsReceiving", _currentMigrationsReceiving.loadRelaxed());
+    builder->append("totalMigrationDonationsCommitted",
+                    _totalMigrationDonationsCommitted.loadRelaxed());
+    builder->append("totalMigrationDonationsAborted",
+                    _totalMigrationDonationsAborted.loadRelaxed());
 }
 
 }  // namespace mongo
