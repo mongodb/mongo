@@ -538,8 +538,8 @@ def block_decode(p, b, opts):
     if uint8(b_page) != 0 or uint8(b_page) != 0 or uint8(b_page) != 0:
         p.rint('garbage in unused bytes')
         return
-    if blockhead.disk_size > 512 * 1024:
-        # This is probably not a valid block
+    if blockhead.disk_size > 17 * 1024 * 1024:
+        # The maximum document size in MongoDB is 16MB. Larger block sizes are suspect.
         p.rint('the block is too big')
         return
     if blockhead.disk_size < 40:
