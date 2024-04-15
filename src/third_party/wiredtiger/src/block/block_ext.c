@@ -752,38 +752,38 @@ __block_ext_overlap(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *ael, 
      * We can think of the overlap possibilities as 11 different cases:
      *
      *		AAAAAAAAAAAAAAAAAA
-     * #1		BBBBBBBBBBBBBBBBBB		ranges are the same
-     * #2	BBBBBBBBBBBBB				overlaps the beginning
-     * #3			BBBBBBBBBBBBBBBB	overlaps the end
-     * #4		BBBBB				B is a prefix of A
-     * #5			BBBBBB			B is middle of A
-     * #6			BBBBBBBBBB		B is a suffix of A
+     * #1	BBBBBBBBBBBBBBBBBB		ranges are the same
+     * #2  BBBBBBBBBBBBB			overlaps the beginning
+     * #3		BBBBBBBBBBBBBBBB	overlaps the end
+     * #4	BBBBB				B is a prefix of A
+     * #5		BBBBBB			B is middle of A
+     * #6		BBBBBBBBBB		B is a suffix of A
      *
      * and:
      *
      *		BBBBBBBBBBBBBBBBBB
-     * #7	AAAAAAAAAAAAA				same as #3
-     * #8			AAAAAAAAAAAAAAAA	same as #2
-     * #9		AAAAA				A is a prefix of B
-     * #10			AAAAAA			A is middle of B
-     * #11			AAAAAAAAAA		A is a suffix of B
+     * #7  AAAAAAAAAAAAA			same as #3
+     * #8		AAAAAAAAAAAAAAAA	same as #2
+     * #9	AAAAA				A is a prefix of B
+     * #10		AAAAAA			A is middle of B
+     * #11		AAAAAAAAAA		A is a suffix of B
      *
      *
      * By swapping the arguments so "A" is always the lower range, we can
      * eliminate cases #2, #8, #10 and #11, and only handle 7 cases:
      *
      *		AAAAAAAAAAAAAAAAAA
-     * #1		BBBBBBBBBBBBBBBBBB		ranges are the same
-     * #3			BBBBBBBBBBBBBBBB	overlaps the end
-     * #4		BBBBB				B is a prefix of A
-     * #5			BBBBBB			B is middle of A
-     * #6			BBBBBBBBBB		B is a suffix of A
+     * #1	BBBBBBBBBBBBBBBBBB		ranges are the same
+     * #3		BBBBBBBBBBBBBBBB	overlaps the end
+     * #4	BBBBB				B is a prefix of A
+     * #5		BBBBBB			B is middle of A
+     * #6		BBBBBBBBBB		B is a suffix of A
      *
      * and:
      *
      *		BBBBBBBBBBBBBBBBBB
-     * #7	AAAAAAAAAAAAA				same as #3
-     * #9		AAAAA				A is a prefix of B
+     * #7  AAAAAAAAAAAAA			same as #3
+     * #9	AAAAA				A is a prefix of B
      */
     a = *ap;
     b = *bp;
