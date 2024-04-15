@@ -913,7 +913,7 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
  * an equivalent descriptor that may be persisted with the recovery document.
  */
 TranslatedRequestParams translateRequestParameters(OperationContext* opCtx,
-                                                   ShardsvrCreateCollectionRequest& request,
+                                                   const ShardsvrCreateCollectionRequest& request,
                                                    const NamespaceString& originalNss) {
     auto performCheckOnCollectionUUID = [opCtx, request](const NamespaceString& resolvedNss) {
         AutoGetCollection coll{
