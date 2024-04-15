@@ -29,22 +29,73 @@
 
 #include "mongo/db/query/query_settings/query_settings_hash.h"
 
-#include "mongo/db/query/query_knobs_gen.h"
+#include <absl/container/inlined_vector.h>
+#include <boost/container_hash/hash.hpp>
 
-namespace mongo::query_settings {
+#include "mongo/db/basic_types.h"
 
-size_t hash(const QuerySettings& querySettings) {
+
+namespace absl {
+
+// Add support for boost::hash of absl InlinedVector.
+template <typename T, size_t N, typename A>
+size_t hash_value(const InlinedVector<T, N, A>& v) {
+    return boost::hash_range(v.begin(), v.end());
+}
+}  // namespace absl
+
+namespace boost {
+// Reproduction of impl for std::optional from boost container_hash/hash.hpp,
+// as there is no impl for boost::optional in the current boost version.
+template <typename T>
+std::size_t hash_value(const optional<T>& v) {
+    if (!v.has_value()) {
+        // Arbitrary value for empty optional.
+        return 0x12345678;
+    } else {
+        hash<T> hf;
+        return hf(*v);
+    }
+}
+}  // namespace boost
+
+namespace mongo {
+size_t hash_value(const OptionalBool& v) {
+    // OptionalBool hash needs to be consistent with equality. OptionalBool currently relies on
+    // implicit conversion to bool for ==. Thus, OptionalBool() == OptionalBool(false).
+    // Thus, it is required that hash(OptionalBool()) == hash(OptionalBool(false));
+    boost::hash<bool> hf;
+    return hf(bool(v));
+}
+
+size_t hash_value(const NamespaceSpec& ns) {
     size_t hash = 0;
-    if (auto version = querySettings.getQueryFramework()) {
-        boost::hash_combine(hash, absl::Hash<QueryFrameworkControlEnum>{}(*version));
-    }
-    if (auto indexHints = querySettings.getIndexHints()) {
-        for (const auto& hintSpec : *indexHints) {
-            for (const auto& hint : hintSpec.getAllowedIndexes()) {
-                boost::hash_combine(hash, hint.hash());
-            }
-        }
-    }
+    boost::hash_combine(hash, ns.getDb());
+    boost::hash_combine(hash, ns.getColl());
     return hash;
 }
+}  // namespace mongo
+
+namespace mongo::query_settings {
+size_t hash_value(const IndexHintSpec& v) {
+    const auto& indexes = v.getAllowedIndexes();
+    size_t hash = boost::hash_range(indexes.begin(), indexes.end());
+    boost::hash_combine(hash, v.getNs());
+    return hash;
+}
+
+size_t hash_value(const QuerySettings& querySettings) {
+    size_t hash = 0;
+    boost::hash_combine(hash, querySettings.getQueryFramework());
+    boost::hash_combine(hash, querySettings.getIndexHints());
+    boost::hash_combine(hash, querySettings.getReject());
+    return hash;
+}
+
+// Alias for existing usage.
+size_t hash(const QuerySettings& querySettings) {
+    return hash_value(querySettings);
+}
+
+
 }  // namespace mongo::query_settings

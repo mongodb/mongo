@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,20 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
+
+#include "database_name.h"
 
 #include <boost/container_hash/hash.hpp>
 
-#include <ostream>
-#include <string_view>
-
 namespace mongo {
-std::ostream& operator<<(std::ostream& stream, StringData value) {
-    return stream << std::string_view{value};
+size_t hash_value(const DatabaseName& dbn) {
+    return boost::hash<std::string_view>{}(
+        std::string_view{dbn.view().substr(0, dbn.sizeWithTenant() + DatabaseName::kDataOffset)});
 }
-
-size_t hash_value(StringData sd) {
-    return boost::hash<std::string_view>{}(std::string_view(sd));
-}
-
 }  // namespace mongo
