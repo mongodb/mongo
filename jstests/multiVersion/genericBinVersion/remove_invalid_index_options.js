@@ -36,6 +36,8 @@ assert.commandWorked(primaryColl.createIndex({x: 1}, {safe: true, sparse: true, 
 assert.commandWorked(primaryColl.createIndex({y: 1}, {sparse: true}));
 assert.commandWorked(primaryColl.createIndex({z: 1}, {xyz: false}));
 
+// Make sure the createIndex oplogs are applied on secondary before turning off the failpoint.
+rst.awaitReplication();
 fpPrimary.off();
 fpSecondary.off();
 
