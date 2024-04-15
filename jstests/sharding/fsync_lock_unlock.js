@@ -5,6 +5,10 @@
  *   uses_parallel_shell,
  * ]
  */
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 const dbName = "test";
 const collName = "collTest";
@@ -112,5 +116,14 @@ let errmsg = "fsyncUnlock called when not locked";
 assert.eq(ret.errmsg.includes(errmsg), true);
 
 performFsyncLockUnlockWithReadWriteOperations();
+
+if (st.configRS.name == st.rs0.name) {
+    // Make sure the lock and unlock commands still work as expected after transitioning to a
+    // dedicated config server.
+    moveDatabaseAndUnshardedColls(st.s.getDB(dbName), st.shard1.shardName);
+
+    ConfigShardUtil.transitionToDedicatedConfigServer(st);
+    performFsyncLockUnlockWithReadWriteOperations();
+}
 
 st.stop();
