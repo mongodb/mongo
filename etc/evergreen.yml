@@ -100,3 +100,25 @@ commit_queue_aliases:
     task: "clang_tidy.*"
     variant_tags: []
     task_tags: []
+
+patch_aliases:
+  - alias: required
+    variant_tags: ["required"]
+    task: ".*"
+  - alias: embedded
+    variant: ".*"
+    task: "embedded_.*"
+  - alias: query
+    variant: "^(.*query-patch-only|linux-x86-dynamic-compile-required)$"
+    task: ".*"
+  - alias: security
+    variant: "^(.*security-patch-only|linux-x86-dynamic-compile|windows-compile-required)$"
+    task: ".*"
+  - alias: bazel
+    description: "Runs bazel build system tests"
+    variant_tags: ["bazel_check"]
+    task_tags: ["bazel_check"]
+  - alias: bazel_variants
+    description: "Runs bazel build system tests"
+    variant_tags: ["bazel_check"]
+    task: ".*"

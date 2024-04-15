@@ -53,3 +53,13 @@ parameters:
   - key: evergreen_config_file_path
     value: "etc/evergreen_nightly.yml"
     description: "path to this file"
+
+patch_aliases:
+  - alias: bazel
+    description: "Runs bazel build system tests"
+    variant_tags: ["bazel_check"]
+    task_tags: ["bazel_check"]
+  - alias: bazel_variants
+    description: "Runs bazel build system tests"
+    variant_tags: ["bazel_check"]
+    task: ".*"
