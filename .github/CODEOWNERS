@@ -53,8 +53,118 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
 /buildscripts/resmokelib/**/* @10gen/devprod-correctness
 
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/OWNERS.yml
+/jstests/concurrency/fsm_workloads/**/server_status.js @10gen/server-service-architecture
+/jstests/concurrency/fsm_workloads/**/server_status_with_time_out_cursors.js @10gen/server-service-architecture
+
+# The following patterns are parsed from ./jstests/core/OWNERS.yml
+/jstests/core/**/connection_string_validation.js @10gen/server-service-architecture
+/jstests/core/**/failcommand_failpoint.js @10gen/server-service-architecture
+/jstests/core/**/hostinfo.js @10gen/server-service-architecture
+/jstests/core/**/latch_analyzer.js @10gen/server-service-architecture
+/jstests/core/**/diagdata.js @10gen/server-service-architecture
+/jstests/core/**/hostinfo.js @10gen/server-service-architecture
+
+# The following patterns are parsed from ./jstests/fail_point/OWNERS.yml
+/jstests/fail_point/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./jstests/httpinterface/OWNERS.yml
+/jstests/httpinterface/**/network_options.js @10gen/server-service-architecture
+
+# The following patterns are parsed from ./jstests/noPassthroughWithMongod/OWNERS.yml
+/jstests/noPassthroughWithMongod/**/connections_opened.js @10gen/server-service-architecture
+/jstests/noPassthroughWithMongod/**/host_connection_string_validation.js @10gen/server-service-architecture
+/jstests/noPassthroughWithMongod/**/ingress_handshake_and_auth_metrics.js @10gen/server-service-architecture
+/jstests/noPassthroughWithMongod/**/ipv6_connection_string_validation.js @10gen/server-service-architecture
+/jstests/noPassthroughWithMongod/**/replset_host_connection_validation.js @10gen/server-service-architecture
+/jstests/noPassthroughWithMongod/**/tcmalloc.js @10gen/server-service-architecture
+/jstests/noPassthroughWithMongod/**/ftdc_params.js @10gen/server-service-architecture
+/jstests/noPassthroughWithMongod/**/log_component_helpers.js @10gen/server-service-architecture
+
+# The following patterns are parsed from ./jstests/sharding/load_balancer_support/OWNERS.yml
+/jstests/sharding/load_balancer_support/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./jstests/watchdog/OWNERS.yml
+/jstests/watchdog/**/* @10gen/server-service-architecture
+
 # The following patterns are parsed from ./site_scons/OWNERS.yml
 /site_scons/**/* @10gen/devprod-build
+
+# The following patterns are parsed from ./src/mongo/base/OWNERS.yml
+/src/mongo/base/**/* @10gen/server-service-architecture
+/src/mongo/base/**/error_codes.yml
+
+# The following patterns are parsed from ./src/mongo/client/OWNERS.yml
+/src/mongo/client/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/db/concurrency/OWNERS.yml
+/src/mongo/db/concurrency/**/exception_util* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/db/ftdc/OWNERS.yml
+/src/mongo/db/ftdc/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/db/process_health/OWNERS.yml
+/src/mongo/db/process_health/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/dbtests/OWNERS.yml
+/src/mongo/dbtests/**/mock_dbclient_conn_test.cpp @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/dbtests/mock/OWNERS.yml
+/src/mongo/dbtests/mock/**/mock_conn_registry.* @10gen/server-service-architecture
+/src/mongo/dbtests/mock/**/mock_dbclient_connection.* @10gen/server-service-architecture
+/src/mongo/dbtests/mock/**/mock_remote_db_server.* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/executor/OWNERS.yml
+/src/mongo/executor/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/idl/OWNERS.yml
+/src/mongo/idl/**/idl_parser* @10gen/server-service-architecture
+/src/mongo/idl/**/idl_test* @10gen/server-service-architecture
+/src/mongo/idl/**/mutable_observer_registry.* @10gen/server-service-architecture
+/src/mongo/idl/**/unittest* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/logv2/OWNERS.yml
+/src/mongo/logv2/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/platform/OWNERS.yml
+/src/mongo/platform/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/rpc/OWNERS.yml
+/src/mongo/rpc/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/scripting/OWNERS.yml
+/src/mongo/scripting/**/dbdirectclient_factory.* @10gen/server-service-architecture
+/src/mongo/scripting/**/deadline_monitor* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/stdx/OWNERS.yml
+/src/mongo/stdx/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/tools/mongobridge_tool/OWNERS.yml
+/src/mongo/tools/mongobridge_tool/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/transport/OWNERS.yml
+/src/mongo/transport/**/* @10gen/server-service-architecture
+/src/mongo/transport/**/ssl_connection_context.h
+
+# The following patterns are parsed from ./src/mongo/unittest/OWNERS.yml
+/src/mongo/unittest/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/util/concurrency/OWNERS.yml
+/src/mongo/util/concurrency/**/idle_thread_block.* @10gen/server-service-architecture
+/src/mongo/util/concurrency/**/mutex.* @10gen/server-service-architecture
+/src/mongo/util/concurrency/**/notification.* @10gen/server-service-architecture
+/src/mongo/util/concurrency/**/spin_lock* @10gen/server-service-architecture
+/src/mongo/util/concurrency/**/thread_name.* @10gen/server-service-architecture
+/src/mongo/util/concurrency/**/thread_pool* @10gen/server-service-architecture
+/src/mongo/util/concurrency/**/ticketholder.* @10gen/server-service-architecture
+/src/mongo/util/concurrency/**/*ticketholder.* @10gen/server-service-architecture
+/src/mongo/util/concurrency/**/admission_context.* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/util/net/OWNERS.yml
+/src/mongo/util/net/**/* @10gen/server-service-architecture
+
+# The following patterns are parsed from ./src/mongo/watchdog/OWNERS.yml
+/src/mongo/watchdog/**/* @10gen/server-service-architecture
 
 # The following patterns are parsed from ./src/third_party/OWNERS.yml
 /src/third_party/**/SConscript @10gen/devprod-build

@@ -1,0 +1,5 @@
+version: 1.0.0
+filters:
+  - "exception_util*": # note we also match the idl file with this rule
+    approvers:
+      - 10gen/server-service-architecture

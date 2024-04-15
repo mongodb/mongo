@@ -1,0 +1,26 @@
+version: 1.0.0
+filters:
+  - "connections_opened.js":
+    approvers:
+      - 10gen/server-service-architecture
+  - "host_connection_string_validation.js":
+    approvers:
+      - 10gen/server-service-architecture
+  - "ingress_handshake_and_auth_metrics.js":
+    approvers:
+      - 10gen/server-service-architecture
+  - "ipv6_connection_string_validation.js":
+    approvers:
+      - 10gen/server-service-architecture
+  - "replset_host_connection_validation.js":
+    approvers:
+      - 10gen/server-service-architecture
+  - "tcmalloc.js":
+    approvers:
+      - 10gen/server-service-architecture
+  - "ftdc_params.js":
+    approvers:
+      - 10gen/server-service-architecture
+  - "log_component_helpers.js":
+    approvers:
+      - 10gen/server-service-architecture
