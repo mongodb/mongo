@@ -136,6 +136,7 @@ buildvariants:
         --use-diagnostic-latches=on
       exec_timeout_secs: 32400 # 9 hour timeout
       timeout_secs: 18000 # 5 hour idle timeout
+      large_distro_name: &enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name rhel80-xlarge
     depends_on: []
     tasks:
       - name: compile_test_parallel_core_stream_TG
@@ -150,107 +151,37 @@ buildvariants:
       - name: compile_integration_and_test_parallel_stream_TG
         distros:
           - rhel80-large
-      - name: test_api_version_compatibility
-      - name: .aggfuzzer !.feature_flag_guarded !.no_debug_mode
-      - name: .aggregation !.feature_flag_guarded !.no_debug_mode
-      - name: audit
-      - name: .auth !.no_debug_mode
-      - name: .causally_consistent !.sharding
-      - name: .change_streams !.no_debug_mode
-      - name: .change_stream_fuzzer
-      - name: .misc_js !.no_debug_mode
-      - name: .concurrency !.large !.no_txns !.no_debug_mode !.feature_flag_guarded
-      - name: .concurrency .large !.no_txns !.no_debug_mode !.feature_flag_guarded
-        distros:
-          - rhel80-medium
-      - name: .config_fuzzer !.large
-      - name: .config_fuzzer .large
-        distros:
-          - rhel80-medium
-      - name: .config_fuzzer_stress
-        distros:
-          - rhel80-large
-      - name: disk_wiredtiger
-      - name: .encrypt !.no_debug_mode
-      - name: idl_tests
-      - name: initial_sync_fuzzer_gen
-      - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
-      - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
-      - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
-      - name: jsCore
-        distros:
-          - rhel80-xlarge
-      - name: .jscore .common !jsCore
-      - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
-      - name: jsCore_txns_large_txns_format
-      - name: json_schema
-      # TODO(SERVER-69996) reenable after ticket is complete
-      # - name: .jstestfuzz !.feature_flag_guarded !.flow_control
-      - name: libunwind_tests
-      - name: .multiversion_sanity_check
-      - name: .multi_shard !.no_debug_mode
-      - name: multiversion_gen
-      - name: .ocsp
-      - name: .query_fuzzer !.feature_flag_guarded
-      - name: .read_write_concern .large
-        distros:
-          - rhel80-medium
-      - name: .read_write_concern !.large
-      # TODO(SERVER-69951) reenable after ticket is complete
-      # - name: .replica_sets !.encrypt !.auth
-      #   distros:
-      #   - rhel80-xlarge
-      - name: replica_sets_api_version_jscore_passthrough_gen
-      - name: replica_sets_reconfig_jscore_passthrough_gen
-      - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
-        distros:
-          - rhel80-xlarge
-      - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-        distros:
-          - rhel80-xlarge
-      - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
-        distros:
-          - rhel80-xlarge
-      - name: change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough_gen
-        distros:
-          - rhel80-xlarge
-      - name: change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough_gen
-        distros:
-          - rhel80-xlarge
-      - name: retryable_writes_jscore_passthrough_gen
-      - name: .read_only
-      - name: .rollbackfuzzer
-      - name: sasl
-      - name: search
-      - name: search_auth
-      - name: search_pinned_connections_auth
-      - name: search_ssl
-      - name: session_jscore_passthrough
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.no_debug_mode !.feature_flag_guarded
-      - name: sharding_api_version_jscore_passthrough_gen
-      - name: .stitch
-      - name: .crypt
-        distros:
-          - rhel80-xlarge
       - name: crypt_build_debug_and_test
         distros:
-          - rhel80-xlarge
-      - name: .updatefuzzer !.no_debug_mode
-      - name: secondary_reads_passthrough_gen
-      - name: server_discovery_and_monitoring_json_test
-      # TODO(SERVER-70015) reenable after ticket is complete
-      # - name: .serverless
-      #   distros:
-      #   - rhel80-xlarge
-      - name: server_selection_json_test
+          - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
+      - name: .development_critical !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
         distros:
-          - rhel80-xlarge
-      - name: streams
-      - name: streams_kafka
-      - name: vector_search
-      - name: vector_search_auth
-      - name: vector_search_ssl
-      - name: generate_buildid_to_debug_symbols_mapping
+          - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
+      - name: .development_critical .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+        distros:
+          - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
+      - name: .release_critical !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .release_critical .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+        distros:
+          - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
+      - name: .release_critical .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+        distros:
+          - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
+      - name: .default !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .default .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+        distros:
+          - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
+      - name: .default .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+        distros:
+          - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
+      - name: .non_deterministic !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .non_deterministic .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+        distros:
+          - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
+      - name: .non_deterministic .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+        distros:
+          - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
 
   ###########################################
   #         Windows buildvariants           #

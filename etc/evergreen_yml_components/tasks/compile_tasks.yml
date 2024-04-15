@@ -1285,6 +1285,7 @@ tasks:
         "release_critical",
         "incompatible_community",
         "requires_compile_variant",
+        "requires_large_host_debug_mode",
         "crypt",
         "bazel_check",
       ]

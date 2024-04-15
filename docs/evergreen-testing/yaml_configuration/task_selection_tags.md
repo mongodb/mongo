@@ -51,10 +51,12 @@ Every task could be tagged with any number of the following tags:
 - `incompatible_inmemory` - the task should be excluded from in-memory variants.
 - `incompatible_aubsan` - the task should be excluded from {A,UB}SAN variants.
 - `incompatible_tsan` - the task should be excluded from TSAN variants.
+- `incompatible_debug_mode` - the task should be excluded from Debug Mode variants.
 - `incompatible_all_feature_flags` - the task should be excluded from all-feature-flags variants.
 - `incompatible_development_variant` - the task should be excluded from the development variants.
 - `requires_compile_variant` - the task can (or should) only run on variants that has compile releated expansions.
 - `requires_large_host` - the task requires a large host to run.
-- `requires_large_host_tsan` - the task requires a large host to run on TSAN.
+- `requires_large_host_tsan` - the task requires a large host to run on TSAN variants.
+- `requires_large_host_debug_mode` - the task requires a large host to run on Debug Mode variants.
 - `requires_large_host_commit_queue` - the task requires a large host to run on in the commit-queue.
 - `requires_all_feature_flags` - the task can only run on variants that has all-feature-flags configuration.

@@ -255,7 +255,6 @@ tasks:
         "incompatible_mac",
         "aggregation",
         "read_write_concern",
-        "no_debug_mode",
       ]
     depends_on:
       - name: aggregation
@@ -324,12 +323,12 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_debug_mode",
         "aggfuzzer",
         "common",
         "timeseries",
         "require_npm",
         "random_name",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -352,7 +351,7 @@ tasks:
   ## Standalone fuzzer for checking wildcard index correctness ##
   - <<: *jstestfuzz_template
     name: aggregation_wildcard_fuzzer_gen
-    # TODO SERVER-85881: Re-enable wildcard fuzzers on debug builds by removing "no_debug_mode" tag.
+    # TODO SERVER-85881: Re-enable wildcard fuzzers on debug builds by removing "incompatible_debug_mode" tag.
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
@@ -361,12 +360,12 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_debug_mode",
         "aggfuzzer",
         "common",
         "wildcard",
         "require_npm",
         "random_name",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -704,10 +703,10 @@ tasks:
       [
         "assigned_to_jira_team_server_query_execution",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "no_passthrough",
         "compute_mode",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -793,6 +792,7 @@ tasks:
   ## jstestfuzz ##
   - <<: *jstestfuzz_template
     name: jstestfuzz_gen
+    # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
@@ -800,6 +800,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "common",
         "require_npm",
@@ -991,11 +992,11 @@ tasks:
       [
         "assigned_to_jira_team_server_query_execution",
         "non_deterministic",
+        "incompatible_debug_mode",
         "updatefuzzer",
         "require_npm",
         "random_name",
         "multiversion",
-        "no_debug_mode",
       ]
     commands:
       - func: "initialize multiversion tasks"
@@ -1019,10 +1020,10 @@ tasks:
       [
         "assigned_to_jira_team_server_query_execution",
         "non_deterministic",
+        "incompatible_debug_mode",
         "updatefuzzer",
         "require_npm",
         "random_name",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"

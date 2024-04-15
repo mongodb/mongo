@@ -114,12 +114,14 @@ rules:
           - incompatible_s390x
           - incompatible_aubsan
           - incompatible_tsan
+          - incompatible_debug_mode
           - incompatible_inmemory
           - incompatible_all_feature_flags
           - incompatible_development_variant
           - requires_compile_variant
           - requires_large_host
           - requires_large_host_tsan
+          - requires_large_host_debug_mode
           - requires_large_host_commit_queue
           - requires_all_feature_flags
 

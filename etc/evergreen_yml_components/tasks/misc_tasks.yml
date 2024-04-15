@@ -2199,3 +2199,93 @@ tasks:
       - non_deterministic
       - requires_compile_variant
       - requires_large_host
+
+  # I am here to workaround Evergreen tag selection validations
+  # TODO SERVER-89174: Delete me after https://jira.mongodb.org/browse/DEVPROD-5173 is done
+  - <<: *no_op_tag_keeper_template
+    name: no_op_tag_keeper_17_01
+    tags:
+      - assigned_to_jira_team_devprod_correctness
+      - development_critical_single_variant
+      - incompatible_debug_mode
+
+  # I am here to workaround Evergreen tag selection validations
+  # TODO SERVER-89174: Delete me after https://jira.mongodb.org/browse/DEVPROD-5173 is done
+  - <<: *no_op_tag_keeper_template
+    name: no_op_tag_keeper_17_02
+    tags:
+      - assigned_to_jira_team_devprod_correctness
+      - development_critical
+      - incompatible_debug_mode
+
+  # I am here to workaround Evergreen tag selection validations
+  # TODO SERVER-89174: Delete me after https://jira.mongodb.org/browse/DEVPROD-5173 is done
+  - <<: *no_op_tag_keeper_template
+    name: no_op_tag_keeper_17_03
+    tags:
+      - assigned_to_jira_team_devprod_correctness
+      - release_critical
+      - incompatible_debug_mode
+
+  # I am here to workaround Evergreen tag selection validations
+  # TODO SERVER-89174: Delete me after https://jira.mongodb.org/browse/DEVPROD-5173 is done
+  - <<: *no_op_tag_keeper_template
+    name: no_op_tag_keeper_17_04
+    tags:
+      - assigned_to_jira_team_devprod_correctness
+      - default
+      - incompatible_debug_mode
+
+  # I am here to workaround Evergreen tag selection validations
+  # TODO SERVER-89174: Delete me after https://jira.mongodb.org/browse/DEVPROD-5173 is done
+  - <<: *no_op_tag_keeper_template
+    name: no_op_tag_keeper_17_05
+    tags:
+      - assigned_to_jira_team_devprod_correctness
+      - non_deterministic
+      - incompatible_debug_mode
+
+  # I am here to workaround Evergreen tag selection validations
+  # TODO SERVER-89174: Delete me after https://jira.mongodb.org/browse/DEVPROD-5173 is done
+  - <<: *no_op_tag_keeper_template
+    name: no_op_tag_keeper_18_01
+    tags:
+      - assigned_to_jira_team_devprod_correctness
+      - development_critical_single_variant
+      - requires_large_host_debug_mode
+
+  # I am here to workaround Evergreen tag selection validations
+  # TODO SERVER-89174: Delete me after https://jira.mongodb.org/browse/DEVPROD-5173 is done
+  - <<: *no_op_tag_keeper_template
+    name: no_op_tag_keeper_18_02
+    tags:
+      - assigned_to_jira_team_devprod_correctness
+      - development_critical
+      - requires_large_host_debug_mode
+
+  # I am here to workaround Evergreen tag selection validations
+  # TODO SERVER-89174: Delete me after https://jira.mongodb.org/browse/DEVPROD-5173 is done
+  - <<: *no_op_tag_keeper_template
+    name: no_op_tag_keeper_18_03
+    tags:
+      - assigned_to_jira_team_devprod_correctness
+      - release_critical
+      - requires_large_host_debug_mode
+
+  # I am here to workaround Evergreen tag selection validations
+  # TODO SERVER-89174: Delete me after https://jira.mongodb.org/browse/DEVPROD-5173 is done
+  - <<: *no_op_tag_keeper_template
+    name: no_op_tag_keeper_18_04
+    tags:
+      - assigned_to_jira_team_devprod_correctness
+      - default
+      - requires_large_host_debug_mode
+
+  # I am here to workaround Evergreen tag selection validations
+  # TODO SERVER-89174: Delete me after https://jira.mongodb.org/browse/DEVPROD-5173 is done
+  - <<: *no_op_tag_keeper_template
+    name: no_op_tag_keeper_18_05
+    tags:
+      - assigned_to_jira_team_devprod_correctness
+      - non_deterministic
+      - requires_large_host_debug_mode

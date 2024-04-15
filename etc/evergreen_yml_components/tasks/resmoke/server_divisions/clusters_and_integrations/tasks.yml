@@ -261,7 +261,14 @@ tasks:
 
   - <<: *gen_task_template
     name: concurrency_multitenancy_with_atlas_proxy_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "incompatible_debug_mode",
+        "serverless",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -275,10 +282,10 @@ tasks:
       [
         "assigned_to_jira_team_server_servicearch",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "non_live_record",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -292,11 +299,11 @@ tasks:
       [
         "assigned_to_jira_team_server_servicearch",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "large",
         "non_live_record",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -310,12 +317,12 @@ tasks:
       [
         "assigned_to_jira_team_server_servicearch",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "common",
         "read_concern_maj",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -329,10 +336,10 @@ tasks:
       [
         "assigned_to_jira_team_server_servicearch",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -346,10 +353,10 @@ tasks:
       [
         "assigned_to_jira_team_server_servicearch",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -363,10 +370,10 @@ tasks:
       [
         "assigned_to_jira_team_server_servicearch",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -380,10 +387,10 @@ tasks:
       [
         "assigned_to_jira_team_server_servicearch",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -397,12 +404,12 @@ tasks:
       [
         "assigned_to_jira_team_server_servicearch",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "common",
         "read_concern_maj",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -447,12 +454,12 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_debug_mode",
         "concurrency",
         "common",
         "read_concern_maj",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -653,7 +660,14 @@ tasks:
 
   - <<: *gen_task_template
     name: multitenancy_with_atlas_proxy_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "incompatible_debug_mode",
+        "serverless",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -661,7 +675,14 @@ tasks:
 
   - <<: *gen_task_template
     name: multitenancy_with_mongoq_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "incompatible_debug_mode",
+        "serverless",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -669,7 +690,14 @@ tasks:
 
   - <<: *gen_task_template
     name: multitenancy_with_mongoq_unsigned_token_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "incompatible_debug_mode",
+        "serverless",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -720,6 +748,7 @@ tasks:
         "assigned_to_jira_team_server_servicearch",
         "default",
         "requires_compile_variant",
+        "requires_large_host_debug_mode",
       ]
     depends_on:
       - name: version_expansions_gen
@@ -735,12 +764,15 @@ tasks:
 
   - <<: *task_template
     name: serverless
+    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_servicearch",
         "default",
-        "serverless",
+        "incompatible_debug_mode",
+        "requires_large_host_debug_mode",
         "requires_large_host_tsan",
+        "serverless",
       ]
     commands:
       - func: "do setup"
@@ -748,12 +780,15 @@ tasks:
 
   - <<: *task_template
     name: serverless_MTM
+    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_servicearch",
         "default",
-        "serverless",
+        "incompatible_debug_mode",
+        "requires_large_host_debug_mode",
         "requires_large_host_tsan",
+        "serverless",
       ]
     commands:
       - func: "do setup"
@@ -768,7 +803,14 @@ tasks:
 
   - <<: *gen_task_template
     name: shard_merge_causally_consistent_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "incompatible_debug_mode",
+        "serverless",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -776,7 +818,14 @@ tasks:
 
   - <<: *gen_task_template
     name: shard_merge_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "incompatible_debug_mode",
+        "serverless",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -784,10 +833,12 @@ tasks:
 
   - <<: *gen_task_template
     name: shard_merge_multi_stmt_txn_jscore_passthrough_gen
+    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_servicearch",
         "default",
+        "incompatible_debug_mode",
         "serverless",
         "txn",
       ]
@@ -849,7 +900,8 @@ tasks:
   # TODO(SERVER-88891): Delete these tenant migration suites
   # - <<: *gen_task_template
   #   name: tenant_migration_causally_consistent_jscore_passthrough_gen
-  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+  #   # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "incompatible_debug_mode", "serverless"]
   #   commands:
   #   - func: "generate resmoke tasks"
   #     vars:
@@ -857,7 +909,8 @@ tasks:
 
   # - <<: *gen_task_template
   #   name: tenant_migration_jscore_passthrough_gen
-  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+  #   # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "incompatible_debug_mode", "serverless"]
   #   commands:
   #   - func: "generate resmoke tasks"
   #     vars:
@@ -865,7 +918,8 @@ tasks:
 
   # - <<: *gen_task_template
   #   name: tenant_migration_kill_primary_jscore_passthrough_gen
-  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+  #   # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "incompatible_debug_mode", "serverless"]
   #   commands:
   #   - func: "generate resmoke tasks"
   #     vars:
@@ -874,7 +928,8 @@ tasks:
 
   # - <<: *gen_task_template
   #   name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
-  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless", "txn"]
+  #   # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "incompatible_debug_mode", "serverless", "txn"]
   #   commands:
   #   - func: "generate resmoke tasks"
   #     vars:
@@ -882,7 +937,8 @@ tasks:
 
   # - <<: *gen_task_template
   #   name: tenant_migration_stepdown_jscore_passthrough_gen
-  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+  #   # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "incompatible_debug_mode", "serverless"]
   #   commands:
   #   - func: "generate resmoke tasks"
   #     vars:
@@ -890,7 +946,8 @@ tasks:
 
   # - <<: *gen_task_template
   #   name: tenant_migration_terminate_primary_jscore_passthrough_gen
-  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
+  #   # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
+  #   tags: ["assigned_to_jira_team_server_servicearch", "default", "incompatible_debug_mode", "serverless"]
   #   commands:
   #   - func: "generate resmoke tasks"
   #     vars:
@@ -1312,7 +1369,6 @@ tasks:
         "encrypt",
         "ocsp",
         "patch_build",
-        "no_debug_mode",
       ]
     commands:
       - func: "do setup"
@@ -1329,11 +1385,11 @@ tasks:
         "incompatible_community",
         "incompatible_mac",
         "incompatible_windows",
+        "incompatible_debug_mode",
         "replica_sets",
         "encrypt",
         "san",
         "gcm",
-        "no_debug_mode",
         "multi_oplog",
       ]
     commands:
@@ -1349,10 +1405,10 @@ tasks:
         "release_critical",
         "incompatible_community",
         "incompatible_mac",
+        "incompatible_debug_mode",
         "replica_sets",
         "encrypt",
         "san",
-        "no_debug_mode",
         "multi_oplog",
       ]
     commands:
@@ -1382,11 +1438,11 @@ tasks:
         "release_critical",
         "incompatible_community",
         "incompatible_mac",
+        "incompatible_debug_mode",
         "sharding",
         "auth",
         "audit",
         "non_live_record",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1418,11 +1474,11 @@ tasks:
         "incompatible_community",
         "incompatible_mac",
         "incompatible_windows",
+        "incompatible_debug_mode",
         "sharding",
         "common",
         "encrypt",
         "gcm",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1437,10 +1493,10 @@ tasks:
         "release_critical",
         "incompatible_community",
         "incompatible_mac",
+        "incompatible_debug_mode",
         "sharding",
         "common",
         "encrypt",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1621,8 +1677,8 @@ tasks:
       [
         "assigned_to_jira_team_server_cluster_scalability",
         "default",
+        "incompatible_debug_mode",
         "multi_shard",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2029,10 +2085,10 @@ tasks:
       [
         "assigned_to_jira_team_server_cluster_scalability",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2180,10 +2236,12 @@ tasks:
 
   - <<: *gen_task_template
     name: replica_sets_configsvr_param_jscore_passthrough_gen
+    # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
         "default",
+        "incompatible_debug_mode",
         "replica_sets",
         "common",
         "san",
@@ -2273,11 +2331,11 @@ tasks:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "large",
         "non_live_record",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2291,10 +2349,10 @@ tasks:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "non_live_record",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2311,12 +2369,12 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_debug_mode",
         "concurrency",
         "common",
         "read_concern_maj",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2330,10 +2388,10 @@ tasks:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2347,10 +2405,10 @@ tasks:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2364,11 +2422,11 @@ tasks:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "stepdowns",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2385,12 +2443,12 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_debug_mode",
         "concurrency",
         "common",
         "read_concern_maj",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2420,12 +2478,12 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_debug_mode",
         "concurrency",
         "common",
         "read_concern_maj",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2439,11 +2497,11 @@ tasks:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "stepdowns",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2457,11 +2515,11 @@ tasks:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "concurrency",
         "stepdowns",
         "large",
         "sharded",
-        "no_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2550,10 +2608,12 @@ tasks:
   ## jstestfuzz concurrent sharded cluster causal consistency ##
   - <<: *jstestfuzz_template
     name: jstestfuzz_concurrent_sharded_causal_consistency_gen
+    # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "causal",
         "require_npm",
@@ -2576,6 +2636,7 @@ tasks:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "non_deterministic",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "flow_control",
         "stepdowns",
@@ -2597,10 +2658,12 @@ tasks:
   ## jstestfuzz concurrent sharded cluster continuous stepdown ##
   - <<: *jstestfuzz_template
     name: jstestfuzz_concurrent_sharded_continuous_stepdown_gen
+    # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "stepdowns",
         "require_npm",
@@ -2619,11 +2682,13 @@ tasks:
   ## jstestfuzz concurrent sharded cluster ##
   - <<: *jstestfuzz_template
     name: jstestfuzz_concurrent_sharded_gen
+    # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "release_critical",
         "incompatible_mac",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "common",
         "sharding",
@@ -2643,10 +2708,12 @@ tasks:
   ## jstestfuzz concurrent sharded cluster with logical session ##
   - <<: *jstestfuzz_template
     name: jstestfuzz_concurrent_sharded_session_gen
+    # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "session",
         "require_npm",
@@ -2665,10 +2732,12 @@ tasks:
   ## jstestfuzz sharded cluster causal consistency ##
   - <<: *jstestfuzz_template
     name: jstestfuzz_sharded_causal_consistency_gen
+    # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "causal",
         "require_npm",
@@ -2689,6 +2758,7 @@ tasks:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "non_deterministic",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "flow_control",
         "stepdowns",
@@ -2710,10 +2780,12 @@ tasks:
   ## jstestfuzz sharded cluster continuous stepdown ##
   - <<: *jstestfuzz_template
     name: jstestfuzz_sharded_continuous_stepdown_gen
+    # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "stepdowns",
         "require_npm",
@@ -2732,11 +2804,13 @@ tasks:
   ## jstestfuzz sharded cluster ##
   - <<: *jstestfuzz_template
     name: jstestfuzz_sharded_gen
+    # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "release_critical",
         "incompatible_mac",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "common",
         "sharding",
@@ -2780,10 +2854,12 @@ tasks:
   ## jstestfuzz sharded cluster with logical session ##
   - <<: *jstestfuzz_template
     name: jstestfuzz_sharded_session_gen
+    # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "session",
         "require_npm",
