@@ -54,6 +54,9 @@ selector:
     # support all timeseries/bucket namespace cases.
     - jstests/core/timeseries/timeseries_user_system_buckets.js
 
+    # TODO SERVER-89286 re-enable this test
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/update_upsert.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
