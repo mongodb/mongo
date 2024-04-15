@@ -58,6 +58,7 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/default_max_time_ms_cluster_parameter.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/logical_time.h"
@@ -634,10 +635,12 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     auto replyBuilder = _parc->_rec->getReplyBuilder();
     auto requestArgs = _parc->getCommonRequestArgs();
 
-    const int maxTimeMS = uassertStatusOK(
-        parseMaxTimeMS(requestArgs.getMaxTimeMS().value_or(IDLAnyType()).getElement()));
-    if (maxTimeMS > 0 && command->getLogicalOp() != LogicalOp::opGetMore) {
-        opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
+    if (command->getLogicalOp() != LogicalOp::opGetMore) {
+        auto requestOrDefaultMaxTimeMS = getRequestOrDefaultMaxTimeMS(
+            opCtx, requestArgs.getMaxTimeMS(), invocation->isReadOperation());
+        if (requestOrDefaultMaxTimeMS && *requestOrDefaultMaxTimeMS > Milliseconds::zero()) {
+            opCtx->setDeadlineAfterNowBy(*requestOrDefaultMaxTimeMS, ErrorCodes::MaxTimeMSExpired);
+        }
     }
 
     if (MONGO_unlikely(

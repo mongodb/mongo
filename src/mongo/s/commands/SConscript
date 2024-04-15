@@ -203,6 +203,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/core',
+        '$BUILD_DIR/mongo/db/default_max_time_ms_cluster_parameter',
         '$BUILD_DIR/mongo/db/fle_crud',
         '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
         '$BUILD_DIR/mongo/db/operation_time_tracker',
