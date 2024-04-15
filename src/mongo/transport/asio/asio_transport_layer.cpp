@@ -37,6 +37,8 @@
 #include <netinet/tcp.h>
 #endif
 
+#include <asio.hpp>
+#include <asio/system_timer.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/operations.hpp>
 
@@ -49,13 +51,13 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/transport/asio/asio_reactor.h"
 #include "mongo/transport/asio/asio_tcp_fast_open.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/executor_stats.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
@@ -98,21 +100,6 @@ using TcpUserTimeoutMillisOption = SocketOption<IPPROTO_TCP, TCP_USER_TIMEOUT, u
 #endif  // __linux__
 
 const Seconds kSessionShutdownTimeout{10};
-
-thread_local AsioReactor* reactorForThread;
-
-class ThreadIdGuard {
-public:
-    explicit ThreadIdGuard(AsioReactor* reactor) {
-        invariant(!reactorForThread);
-        reactorForThread = reactor;
-    }
-
-    ~ThreadIdGuard() {
-        invariant(reactorForThread);
-        reactorForThread = nullptr;
-    }
-};
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectTimesOut);
@@ -197,69 +184,106 @@ private:
     std::shared_ptr<TimerType> _timer;
 };
 
-AsioReactor::AsioReactor() : _clkSource(this), _stats(&_clkSource) {}
+class AsioReactor final : public Reactor {
+public:
+    AsioReactor() : _clkSource(this), _stats(&_clkSource), _ioContext() {}
 
-void AsioReactor::run() noexcept {
-    ThreadIdGuard threadIdGuard(this);
-    asio::io_context::work work(_ioContext);
-    _ioContext.run();
-}
+    void run() noexcept override {
+        ThreadIdGuard threadIdGuard(this);
+        asio::io_context::work work(_ioContext);
+        _ioContext.run();
+    }
 
-void AsioReactor::runFor(Milliseconds time) noexcept {
-    ThreadIdGuard threadIdGuard(this);
-    asio::io_context::work work(_ioContext);
-    _ioContext.run_for(time.toSystemDuration());
-}
+    void runFor(Milliseconds time) noexcept override {
+        ThreadIdGuard threadIdGuard(this);
+        asio::io_context::work work(_ioContext);
+        _ioContext.run_for(time.toSystemDuration());
+    }
 
-void AsioReactor::stop() {
-    _ioContext.stop();
-}
+    void stop() override {
+        _ioContext.stop();
+    }
 
-void AsioReactor::drain() {
-    ThreadIdGuard threadIdGuard(this);
-    _ioContext.restart();
-    LOGV2_DEBUG(23012, 2, "Draining remaining work in reactor.");
-    /**
-     * Drain the remaining work. We use io_context::run_one() in a loop because io_context::run()
-     * will hang indefinitely after the last task is processed.
-     */
-    while (_ioContext.run_one())
-        ;
-    _closedForScheduling.store(true);
-    _ioContext.stop();
-}
+    void drain() override {
+        ThreadIdGuard threadIdGuard(this);
+        _ioContext.restart();
+        while (_ioContext.poll()) {
+            LOGV2_DEBUG(23012, 2, "Draining remaining work in reactor.");
+        }
+        _ioContext.stop();
+    }
 
-std::unique_ptr<ReactorTimer> AsioReactor::makeTimer() {
-    return std::make_unique<AsioReactorTimer>(_ioContext);
-}
+    std::unique_ptr<ReactorTimer> makeTimer() override {
+        return std::make_unique<AsioReactorTimer>(_ioContext);
+    }
 
-Date_t AsioReactor::now() {
-    return Date_t(asio::system_timer::clock_type::now());
-}
+    Date_t now() override {
+        return Date_t(asio::system_timer::clock_type::now());
+    }
 
-void AsioReactor::schedule(Task task) {
-    if (_closedForScheduling.load()) {
-        task({ErrorCodes::ShutdownInProgress, "Shutdown in progress"});
-    } else {
+    void schedule(Task task) override {
         asio::post(_ioContext, [task = _stats.wrapTask(std::move(task))] { task(Status::OK()); });
     }
-}
 
-void AsioReactor::dispatch(Task task) {
-    asio::dispatch(_ioContext, [task = _stats.wrapTask(std::move(task))] { task(Status::OK()); });
-}
+    void dispatch(Task task) override {
+        asio::dispatch(_ioContext,
+                       [task = _stats.wrapTask(std::move(task))] { task(Status::OK()); });
+    }
 
-bool AsioReactor::onReactorThread() const {
-    return this == reactorForThread;
-}
+    bool onReactorThread() const override {
+        return this == _reactorForThread;
+    }
 
-void AsioReactor::appendStats(BSONObjBuilder& bob) const {
-    _stats.serialize(&bob);
-}
+    operator asio::io_context&() {
+        return _ioContext;
+    }
 
-asio::io_context& AsioReactor::getIoContext() {
-    return _ioContext;
-}
+    void appendStats(BSONObjBuilder& bob) const override {
+        _stats.serialize(&bob);
+    }
+
+private:
+    // Provides `ClockSource` API for the reactor's clock source.
+    class ReactorClockSource final : public ClockSource {
+    public:
+        explicit ReactorClockSource(AsioReactor* reactor) : _reactor(reactor) {}
+        ~ReactorClockSource() = default;
+
+        Milliseconds getPrecision() override {
+            MONGO_UNREACHABLE;
+        }
+
+        Date_t now() override {
+            return _reactor->now();
+        }
+
+    private:
+        AsioReactor* const _reactor;
+    };
+
+    class ThreadIdGuard {
+    public:
+        ThreadIdGuard(AsioReactor* reactor) {
+            invariant(!_reactorForThread);
+            _reactorForThread = reactor;
+        }
+
+        ~ThreadIdGuard() {
+            invariant(_reactorForThread);
+            _reactorForThread = nullptr;
+        }
+    };
+
+    static thread_local AsioReactor* _reactorForThread;
+
+    ReactorClockSource _clkSource;
+
+    ExecutorStats _stats;
+
+    asio::io_context _ioContext;
+};
+
+thread_local AsioReactor* AsioReactor::_reactorForThread = nullptr;
 
 AsioTransportLayer::Options::Options(const ServerGlobalParams* params)
     : port(params->port),
@@ -553,8 +577,8 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
     }
 
     std::error_code ec;
-    AsioSession::GenericSocket sock(_egressReactor->getIoContext());
-    WrappedResolver resolver(_egressReactor->getIoContext());
+    AsioSession::GenericSocket sock(*_egressReactor);
+    WrappedResolver resolver(*_egressReactor);
 
     Date_t timeBefore = Date_t::now();
     auto swEndpoints = resolver.resolve(peer, _listenerOptions.enableIPv6);
@@ -655,7 +679,7 @@ StatusWith<std::shared_ptr<AsioSession>> AsioTransportLayer::_doSyncConnect(
     const HostAndPort& peer,
     const Milliseconds& timeout,
     boost::optional<TransientSSLParams> transientSSLParams) {
-    AsioSession::GenericSocket sock(_egressReactor->getIoContext());
+    AsioSession::GenericSocket sock(*_egressReactor);
     std::error_code ec;
 
     const auto protocol = endpoint->protocol();
@@ -763,7 +787,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
     auto reactorImpl = checked_cast<AsioReactor*>(reactor.get());
     auto pf = makePromiseFuture<std::shared_ptr<Session>>();
     auto connector = std::make_shared<AsyncConnectState>(
-        std::move(peer), reactorImpl->getIoContext(), std::move(pf.promise), reactor);
+        std::move(peer), *reactorImpl, std::move(pf.promise), reactor);
     Future<std::shared_ptr<Session>> mergedFuture = std::move(pf.future);
 
     if (connector->peer.host().empty()) {
@@ -952,7 +976,7 @@ Status AsioTransportLayer::setup() {
     }
 
     _listenerPort = _listenerOptions.port;
-    WrappedResolver resolver(_acceptorReactor->getIoContext());
+    WrappedResolver resolver(*_acceptorReactor);
 
     std::vector<int> ports = {_listenerPort};
     if (_listenerOptions.loadBalancerPort) {
@@ -1003,7 +1027,7 @@ Status AsioTransportLayer::setup() {
             fassertFailedNoTrace(40488);
         }
 
-        GenericAcceptor acceptor(_acceptorReactor->getIoContext());
+        GenericAcceptor acceptor(*_acceptorReactor);
         try {
             acceptor.open(addr->protocol());
         } catch (std::exception&) {
@@ -1351,7 +1375,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
 
     _trySetListenerSocketBacklogQueueDepth(acceptor);
 
-    acceptor.async_accept(_ingressReactor->getIoContext(), std::move(acceptCb));
+    acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
 }
 
 void AsioTransportLayer::_trySetListenerSocketBacklogQueueDepth(
