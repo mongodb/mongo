@@ -136,17 +136,24 @@ bool ReplaceRootTransformation::pushDotRenamedMatchBefore(Pipeline::SourceContai
     const auto unnestedPath = unnestsPath();
 
     if (prospectiveMatch && unnestedPath) {
+        MatchExpression* expr = prospectiveMatch->getMatchExpression();
+        // A MatchExpression that contains $expr is ineligible for pushdown because the match
+        // pushdown turned out to be comparatively slower in our benchmarks when $expr was used on
+        // dotted paths.
+        if (QueryPlannerCommon::hasNode(expr, MatchExpression::EXPRESSION)) {
+            return false;
+        }
+
         // If we reach this point, we know:
         // 1) The current stage is a ReplaceRoot stage whose transformation represents the unnesting
         // of a field path (length > 1).
-        // 2) The stage after us is a match. For a replaceRoot stage that unnests a field path, we
-        // will attempt to prepend the field path to subpaths in a copy of the match stage's
-        // MatchExpression.
+        // 2) The stage after us is a non-$expr match. For a replaceRoot stage that unnests a field
+        // path, we will attempt to prepend the field path to subpaths in a copy of the match
+        // stage's MatchExpression.
         //
         // Ex: For the pipeline [{$replaceWith: {"$subDocument"}}, {$match: {x: 2}}], we make a copy
         // of the original match expression and transform it to {$match: {"subDocument.x": 2}}. If
         // the entire ME is eligible, we return a new match stage with the prepended ME.
-        MatchExpression* expr = prospectiveMatch->getMatchExpression();
         auto& prefixPath = unnestedPath.get();
         StringMap<std::string> renames;
 

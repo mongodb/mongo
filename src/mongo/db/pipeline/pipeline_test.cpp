@@ -3722,7 +3722,7 @@ TEST(PipelineOptimizationTest, MultipleMatchesPushedBeforeReplaceWith) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
-TEST(PipelineOptimizationTest, MatchPushedBeforeMultipleReplaceWithsDiffPredName) {
+TEST(PipelineOptimizationTest, MatchOnlyPushedBeforeOneReplaceWith) {
     std::string inputPipe =
         "["
         " {$replaceWith: '$subDocumentA'},"
@@ -3731,16 +3731,15 @@ TEST(PipelineOptimizationTest, MatchPushedBeforeMultipleReplaceWithsDiffPredName
         "]";
     std::string outputPipe =
         "["
-        " {$match: {$or: [{'subDocumentA.subDocumentB.x.a': {$eq: 2}},"
-        " {$expr: {$ne: [{$type: ['$subDocumentA.subDocumentB']}, {$const: 'object'}]}},"
-        " {$expr: {$ne: [{$type: ['$subDocumentA']}, {$const: 'object'}]}}]}},"
         " {$replaceRoot: {newRoot: '$subDocumentA'}},"
+        " {$match: {$or: [{'subDocumentB.x.a': {$eq: 2}},"
+        " {$expr: {$ne: [{$type: ['$subDocumentB']}, {$const: 'object'}]}}]}},"
         " {$replaceRoot: {newRoot: '$subDocumentB'}}"
         "]";
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
-TEST(PipelineOptimizationTest, ExprMatchPushedBeforeReplaceWith) {
+TEST(PipelineOptimizationTest, NoReplaceWithMatchOptForExprMatch) {
     std::string inputPipe =
         "["
         " {$replaceWith: '$subDocument'},"
@@ -3748,16 +3747,14 @@ TEST(PipelineOptimizationTest, ExprMatchPushedBeforeReplaceWith) {
         "]";
     std::string outputPipe =
         "["
-        " {$match: {$or: [{$and: [{$expr: {$eq: ['$subDocument.x', {$const: 2}]}},"
-        " {'subDocument.x': {$_internalExprEq: 2}}]},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}},"
-        " {$replaceRoot: {newRoot: '$subDocument'}}"
+        " {$replaceRoot: {newRoot: '$subDocument'}},"
+        " {$match: {$and: [{$expr: {$eq: ['$x', {$const: 2}]}},"
+        " {'x': {$_internalExprEq: 2}}]}}"
         "]";
     std::string serializedPipe =
         "["
-        " {$match: {$or: [{$expr: {$eq: ['$subDocument.x', {$const: 2}]}},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}},"
-        " {$replaceRoot: {newRoot: '$subDocument'}}"
+        " {$replaceRoot: {newRoot: '$subDocument'}},"
+        " {$match: {$expr: {$eq: ['$x', 2]}}}"
         "]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
