@@ -5318,7 +5318,8 @@ buildvariants:
     - name: ".data-validation-stress-test"
     - name: catch2-unittest-test
     - name: s3-tiered-storage-extensions-test
-    - name: azure-gcp-tiered-storage-extensions-test
+    # FIXME-WT-12812 - This test is unstable when run with the new tmalloc install script. Disabled while WT-12812 is under investigation.
+    # - name: azure-gcp-tiered-storage-extensions-test
     - name: bench-tiered-push-pull
     - name: catch2-unittest-assertions
     - name: ".tiered_unittest"
