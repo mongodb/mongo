@@ -39,7 +39,7 @@ namespace mongo::query_settings::index_hints {
 
 auto makeDbName(StringData dbName) {
     return DatabaseNameUtil::deserialize(
-        boost::none /*tenantId=*/, dbName, SerializationContext::stateCommandRequest());
+        boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
 }
 
 TEST(IndexHintSpecsSerialization, TestSerialization) {
@@ -83,8 +83,11 @@ TEST(IndexHintSpecsSerialization, TestSerialization) {
 
 TEST(IndexHintSpecsSerialization, TestDeserializationSingleSpec) {
     auto testDbName = "testDb";
-    auto testCollName = "testColl";
+    auto testCollName = "testColl"_sd;
     auto dbName = makeDbName(testDbName);
+    NamespaceSpec ns;
+    ns.setDb(dbName);
+    ns.setColl(testCollName);
     BSONObj obj = fromjson(R"({
       "ns": {
         "db": "testDb",
@@ -92,28 +95,29 @@ TEST(IndexHintSpecsSerialization, TestDeserializationSingleSpec) {
       },
       "allowedIndexes": [{"$natural": -1}]
     })");
-    auto indexHintSpecs = parse(boost::none /*tenantId=*/,
-                                BSON("" << obj).firstElement(),
-                                SerializationContext::stateDefault());
+    auto parsedIndexHintSpecs = parse(boost::none /*tenantId=*/,
+                                      BSON("" << obj).firstElement(),
+                                      SerializationContext::stateDefault());
 
-    // TODO: SERVER-89072 Introduce query settings equality operator.
-    ASSERT_EQ(indexHintSpecs.size(), 1);
-    ASSERT_EQ(indexHintSpecs.at(0).getAllowedIndexes().size(), 1);
-    ASSERT_EQ(indexHintSpecs.at(0).getNs().getDb().get(), dbName);
-    ASSERT_EQ(indexHintSpecs.at(0).getNs().getColl().get(), testCollName);
-    ASSERT_EQ(static_cast<int8_t>(
-                  indexHintSpecs.at(0).getAllowedIndexes().at(0).getNaturalHint()->direction),
-              -1);
+    IndexHintSpecs expectedHintSpecs{
+        IndexHintSpec(ns, {IndexHint(NaturalOrderHint(NaturalOrderHint::Direction::kBackward))})};
+    ASSERT_EQ(expectedHintSpecs, parsedIndexHintSpecs);
 }
 
 TEST(IndexHintSpecsSerialization, TestDeserializationMultipleSpecs) {
     auto testDbNameA = "testDbA";
-    auto testCollNameA = "testCollA";
+    auto testCollNameA = "testCollA"_sd;
     auto dbNameA = makeDbName(testDbNameA);
+    NamespaceSpec nsA;
+    nsA.setDb(dbNameA);
+    nsA.setColl(testCollNameA);
 
     auto testDbNameB = "testDbB";
-    auto testCollNameB = "testCollB";
+    auto testCollNameB = "testCollB"_sd;
     auto dbNameB = makeDbName(testDbNameB);
+    NamespaceSpec nsB;
+    nsB.setDb(dbNameB);
+    nsB.setColl(testCollNameB);
 
     BSONObj indexHintSpecA = fromjson(R"({
       "ns": {
@@ -131,29 +135,14 @@ TEST(IndexHintSpecsSerialization, TestDeserializationMultipleSpecs) {
       "allowedIndexes": [{a: 1}, {b: 1}]
     })");
     BSONArray array = BSON_ARRAY(indexHintSpecA << indexHintSpecB);
-    auto indexHintSpecs = parse(boost::none /*tenantId=*/,
-                                BSON("" << array).firstElement(),
-                                SerializationContext::stateDefault());
+    auto parsedIndexHintSpecs = parse(boost::none /*tenantId=*/,
+                                      BSON("" << array).firstElement(),
+                                      SerializationContext::stateDefault());
 
-    // TODO: SERVER-89072 Introduce query settings equality operator.
-    ASSERT_EQ(indexHintSpecs.size(), 2);
-
-    ASSERT_EQ(indexHintSpecs.at(0).getNs().getDb().get(), dbNameA);
-    ASSERT_EQ(indexHintSpecs.at(0).getNs().getColl().get(), testCollNameA);
-    ASSERT_EQ(indexHintSpecs.at(0).getAllowedIndexes().size(), 1);
-    ASSERT_EQ(static_cast<int8_t>(
-                  indexHintSpecs.at(0).getAllowedIndexes().at(0).getNaturalHint()->direction),
-              1);
-
-    ASSERT_EQ(indexHintSpecs.at(1).getNs().getDb().get(), dbNameB);
-    ASSERT_EQ(indexHintSpecs.at(1).getNs().getColl().get(), testCollNameB);
-    ASSERT_EQ(indexHintSpecs.at(1).getAllowedIndexes().size(), 2);
-    ASSERT_EQ(indexHintSpecs.at(1).getAllowedIndexes().at(0).getIndexKeyPattern()->woCompare(
-                  BSON("a" << 1)),
-              0);
-    ASSERT_EQ(indexHintSpecs.at(1).getAllowedIndexes().at(1).getIndexKeyPattern()->woCompare(
-                  BSON("b" << 1)),
-              0);
+    IndexHintSpecs expectedHintSpecs{
+        IndexHintSpec(nsA, {IndexHint(NaturalOrderHint(NaturalOrderHint::Direction::kForward))}),
+        IndexHintSpec(nsB, {IndexHint(BSON("a" << 1)), IndexHint(BSON("b" << 1))})};
+    ASSERT_EQ(expectedHintSpecs, parsedIndexHintSpecs);
 }
 
 TEST(IndexHintSpecsSerialization, TestFailedDeserialization) {
