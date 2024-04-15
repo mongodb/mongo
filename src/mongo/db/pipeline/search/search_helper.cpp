@@ -213,12 +213,7 @@ parseMongotResponseCursors(std::vector<executor::TaskExecutorCursor> cursors) {
 }
 }  // namespace
 
-/**
- * Creates an additional pipeline to be run during a query if the query needs to generate metadata.
- * Does not take ownership of the passed in pipeline, and returns a pipeline containing only a
- * metadata generating $search stage. Can return null if no metadata pipeline is required.
- */
-std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineForSearch(
+std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineAndAttachCursorsForSearch(
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const AggregateCommandRequest& request,
@@ -233,10 +228,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineForSearch(
         dynamic_cast<DocumentSourceInternalSearchMongotRemote*>(origPipeline->peekFront());
     tassert(6253727, "Expected search stage", origSearchStage);
 
-    // We only want to return multiple cursors if we are not in mongos and we plan on getting
-    // unmerged metadata documents back from mongot.
-    auto shouldBuildMetadataPipeline =
+    // We expect to receive unmerged metadata documents from mongot if we are not in mongos and have
+    // a metadata merge protocol version. However, we can ignore the meta cursor if the pipeline
+    // doesn't have a downstream reference to $$SEARCH_META.
+    auto expectsMetaCursorFromMongot =
         !expCtx->inMongos && origSearchStage->getIntermediateResultsProtocolVersion();
+    auto shouldBuildMetadataPipeline =
+        expectsMetaCursorFromMongot && origSearchStage->queryReferencesSearchMeta();
 
     uassert(
         6253506, "Cannot have exchange specified in a $search pipeline", !request.getExchange());
@@ -295,22 +293,28 @@ std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineForSearch(
                 // metadata.
                 tassert(6253303,
                         "Didn't expect metadata cursor from mongot",
-                        shouldBuildMetadataPipeline);
+                        expectsMetaCursorFromMongot);
                 tassert(6253726,
                         "Expected to not already have created a metadata pipeline",
                         !newPipeline);
 
-                // Construct a duplicate ExpressionContext for our cloned pipeline. This is
-                // necessary so that the duplicated pipeline and the cloned pipeline do not
-                // accidentally share an OperationContext.
-                auto newExpCtx = expCtx->copyWith(expCtx->ns, expCtx->uuid);
+                // Only create the new metadata pipeline if the original pipeline needs it. If we
+                // don't create this new pipeline, the meta cursor returned from mongot will be
+                // killed by the task_executor_cursor destructor when it goes out of scope below.
+                if (shouldBuildMetadataPipeline) {
+                    // Construct a duplicate ExpressionContext for our cloned pipeline. This is
+                    // necessary so that the duplicated pipeline and the cloned pipeline do not
+                    // accidentally share an OperationContext.
+                    auto newExpCtx = expCtx->copyWith(expCtx->ns, expCtx->uuid);
 
-                // Clone the MongotRemote stage and set the metadata cursor.
-                auto newStage = origSearchStage->copyForAlternateSource(std::move(*it), newExpCtx);
+                    // Clone the MongotRemote stage and set the metadata cursor.
+                    auto newStage =
+                        origSearchStage->copyForAlternateSource(std::move(*it), newExpCtx);
 
-                // Build a new pipeline with the metadata source as the only stage.
-                newPipeline = Pipeline::create({newStage}, newExpCtx);
-                newPipeline->pipelineType = *maybeCursorLabel;
+                    // Build a new pipeline with the metadata source as the only stage.
+                    newPipeline = Pipeline::create({newStage}, newExpCtx);
+                    newPipeline->pipelineType = *maybeCursorLabel;
+                }
                 break;
         }
     }

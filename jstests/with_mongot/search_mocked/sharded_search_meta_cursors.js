@@ -1,10 +1,7 @@
 /*
- * For now, this tests that if mongod gets an aggregation command from a mongos with a $search stage
- * it will return two cursors. It also ensures that mongod accepts the requiresSearchMetaCursor
- * field without erroring.
- *
- * TODO SERVER-86757 will enable this test to also check that when requiresSearchMetaCursor is
- * explicitly false, mongod only returns one cursor,
+ * Test that if a mongod gets an aggregation command from a mongoS with a $search stage it will
+ * return two cursors by default or when requiresSearchMetaCursor is explicitly true, and will
+ * only return one cursor when requiresSearchMetaCursor is explicitly false.
  */
 
 import "jstests/libs/sbe_assert_error_override.js";
@@ -53,6 +50,7 @@ const st = stWithMock.st;
 const mongos = st.s;
 const testDb = mongos.getDB(dbName);
 
+// TODO SERVER-87335 Make this work for SBE
 if (checkSbeRestrictedOrFullyEnabled(testDb) &&
     FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), 'SearchInSbe')) {
     jsTestLog("Skipping the test because it only applies to $search in classic engine.");
@@ -79,24 +77,36 @@ const protocolVersion = NumberInt(1);
 
 const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), collName);
 const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), collName);
-function mockShardZero() {
+
+function mockShardZero(metaCursorWillBeKilled = false) {
     const exampleCursor = searchShardedExampleCursors1(
         dbName,
         collNS,
         collName,
         mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0, protocolVersion));
     const s0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
+    // The getMore will be pre-fetched, but if the meta cursor is deemed unnecessary, we'll issue a
+    // killCursors on the meta cursor. If the connection is pinned, we'll try to cancel the getMore
+    // as we killCursors, so the getMore may go unused. (When the connection isn't pinned, we don't
+    // try to cancel the in-flight getMore).
+    if (metaCursorWillBeKilled) {
+        exampleCursor.historyMeta[0].maybeUnused = true;
+    }
     s0Mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);
     s0Mongot.setMockResponses(exampleCursor.historyMeta, exampleCursor.metaID);
 }
 
-function mockShardOne() {
+function mockShardOne(metaCursorWillBeKilled = false) {
     const exampleCursor = searchShardedExampleCursors2(
         dbName,
         collNS,
         collName,
         mongotCommandForQuery(mongotQuery, collName, dbName, collUUID1, protocolVersion));
     const s1Mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
+    // See comment in mockShardZero().
+    if (metaCursorWillBeKilled) {
+        exampleCursor.historyMeta[0].maybeUnused = true;
+    }
     s1Mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);
     s1Mongot.setMockResponses(exampleCursor.historyMeta, exampleCursor.metaID);
 }
@@ -192,26 +202,25 @@ function runTestRequiresMetaCursorOnConn(shardDB, searchStage, expectedDocs, exp
 }
 
 /**
- * TODO SERVER-86757 will enable this helper to be useful for the case described here:
  * Tests that mongod returns just the results cursor when requiresSearchMetaCursor is explicitly set
  * to false.
  */
-// function runTestNoMetaCursorOnConn(shardDB, expectedDocs) {
-//     // Run the command that explicitly says no meta cursor is needed.
-//     commandObj.pipeline = [shardPipelineDoesntRequireMetaCursor];
-//     const shardResponse = shardDB.runCommand(commandObj);
-//     let cursor = validateInitialResponse(shardResponse);
+function runTestNoMetaCursorOnConn(shardDB, expectedDocs) {
+    // Run the command that explicitly says no meta cursor is needed.
+    commandObj.pipeline = [shardPipelineDoesntRequireMetaCursor];
+    const shardResponse = shardDB.runCommand(commandObj);
+    let cursor = validateInitialResponse(shardResponse);
 
-//     // Iterate the cursor.
-//     const getMoreRes = shardDB.runCommand({getMore: cursor.id, collection: collName});
+    // Iterate the cursor.
+    const getMoreRes = shardDB.runCommand({getMore: cursor.id, collection: collName});
 
-//     // Cursor is now exhausted.
-//     const getMoreResults = validateGetMoreResponse(getMoreRes, 0);
-//     assert.sameMembers(expectedDocs, getMoreResults);
-// }
+    // Cursor is now exhausted.
+    const getMoreResults = validateGetMoreResponse(getMoreRes, 0);
+    assert.sameMembers(expectedDocs, getMoreResults);
+}
 
 // Run queries against a specific shard to see what a mongod response to a search query looks like.
-// Since we are running a pipeline with $_internalSearchMongotRemote we need to use an internal
+// Since we are simulating a $search pipeline sent from the router, we need to use an internal
 // client.
 let expectedDocs = [
     // SortKey and searchScore are included because we're getting results directly from the
@@ -229,10 +238,8 @@ runTestRequiresMetaCursorOnConn(
 mockShardZero();
 runTestRequiresMetaCursorOnConn(
     shardZeroDB, shardPipelineRequiresMetaCursorExplicit, expectedDocs, expectedMetaResults);
-mockShardZero();
-// TODO SERVER-86757 this last case should use runTestNoMetaCursorOnConn instead
-runTestRequiresMetaCursorOnConn(
-    shardZeroDB, shardPipelineDoesntRequireMetaCursor, expectedDocs, expectedMetaResults);
+mockShardZero(/*metaCursorWillBeKilled*/ true);
+runTestNoMetaCursorOnConn(shardZeroDB, expectedDocs);
 
 // Repeat for second shard.
 expectedDocs = [
@@ -249,10 +256,8 @@ runTestRequiresMetaCursorOnConn(
 mockShardOne();
 runTestRequiresMetaCursorOnConn(
     shardOneDB, shardPipelineRequiresMetaCursorExplicit, expectedDocs, expectedMetaResults);
-mockShardOne();
-// TODO SERVER-86757 this last case should use runTestNoMetaCursorOnConn instead
-runTestRequiresMetaCursorOnConn(
-    shardOneDB, shardPipelineDoesntRequireMetaCursor, expectedDocs, expectedMetaResults);
+mockShardOne(/*metaCursorWillBeKilled*/ true);
+runTestNoMetaCursorOnConn(shardOneDB, expectedDocs);
 
 // Check that if exchange is set on a search query it fails.
 commandObj = {

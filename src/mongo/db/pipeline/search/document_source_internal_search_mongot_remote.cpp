@@ -92,6 +92,8 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
                 spec.addField(InternalSearchMongotRemoteSpec::kSortSpecFieldName,
                               opts.serializeLiteral(*_sortSpec));
             }
+            spec.addField(InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
+                          opts.serializeLiteral(_queryReferencesSearchMeta));
             return spec.freezeToValue();
         } else {
             // mongod/mongos don't know how to read a search query, so we can't redact the correct
@@ -123,6 +125,8 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
         mDoc.addField(InternalSearchMongotRemoteSpec::kMongotDocsRequestedFieldName,
                       opts.serializeLiteral(*_mongotDocsRequested));
     }
+    mDoc.addField(InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
+                  opts.serializeLiteral(_queryReferencesSearchMeta));
     return mDoc.freezeToValue();
 }
 
