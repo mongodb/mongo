@@ -99,6 +99,35 @@ __wt_txn_op_set_recno(WT_SESSION_IMPL *session, uint64_t recno)
 }
 
 /*
+ * __txn_op_need_set_key --
+ *     Check if we need to copy the key to the most recent transaction operation.
+ */
+static WT_INLINE bool
+__txn_op_need_set_key(WT_TXN *txn, WT_TXN_OP *op)
+{
+    /*
+     * We save the key for resolving the prepared updates. However, if we have already set the
+     * commit timestamp, the transaction cannot be prepared. Therefore, no need to save the key.
+     */
+    if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
+        return (false);
+
+    /* History store writes cannot be prepared. */
+    if (WT_IS_HS(op->btree->dhandle))
+        return (false);
+
+    /* Metadata writes cannot be prepared. */
+    if (WT_IS_METADATA(op->btree->dhandle))
+        return (false);
+
+    /* Auto transactions cannot be prepared. */
+    if (F_ISSET(txn, WT_TXN_AUTOCOMMIT))
+        return (false);
+
+    return (true);
+}
+
+/*
  * __wt_txn_op_set_key --
  *     Copy the given key onto the most recent transaction operation. This function early exits if
  *     the transaction cannot prepare.
@@ -115,8 +144,7 @@ __wt_txn_op_set_key(WT_SESSION_IMPL *session, const WT_ITEM *key)
 
     op = txn->mod + txn->mod_count - 1;
 
-    if (WT_SESSION_IS_CHECKPOINT(session) || WT_IS_HS(op->btree->dhandle) ||
-      WT_IS_METADATA(op->btree->dhandle) || F_ISSET(txn, WT_TXN_AUTOCOMMIT))
+    if (!__txn_op_need_set_key(txn, op))
         return (0);
 
     WT_ASSERT(session, op->type == WT_TXN_OP_BASIC_ROW || op->type == WT_TXN_OP_INMEM_ROW);
