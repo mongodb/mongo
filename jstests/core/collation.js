@@ -1813,7 +1813,7 @@ let err = assert.throws(() => coll.find()
                                   .max({str: "D"})
                                   .collation({locale: "en_US", strength: 2})
                                   .itcount());
-assert.commandFailedWithCode(err, 51173);
+assert.commandFailedWithCode(err, ErrorCodes.NoQueryExecutionPlans);
 
 // Even after building an index with the right key pattern, the query should fail since the
 // collations don't match.
