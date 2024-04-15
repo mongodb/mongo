@@ -16,7 +16,7 @@ include "WT/_intpack.tcl-inc"
 
 proc log_record {} {
   globals WT_LOG_*
-  ssection __wt_log_record {
+  ssection -collapsed __wt_log_record {
     #uint32 len         ;# Record length including hdr
     xentry -var len { uint32 }
     uint32 -hex checksum
@@ -59,38 +59,38 @@ proc read_record {name} {
         nswitch $rectype {
           $WT_LOGREC_SYSTEM {
             # __wt_log_recover_system -> __wt_logop_prev_lsn_unpack -> __wt_struct_unpack(fmt="IIII") -> __wt_struct_unpackv(fmt="IIII")
-            xentry optype { format_enum [unpack_I] $WT_LOGOP_n }
-            xentry size { unpack_I }
-            xentry -var file { unpack_I }
-            xentry -var offset { unpack_I }
-            set desc "f:$file off:$offset"
+            set desc [strcut [xentry optype { format_enum [unpack_I] $WT_LOGOP_n }] WT_LOGOP_]
+            append desc " sz:[xentry size { unpack_I }]"
+            append desc " f:[xentry -var file { unpack_I }]"
+            append desc " off:[xentry -var offset { unpack_I }]"
+            sectionvalue $desc
           }
           $WT_LOGREC_CHECKPOINT {
             # __wt_txn_checkpoint_logread
-            xentry optype { format_enum [unpack_I] $WT_LOGOP_n }
-            xentry size { unpack_I }
-            xentry -var file { unpack_I }
-            xentry -var offset { unpack_I }
-            xentry -var nsnapshot { unpack_I }
-            xentry -var snapshot { unpack_i }
-            set desc "f:$file off:$offset nsn:$nsnapshot sn:$snapshot"
+            set desc [strcut [xentry optype { format_enum [unpack_I] $WT_LOGOP_n }] WT_LOGOP_]
+            append desc " sz:[xentry size { unpack_I }]"
+            append desc " f:[xentry -var file { unpack_I }]"
+            append desc " off:[xentry -var offset { unpack_I }]"
+            append desc " nsn:[xentry -var nsnapshot { unpack_I }]"
+            append desc " sn:[xentry -var snapshot { unpack_i }]"
+            sectionvalue $desc
           }
           $WT_LOGREC_COMMIT {
-            xentry txnid { unpack_I }
+            set desc "txnid:[xentry txnid { unpack_I }]"
+            set n_ops 0
             # __txn_op_apply -> __wt_logop_read
             while {[peek uint8]} {
+              incr n_ops
               ssection -collapsed op {
                 set _opstart [pos]
                 xentry -varname optype_fmt optype { format_enum [set optype [unpack_I]] $WT_LOGOP_n }
                 set optype_fmt [strcut $optype_fmt WT_LOGOP_]
-                set desc $optype_fmt
                 sectionvalue $optype_fmt
                 xentry -var opsize { unpack_I }
                 # __txn_op_apply
                 if {$optype & $WT_LOGOP_IGNORE} {
                   entry "WT_LOGOP_IGNORE" ""
-                  set desc "WT_LOGOP_IGNORE | [format_enum [expr {$optype & ~$WT_LOGOP_IGNORE}] $WT_LOGOP_n]"
-                  sectionvalue $desc
+                  sectionvalue "WT_LOGOP_IGNORE | [format_enum [expr {$optype & ~$WT_LOGOP_IGNORE}] $WT_LOGOP_n]"
                   goto [expr {$_opstart + $opsize}]
                 } else {
                   # __txn_op_apply
@@ -117,32 +117,29 @@ proc read_record {name} {
                       # __txn_op_apply -> __wt_logop_row_put_unpack
                       xentry fileid { unpack_I }
                       #xentry key { unpack_U_ascii }
-                      set key [struct_U_ascii key]
+                      set key [unpack_size_key key]
                       #xentry value { unpack_U_ascii }
                       #xentry value { unpack_u_ascii [expr {$len - ([pos] - $_start)}] }
                       # last 'u' goes as 'U' with the remaining size
                       xentry value { unpack_u_ascii [remaining $_opstart $opsize] }
                       sectionvalue "$optype_fmt $key"
-                      set desc "$desc $key"
                     }
                     $WT_LOGOP_ROW_REMOVE {
                       # __txn_op_apply -> __wt_logop_row_put_unpack
                       xentry fileid { unpack_I }
                       #xentry key { unpack_U_ascii }
-                      #set key [struct_U_ascii key]
+                      #set key [unpack_size_key key]
                       # last 'u' goes as 'U' with the remaining size
                       xentry key { unpack_u_ascii [remaining $_opstart $opsize] }
                       sectionvalue "$optype_fmt $key"
-                      set desc "$desc $key"
                     }
                     $WT_LOGOP_ROW_TRUNCATE {
                       # __txn_op_apply -> __wt_logop_row_truncate_unpack
                       xentry fileid { unpack_I }
-                      set start_key [struct_U_ascii key]
-                      set stop_key [struct_U_ascii key]
+                      set start_key [unpack_size_key key]
+                      set stop_key [unpack_size_key key]
                       set mode_fmt [valev mode { format_enum [unpack_I] $WT_TXN_TRUNC_MODE }]
                       sectionvalue "$optype_fmt [strcut $mode_fmt WT_TXN_TRUNC_] $start_key $stop_key"
-                      set desc "$desc $start_key $stop_key"
                     }
                     $WT_LOGOP_TXN_TIMESTAMP {
                       # __txn_op_apply -> __wt_logop_txn_timestamp_unpack
@@ -163,21 +160,19 @@ proc read_record {name} {
                 gotoend $_opstart $opsize
               }
             }
+            append desc " ops: $n_ops"
           }
           $WT_LOGREC_FILE_SYNC {
-            xentry -var fileid { unpack_I }
-            xentry -var start { unpack_i }
-            set desc "f:$fileid start:$start"
+            set desc "f:[xentry -var fileid { unpack_I }]"
+            append desc " start:[xentry -var start { unpack_i }]"
           }
           $WT_LOGREC_MESSAGE {
-            xentry -var msg { unpack_s_ascii }
-            sectionvalue $msg
-            set desc $msg
+            set desc [xentry -var msg { unpack_s_ascii }]
           }
           default {}
         }
       }]} {
-        set desc "---"
+        append desc " -incomplete-"
       }
     }
     sectionname "$name:$rectype_shortfmt"

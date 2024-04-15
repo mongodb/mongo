@@ -60,7 +60,7 @@ proc __wt_cell {} {
         if {$short == $WT_CELL_KEY_SHORT_PFX} {
           uint8 -hex prefix
         }
-        sectionvalue [ascii $len data]
+        sectionvalue [unpack_key $len]
       } else {
         # Not short
         set desc_n [expr {$desc & 0xf0}]
