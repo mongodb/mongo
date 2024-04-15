@@ -30,6 +30,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -86,13 +87,82 @@ protected:
 
     using LogicalTimeArray = ComponentArray<LogicalTime>;
 
-    struct component_comparator {
-        bool operator()(const Component& c0, const Component& c1) const {
-            return static_cast<uint8_t>(c0) < static_cast<uint8_t>(c1);
+    /**
+     * Bare-bones std::set like class to hold a set of Components without memory allocation.
+     */
+    class ComponentSet {
+    public:
+        ComponentSet() = default;
+        ComponentSet(Component c) {
+            insert(c);
         }
-    };
 
-    using ComponentSet = std::set<Component, component_comparator>;
+        void insert(Component c) {
+            _components.set(static_cast<std::size_t>(c));
+        }
+
+        /**
+         * Iterator that implements LegacyForwardIterator.
+         */
+        class iterator {
+            friend class ComponentSet;
+
+        public:
+            Component operator*() const {
+                return static_cast<Component>(_pos);
+            }
+
+            iterator operator++() {
+                // Advance one if not at the end and then find a true bit if the current bit is not
+                // true.
+                if (_pos < _set->_components.size()) {
+                    _pos++;
+                    advanceIfNeeded();
+                }
+                return *this;
+            }
+
+            bool operator==(const iterator& right) const {
+                return this->_pos == right._pos;
+            }
+
+            bool operator!=(const iterator& right) const {
+                return this->_pos != right._pos;
+            }
+
+        private:
+            iterator(const ComponentSet* set) : _set(set), _pos(0) {
+                advanceIfNeeded();
+            }
+
+            iterator(const ComponentSet* set, std::size_t pos) : _set(set), _pos(pos) {}
+
+            // advance if the current bit is not true until the next valid bit or reach the end of
+            // the bit set
+            void advanceIfNeeded() {
+                for (; _pos < _set->_components.size(); ++_pos) {
+                    if (_set->_components.test(_pos)) {
+                        break;
+                    }
+                }
+            }
+
+        private:
+            const ComponentSet* _set;
+            std::size_t _pos;
+        };
+
+        iterator begin() const {
+            return iterator(this);
+        }
+
+        iterator end() const {
+            return iterator(this, _components.size());
+        }
+
+    private:
+        std::bitset<static_cast<std::size_t>(Component::_kNumComponents)> _components;
+    };
 
 public:
     class VectorTime {
