@@ -28,6 +28,7 @@
 
 /* Required to build using older versions of g++. */
 #include <cinttypes>
+#include <memory>
 #include <mutex>
 
 #include "connection_manager.h"

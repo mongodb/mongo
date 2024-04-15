@@ -29,6 +29,7 @@
 #ifndef TEST_H
 #define TEST_H
 
+#include <memory>
 #include <vector>
 #include <string>
 
