@@ -987,8 +987,9 @@ dump_explore(WT_CURSOR *cursor, const char *uri, bool reverse, bool pretty, bool
 
     session = cursor->session;
     session_impl = (WT_SESSION_IMPL *)session;
-    once = search_near = false;
+    once = false;
     bookmark_index = window = 0;
+    WT_NOT_READ(search_near, false);
     memset(args, 0, sizeof(args));
     memset(bookmarks, 0, sizeof(bookmarks));
 

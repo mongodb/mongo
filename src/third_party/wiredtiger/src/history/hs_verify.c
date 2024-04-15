@@ -157,14 +157,14 @@ __wt_hs_verify(WT_SESSION_IMPL *session)
     uint32_t btree_id;
     char *uri_data;
 
-    ds_cursor = hs_cursor = NULL;
-    WT_ERR(__wt_scr_alloc(session, 0, &buf));
     WT_CLEAR(key);
+    ds_cursor = hs_cursor = NULL;
     hs_start_ts = 0;
     hs_counter = 0;
     btree_id = WT_BTREE_ID_INVALID;
     uri_data = NULL;
 
+    WT_ERR(__wt_scr_alloc(session, 0, &buf));
     WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
     F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
 
@@ -191,7 +191,6 @@ __wt_hs_verify(WT_SESSION_IMPL *session)
         }
 
         WT_ERR(__wt_open_cursor(session, uri_data, NULL, NULL, &ds_cursor));
-        __wt_free(session, uri_data);
         F_SET(ds_cursor, WT_CURSOR_RAW_OK);
 
         /* Note that the following call moves the hs cursor internally. */

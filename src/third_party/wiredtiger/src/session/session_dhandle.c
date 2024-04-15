@@ -377,12 +377,16 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
     const char *checkpoint, *hs_checkpoint;
     bool ckpt_running, is_hs, is_unnamed_ckpt, is_reserved_name, must_resolve;
 
-    ckpt_gen = ds_time = first_snapshot_time = hs_time = oldest_time = snapshot_time = stable_time =
-      0;
+    ds_time = first_snapshot_time = hs_time = oldest_time = snapshot_time = stable_time = 0;
+    WT_NOT_READ(ckpt_gen, 0);
     ds_order = hs_order = 0;
     checkpoint = NULL;
     hs_checkpoint = NULL;
-    ckpt_running = is_hs = is_unnamed_ckpt = is_reserved_name = must_resolve = false;
+    WT_NOT_READ(ckpt_running, false);
+    WT_NOT_READ(is_hs, false);
+    WT_NOT_READ(is_unnamed_ckpt, false);
+    WT_NOT_READ(is_reserved_name, false);
+    WT_NOT_READ(must_resolve, false);
 
     /* These should only be set together. Asking for only one doesn't make sense. */
     WT_ASSERT(session, (hs_dhandlep == NULL) == (ckpt_snapshot == NULL));

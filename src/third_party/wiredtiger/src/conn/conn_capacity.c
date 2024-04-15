@@ -356,9 +356,12 @@ __wt_capacity_throttle(WT_SESSION_IMPL *session, uint64_t bytes, WT_THROTTLE_TYP
 
     conn = S2C(session);
     cap = &conn->capacity;
-    /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
-    capacity = steal_capacity = 0;
+    steal_capacity = 0;
     reservation = steal = NULL;
+
+    /* Quiet warnings from both gcc and clang about this variable. */
+    WT_NOT_READ(capacity, 0);
+
     switch (type) {
     case WT_THROTTLE_CHUNKCACHE:
         __throttle_chunkcache(session, cap, bytes);

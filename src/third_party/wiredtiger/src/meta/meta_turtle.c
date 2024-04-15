@@ -209,10 +209,10 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session, WT_BACKUPHASH *backuphash)
     const char *drop_cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_drop), "remove_files=false", NULL};
     bool exist;
 
-    file_len = 0;
     conn = S2C(session);
     filename = metadata_conf = tablename = NULL;
     exist = false;
+    WT_NOT_READ(file_len, 0);
 
     WT_CLEAR(meta_state);
     meta_state.backuphash = backuphash;
