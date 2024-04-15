@@ -71,16 +71,14 @@ export function mongotKillCursorResponse(collName, cursorId) {
 
 /**
  * Helper to mock the response of 'planShardedSearch' which don't care about the results of the
- * merging pipeline on any connection (shard or mongos).
+ * merging pipeline.
  * @param {String} collName
  * @param {Object} query
  * @param {String} dbName
  * @param {Object} sortSpec
  * @param {ShardingTestWithMongotMock} stWithMock
- * @param {Mongo} conn
  */
-export function mockPlanShardedSearchResponseOnConn(
-    collName, query, dbName, sortSpec, stWithMock, conn, maybeUnused = false) {
+export function mockPlanShardedSearchResponse(collName, query, dbName, sortSpec, stWithMock) {
     mockPlanShardedSearchResponse.cursorId++;
     let resp = {
         ok: 1,
@@ -98,21 +96,11 @@ export function mockPlanShardedSearchResponseOnConn(
             $db: dbName,
             searchFeatures: {shardedSort: 1}
         },
-        response: resp,
-        maybeUnused
+        response: resp
     }];
-    const mongot = stWithMock.getMockConnectedToHost(conn);
+    const mongot = stWithMock.getMockConnectedToHost(stWithMock.st.s);
     let host = mongot.getConnection().host;
     mongot.setMockResponses(mergingPipelineHistory, mockPlanShardedSearchResponse.cursorId);
-}
-
-/**
- * Convenience helper function to simulate mockPlanShardedSearchResponseOnConn specifically on
- * mongos, which is the most common usage.
- */
-export function mockPlanShardedSearchResponse(collName, query, dbName, sortSpec, stWithMock) {
-    mockPlanShardedSearchResponseOnConn(
-        collName, query, dbName, sortSpec, stWithMock, stWithMock.st.s);
 }
 
 mockPlanShardedSearchResponse.cursorId = 1423;
