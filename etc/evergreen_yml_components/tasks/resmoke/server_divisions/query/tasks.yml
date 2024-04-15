@@ -349,43 +349,6 @@ tasks:
           suite: generational_fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
-  ## Standalone fuzzer for checking block_processing correctness ##
-  - <<: *jstestfuzz_template
-    name: aggregation_blockprocessing_fuzzer_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_query_execution",
-        "release_critical",
-        "incompatible_development_variant",
-        "incompatible_mac",
-        "incompatible_ppc",
-        "incompatible_s390x",
-        "aggfuzzer",
-        "common",
-        "timeseries",
-        "blockprocessing",
-        "require_npm",
-        "random_name",
-        "no_debug_mode",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          <<: *jstestfuzz_config_vars
-          # We have seen some common scenarios where the generated pipelines take a while to run and can
-          # hit some timeouts. We'll split 70000 pipelines across 70 files, compared to 80000 pipelines
-          # across 20 files in the other generational agg fuzzers. This approach can be considered if we
-          # see similar timeouts elsewhere. It is not well understood whether/how we could pass
-          # 'numPipelines' as an argument in the yaml here, but it works as part of the
-          # 'jstestfuzz_vars' argument string. If a future reader better understands this evergreen
-          # integration, please update this comment and/or move numPipelines to a yaml arg here.
-          num_files: 70
-          num_tasks: 20
-          jstestfuzz_vars: --diffTestingMode blockprocessing --numPipelines=1000
-          npm_command: agg-fuzzer
-          suite: generational_fuzzer
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
   ## Standalone fuzzer for checking wildcard index correctness ##
   - <<: *jstestfuzz_template
     name: aggregation_wildcard_fuzzer_gen
