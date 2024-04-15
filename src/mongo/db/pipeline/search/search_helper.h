@@ -172,9 +172,6 @@ void establishSearchMetaCursorSBE(const boost::intrusive_ptr<ExpressionContext>&
 
 std::unique_ptr<executor::TaskExecutorCursor> getSearchMetadataCursor(DocumentSource* ds);
 
-std::function<void(BSONObjBuilder& bob)> buildSearchGetMoreFunc(
-    std::function<boost::optional<long long>()> calcDocsNeeded);
-
 std::unique_ptr<RemoteCursorMap> getSearchRemoteCursors(
     const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline);
 
