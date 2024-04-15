@@ -232,6 +232,11 @@ function analyzeShardKey(ns, shardKey, indexKey) {
               `step for calculating the cardinality and frequency metrics. ${tojsononeline(res)}`);
         return res;
     }
+    if (res.code == ErrorCodes.StaleConfig) {
+        print(`Failed to analyze the shard key because it failed with a StaleConfig error. ` +
+              `${tojsononeline(res)}`);
+        return res;
+    }
 
     assert.commandWorked(res);
     jsTest.log(`Finished analyzing the shard key: ${tojsononeline(res)}`);
