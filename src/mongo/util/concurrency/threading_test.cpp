@@ -36,6 +36,7 @@
 #include <typeinfo>
 
 #include "mongo/db/client.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/platform/atomic_word.h"
@@ -57,7 +58,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
-namespace ThreadedTests {
+namespace {
 
 template <int nthreads_param = 10>
 class ThreadedTest {
@@ -240,6 +241,8 @@ class TicketHolderWaits : public ThreadedTest<10> {
 public:
     TicketHolderWaits() : _hotel(rooms) {
         auto client = Client::getCurrent();
+        invariant(client);
+
         constexpr bool trackPeakUsed = false;
         // TODO SERVER-72616: We can only test PriorityTicketHolder on Linux. Remove ifdefs when
         // it's available on other platforms.
@@ -270,7 +273,7 @@ private:
         void checkIn() {
             stdx::lock_guard<Latch> lk(_frontDesk);
             _checkedIn++;
-            MONGO_verify(_checkedIn <= _nRooms);
+            ASSERT_LTE(_checkedIn, _nRooms);
             if (_checkedIn > _maxRooms)
                 _maxRooms = _checkedIn;
         }
@@ -278,7 +281,7 @@ private:
         void checkOut() {
             stdx::lock_guard<Latch> lk(_frontDesk);
             _checkedIn--;
-            MONGO_verify(_checkedIn >= 0);
+            ASSERT_GTE(_checkedIn, 0);
         }
 
         Mutex _frontDesk = MONGO_MAKE_LATCH("Hotel::_frontDesk");
@@ -320,37 +323,49 @@ private:
     void validate() override {
         // This should always be true, assuming that it takes < 1 sec for the hardware to process a
         // check-out/check-in Time for test is then ~ #threads / _nRooms * 2 seconds
-        MONGO_verify(_hotel._maxRooms == _hotel._nRooms);
+        ASSERT_EQ(_hotel._maxRooms, _hotel._nRooms);
     }
 
 protected:
     std::unique_ptr<TicketHolder> _tickets;
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
-public:
-    All() : OldStyleSuiteSpecification("threading") {}
+class ThreadingTest : public ServiceContextTest {};
 
-    void setupTests() override {
-        // Slack is a test to see how long it takes for another thread to pick up
-        // and begin work after another relinquishes the lock.  e.g. a spin lock
-        // would have very little slack.
-        add<Slack<SimpleMutex, stdx::lock_guard<SimpleMutex>>>();
+TEST_F(ThreadingTest, Slack) {
+    // Slack is a test to see how long it takes for another thread to pick up
+    // and begin work after another relinquishes the lock.  e.g. a spin lock
+    // would have very little slack.
+    Slack<SimpleMutex, stdx::lock_guard<SimpleMutex>> test;
+    test.run();
+}
 
-        add<IsAtomicWordAtomic<AtomicWord<unsigned>>>();
-        add<IsAtomicWordAtomic<AtomicWord<unsigned long long>>>();
-        add<ThreadPoolTest>();
+TEST_F(ThreadingTest, IsAtomicWordAtomic_AtomicWord_unsigned) {
+    IsAtomicWordAtomic<AtomicWord<unsigned>> test;
+    test.run();
+}
 
-        add<TicketHolderWaits<SemaphoreTicketHolder>>();
-        // TODO SERVER-72616: We can only test PriorityTicketHolder on Linux. Remove this when it's
-        // available on other platforms.
+TEST_F(ThreadingTest, IsAtomicWordAtomic_AtomicWord_unsigned_long_long) {
+    IsAtomicWordAtomic<AtomicWord<unsigned long long>> test;
+    test.run();
+}
+
+TEST_F(ThreadingTest, ThreadPool) {
+    ThreadPoolTest test;
+    test.run();
+}
+
+TEST_F(ThreadingTest, TicketHolderWaits_SemaphoreTicketHolder) {
+    TicketHolderWaits<SemaphoreTicketHolder> test;
+    test.run();
+}
+
 #ifdef __linux__
-        add<TicketHolderWaits<PriorityTicketHolder>>();
+TEST_F(ThreadingTest, TicketHolderWaits_PriorityTicketHolder) {
+    TicketHolderWaits<PriorityTicketHolder> test;
+    test.run();
+}
 #endif
-    }
-};
 
-unittest::OldStyleSuiteInitializer<All> myall;
-
-}  // namespace ThreadedTests
+}  // namespace
 }  // namespace mongo

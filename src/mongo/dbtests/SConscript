@@ -113,7 +113,6 @@ env.Program(
         'rollbacktests.cpp',
         'socktests.cpp',
         'storage_debug_util.cpp',
-        'threadedtests.cpp',
         'updatetests.cpp',
         'validate_tests.cpp',
         'wildcard_access_method_test.cpp',
