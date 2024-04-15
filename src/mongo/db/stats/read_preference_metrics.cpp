@@ -81,7 +81,7 @@ void ReadPreferenceMetrics::Counters::increment(ReadPreferenceSetting readPref, 
     // For primary read preference, the tag set will be empty, which is represented by an empty BSON
     // array. For other read preference values without tags, the tag set contains one empty document
     // in the BSON array. See the TagSet class definition for more details.
-    if (readPref.tags != TagSet::primaryOnly() && readPref.tags != TagSet()) {
+    if (!readPref.tags.isPrimaryOnly() && !readPref.tags.isMatchAnyNode()) {
         tagged.increment(isInternal);
     }
 }

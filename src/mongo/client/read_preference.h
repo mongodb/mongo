@@ -63,6 +63,9 @@ Status validateReadPreferenceMode(const std::string& prefStr, const boost::optio
  * A simple object for representing the list of tags requested by a $readPreference.
  */
 class TagSet {
+private:
+    static const BSONArray kMatchAny;
+
 public:
     /**
      * Creates a TagSet that matches any nodes. This is the TagSet represented by the BSON
@@ -100,6 +103,21 @@ public:
     }
     bool operator!=(const TagSet& other) const {
         return !(*this == other);
+    }
+
+    /**
+     * Primary only is defined as a empty BSON Array. See comments on primaryOnly().
+     */
+    bool isPrimaryOnly() const {
+        return _tags.isEmpty();
+    }
+
+    /**
+     * Match any node is defined as array with one element which is an empty BSON document. See
+     * comments on default constructor.
+     */
+    bool isMatchAnyNode() const {
+        return _tags.binaryEqual(kMatchAny);
     }
 
 private:

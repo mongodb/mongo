@@ -346,4 +346,22 @@ TEST(ReadPreferenceSetting, Roundtrip) {
                                          true /* isPretargeted */));
 }
 
+// Verify TagSet isFlags work correctly
+TEST(TagSet, TestFlags) {
+    TagSet tsPrimary = TagSet::primaryOnly();
+    ASSERT_TRUE(tsPrimary.isPrimaryOnly());
+    ASSERT_FALSE(tsPrimary.isMatchAnyNode());
+
+    TagSet tsMatchAny;
+    ASSERT_FALSE(tsMatchAny.isPrimaryOnly());
+    ASSERT_TRUE(tsMatchAny.isMatchAnyNode());
+    ASSERT_FALSE(tsMatchAny == TagSet::primaryOnly());
+
+    TagSet tsSomething(BSON_ARRAY(BSON("x" << 1)));
+    ASSERT_FALSE(tsSomething.isPrimaryOnly());
+    ASSERT_FALSE(tsSomething.isMatchAnyNode());
+    ASSERT_FALSE(tsSomething == TagSet::primaryOnly());
+}
+
+
 }  // namespace
