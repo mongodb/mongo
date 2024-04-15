@@ -13,7 +13,7 @@
  * ]
  */
 
-function setDefaultReadMaxTimeMs(db, newValue) {
+function setDefaultReadMaxTimeMS(db, newValue) {
     assert.commandWorked(
         db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
 
@@ -54,7 +54,7 @@ function runBypassTests(conn) {
     };
 
     // Sets the default maxTimeMS for read operations with a small value.
-    setDefaultReadMaxTimeMs(adminDB, 1);
+    setDefaultReadMaxTimeMS(adminDB, 1);
 
     // Prepare a regular user without the 'bypassDefaultMaxtimeMS' privilege.
     adminDB.createUser({user: 'regularUser', pwd: 'password', roles: ["readAnyDatabase"]});
@@ -107,7 +107,7 @@ function runBypassTests(conn) {
 
     // Unsets the default MaxTimeMS to make queries not to time out in the
     // following code.
-    setDefaultReadMaxTimeMs(adminDB, 0);
+    setDefaultReadMaxTimeMS(adminDB, 0);
 }
 
 const rst = new ReplSetTest({nodes: 1, keyFile: "jstests/libs/key1"});
