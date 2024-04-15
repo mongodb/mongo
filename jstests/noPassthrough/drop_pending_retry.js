@@ -44,8 +44,16 @@ assert(db.getCollection("toDrop").drop());
 
 // We need to perform this write so that the drop timestamp above is less than the checkpoint
 // timestamp.
-assert.commandWorked(db.getCollection("toWrite").insert({x: 1}));
+let insertResponse = db.runCommand({insert: "toWrite", documents: [{x: 1}]});
 
+assert(insertResponse.ok);
+let insertOptime = insertResponse.opTime;
+// Check that lastCommited, lastApplied, and allDurable are what we expect them to be.
+
+let replSetStatus = rst.status();
+assert.eq(replSetStatus.optimes.lastCommittedOpTime, insertOptime, tojson(replSetStatus));
+assert.eq(replSetStatus.optimes.appliedOpTime, insertOptime, tojson(replSetStatus));
+assert.eq(replSetStatus.optimes.durableOpTime, insertOptime, tojson(replSetStatus));
 // Take a checkpoint to advance the checkpoint timestamp.
 assert.commandWorked(db.adminCommand({fsync: 1}));
 
