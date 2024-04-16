@@ -630,6 +630,19 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
                     opCtx,
                     shardIdToUpdate,
                     Participant::ReadOnly::kOutstandingAdditionalParticipant);
+
+                if (!p().recoveryShardId) {
+                    LOGV2_DEBUG(
+                        89275,
+                        3,
+                        "Choosing outstanding additional participant shard as recovery shard",
+                        "sessionId"_attr = _sessionId(),
+                        "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                        "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
+                        "shardId"_attr = shardIdToUpdate);
+                    p().recoveryShardId = shardIdToUpdate;
+                }
+
                 return;
             }
 
@@ -1773,10 +1786,13 @@ void TransactionRouter::Router::appendRecoveryToken(BSONObjBuilder* builder) con
     TxnRecoveryToken recoveryToken;
 
     // The recovery shard is chosen on the first statement that did a write (transactions that only
-    // did reads do not need to be recovered; they can just be retried).
+    // did reads do not need to be recovered; they can just be retried) or that returned an
+    // additional participant with an empty readOnly value.
     if (p().recoveryShardId) {
-        invariant(o().participants.find(*p().recoveryShardId)->second.readOnly ==
-                  Participant::ReadOnly::kNotReadOnly);
+        auto recoveryShardReadOnly = o().participants.find(*p().recoveryShardId)->second.readOnly;
+        invariant(recoveryShardReadOnly == Participant::ReadOnly::kNotReadOnly ||
+                  recoveryShardReadOnly ==
+                      Participant::ReadOnly::kOutstandingAdditionalParticipant);
         recoveryToken.setRecoveryShardId(*p().recoveryShardId);
     }
 

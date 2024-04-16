@@ -119,6 +119,9 @@ const BSONObj kOkReadOnlyTrueAdditionalParticipantsReadOnlyTrueResponse = BSON(
 const BSONObj kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly =
     BSON("ok" << 1 << "readOnly" << false << "additionalParticipants"
               << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3")))));
+const BSONObj kOkReadOnlyTrueAdditionalParticipantsMissingReadOnly =
+    BSON("ok" << 1 << "readOnly" << true << "additionalParticipants"
+              << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3")))));
 const BSONObj kErrorWithAdditionalParticipantsResponse =
     BSON("ok" << 0 << "additionalParticipants"
               << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3")))));
@@ -1617,7 +1620,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantIsRecoveryShard) {
+TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantDidWriteAndIsRecoveryShard) {
     TxnNumber txnNum{3};
     operationContext()->setTxnNumber(txnNum);
 
@@ -1642,6 +1645,43 @@ TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantIsRecoveryS
     ASSERT(additionalParticipant != nullptr);
     ASSERT(additionalParticipant->readOnly ==
            TransactionRouter::Participant::ReadOnly::kNotReadOnly);
+    ASSERT(txnRouter.getRecoveryShardId());
+    ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard3);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantOutstandingIsRecoveryShard) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    // The recovery shard is unset initially.
+    ASSERT_FALSE(txnRouter.getRecoveryShardId());
+
+    // Attach request fields for a request to shard1
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+
+    // First, process a response from shard1 indicating that it's readOnly, and that it added
+    // shard3 as an additional participant which was readOnly. The transaction router will only mark
+    // an additionalParticipant as outstanding if it first had marked it readOnly.
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyTrueAdditionalParticipantsReadOnlyTrueResponse);
+
+    // Now, process a response from shard1 still indicating that it's readOnly and that it added
+    // shard3 as an additional participant, but that it has not yet heard back from shard3 (so,
+    // there is no readOnly value for shard3). Assert that shard3 was added to the participants list
+    // and marked as outstanding. Because there are no other write shards and the shard will be
+    // treated as a write shard at commit time, the transaction router should pick shard3 as the
+    // recovery shard.
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyTrueAdditionalParticipantsMissingReadOnly);
+    auto additionalParticipant = txnRouter.getParticipant(shard3);
+    ASSERT(additionalParticipant != nullptr);
+    ASSERT(additionalParticipant->readOnly ==
+           TransactionRouter::Participant::ReadOnly::kOutstandingAdditionalParticipant);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard3);
 }
