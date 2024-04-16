@@ -374,7 +374,7 @@ struct ESCDocument {
  */
 class FLETagQueryInterface {
 public:
-    enum class TagQueryType { kInsert, kQuery, kCompact, kCleanup };
+    enum class TagQueryType { kInsert, kQuery, kCompact, kCleanup, kPadding };
 
     virtual ~FLETagQueryInterface();
 
@@ -463,6 +463,35 @@ public:
                                                       const TagToken& tagToken,
                                                       const ValueToken& valueToken,
                                                       FLEStatusSection::EmuBinaryTracker& tracker);
+
+    /**
+     * Decrypts an anchor document (either null or non-null).
+     * If the input document is a non-null anchor, then the resulting ESCDocument.position
+     * is 0, and ESCDocument.count is the non-anchor position (cpos).
+     * If the input document is a null anchor, then ESCDocument.position is the non-zero
+     * anchor position (apos), and ESCDocument.count is the cpos.
+     */
+    static StatusWith<ESCDocument> decryptAnchorDocument(const ValueToken& valueToken,
+                                                         BSONObj& doc);
+
+    /**
+     * Reads the anchor document identified by anchorId, and if found, decrypts the value
+     * and returns the parsed positions as a pair. If the anchor is not found, returns none.
+     */
+    static boost::optional<ESCCountsPair> readAndDecodeAnchor(
+        const FLEStateCollectionReader& reader,
+        const ValueToken& valueToken,
+        const PrfBlock& anchorId);
+
+    /**
+     * Performs all the ESC reads required by the QE cleanup algorithm, for anchor cleanup or
+     * padding cleanup.
+     */
+    static FLEEdgeCountInfo getEdgeCountInfoForPaddingCleanupCommon(
+        const FLEStateCollectionReader& reader,
+        const TagToken& tagToken,
+        const ValueToken& valueToken,
+        const EmuBinaryResult& positions);
 };
 
 /**
@@ -549,16 +578,6 @@ public:
                                               const ESCTwiceDerivedValueToken& valueToken,
                                               uint64_t apos,
                                               uint64_t cpos);
-
-    /**
-     * Decrypts an anchor document (either null or non-null).
-     * If the input document is a non-null anchor, then the resulting ESCDocument.position
-     * is 0, and ESCDocument.count is the non-anchor position (cpos).
-     * If the input document is a null anchor, then ESCDocument.position is the non-zero
-     * anchor position (apos), and ESCDocument.count is the cpos.
-     */
-    static StatusWith<ESCDocument> decryptAnchorDocument(
-        const ESCTwiceDerivedValueToken& valueToken, BSONObj& doc);
 
     /*
      * Note on EmuBinaryV2 results:

@@ -135,6 +135,7 @@ enums:
             Query: "query"
             Compact: "compact"
             Cleanup: "cleanup"
+            Padding: "padding"
 
 commands:
     getQueryableEncryptionCountInfo:

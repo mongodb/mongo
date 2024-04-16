@@ -268,7 +268,7 @@ FLEEdgeCountInfo convertTokensToEdgeCount(const QECountInfoReplyTokens& token) {
     auto esc =
         FLETokenFromCDR<FLETokenType::ESCTwiceDerivedTagToken>(token.getESCTwiceDerivedTagToken());
 
-    return FLEEdgeCountInfo(token.getCount(), esc, spos, npos, token.getStats(), edc);
+    return FLEEdgeCountInfo(token.getCount(), esc.data, spos, npos, token.getStats(), edc);
 }
 
 std::vector<std::vector<FLEEdgeCountInfo>> toEdgeCounts(
@@ -799,8 +799,8 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
         for (auto const& countInfo : countInfos) {
             serverPayload[i].counts.push_back(countInfo.count);
 
-            escDocuments.push_back(
-                ESCCollection::generateNonAnchorDocument(countInfo.tagToken, countInfo.count));
+            escDocuments.push_back(ESCCollection::generateNonAnchorDocument(
+                ESCTwiceDerivedTagToken(countInfo.tagTokenData), countInfo.count));
         }
     }
 
@@ -1635,6 +1635,8 @@ QECountInfoQueryTypeEnum queryTypeTranslation(FLEQueryInterface::TagQueryType ty
             return QECountInfoQueryTypeEnum::Compact;
         case FLEQueryInterface::TagQueryType::kCleanup:
             return QECountInfoQueryTypeEnum::Cleanup;
+        case FLEQueryInterface::TagQueryType::kPadding:
+            return QECountInfoQueryTypeEnum::Padding;
         default:
             uasserted(7517101, "Invalid TagQueryType value.");
     }
