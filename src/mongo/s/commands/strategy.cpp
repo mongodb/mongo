@@ -636,10 +636,11 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     auto requestArgs = _parc->getCommonRequestArgs();
 
     if (command->getLogicalOp() != LogicalOp::opGetMore) {
-        auto requestOrDefaultMaxTimeMS = getRequestOrDefaultMaxTimeMS(
+        auto [requestOrDefaultMaxTimeMS, _] = getRequestOrDefaultMaxTimeMS(
             opCtx, requestArgs.getMaxTimeMS(), invocation->isReadOperation());
-        if (requestOrDefaultMaxTimeMS && *requestOrDefaultMaxTimeMS > Milliseconds::zero()) {
-            opCtx->setDeadlineAfterNowBy(*requestOrDefaultMaxTimeMS, ErrorCodes::MaxTimeMSExpired);
+        if (auto maxTimeMS = requestOrDefaultMaxTimeMS.value_or(Milliseconds{0});
+            requestOrDefaultMaxTimeMS > Milliseconds::zero()) {
+            opCtx->setDeadlineAfterNowBy(maxTimeMS, ErrorCodes::MaxTimeMSExpired);
         }
     }
 

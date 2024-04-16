@@ -33,27 +33,27 @@
 #include "mongo/db/default_max_time_ms_cluster_parameter_gen.h"
 
 namespace mongo {
-
-boost::optional<Milliseconds> getRequestOrDefaultMaxTimeMS(
+std::pair<boost::optional<Milliseconds>, bool> getRequestOrDefaultMaxTimeMS(
     OperationContext* opCtx,
     const boost::optional<mongo::IDLAnyType>& requestMaxTimeMS,
     const bool isReadOperation) {
 
     // Always uses the user-defined value if it's passed in.
     if (requestMaxTimeMS) {
-        return Milliseconds{uassertStatusOK(parseMaxTimeMS(requestMaxTimeMS->getElement()))};
+        return {Milliseconds{uassertStatusOK(parseMaxTimeMS(requestMaxTimeMS->getElement()))},
+                false};
     }
 
     // Currently, defaultMaxTimeMS is only applicable to read operations.
     if (!isReadOperation) {
-        return boost::none;
+        return {boost::none, false};
     }
 
     // If the feature flag is disabled, return early.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (!fcvSnapshot.isVersionInitialized() ||
         !gFeatureFlagDefaultReadMaxTimeMS.isEnabled(fcvSnapshot)) {
-        return boost::none;
+        return {boost::none, false};
     }
 
     const boost::optional<auth::ValidatedTenancyScope>& vts =
@@ -66,7 +66,7 @@ boost::optional<Milliseconds> getRequestOrDefaultMaxTimeMS(
             ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(boost::none),
                                                ActionType::bypassDefaultMaxTimeMS);
     if (bypassDefaultMaxTimeMS) {
-        return boost::none;
+        return {boost::none, false};
     }
 
     auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
@@ -78,13 +78,17 @@ boost::optional<Milliseconds> getRequestOrDefaultMaxTimeMS(
         auto tenantDefaultReadMaxTimeMS =
             defaultMaxTimeMSParam->getValue(tenantId).getReadOperations();
         if (tenantDefaultReadMaxTimeMS) {
-            return Milliseconds{tenantDefaultReadMaxTimeMS};
+            return {Milliseconds{tenantDefaultReadMaxTimeMS}, true};
         }
     }
 
     // Uses the global default maxTimeMS for read operations.
     auto globalDefaultReadMaxTimeMS =
         defaultMaxTimeMSParam->getValue(boost::none).getReadOperations();
-    return Milliseconds{globalDefaultReadMaxTimeMS};
+    if (globalDefaultReadMaxTimeMS) {
+        return {Milliseconds{globalDefaultReadMaxTimeMS}, true};
+    }
+
+    return {boost::none, false};
 }
 }  // namespace mongo

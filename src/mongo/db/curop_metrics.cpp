@@ -69,7 +69,9 @@ void incrCounter(Counter64* stat, const boost::optional<T>& in) {
 struct InBoth {
     explicit InBoth(ClusterRole role)
         : killedDueToClientDisconnect{makeCounter("operation.killedDueToClientDisconnect", role)},
-          killedDueToMaxTimeMSExpired{makeCounter("operation.killedDueToMaxTimeMSExpired", role)} {}
+          killedDueToMaxTimeMSExpired{makeCounter("operation.killedDueToMaxTimeMSExpired", role)},
+          killedDueToDefaultMaxTimeMSExpired{
+              makeCounter("operation.killedDueToDefaultMaxTimeMSExpired", role)} {}
 
     void record(OperationContext* opCtx) {
         auto* curOp = CurOp::get(opCtx);
@@ -80,12 +82,17 @@ struct InBoth {
         }
         if (killStatus == ErrorCodes::MaxTimeMSExpired ||
             debug.errInfo == ErrorCodes::MaxTimeMSExpired) {
-            killedDueToMaxTimeMSExpired->increment();
+            if (opCtx->usesDefaultMaxTimeMS()) {
+                killedDueToDefaultMaxTimeMSExpired->increment();
+            } else {
+                killedDueToMaxTimeMSExpired->increment();
+            }
         }
     }
 
     Counter64* killedDueToClientDisconnect;
     Counter64* killedDueToMaxTimeMSExpired;
+    Counter64* killedDueToDefaultMaxTimeMSExpired;
 };
 
 /** Counters that are in shard service. */
