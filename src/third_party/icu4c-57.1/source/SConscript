@@ -61,7 +61,7 @@ i18nEnv = env.Clone()
 i18nEnv.Append(CPPDEFINES=[
     ('U_I18N_IMPLEMENTATION', 1),
 ], )
-i18nEnv.Library(
+i18nEnv.BazelLibrary(
     target='icu_i18n',
     source=[
         'i18n/affixpatternparser.cpp',
@@ -272,7 +272,7 @@ commonEnv = env.Clone()
 commonEnv.Append(CPPDEFINES=[
     ('U_COMMON_IMPLEMENTATION', 1),
 ], )
-commonEnv.Library(
+commonEnv.BazelLibrary(
     target='icu_common',
     source=[
         'common/appendable.cpp',
@@ -463,7 +463,7 @@ commonEnv.Library(
     ],
 )
 
-env.Library(
+env.BazelLibrary(
     target='icu_data',
     source=[
         'stubdata/stubdata.c',
