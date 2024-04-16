@@ -70,7 +70,7 @@ QueryShapeConfiguration makeQueryShapeConfiguration(const QuerySettings& setting
                                                     QueryInstance query,
                                                     OperationContext* opCtx,
                                                     boost::optional<TenantId> tenantId) {
-    auto queryShapeHash = createRepresentativeInfo(query, opCtx, tenantId).queryShapeHash;
+    auto queryShapeHash = createRepresentativeInfo(opCtx, query, tenantId).queryShapeHash;
     QueryShapeConfiguration result(queryShapeHash, settings);
     result.setRepresentativeQuery(query);
     return result;

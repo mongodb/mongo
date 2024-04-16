@@ -57,7 +57,7 @@ BSONObj createDebugQueryShape(const BSONObj& representativeQuery,
     // Get the serialized query shape by creating the representative information for the given
     // representative query.
     const auto representativeInfo =
-        query_settings::createRepresentativeInfo(representativeQuery, opCtx, tenantId);
+        query_settings::createRepresentativeInfo(opCtx, representativeQuery, tenantId);
     return representativeInfo.serializedQueryShape;
 }
 

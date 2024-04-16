@@ -161,14 +161,13 @@ void setQueryShapeHash(OperationContext* opCtx, const boost::optional<QueryShape
 /*
  * Creates the corresponding RepresentativeQueryInfo for Find query representatives.
  */
-RepresentativeQueryInfo createRepresentativeInfoFind(
-    const QueryInstance& queryInstance,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const boost::optional<TenantId>& tenantId) {
+RepresentativeQueryInfo createRepresentativeInfoFind(OperationContext* opCtx,
+                                                     const QueryInstance& queryInstance,
+                                                     const boost::optional<TenantId>& tenantId) {
     auto findCommandRequest = std::make_unique<FindCommandRequest>(
         FindCommandRequest::parse(IDLParserContext("findCommandRequest",
                                                    false /* apiStrict */,
-                                                   auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                                                   auth::ValidatedTenancyScope::get(opCtx),
                                                    tenantId,
                                                    kSerializationContext),
                                   queryInstance));
@@ -179,57 +178,58 @@ RepresentativeQueryInfo createRepresentativeInfoFind(
         query_request_helper::addShowRecordIdMetaProj(findCommandRequest.get());
     }
 
-    // Populate encryption information.
-    auto& encryptionInformation = findCommandRequest->getEncryptionInformation();
+    // Extract namespace from find command.
+    auto& nssOrUuid = findCommandRequest->getNamespaceOrUUID();
+    uassert(7746605,
+            "Collection namespace string must be provided for setQuerySettings command",
+            nssOrUuid.isNamespaceString());
 
-    // Check if the find command is eligible for IDHACK.
-    auto isIdHackEligibleQuery = isIdHackEligibleQueryWithoutCollator(*findCommandRequest);
-
+    auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, nssOrUuid.nss());
     auto parsedFindCommand = uassertStatusOK(parsed_find_command::parse(
         expCtx,
         ParsedFindCommandParams{.findCommand = std::move(findCommandRequest),
                                 .allowedFeatures =
                                     MatchExpressionParser::kAllowAllSpecialFeatures}));
 
-    // Extract namespace from find command.
-    auto& nssOrUuid = parsedFindCommand->findCommandRequest->getNamespaceOrUUID();
-    uassert(7746605,
-            "Collection namespace string must be provided for setQuerySettings command",
-            nssOrUuid.isNamespaceString());
-    stdx::unordered_set<NamespaceString> involvedNamespaces{nssOrUuid.nss()};
-
-    FindCmdShape findCmdShape{*parsedFindCommand, expCtx};
     const auto serializationContext =
         parsedFindCommand->findCommandRequest->getSerializationContext();
+    FindCmdShape findCmdShape{*parsedFindCommand, expCtx};
+    auto serializedQueryShape = findCmdShape.toBson(
+        opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, serializationContext);
 
     return RepresentativeQueryInfo{
-        findCmdShape.toBson(expCtx->opCtx,
-                            SerializationOptions::kDebugQueryShapeSerializeOptions,
-                            serializationContext),
-        findCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
-        nssOrUuid.nss(),
-        std::move(involvedNamespaces),
-        std::move(encryptionInformation),
-        isIdHackEligibleQuery,
-        {/* no unsupported agg stages */}};
+        .serializedQueryShape = serializedQueryShape,
+        .queryShapeHash = findCmdShape.sha256Hash(opCtx, serializationContext),
+        .namespaceString = nssOrUuid.nss(),
+        .involvedNamespaces = {nssOrUuid.nss()},
+        .encryptionInformation = parsedFindCommand->findCommandRequest->getEncryptionInformation(),
+        .isIdHackQuery =
+            isIdHackEligibleQueryWithoutCollator(*parsedFindCommand->findCommandRequest),
+        .systemStage = {/* no unsupported agg stages */},
+    };
 }
 
 /*
  * Creates the corresponding RepresentativeQueryInfo for Distinct query representatives.
  */
 RepresentativeQueryInfo createRepresentativeInfoDistinct(
+    OperationContext* opCtx,
     const QueryInstance& queryInstance,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::optional<TenantId>& tenantId) {
-    auto distinctCommandRequest =
-        std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
-            IDLParserContext("distinctCommandRequest",
-                             false /* apiStrict */,
-                             auth::ValidatedTenancyScope::get(expCtx->opCtx),
-                             tenantId,
-                             kSerializationContext),
-            queryInstance));
+    auto distinctCommandRequest = std::make_unique<DistinctCommandRequest>(
+        DistinctCommandRequest::parse(IDLParserContext("distinctCommandRequest",
+                                                       false /* apiStrict */,
+                                                       auth::ValidatedTenancyScope::get(opCtx),
+                                                       tenantId,
+                                                       kSerializationContext),
+                                      queryInstance));
+    // Extract namespace from distinct command.
+    auto& nssOrUuid = distinctCommandRequest->getNamespaceOrUUID();
+    uassert(7919501,
+            "Collection namespace string must be provided for setQuerySettings command",
+            nssOrUuid.isNamespaceString());
 
+    auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, nssOrUuid);
     auto parsedDistinctCommand =
         parsed_distinct_command::parse(expCtx,
                                        queryInstance,
@@ -237,100 +237,89 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(
                                        ExtensionsCallbackNoop(),
                                        MatchExpressionParser::kAllowAllSpecialFeatures);
 
-    // Extract namespace from distinct command.
-    auto& nssOrUuid = parsedDistinctCommand->distinctCommandRequest->getNamespaceOrUUID();
-    uassert(7919501,
-            "Collection namespace string must be provided for setQuerySettings command",
-            nssOrUuid.isNamespaceString());
-    stdx::unordered_set<NamespaceString> involvedNamespaces{nssOrUuid.nss()};
 
     DistinctCmdShape distinctCmdShape{*parsedDistinctCommand, expCtx};
     const auto serializationContext =
         parsedDistinctCommand->distinctCommandRequest->getSerializationContext();
-
-    return RepresentativeQueryInfo{
+    auto serializedQueryShape =
         distinctCmdShape.toBson(expCtx->opCtx,
                                 SerializationOptions::kDebugQueryShapeSerializeOptions,
-                                serializationContext),
-        distinctCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
-        nssOrUuid.nss(),
-        std::move(involvedNamespaces),
-        boost::none /* encryptionInformation */,
-        false /* isIdHackEligibleQuery */,
-        {/* no unsupported agg stages */}};
+                                serializationContext);
+
+    return RepresentativeQueryInfo{
+        .serializedQueryShape = serializedQueryShape,
+        .queryShapeHash = distinctCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
+        .namespaceString = nssOrUuid.nss(),
+        .involvedNamespaces = {nssOrUuid.nss()},
+        .encryptionInformation = boost::none,
+        .isIdHackQuery = false,
+        .systemStage = {/* no unsupported agg stages */},
+    };
 }
 
 /*
  * Creates the corresponding RepresentativeQueryInfo for Aggregation query representatives.
  */
-RepresentativeQueryInfo createRepresentativeInfoAgg(
-    const QueryInstance& queryInstance,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const boost::optional<TenantId>& tenantId) {
-    auto aggregateCommandRequest = AggregateCommandRequest::parse(
-        IDLParserContext("aggregateCommandRequest",
-                         false /* apiStrict */,
-                         auth::ValidatedTenancyScope::get(expCtx->opCtx),
-                         tenantId,
-                         kSerializationContext),
-        queryInstance);
-    // Add the aggregate command request to the expression context for the parsed pipeline
-    // to be able to get the involved namespaces.
-    expCtx->ns = aggregateCommandRequest.getNamespace();
-
-    // Populate encryption information.
-    auto& encryptionInformation = aggregateCommandRequest.getEncryptionInformation();
-
+RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
+                                                    const QueryInstance& queryInstance,
+                                                    const boost::optional<TenantId>& tenantId) {
+    auto aggregateCommandRequest =
+        AggregateCommandRequest::parse(IDLParserContext("aggregateCommandRequest",
+                                                        false /* apiStrict */,
+                                                        auth::ValidatedTenancyScope::get(opCtx),
+                                                        tenantId,
+                                                        kSerializationContext),
+                                       queryInstance);
     // Populate foreign collection namespaces.
     auto parsedPipeline = LiteParsedPipeline(aggregateCommandRequest);
     auto involvedNamespaces = parsedPipeline.getInvolvedNamespaces();
-
-    // When parsing the pipeline, we try to resolve the namespaces, which requires the resolved
-    // namespaces to be present in the expression context.
-    expCtx->addResolvedNamespaces(
-        stdx::unordered_set<NamespaceString>{involvedNamespaces.begin(), involvedNamespaces.end()});
-
     // We also need to add the main namespace because 'addResolvedNamespaces' only
     // adds the foreign collections.
     auto resolvedNs = ExpressionContext::ResolvedNamespace{aggregateCommandRequest.getNamespace(),
                                                            aggregateCommandRequest.getPipeline()};
     involvedNamespaces.insert(resolvedNs.ns);
 
+    // When parsing the pipeline, we try to resolve the namespaces, which requires the resolved
+    // namespaces to be present in the expression context.
+    auto nss = aggregateCommandRequest.getNamespace();
+    auto expCtx =
+        ExpressionContext::makeBlankExpressionContext(opCtx, nss, aggregateCommandRequest.getLet());
+    expCtx->addResolvedNamespaces(
+        stdx::unordered_set<NamespaceString>{involvedNamespaces.begin(), involvedNamespaces.end()});
     auto pipeline = Pipeline::parse(aggregateCommandRequest.getPipeline(), expCtx);
-    const auto& ns = aggregateCommandRequest.getNamespace();
 
     const auto serializationContext = aggregateCommandRequest.getSerializationContext();
-    AggCmdShape aggCmdShape{
-        std::move(aggregateCommandRequest), ns, involvedNamespaces, *pipeline, expCtx};
+    AggCmdShape aggCmdShape{aggregateCommandRequest, nss, involvedNamespaces, *pipeline, expCtx};
+    auto serializedQueryShape =
+        aggCmdShape.toBson(expCtx->opCtx,
+                           SerializationOptions::kDebugQueryShapeSerializeOptions,
+                           serializationContext);
 
     // For aggregate queries, the check for IDHACK should not be taken into account due to the
     // complexity of determining if a pipeline is eligible or not for IDHACK.
     return RepresentativeQueryInfo{
-        aggCmdShape.toBson(expCtx->opCtx,
-                           SerializationOptions::kDebugQueryShapeSerializeOptions,
-                           serializationContext),
-        aggCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
-        std::move(expCtx->ns),
-        std::move(involvedNamespaces),
-        std::move(encryptionInformation),
-        false /* isIdHackEligibleQuery */,
-        getStageExemptedFromRejection(*pipeline)};
+        .serializedQueryShape = serializedQueryShape,
+        .queryShapeHash = aggCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
+        .namespaceString = nss,
+        .involvedNamespaces = std::move(involvedNamespaces),
+        .encryptionInformation = aggregateCommandRequest.getEncryptionInformation(),
+        .isIdHackQuery = false,
+        .systemStage = getStageExemptedFromRejection(*pipeline),
+    };
 }
 
-RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
-                                                 OperationContext* opCtx,
+RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
+                                                 const BSONObj& cmd,
                                                  const boost::optional<TenantId>& tenantId) {
-
-    auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, NamespaceString());
     const auto commandName = cmd.firstElementFieldNameStringData();
     if (commandName == FindCommandRequest::kCommandName) {
-        return createRepresentativeInfoFind(cmd, expCtx, tenantId);
+        return createRepresentativeInfoFind(opCtx, cmd, tenantId);
     }
     if (commandName == AggregateCommandRequest::kCommandName) {
-        return createRepresentativeInfoAgg(cmd, expCtx, tenantId);
+        return createRepresentativeInfoAgg(opCtx, cmd, tenantId);
     }
     if (commandName == DistinctCommandRequest::kCommandName) {
-        return createRepresentativeInfoDistinct(cmd, expCtx, tenantId);
+        return createRepresentativeInfoDistinct(opCtx, cmd, tenantId);
     }
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
 }

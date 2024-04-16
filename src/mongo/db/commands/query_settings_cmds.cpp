@@ -246,7 +246,7 @@ public:
                 if (const auto& queryInstance =
                         newQueryShapeConfiguration.getRepresentativeQuery()) {
                     auto representativeQueryInfo =
-                        createRepresentativeInfo(*queryInstance, opCtx, tenantId);
+                        createRepresentativeInfo(opCtx, *queryInstance, tenantId);
 
                     // Assert that query settings will be set on a valid query.
                     utils::validateRepresentativeQuery(representativeQueryInfo);
@@ -263,7 +263,7 @@ public:
             OperationContext* opCtx, const QueryInstance& queryInstance) {
             auto& querySettingsManager = QuerySettingsManager::get(opCtx);
             auto tenantId = request().getDbName().tenantId();
-            auto representativeQueryInfo = createRepresentativeInfo(queryInstance, opCtx, tenantId);
+            auto representativeQueryInfo = createRepresentativeInfo(opCtx, queryInstance, tenantId);
             auto& queryShapeHash = representativeQueryInfo.queryShapeHash;
 
             // If there is already an entry for a given QueryShapeHash, then perform
@@ -381,7 +381,7 @@ public:
                               // comparison during search for the matching
                               // QueryShapeConfiguration.
                               auto representativeQueryInfo =
-                                  createRepresentativeInfo(queryInstance, opCtx, tenantId);
+                                  createRepresentativeInfo(opCtx, queryInstance, tenantId);
 
                               return representativeQueryInfo.queryShapeHash;
                           },
