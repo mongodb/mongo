@@ -97,13 +97,13 @@ function testFn(db) {
 }
 
 jsTestLog("Testing against a replica set");
-const rst = new ReplSetTest({nodes: 2});
+const rst = new ReplSetTest({nodes: 2, causallyConsistent: true});
 rst.startSet();
 rst.initiate();
 testFn(new Mongo(rst.getURL()).getDB(dbName));
 rst.stopSet();
 
 jsTestLog("Testing against a sharded cluster");
-const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
+const st = new ShardingTest({shards: 1, rs: {nodes: 2}, causallyConsistent: true});
 testFn(st.s.getDB(dbName));
 st.stop();
