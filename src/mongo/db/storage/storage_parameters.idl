@@ -239,11 +239,6 @@ feature_flags:
         default: true
         version: 6.0
         shouldBeFCVGated: true
-    featureFlagDerivedMetadata:
-        description: "When enabled, support storing derived collection and index metadata"
-        cpp_varname: feature_flags::gDerivedMetadata
-        default: false
-        shouldBeFCVGated: true
     featureFlagInternalWritesAreReplicatedTransactionally:
         description: Feature flag to enable internal writes to use the transactionally replicated WriteUnitOfWork API by default.
         cpp_varname: gFeatureFlagInternalWritesAreReplicatedTransactionally
