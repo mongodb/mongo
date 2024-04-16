@@ -1,4 +1,5 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 const st = new ShardingTest({
     shards: 3,
@@ -432,14 +433,7 @@ function testAddShard() {
     for (const dbName of dbsOnNewReplicaSet) {
         assert.commandWorked(st.getDB(dbName).dropDatabase());
     }
-
-    let res = assert.commandWorked(st.s.adminCommand({removeShard: newShardName}));
-    if (res.state === 'started') {
-        // Issue a second removeShard request to sync on the full removal of the targeted RS.
-        res = assert.commandWorked(st.s.adminCommand({removeShard: newShardName}));
-    }
-
-    assert.eq('completed', res.state);
+    removeShard(st, newShardName);
     newReplicaSet.stopSet();
 }
 
