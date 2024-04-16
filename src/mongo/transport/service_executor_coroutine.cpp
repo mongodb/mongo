@@ -206,6 +206,7 @@ Status ServiceExecutorCoroutine::_startWorker(int16_t groupId) {
             if (cnt == 0) {
                 if (idleCnt == 0) {
                     idleStartTime = std::chrono::steady_clock::now();
+                    MONGO_LOG(3) << "idleStartTime " << idleStartTime.time_since_epoch().count();
                 }
                 idleCnt++;
                 if ((idleCnt & kIdleCycle) == 0) {
