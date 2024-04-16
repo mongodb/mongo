@@ -43,7 +43,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/oplog_batcher_test_fixture.h"
+#include "mongo/db/repl/oplog_applier_batcher_test_fixture.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
 #include "mongo/db/service_context_test_fixture.h"

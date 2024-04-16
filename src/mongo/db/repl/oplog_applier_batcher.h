@@ -62,9 +62,9 @@ class OplogApplier;
  * Consumes batches of oplog entries from the OplogBuffer to give to the oplog applier, freeing
  * up space for more operations to be fetched from a sync source and allocated onto the OplogBuffer.
  */
-class OplogBatcher {
-    OplogBatcher(const OplogBatcher&) = delete;
-    OplogBatcher& operator=(const OplogBatcher&) = delete;
+class OplogApplierBatcher {
+    OplogApplierBatcher(const OplogApplierBatcher&) = delete;
+    OplogApplierBatcher& operator=(const OplogApplierBatcher&) = delete;
 
 public:
     /**
@@ -87,11 +87,11 @@ public:
     };
 
     /**
-     * Constructs an OplogBatcher
+     * Constructs an OplogApplierBatcher
      */
-    OplogBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer);
+    OplogApplierBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer);
 
-    virtual ~OplogBatcher();
+    virtual ~OplogApplierBatcher();
 
     /**
      * Returns the batch of oplog entries and clears _ops so the batcher can store a new batch.
@@ -99,8 +99,8 @@ public:
     OplogApplierBatch getNextBatch(Seconds maxWaitTime);
 
     /**
-     * Starts up a thread to continuously pull from the OplogBuffer into the OplogBatcher's oplog
-     * batch.
+     * Starts up a thread to continuously pull from the OplogBuffer into the OplogApplierBatcher's
+     * oplog batch.
      */
     void startup(StorageInterface* storageInterface);
 
@@ -168,7 +168,7 @@ private:
     OplogApplier* _oplogApplier;
     OplogBuffer* const _oplogBuffer;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("OplogBatcher::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH("OplogApplierBatcher::_mutex");
     stdx::condition_variable _cv;
 
     /**

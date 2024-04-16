@@ -40,7 +40,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_batcher.h"
+#include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
@@ -110,11 +110,11 @@ public:
     class Observer;
 
     /**
-     * OplogBatcher is an implementation detail that should be abstracted from all levels above
-     * the OplogApplier. Parts of the system that need to modify BatchLimits can do so through the
-     * OplogApplier.
+     * OplogApplierBatcher is an implementation detail that should be abstracted from all levels
+     * above the OplogApplier. Parts of the system that need to modify BatchLimits can do so through
+     * the OplogApplier.
      */
-    using BatchLimits = OplogBatcher::BatchLimits;
+    using BatchLimits = OplogApplierBatcher::BatchLimits;
 
     /**
      * Constructs this OplogApplier with specific options.
@@ -184,7 +184,7 @@ public:
     StatusWith<OpTime> applyOplogBatch(OperationContext* opCtx, std::vector<OplogEntry> ops);
 
     /**
-     * Calls the OplogBatcher's getNextApplierBatch.
+     * Calls the OplogApplierBatcher's getNextApplierBatch.
      */
     StatusWith<OplogApplierBatch> getNextApplierBatch(
         OperationContext* opCtx,
@@ -229,7 +229,7 @@ private:
 
 protected:
     // Handles consuming oplog entries from the OplogBuffer for oplog application.
-    std::unique_ptr<OplogBatcher> _oplogBatcher;
+    std::unique_ptr<OplogApplierBatcher> _oplogBatcher;
 };
 
 /**

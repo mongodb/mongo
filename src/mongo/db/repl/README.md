@@ -289,15 +289,15 @@ Otherwise, the secondary found a sync source! At that point `BackgroundSync` sta
 ### Oplog Entry Application
 
 A separate thread, `ReplBatcher`, runs the
-[`OplogBatcher`](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/db/repl/oplog_batcher.h) and
-is used for pulling oplog entries off of the oplog buffer and creating the next batch that will be
-applied. These batches are called **oplog applier batches** and are different from **oplog fetcher
-batches**, which are sent by a node's sync source during [oplog fetching](#oplog-fetching). Oplog
-applier batches differ from oplog fetcher batches because they have more restrictions than just size
-limits when creating a new batch. Operations in a batch are applied in parallel when possible, so
-there are certain operation types (like commands) which require being in their own oplog applier
-batch. For example, a dropDatabase operation shouldn't be applied in parallel with other operations,
-so it must be in a batch of size one.
+[`OplogApplierBatcher`](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/db/repl/oplog_applier_batcher.h)
+and is used for pulling oplog entries off of the oplog buffer and creating the next batch that will
+be applied. These batches are called **oplog applier batches** and are different from **oplog
+fetcher batches**, which are sent by a node's sync source during [oplog fetching](#oplog-fetching).
+Oplog applier batches differ from oplog fetcher batches because they have more restrictions than
+just size limits when creating a new batch. Operations in a batch are applied in parallel when
+possible, so there are certain operation types (like commands) which require being in their own
+oplog applier batch. For example, a `dropDatabase` operation shouldn't be applied in parallel with
+other operations, so it must be in a batch of size one.
 
 The
 [`OplogApplier`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/oplog_applier.h)

@@ -65,7 +65,7 @@ OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            Observer* observer,
                            const Options& options)
     : _executor(executor), _oplogBuffer(oplogBuffer), _observer(observer), _options(options) {
-    _oplogBatcher = std::make_unique<OplogBatcher>(this, oplogBuffer);
+    _oplogBatcher = std::make_unique<OplogApplierBatcher>(this, oplogBuffer);
 }
 
 OplogBuffer* OplogApplier::getBuffer() const {

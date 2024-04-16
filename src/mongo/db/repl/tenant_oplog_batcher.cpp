@@ -46,7 +46,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
-#include "mongo/db/repl/oplog_batcher.h"
+#include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
 #include "mongo/logv2/log.h"
@@ -178,7 +178,7 @@ void TenantOplogBatcher::_consume(OperationContext* opCtx) {
 }
 
 bool TenantOplogBatcher::_mustProcessIndividually(const OplogEntry& entry) {
-    // See the comment of OplogBatcher::_getBatchActionForEntry() for details. The conditions
+    // See the comment of OplogApplierBatcher::_getBatchActionForEntry() for details. The conditions
     // here are similar to the kProcessIndividually case in that function.
     if (entry.isCommand()) {
         return (entry.getCommandType() != OplogEntry::CommandType::kApplyOps) ||
@@ -223,7 +223,7 @@ StatusWith<TenantOplogBatch> TenantOplogBatcher::_readNextBatch(BatchLimits limi
                 // batch.
                 break;
             }
-            auto opCount = OplogBatcher::getOpCount(entry);
+            auto opCount = OplogApplierBatcher::getOpCount(entry);
             auto opBytes = entry.getRawObjSizeBytes();
             if (totalOps > 0 &&
                 (totalOps + opCount > limits.ops || totalBytes + opBytes > limits.bytes)) {

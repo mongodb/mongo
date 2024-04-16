@@ -70,7 +70,7 @@ public:
 
         // InitialSyncer waits this long before retrying getApplierBatchCallback() if there are
         // currently no operations available to apply or if the 'rsSyncApplyStop' failpoint is
-        // active. This default value is based on the duration in OplogBatcher::run().
+        // active. This default value is based on the duration in OplogApplierBatcher::run().
         Milliseconds getApplierBatchCallbackRetryWait{1000};
 
         GetMyLastOptimeFn getMyLastOptime;
