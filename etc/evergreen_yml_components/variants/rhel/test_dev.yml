@@ -229,6 +229,7 @@ buildvariants:
       - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
       - name: .concurrency .sharded !.large
       - name: .concurrency .sharded .large
+      - name: .unsplittable_collections
         distros:
           - rhel80-medium
       - name: .multi_shard
