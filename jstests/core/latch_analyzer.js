@@ -1,7 +1,12 @@
 /**
  * Verify that the LatchAnalyzer is working to expectations
  *
- * @tags: [multiversion_incompatible, no_selinux, requires_latch_analyzer]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   no_selinux,
+ *   requires_latch_analyzer,
+ *   multi_clients_incompatible,
+ * ]
  */
 
 const failPointName = "enableLatchAnalysis";
