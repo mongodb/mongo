@@ -51,7 +51,7 @@ SemaphoreTicketHolder::SemaphoreTicketHolder(ServiceContext* serviceContext,
     : TicketHolder(serviceContext, numTickets, trackPeakUsed), _tickets(numTickets) {}
 
 boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
-    uint64_t available = _tickets.load();
+    uint32_t available = _tickets.load();
     while (true) {
         if (available == 0) {
             return boost::none;
@@ -65,42 +65,50 @@ boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext*
 
 boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
                                                                        AdmissionContext* admCtx,
-                                                                       Date_t deadline,
+                                                                       Date_t until,
                                                                        bool interruptible) {
-    boost::optional<Ticket> maybeTicket = _tryAcquireImpl(admCtx);
-    if (MONGO_likely(maybeTicket)) {
-        if (interruptible) {
-            opCtx->checkForInterrupt();
-        }
+    auto nextDeadline = [&]() {
+        // Timed waits can be problematic if we have a large number of waiters, since each time we
+        // check for interrupt we risk waking up all waiting threads at the same time. We introduce
+        // some jitter here to try to reduce the impact of a thundering herd of waiters woken at
+        // the same time.
+        static int32_t baseIntervalMs = 500;
+        static double jitterFactor = 0.2;
+        static thread_local XorShift128 urbg(SecureRandom().nextInt64());
+        int32_t offset = std::uniform_int_distribution<int32_t>(
+            -jitterFactor * baseIntervalMs, baseIntervalMs * jitterFactor)(urbg);
+        return std::min(until, Date_t::now() + Milliseconds{baseIntervalMs + offset});
+    };
 
-        return std::move(*maybeTicket);
-    }
-
+    Date_t deadline = nextDeadline();
     while (true) {
-        Waitable::TimeoutState status;
-        _parkingLot.runWithNotifyable(*opCtx->getBaton(), [&]() noexcept {
-            ClockSource* clockSource = opCtx->getServiceContext()->getPreciseClockSource();
-            Baton* baton = opCtx->getBaton().get();
-            status = baton->run_until(clockSource, deadline);
-        });
+        while (!_tickets.waitUntil(0, deadline)) {
+            if (deadline == until) {
+                return boost::none;
+            }
 
-        if (status == Waitable::TimeoutState::Timeout) {
-            return boost::none;
+            deadline = nextDeadline();
+            if (interruptible) {
+                opCtx->checkForInterrupt();
+            }
         }
 
-        if (interruptible) {
-            opCtx->checkForInterrupt();
-        }
+        uint32_t available = _tickets.load();
+        if (available > 0 && _tickets.compareAndSwap(&available, available - 1)) {
+            Ticket ticket{this, admCtx};
 
-        if (boost::optional<Ticket> maybeTicket = _tryAcquireImpl(admCtx)) {
-            return std::move(*maybeTicket);
+            if (interruptible) {
+                opCtx->checkForInterrupt();
+            }
+
+            return std::move(ticket);
         }
     }
 }
 
 void SemaphoreTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
     _tickets.fetchAndAdd(1);
-    _parkingLot.notifyOne();
+    _tickets.notifyOne();
 }
 
 int32_t SemaphoreTicketHolder::available() const {
