@@ -76,6 +76,18 @@ struct BucketSpec {
     // measurements.
     std::set<std::string> computedMetaProjFields;
 
+    // Remove fields that the predicate function evaluates to true for.
+    void eraseIfPredTrueFromComputedMetaProjFields(const std::function<bool(std::string)> pred) {
+        auto it = computedMetaProjFields.begin();
+        while (it != computedMetaProjFields.end()) {
+            if (pred(*it)) {
+                it = computedMetaProjFields.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
     bool includeMinTimeAsMetadata = false;
     bool includeMaxTimeAsMetadata = false;
 
@@ -206,8 +218,9 @@ private:
     // included in the materialized measurements.
     void eraseMetaFromFieldSetAndDetermineIncludeMeta();
 
-    // Erase computed meta projection fields if they are present in the exclusion field set.
-    void eraseExcludedComputedMetaProjFields();
+    // Erase computed meta projection fields if they are present in the exclusion field set or if
+    // they are not present in the inclusion set.
+    void eraseUnneededComputedMetaProjFields();
 
     BucketSpec _spec;
     Behavior _unpackerBehavior;

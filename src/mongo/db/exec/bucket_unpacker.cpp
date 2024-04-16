@@ -622,12 +622,18 @@ void BucketUnpacker::eraseMetaFromFieldSetAndDetermineIncludeMeta() {
     }
 }
 
-void BucketUnpacker::eraseExcludedComputedMetaProjFields() {
-    if (_unpackerBehavior == BucketUnpacker::Behavior::kExclude) {
-        for (const auto& field : _spec.fieldSet) {
-            _spec.computedMetaProjFields.erase(field);
-        }
-    }
+void BucketUnpacker::eraseUnneededComputedMetaProjFields() {
+    //  If this is an inclusion spec and the current computed field is not part of in the include
+    //  fields, it means the computed field should not be available after the current unpack stage.
+    //  Similarly, for exclusion spec, if the current computed field is part of the exclude fields,
+    //  the computed fields should not be available after the current unpack stage. This can happen
+    //  if there was a $project stage after a $addFields stage.
+    bool removeIfInFieldSet = _unpackerBehavior == BucketUnpacker::Behavior::kExclude;
+    auto conditionToErase = [&](const std::string& computedField) {
+        bool inFieldSet = _spec.fieldSet.find(computedField) != _spec.fieldSet.end();
+        return inFieldSet == removeIfInFieldSet;
+    };
+    _spec.eraseIfPredTrueFromComputedMetaProjFields(conditionToErase);
 }
 
 void BucketUnpacker::setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior behavior) {
@@ -636,7 +642,7 @@ void BucketUnpacker::setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior 
 
     eraseMetaFromFieldSetAndDetermineIncludeMeta();
     determineIncludeTimeField();
-    eraseExcludedComputedMetaProjFields();
+    eraseUnneededComputedMetaProjFields();
 
     _includeMinTimeAsMetadata = _spec.includeMinTimeAsMetadata;
     _includeMaxTimeAsMetadata = _spec.includeMaxTimeAsMetadata;
