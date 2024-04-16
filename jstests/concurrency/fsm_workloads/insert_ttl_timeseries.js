@@ -180,6 +180,10 @@ export const $config = (function() {
         assert.soon(() => {
             return db[collName].find({first: true}).itcount() == 0;
         }, 'Expected oldest documents to be removed', timeoutMS);
+
+        if (TestData.runningWithBalancer) {
+            BalancerHelper.enableBalancerForCollection(db, db[collName].getFullName());
+        }
     }
 
     const standardTransition = {

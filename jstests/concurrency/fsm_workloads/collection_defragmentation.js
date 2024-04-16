@@ -10,6 +10,7 @@
  *  # This test configure the 'balancerShouldReturnRandomMigrations' failpoint
  *  # that will be reset to its default value if a node is killed and restarted.
  *  does_not_support_stepdowns,
+ *  assumes_stable_shard_list,
  * ]
  */
 

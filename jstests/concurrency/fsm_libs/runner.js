@@ -2,6 +2,7 @@ import {Cluster} from "jstests/concurrency/fsm_libs/cluster.js";
 import {parseConfig} from "jstests/concurrency/fsm_libs/parse_config.js";
 import {ThreadManager} from "jstests/concurrency/fsm_libs/thread_mgr.js";
 import {uniqueCollName, uniqueDBName} from "jstests/concurrency/fsm_utils/name_utils.js";
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
 export const runner = (function() {
     function validateExecutionMode(mode) {
@@ -357,8 +358,16 @@ export const runner = (function() {
         var myDB = context[workload].db;
         var collName = context[workload].collName;
 
-        var config = context[workload].config;
-        config.setup.call(config.data, myDB, collName, cluster);
+        const fn = () => {
+            var config = context[workload].config;
+            config.setup.call(config.data, myDB, collName, cluster);
+        };
+
+        if (TestData.transitioningConfigShard) {
+            ConfigShardUtil.retryOnConfigTransitionErrors(fn);
+        } else {
+            fn();
+        }
     }
 
     function teardownWorkload(workload, context, cluster) {

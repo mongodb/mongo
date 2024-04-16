@@ -1,6 +1,7 @@
 import {
     withTxnAndAutoRetry
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 export var fsm = (function() {
@@ -153,6 +154,14 @@ export var fsm = (function() {
 
                     fn.call(args.data, args.db, args.collName, connCache);
                 }
+            } else if (TestData.transitioningConfigShard) {
+                // Some state functions choose a specific shard for a command and may fail with
+                // ShardNotFound if the shard list changes during execution. Retry on the assumption
+                // a different shard will be chosen on the retry or soon the config server will
+                // become a shard again.
+                ConfigShardUtil.retryOnConfigTransitionErrors(() => {
+                    fn.call(args.data, args.db, args.collName, connCache);
+                });
             } else {
                 fn.call(args.data, args.db, args.collName, connCache);
             }

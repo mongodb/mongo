@@ -371,7 +371,9 @@ int getRandomIndex(int max) {
 
 // Returns a randomly chosen pair of source -> destination shards for testing.
 boost::optional<MigrateInfo> chooseRandomMigration(
-    const stdx::unordered_set<ShardId>& availableShards, const DistributionStatus& distribution) {
+    const ShardStatisticsVector& shardStats,
+    const stdx::unordered_set<ShardId>& availableShards,
+    const DistributionStatus& distribution) {
 
     if (availableShards.size() < 2) {
         return boost::none;
@@ -381,6 +383,19 @@ boost::optional<MigrateInfo> chooseRandomMigration(
     std::copy(availableShards.begin(), availableShards.end(), std::back_inserter(shards));
     std::default_random_engine rng(time(nullptr));
     std::shuffle(shards.begin(), shards.end(), rng);
+
+    // Filter out draining shards to get more realistic coverage for tests that remove shards.
+    std::erase_if(shards, [&](auto shardId) {
+        for (const auto& stat : shardStats) {
+            if (stat.shardId == shardId && stat.isDraining) {
+                return true;
+            }
+        }
+        return false;
+    });
+    if (shards.size() < 2) {
+        return boost::none;
+    }
 
     // Get a random shard with chunks as the donor shard and another random shard as the recipient
     boost::optional<ShardId> donorShard;
@@ -441,27 +456,6 @@ MigrateInfosWithReason BalancerPolicy::balance(
     bool forceJumbo) {
     vector<MigrateInfo> migrations;
     MigrationReason firstReason = MigrationReason::none;
-
-    if (MONGO_unlikely(balancerShouldReturnRandomMigrations.shouldFail()) &&
-        !distribution.nss().isConfigDB()) {
-        LOGV2_DEBUG(21881, 1, "balancerShouldReturnRandomMigrations failpoint is set");
-
-        auto migration = chooseRandomMigration(*availableShards, distribution);
-
-        if (migration) {
-            migrations.push_back(migration.get());
-            firstReason = MigrationReason::chunksImbalance;
-
-            tassert(8245223,
-                    "Migration's from shard does not exist in available shards",
-                    availableShards->erase(migration.get().from));
-            tassert(8245224,
-                    "Migration's to shard does not exist in available shards",
-                    availableShards->erase(migration.get().to));
-        }
-
-        return std::make_pair(std::move(migrations), firstReason);
-    }
 
     // 1) Check for shards, which are in draining mode
     {
@@ -546,6 +540,30 @@ MigrateInfosWithReason BalancerPolicy::balance(
                 return std::make_pair(std::move(migrations), firstReason);
             }
         }
+    }
+
+    // Select random migrations after checking for draining shards so tests with removeShard or
+    // transitionToDedicatedConfigServer can eventually drain shards.
+    // NOTE: randomly chosen migrations do not respect zones.
+    if (MONGO_unlikely(balancerShouldReturnRandomMigrations.shouldFail()) &&
+        !distribution.nss().isConfigDB()) {
+        LOGV2_DEBUG(21881, 1, "balancerShouldReturnRandomMigrations failpoint is set");
+
+        auto migration = chooseRandomMigration(shardStats, *availableShards, distribution);
+
+        if (migration) {
+            migrations.push_back(migration.get());
+            firstReason = MigrationReason::chunksImbalance;
+
+            tassert(8245223,
+                    "Migration's from shard does not exist in available shards",
+                    availableShards->erase(migration.get().from));
+            tassert(8245224,
+                    "Migration's to shard does not exist in available shards",
+                    availableShards->erase(migration.get().to));
+        }
+
+        return std::make_pair(std::move(migrations), firstReason);
     }
 
     // 2) Check for chunks, which are on the wrong shard and must be moved off of it
