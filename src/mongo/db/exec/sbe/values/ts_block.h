@@ -146,7 +146,7 @@ public:
         return false;
     }
 
-    boost::optional<size_t> tryCount() const override {
+    size_t count() override {
         return _count;
     }
 

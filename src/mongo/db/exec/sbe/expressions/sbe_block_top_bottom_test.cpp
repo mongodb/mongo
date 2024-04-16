@@ -229,7 +229,7 @@ public:
         auto blockSize = blocks[0]->count();
         std::vector<TypedValues> typedValVecs(blockSize);
         for (size_t i = 0; i < blocks.size(); ++i) {
-            invariant(*blocks[i]->tryCount() == *blocks[0]->tryCount());
+            invariant(blocks[i]->count() == blocks[0]->count());
             auto deblocked = blocks[i]->extract();
             for (size_t j = 0; j < deblocked.count(); ++j) {
                 // Capture fillEmpty(null) semantics.

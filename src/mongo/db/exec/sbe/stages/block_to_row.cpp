@@ -178,13 +178,9 @@ void BlockToRowStage::prepareDeblock() {
 
         _deblockedValueRuns.emplace_back(std::move(tvVec));
 
-        tassert(7962151, "Block's count must always be same as count of deblocked values", [&] {
-            if (auto optCnt = valueBlock->tryCount()) {
-                return *optCnt == deblocked.count();
-            } else {
-                return true;
-            }
-        }());
+        tassert(7962151,
+                "Block's count must always be same as count of deblocked values",
+                valueBlock->count() == deblocked.count());
         tassert(7962101,
                 "All deblocked value runs for output must be same size",
                 _deblockedValueRuns.back().size() == _deblockedValueRuns.front().size());

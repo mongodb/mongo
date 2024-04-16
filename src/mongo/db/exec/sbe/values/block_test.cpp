@@ -709,13 +709,43 @@ TEST_F(ValueBlockTest, TestBlockMapFast) {
     auto [strTag2, strVal2] = value::makeNewString("a slightly longer string");
     block->push_back(strTag2, strVal2);
 
+    // Verify that the fast path won't be taken if we don't have a lower and upper bound for the
+    // block.
+    ASSERT_EQ(block->mapMonotonicFastPath(testOp5), nullptr);
     block->setMin(strTag2, strVal2);
+    ASSERT_EQ(block->mapMonotonicFastPath(testOp5), nullptr);
     block->setMax(strTag1, strVal1);
 
-    auto outBlock1 = block->map(testOp5);
+    // Verify that correct results are produced.
+    auto outBlock1 = block->mapMonotonicFastPath(testOp5);
     auto output1 = blockToBsonArr(*outBlock1);
     ASSERT_BSONOBJ_EQ(output1,
                       fromjson("{result: ['fake result from map', 'fake result from map']}"));
+
+    // Verify that it actually used the fast path.
+    ASSERT_NE(block->mapMonotonicFastPath(testOp5), nullptr);
+
+    // Verify that the fast path won't be taken if the block isn't dense.
+    block->push_back(makeNothing());
+    ASSERT_EQ(block->mapMonotonicFastPath(testOp5), nullptr);
+}
+
+TEST_F(ValueBlockTest, EmptyBlockMapTest) {
+    auto emptyTestBlock = std::make_unique<TestBlock>();
+    auto emptyHeterogeneousBlock = std::make_unique<value::HeterogeneousBlock>(
+        std::vector<value::TypeTags>{} /* tags */, std::vector<value::Value>{} /* vals */);
+    auto emptyIntBlock =
+        std::make_unique<value::Int32Block>(std::vector<value::Value>{} /* vals */);
+
+    std::vector<std::unique_ptr<value::ValueBlock>> emptyBlocks;
+    emptyBlocks.push_back(std::move(emptyTestBlock));           // ValueBlock::defaultMapImpl
+    emptyBlocks.push_back(std::move(emptyHeterogeneousBlock));  // HeterogeneousBlock::map
+    emptyBlocks.push_back(std::move(emptyIntBlock));            // HomogeneousBlock::map
+    for (size_t i = 0; i < emptyBlocks.size(); ++i) {
+        auto outBlock = emptyBlocks[i]->map(testOp5);
+        auto output = blockToBsonArr(*outBlock);
+        ASSERT_BSONOBJ_EQ(output, fromjson("{result: []}"));
+    }
 }
 
 // Test ValueBlock::tokenize().
@@ -739,7 +769,7 @@ TEST_F(ValueBlockTest, TestTokenize) {
     block->push_back(TypeTags::Nothing, Value{0u});
 
     auto [outTokens, outIdxs] = block->tokenize();
-    ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(5));
+    ASSERT_EQ(outTokens->count(), 5);
 
     auto outTokensBson = blockToBsonArr(*outTokens);
     ASSERT_BSONOBJ_EQ(outTokensBson,
@@ -757,7 +787,7 @@ TEST_F(ValueBlockTest, MonoBlockTokenize) {
         auto block = std::make_unique<value::MonoBlock>(4, strTag, strVal);
 
         auto [outTokens, outIdxs] = block->tokenize();
-        ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(1));
+        ASSERT_EQ(outTokens->count(), 1);
 
         auto outTokensBson = blockToBsonArr(*outTokens);
         ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [\"not a small string\"]}"));
@@ -770,7 +800,7 @@ TEST_F(ValueBlockTest, MonoBlockTokenize) {
         auto block = std::make_unique<value::MonoBlock>(4, TypeTags::Nothing, Value{0u});
 
         auto [outTokens, outIdxs] = block->tokenize();
-        ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(1));
+        ASSERT_EQ(outTokens->count(), 1);
 
         auto outTokensBson = blockToBsonArr(*outTokens);
         ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [null]}"));
@@ -798,7 +828,7 @@ TEST_F(ValueBlockTest, IntBlockTokenize) {
         block->pushNothing();
 
         auto [outTokens, outIdxs] = block->tokenize();
-        ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(4));
+        ASSERT_EQ(outTokens->count(), 4);
 
         auto outTokensBson = blockToBsonArr(*outTokens);
         ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [null, 2, 0, 1]}"));
@@ -815,7 +845,7 @@ TEST_F(ValueBlockTest, IntBlockTokenize) {
         block->push_back(value::bitcastFrom<int32_t>(0));
 
         auto [outTokens, outIdxs] = block->tokenize();
-        ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(2));
+        ASSERT_EQ(outTokens->count(), 2);
 
         auto outTokensBson = blockToBsonArr(*outTokens);
         ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [null, 0]}"));
@@ -834,7 +864,7 @@ TEST_F(ValueBlockTest, IntBlockTokenize) {
         block->push_back(value::bitcastFrom<int32_t>(1));
 
         auto [outTokens, outIdxs] = block->tokenize();
-        ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(3));
+        ASSERT_EQ(outTokens->count(), 3);
 
         auto outTokensBson = blockToBsonArr(*outTokens);
         ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [2, 0, 1]}"));
@@ -859,12 +889,35 @@ TEST_F(ValueBlockTest, DoubleBlockTokenize) {
     block->push_back(std::numeric_limits<double>::quiet_NaN());
 
     auto [outTokens, outIdxs] = block->tokenize();
-    ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(4));
+    ASSERT_EQ(outTokens->count(), 4);
 
     auto outTokensBson = blockToBsonArr(*outTokens);
     ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [null, 1.1, NaN, 2.2]}"));
 
     std::vector<size_t> expIdxs{0, 1, 2, 0, 0, 2, 3, 1, 2};
+    ASSERT_EQ(outIdxs, expIdxs);
+}
+
+// Test that default implementation still works for BoolBlock's.
+TEST_F(ValueBlockTest, BoolBlockTokenize) {
+    auto block = std::make_unique<value::BoolBlock>();
+
+    block->pushNothing();
+    block->push_back(false);
+    block->pushNothing();
+    block->pushNothing();
+    block->push_back(true);
+    block->push_back(true);
+    block->push_back(false);
+    block->push_back(true);
+
+    auto [outTokens, outIdxs] = block->tokenize();
+    ASSERT_EQ(outTokens->count(), 3);
+
+    auto outTokensBson = blockToBsonArr(*outTokens);
+    ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [null, false, true]}"));
+
+    std::vector<size_t> expIdxs{0, 1, 0, 0, 2, 2, 1, 2};
     ASSERT_EQ(outIdxs, expIdxs);
 }
 
@@ -993,4 +1046,78 @@ TEST_F(ValueBlockTest, ArgMinMaxGetAt) {
     }
 }
 
+TEST_F(ValueBlockTest, AllTrueFalseTest) {
+    {
+        value::MonoBlock intMonoBlock(
+            3, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+
+        ASSERT_EQ(intMonoBlock.allFalse(), boost::none);
+        ASSERT_EQ(intMonoBlock.allTrue(), boost::none);
+    }
+
+    {
+        value::MonoBlock trueMonoBlock(
+            3, value::TypeTags::Boolean, value::bitcastFrom<int32_t>(true));
+
+        ASSERT_EQ(trueMonoBlock.allFalse(), boost::optional<bool>{false});
+        ASSERT_EQ(trueMonoBlock.allTrue(), boost::optional<bool>{true});
+    }
+
+    {
+        value::MonoBlock falseMonoBlock(
+            3, value::TypeTags::Boolean, value::bitcastFrom<int32_t>(false));
+
+        ASSERT_EQ(falseMonoBlock.allFalse(), boost::optional<bool>{true});
+        ASSERT_EQ(falseMonoBlock.allTrue(), boost::optional<bool>{false});
+    }
+
+    {
+        value::BoolBlock boolBlock{std::vector<bool>{true, false}};
+
+        ASSERT_EQ(boolBlock.allFalse(), boost::optional<bool>{false});
+        ASSERT_EQ(boolBlock.allTrue(), boost::optional<bool>{false});
+
+        boolBlock.pushNothing();
+
+        ASSERT_EQ(boolBlock.allFalse(), boost::none);
+        ASSERT_EQ(boolBlock.allTrue(), boost::none);
+    }
+
+    {
+        value::BoolBlock trueBoolBlock{std::vector<bool>{true, true}};
+
+        ASSERT_EQ(trueBoolBlock.allFalse(), boost::optional<bool>{false});
+        ASSERT_EQ(trueBoolBlock.allTrue(), boost::optional<bool>{true});
+
+        trueBoolBlock.pushNothing();
+
+        ASSERT_EQ(trueBoolBlock.allFalse(), boost::none);
+        ASSERT_EQ(trueBoolBlock.allTrue(), boost::none);
+    }
+
+    {
+        value::BoolBlock falseBoolBlock{std::vector<bool>{false, false}};
+
+        ASSERT_EQ(falseBoolBlock.allFalse(), boost::optional<bool>{true});
+        ASSERT_EQ(falseBoolBlock.allTrue(), boost::optional<bool>{false});
+
+        falseBoolBlock.pushNothing();
+
+        ASSERT_EQ(falseBoolBlock.allFalse(), boost::none);
+        ASSERT_EQ(falseBoolBlock.allTrue(), boost::none);
+    }
+
+    {
+        value::Int32Block intBlock{std::vector<value::Value>{value::bitcastFrom<int32_t>(1),
+                                                             value::bitcastFrom<int32_t>(2)}};
+
+        ASSERT_EQ(intBlock.allFalse(), boost::none);
+        ASSERT_EQ(intBlock.allTrue(), boost::none);
+
+        intBlock.pushNothing();
+
+        ASSERT_EQ(intBlock.allFalse(), boost::none);
+        ASSERT_EQ(intBlock.allTrue(), boost::none);
+    }
+}
 }  // namespace mongo::sbe

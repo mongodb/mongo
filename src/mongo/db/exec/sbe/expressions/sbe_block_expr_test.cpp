@@ -175,7 +175,7 @@ public:
         value::releaseValue(_maxVal.first, _maxVal.second);
     }
 
-    boost::optional<size_t> tryCount() const override {
+    size_t count() override {
         return _count;
     }
 
@@ -707,21 +707,52 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
         auto [fillTag, fillVal] = makeInt32(45);
         fillAccessor.reset(fillTag, fillVal);
 
-        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
-                            value::bitcastFrom<value::ValueBlock*>(&block));
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard guard(runTag, runVal);
+        {
+            blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                                value::bitcastFrom<value::ValueBlock*>(&block));
+            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+            value::ValueGuard guard(runTag, runVal);
 
-        assertBlockEq(
-            runTag,
-            runVal,
-            std::vector{makeInt32(42), makeInt32(43), makeInt32(44), makeInt32(45), makeInt32(46)});
+            assertBlockEq(
+                runTag,
+                runVal,
+                std::vector{
+                    makeInt32(42), makeInt32(43), makeInt32(44), makeInt32(45), makeInt32(46)});
+        }
+
+        {
+            // Block that only has Nothings.
+            value::Int32Block nothingBlock;
+            nothingBlock.pushNothing();
+            nothingBlock.pushNothing();
+
+            blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                                value::bitcastFrom<value::ValueBlock*>(&nothingBlock));
+            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+            value::ValueGuard guard{runTag, runVal};
+
+            assertBlockEq(runTag, runVal, TypedValues{{fillTag, fillVal}, {fillTag, fillVal}});
+        }
+
+        {
+            // Dense block.
+            value::Int32Block denseBlock;
+            denseBlock.push_back(1);
+            denseBlock.push_back(2);
+
+            blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                                value::bitcastFrom<value::ValueBlock*>(&denseBlock));
+            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+            value::ValueGuard guard{runTag, runVal};
+
+            assertBlockEq(runTag, runVal, TypedValues{makeInt32(1), makeInt32(2)});
+        }
     }
 
     {
         // Deep replacement value of a different type.
         auto [fillTag, fillVal] = value::makeNewString("Replacement for missing value"_sd);
-        fillAccessor.reset(true, fillTag, fillVal);
+        fillAccessor.reset(fillTag, fillVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&block));

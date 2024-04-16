@@ -250,9 +250,13 @@ public:
             _vals[i] = copyVal;
             _tags[i] = copyTag;
         }
+        _isDense = o._isDense;
     }
     TestBlockBase(TestBlockBase&& o)
-        : value::ValueBlock(std::move(o)), _vals(std::move(o._vals)), _tags(std::move(o._tags)) {
+        : value::ValueBlock(std::move(o)),
+          _vals(std::move(o._vals)),
+          _tags(std::move(o._tags)),
+          _isDense(o._isDense) {
         o._vals = {};
         o._tags = {};
     }
@@ -263,13 +267,16 @@ public:
     }
 
     void push_back(value::TypeTags t, value::Value v) {
+        if (t == value::TypeTags::Nothing) {
+            _isDense = false;
+        }
         _vals.push_back(v);
         _tags.push_back(t);
     }
     void push_back(std::pair<value::TypeTags, value::Value> tv) {
         push_back(tv.first, tv.second);
     }
-    boost::optional<size_t> tryCount() const override {
+    size_t count() override {
         return _vals.size();
     }
     value::DeblockedTagVals deblock(
@@ -281,6 +288,9 @@ public:
         return std::make_unique<TestBlockBase>(*this);
     }
 
+    boost::optional<bool> tryDense() const override {
+        return _isDense;
+    }
     std::pair<value::TypeTags, value::Value> tryMin() const override {
         if (_minVal) {
             return *_minVal;
@@ -309,6 +319,7 @@ private:
     std::vector<value::TypeTags> _tags;
     std::vector<value::Value> _vals;
     boost::optional<std::pair<value::TypeTags, value::Value>> _minVal, _maxVal;
+    bool _isDense = true;
 };
 
 using TestBlock = TestBlockBase<true /* IsExtractable */>;

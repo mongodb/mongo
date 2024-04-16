@@ -84,8 +84,8 @@ std::unique_ptr<ValueBlock> ValueBlock::map(const ColumnOp& op) {
 std::unique_ptr<ValueBlock> ValueBlock::mapMonotonicFastPath(const ColumnOp& op) {
     // If the ColumnOp function is monotonic and the block is dense, we can try to map the whole
     // bucket to a MonoBlock instead of mapping each value iteratively.
-    if ((op.opType.flags & ColumnOpType::kMonotonic) && tryDense().get_value_or(false) &&
-        tryCount()) {
+    if (static_cast<bool>(op.opType.flags & ColumnOpType::kMonotonic) &&
+        tryDense().get_value_or(false)) {
         auto [lbTag, lbVal] = tryLowerBound();
         auto [ubTag, ubVal] = tryUpperBound();
 
@@ -97,7 +97,7 @@ std::unique_ptr<ValueBlock> ValueBlock::mapMonotonicFastPath(const ColumnOp& op)
 
             auto [cmpTag, cmpVal] = value::compareValue(lbResTag, lbResVal, ubResTag, ubResVal);
             if (cmpTag == value::TypeTags::NumberInt32 && cmpVal == 0) {
-                minGuard.reset();
+                // The MonoBlock constructor will create it's own copy of [lsResTag, lbResVal].
                 return std::make_unique<MonoBlock>(count(), lbResTag, lbResVal);
             }
         }
@@ -164,17 +164,10 @@ std::unique_ptr<ValueBlock> buildBlockFromStorage(std::vector<value::TypeTags> t
         }
     }
 
-    bool isDense = std::all_of(
-        tags.begin(), tags.end(), [](TypeTags tag) { return tag != TypeTags::Nothing; });
-
-    return std::make_unique<HeterogeneousBlock>(std::move(tags), std::move(vals), isDense);
+    return std::make_unique<HeterogeneousBlock>(std::move(tags), std::move(vals));
 }
 
 std::unique_ptr<ValueBlock> HeterogeneousBlock::map(const ColumnOp& op) {
-    if (auto fastPathResult = this->mapMonotonicFastPath(op); fastPathResult) {
-        return fastPathResult;
-    }
-
     size_t numElems = _vals.size();
     if (numElems == 0) {
         return std::make_unique<HeterogeneousBlock>();
@@ -380,8 +373,7 @@ std::unique_ptr<ValueBlock> ValueBlock::fillEmpty(TypeTags fillTag, Value fillVa
         }
     }
 
-    return std::make_unique<HeterogeneousBlock>(
-        std::move(tags), std::move(vals), true /* isDense */);
+    return std::make_unique<HeterogeneousBlock>(std::move(tags), std::move(vals));
 }
 
 template <typename T, value::TypeTags TypeTag>
@@ -390,7 +382,9 @@ std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::fillEmpty(TypeTags fil
     if (*tryDense()) {
         return nullptr;
     } else if (fillTag == TypeTag) {
-        if (_presentBitset.none()) {
+        // If _vals.size() is 0, then we know all values in the block (if there are any to begin
+        // with) must be Nothings.
+        if (_vals.size() == 0) {
             return std::make_unique<MonoBlock>(_presentBitset.size(), fillTag, fillVal);
         }
         // We also know that fillTag must be shallow since HomogeneousBlocks can only store
@@ -482,9 +476,9 @@ template std::unique_ptr<ValueBlock> BoolBlock::fillType(uint32_t typeMask,
                                                          Value fillVal);
 
 std::unique_ptr<ValueBlock> ValueBlock::exists() {
-    if (tryDense().get_value_or(false) && tryCount()) {
+    if (tryDense().get_value_or(false)) {
         return std::make_unique<MonoBlock>(
-            *tryCount(), TypeTags::Boolean, value::bitcastFrom<bool>(true));
+            count(), TypeTags::Boolean, value::bitcastFrom<bool>(true));
     }
     auto extracted = extract();
     std::vector<Value> vals(extracted.count());

@@ -536,21 +536,17 @@ ValueBlock& TsCellBlockForTopLevelField::getValueBlock() {
 }
 
 std::unique_ptr<CellBlock> TsCellBlockForTopLevelField::clone() const {
-    auto precomputedCount = _unownedTsBlock->tryCount();
-    tassert(
-        7943900, "Assumes count() is available in O(1) time on TS Block type", precomputedCount);
+    auto precomputedCount = _unownedTsBlock->count();
     auto tsBlockClone = _unownedTsBlock->cloneStrongTyped();
 
     // Using raw new to access private constructor.
     return std::unique_ptr<TsCellBlockForTopLevelField>(
-        new TsCellBlockForTopLevelField(*precomputedCount, std::move(tsBlockClone)));
+        new TsCellBlockForTopLevelField(precomputedCount, std::move(tsBlockClone)));
 }
 
 TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(TsBlock* block) : _unownedTsBlock(block) {
-    auto count = block->tryCount();
-    tassert(8182400, "Assumes count() is available in O(1) time on TS Block type", count);
     // Position info of 1111...
-    _positionInfo.resize(*count, 1);
+    _positionInfo.resize(block->count(), 1);
 }
 
 TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(size_t count,
