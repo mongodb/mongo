@@ -1078,7 +1078,8 @@ def mongo_cc_library(
         mongo_api_name = None,
         target_compatible_with = [],
         skip_global_deps = [],
-        non_transitive_dyn_linkopts = []):
+        non_transitive_dyn_linkopts = [],
+        defines = []):
     """Wrapper around cc_library.
 
     Args:
@@ -1096,11 +1097,14 @@ def mongo_cc_library(
       linkstatic: Whether or not linkstatic should be passed to the native bazel cc_test rule. This argument
         is currently not supported. The mongo build must link entirely statically or entirely dynamically. This can be
         configured via //config/bazel:linkstatic.
-      local_defines: macro definitions passed to all source and header files.
+      local_defines: macro definitions added to the compile line when building any source in this target, but not to the compile
+        line of targets that depend on this.
       skip_global_deps: Globally injected dependencies to skip adding as a dependency (options: "libunwind", "allocator").
       non_transitive_dyn_linkopts: Any extra link options to pass in when linking dynamically. Unlike linkopts these are not
         applied transitively to all targets depending on this target, and are only used when linking this target itself.
         See https://jira.mongodb.org/browse/SERVER-89047 for motivation.
+      defines: macro definitions added to the compile line when building any source in this target, as well as the compile
+        line of targets that depend on this.
     """
 
     if linkstatic == True:
@@ -1162,6 +1166,7 @@ def mongo_cc_library(
         linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
         linkstatic = True,
         local_defines = MONGO_GLOBAL_DEFINES + visibility_support_defines + local_defines,
+        defines = defines,
         includes = includes,
         features = MONGO_GLOBAL_FEATURES + ["supports_pic", "pic"],
         target_compatible_with = select({
@@ -1183,6 +1188,7 @@ def mongo_cc_library(
         linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
         linkstatic = True,
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
+        defines = defines,
         includes = includes,
         features = MONGO_GLOBAL_FEATURES + select({
             "//bazel/config:linkstatic_disabled": ["supports_pic", "pic"],
@@ -1237,7 +1243,8 @@ def mongo_cc_binary(
         includes = [],
         linkstatic = False,
         local_defines = [],
-        target_compatible_with = []):
+        target_compatible_with = [],
+        defines = []):
     """Wrapper around cc_binary.
 
     Args:
@@ -1255,6 +1262,8 @@ def mongo_cc_binary(
         is currently not supported. The mongo build must link entirely statically or entirely dynamically. This can be
         configured via //config/bazel:linkstatic.
       local_defines: macro definitions passed to all source and header files.
+      defines: macro definitions added to the compile line when building any source in this target, as well as the compile
+        line of targets that depend on this.
     """
 
     if linkstatic == True:
@@ -1292,6 +1301,7 @@ def mongo_cc_binary(
         linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts + rpath_flags,
         linkstatic = LINKSTATIC_ENABLED,
         local_defines = MONGO_GLOBAL_DEFINES + LIBUNWIND_DEFINES + local_defines,
+        defines = defines,
         includes = includes,
         features = MONGO_GLOBAL_FEATURES + ["pie"],
         dynamic_deps = select({

@@ -206,7 +206,7 @@ if not use_system_version_of_library('icu'):
         ],
     }
 
-if not use_system_version_of_library('libbson'):
+if not use_system_version_of_library('bson'):
 
     platform_directory = "build_linux"
 
@@ -218,7 +218,7 @@ if not use_system_version_of_library('libbson'):
     elif env.TargetOSIs('darwin'):
         platform_directory = "build_osx"
 
-    thirdPartyEnvironmentModifications['libbson'] = {
+    thirdPartyEnvironmentModifications['bson'] = {
         'CPPPATH': [
             '#/src/third_party/libbson/dist/src/libbson/src',
             '#/src/third_party/libbson/' + platform_directory,
@@ -708,16 +708,16 @@ else:
 icuEnv.ShimLibrary(name="icu", )
 
 libbsonEnv = env.Clone()
-if use_system_version_of_library("libbson"):
+if use_system_version_of_library("bson"):
     libbsonEnv = libbsonEnv.Clone(SYSLIBDEPS=[
         env['LIBDEPS_LIBBSON_SYSLIBDEP'],
     ])
 else:
     libbsonEnv = libbsonEnv.Clone()
-    libbsonEnv.InjectThirdParty(libraries=['libbson'])
+    libbsonEnv.InjectThirdParty(libraries=['bson'])
     libbsonEnv.SConscript('libbson/SConscript', exports={'env': libbsonEnv})
     libbsonEnv = libbsonEnv.Clone(LIBDEPS_INTERFACE=[
-        'libbson/libbson',
+        'libbson/bson',
     ])
 
 libbsonEnv.ShimLibrary(name="libbson", )

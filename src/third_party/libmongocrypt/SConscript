@@ -10,7 +10,7 @@ env = env.Clone()
 env['CCFLAGS_WERROR'] = []
 env['CXXFLAGS_WERROR'] = []
 
-env.InjectThirdParty(libraries=['libbson'])
+env.InjectThirdParty(libraries=['bson'])
 
 env.InjectThirdParty(libraries=['intel_decimal128'])
 

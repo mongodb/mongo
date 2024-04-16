@@ -18,8 +18,8 @@ else:
 
     env.Append(CCFLAGS=['-Wno-sign-compare'])
 
-env.Library(
-    target="libbson",
+env.BazelLibrary(
+    target="bson",
     source=[
         'dist/src/common/common-b64.c',
         'dist/src/common/common-md5.c',

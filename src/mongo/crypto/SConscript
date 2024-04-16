@@ -94,7 +94,7 @@ env.Library(
 
 fleCryptoEnv = env.Clone()
 fleCryptoEnv.InjectThirdParty(libraries=['libmongocrypt'])
-fleCryptoEnv.InjectThirdParty(libraries=['libbson'])
+fleCryptoEnv.InjectThirdParty(libraries=['bson'])
 
 fleCryptoEnv.Library(
     target="fle_crypto",
