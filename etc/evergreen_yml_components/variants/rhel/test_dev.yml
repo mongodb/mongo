@@ -355,6 +355,10 @@ buildvariants:
       - name: vector_search
       - name: vector_search_auth
       - name: vector_search_ssl
+      - name: cursor_hints_to_query_settings_replset_passthrough
+      - name: cursor_hints_to_query_settings_sharded_collections_passthrough
+      - name: cursor_hints_to_query_settings_unsharded_collections_passthrough
+      - name: implicit_query_settings_fallback
 
   ###########################################
   #     Experimental buildvariants          #

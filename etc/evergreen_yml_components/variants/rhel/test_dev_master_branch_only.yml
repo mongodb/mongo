@@ -939,6 +939,10 @@ buildvariants:
       - name: vector_search
       - name: vector_search_auth
       - name: vector_search_ssl
+      - name: cursor_hints_to_query_settings_replset_passthrough
+      - name: cursor_hints_to_query_settings_sharded_collections_passthrough
+      - name: cursor_hints_to_query_settings_unsharded_collections_passthrough
+      - name: implicit_query_settings_fallback
 
   - &enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only-template
     <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
@@ -1063,6 +1067,10 @@ buildvariants:
       - name: query_stats_mongos_aggregation_passthrough
       - name: query_stats_mongos_passthrough
       - name: query_stats_passthrough
+      - name: cursor_hints_to_query_settings_replset_passthrough
+      - name: cursor_hints_to_query_settings_sharded_collections_passthrough
+      - name: cursor_hints_to_query_settings_unsharded_collections_passthrough
+      - name: implicit_query_settings_fallback
 
   - <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only-template
     name: enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers
