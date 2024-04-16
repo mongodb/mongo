@@ -344,8 +344,11 @@ stdx::unordered_set<CursorId> CursorManager::getCursorsForOpKeys(
 
     stdx::lock_guard<Latch> lk(_opKeyMutex);
     for (auto opKey : opKeys) {
-        if (auto it = _opKeyMap.find(opKey); it != _opKeyMap.end())
-            cursors.insert(it->second);
+        if (auto it = _opKeyMap.find(opKey); it != _opKeyMap.end()) {
+            for (auto cursor : it->second) {
+                cursors.insert(cursor);
+            }
+        }
     }
     return cursors;
 }
@@ -392,7 +395,12 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
     // If set, store the mapping of OperationKey to the generated CursorID.
     if (auto opKey = opCtx->getOperationKey()) {
         stdx::lock_guard<Latch> lk(_opKeyMutex);
-        _opKeyMap.emplace(*opKey, cursorId);
+        auto it = _opKeyMap.find(*opKey);
+        if (it != _opKeyMap.end()) {
+            it->second.insert(cursorId);
+        } else {
+            _opKeyMap.emplace(*opKey, std::set<CursorId>{cursorId});
+        }
     }
 
     // Restores the maxTimeMS provided in the cursor generating command in the case it used
