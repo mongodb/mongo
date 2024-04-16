@@ -6108,7 +6108,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
     return {true, objTag, objVal};
 }
 
-ByteCode::multiAccState ByteCode::getMultiAccState(value::TypeTags stateTag,
+ByteCode::MultiAccState ByteCode::getMultiAccState(value::TypeTags stateTag,
                                                    value::Value stateVal) {
     uassert(
         7548600, "The accumulator state should be an array", stateTag == value::TypeTags::Array);

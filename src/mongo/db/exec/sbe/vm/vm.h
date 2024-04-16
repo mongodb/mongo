@@ -1334,7 +1334,7 @@ public:
     bool runPredicate(const CodeFragment* code);
 
     typedef std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t, bool>
-        multiAccState;
+        MultiAccState;
 
 private:
     void runInternal(const CodeFragment* code, int64_t position);
@@ -1917,7 +1917,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinObjectToArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinArrayToObject(ArityType arity);
 
-    static multiAccState getMultiAccState(value::TypeTags stateTag, value::Value stateVal);
+    static MultiAccState getMultiAccState(value::TypeTags stateTag, value::Value stateVal);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNNeedsMoreInput(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstN(ArityType arity);
