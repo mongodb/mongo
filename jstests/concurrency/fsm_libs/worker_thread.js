@@ -186,6 +186,11 @@ export const workerThread = (function() {
                 await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
             }
 
+            if (TestData.transitioningConfigShard) {
+                await import(
+                    "jstests/libs/override_methods/implicitly_retry_on_config_transition_errors.js");
+            }
+
             for (const workload of workloads) {
                 const {$config} = await import(workload);
                 var config = parseConfig($config);  // to normalize

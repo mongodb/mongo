@@ -425,7 +425,10 @@ export const Cluster = function(options) {
         i = 0;
         var shard = st.shard(0);
         while (shard) {
-            if (shard.name.includes('/')) {
+            if (TestData.transitioningConfigShard && shard.shardName === "config") {
+                // Skip the config shard if it's transitioning in and out of being a shard to avoid
+                // tests that use manual shard operations failing with ShardNotFound.
+            } else if (shard.name.includes('/')) {
                 // If the shard is a replica set, the format of st.shard(0).name in ShardingTest is
                 // "test-rs0/localhost:20006,localhost:20007,localhost:20008".
                 var [_, shards] = shard.name.split('/');

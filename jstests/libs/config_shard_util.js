@@ -45,9 +45,26 @@ export const ConfigShardUtil = (function() {
         });
     }
 
+    function retryOnConfigTransitionErrors(func) {
+        while (true) {
+            try {
+                func();
+                return;
+            } catch (e) {
+                if (e.code === ErrorCodes.ShardNotFound) {
+                    print("Ignoring error with transitioning config shard, retrying: " + tojson(e));
+                    continue;
+                }
+
+                throw e;
+            }
+        }
+    }
+
     return {
         isTransitionEnabledIgnoringFCV,
         transitionToDedicatedConfigServer,
         waitForRangeDeletions,
+        retryOnConfigTransitionErrors,
     };
 })();

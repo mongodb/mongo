@@ -203,6 +203,7 @@ executor:
       eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
   hooks:
     - class: ContinuousConfigShardTransition
+      random_balancer_on: false
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections

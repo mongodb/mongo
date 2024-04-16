@@ -63,6 +63,35 @@ selector:
     # infrastructure. See SERVER-77039 for full details.
     - jstests/concurrency/fsm_workloads/map_reduce_drop.js
 
+    # TODO SERVER-89555: Timeseries collections hit movePrimaryInProgress errors and the temporary
+    # retry logic for this hook leads to breaking a test assertion.
+    - jstests/concurrency/fsm_workloads/timeseries_mirrored_writes.js
+
+    # TODO SERVER-89838: Check metadata consistency hook detects different time series options on
+    # shards after collMod.
+    - jstests/concurrency/fsm_workloads/timeseries_collmod_granularity_update.js
+    - jstests/concurrency/fsm_workloads/timeseries_agg_out.js
+
+    # TODO SERVER-89839: Seem to time out waiting for TTL deletion to finish in teardown while
+    # balancing is disabled, which leads config transition hook to timeout.
+    - jstests/concurrency/fsm_workloads/indexed_insert_ttl.js
+    - jstests/concurrency/fsm_workloads/insert_ttl_timeseries.js
+    - jstests/concurrency/fsm_workloads/insert_ttl_retry_writes_timeseries.js
+
+    # TODO SERVER-89840: Inconsistent UUIDs for config.system.sessions across config shard and
+    # removed/re-added shard.
+    - jstests/concurrency/fsm_workloads/add_remove_shards_killop.js
+
+    # TODO SERVER-89841: Performs many sharding DDL operations and can time out taking the DDL lock
+    # on slower variants.
+    - jstests/concurrency/fsm_workloads/agg_sort.js
+    - jstests/concurrency/fsm_workloads/map_reduce_interrupt.js
+    - jstests/concurrency/fsm_workloads/map_reduce_replace.js
+    - jstests/concurrency/fsm_workloads/map_reduce_replace_remove.js
+    - jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js
+    - jstests/concurrency/fsm_workloads/random_DDL_operations.js
+    - jstests/concurrency/fsm_workloads/rename_sharded_collection.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off
@@ -73,6 +102,14 @@ selector:
 
     # The following tags are excluded specifically for this suite.
     - config_shard_incompatible
+    - assumes_stable_shard_list
+
+    # TODO SERVER-89342: Enable these tests
+    - requires_capped
+
+    # This suites execute random moveCollections in the background that cause open cursors on the
+    # collection to be killed.
+    - requires_getmore
 
 executor:
   archive:
@@ -84,9 +121,12 @@ executor:
     tests: true
   config:
     shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_retry_on_config_transition_errors.js");
       global_vars:
         TestData:
           runningWithBalancer: true
+          transitioningConfigShard: true
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousConfigShardTransition
@@ -100,6 +140,7 @@ executor:
     - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
+    config_shard: "any"
     mongos_options:
       set_parameters:
         enableTestCommands: 1
@@ -115,8 +156,16 @@ executor:
         queryAnalysisWriterIntervalSecs: 1
         defaultConfigCommandTimeoutMS: 90000
         skipDroppingHashedShardKeyIndex: true
+        reshardingMinimumOperationDurationMillis: 0
+        # Manually set the random migration fail point so we can set a threshold for skipping
+        # moveCollection to prevent "starving" random chunk migrations.
+        failpoint.balancerShouldReturnRandomMigrations:
+          data:
+            skipMoveCollectionThreshold: 0.5
+          mode: alwaysOn
+        balancerMigrationsThrottlingMs: 100
     num_rs_nodes_per_shard: 3
-    num_shards: 2
+    # Use 3 shards so there's always at least two for workloads with manual migrations, etc.
+    num_shards: 3
     num_mongos: 2
     enable_balancer: true
-    random_migrations: true

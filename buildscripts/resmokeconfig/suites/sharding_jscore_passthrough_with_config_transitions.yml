@@ -64,6 +64,7 @@ executor:
   config: {}
   hooks:
     - class: ContinuousConfigShardTransition
+      random_balancer_on: false
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections

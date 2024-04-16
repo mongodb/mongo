@@ -57,6 +57,10 @@ export const $config = (function() {
             var count = db[collName].find({first: true}).itcount();
             return count === 0;
         }, 'Expected oldest documents with TTL fields to be removed', timeoutMS);
+
+        if (TestData.runningWithBalancer) {
+            BalancerHelper.enableBalancerForCollection(db, db[collName].getFullName());
+        }
     }
 
     return {
