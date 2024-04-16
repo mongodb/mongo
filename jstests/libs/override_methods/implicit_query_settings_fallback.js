@@ -4,6 +4,8 @@ import {
     getCommandName,
     getExplainCommand,
     getInnerCommand,
+    isInternalDbName,
+    isSystemCollectionName
 } from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query_settings_index_hints_tests.js";
@@ -16,6 +18,11 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
  */
 function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {
     const assertFallbackPlanMatchesOriginalPlan = () => {
+        if (isInternalDbName(dbName)) {
+            // Query settings cannot be set over internal databases.
+            return;
+        }
+
         const db = conn.getDB(dbName);
         const innerCmd = getInnerCommand(cmdObj);
         if (!QuerySettingsUtils.isSupportedCommand(getCommandName(innerCmd))) {
@@ -43,8 +50,9 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
         }
 
         const collectionName = getCollectionName(innerCmd);
-        if (!collectionName) {
-            // Can't test the fallback on queries not involving any collections.
+        if (!collectionName || isSystemCollectionName(collectionName)) {
+            // Can't test the fallback on queries not involving any collections or queries targeting
+            // the system collection.
             return;
         }
 

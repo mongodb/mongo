@@ -44,3 +44,11 @@ export function getCollectionName(cmdObj) {
     }
     return collInfos[0].options.viewOn || name;
 }
+
+export function isSystemCollectionName(collectionName) {
+    return collectionName.startsWith("system.");
+}
+
+export function isInternalDbName(dbName) {
+    return ["admin", "local", "config"].includes(dbName);
+}
