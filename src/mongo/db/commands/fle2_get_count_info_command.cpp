@@ -89,8 +89,9 @@ std::vector<std::vector<FLEEdgePrfBlock>> toNestedTokens(
 }
 
 QECountInfoReplyTokens tokenFromCountInfo(const FLEEdgeCountInfo& countInfo) {
-    QECountInfoReplyTokens token(FLEUtil::vectorFromCDR(countInfo.tagToken.toCDR()),
-                                 countInfo.count);
+    QECountInfoReplyTokens token(
+        std::vector<std::uint8_t>(countInfo.tagTokenData.begin(), countInfo.tagTokenData.end()),
+        countInfo.count);
 
     if (countInfo.edc) {
         token.setEDCDerivedFromDataTokenAndContentionFactorToken(countInfo.edc.value().toCDR());
@@ -152,6 +153,8 @@ FLEQueryInterface::TagQueryType queryTypeTranslation(QECountInfoQueryTypeEnum ty
             return FLEQueryInterface::TagQueryType::kCompact;
         case QECountInfoQueryTypeEnum::Cleanup:
             return FLEQueryInterface::TagQueryType::kCleanup;
+        case QECountInfoQueryTypeEnum::Padding:
+            return FLEQueryInterface::TagQueryType::kPadding;
         default:
             uasserted(7517102, "Invalid QECountInfoQueryTypeEnum value.");
     }

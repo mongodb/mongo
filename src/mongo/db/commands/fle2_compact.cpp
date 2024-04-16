@@ -418,7 +418,7 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
     auto latestCpos = emuBinaryResult.cpos.value();
 
     auto anchorDoc = ESCCollection::generateAnchorDocument(
-        countInfo.tagToken, valueToken, countInfo.count, latestCpos);
+        ESCTwiceDerivedTagToken(countInfo.tagTokenData), valueToken, countInfo.count, latestCpos);
 
     StmtId stmtId = kUninitializedStmtId;
 
@@ -458,10 +458,15 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
         FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(anchorPaddingRootToken);
     // Compact 4.h, Calculate a := AnchorBinaryHops(AnchorPaddingTokenKey,
     // AnchorPaddingTokenValue)
-    FLEStateCollectionQueryInterfaceReader reader(queryImpl, escNss);
-    auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
-    auto optA = ESCCollectionAnchorPadding::anchorBinaryHops(
-        reader, anchorPaddingKeyToken, anchorPaddingValueToken, tracker);
+    // Use a call to getQueryableEncryptionCountInfo to get count info in one roundtrip rather than
+    // using anchorBinaryHops, which would take multiple
+    auto countInfo = fetchEdgeCountInfo(queryImpl,
+                                        anchorPaddingRootToken,
+                                        escNss,
+                                        FLEQueryInterface::TagQueryType::kPadding,
+                                        "padding"_sd);
+    auto& emuBinaryResult = countInfo.searchedCounts.value();
+    auto optA = emuBinaryResult.apos;
 
     // TODO SERVER-85749 handle boost::none case
     if (optA) {
@@ -499,7 +504,8 @@ std::vector<PrfBlock> cleanupOneFieldValuePairImpl(FLEQueryInterface* queryImpl,
                                                    const T& rootToken,
                                                    const NamespaceString& escNss,
                                                    std::size_t maxAnchorListLength,
-                                                   ECStats* escStats) {
+                                                   ECStats* escStats,
+                                                   FLEQueryInterface::TagQueryType tagQueryType) {
     CompactStatsCounter<ECStats> stats(escStats);
     const auto [tagToken, valueToken] = generateCompactionTokenPair(rootToken);
 
@@ -515,8 +521,13 @@ std::vector<PrfBlock> cleanupOneFieldValuePairImpl(FLEQueryInterface* queryImpl,
      * of the null anchor lookup (D). The "count" field shall contain the value of a_1 that
      * the null anchor should be updated with.
      */
+
     auto countInfo = fetchEdgeCountInfo(
-        queryImpl, rootToken, escNss, FLEQueryInterface::TagQueryType::kCleanup, "cleanup"_sd);
+        queryImpl,
+        rootToken,
+        escNss,
+        tagQueryType,
+        tagQueryType == FLEQueryInterface::TagQueryType::kPadding ? "padding"_sd : "cleanup"_sd);
     auto& emuBinaryResult = countInfo.searchedCounts.value();
 
     stats.add(countInfo.stats.get());
@@ -616,7 +627,13 @@ std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
                                                FLECleanupOneMode mode) {
     if (mode == FLECleanupOneMode::kNormal) {
         return cleanupOneFieldValuePairImpl<ESCCollection>(
-            queryImpl, ecocDoc.fieldName, ecocDoc.esc, escNss, maxAnchorListLength, escStats);
+            queryImpl,
+            ecocDoc.fieldName,
+            ecocDoc.esc,
+            escNss,
+            maxAnchorListLength,
+            escStats,
+            FLEQueryInterface::TagQueryType::kCleanup);
     } else {
         invariant(mode == FLECleanupOneMode::kPadding);
         if (!ecocDoc.isRange() || !ecocDoc.anchorPaddingRootToken) {
@@ -628,7 +645,8 @@ std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
             *ecocDoc.anchorPaddingRootToken,
             escNss,
             maxAnchorListLength,
-            escStats);
+            escStats,
+            FLEQueryInterface::TagQueryType::kPadding);
     }
 }
 
@@ -861,13 +879,14 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
                 auto [escNss, maxAnchors, fieldName, anchorPaddingRootToken] = *sharedBlock.get();
 
                 anchorsToRemove->clear();
-                *anchorsToRemove =
-                    cleanupOneFieldValuePairImpl<ESCCollectionAnchorPadding>(&queryImpl,
-                                                                             fieldName,
-                                                                             anchorPaddingRootToken,
-                                                                             escNss,
-                                                                             maxAnchors,
-                                                                             innerEscStats.get());
+                *anchorsToRemove = cleanupOneFieldValuePairImpl<ESCCollectionAnchorPadding>(
+                    &queryImpl,
+                    fieldName,
+                    anchorPaddingRootToken,
+                    escNss,
+                    maxAnchors,
+                    innerEscStats.get(),
+                    FLEQueryInterface::TagQueryType::kPadding);
 
                 return SemiFuture<void>::makeReady();
             }));
