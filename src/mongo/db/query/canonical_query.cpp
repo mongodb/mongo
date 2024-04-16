@@ -149,7 +149,8 @@ CanonicalQuery::CanonicalQuery(OperationContext* opCtx, const CanonicalQuery& ba
         baseQuery.getExpCtx(),
         baseQuery.getCollator() ? baseQuery.getCollator()->clone() : nullptr,
         matchExpr->clone(),
-        std::move(findCommand)));
+        std::move(findCommand),
+        ProjectionPolicies::findProjectionPolicies()));
 
     // Note: we do not optimize the MatchExpression representing the branch of the top-level $or
     // that we are currently examining. This is because repeated invocations of

@@ -61,6 +61,19 @@
 
 namespace mongo {
 
+namespace {
+
+bool containsTextOperator(const MatchExpression& expr) {
+    if (expr.matchType() == MatchExpression::MatchType::TEXT)
+        return true;
+    for (auto child : expr) {
+        if (containsTextOperator(*child))
+            return true;
+    }
+    return false;
+}
+
+}  // namespace
 using boost::intrusive_ptr;
 using std::pair;
 using std::string;
@@ -99,7 +112,7 @@ void DocumentSourceMatch::rebuild(BSONObj predicate) {
 void DocumentSourceMatch::rebuild(BSONObj predicate, std::unique_ptr<MatchExpression> expr) {
     invariant(predicate.isOwned());
     _predicate = std::move(predicate);
-    _isTextQuery = DocumentSourceMatch::isTextQuery(_predicate);
+    _isTextQuery = containsTextOperator(*expr);
     DepsTracker dependencies =
         DepsTracker(_isTextQuery ? DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore
                                  : DepsTracker::kAllMetadata);

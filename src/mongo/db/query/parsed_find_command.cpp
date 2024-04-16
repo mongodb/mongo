@@ -211,14 +211,15 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> ParsedFindCommand::withExistingFi
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<CollatorInterface> collator,
     std::unique_ptr<MatchExpression> filter,
-    std::unique_ptr<FindCommandRequest> findCommandRequest) {
+    std::unique_ptr<FindCommandRequest> findCommandRequest,
+    const ProjectionPolicies& projectionPolicies) {
     auto out = std::make_unique<ParsedFindCommand>();
     out->collator = std::move(collator);
     if (auto status = setFilter(out.get(), std::move(filter), findCommandRequest); !status.isOK()) {
         return status;
     }
-    if (auto status = setSortAndProjection(
-            out.get(), expCtx, findCommandRequest, ProjectionPolicies::findProjectionPolicies());
+    if (auto status =
+            setSortAndProjection(out.get(), expCtx, findCommandRequest, projectionPolicies);
         !status.isOK()) {
         return status;
     }
