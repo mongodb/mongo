@@ -647,6 +647,20 @@ public:
     }
 
     /**
+     * Sets whether the maxTime used by this operation is the default value.
+     */
+    void setUsesDefaultMaxTimeMS(bool usesDefaultMaxTimeMS) {
+        _usesDefaultMaxTimeMS = usesDefaultMaxTimeMS;
+    }
+
+    /**
+     * Gets whether the maxTime used by this operation is the default value.
+     */
+    bool usesDefaultMaxTimeMS() const {
+        return _usesDefaultMaxTimeMS;
+    }
+
+    /**
      * Restore deadline to match the value stored in _storedMaxTime.
      */
     void restoreMaxTimeMS();
@@ -906,6 +920,8 @@ private:
 
     // The value of the maxTimeMS requested by user in the case it was overwritten.
     boost::optional<Microseconds> _storedMaxTime;
+
+    bool _usesDefaultMaxTimeMS = false;
 
     // Timer counting the elapsed time since the construction of this OperationContext.
     Timer _elapsedTime;
