@@ -108,7 +108,7 @@ assert.commandWorked(runCommandWithSecurityToken(unsignedToken2, regularUserDB, 
 
 // Sets the default timeout of tenantId1 with a higher value.
 assert.commandWorked(runCommandWithSecurityToken(
-    unsignedToken1, adminDB, {setClusterParameter: {defaultMaxTimeMS: {readOperations: 500}}}));
+    unsignedToken1, adminDB, {setClusterParameter: {defaultMaxTimeMS: {readOperations: 60000}}}));
 
 // With both the global and tenant-specific default timeout, the operation run by a tenant will
 // choose its tenant-specific default.
