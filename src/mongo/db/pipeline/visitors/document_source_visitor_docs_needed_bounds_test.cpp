@@ -68,8 +68,8 @@ protected:
     }
 
     void assertDiscreteAndEq(DocsNeededBounds bounds, long long expectedValue) {
-        ASSERT_TRUE(std::holds_alternative<DiscreteValue>(bounds));
-        ASSERT_EQUALS(std::get<DiscreteValue>(bounds).value, expectedValue);
+        ASSERT_TRUE(std::holds_alternative<long long>(bounds));
+        ASSERT_EQUALS(std::get<long long>(bounds), expectedValue);
     }
 
     void assertUnknown(DocsNeededBounds bounds) {

@@ -32,11 +32,6 @@
 
 namespace mongo {
 namespace docs_needed_bounds {
-struct DiscreteValue {
-    DiscreteValue(long long value) : value(value) {}
-    long long value = 0;
-};
-
 struct NeedAll {
     // Nothing
 };
@@ -46,16 +41,15 @@ struct Unknown {
 };
 }  // namespace docs_needed_bounds
 
-using DiscreteValue = docs_needed_bounds::DiscreteValue;
 using NeedAll = docs_needed_bounds::NeedAll;
 using Unknown = docs_needed_bounds::Unknown;
 
-using DocsNeededBounds = std::variant<DiscreteValue, NeedAll, Unknown>;
+using DocsNeededBounds = std::variant<long long, NeedAll, Unknown>;
 
 /**
  * The visitor context used to compute the number of documents needed for a pipeline, assuming
  * the pipeline will be traversed in reverse order. Tracks the minimum and maximum constraints
- * inferred so far, and the current skip value.
+ * inferred so far.
  *
  * NOTE: Any blocking stages (like $sort, $group) should use only applyBlockingStage(), since the
  * result cardinality of a stage doesn't matter if it requires all documents as input.
@@ -76,17 +70,17 @@ struct DocsNeededBoundsContext : public DocumentSourceVisitorContextBase {
  * Walks the pipeline to infer lower and upper bound constraints on how many documents
  * will need to be scanned / retrieved to satisfy the query. Returns a pair of DocsNeededBounds,
  * (first the minimum lower bound constraint, then the maximum upper bound constraint), of type
- * DiscreteValue, NeedAll, or Unknown.
+ * long long, NeedAll, or Unknown.
  *
  * We walk the pipeline back-to-front to observe how each stage in the pipeline will affect the
  * minimum and maximum bounds on documents needed in the pipeline. For example, reaching a
  * blocking stage means we need all documents (NeedAll), and reaching a $limit stage means we can
- * constrict the min/max bounds to the limit value (DiscreteValue).
+ * constrict the min/max bounds to the discrete limit value.
  *
  * As we iterate to visit each stage in reverse order, we check the existing bounds to consider
  * overriding them. For example, with the pipeline [{$limit}, {$sort}], the limit value will
  * override the NeedAll imposed by $sort, since we only need to sort the limit-ed documents. But,
- * with the pipeline [{$sort}, {$limit}], the $sort supercedes the $limit's DiscreteValue with
+ * with the pipeline [{$sort}, {$limit}], the $sort supercedes the $limit's value with
  * NeedAll since the limit is applied to the sorted set of all documents.
  *
  * Not all stages override existing bounds. In the pipeline [{$match}, {$sort}], the NeedAll

@@ -54,7 +54,7 @@ void DocsNeededBoundsContext::applyPossibleDecreaseStage() {
     // For example, in the sequence of a $match before a $limit, without knowing the selectivity of
     // the $match, we must reset the maxBounds to Unknown.
     maxBounds = visit(OverloadedVisitor{
-                          [](DiscreteValue) -> DocsNeededBounds { return Unknown(); },
+                          [](long long) -> DocsNeededBounds { return Unknown(); },
                           [](NeedAll all) -> DocsNeededBounds { return all; },
                           [](Unknown unknown) -> DocsNeededBounds { return unknown; },
                       },
@@ -69,7 +69,7 @@ void DocsNeededBoundsContext::applyPossibleIncreaseStage() {
     // For example, in the sequence of a $densify before a limit, we must reset the minBounds to
     // Unknown since we don't know the rate at which $densify will add documents to the stream.
     minBounds = visit(OverloadedVisitor{
-                          [](DiscreteValue) -> DocsNeededBounds { return Unknown(); },
+                          [](long long) -> DocsNeededBounds { return Unknown(); },
                           [](NeedAll all) -> DocsNeededBounds { return all; },
                           [](Unknown unknown) -> DocsNeededBounds { return unknown; },
                       },
@@ -81,15 +81,15 @@ void DocsNeededBoundsContext::applySkip(long long newSkip) {
     // discretely $limit-ed bounds, or ignoring it otherwise.
     auto applySkip = [newSkip](DocsNeededBounds currBounds) -> DocsNeededBounds {
         return visit(OverloadedVisitor{
-                         [newSkip](DiscreteValue discreteBounds) -> DocsNeededBounds {
+                         [newSkip](long long discreteBounds) -> DocsNeededBounds {
                              long long safeSum = 0;
-                             if (overflow::add(discreteBounds.value, newSkip, &safeSum)) {
+                             if (overflow::add(discreteBounds, newSkip, &safeSum)) {
                                  // If we're skipping so many that it overflows 64
                                  // bits, we'll consider it as if we just need all
                                  // documents.
                                  return NeedAll();
                              }
-                             return DiscreteValue(safeSum);
+                             return safeSum;
                          },
                          [](NeedAll all) -> DocsNeededBounds { return all; },
                          [](Unknown unknown) -> DocsNeededBounds { return unknown; },
@@ -106,37 +106,37 @@ void DocsNeededBoundsContext::applyLimit(long long limit) {
     bool overridesMaxBounds = true;
     maxBounds =
         visit(OverloadedVisitor{
-                  [&overridesMaxBounds, limit](DiscreteValue discreteBounds) -> DocsNeededBounds {
-                      if (limit <= discreteBounds.value) {
-                          return DiscreteValue(limit);
+                  [&overridesMaxBounds, limit](long long discreteBounds) -> DocsNeededBounds {
+                      if (limit <= discreteBounds) {
+                          return limit;
                       } else {
                           overridesMaxBounds = false;
                           return discreteBounds;
                       }
                   },
-                  [limit](NeedAll) -> DocsNeededBounds { return DiscreteValue(limit); },
-                  [limit](Unknown) -> DocsNeededBounds { return DiscreteValue(limit); },
+                  [limit](NeedAll) -> DocsNeededBounds { return limit; },
+                  [limit](Unknown) -> DocsNeededBounds { return limit; },
               },
               maxBounds);
 
     // Apply the limit to min bounds, as long as it's less than the existing bounds.
     // In the specific edge case where the minBounds was Unknown but the maxBounds was a
-    // DiscreteValue, we only want to set a minBounds here if the new limit also overrides
+    // value, we only want to set a minBounds here if the new limit also overrides
     // the maxBounds. Consider the pipeline [{$limit: 20}, {$densify}, {$limit: 10}] where, because
     // $densify could only increase the number of documents in the result stream, we should infer
     // that the maxBounds is 10 and the minBounds is unknown (i.e., we could need even fewer than
     // 10 documents). We need to avoid miscomputing minBounds as 20 after $densify sets minBounds
     // to Unknown.
     minBounds = visit(OverloadedVisitor{
-                          [limit](DiscreteValue discreteBounds) -> DocsNeededBounds {
-                              return DiscreteValue(std::min(discreteBounds.value, limit));
+                          [limit](long long discreteBounds) -> DocsNeededBounds {
+                              return std::min(discreteBounds, limit);
                           },
-                          [limit](NeedAll) -> DocsNeededBounds { return DiscreteValue(limit); },
+                          [limit](NeedAll) -> DocsNeededBounds { return limit; },
                           [overridesMaxBounds, limit](Unknown unknown) -> DocsNeededBounds {
                               // If minBounds is unknown, we don't want to set it if the limit
                               // didn't override the maxBounds. See comment above.
                               if (overridesMaxBounds) {
-                                  return DiscreteValue(limit);
+                                  return limit;
                               }
                               return unknown;
                           },
