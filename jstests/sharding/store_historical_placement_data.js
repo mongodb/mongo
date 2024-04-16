@@ -1,7 +1,9 @@
 
 (function() {
 "use strict";
+
 load("jstests/libs/feature_flag_util.js");
+load('jstests/sharding/libs/remove_shard_util.js');  // For removeShard.
 
 const st = new ShardingTest({
     shards: 3,
@@ -397,7 +399,10 @@ function testAddShard() {
     }
 
     // Execute the test case teardown
-    st.s.adminCommand({removeShard: newShardName});
+    for (const dbName of dbsOnNewReplicaSet) {
+        assert.commandWorked(st.getDB(dbName).dropDatabase());
+    }
+    removeShard(st, newShardName);
     newReplicaSet.stopSet();
 }
 
