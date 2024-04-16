@@ -130,6 +130,10 @@ struct SBEColumnMaterializer {
         return {value::TypeTags::Nothing, value::Value{0}};
     }
 
+    static bool isMissing(const Element& elem) {
+        return elem.first == value::TypeTags::Nothing;
+    }
+
 private:
     /**
      * This helper method is used for both bsonJavascript and bsonString data. They both have
