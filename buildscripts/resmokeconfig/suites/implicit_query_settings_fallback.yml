@@ -22,10 +22,6 @@ selector:
     # queries.
     - jstests/core/find_with_resume_after_param.js
 
-    # TODO SERVER-89028: Support $let commands in setQuerySettings.
-    - jstests/core/command_let_variables_merge_only.js
-    - jstests/aggregation/expressions/percentile_expression_approx.js
-
     # TODO SERVER-89299: Ensure the uniqueness of query shapes containing $setWindowFields.
     - jstests/aggregation/sources/setWindowFields/**/*.js
     - jstests/aggregation/sources/fill/**/*.js

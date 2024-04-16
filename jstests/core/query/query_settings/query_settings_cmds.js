@@ -121,23 +121,68 @@ function testQuerySettingsUsing(params) {
     }
 }
 
-let buildPipeline = (matchValue) => [{$match: {matchKey: matchValue}},
-                                     {
-                                         $group: {
-                                             _id: "groupID",
-                                             values: {$addToSet: "$value"},
-                                         },
-                                     },
-];
-
 function testQuerySettingsParameterized({find, distinct, aggregate}) {
     // Testing find query settings.
+    const filter = {a: "$$variableA", b: "$$variableB"};
     testQuerySettingsUsing({
-        queryA: qsutils.makeFindQueryInstance({filter: {a: 15, b: 10}}),
-        queryB: qsutils.makeFindQueryInstance({filter: {b: "string", a: "super-string"}}),
-        queryBPrime:
-            qsutils.makeFindQueryInstance({filter: {b: "another string", a: "still-super-string"}}),
+        queryA: qsutils.makeFindQueryInstance({
+            filter,
+            let : {
+                variableA: 10,
+                variableB: 15,
+            },
+        }),
+        queryB: qsutils.makeFindQueryInstance({
+            filter,
+            let : {
+                variableA: "string",
+                variableB: "super-string",
+            },
+        }),
+        queryBPrime: qsutils.makeFindQueryInstance({
+            filter,
+            let : {
+                variableA: "another-string",
+                variableB: "still-super-string",
+            },
+        }),
         ...find
+    });
+
+    // Same for aggregate query settings.
+    const pipeline = [
+        {
+            $match: {
+                matchKey: "$$variable",
+            },
+        },
+        {
+            $group: {
+                _id: "groupID",
+                values: {$addToSet: "$value"},
+            },
+        },
+    ];
+    testQuerySettingsUsing({
+        queryA: qsutils.makeAggregateQueryInstance({
+            pipeline,
+            let : {
+                variable: 10,
+            },
+        }),
+        queryB: qsutils.makeAggregateQueryInstance({
+            pipeline,
+            let : {
+                variable: "string",
+            },
+        }),
+        queryBPrime: qsutils.makeAggregateQueryInstance({
+            pipeline,
+            let : {
+                variable: "another-string",
+            },
+        }),
+        ...aggregate
     });
 
     // Same for distinct query settings.
@@ -148,20 +193,6 @@ function testQuerySettingsParameterized({find, distinct, aggregate}) {
         queryBPrime: qsutils.makeDistinctQueryInstance(
             {key: "k", query: {b: "another string", a: "no-more-super-string"}}),
         ...distinct
-    });
-
-    // Same for aggregate query settings.
-    testQuerySettingsUsing({
-        queryA: qsutils.makeAggregateQueryInstance({
-            pipeline: buildPipeline(15),
-        }),
-        queryB: qsutils.makeAggregateQueryInstance({
-            pipeline: buildPipeline("string"),
-        }),
-        queryBPrime: qsutils.makeAggregateQueryInstance({
-            pipeline: buildPipeline("another string"),
-        }),
-        ...aggregate
     });
 }
 

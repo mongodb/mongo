@@ -56,8 +56,8 @@ struct RepresentativeQueryInfo {
  * Creates the corresponding RepresentativeQueryInfo instance by parsing the representative
  * query BSONObj.
  */
-RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
-                                                 OperationContext* opCtx,
+RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
+                                                 const BSONObj& cmd,
                                                  const boost::optional<TenantId>& tenantId);
 
 QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionContext>& expCtx,
