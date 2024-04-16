@@ -511,6 +511,7 @@ void MirrorMaestroImpl::shutdown() noexcept {
 
     if (_executor) {
         _executor->shutdown();
+        _executor->join();
     }
 
     // Set _initGuard.liveness to kShutdown
