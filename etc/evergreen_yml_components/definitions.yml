@@ -240,6 +240,20 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz
 
+  "write mongo binary URL to downstream_expansions.yml": &echo_mongo_binary_url
+    command: shell.exec
+    params:
+      shell: bash
+      script: |
+        touch downstream_expansions.yaml
+        echo "${build_variant}-mongo-binaries: https://mciuploads.s3.amazonaws.com/${mongo_binaries}" 2>&1 | tee downstream_expansions.yaml
+
+  "set downstreams expansions": &downstream_expansions
+    command: downstream_expansions.set
+    display_name: "set downstream expansions"
+    params:
+      file: downstream_expansions.yaml
+
   "extract binaries": &extract_binaries
     command: subprocess.exec
     display_name: "extract binaries"
@@ -671,6 +685,10 @@ functions:
     - *monitor_process_threads
     - *collect_system_resource_info
     - *collect_ulimit_info
+
+  "write and set downstream expansions":
+    - *echo_mongo_binary_url
+    - *downstream_expansions
 
   "do setup for antithesis":
     - command: s3.get

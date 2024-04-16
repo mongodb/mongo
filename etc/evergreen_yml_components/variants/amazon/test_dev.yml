@@ -285,6 +285,8 @@ buildvariants:
       - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2023.0-large
+      # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
+      - name: set_downstream_expansions_for_mongot
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
       - name: search_auth
@@ -345,6 +347,8 @@ buildvariants:
       - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2023.0-arm64-large
+      # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
+      - name: set_downstream_expansions_for_mongot
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
       - name: search_auth
@@ -399,6 +403,8 @@ buildvariants:
       - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2-arm64-latest-large
+      # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
+      - name: set_downstream_expansions_for_mongot
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
       - name: search_auth
@@ -456,6 +462,9 @@ buildvariants:
       - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2-latest-large
+      # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
+      - name: set_downstream_expansions_for_mongot
+      # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
       - name: search_auth
       - name: search_end_to_end_sharded_cluster
