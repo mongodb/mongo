@@ -163,9 +163,6 @@ function assertTimeseriesAggregationCorrectness(total, shards) {
     assert.eq(total.numBucketsClosedDueToTimeForward,
               shards.map(x => x.numBucketsClosedDueToTimeForward)
                   .reduce((x, y) => x + y, 0 /* initial value */));
-    assert.eq(total.numBucketsClosedDueToTimeBackward,
-              shards.map(x => x.numBucketsClosedDueToTimeBackward)
-                  .reduce((x, y) => x + y, 0) /* initial value */);
     assert.eq(total.numBucketsClosedDueToMemoryThreshold,
               shards.map(x => x.numBucketsClosedDueToMemoryThreshold)
                   .reduce((x, y) => x + y, 0 /* initial value */));

@@ -46,7 +46,6 @@ struct ExecutionStats {
     AtomicWord<long long> numBucketsClosedDueToSize;
     AtomicWord<long long> numBucketsClosedDueToCachePressure;
     AtomicWord<long long> numBucketsClosedDueToTimeForward;
-    AtomicWord<long long> numBucketsClosedDueToTimeBackward;
     AtomicWord<long long> numBucketsClosedDueToMemoryThreshold;
     AtomicWord<long long> numBucketsClosedDueToReopening;
     AtomicWord<long long> numBucketsArchivedDueToMemoryThreshold;
@@ -91,7 +90,6 @@ public:
     void incNumBucketsClosedDueToSize(long long increment = 1);
     void incNumBucketsClosedDueToCachePressure(long long increment = 1);
     void incNumBucketsClosedDueToTimeForward(long long increment = 1);
-    void incNumBucketsClosedDueToTimeBackward(long long increment = 1);
     void incNumBucketsClosedDueToMemoryThreshold(long long increment = 1);
     void incNumBucketsClosedDueToReopening(long long increment = 1);
     void incNumBucketsArchivedDueToMemoryThreshold(long long increment = 1);

@@ -172,7 +172,7 @@ compressedBuckets = timeseriesStats.numCompressedBuckets;
 assert.eq(bucketsClosedDueToSize, 0, formatStatsLog(timeseriesStats));
 assert.eq(timeseriesStats.numBucketsClosedDueToSchemaChange, 0, formatStatsLog(timeseriesStats));
 assert.eq(timeseriesStats.numBucketsClosedDueToTimeForward, 0, formatStatsLog(timeseriesStats));
-assert.eq(timeseriesStats.numBucketsClosedDueToTimeBackward, 0, formatStatsLog(timeseriesStats));
+assert.eq(timeseriesStats.numBucketsArchivedDueToTimeBackward, 0, formatStatsLog(timeseriesStats));
 assert.eq(timeseriesStats.numBucketsClosedDueToMemoryThreshold, 0, formatStatsLog(timeseriesStats));
 
 // Previously, the bucket max size was 128KB, but under cache pressure using
