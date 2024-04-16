@@ -248,6 +248,10 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(ElementStorage& al
                       auto encoded = Simple8bTypeUtil::encodeDouble(val, newScaleIndex);
                       uassert(8690001, "Invalid double encoding in BSON Column", encoded);
                       d64.lastEncodedValue = *encoded;
+                  } else {
+                      uassert(8915500,
+                              "Unexpected control for type in BSONColumn",
+                              newScaleIndex == Simple8bTypeUtil::kMemoryAsInteger);
                   }
 
                   d64.scaleIndex = newScaleIndex;
@@ -262,6 +266,11 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(ElementStorage& al
               [&](DecodingState::Decoder128& d128) {
                   // We can read the last known value from the decoder iterator even as it has
                   // reached end.
+                  uassert(8915501,
+                          "Invalid control byte in BSON Column",
+                          bsoncolumn::scaleIndexForControlByte(control) ==
+                              Simple8bTypeUtil::kMemoryAsInteger);
+
                   boost::optional<uint128_t> lastSimple8bValue =
                       d128.pos.valid() ? *d128.pos : uint128_t(0);
                   d128.pos = Simple8b<uint128_t>(buffer + 1, size, lastSimple8bValue).begin();
