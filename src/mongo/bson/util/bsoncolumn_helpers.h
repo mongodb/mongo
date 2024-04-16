@@ -721,6 +721,45 @@ public:
         return ptr;
     }
 
+    template <class Buffer, typename Finish>
+    requires Appendable<Buffer>
+    static const char* decompressAllMissing(const char* ptr,
+                                            const char* end,
+                                            Buffer& buffer,
+                                            uint64_t lastNonRLEBlock,
+                                            const Finish& finish) {
+        // The last element in the buffer is missing (EOO).
+        size_t elemCount = 0;
+        while (ptr < end) {
+            const uint8_t control = *ptr;
+            if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                isInterleavedStartControlByte(control))
+                break;
+
+            uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+            uassert(8915000,
+                    "Invalid control byte in BSON Column",
+                    bsoncolumn::scaleIndexForControlByte(control) ==
+                        Simple8bTypeUtil::kMemoryAsInteger);
+
+            elemCount += simple8b::visitAll<int64_t>(
+                ptr + 1,
+                size,
+                lastNonRLEBlock,
+                [&buffer](int64_t v) {
+                    // We can have non-zero deltas following an EOO, so we don't need to assert
+                    // here.
+                    buffer.appendMissing();
+                },
+                [&buffer]() { buffer.appendMissing(); });
+
+            ptr += 1 + size;
+        }
+
+        finish(elemCount, lastNonRLEBlock);
+        return ptr;
+    }
+
     template <class Buffer>
     requires Appendable<Buffer>
     static const char* decompressAllDouble(const char* ptr,
@@ -743,6 +782,10 @@ public:
                                             Buffer& buffer,
                                             uint64_t lastNonRLEBlock,
                                             const Finish& finish) {
+        if (buffer.isLastMissing()) {
+            return decompressAllMissing(ptr, end, buffer, lastNonRLEBlock, finish);
+        }
+
         size_t elemCount = 0;
         while (ptr < end) {
             const uint8_t control = *ptr;
@@ -818,6 +861,10 @@ public:
 
     static BSONElement materializeMissing(ElementStorage& allocator) {
         return BSONElement();
+    }
+
+    static bool isMissing(const Element& elem) {
+        return elem.eoo();
     }
 
 private:

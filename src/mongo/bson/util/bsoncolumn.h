@@ -447,6 +447,10 @@ public:
         _collection.push_back(_last);
     }
 
+    bool isLastMissing() {
+        return CMaterializer::isMissing(_last);
+    }
+
     // Sets the last value without appending anything.
     template <typename T>
     void setLast(const BSONElement& val) {
