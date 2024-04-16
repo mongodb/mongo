@@ -219,6 +219,9 @@ public:
     virtual boost::optional<uint32_t> getQueryHash() const = 0;
 
     virtual boost::optional<std::size_t> getQueryStatsKeyHash() const = 0;
+
+    virtual bool getQueryStatsWillNeverExhaust() const = 0;
+
     /**
      * Returns the number of batches returned by this cursor.
      */
@@ -274,7 +277,7 @@ public:
      * Returns and releases ownership of the Key associated with the request this
      * cursor is handling.
      */
-    virtual std::unique_ptr<query_stats::Key> getKey() = 0;
+    virtual std::unique_ptr<query_stats::Key> takeKey() = 0;
 
     /**
      * Returns the aggregated metrics from any remote requests made by this cursor (if any).

@@ -339,10 +339,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
-        query_stats::registerRequest(opCtx, executionNss, [&]() {
-            return std::make_unique<query_stats::AggKey>(
-                request, *pipeline, expCtx, involvedNamespaces, executionNss);
-        });
+        query_stats::registerRequest(
+            opCtx,
+            executionNss,
+            [&]() {
+                return std::make_unique<query_stats::AggKey>(
+                    request, *pipeline, expCtx, involvedNamespaces, executionNss);
+            },
+            hasChangeStream);
     }
 
     // Perform the query settings lookup and attach it to the ExpressionContext.

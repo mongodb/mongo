@@ -583,7 +583,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         if (const auto remoteMetrics = ccc->takeRemoteMetrics()) {
             opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(*remoteMetrics);
         }
-        collectQueryStatsMongos(opCtx, ccc->getKey());
+        collectQueryStatsMongos(opCtx, ccc->takeKey());
         return CursorId(0);
     }
 
