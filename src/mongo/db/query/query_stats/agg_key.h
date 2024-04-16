@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/key.h"
 
@@ -71,12 +72,14 @@ struct AggCmdComponents : public SpecificKeyComponents {
 
     stdx::unordered_set<NamespaceString> involvedNamespaces;
     bool _bypassDocumentValidation;
+    const boost::optional<mongo::ExplainOptions::Verbosity> _verbosity;
 
     // This anonymous struct represents the presence of the member variables as C++ bit fields.
     // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
     struct HasField {
         bool batchSize : 1 = false;
         bool bypassDocumentValidation : 1 = false;
+        bool explain : 1 = false;
     } _hasField;
 };
 

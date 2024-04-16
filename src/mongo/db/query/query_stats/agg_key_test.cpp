@@ -90,7 +90,7 @@ TEST_F(AggKeyTest, SizeOfAggCmdComponents) {
 
     const auto minimumSize = sizeof(SpecificKeyComponents) +
         sizeof(stdx::unordered_set<NamespaceString>) + 2 /*size for bool and HasField*/ +
-        namespaceSize(namespaces);
+        sizeof(boost::optional<mongo::ExplainOptions::Verbosity>) + namespaceSize(namespaces);
     ASSERT_GTE(aggComponents->size(), minimumSize);
     ASSERT_LTE(aggComponents->size(), minimumSize + 8 /*padding*/);
 }

@@ -692,6 +692,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         if (expCtx->explain) {
             explain_common::appendIfRoom(
                 aggregation_request_helper::serializeToCommandObj(request), "command", result);
+            collectQueryStatsMongos(opCtx,
+                                    std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
         }
     } else if (status.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
         // Increment counters even in case of failed aggregate commands.

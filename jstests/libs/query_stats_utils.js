@@ -355,6 +355,22 @@ function hasValueAtPath(object, dottedPath) {
 }
 
 /**
+ *  Returns the object's value at the dottedPath.
+ * @param {object} object
+ * @param {string} dottedPath
+ */
+export function getValueAtPath(object, dottedPath) {
+    let nestedFields = dottedPath.split(".");
+    for (const nestedField of nestedFields) {
+        if (!object.hasOwnProperty(nestedField)) {
+            return false
+        }
+        object = object[nestedField];
+    }
+    return object;
+}
+
+/**
  * Runs an assertion callback function on a node with query stats enabled - once with a mongod, and
  * once with a mongos.
  * @param {String} collName - The desired collection name to use. The db will be "test".
