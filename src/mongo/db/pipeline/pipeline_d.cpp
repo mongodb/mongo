@@ -883,6 +883,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     Pipeline* pipeline,
     QueryMetadataBitSet unavailableMetadata,
     const BSONObj& queryObj,
+    boost::intrusive_ptr<DocumentSourceMatch> leadingMatch,
     const AggregateCommandRequest* aggRequest,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     bool timeseriesBoundedSortOptimization,
@@ -971,19 +972,44 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     std::unique_ptr<FindCommandRequest> findCommand =
         createFindCommand(expCtx, nss, queryObj, projObj, sortObj, skipThenLimit, aggRequest);
 
-    // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially
-    // allow SBE to execute the portion of the query that's pushed down, even if the portion of
-    // the query that is not pushed down contains expressions not supported by SBE.
-    expCtx->sbeCompatibility = SbeCompatibility::noRequirements;
+    auto parsedFind = [&](auto leadingMatch,
+                          auto findCommand) -> std::unique_ptr<ParsedFindCommand> {
+        // We can only re-use the parsed MatchExpression if the filter does not require the special
+        // $text extension since the $match stage by default will use the no-op extensions callback.
+        // Do not need to worry about $where extension since it's not allowed within the $match
+        // stage.
+        if (leadingMatch && !leadingMatch->isTextQuery()) {
+            // The $match stage manages its own state for SBE compatibility without modifying the
+            // ExpressionContext. Instead of re-parsing the MatchExpression to set the
+            // compatibility we manually set it here.
+            expCtx->sbeCompatibility = leadingMatch->sbeCompatibility();
+            tassert(8897900,
+                    "Expected non-empty query for pushing down leading $match stage",
+                    !queryObj.isEmpty());
+            return uassertStatusOK(ParsedFindCommand::withExistingFilter(
+                expCtx,
+                expCtx->getCollator() ? expCtx->getCollator()->clone() : nullptr,
+                leadingMatch->getMatchExpression()->clone(),
+                std::move(findCommand),
+                ProjectionPolicies::aggregateProjectionPolicies()));
+        } else {
+            // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially
+            // allow SBE to execute the portion of the query that's pushed down, even if the portion
+            // of the query that is not pushed down contains expressions not supported by SBE.
+            expCtx->sbeCompatibility = SbeCompatibility::noRequirements;
+            return uassertStatusOK(parsed_find_command::parse(
+                expCtx,
+                ParsedFindCommandParams{
+                    .findCommand = std::move(findCommand),
+                    .extensionsCallback = ExtensionsCallbackReal(expCtx->opCtx, &nss),
+                    .allowedFeatures = matcherFeatures,
+                    .projectionPolicies = ProjectionPolicies::aggregateProjectionPolicies()}));
+        }
+    }(std::move(leadingMatch), std::move(findCommand));
 
     StatusWith<std::unique_ptr<CanonicalQuery>> cq = CanonicalQuery::make(
         {.expCtx = expCtx,
-         .parsedFind =
-             ParsedFindCommandParams{
-                 .findCommand = std::move(findCommand),
-                 .extensionsCallback = ExtensionsCallbackReal(expCtx->opCtx, &nss),
-                 .allowedFeatures = matcherFeatures,
-                 .projectionPolicies = ProjectionPolicies::aggregateProjectionPolicies()},
+         .parsedFind = std::move(parsedFind),
          .isCountLike = *shouldProduceEmptyDocs,
          .isSearchQuery = PipelineD::isSearchPresentAndEligibleForSbe(pipeline)});
 
@@ -1011,6 +1037,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     Pipeline* pipeline,
     QueryMetadataBitSet unavailableMetadata,
     const BSONObj& queryObj,
+    boost::intrusive_ptr<DocumentSourceMatch> leadingMatch,
     const AggregateCommandRequest* aggRequest,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     bool* shouldProduceEmptyDocs,
@@ -1029,6 +1056,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
                              pipeline,
                              unavailableMetadata,
                              queryObj,
+                             std::move(leadingMatch),
                              aggRequest,
                              matcherFeatures,
                              timeseriesBoundedSortOptimization,
@@ -1433,20 +1461,25 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     // Look for an initial match. This works whether we got an initial query or not. If not, it
     // results in a "{}" query, which will be what we want in that case.
     const BSONObj queryObj = pipeline->getInitialQuery();
+    boost::intrusive_ptr<DocumentSourceMatch> leadingMatch;
+    bool isTextQuery = false;
+    // If a $match query is pulled into the cursor, the $match is redundant, and can be
+    // removed from the pipeline.
     if (!queryObj.isEmpty()) {
-        auto matchStage = dynamic_cast<DocumentSourceMatch*>(sources.front().get());
-        if (matchStage) {
-            // If a $match query is pulled into the cursor, the $match is redundant, and can be
-            // removed from the pipeline.
+        auto firstStage = sources.front();
+        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(firstStage.get())) {
+            leadingMatch = boost::intrusive_ptr<DocumentSourceMatch>(matchStage);
+            isTextQuery = matchStage->isTextQuery();
             sources.pop_front();
         } else {
             // A $geoNear stage, the only other stage that can produce an initial query, is also
-            // a valid initial stage. However, we should be in prepareGeoNearCursorSource() instead.
+            // a valid initial stage. However, we should be in buildInnerQueryExecutorGeoNear()
+            // instead.
             MONGO_UNREACHABLE;
         }
     }
 
-    auto unavailableMetadata = DocumentSourceMatch::isTextQuery(queryObj)
+    auto unavailableMetadata = isTextQuery
         ? DepsTracker::kDefaultUnavailableMetadata & ~DepsTracker::kOnlyTextScore
         : DepsTracker::kDefaultUnavailableMetadata;
 
@@ -1507,6 +1540,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
                                                 pipeline,
                                                 unavailableMetadata,
                                                 queryObj,
+                                                std::move(leadingMatch),
                                                 aggRequest,
                                                 Pipeline::kAllowedMatcherFeatures,
                                                 &shouldProduceEmptyDocs,
@@ -1772,6 +1806,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
                         pipeline,
                         DepsTracker::kDefaultUnavailableMetadata & ~DepsTracker::kAllGeoNearData,
                         fullQuery,
+                        nullptr,
                         aggRequest,
                         Pipeline::kGeoNearMatcherFeatures,
                         &shouldProduceEmptyDocs,

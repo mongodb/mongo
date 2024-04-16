@@ -292,11 +292,12 @@ CanonicalDistinct CanonicalDistinct::parse(const boost::intrusive_ptr<Expression
         findRequest->setUnwrappedReadPref(*parsedDistinct->queryOptions);
     }
 
-    auto parsedFind =
-        uassertStatusOK(ParsedFindCommand::withExistingFilter(expCtx,
-                                                              std::move(parsedDistinct->collator),
-                                                              std::move(parsedDistinct->query),
-                                                              std::move(findRequest)));
+    auto parsedFind = uassertStatusOK(
+        ParsedFindCommand::withExistingFilter(expCtx,
+                                              std::move(parsedDistinct->collator),
+                                              std::move(parsedDistinct->query),
+                                              std::move(findRequest),
+                                              ProjectionPolicies::findProjectionPolicies()));
 
     auto cq = std::make_unique<CanonicalQuery>(
         CanonicalQueryParams{.expCtx = expCtx, .parsedFind = std::move(parsedFind)});

@@ -75,7 +75,8 @@ struct ParsedFindCommand {
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::unique_ptr<CollatorInterface> collator,
         std::unique_ptr<MatchExpression> filter,
-        std::unique_ptr<FindCommandRequest> findCommandRequest);
+        std::unique_ptr<FindCommandRequest> findCommandRequest,
+        const ProjectionPolicies& projectionPolicies);
 
     std::unique_ptr<CollatorInterface> collator;
     std::unique_ptr<MatchExpression> filter;
