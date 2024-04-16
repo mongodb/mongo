@@ -38,12 +38,6 @@ variables:
       - name: package_new_compile
         variant: amazon2-arm64-compile
 
-  - &amazon2_x86_expansions
-    multiversion_platform: amazon2
-    multiversion_edition: enterprise
-    repo_edition: enterprise
-    num_scons_link_jobs_available: 0.99
-
   - &schedule_variant_auto_tasks_task
     name: schedule_variant_auto_tasks
     activate: false
@@ -57,22 +51,6 @@ variables:
     depends_on:
       - name: schedule_global_auto_tasks
         variant: task_generation
-
-  # THIS HAS COPIES IN:
-  # - etc/evergreen_yml_components/variants/perf/perf_branching.yml
-  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &linux_arm64_generic_expansions
-    multiversion_platform: amazon2
-    multiversion_edition: enterprise
-    multiversion_architecture: aarch64
-    packager_arch: aarch64
-    packager_distro: amazon2
-    repo_edition: enterprise
-    large_distro_name: amazon2-arm64-large
-    core_analyzer_distro_name: amazon2-arm64-xlarge
-    num_scons_link_jobs_available: 0.99
 
   - modules: &perf_modules
       - dsi
@@ -94,7 +72,6 @@ buildvariants:
     cron: &linux-1-node-repl-cron "0 0 * * 4" # 00:00 on Thursday
     modules: *perf_modules
     expansions:
-      <<: *linux_arm64_generic_expansions
       mongodb_setup_release: 2022-11
       mongodb_setup: single-replica
       infrastructure_provisioning_release: 2023-09
@@ -151,7 +128,6 @@ buildvariants:
     cron: &cron_query_perf_schedule "0 0 * * 4" # 00:00 on Thursday
     modules: *perf_modules
     expansions:
-      <<: *amazon2_x86_expansions
       mongodb_setup_release: 2022-11
       mongodb_setup: standalone-classic-query-engine
       infrastructure_provisioning_release: 2023-09
@@ -2239,7 +2215,6 @@ buildvariants:
     cron: *linux-1-node-repl-cron
     modules: *perf_modules
     expansions:
-      <<: *linux_arm64_generic_expansions
       mongodb_setup_release: 2022-11
       mongodb_setup: shard-one-node-default-sharding
       infrastructure_provisioning_release: 2023-09

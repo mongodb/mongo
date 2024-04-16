@@ -42,12 +42,6 @@ variables:
       - name: package_new_compile
         variant: amazon2-arm64-compile
 
-  - &amazon2_x86_expansions
-    multiversion_platform: amazon2
-    multiversion_edition: enterprise
-    repo_edition: enterprise
-    num_scons_link_jobs_available: 0.99
-
   - &schedule_variant_auto_tasks_task
     name: schedule_variant_auto_tasks
     activate: false
@@ -61,21 +55,6 @@ variables:
     depends_on:
       - name: schedule_global_auto_tasks
         variant: task_generation
-
-  # THIS HAS COPIES IN:
-  # - etc/evergreen_yml_components/variants/perf/perf.yml
-  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &linux_arm64_generic_expansions
-    multiversion_platform: amazon2
-    multiversion_edition: enterprise
-    multiversion_architecture: aarch64
-    packager_arch: aarch64
-    packager_distro: amazon2
-    repo_edition: enterprise
-    large_distro_name: amazon2-arm64-large
-    num_scons_link_jobs_available: 0.99
 
   - modules: &perf_modules
       - dsi
