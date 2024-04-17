@@ -4303,6 +4303,24 @@ tasks:
         vars:
           test-name: parallel-pop-btree-long.wtperf
 
+  - name: perf-test-short-key-btree
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: short-key-btree.wtperf
+          maxruns: 1
+          wtarg: -ops ['"load", "read"']
+      - func: "upload stats to atlas"
+        vars:
+          test-name: short-key-btree.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: short-key-btree.wtperf
+
   - name: perf-test-update-only-btree
     tags: ["btree-perf"]
     depends_on:
