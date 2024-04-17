@@ -13,7 +13,7 @@
 
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 load("jstests/libs/profiler.js");             // For profilerHas*OrThrow helper functions.
-load("jstests/libs/log.js");                  // For findMatchingLogLines.
+load("jstests/libs/local_reads.js");          // For various local read helpers.
 
 const st = new ShardingTest({shards: 2, mongos: 2});
 const testName = "sharded_lookup";
@@ -27,14 +27,8 @@ st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 // Turn on the profiler and increase the query log level for both shards.
 assert.commandWorked(st.shard0.getDB(testName).setProfilingLevel(2));
 assert.commandWorked(st.shard1.getDB(testName).setProfilingLevel(2));
-assert.commandWorked(st.shard0.adminCommand({
-    setParameter: 1,
-    logComponentVerbosity: {query: {verbosity: 3}, replication: {heartbeats: 0}}
-}));
-assert.commandWorked(st.shard1.adminCommand({
-    setParameter: 1,
-    logComponentVerbosity: {query: {verbosity: 3}, replication: {heartbeats: 0}}
-}));
+enableLocalReadLogs(st.shard0);
+enableLocalReadLogs(st.shard1);
 
 const ordersColl = mongosDB.orders;
 const reviewsColl = mongosDB.reviews;
@@ -46,11 +40,15 @@ const updatesColl = mongosDB.updates;
 const freshMongos = st.s1;
 const freshReviews = freshMongos.getDB(testName)[reviewsColl.getName()];
 
-function getLocalReadCount(node, namespace, comment) {
-    const log = assert.commandWorked(node.adminCommand({getLog: "global"})).log;
-    return [
-        ...findMatchingLogLines(log, {id: 5837600, namespace, comment: {comment: comment}})
-    ].length;
+function getNode(i) {
+    return i === 0 ? st.shard0 : st.shard1;
+}
+
+function assertLocalReadCount(comment, actualCount, expectedCount) {
+    assert.eq(actualCount,
+              expectedCount,
+              "Expected to find " + expectedCount + " local reads but found " + actualCount +
+                  " instead for " + comment + ".");
 }
 
 function assertLookupExecution(pipeline, opts, expected) {
@@ -111,31 +109,40 @@ function assertLookupExecution(pipeline, opts, expected) {
                 },
                 numExpectedMatches: expected.toplevelExec[i]
             });
-        }
 
-        // Confirm that the $lookup subpipeline execution is as expected.
-        profilerHasNumMatchingEntriesOrThrow({
-            profileDB: shardList[i],
-            filter: {
-                "command.aggregate": reviewsColl.getName(),
-                "command.comment": opts.comment,
-                "command.fromMongos": expected.mongosMerger === true
-            },
-            numExpectedMatches: expected.subpipelineExec[i]
-        });
-
-        if (expected.subpipelineLocalExec) {
-            const node = i == 0 ? st.shard0 : st.shard1;
-            const localReadCount = getLocalReadCount(node, reviewsColl.getFullName(), opts.comment);
-
-            if (expected.subpipelineLocalExec[i] !== localReadCount) {
-                const globalLogResponse = node.adminCommand({getLog: "global"});
-                if (globalLogResponse.ok) {
-                    jsTestLog('Log for node ' + node.name + ': ' + tojson(globalLogResponse.log));
-                }
-                assert(false,
-                       "Expected to find " + expected.subpipelineLocalExec[i] +
-                           " local reads but found " + localReadCount + " instead.");
+            // Confirm that the $lookup subpipeline execution is as expected.
+            profilerHasNumMatchingEntriesOrThrow({
+                profileDB: shardList[i],
+                filter: {
+                    "command.aggregate": reviewsColl.getName(),
+                    "command.comment": opts.comment,
+                    "command.fromMongos": expected.mongosMerger === true
+                },
+                numExpectedMatches: expected.subpipelineExec[i]
+            });
+            if (expected.subpipelineLocalExec) {
+                assertLocalReadCount(
+                    opts.comment,
+                    getLocalReadCount(getNode(i), reviewsColl.getFullName(), opts.comment),
+                    expected.subpipelineLocalExec[i]);
+            }
+        } else {
+            // If merger is randomly delegated, we can't know in advance if reads will be local or
+            // remote.
+            const localReadCount =
+                getLocalReadCount(getNode(i), reviewsColl.getFullName(), opts.comment);
+            if (localReadCount === 0) {
+                profilerHasNumMatchingEntriesOrThrow({
+                    profileDB: shardList[i],
+                    filter: {
+                        "command.aggregate": reviewsColl.getName(),
+                        "command.comment": opts.comment,
+                        "command.fromMongos": expected.mongosMerger === true
+                    },
+                    numExpectedMatches: expected.subpipelineExec[i]
+                });
+            } else {
+                assertLocalReadCount(opts.comment, localReadCount, expected.subpipelineExec[i]);
             }
         }
 
@@ -162,6 +169,13 @@ function assertLookupExecution(pipeline, opts, expected) {
             });
         }
 
+        if (expected.nestedLocalExec) {
+            assertLocalReadCount(
+                opts.comment,
+                getLocalReadCount(getNode(i), updatesColl.getFullName(), opts.comment),
+                expected.nestedLocalExec[i]);
+        }
+
         // If there is an additional top-level $lookup, confirm that execution is as expected.
         if (expected.multipleLookups) {
             // Confirm that the second $lookup execution is as expected.
@@ -182,6 +196,11 @@ function assertLookupExecution(pipeline, opts, expected) {
                     {"command.aggregate": updatesColl.getName(), "command.comment": opts.comment},
                 numExpectedMatches: expected.multipleLookups.subpipelineExec[i]
             });
+
+            assertLocalReadCount(
+                opts.comment,
+                getLocalReadCount(getNode(i), updatesColl.getFullName(), opts.comment),
+                expected.multipleLookups.subpipelineLocalExec[i]);
         }
     }
     assert(ordersColl.drop());
@@ -286,7 +305,10 @@ assertLookupExecution(pipeline, {comment: "sharded_to_sharded_targeted"}, {
     toplevelExec: [1, 1],
     // Each node executing the $lookup will, for every document that flows through the $lookup
     // stage, target the shard(s) that holds the relevant data for the sharded foreign collection.
-    subpipelineExec: [1, 3]
+    subpipelineExec: [1, 2],
+    // In cases, when shard targets itself, it will not show up in profiler, as the read will be
+    // performed without remote cursor.
+    subpipelineLocalExec: [0, 1]
 });
 
 // Test sharded local collection and sharded foreign collection, with an untargeted $lookup.
@@ -382,7 +404,8 @@ assertLookupExecution(pipeline, {comment: "sharded_to_sharded_to_sharded_targete
     // When executing the subpipeline, the nested $lookup stage will stay on the merging half of the
     // pipeline and execute on the merging node, targeting shards to execute the nested $lookup
     // subpipeline.
-    nestedExec: [1, 2]
+    nestedExec: [0, 2],
+    nestedLocalExec: [1, 0],
 });
 
 // Test sharded local collection and sharded foreign collection with a targeted top-level $lookup
@@ -461,7 +484,8 @@ assertLookupExecution(pipeline, {comment: "sharded_to_sharded_view_to_sharded"},
     // When executing the subpipeline, the "nested" $lookup stage contained in the view pipeline
     // will stay on the merging half of the pipeline and execute on the merging node, targeting
     // shards to execute the nested subpipeline.
-    nestedExec: [1, 2]
+    nestedExec: [0, 2],
+    nestedLocalExec: [1, 0],
 });
 
 // Test that a targeted $lookup on a sharded collection can execute correctly on mongos.
@@ -596,7 +620,7 @@ assertLookupExecution(pipeline, {comment: "multiple_lookups"}, {
     // The second $lookup stage's expected execution behavior is similar to the first, executing in
     // parallel on every shard that contains the 'updates' collection and, for each node, targeting
     // shards to execute the subpipeline.
-    multipleLookups: {toplevelExec: [1, 1], subpipelineExec: [1, 2]}
+    multipleLookups: {toplevelExec: [1, 1], subpipelineExec: [0, 2], subpipelineLocalExec: [1, 0]}
 });
 
 // Test that a $lookup with a subpipeline containing a non-correlated pipeline prefix is properly

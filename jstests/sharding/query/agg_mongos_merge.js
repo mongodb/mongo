@@ -23,6 +23,7 @@ const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 const unshardedColl = mongosDB[jsTestName() + "_unsharded"];
 const primaryShardDB = st.shard0.getDB(jsTestName());
+const nonPrimaryShardDB = st.shard1.getDB(jsTestName());
 
 assert.commandWorked(mongosDB.dropDatabase());
 
@@ -71,9 +72,11 @@ let testNameHistory = new Set();
 // Clears system.profile and restarts the profiler on the primary shard. We enable profiling to
 // verify that no $mergeCursors occur during tests where we expect the merge to run on mongoS.
 function startProfiling() {
-    assert.commandWorked(primaryShardDB.setProfilingLevel(0));
-    primaryShardDB.system.profile.drop();
-    assert.commandWorked(primaryShardDB.setProfilingLevel(2));
+    for (let shard of [primaryShardDB, nonPrimaryShardDB]) {
+        assert.commandWorked(shard.setProfilingLevel(0));
+        shard.system.profile.drop();
+        assert.commandWorked(shard.setProfilingLevel(2));
+    }
 }
 
 /**
@@ -106,17 +109,37 @@ function assertMergeBehaviour(
     // Verify that the aggregation returns the expected number of results.
     assert.eq(mongosColl.aggregate(pipeline, opts).itcount(), expectedCount);
 
-    // Verify that a $mergeCursors aggregation ran on the primary shard if 'mergeType' is not
-    // 'mongos', and that no such aggregation ran otherwise.
-    profilerHasNumMatchingEntriesOrThrow({
-        profileDB: primaryShardDB,
-        numExpectedMatches: (mergeType === "mongos" ? 0 : 1),
-        filter: {
-            "command.aggregate": mongosColl.getName(),
-            "command.comment": testName,
-            "command.pipeline.$mergeCursors": {$exists: 1}
-        }
-    });
+    const mergeFilter = {
+        "command.aggregate": mongosColl.getName(),
+        "command.comment": testName,
+        "command.pipeline.$mergeCursors": {$exists: 1}
+    };
+    const primaryShardMergeCount = primaryShardDB.system.profile.find(mergeFilter).itcount();
+    const nonPrimaryShardMergeCount = nonPrimaryShardDB.system.profile.find(mergeFilter).itcount();
+
+    const foundMessage = function() {
+        return "found " + primaryShardMergeCount + " merges on the primary shard and " +
+            nonPrimaryShardMergeCount + " on the other shard. Total merges on shards: " +
+            (primaryShardMergeCount + nonPrimaryShardMergeCount);
+    };
+
+    if (mergeType === "mongos") {
+        assert.eq(primaryShardMergeCount + nonPrimaryShardMergeCount,
+                  0,
+                  "Expected merge on mongos, but " + foundMessage());
+    } else if (mergeType === "primaryShard") {
+        assert.eq(primaryShardMergeCount,
+                  1,
+                  "Expected merge on the primary shard, but " + foundMessage());
+        assert.eq(nonPrimaryShardMergeCount,
+                  0,
+                  "Expected merge on the primary shard, but " + foundMessage());
+    } else {
+        assert.eq(mergeType, "anyShard", "unknown merge type: " + mergeType);
+        assert.eq(primaryShardMergeCount + nonPrimaryShardMergeCount,
+                  1,
+                  "Expected merge on any shard, but " + foundMessage());
+    }
 }
 
 /**

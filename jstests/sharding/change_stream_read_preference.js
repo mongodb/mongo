@@ -4,10 +4,12 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
+
 (function() {
 "use strict";
 
-load('jstests/libs/profiler.js');  // For various profiler helpers.
+load('jstests/libs/profiler.js');     // For various profiler helpers.
+load('jstests/libs/local_reads.js');  // For various local read helpers.
 
 const st = new ShardingTest({
     name: "change_stream_read_pref",
@@ -42,6 +44,8 @@ assert.commandWorked(mongosDB.adminCommand(
 for (let rs of [st.rs0, st.rs1]) {
     assert.commandWorked(rs.getPrimary().getDB(dbName).setProfilingLevel(2));
     assert.commandWorked(rs.getSecondary().getDB(dbName).setProfilingLevel(2));
+    enableLocalReadLogs(rs.getPrimary());
+    enableLocalReadLogs(rs.getSecondary());
 }
 
 // Write a document to each chunk.
@@ -71,14 +75,18 @@ for (let rs of [st.rs0, st.rs1]) {
         {profileDB: primaryDB, filter: {'originatingCommand.comment': changeStreamComment}});
 
     // Test that the update lookup goes to the primary as well.
-    let filter = {
-        op: "command",
-        ns: mongosColl.getFullName(),
-        "command.comment": changeStreamComment,
-        "command.aggregate": mongosColl.getName()
-    };
+    const localReadCount =
+        getLocalReadCount(primaryDB, mongosColl.getFullName(), changeStreamComment);
+    if (localReadCount === 0) {
+        let filter = {
+            op: "command",
+            ns: mongosColl.getFullName(),
+            "command.comment": changeStreamComment,
+            "command.aggregate": mongosColl.getName()
+        };
 
-    profilerHasSingleMatchingEntryOrThrow({profileDB: primaryDB, filter: filter});
+        profilerHasSingleMatchingEntryOrThrow({profileDB: primaryDB, filter: filter});
+    }
 }
 
 primaryStream.close();
@@ -107,18 +115,21 @@ for (let rs of [st.rs0, st.rs1]) {
         {profileDB: secondaryDB, filter: {'originatingCommand.comment': changeStreamComment}});
 
     // Test that the update lookup goes to the secondary as well.
-    let filter = {
-        op: "command",
-        ns: mongosColl.getFullName(),
-        "command.comment": changeStreamComment,
-        // We need to filter out any profiler entries with a stale config - this is the
-        // first read on this secondary with a readConcern specified, so it is the first
-        // read on this secondary that will enforce shard version.
-        errCode: {$ne: ErrorCodes.StaleConfig},
-        "command.aggregate": mongosColl.getName()
-    };
-
-    profilerHasSingleMatchingEntryOrThrow({profileDB: secondaryDB, filter: filter});
+    const localReadCount =
+        getLocalReadCount(secondaryDB, mongosColl.getFullName(), changeStreamComment);
+    if (localReadCount === 0) {
+        let filter = {
+            op: "command",
+            ns: mongosColl.getFullName(),
+            "command.comment": changeStreamComment,
+            // We need to filter out any profiler entries with a stale config - this is the
+            // first read on this secondary with a readConcern specified, so it is the first
+            // read on this secondary that will enforce shard version.
+            errCode: {$ne: ErrorCodes.StaleConfig},
+            "command.aggregate": mongosColl.getName()
+        };
+        profilerHasSingleMatchingEntryOrThrow({profileDB: secondaryDB, filter: filter});
+    }
 }
 
 secondaryStream.close();

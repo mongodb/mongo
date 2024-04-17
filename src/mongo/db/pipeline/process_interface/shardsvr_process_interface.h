@@ -137,8 +137,6 @@ public:
         const NamespaceString& nss,
         const boost::optional<DatabaseVersion>& dbVersion) override;
 
-    void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) final;
-
     void createTimeseriesView(OperationContext* opCtx,
                               const NamespaceString& ns,
                               const BSONObj& cmdObj,

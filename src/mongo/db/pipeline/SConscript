@@ -185,6 +185,10 @@ env.Library(
         '$BUILD_DIR/mongo/s/query/cluster_query',
         'aggregation',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/shard_role_api',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
+    ],
 )
 
 env.Library(

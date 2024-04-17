@@ -532,13 +532,6 @@ public:
         const NamespaceString& nss,
         const boost::optional<DatabaseVersion>& dbVersion) = 0;
 
-    /**
-     * Checks if this process is on the primary shard for db specified by the given namespace.
-     * Throws an IllegalOperation exception otherwise. Assumes the operation context has a db
-     * version attached to it for db name specified by the namespace.
-     */
-    virtual void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) = 0;
-
     virtual std::unique_ptr<ResourceYielder> getResourceYielder(StringData cmdName) const = 0;
 
     /**

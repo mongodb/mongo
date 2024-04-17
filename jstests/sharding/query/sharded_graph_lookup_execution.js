@@ -11,6 +11,7 @@
 
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 load("jstests/libs/profiler.js");             // For profilerHas*OrThrow helper functions.
+load('jstests/libs/local_reads.js');          // For various local read helpers.
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 const testName = "sharded_graph_lookup";
@@ -24,10 +25,16 @@ st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 // Turn on the profiler for both shards.
 assert.commandWorked(st.shard0.getDB(testName).setProfilingLevel(2));
 assert.commandWorked(st.shard1.getDB(testName).setProfilingLevel(2));
+enableLocalReadLogs(st.shard0);
+enableLocalReadLogs(st.shard1);
 
 const airportsColl = mongosDB.airports;
 const travelersColl = mongosDB.travelers;
 const airfieldsColl = mongosDB.airfields;
+
+function getNode(i) {
+    return i === 0 ? st.shard0 : st.shard1;
+}
 
 function assertGraphLookupExecution(pipeline, opts, expectedResults, executionList) {
     assert.commandWorked(travelersColl.insert([
@@ -91,17 +98,24 @@ function assertGraphLookupExecution(pipeline, opts, expectedResults, executionLi
 
             // Confirm that the $graphLookup recursive $match execution is as expected. In the
             // nested cases, we need to check the $lookup subpipeline execution instead. In either
-            // case, the command dispatched is an aggregate.
-            profilerHasNumMatchingEntriesOrThrow({
-                profileDB: shardList[shard],
-                filter: {
-                    "command.aggregate": fromCollName,
-                    "command.comment": opts.comment,
-                    "command.fromMongos": exec.mongosMerger === true
-                },
-                numExpectedMatches: isLookup ? exec.subpipelineExec[shard]
-                                             : exec.recursiveMatchExec[shard]
-            });
+            // case, the command is either dispatched as aggregate or is a local read.
+            const totalExecs =
+                isLookup ? exec.subpipelineExec[shard] : exec.recursiveMatchExec[shard];
+            const localReadCount = getLocalReadCount(
+                getNode(shard), mongosDB[fromCollName].getFullName(), opts.comment);
+            const remoteReadCount = shardList[shard]
+                                        .system.profile
+                                        .find({
+                                            "command.aggregate": fromCollName,
+                                            "command.comment": opts.comment,
+                                            "command.fromMongos": exec.mongosMerger === true
+                                        })
+                                        .itcount();
+            assert.eq(localReadCount + remoteReadCount,
+                      totalExecs,
+                      "Expected total of " + totalExecs + " reads, but found " + localReadCount +
+                          " local reads and " + remoteReadCount + " remote reads (total " +
+                          (localReadCount + remoteReadCount) + ") for " + opts.comment);
         }
     }
 
@@ -302,10 +316,10 @@ assertGraphLookupExecution(pipeline, {comment: "sharded_to_sharded_to_unsharded"
         // half of the pipeline and execute on the merging node, sending requests to execute the
         // nested $matches on the primary shard (where the unsharded 'airfields' collection is).
         // Only the $graphLookup on the non-primary shard needs to send requests over the network;
-        // the rest can be done via a local read and are not logged. The $graphLookups cannot share
-        // a cache because they run indepedently.
+        // the rest can be done via a local read. The $graphLookups cannot share a cache because
+        // they run indepedently.
         toplevelExec: [0, 0],
-        recursiveMatchExec: [2, 0]
+        recursiveMatchExec: [6, 0]
     }
 ]);
 

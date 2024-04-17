@@ -481,6 +481,12 @@ last-continuous:
     ticket: SERVER-83370
   - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
     ticket: SERVER-86253
+  - test_file: jstests/sharding/query/lookup_unionWith_subpipeline_local_read.js
+    ticket: SERVER-77427
+  - test_file: jstests/sharding/query/sharded_graph_lookup_execution.js
+    ticket: SERVER-77427
+  - test_file: jstests/sharding/query/sharded_lookup_execution.js
+    ticket: SERVER-77427
   suites: null
 last-lts:
   all:
@@ -1010,4 +1016,10 @@ last-lts:
     ticket: SERVER-83370
   - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
     ticket: SERVER-86253
+  - test_file: jstests/sharding/query/lookup_unionWith_subpipeline_local_read.js
+    ticket: SERVER-77427
+  - test_file: jstests/sharding/query/sharded_graph_lookup_execution.js
+    ticket: SERVER-77427
+  - test_file: jstests/sharding/query/sharded_lookup_execution.js
+    ticket: SERVER-77427
   suites: null

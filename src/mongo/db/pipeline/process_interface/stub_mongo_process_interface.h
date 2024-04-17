@@ -345,10 +345,6 @@ public:
         return std::make_unique<ScopedExpectUnshardedCollectionNoop>();
     }
 
-    void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) override {
-        // Do nothing.
-    }
-
     std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const {
         MONGO_UNREACHABLE;

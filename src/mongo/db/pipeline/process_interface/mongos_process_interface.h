@@ -248,10 +248,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) override {
-        MONGO_UNREACHABLE;
-    }
-
     std::unique_ptr<ResourceYielder> getResourceYielder(StringData cmdName) const override {
         return nullptr;
     }

@@ -481,12 +481,4 @@ ShardServerProcessInterface::expectUnshardedCollectionInScope(
     return std::make_unique<ScopedExpectUnshardedCollectionImpl>(opCtx, nss, dbVersion);
 }
 
-void ShardServerProcessInterface::checkOnPrimaryShardForDb(OperationContext* opCtx,
-                                                           const NamespaceString& nss) {
-    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
-    const auto scopedDss =
-        DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
-    scopedDss->assertIsPrimaryShardForDb(opCtx);
-}
-
 }  // namespace mongo
