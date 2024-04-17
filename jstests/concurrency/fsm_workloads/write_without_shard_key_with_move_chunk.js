@@ -3,7 +3,7 @@
  * there are concurrent chunk migrations.
  *
  * @tags: [
- *  requires_fcv_71,
+ *  requires_fcv_81,
  *  requires_sharding,
  *  uses_transactions,
  * ]

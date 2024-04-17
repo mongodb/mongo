@@ -51,6 +51,7 @@ selector:
     - jstests/core/write/find_and_modify/find_and_modify_server7660.js
     # updateOne sort.
     - jstests/core/write/update/updateOne_sort.js
+    - jstests/core/write/update/updateOne_sort_sharded.js
     # Incompatible find command option.
     - jstests/core/min_max_hashed_index.js # min
     - jstests/core/query/expr/expr.js # divide

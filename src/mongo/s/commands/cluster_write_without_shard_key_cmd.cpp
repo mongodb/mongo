@@ -224,8 +224,10 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
                 nss.isTimeseriesBucketsCollection()) {
                 queryBuilder.appendElementsUnique(updateOp->getFilter());
             } else {
-                // Unset the collation because targeting by _id uses default collation.
+                // Unset the collation and sort because targeting by _id uses default collation and
+                // we should uniquely target a single document by _id.
                 newUpdateOp.setCollation(boost::none);
+                newUpdateOp.setSort(boost::none);
             }
 
             newUpdateOp.setFilter(queryBuilder.obj());
@@ -281,8 +283,10 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
             nss.isTimeseriesBucketsCollection()) {
             queryBuilder.appendElementsUnique(updateRequest.getUpdates().front().getQ());
         } else {
-            // Unset the collation because targeting by _id uses default collation.
+            // Unset the collation and sort because targeting by _id uses default collation and we
+            // should uniquely target a single document by _id.
             updateRequest.getUpdates().front().setCollation(boost::none);
+            updateRequest.getUpdates().front().setSort(boost::none);
         }
 
         updateRequest.getUpdates().front().setQ(queryBuilder.obj());

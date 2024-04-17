@@ -1,8 +1,12 @@
 /**
- * Runs updateOne, deleteOne, and findAndModify without shard key against a sharded cluster.
+ * Runs updateOne, deleteOne, and findAndModify without shard key against a sharded cluster. For
+ * validation purposes, this test is set up such that each thread only modifies documents in its own
+ * partition, so there won't be concurrent modifications to the same document across threads.
+ * However, writes may conflict with move chunks.
  *
  * @tags: [
- *  requires_fcv_71,
+ *  # updateOne with a sort option is supported in 8.0
+ *  requires_fcv_81,
  *  requires_sharding,
  *  uses_transactions,
  * ]
@@ -95,8 +99,61 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     /**
-     * Randomly generates and runs an update operator document update, replacement update, or an
-     * aggregation pipeline update.
+     * Sorts documents by sortVal and returns an array of the _id fields of documents that are first
+     * in the sort order.
+     */
+    $config.data.returnDocsThatSortFirst = function returnDocsThatSortFirst(
+        db, collName, query, options) {
+        // If sorting, ensure that the correct document is modified. Save the _id values of the
+        // documents that come first in the sort order, and validate that a document that comes
+        // first in the sort order is correctly applied the update.
+        const sortVal = {[this.secondaryDocField]: this.generateRandomInt(0, 1) === 0 ? -1 : 1};
+        options.sort = sortVal;
+
+        // Need to specify batch count that is larger than the total number of records to
+        // prevent getMore command from being issued since stepdown suites ban it.
+        const docs = db[collName].find(query).sort(sortVal).batchSize(1e6).toArray();
+
+        // A previous update op with a query on a non-existent tertiary field, doUpsert = true,
+        // and doShardKeyUpdate = true could lead to a document with no secondaryDocField value
+        // getting inserted into the collection. This would sort first in an ascending sort
+        // because missing/null comes before integers in the BSON comparison order. Since we
+        // sort on the secondaryDocField and assume that it exists to validate the sort, we will
+        // skip write response validation if it doesn't exist for ease of testing.
+        const secondaryDocFieldVal = docs[0][this.secondaryDocField];
+        if (secondaryDocFieldVal == undefined) {
+            return undefined;
+        }
+
+        const docsThatSortFirstIds =
+            db[collName]
+                .find({[this.secondaryDocField]: secondaryDocFieldVal}, {[this.idField]: 1})
+                .toArray();
+
+        return docsThatSortFirstIds;
+    };
+
+    /**
+     * Validate that for an update with a sort, the correct document (one that sorts first) was
+     * updated.
+     */
+    $config.data.validateSortedUpdate = function validateSortedUpdate(
+        db, collName, update, doShardKeyUpdate, docsThatSortFirstIds) {
+        let correctDocModified = false;
+        const sortField = doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField;
+
+        for (let i = 0; i < docsThatSortFirstIds.length; i++) {
+            let docSort = db[collName].find(docsThatSortFirstIds[i]).toArray()[0];
+            if (docSort[sortField] == update[sortField]) {
+                correctDocModified = true;
+            }
+        }
+        assert(correctDocModified);
+    };
+
+    /**
+     * Randomly generates and runs an update operator document update, replacement update,
+     * or an aggregation pipeline update.
      */
     $config.data.generateAndRunRandomUpdateOp = function generateAndRunRandomUpdateOp(db,
                                                                                       collName) {
@@ -109,21 +166,36 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // Used for validation after running the write operation.
         const containsMatchedDocs = db[collName].findOne(query) != null;
 
+        // Only test sort when there are matching documents in the collection. We do not test sort
+        // for replacement updates as replaceOne does not support a sort parameter.
+        const doSort = containsMatchedDocs && updateType !== 1 && this.generateRandomBool();
+        let docsThatSortFirstIds = new Array();
+
+        let options = {upsert: doUpsert};
+        if (doSort) {
+            docsThatSortFirstIds = this.returnDocsThatSortFirst(db, collName, query, options);
+            if (docsThatSortFirstIds == undefined) {
+                return;
+            }
+        }
+
         jsTestLog("updateOne state running with the following parameters: \n" +
                   "query: " + tojson(query) + "\n" +
                   "updateType: " + updateType + "\n" +
                   "doShardKeyUpdate: " + doShardKeyUpdate + "\n" +
                   "doUpsert: " + doUpsert + "\n" +
+                  "doSort: " + doSort + "\n" +
                   "containsMatchedDocs: " + containsMatchedDocs);
 
         let res;
+        let update;
         try {
             if (updateType === 0 /* Update operator document */) {
-                const update = {
+                update = {
                     [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
                         newValue
                 };
-                res = db[collName].updateOne(query, {$set: update}, {upsert: doUpsert});
+                res = db[collName].updateOne(query, {$set: update}, options);
             } else if (updateType === 1 /* Replacement Update */) {
                 // Always including a shard key update for replacement documents in order to keep
                 // the new document within the current thread's partition.
@@ -133,17 +205,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                                                   [this.secondaryDocField]: newValue,
                                                   tid: this.tid
                                               },
-                                              {upsert: doUpsert});
+                                              options);
             } else { /* Aggregation pipeline update */
-                const update = {
+                update = {
                     [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
                         newValue
                 };
 
                 // The $unset will result in a no-op since 'z' is not a field populated in any of
                 // the documents.
-                res = db[collName].updateOne(
-                    query, [{$set: update}, {$unset: "z"}], {upsert: doUpsert});
+                res = db[collName].updateOne(query, [{$set: update}, {$unset: "z"}], options);
             }
         } catch (err) {
             if (this.shouldSkipWriteResponseValidation(err)) {
@@ -173,6 +244,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // In case the modification results in no change to the document, matched may be higher
         // than modified.
         assert.gte(res.matchedCount, res.modifiedCount, res);
+
+        if (doSort) {
+            this.validateSortedUpdate(db, collName, update, doShardKeyUpdate, docsThatSortFirstIds);
+        }
     };
 
     /**
@@ -254,7 +329,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             ErrorCodes.NoSuchTransaction,
             ErrorCodes.StaleConfig,
             ErrorCodes.ShardCannotRefreshDueToLocksHeld,
-            ErrorCodes.WriteConflict
+            ErrorCodes.WriteConflict,
+            ErrorCodes.SnapshotUnavailable
         ];
 
         // If we're running in a stepdown suite, then attempting to update the shard key may
@@ -348,7 +424,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // If sorting, ensure that the correct document is modified.
         if (doSort) {
             sortVal = {[this.secondaryDocField]: this.generateRandomInt(0, 1) === 0 ? -1 : 1};
-            sortDoc = db[collName].find(query).sort(sortVal)[0];
+            // Need to specify batch count that is larger than the total number of records to
+            // prevent getMore command from being issued since stepdown suites ban it.
+            sortDoc = db[collName].find(query).sort(sortVal).batchSize(1e6)[0];
         }
 
         let res;

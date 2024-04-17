@@ -4,7 +4,10 @@
  * A large number of documents are inserted during the workload setup. Each thread repeatedly
  * updates a document from the collection using the updateOne command with a sort. At the end of the
  * workload, the contents of the database are checked for whether the correct number of documents
- * were updated.
+ * were updated. They are also checked to ensure that the modified documents were those that came
+ * first in the sort order (for a descending sort, the documents that had the highest sortField
+ * values). While sortField is modified by the update, the document's _id value is the same as its
+ * old sortField value, so we check the value at _id instead.
  *
  * This test is modeled off of findAndModify_update_queue.js, but instead of storing the _id field
  * of the updated document in another database and ensuring that every thread updated a different
@@ -13,7 +16,7 @@
  *
  * @tags: [
  *   # PM-1632 was delivered in 7.1, resolving the issue about assumes_unsharded_collection.
- *   requires_fcv_80,
+ *   requires_fcv_81,
  * ]
  */
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
@@ -25,11 +28,11 @@ export const $config = (function() {
         uniqueDBName: jsTestName(),
 
         newDocForInsert: function newDocForInsert(i) {
-            return {_id: i, a: 1, b: 1};
+            return {_id: i, sortField: i, queryField: 1};
         },
 
         getIndexSpecs: function getIndexSpecs() {
-            return [{a: 1}, {b: 1}];
+            return [{sortField: -1}, {queryField: 1}];
         },
 
         opName: 'updated'
@@ -39,10 +42,15 @@ export const $config = (function() {
         function updateOne(db, collName) {
             const updateCmd = {
                 update: collName,
-                updates: [{q: {a: 1, b: 1}, u: {$inc: {a: 1}}, multi: false, sort: {a: -1}}]
+                updates: [{
+                    q: {queryField: 1},
+                    u: {$set: {sortField: -1, queryField: -1}},
+                    multi: false,
+                    sort: {sortField: -1}
+                }]
             };
 
-            // Update field 'a' to avoid matching the same document again.
+            // Update field 'sortField' to avoid matching the same document again.
             var res = db.runCommand(updateCmd);
 
             if (isMongod(db)) {
@@ -64,10 +72,11 @@ export const $config = (function() {
 
     function setup(db, collName) {
         // Each thread should update exactly one document per iteration.
-        this.numDocs = this.iterations * this.threadCount;
+        this.numDocsToMatch = this.iterations * this.threadCount;
+        this.numDocsTotal = 2 * this.numDocsToMatch;
 
         var bulk = db[collName].initializeUnorderedBulkOp();
-        for (var i = 0; i < this.numDocs; ++i) {
+        for (var i = 1; i <= this.numDocsTotal; ++i) {
             var doc = this.newDocForInsert(i);
             // Require that documents inserted by this workload use _id values that can be compared
             // using the default JS comparator.
@@ -79,7 +88,7 @@ export const $config = (function() {
         }
         var res = bulk.execute();
         assert.commandWorked(res);
-        assert.eq(this.numDocs, res.nInserted);
+        assert.eq(this.numDocsTotal, res.nInserted);
 
         this.getIndexSpecs().forEach(function createIndex(indexSpec) {
             assert.commandWorked(db[collName].createIndex(indexSpec));
@@ -87,15 +96,22 @@ export const $config = (function() {
     }
 
     function teardown(db, collName) {
-        var numOldDocs = db[collName].countDocuments({a: 1, b: 1});
-        assert.eq(numOldDocs, 0);
-        var numNewDocs = db[collName].countDocuments({a: 2, b: 1});
-        assert.eq(numNewDocs, this.numDocs);
+        var numNewDocs = db[collName].countDocuments({sortField: -1, queryField: -1});
+        assert.eq(numNewDocs, this.numDocsToMatch);
+
+        // Ensure that the modified documents were those that came first in the sort order (for a
+        // descending sort, the documents that had the highest sortField values). While sortField is
+        // modified by the update, the document's _id value is the same as its old sortField value,
+        // so we check the value at _id instead.
+        var docs = db[collName].find({sortField: -1, queryField: -1}).sort({_id: -1}).toArray();
+        for (var i = 0; i < numNewDocs; ++i) {
+            assert.eq(docs[i]._id, this.numDocsTotal - i);
+        }
     }
 
     return {
         threadCount: 10,
-        iterations: 100,
+        iterations: 50,
         data: data,
         startState: 'updateOne',
         states: states,

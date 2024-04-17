@@ -50,7 +50,7 @@ export var WriteWithoutShardKeyTestUtil = (function() {
      * - For replacement style updates, we expect that the final replacement modification is a
      * unique document in the collection.
      */
-    function validateResultUpdate(docs, expectedMods, isReplacementTest) {
+    function validateResultUpdate(docs, expectedMods, isReplacementTest, updatedDocId = null) {
         expectedMods.forEach(mod => {
             if (isReplacementTest) {
                 let matches = 0;
@@ -68,6 +68,13 @@ export var WriteWithoutShardKeyTestUtil = (function() {
                 docs.forEach(doc => {
                     if (doc[field] == value) {
                         docsHaveFieldMatchArray.push(doc[field] == value);
+                        // For updateOne with sort, validate that the document that was first in the
+                        // sort order was updated.
+                        if (updatedDocId) {
+                            let idField = Object.keys(updatedDocId)[0];
+                            let idValue = updatedDocId[idField]
+                            assert.eq(doc[idField], idValue);
+                        }
                     }
                 });
 
@@ -205,6 +212,11 @@ export var WriteWithoutShardKeyTestUtil = (function() {
 
             switch (operationType) {
                 case OperationType.updateOne:
+                    validateResultUpdate(allMatchedDocs,
+                                         testCase.expectedMods,
+                                         testCase.replacementDocTest,
+                                         testCase.updatedDocId);
+                    break;
                 case OperationType.findAndModifyUpdate:
                     validateResultUpdate(
                         allMatchedDocs, testCase.expectedMods, testCase.replacementDocTest);

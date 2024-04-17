@@ -295,6 +295,9 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
             auto updateOp = op.getUpdate();
             parsedInfo.query = updateOp->getFilter();
             parsedInfo.hint = updateOp->getHint();
+            parsedInfo.sort = updateOp->getSort() && !updateOp->getSort()->isEmpty()
+                ? updateOp->getSort()
+                : boost::none;
             if ((parsedInfo.upsert = updateOp->getUpsert())) {
                 parsedInfo.updateRequest =
                     bulk_write_common::makeUpdateOpEntryFromUpdateOp(updateOp);
@@ -320,6 +323,10 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
             IDLParserContext("_clusterQueryWithoutShardKeyForUpdate"), writeCmdObj);
         parsedInfo.query = updateRequest.getUpdates().front().getQ();
         parsedInfo.hint = updateRequest.getUpdates().front().getHint();
+        parsedInfo.sort = updateRequest.getUpdates().front().getSort() &&
+                !updateRequest.getUpdates().front().getSort()->isEmpty()
+            ? updateRequest.getUpdates().front().getSort()
+            : boost::none;
         parsedInfo.let = updateRequest.getLet();
         parsedInfo.isTimeseriesNamespace = updateRequest.getIsTimeseriesNamespace();
 

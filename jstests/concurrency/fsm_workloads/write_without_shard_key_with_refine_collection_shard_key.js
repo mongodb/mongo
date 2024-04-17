@@ -3,7 +3,7 @@
  * concurrently refining the collection's shard key.
  *
  * @tags: [
- *  requires_fcv_71,
+ *  requires_fcv_81,
  *  requires_sharding,
  *  uses_transactions,
  *  assumes_balancer_off,

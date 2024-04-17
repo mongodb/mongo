@@ -7,7 +7,7 @@
  *
  * @tags: [
  *   # PM-1632 was delivered in 7.1, resolving the issue about assumes_unsharded_collection.
- *   requires_fcv_80,
+ *   requires_fcv_81,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
@@ -26,7 +26,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.updateOne = function(db, collName) {
         const updateCmd = {
             update: collName,
-            updates: [{q: {a: 1, b: 1}, u: {$inc: {a: 1}}, multi: false, sort: {a: -1}}]
+            updates: [{
+                q: {sortField: 1, queryField: 1},
+                u: {$inc: {sortField: 1}},
+                multi: false,
+                sort: {sortField: -1}
+            }]
         };
 
         // Update field 'a' to avoid matching the same document again.
@@ -38,7 +43,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.setup = function(db, collName) {
         var bulk = db[collName].initializeUnorderedBulkOp();
-        var doc = this.newDocForInsert(0);
+        var doc = this.newDocForInsert(1);
         // Require that documents inserted by this workload use _id values that can be compared
         // using the default JS comparator.
         assert.neq(typeof doc._id,
@@ -60,11 +65,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var docs = db[collName].find().toArray();
         // Assert that while 10 threads attempted an updateOne on a single matching document, it was
         // only updated once with the correct update. All updateOne operations look for a document
-        // with a==1, and then increment 'a' by 1. One should win the race and set a=2. The others
-        // should fail to find a match. The assertion is that 'a' got incremented once (not zero
-        // times and not twice).
+        // with sortField==1, and then increment 'sortField' by 1. One should win the race and set
+        // sortField=2. The others should fail to find a match. The assertion is that 'sortField'
+        // got incremented once (not zero times and not twice).
         assert.eq(docs.length, 1);
-        assert.eq(docs[0].a, 2);
+        assert.eq(docs[0].sortField, 2);
     };
 
     return $config;

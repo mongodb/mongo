@@ -1411,10 +1411,17 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     assertCanWrite_inlock(opCtx, ns);
 
-    if (updateRequest->getSort().isEmpty()) {
+    // No need to call writeConflictRetry() since it does not retry if in a transaction,
+    // but calling it can cause WCE to be double counted.
+    const auto inTransaction = opCtx->inMultiDocumentTransaction();
+    if (updateRequest->getSort().isEmpty() || inTransaction) {
         return performSingleUpdateOpNoRetry(
             opCtx, source, curOp, collection, parsedUpdate, containsDotsAndDollarsField);
     } else {
+        // Call writeConflictRetry() if we have a sort, since we express the sort with a limit of 1.
+        // In the case that the predicate of the currently matching document changes due to a
+        // concurrent modification, the query will be retried to see if there's another matching
+        // document.
         return writeConflictRetry(opCtx, "update", ns, [&]() -> SingleWriteResult {
             return performSingleUpdateOpNoRetry(
                 opCtx, source, curOp, collection, parsedUpdate, containsDotsAndDollarsField);
