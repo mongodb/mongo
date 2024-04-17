@@ -870,7 +870,8 @@ TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeAppliesRecipientConfig) {
     }
 
     auto opCtx = makeOperationContext();
-    getReplCoord()->signalDrainComplete(opCtx.get(), _configTerm);
+    getReplCoord()->signalWriterDrainComplete(opCtx.get(), _configTerm);
+    getReplCoord()->signalApplierDrainComplete(opCtx.get(), _configTerm);
     while (getReplCoord()->getConfigVersionAndTerm() < splitConfig.getConfigVersionAndTerm()) {
         sleepFor(Milliseconds(10));
     }

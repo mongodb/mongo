@@ -588,15 +588,30 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
     return Status::OK();
 }
 
-void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* opCtx) {
+void ReplicationCoordinatorExternalStateImpl::onWriterDrainComplete(OperationContext* opCtx) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(ExecutionAdmissionContext::get(opCtx).getPriority() ==
                   AdmissionContext::Priority::kExempt,
               "Replica Set state changes are critical to the cluster and should not be throttled");
 
+    if (_oplogApplyBuffer) {
+        _oplogApplyBuffer->enterDrainMode();
+    }
+}
+
+void ReplicationCoordinatorExternalStateImpl::onApplierDrainComplete(OperationContext* opCtx) {
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(ExecutionAdmissionContext::get(opCtx).getPriority() ==
+                  AdmissionContext::Priority::kExempt,
+              "Replica Set state changes are critical to the cluster and should not be throttled");
+
+    // When _oplogWriteBuffer is not null, featureFlagReduceMajorityWriteLatency is enabled.
+    // We call exitDrainMode() on both buffers, since onWriterDrainComplete() does not call
+    // exitDrainMode() on the write buffer.
     if (_oplogWriteBuffer) {
         _oplogWriteBuffer->exitDrainMode();
-    } else if (_oplogApplyBuffer) {
+    }
+    if (_oplogApplyBuffer) {
         _oplogApplyBuffer->exitDrainMode();
     }
 }
@@ -1245,13 +1260,16 @@ void ReplicationCoordinatorExternalStateImpl::stopProducer() {
 void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
     stdx::lock_guard<Latch> lk(_threadMutex);
     // When _oplogWriteBuffer is not null, featureFlagReduceMajorityWriteLatency is enabled.
-    // We only need to call exitDrainMode() on write buffer in this case as the apply buffer
-    // will call exitDrainMode() by the writer after it exits drain mode.
+    // We call exitDrainMode() on both buffers, but it is possible that the apply buffer is
+    // not even in drain mode when exitDrainMode() is called, which can happen if the node
+    // steps down in the middle of a step-up.
     if (_oplogWriteBuffer) {
         _oplogWriteBuffer->exitDrainMode();
-    } else if (_oplogApplyBuffer) {
+    }
+    if (_oplogApplyBuffer) {
         _oplogApplyBuffer->exitDrainMode();
     }
+
     if (_bgSync) {
         _bgSync->startProducerIfStopped();
     }

@@ -433,16 +433,19 @@ Status ReplicationCoordinatorMock::setFollowerModeRollback(OperationContext* opC
     return setFollowerMode(MemberState::RS_ROLLBACK);
 }
 
-void ReplicationCoordinatorMock::setApplierState(const ApplierState& newState) {
+void ReplicationCoordinatorMock::setOplogSyncState(const OplogSyncState& newState) {
     stdx::lock_guard<Mutex> lk(_mutex);
-    _applierState = newState;
+    _oplogSyncState = newState;
 }
 
-ReplicationCoordinator::ApplierState ReplicationCoordinatorMock::getApplierState() {
-    return _applierState;
+ReplicationCoordinator::OplogSyncState ReplicationCoordinatorMock::getOplogSyncState() {
+    return _oplogSyncState;
 }
 
-void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*, long long) noexcept {}
+void ReplicationCoordinatorMock::signalWriterDrainComplete(OperationContext*, long long) noexcept {}
+
+void ReplicationCoordinatorMock::signalApplierDrainComplete(OperationContext*, long long) noexcept {
+}
 
 void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
 

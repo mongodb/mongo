@@ -561,78 +561,109 @@ public:
      * Step-up
      * =======
      * On stepup, repl coord enters catch-up mode. It's the same as the secondary mode from
-     * the perspective of producer and applier, so there's nothing to do with them.
-     * When a node enters drain mode, producer state = Stopped, applier state = Draining.
+     * the perspective of producer and writer/applier, so there's nothing to do with them.
      *
-     * If the applier state is Draining, it will signal repl coord when there's nothing to apply.
-     * The applier goes into Stopped state at the same time.
+     * When entering drain mode, producer state = Stopped, writer state = Draining, applier
+     * state = Running.
+     *
+     * Once writer is done writing everything, applier state = Draining. Applier will later
+     * signal repl coord when there's nothing to apply. After that both writer and applier
+     * go to the Stopped state.
      *
      * The states go like the following:
-     * - secondary and during catchup mode
-     * (producer: Running, applier: Running)
+     *
+     * - Secondary and during catchup mode:
+     * (producer: Running, writer: Running, applier: Running)
      *      |
-     *      | finish catch-up, enter drain mode
+     *      | finishes catch-up, writer enters drain mode
      *      V
-     * - drain mode
-     * (producer: Stopped, applier: Draining)
+     * - Writer drain mode:
+     * (producer: Stopped, writer: Draining, applier: Running)
      *      |
-     *      | applier signals drain is complete
+     *      | writer signals drain complete, applier enters drain mode
+     *      V
+     * - Applier drain mode:
+     * (producer: Stopped, writer: Draining, applier: Draining)
+     *      |
+     *      | applier signals drain complete
      *      V
      * - primary is in writable mode
-     * (producer: Stopped, applier: Stopped)
+     * (producer: Stopped, writer: Stopped, applier: Stopped)
      *
      *
      * Step-down
      * =========
      * The state transitions become:
-     * - primary is in writable mode
-     * (producer: Stopped, applier: Stopped)
+     *
+     * - Primary is in writable mode:
+     * (producer: Stopped, writer: Stopped, applier: Stopped)
      *      |
-     *      | step down
+     *      | steps down
      *      V
-     * - secondary mode, starting bgsync
-     * (producer: Starting, applier: Running)
+     * - Secondary mode, starting bgsync:
+     * (producer: Starting, writer: Running, applier: Running)
      *      |
      *      | bgsync runs start()
      *      V
-     * - secondary mode, normal
-     * (producer: Running, applier: Running)
+     * - Secondary mode, normal:
+     * (producer: Running, Writer: Running, applier: Running)
      *
      * When a node steps down during draining mode, it's OK to change from (producer: Stopped,
-     * applier: Draining) to (producer: Starting, applier: Running).
-     *
-     * When a node steps down during catchup mode, the states remain the same (producer: Running,
+     * writer: Draining, applier: Running/Draining) to (producer: Starting, writer: Running,
      * applier: Running).
      *
-     * DrainingForShardSplit follows the same state diagram as Draining, it only exists to hint the
-     * signalDrainModeComplete method that it should not follow the primary step-up logic.
+     * When a node steps down during catchup mode, the states remain the same (producer: Running,
+     * writer: Running, applier: Running).
+     *
+     * WriterDrainingForShardSplit and ApplierDrainingForShardSplit follow the same state diagram
+     * as Draining, they only exist to hint the signalApplierDrainComplete method that it should
+     * not follow the primary step-up logic.
      */
-    enum class ApplierState { Running, Draining, DrainingForShardSplit, Stopped };
+    enum class OplogSyncState {
+        Running,
+        WriterDraining,
+        WriterDrainingForShardSplit,
+        ApplierDraining,
+        ApplierDrainingForShardSplit,
+        Stopped,
+    };
 
     /**
-     * In normal cases: Running -> Draining -> Stopped -> Running.
-     * Draining -> Running is also possible if a node steps down during drain mode.
+     * In normal cases: Running -> WriterDraining -> ApplierDraining -> Stopped -> Running.
+     * WriterDraining/ApplierDraining -> Running is also possible if the node steps down
+     * during drain mode.
      *
-     * Only the applier can make the transition from Draining to Stopped by calling
-     * signalDrainComplete().
+     * Only the applier can make the transition from ApplierDraining to Stopped by calling
+     * signalApplierDrainComplete().
      */
-    virtual ApplierState getApplierState() = 0;
+    virtual OplogSyncState getOplogSyncState() = 0;
+
+    /**
+     * Signals that a previously requested pause and drain of the writer buffer
+     * has completed.
+     *
+     * This is an interface that allows the writer to notify the applier buffer
+     * to start draining.
+     */
+    virtual void signalWriterDrainComplete(OperationContext* opCtx,
+                                           long long termWhenExhausted) = 0;
 
     /**
      * Signals that a previously requested pause and drain of the applier buffer
      * has completed.
      *
-     * This is an interface that allows the applier to reenable writes after
-     * a successful election triggers the draining of the applier buffer.
+     * This is an interface that allows the applier to reenable writes after a
+     * successful election triggers the draining of the applier buffer.
      *
-     * The applier signals drain complete when the buffer is empty and it's in Draining
+     * The applier signals drain complete when its buffer is empty and it is in Draining
      * state. We need to make sure the applier checks both conditions in the same term.
      * Otherwise, it's possible that the applier confirms the empty buffer, but the node
-     * steps down and steps up so quickly that the applier signals drain complete in the wrong
-     * term.
+     * steps down and steps up so quickly that the applier signals drain complete in the
+     * wrong term.
      */
-    virtual void signalDrainComplete(OperationContext* opCtx,
-                                     long long termWhenBufferIsEmpty) noexcept = 0;
+    virtual void signalApplierDrainComplete(OperationContext* opCtx,
+                                            long long termWhenExhausted) noexcept = 0;
+
 
     /**
      * Signals the sync source feedback thread to wake up and send a handshake and

@@ -324,7 +324,9 @@ void ReplicationCoordinatorExternalStateMock::setIsReadCommittedEnabled(bool val
     _isReadCommittedSupported = val;
 }
 
-void ReplicationCoordinatorExternalStateMock::onDrainComplete(OperationContext* opCtx) {}
+void ReplicationCoordinatorExternalStateMock::onWriterDrainComplete(OperationContext* opCtx) {}
+
+void ReplicationCoordinatorExternalStateMock::onApplierDrainComplete(OperationContext* opCtx) {}
 
 OpTime ReplicationCoordinatorExternalStateMock::onTransitionToPrimary(OperationContext* opCtx) {
     _lastOpTime = _firstOpTimeOfMyTerm;

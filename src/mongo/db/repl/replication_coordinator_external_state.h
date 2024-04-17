@@ -113,16 +113,23 @@ public:
     virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config) = 0;
 
     /**
+     * Called when a node is ready to start drain mode for oplog application, after it completes
+     * draining for oplog writes. It is called outside of the global X lock and the replication
+     * replication coordinator mutex.
+     */
+    virtual void onWriterDrainComplete(OperationContext* opCtx) = 0;
+
+    /**
      * Called when a node on way to becoming a primary is ready to leave drain mode. It is called
      * outside of the global X lock and the replication coordinator mutex.
      *
      * Throws on errors.
      */
-    virtual void onDrainComplete(OperationContext* opCtx) = 0;
+    virtual void onApplierDrainComplete(OperationContext* opCtx) = 0;
 
     /**
      * Called as part of the process of transitioning to primary and run with the global X lock and
-     * the replication coordinator mutex acquired, so no majoirty writes are allowed while in this
+     * the replication coordinator mutex acquired, so no majority writes are allowed while in this
      * state. See the call site in ReplicationCoordinatorImpl for details about when and how it is
      * called.
      *

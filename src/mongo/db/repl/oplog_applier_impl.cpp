@@ -553,7 +553,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
                 // they can be stale. We make sure the applier is still draining in the given term
                 // before and after the check, so that if the oplog buffer was exhausted, then
                 // it still will be.
-                _replCoord->signalDrainComplete(&opCtx, *ops.termWhenExhausted());
+                _replCoord->signalApplierDrainComplete(&opCtx, *ops.termWhenExhausted());
             }
             continue;  // Try again.
         }
@@ -622,7 +622,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 
     LOGV2_DEBUG(21230, 2, "Oplog application batch size", "size"_attr = ops.size());
 
-    if (_replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped) {
+    if (_replCoord->getOplogSyncState() == ReplicationCoordinator::OplogSyncState::Stopped) {
         LOGV2_FATAL_CONTINUE(21234, "Attempting to replicate ops while primary");
         return {ErrorCodes::CannotApplyOplogWhilePrimary,
                 "attempting to replicate ops while primary"};

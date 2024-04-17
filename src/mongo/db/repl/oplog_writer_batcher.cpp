@@ -63,9 +63,9 @@ OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx,
     OplogWriterBatch batch;
     size_t totalBytes = 0;
     size_t totalOps = 0;
-    bool exhausted = false;
+    boost::optional<long long> termWhenExhausted;
     auto now = opCtx->getServiceContext()->getFastClockSource()->now();
-    auto delaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp(now);
+    auto delaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp(opCtx, now);
     auto delayMillis = Milliseconds(oplogBatchDelayMillis);
     Date_t waitForDataDeadline = now + maxWaitTime;
     // We expect oplogBatchDelayMillis to be tens of milliseconds so we cap it at
@@ -111,7 +111,6 @@ OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx,
         }
 
         if (!_waitForData(opCtx, waitForDataDeadline)) {
-            exhausted = _oplogBuffer->inDrainModeAndEmpty();
             break;
         }
     }
@@ -119,8 +118,9 @@ OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx,
     // We can't wait for any data from the buffer, return an empty batch.
     if (batches.empty()) {
         OplogWriterBatch batch;
-        if (exhausted) {
-            batch.setExhausted();
+        if (auto term = _isBufferExhausted(opCtx)) {
+            LOGV2(8938402, "Oplog writer buffer has been drained", "term"_attr = term);
+            batch.setTermWhenExhausted(*term);
         }
         return batch;
     }
@@ -204,14 +204,32 @@ bool OplogWriterBatcher::_waitForData(OperationContext* opCtx, Date_t waitDeadli
  * entries that can be be returned in a batch.
  */
 boost::optional<Date_t> OplogWriterBatcher::_calculateSecondaryDelaySecsLatestTimestamp(
-    Date_t now) {
-    auto service = cc().getServiceContext();
-    auto replCoord = ReplicationCoordinator::get(service);
-    auto secondaryDelaySecs = replCoord->getSecondaryDelaySecs();
+    OperationContext* opCtx, Date_t now) {
+    auto secondaryDelaySecs = ReplicationCoordinator::get(opCtx)->getSecondaryDelaySecs();
     if (secondaryDelaySecs <= Seconds(0)) {
         return {};
     }
     return now - secondaryDelaySecs;
+}
+
+boost::optional<long long> OplogWriterBatcher::_isBufferExhausted(OperationContext* opCtx) {
+    // Store the current term. It's checked in signalWriterDrainComplete() to detect if
+    // the node has stepped down and stepped back up again. See the declaration of
+    // signalWriterDrainComplete() for more details.
+    auto replCoord = ReplicationCoordinator::get(opCtx);
+    auto termWhenExhausted = replCoord->getTerm();
+    auto syncState = replCoord->getOplogSyncState();
+
+    // Draining state guarantees the producer has already been fully stopped and no more
+    // operations will be pushed in to the oplog buffer until the OplogSyncState changes.
+    auto isDraining = syncState == ReplicationCoordinator::OplogSyncState::WriterDraining ||
+        syncState == ReplicationCoordinator::OplogSyncState::WriterDrainingForShardSplit;
+
+    if (isDraining && _oplogBuffer->isEmpty()) {
+        return termWhenExhausted;
+    }
+
+    return {};
 }
 
 }  // namespace repl

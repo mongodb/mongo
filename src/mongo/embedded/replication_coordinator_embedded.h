@@ -212,9 +212,11 @@ public:
 
     Status setFollowerModeRollback(OperationContext* opCtx) override;
 
-    ApplierState getApplierState() override;
+    OplogSyncState getOplogSyncState() override;
 
-    void signalDrainComplete(OperationContext*, long long) noexcept override;
+    void signalWriterDrainComplete(OperationContext*, long long) noexcept override;
+
+    void signalApplierDrainComplete(OperationContext*, long long) noexcept override;
 
     void signalUpstreamUpdater() override;
 

@@ -125,8 +125,8 @@ void ReplicaSetAwareServiceRegistry::onStepUpBegin(OperationContext* opCtx, long
 
 void ReplicaSetAwareServiceRegistry::onStepUpComplete(OperationContext* opCtx, long long term) {
     // Since this method is called before we mark the node writable in
-    // ReplicationCoordinatorImpl::signalDrainComplete and therefore can block the new primary from
-    // starting to receive writes, generate a warning if we are spending too long here.
+    // ReplicationCoordinatorImpl::signalApplierDrainComplete and therefore can block the new
+    // primary from starting to receive writes, generate a warning if we are spending too long here.
     Timer totalTime{};
     ON_BLOCK_EXIT([&] {
         auto timeSpent = totalTime.millis();

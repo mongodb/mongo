@@ -1961,16 +1961,20 @@ TEST_F(ReplCoordTest, DrainCompletionMidStepDown) {
     ASSERT(termUpdated == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
 
     // Set 'firstOpTimeOfMyTerm' to have term 1, so that the node will see that the noop entry has
-    // the correct term at the end of signalDrainComplete.
+    // the correct term at the end of signalApplierDrainComplete.
     getExternalState()->setFirstOpTimeOfMyTerm(OpTime(Timestamp(100, 1), 1));
     // Now signal that replication applier is finished draining its buffer.
-    getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
+    getReplCoord()->signalWriterDrainComplete(opCtx.get(), getReplCoord()->getTerm());
+    getReplCoord()->signalApplierDrainComplete(opCtx.get(), getReplCoord()->getTerm());
 
     // Now wait for stepdown to complete
     getReplExec()->waitForEvent(updateTermEvh);
 
     // By now, the node should have left drain mode.
-    ASSERT(ReplicationCoordinator::ApplierState::Draining != getReplCoord()->getApplierState());
+    ASSERT_NOT_EQUALS(ReplicationCoordinator::OplogSyncState::WriterDraining,
+                      getReplCoord()->getOplogSyncState());
+    ASSERT_NOT_EQUALS(ReplicationCoordinator::OplogSyncState::ApplierDraining,
+                      getReplCoord()->getOplogSyncState());
 
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
     // ASSERT_EQUALS(2, getReplCoord()->getTerm()); // SERVER-28290
@@ -2050,7 +2054,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     const auto opCtx = makeOperationContext();
     simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen, opCtx.get());
     ASSERT_TRUE(repl->getMemberState().primary());
-    ASSERT(repl->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
+    ASSERT(repl->getOplogSyncState() == ReplicationCoordinator::OplogSyncState::WriterDraining);
 
     {
         // We can't take writes yet since we're still in drain mode.
@@ -2074,7 +2078,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     ASSERT(stepDownStatus == ErrorCodes::PrimarySteppedDown ||
            stepDownStatus == ErrorCodes::Interrupted);
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-    ASSERT(repl->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
+    ASSERT(repl->getOplogSyncState() == ReplicationCoordinator::OplogSyncState::WriterDraining);
 
     // Ensure that the failed stepdown attempt didn't make us able to take writes since we're still
     // in drain mode.
@@ -2084,8 +2088,9 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     }
 
     // Now complete drain mode and ensure that we become capable of taking writes.
-    signalDrainComplete(opCtx.get());
-    ASSERT(repl->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
+    ASSERT(repl->getOplogSyncState() == ReplicationCoordinator::OplogSyncState::Stopped);
 
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
@@ -5058,8 +5063,9 @@ TEST_F(ReplCoordTest, AwaitHelloResponseReturnsOnElectionWin) {
     simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen, opCtx.get());
 
     waitForHelloFailPoint->waitForTimesEntered(timesEnteredFailPoint + 2);
-    signalDrainComplete(opCtx.get());
-    ASSERT(getReplCoord()->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
+    ASSERT(getReplCoord()->getOplogSyncState() == ReplicationCoordinator::OplogSyncState::Stopped);
 
     getHelloThread.join();
 }
@@ -5167,8 +5173,9 @@ TEST_F(ReplCoordTest, AwaitHelloResponseReturnsOnElectionWinWithReconfig) {
     simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen, opCtx.get());
 
     waitForHelloFailPoint->waitForTimesEntered(timesEnteredFailPoint + 2);
-    signalDrainComplete(opCtx.get());
-    ASSERT(getReplCoord()->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
+    ASSERT(getReplCoord()->getOplogSyncState() == ReplicationCoordinator::OplogSyncState::Stopped);
 
     getHelloThread.join();
 }
@@ -8681,7 +8688,8 @@ TEST_F(ReplCoordTest, ShouldChooseNearestNodeAsSyncSourceWhenPrimaryAndChainingA
     simulateSuccessfulV1ElectionWithoutExitingDrainMode(
         getReplCoord()->getElectionTimeout_forTest(), opCtx.get());
     ASSERT(replCoord->getMemberState().primary());
-    ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
+    ASSERT(replCoord->getOplogSyncState() ==
+           ReplicationCoordinator::OplogSyncState::WriterDraining);
 
     ReplSetHeartbeatResponse hbResp;
     hbResp.setTerm(1);

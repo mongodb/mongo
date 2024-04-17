@@ -195,20 +195,14 @@ void OplogWriterImpl::_run() {
         }
 
         auto batch = _batcher.getNextBatch(opCtx, Seconds(1));
-
-        // Signal the apply buffer to enter or exit drain mode if it is not.
-        if (_applyBufferInDrainMode != batch.exhausted()) {
-            if (_applyBufferInDrainMode) {
-                _applyBuffer->exitDrainMode();
-            } else {
-                _applyBuffer->enterDrainMode();
-            }
-            _applyBufferInDrainMode = batch.exhausted();
-        }
-
         if (batch.empty()) {
             if (inShutdown()) {
                 return;
+            }
+            if (batch.termWhenExhausted()) {
+                // The writer's buffer has been drained, now signal the applier's buffer
+                // to enter drain mode.
+                _replCoord->signalWriterDrainComplete(opCtx, *batch.termWhenExhausted());
             }
             continue;
         }

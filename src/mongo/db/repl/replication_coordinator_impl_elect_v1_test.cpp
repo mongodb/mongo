@@ -78,6 +78,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -105,7 +106,7 @@ using namespace mongo::test::mock;
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
-using ApplierState = ReplicationCoordinator::ApplierState;
+using OplogSyncState = ReplicationCoordinator::OplogSyncState;
 
 class ReplCoordMockTest : public ReplCoordTest {
 public:
@@ -215,6 +216,7 @@ TEST_F(ReplCoordTest, RandomizedElectionOffsetAvoidsDivideByZero) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     assertStartSuccess(
         BSON("_id"
              << "mySet"
@@ -265,7 +267,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
     simulateCatchUpAbort();
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
 
     const auto opCtxPtr = makeOperationContext();
     auto& opCtx = *opCtxPtr;
@@ -276,7 +278,8 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
         getReplCoord()->awaitHelloResponse(opCtxPtr.get(), {}, boost::none, boost::none);
     ASSERT_FALSE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
     ASSERT_TRUE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
-    signalDrainComplete(&opCtx);
+    signalWriterDrainComplete(&opCtx);
+    signalApplierDrainComplete(&opCtx);
     helloResponse =
         getReplCoord()->awaitHelloResponse(opCtxPtr.get(), {}, boost::none, boost::none);
     ASSERT_TRUE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
@@ -308,6 +311,7 @@ TEST_F(ReplCoordTest, StartElectionDoesNotStartAnElectionWhenNodeIsRecovering) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     startCapturingLogMessages();
     assertStartSuccess(BSON("_id"
                             << "mySet"
@@ -323,7 +327,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     getReplCoord()->waitForElectionFinish_forTest();
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
 
     const auto opCtxPtr = makeOperationContext();
     auto& opCtx = *opCtxPtr;
@@ -334,7 +338,8 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
         getReplCoord()->awaitHelloResponse(opCtxPtr.get(), {}, boost::none, boost::none);
     ASSERT_FALSE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
     ASSERT_TRUE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
-    signalDrainComplete(&opCtx);
+    signalWriterDrainComplete(&opCtx);
+    signalApplierDrainComplete(&opCtx);
     helloResponse =
         getReplCoord()->awaitHelloResponse(opCtxPtr.get(), {}, boost::none, boost::none);
     ASSERT_TRUE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
@@ -2800,6 +2805,7 @@ protected:
 
 // The first round of heartbeats indicates we are the most up-to-date.
 TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     startCapturingLogMessages();
     OpTime time1(Timestamp(100, 1), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
@@ -2814,13 +2820,14 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
 
     // Get 2 heartbeats from secondaries.
     ASSERT_EQUALS(2, count);
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
     stopCapturingLogMessages();
     ASSERT_EQ(
         1,
         countTextFormatLogLinesContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
         opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
@@ -2847,6 +2854,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
 
 // Heartbeats set a future target OpTime and we reached that successfully.
 TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     startCapturingLogMessages();
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -2869,14 +2877,15 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
     ASSERT_EQUALS(time2,
                   ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
     advanceMyLastWrittenAndAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(
         1, countTextFormatLogLinesContaining("Caught up to the latest known optime successfully"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
         opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
@@ -2897,6 +2906,7 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
 }
 
 TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     startCapturingLogMessages();
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -2907,11 +2917,12 @@ TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
         // Other nodes are ahead of me.
         getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time2));
     });
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
         opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
@@ -2932,6 +2943,7 @@ TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
 }
 
 TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     startCapturingLogMessages();
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -2947,13 +2959,14 @@ TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
             getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time1));
         }
     });
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
     stopCapturingLogMessages();
     ASSERT_EQ(
         1,
         countTextFormatLogLinesContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
         opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
@@ -2975,6 +2988,7 @@ TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
 }
 
 TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     startCapturingLogMessages();
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -2992,13 +3006,14 @@ TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
             getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time1));
         }
     });
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
     stopCapturingLogMessages();
     ASSERT_EQ(
         1,
         countTextFormatLogLinesContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
         opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
@@ -3026,13 +3041,13 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownBeforeHeartbeatRefreshing) {
     OpTime time2(Timestamp(100, 2), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
     // Step down immediately.
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
     TopologyCoordinator::UpdateTermResult updateTermResult;
     auto evh = getReplCoord()->updateTerm_forTest(2, &updateTermResult);
     ASSERT_TRUE(evh.isValid());
     getReplExec()->waitForEvent(evh);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Exited primary catch-up mode"));
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Caught up to the latest"));
@@ -3074,14 +3089,14 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
     ASSERT_EQUALS(time2,
                   ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
     TopologyCoordinator::UpdateTermResult updateTermResult;
     auto evh = getReplCoord()->updateTerm_forTest(2, &updateTermResult);
     ASSERT_TRUE(evh.isValid());
     getReplExec()->waitForEvent(evh);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
     //    replyHeartbeatsAndRunUntil(getNet()->now() + config.getCatchUpTimeoutPeriod());
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Exited primary catch-up mode"));
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Caught up to the latest"));
@@ -3112,6 +3127,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     startCapturingLogMessages();
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -3124,9 +3140,9 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
         net->scheduleResponse(noi, net->now(), makeHeartbeatResponse(time2));
     });
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
     advanceMyLastWrittenAndAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
-    ASSERT(replCoord->getApplierState() == ApplierState::Draining);
+    ASSERT(replCoord->getOplogSyncState() == OplogSyncState::WriterDraining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Caught up to the latest"));
 
@@ -3153,7 +3169,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
     ASSERT_TRUE(replCoord->getMemberState().secondary());
 
     // Step up again
-    ASSERT(replCoord->getApplierState() == ApplierState::Running);
+    ASSERT(replCoord->getOplogSyncState() == OplogSyncState::Running);
     simulateSuccessfulV1Voting();
     ASSERT_TRUE(replCoord->getMemberState().primary());
 
@@ -3162,15 +3178,16 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
         auto net = getNet();
         net->scheduleResponse(noi, net->now(), makeHeartbeatResponse(time2));
     });
-    ASSERT(replCoord->getApplierState() == ApplierState::Draining);
+    ASSERT(replCoord->getOplogSyncState() == OplogSyncState::WriterDraining);
     {
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
         ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(
             opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
     }
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT(replCoord->getApplierState() == ApplierState::Stopped);
+    ASSERT(replCoord->getOplogSyncState() == OplogSyncState::Stopped);
     ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(
         opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
@@ -3191,6 +3208,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
 }
 
 TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(200, 1), 0);
     OpTime time3(Timestamp(300, 1), 0);
@@ -3213,7 +3231,7 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
         }
     });
     // The node is still in catchup mode, but the target optime has been set.
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countTextFormatLogLinesContaining("Heartbeats updated catchup target optime"));
     ASSERT_EQUALS(time3,
@@ -3221,7 +3239,7 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
 
     // 3) Advancing its applied optime to time 2 isn't enough.
     advanceMyLastWrittenAndAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
 
     // 4) After a while, the other node at time 4 becomes available. Time 4 becomes the new target.
     startCapturingLogMessages();
@@ -3235,7 +3253,7 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
         }
     });
     // The node is still in catchup mode, but the target optime has been updated.
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countTextFormatLogLinesContaining("Heartbeats updated catchup target optime"));
     ASSERT_EQUALS(time4,
@@ -3243,16 +3261,17 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
 
     // 5) Advancing to time 3 isn't enough now.
     advanceMyLastWrittenAndAppliedOpTime(time3, Date_t() + Seconds(time3.getSecs()));
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
 
     // 6) The node catches up time 4 eventually.
     startCapturingLogMessages();
     advanceMyLastWrittenAndAppliedOpTime(time4, Date_t() + Seconds(time4.getSecs()));
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countTextFormatLogLinesContaining("Caught up to the latest"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
         opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
@@ -3273,6 +3292,7 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
 }
 
 TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     startCapturingLogMessages();
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -3301,20 +3321,21 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
         ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
     });
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
 
     // Simulate a user initiated abort.
     ASSERT_OK(getReplCoord()->abortCatchupIfNeeded(
         ReplicationCoordinator::PrimaryCatchUpConclusionReason::
             kFailedWithReplSetAbortPrimaryCatchUpCmd));
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
 
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Exited primary catch-up mode"));
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Caught up to the latest"));
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
         opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
@@ -3336,15 +3357,17 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
 }
 
 TEST_F(PrimaryCatchUpTest, ZeroTimeout) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     startCapturingLogMessages();
 
     OpTime time1(Timestamp(100, 1), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1, 0);
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Skipping primary catchup"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
         opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
@@ -3376,12 +3399,12 @@ TEST_F(PrimaryCatchUpTest, CatchUpFailsDueToPrimaryStepDown) {
         // Other nodes are ahead of me.
         getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time2));
     });
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
 
     auto opCtx = makeOperationContext();
     getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
 
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Exited primary catch-up mode"));
