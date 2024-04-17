@@ -71,7 +71,7 @@ namespace {
 
 const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collection");
 
-class GetExecutorTest : public ServiceContextTest {
+class QueryPlannerParamsTest : public ServiceContextTest {
 protected:
     /**
      * Utility functions to create a CanonicalQuery
@@ -98,48 +98,37 @@ protected:
     }
 
     /**
-     * Test function to check filterAllowedIndexEntries.
-     *
-     * indexes: A vector of index entries to filter against.
-     * keyPatterns: A set of index key patterns to use in the filter.
-     * indexNames: A set of index names to use for the filter.
-     *
-     * expectedFilteredNames: The names of indexes that are expected to pass through the filter.
+     * Asserts index filters are applied correctly and the list of available indexes after
+     * application equals to 'expectedFilteredNames'.
      */
-    void testAllowedIndices(std::vector<IndexEntry> indexes,
-                            BSONObjSet keyPatterns,
-                            stdx::unordered_set<std::string> indexNames,
-                            stdx::unordered_set<std::string> expectedFilteredNames) {
+    void assertIndexFiltersApplication(std::vector<IndexEntry> indexes,
+                                       BSONObjSet keyPatterns,
+                                       stdx::unordered_set<std::string> indexNames,
+                                       stdx::unordered_set<std::string> expectedFilteredNames) {
         // Create collection.
         auto collection = std::make_unique<CollectionMock>(nss);
         auto collectionPtr = CollectionPtr(collection.get());
 
-        // Set up query settings decoration.
-        // TODO: SERVER-86574 Fix index filter unit tests.
-        // auto& querySettings =
-        // *QuerySettingsDecoration::get(collectionPtr->getSharedDecorations());
-        //
-        // // getAllowedIndices() should return boost::none if no index filters are specified for
-        // the
-        // // query shape.
-        // std::unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}"));
-        // const auto key = cq->encodeKeyForPlanCacheCommand();
-        // ASSERT_FALSE(querySettings.getAllowedIndicesFilter(key));
-        //
-        // // Set index filter on the given query shape.
-        // querySettings.setAllowedIndices(*cq, keyPatterns, indexNames);
-        //
-        // // Fill out planner params, which applies the index filters.
-        // QueryPlannerParams plannerParams;
-        // plannerParams.mainCollection.indexes = indexes;
-        // plannerParams.applyQuerySettingsOrIndexFilters(*cq.get(),
-        //                                                MultipleCollectionAccessor(collectionPtr),
-        //                                                true /* shouldIgnoreQuerySettings */);
-        // ASSERT_EQ(expectedFilteredNames.size(), plannerParams.mainCollection.indexes.size());
-        // for (const auto& indexEntry : plannerParams.mainCollection.indexes) {
-        //     ASSERT_TRUE(expectedFilteredNames.find(indexEntry.identifier.catalogName) !=
-        //                 expectedFilteredNames.end());
-        // }
+        // Retrieve query settings decoration.
+        auto& querySettings = *QuerySettingsDecoration::get(collectionPtr->getSharedDecorations());
+
+        // Ensure getAllowedIndices() returns boost::none if no index filters are specified for the
+        // query shape.
+        std::unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}"));
+        ASSERT_FALSE(querySettings.getAllowedIndicesFilter(*cq));
+
+        // Set index filter on the given query shape.
+        querySettings.setAllowedIndices(*cq, keyPatterns, indexNames);
+
+        // "Fill out" planner params and apply the index filters.
+        QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForTest{});
+        plannerParams.mainCollectionInfo.indexes = indexes;
+        plannerParams.applyIndexFilters(*cq.get(), collectionPtr);
+        ASSERT_EQ(expectedFilteredNames.size(), plannerParams.mainCollectionInfo.indexes.size());
+        for (const auto& indexEntry : plannerParams.mainCollectionInfo.indexes) {
+            ASSERT_TRUE(expectedFilteredNames.find(indexEntry.identifier.catalogName) !=
+                        expectedFilteredNames.end());
+        }
     }
 
     ServiceContext::UniqueOperationContext _opCtx{makeOperationContext()};
@@ -187,8 +176,8 @@ IndexEntry buildWildcardIndexEntry(const BSONObj& kp,
 }
 
 // Use of index filters to select compound index over single key index.
-TEST_F(GetExecutorTest, GetAllowedIndices) {
-    testAllowedIndices(
+TEST_F(QueryPlannerParamsTest, GetAllowedIndices) {
+    assertIndexFiltersApplication(
         {buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
          buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
          buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
@@ -200,8 +189,8 @@ TEST_F(GetExecutorTest, GetAllowedIndices) {
 // Setting index filter referring to non-existent indexes
 // will effectively disregard the index catalog and
 // result in the planner generating a collection scan.
-TEST_F(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
-    testAllowedIndices(
+TEST_F(QueryPlannerParamsTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
+    assertIndexFiltersApplication(
         {buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
          buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
          buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
@@ -212,89 +201,93 @@ TEST_F(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
 
 // This test case shows how to force query execution to use
 // an index that orders items in descending order.
-TEST_F(GetExecutorTest, GetAllowedIndicesDescendingOrder) {
-    testAllowedIndices({buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: -1}"), "a_-1")},
-                       SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: -1}")}),
-                       stdx::unordered_set<std::string>{},
-                       {"a_-1"});
+TEST_F(QueryPlannerParamsTest, GetAllowedIndicesDescendingOrder) {
+    assertIndexFiltersApplication(
+        {buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
+         buildSimpleIndexEntry(fromjson("{a: -1}"), "a_-1")},
+        SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: -1}")}),
+        stdx::unordered_set<std::string>{},
+        {"a_-1"});
 }
 
-TEST_F(GetExecutorTest, GetAllowedIndicesMatchesByName) {
-    testAllowedIndices({buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1:en")},
-                       // BSONObjSet default constructor is explicit, so we cannot
-                       // copy-list-initialize until C++14.
-                       SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
-                       {"a_1"},
-                       {"a_1"});
+TEST_F(QueryPlannerParamsTest, GetAllowedIndicesMatchesByName) {
+    assertIndexFiltersApplication({buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
+                                   buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1:en")},
+                                  // BSONObjSet default constructor is explicit, so we cannot
+                                  // copy-list-initialize until C++14.
+                                  SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
+                                  {"a_1"},
+                                  {"a_1"});
 }
 
-TEST_F(GetExecutorTest, GetAllowedIndicesMatchesMultipleIndexesByKey) {
-    testAllowedIndices({buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1:en")},
-                       SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1}")}),
-                       stdx::unordered_set<std::string>{},
-                       {"a_1", "a_1:en"});
+TEST_F(QueryPlannerParamsTest, GetAllowedIndicesMatchesMultipleIndexesByKey) {
+    assertIndexFiltersApplication(
+        {buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
+         buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1:en")},
+        SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1}")}),
+        stdx::unordered_set<std::string>{},
+        {"a_1", "a_1:en"});
 }
 
-TEST_F(GetExecutorTest, GetAllowedWildcardIndicesByKey) {
+TEST_F(QueryPlannerParamsTest, GetAllowedWildcardIndicesByKey) {
     auto wcProj = createProjectionExecutor(
         fromjson("{_id: 0}"),
         {ProjectionPolicies::DefaultIdPolicy::kExcludeId,
          ProjectionPolicies::ArrayRecursionPolicy::kDoNotRecurseNestedArrays});
-    testAllowedIndices({buildWildcardIndexEntry(BSON("$**" << 1), wcProj, "$**_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
-                       SimpleBSONObjComparator::kInstance.makeBSONObjSet({BSON("$**" << 1)}),
-                       stdx::unordered_set<std::string>{},
-                       {"$**_1"});
+    assertIndexFiltersApplication(
+        {buildWildcardIndexEntry(BSON("$**" << 1), wcProj, "$**_1"),
+         buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
+         buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+         buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+        SimpleBSONObjComparator::kInstance.makeBSONObjSet({BSON("$**" << 1)}),
+        stdx::unordered_set<std::string>{},
+        {"$**_1"});
 }
 
-TEST_F(GetExecutorTest, GetAllowedWildcardIndicesByName) {
+TEST_F(QueryPlannerParamsTest, GetAllowedWildcardIndicesByName) {
     auto wcProj = createProjectionExecutor(
         fromjson("{_id: 0}"),
         {ProjectionPolicies::DefaultIdPolicy::kExcludeId,
          ProjectionPolicies::ArrayRecursionPolicy::kDoNotRecurseNestedArrays});
-    testAllowedIndices({buildWildcardIndexEntry(BSON("$**" << 1), wcProj, "$**_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
-                       SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
-                       {"$**_1"},
-                       {"$**_1"});
+    assertIndexFiltersApplication({buildWildcardIndexEntry(BSON("$**" << 1), wcProj, "$**_1"),
+                                   buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
+                                   buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                                   buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+                                  SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
+                                  {"$**_1"},
+                                  {"$**_1"});
 }
 
-TEST_F(GetExecutorTest, GetAllowedPathSpecifiedWildcardIndicesByKey) {
+TEST_F(QueryPlannerParamsTest, GetAllowedPathSpecifiedWildcardIndicesByKey) {
     auto wcProj = createProjectionExecutor(
         fromjson("{_id: 0}"),
         {ProjectionPolicies::DefaultIdPolicy::kExcludeId,
          ProjectionPolicies::ArrayRecursionPolicy::kDoNotRecurseNestedArrays});
-    testAllowedIndices({buildWildcardIndexEntry(BSON("a.$**" << 1), wcProj, "a.$**_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
-                       SimpleBSONObjComparator::kInstance.makeBSONObjSet({BSON("a.$**" << 1)}),
-                       stdx::unordered_set<std::string>{},
-                       {"a.$**_1"});
+    assertIndexFiltersApplication(
+        {buildWildcardIndexEntry(BSON("a.$**" << 1), wcProj, "a.$**_1"),
+         buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
+         buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+         buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+        SimpleBSONObjComparator::kInstance.makeBSONObjSet({BSON("a.$**" << 1)}),
+        stdx::unordered_set<std::string>{},
+        {"a.$**_1"});
 }
 
-TEST_F(GetExecutorTest, GetAllowedPathSpecifiedWildcardIndicesByName) {
+TEST_F(QueryPlannerParamsTest, GetAllowedPathSpecifiedWildcardIndicesByName) {
     auto wcProj = createProjectionExecutor(
         fromjson("{_id: 0}"),
         {ProjectionPolicies::DefaultIdPolicy::kExcludeId,
          ProjectionPolicies::ArrayRecursionPolicy::kDoNotRecurseNestedArrays});
-    testAllowedIndices({buildWildcardIndexEntry(BSON("a.$**" << 1), wcProj, "a.$**_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
-                       SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
-                       {"a.$**_1"},
-                       {"a.$**_1"});
+    assertIndexFiltersApplication({buildWildcardIndexEntry(BSON("a.$**" << 1), wcProj, "a.$**_1"),
+                                   buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
+                                   buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                                   buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+                                  SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
+                                  {"a.$**_1"},
+                                  {"a.$**_1"});
 }
 
-TEST_F(GetExecutorTest, isComponentOfPathMultikeyNoMetadata) {
+TEST_F(QueryPlannerParamsTest, isComponentOfPathMultikeyNoMetadata) {
     BSONObj indexKey = BSON("a" << 1 << "b.c" << -1);
     MultikeyPaths multikeyInfo = {};
 
@@ -305,7 +298,7 @@ TEST_F(GetExecutorTest, isComponentOfPathMultikeyNoMetadata) {
     ASSERT_FALSE(isAnyComponentOfPathMultikey(indexKey, false, multikeyInfo, "b.c"));
 }
 
-TEST_F(GetExecutorTest, isComponentOfPathMultikeyWithMetadata) {
+TEST_F(QueryPlannerParamsTest, isComponentOfPathMultikeyWithMetadata) {
     BSONObj indexKey = BSON("a" << 1 << "b.c" << -1);
     MultikeyPaths multikeyInfo = {{}, {1}};
 
@@ -313,7 +306,7 @@ TEST_F(GetExecutorTest, isComponentOfPathMultikeyWithMetadata) {
     ASSERT_TRUE(isAnyComponentOfPathMultikey(indexKey, true, multikeyInfo, "b.c"));
 }
 
-TEST_F(GetExecutorTest, isComponentOfPathMultikeyWithEmptyMetadata) {
+TEST_F(QueryPlannerParamsTest, isComponentOfPathMultikeyWithEmptyMetadata) {
     BSONObj indexKey = BSON("a" << 1 << "b.c" << -1);
 
 
