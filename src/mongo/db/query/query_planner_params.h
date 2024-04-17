@@ -289,6 +289,12 @@ struct QueryPlannerParams {
                                                   const CanonicalQuery& canonicalQuery,
                                                   const MultipleCollectionAccessor& collections);
 
+    /**
+     * If query supports index filters, filters params.indices according to the configuration. In
+     * addition, sets that there were index filters.
+     * NOTE: method is marked public for testing purposes only.
+     */
+    void applyIndexFilters(const CanonicalQuery& canonicalQuery, const CollectionPtr& collection);
 
     // Options as provided when constructing the params, without any collection specific
     // modifications.
@@ -378,12 +384,6 @@ private:
      */
     void applyQuerySettingsOrIndexFiltersForMainCollection(
         const CanonicalQuery& canonicalQuery, const MultipleCollectionAccessor& collections);
-
-    /**
-     * If query supports index filters, filters params.indices according to the configuration. In
-     * addition, sets that there were index filters.
-     */
-    void applyIndexFilters(const CanonicalQuery& canonicalQuery, const CollectionPtr& collection);
 
     /**
      * Applies 'indexHints' query settings for the given 'collection'.In addition, sets that there
