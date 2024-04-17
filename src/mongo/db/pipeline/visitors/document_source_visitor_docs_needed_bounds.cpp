@@ -214,6 +214,12 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalShardFilter
     ctx->applyPossibleDecreaseStage();
 }
 
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceRedact& source) {
+    // $redact may function like a $match if it redacts an entire document, so it may decrease
+    // the number of documents in the result stream.
+    ctx->applyPossibleDecreaseStage();
+}
+
 void visit(DocsNeededBoundsContext* ctx, const DocumentSourceUnwind& source) {
     // It's likely an $unwind stage would increase the cardinality of the result stream.
     // If preserveNullAndEmptyArrays is false, it's possible the stage could reduce cardinality as
@@ -286,11 +292,6 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceMerge& source) {
 
 void visit(DocsNeededBoundsContext* ctx, const DocumentSourceOut& source) {
     // No change.
-}
-
-void visit(DocsNeededBoundsContext* ctx, const DocumentSourceRedact& source) {
-    // TODO SERVER-88774 Investigate if this stage can be no change.
-    ctx->applyUnknownStage();
 }
 
 void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSetVariableFromSubPipeline& source) {
