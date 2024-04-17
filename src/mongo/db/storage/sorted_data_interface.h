@@ -516,8 +516,8 @@ public:
      * Create a Value copy from this view including all components.
      */
     key_string::Value getValueCopy() const {
-        return std::move(*key_string::Value::makeValue(
-            _version, getKeyStringWithoutRecordIdView(), getRecordIdView(), getTypeBitsView()));
+        return key_string::Value::makeValue(
+            _version, getKeyStringWithoutRecordIdView(), getRecordIdView(), getTypeBitsView());
     }
 
     bool isEmpty() const {

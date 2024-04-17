@@ -434,12 +434,12 @@ void bindSingleIntervalPlanSlots(const stage_builder::IndexBoundsEvaluationInfo&
             indexBoundsInfo.slots.slots);
     runtimeEnvironment->resetSlot(singleInterval.lowKey,
                                   sbe::value::TypeTags::keyString,
-                                  sbe::value::makeKeyString(std::move(lowKey)).second,
+                                  sbe::value::makeKeyString(*lowKey).second,
                                   /* owned */ true);
 
     runtimeEnvironment->resetSlot(singleInterval.highKey,
                                   sbe::value::TypeTags::keyString,
-                                  sbe::value::makeKeyString(std::move(highKey)).second,
+                                  sbe::value::makeKeyString(*highKey).second,
                                   /* owned */ true);
 }
 

@@ -432,10 +432,7 @@ public:
         return *this;
     }
 
-    static std::unique_ptr<Value> makeValue(Version version,
-                                            StringData ks,
-                                            StringData rid,
-                                            StringData typeBits);
+    static Value makeValue(Version version, StringData ks, StringData rid, StringData typeBits);
 
     /**
      * Compare with another key_string::Value or Builder.

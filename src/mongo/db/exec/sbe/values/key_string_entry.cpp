@@ -37,11 +37,12 @@ KeyStringEntry::KeyStringEntry(const SortedDataKeyValueView& view)
       _rid(view.getRecordIdView()),
       _version(view.getVersion()) {}
 
-KeyStringEntry::KeyStringEntry(std::unique_ptr<key_string::Value> value)
-    : _value(std::move(value)) {
-    _key = {_value->getBuffer(), _value->getSize()};
+KeyStringEntry::KeyStringEntry(const key_string::Value& value, size_t ridSize) : _value(value) {
+    _key = {_value->getBuffer(), _value->getSize() - ridSize};
     _typeBits = _value->getTypeBitsView();
-    _rid = {};
+    if (ridSize != 0) {
+        _rid = {_value->getBuffer() + _key.size(), ridSize};
+    }
     _version = _value->getVersion();
 }
 
@@ -55,14 +56,8 @@ KeyStringEntry& KeyStringEntry::operator=(KeyStringEntry&& other) noexcept {
 }
 
 std::unique_ptr<KeyStringEntry> KeyStringEntry::makeCopy() const {
-    auto newKeyString = std::make_unique<KeyStringEntry>();
-    newKeyString->_value = key_string::Value::makeValue(_version, _key, _rid, _typeBits);
-    // The RecordId will be appended to the key_string::Value buffer, use current key size to
-    // for the new key.
-    newKeyString->_key = {newKeyString->_value->getBuffer(), _key.size()};
-    newKeyString->_rid = {newKeyString->_value->getBuffer() + _key.size(), _rid.size()};
-    newKeyString->_typeBits = newKeyString->_value->getTypeBitsView();
-    return newKeyString;
+    return std::make_unique<KeyStringEntry>(
+        key_string::Value::makeValue(_version, _key, _rid, _typeBits), _rid.size());
 }
 
 void KeyStringEntry::serialize(BufBuilder& buf) const {

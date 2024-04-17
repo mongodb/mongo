@@ -40,13 +40,13 @@ public:
 
     explicit KeyStringEntry(const SortedDataKeyValueView& view);
 
-    // This constructor assumes the input keyString is not appended with RecordId.
-    explicit KeyStringEntry(std::unique_ptr<key_string::Value> value);
+    // Caller needs to provide the ridSize if input keyString is appended with RecordId.
+    explicit KeyStringEntry(const key_string::Value& value, size_t ridSize = 0);
 
     KeyStringEntry& operator=(KeyStringEntry&& other) noexcept;
 
     bool owned() const {
-        return _value.get() != nullptr;
+        return _value != boost::none;
     }
 
     StringData getKeyStringView() const {
@@ -83,7 +83,7 @@ public:
     }
 
     key_string::Value getValueCopy() const {
-        return std::move(*key_string::Value::makeValue(_version, _key, _rid, _typeBits));
+        return key_string::Value::makeValue(_version, _key, _rid, _typeBits);
     }
 
     std::unique_ptr<KeyStringEntry> makeCopy() const;
@@ -106,6 +106,6 @@ private:
     // For indexConsistencyCheck.
     StringData _rid;
     key_string::Version _version;
-    std::unique_ptr<key_string::Value> _value;  // null means unowned view.
+    boost::optional<key_string::Value> _value;  // none means unowned view.
 };
 }  // namespace mongo::sbe::value
