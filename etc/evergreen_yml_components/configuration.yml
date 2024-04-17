@@ -53,6 +53,10 @@ modules:
     repo: git@github.com:wiredtiger/wiredtiger.git
     prefix: src/third_party
     branch: develop
+  - name: mongot
+    repo: git@github.com:10gen/mongot.git
+    prefix: ${workdir}/src
+    branch: master
 
 # Pre task steps
 pre:
