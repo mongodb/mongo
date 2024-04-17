@@ -5,6 +5,7 @@
  *
  * @tags: [
  *   requires_fcv_80,
+ *   does_not_support_stepdowns,
  * ]
  */
 const st = new ShardingTest({shards: 2, configShard: true});
