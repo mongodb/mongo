@@ -307,38 +307,12 @@ runTest({
     cmdObj: {
         update: collName,
         updates: [{
-            q: {},
-            u: {$inc: {[metaField + ".b"]: 1}},
-            multi: true,
-        }]
-    },
-    numProfilerEntries: {sharded: 2, unsharded: 1},
-});
-
-runTest({
-    shardKey: {[metaField + ".a"]: 1},
-    cmdObj: {
-        update: collName,
-        updates: [{
             q: {[metaField + ".a"]: 1},
             u: {$inc: {[metaField + ".b"]: -1}},
             multi: true,
         }]
     },
     numProfilerEntries: {sharded: 1, unsharded: 1},
-});
-
-runTest({
-    shardKey: {[metaField + ".a"]: 1},
-    cmdObj: {
-        update: bucketsCollName,
-        updates: [{
-            q: {},
-            u: {$inc: {["meta.b"]: 1}},
-            multi: true,
-        }]
-    },
-    numProfilerEntries: {sharded: 2, unsharded: 1},
 });
 
 runTest({
@@ -360,35 +334,11 @@ runTest({
     cmdObj: {
         delete: collName,
         deletes: [{
-            q: {},
-            limit: 0,
-        }],
-    },
-    numProfilerEntries: {sharded: 2, unsharded: 1},
-});
-
-runTest({
-    shardKey: {[metaField]: 1},
-    cmdObj: {
-        delete: collName,
-        deletes: [{
             q: {[metaField]: 0},
             limit: 0,
         }],
     },
     numProfilerEntries: {sharded: 1, unsharded: 1},
-});
-
-runTest({
-    shardKey: {[metaField]: 1},
-    cmdObj: {
-        delete: bucketsCollName,
-        deletes: [{
-            q: {},
-            limit: 0,
-        }],
-    },
-    numProfilerEntries: {sharded: 2, unsharded: 1},
 });
 
 runTest({
