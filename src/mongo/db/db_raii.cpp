@@ -846,7 +846,7 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     }
 
     checkSecondaryNssShardVersions(
-        opCtx, options._secondaryNssOrUUIDsBegin, options._secondaryNssOrUUIDsEnd);
+        opCtx, _options._secondaryNssOrUUIDsBegin, _options._secondaryNssOrUUIDsEnd);
 
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (_isLockFreeReadSubOperation) {
@@ -906,7 +906,7 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     scopedCss->checkShardVersionOrThrow(opCtx);
 
     checkSecondaryNssShardVersions(
-        opCtx, options._secondaryNssOrUUIDsBegin, options._secondaryNssOrUUIDsEnd);
+        opCtx, _options._secondaryNssOrUUIDsBegin, _options._secondaryNssOrUUIDsEnd);
 
     if (_collectionPtr) {
         assertReadConcernSupported(
