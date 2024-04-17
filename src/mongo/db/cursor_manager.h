@@ -252,7 +252,13 @@ private:
         // 'cursor'.
         if (auto opKey = cursor->getOperationKey()) {
             stdx::lock_guard<Latch> lk(_opKeyMutex);
-            _opKeyMap.erase(*opKey);
+            auto it = _opKeyMap.find(*opKey);
+            if (it != _opKeyMap.end()) {
+                it->second.erase(cursor->cursorid());
+                if (it->second.empty()) {
+                    _opKeyMap.erase(*opKey);
+                }
+            }
         }
         map->erase(cursor->cursorid());
     }
@@ -282,7 +288,7 @@ private:
     // cursors in the map above are not present in this map, since OperationKey is not required when
     // registering a cursor.
     mutable Mutex _opKeyMutex = MONGO_MAKE_LATCH("CursorManager::_opKeyMutex");
-    stdx::unordered_map<OperationKey, CursorId, UUID::Hash> _opKeyMap;
+    stdx::unordered_map<OperationKey, std::set<CursorId>, UUID::Hash> _opKeyMap;
 };
 
 }  // namespace mongo
