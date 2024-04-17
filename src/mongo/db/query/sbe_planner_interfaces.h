@@ -47,7 +47,7 @@ public:
         OperationContext* opCtx,
         const MultipleCollectionAccessor& collections,
         std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
-        QueryPlannerParams plannerParams,
+        std::unique_ptr<QueryPlannerParams> plannerParams,
         boost::optional<size_t> cachedPlanHash,
         std::unique_ptr<sbe::RuntimePlanner> runtimePlanner,
         std::vector<std::unique_ptr<QuerySolution>> solutions,
@@ -65,7 +65,7 @@ private:
     OperationContext* _opCtx;
     const MultipleCollectionAccessor& _collections;
     std::unique_ptr<PlanYieldPolicySBE> _yieldPolicy;
-    QueryPlannerParams _plannerParams;
+    std::unique_ptr<QueryPlannerParams> _plannerParams;
     sbe::CandidatePlans _candidates;
     boost::optional<size_t> _cachedPlanHash;
     std::unique_ptr<RemoteCursorMap> _remoteCursors;
@@ -82,7 +82,7 @@ public:
         CanonicalQuery* cq,
         const MultipleCollectionAccessor& collections,
         std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
-        QueryPlannerParams plannerParams,
+        std::unique_ptr<QueryPlannerParams> plannerParams,
         std::unique_ptr<QuerySolution> solution,
         std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
         boost::optional<size_t> cachedPlanHash,
@@ -101,7 +101,7 @@ private:
     OperationContext* _opCtx;
     const MultipleCollectionAccessor& _collections;
     std::unique_ptr<PlanYieldPolicySBE> _yieldPolicy;
-    QueryPlannerParams _plannerParams;
+    std::unique_ptr<QueryPlannerParams> _plannerParams;
     std::unique_ptr<QuerySolution> _solution;
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> _root;
     const boost::optional<size_t> _cachedPlanHash;

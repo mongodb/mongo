@@ -54,7 +54,7 @@ struct PlannerDataForSBE final : public PlannerData {
                       CanonicalQuery* cq,
                       std::unique_ptr<WorkingSet> workingSet,
                       const MultipleCollectionAccessor& collections,
-                      QueryPlannerParams plannerParams,
+                      std::unique_ptr<QueryPlannerParams> plannerParams,
                       PlanYieldPolicy::YieldPolicy yieldPolicy,
                       boost::optional<size_t> cachedPlanHash,
                       std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy)
@@ -124,7 +124,7 @@ protected:
     }
 
     size_t plannerOptions() const {
-        return _plannerData.plannerParams.mainCollectionInfo.options;
+        return _plannerData.plannerParams->mainCollectionInfo.options;
     }
 
     boost::optional<size_t> cachedPlanHash() const {
@@ -140,7 +140,7 @@ protected:
     }
 
     const QueryPlannerParams& plannerParams() const {
-        return _plannerData.plannerParams;
+        return *_plannerData.plannerParams;
     }
 
     PlannerDataForSBE extractPlannerData() {

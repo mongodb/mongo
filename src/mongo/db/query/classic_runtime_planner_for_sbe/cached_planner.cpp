@@ -171,7 +171,7 @@ std::unique_ptr<PlannerInterface> replan(PlannerDataForSBE plannerData,
 
     // Use the query planning module to plan the whole query.
     auto solutions =
-        uassertStatusOK(QueryPlanner::plan(*plannerData.cq, plannerData.plannerParams));
+        uassertStatusOK(QueryPlanner::plan(*plannerData.cq, *plannerData.plannerParams));
 
     // There's a single solution, there's a special planner for just this case.
     if (solutions.size() == 1) {
@@ -213,7 +213,7 @@ std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
         // We'd like to check if there is any foreign collection in the hash_lookup stage
         // that is no longer eligible for using a hash_lookup plan. In this case we
         // invalidate the cache and immediately replan without ever running a trial period.
-        const auto& secondaryCollectionsInfo = plannerData.plannerParams.secondaryCollectionsInfo;
+        const auto& secondaryCollectionsInfo = plannerData.plannerParams->secondaryCollectionsInfo;
 
         for (const auto& foreignCollection : foreignHashJoinCollections) {
             const auto collectionInfo = secondaryCollectionsInfo.find(foreignCollection);
