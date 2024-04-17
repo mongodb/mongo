@@ -84,7 +84,8 @@ public:
     std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const override;
     ThreadPool* getDbWorkThreadPool() const override;
     Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config) override;
-    void onDrainComplete(OperationContext* opCtx) override;
+    void onWriterDrainComplete(OperationContext* opCtx) override;
+    void onApplierDrainComplete(OperationContext* opCtx) override;
     OpTime onTransitionToPrimary(OperationContext* opCtx) override;
     void forwardSecondaryProgress(bool prioritized) override;
     bool isSelf(const HostAndPort& host, ServiceContext* service) override;

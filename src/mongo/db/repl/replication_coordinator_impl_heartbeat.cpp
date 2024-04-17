@@ -1068,8 +1068,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         _topCoord->advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTime(), false, true);
         _clearCommittedSnapshot_inlock();
 
-        invariant(_applierState == ApplierState::Stopped);
-        _applierState = ApplierState::Running;
+        invariant(_oplogSyncState == OplogSyncState::Stopped);
+        _oplogSyncState = OplogSyncState::Running;
         _externalState->startProducerIfStopped();
     }
 

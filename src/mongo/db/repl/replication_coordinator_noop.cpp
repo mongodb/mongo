@@ -186,11 +186,15 @@ Status ReplicationCoordinatorNoOp::setFollowerModeRollback(OperationContext* opC
     MONGO_UNREACHABLE;
 }
 
-ReplicationCoordinator::ApplierState ReplicationCoordinatorNoOp::getApplierState() {
+ReplicationCoordinator::OplogSyncState ReplicationCoordinatorNoOp::getOplogSyncState() {
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::signalDrainComplete(OperationContext*, long long) noexcept {
+void ReplicationCoordinatorNoOp::signalWriterDrainComplete(OperationContext*, long long) noexcept {
+    MONGO_UNREACHABLE;
+}
+
+void ReplicationCoordinatorNoOp::signalApplierDrainComplete(OperationContext*, long long) noexcept {
     MONGO_UNREACHABLE;
 }
 

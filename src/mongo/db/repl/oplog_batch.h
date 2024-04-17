@@ -86,9 +86,23 @@ public:
         return std::move(_batch);
     }
 
+    /**
+     * Passes the term when the buffer is exhausted to a higher level in case the node has stepped
+     * down and then stepped up again. See its caller for more context.
+     */
+    boost::optional<long long> termWhenExhausted() const {
+        return _termWhenExhausted;
+    }
+
+    void setTermWhenExhausted(long long term) {
+        invariant(empty());
+        _termWhenExhausted = term;
+    }
+
 private:
     std::vector<T> _batch;
     std::size_t _byteSize;
+    boost::optional<long long> _termWhenExhausted;
 };
 
 /**
@@ -116,49 +130,11 @@ public:
         _mustShutdown = true;
     }
 
-    /**
-     * Passes the term when the buffer is exhausted to a higher level in case the node has stepped
-     * down and then stepped up again. See its caller for more context.
-     */
-    boost::optional<long long> termWhenExhausted() const {
-        return _termWhenExhausted;
-    }
-
-    void setTermWhenExhausted(long long term) {
-        invariant(empty());
-        _termWhenExhausted = term;
-    }
-
 private:
     bool _mustShutdown = false;
-    boost::optional<long long> _termWhenExhausted;
 };
 
-/**
- * Stores a batch of oplog entry BSON for oplog writer.
- */
-class OplogWriterBatch : public OplogBatch<BSONObj> {
-public:
-    OplogWriterBatch() : OplogBatch<BSONObj>() {}
-
-    OplogWriterBatch(std::vector<BSONObj> entries, size_t bytesSize)
-        : OplogBatch<BSONObj>(std::move(entries), bytesSize) {}
-
-    /**
-     * A batch with this set indicates that the buffer is in drain mode and the batch must be empty.
-     */
-    bool exhausted() const {
-        return _exhausted;
-    }
-
-    void setExhausted() {
-        invariant(empty());
-        _exhausted = true;
-    }
-
-private:
-    bool _exhausted = false;
-};
+using OplogWriterBatch = OplogBatch<BSONObj>;
 
 }  // namespace repl
 }  // namespace mongo

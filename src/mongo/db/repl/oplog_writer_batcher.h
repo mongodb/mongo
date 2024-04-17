@@ -75,7 +75,8 @@ private:
      * If secondaryDelaySecs is enabled, this function calculates the most recent timestamp of any
      * oplog entries that can be be returned in a batch.
      */
-    boost::optional<Date_t> _calculateSecondaryDelaySecsLatestTimestamp(Date_t now);
+    boost::optional<Date_t> _calculateSecondaryDelaySecsLatestTimestamp(OperationContext* opCtx,
+                                                                        Date_t now);
 
     /**
      * Get a batch from either the _stashedBatch or _oplogBuffer. If there is an entry in the batch
@@ -85,6 +86,11 @@ private:
     bool _pollFromBuffer(OperationContext* opCtx,
                          OplogWriterBatch* batch,
                          boost::optional<Date_t>& delaySecsLatestTimestamp);
+
+    /**
+     * Return the current term if the writer is in drain mode and the buffer is exhausted.
+     */
+    boost::optional<long long> _isBufferExhausted(OperationContext* opCtx);
 
 private:
     // This should be a OplogBuffer that supports batch operations.

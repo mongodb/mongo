@@ -161,8 +161,6 @@ private:
 
     // Not owned by us.
     Observer* const _observer;
-
-    bool _applyBufferInDrainMode = false;
 };
 
 }  // namespace repl

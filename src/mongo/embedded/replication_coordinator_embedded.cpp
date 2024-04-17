@@ -189,11 +189,17 @@ Status ReplicationCoordinatorEmbedded::setFollowerModeRollback(OperationContext*
     UASSERT_NOT_IMPLEMENTED;
 }
 
-ReplicationCoordinator::ApplierState ReplicationCoordinatorEmbedded::getApplierState() {
+ReplicationCoordinator::OplogSyncState ReplicationCoordinatorEmbedded::getOplogSyncState() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::signalDrainComplete(OperationContext*, long long) noexcept {
+void ReplicationCoordinatorEmbedded::signalWriterDrainComplete(OperationContext*,
+                                                               long long) noexcept {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+void ReplicationCoordinatorEmbedded::signalApplierDrainComplete(OperationContext*,
+                                                                long long) noexcept {
     UASSERT_NOT_IMPLEMENTED;
 }
 

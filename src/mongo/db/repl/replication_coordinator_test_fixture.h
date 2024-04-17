@@ -318,9 +318,14 @@ protected:
                                                              OperationContext* opCtx);
 
     /**
+     * Transition the ReplicationCoordinator from writer draining mode to applier draining mode.
+     */
+    void signalWriterDrainComplete(OperationContext* opCtx) noexcept;
+
+    /**
      * Transition the ReplicationCoordinator from drain mode to being fully primary/master.
      */
-    void signalDrainComplete(OperationContext* opCtx) noexcept;
+    void signalApplierDrainComplete(OperationContext* opCtx) noexcept;
 
     /**
      * Shuts down the objects under test.

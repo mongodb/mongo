@@ -278,10 +278,14 @@ public:
 
     Status setFollowerModeRollback(OperationContext* opCtx) override;
 
-    ApplierState getApplierState() override;
+    OplogSyncState getOplogSyncState() override;
 
-    void signalDrainComplete(OperationContext* opCtx,
-                             long long termWhenBufferIsEmpty) noexcept override;
+    void signalWriterDrainComplete(OperationContext* opCtx,
+                                   long long termWhenExhausted) noexcept override;
+
+    void signalApplierDrainComplete(OperationContext* opCtx,
+                                    long long termWhenExhausted) noexcept override;
+
 
     void signalUpstreamUpdater() override;
 
@@ -1848,7 +1852,7 @@ private:
     // Current ReplicaSet state.
     MemberState _memberState;  // (M)
 
-    ReplicationCoordinator::ApplierState _applierState = ApplierState::Running;  // (M)
+    ReplicationCoordinator::OplogSyncState _oplogSyncState = OplogSyncState::Running;  // (M)
 
     // Used to signal threads waiting for changes to _rsConfigState.
     stdx::condition_variable _rsConfigStateChange;  // (M)

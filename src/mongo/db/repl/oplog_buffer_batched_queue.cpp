@@ -190,11 +190,6 @@ void OplogBufferBatchedQueue::exitDrainMode() {
     _drainMode = false;
 }
 
-bool OplogBufferBatchedQueue::inDrainModeAndEmpty() {
-    stdx::lock_guard<Latch> lk(_mutex);
-    return _drainMode && !_curCount;
-}
-
 void OplogBufferBatchedQueue::_waitForSpace_inlock(stdx::unique_lock<Latch>& lk, std::size_t size) {
     invariant(size > 0);
     invariant(!_waitSize);

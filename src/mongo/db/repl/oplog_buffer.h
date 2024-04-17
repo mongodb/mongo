@@ -205,13 +205,6 @@ public:
     virtual void exitDrainMode() {
         MONGO_UNIMPLEMENTED;
     }
-
-    /**
-     * Returns true if this buffer is in drain mode and empty.
-     */
-    virtual bool inDrainModeAndEmpty() {
-        MONGO_UNIMPLEMENTED;
-    }
 };
 
 class OplogBuffer::Counters {

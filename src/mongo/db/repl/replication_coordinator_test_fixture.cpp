@@ -66,6 +66,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -387,6 +388,7 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
 
 void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t electionTime,
                                                                         OperationContext* opCtx) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     NetworkInterfaceMock* net = getNet();
 
@@ -444,7 +446,8 @@ void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t e
         hasReadyRequests = net->hasReadyRequests();
         getNet()->exitNetwork();
     }
-    ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
+    ASSERT(replCoord->getOplogSyncState() ==
+           ReplicationCoordinator::OplogSyncState::WriterDraining);
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
 
     auto helloResponse = replCoord->awaitHelloResponse(opCtx, {}, boost::none, boost::none);
@@ -456,9 +459,9 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(OperationContext* opCtx, Date
     simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTime, opCtx);
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
 
-    signalDrainComplete(opCtx);
+    signalWriterDrainComplete(opCtx);
+    signalApplierDrainComplete(opCtx);
 
-    ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
     auto helloResponse = replCoord->awaitHelloResponse(opCtx, {}, boost::none, boost::none);
     ASSERT_TRUE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
     ASSERT_FALSE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
@@ -466,26 +469,36 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(OperationContext* opCtx, Date
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
 }
 
-void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) noexcept {
-    // Writes that occur in code paths that call signalDrainComplete are expected to have Immediate
-    // priority.
+void ReplCoordTest::signalWriterDrainComplete(OperationContext* opCtx) noexcept {
+    getReplCoord()->signalWriterDrainComplete(opCtx, getReplCoord()->getTerm());
+    ASSERT(getReplCoord()->getOplogSyncState() ==
+           ReplicationCoordinator::OplogSyncState::ApplierDraining);
+}
+
+void ReplCoordTest::signalApplierDrainComplete(OperationContext* opCtx) noexcept {
+    // Writes that occur in code paths that call signalApplierDrainComplete are expected to have
+    // Immediate priority.
     ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
         opCtx, AdmissionContext::Priority::kExempt);
     getExternalState()->setFirstOpTimeOfMyTerm(OpTime(Timestamp(1, 1), getReplCoord()->getTerm()));
-    getReplCoord()->signalDrainComplete(opCtx, getReplCoord()->getTerm());
+    getReplCoord()->signalApplierDrainComplete(opCtx, getReplCoord()->getTerm());
+    ASSERT(getReplCoord()->getOplogSyncState() == ReplicationCoordinator::OplogSyncState::Stopped);
 }
 
 void ReplCoordTest::runSingleNodeElection(OperationContext* opCtx) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0),
                                                         Date_t() + Seconds(1));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->waitForElectionFinish_forTest();
 
-    ASSERT(getReplCoord()->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() ==
+           ReplicationCoordinator::OplogSyncState::WriterDraining);
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
 
-    signalDrainComplete(opCtx);
+    signalWriterDrainComplete(opCtx);
+    signalApplierDrainComplete(opCtx);
 }
 
 void ReplCoordTest::shutdown(OperationContext* opCtx) {
