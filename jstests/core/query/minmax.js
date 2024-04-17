@@ -45,7 +45,7 @@ assert.eq(1,
 
 // Check that min/max requires a hint.
 assert.throwsWithCode(() => coll.find().min({a: 1, b: 2}).max({a: 2, b: 1}).toArray(),
-                      ErrorCodes.NoQueryExecutionPlans);
+                      [ErrorCodes.NoQueryExecutionPlans, 51173]);
 
 // Hint doesn't match.
 let error = assert.throws(function() {
