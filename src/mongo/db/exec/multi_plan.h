@@ -55,6 +55,8 @@
 
 namespace mongo {
 
+extern FailPoint sleepWhileMultiplanning;
+
 /**
  * This stage outputs its mainChild, and possibly it's backup child
  * and also updates the cache.

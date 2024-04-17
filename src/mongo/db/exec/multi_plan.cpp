@@ -131,6 +131,8 @@ auto& classicNumPlansHistogram =
 
 }  // namespace
 
+MONGO_FAIL_POINT_DEFINE(sleepWhileMultiplanning);
+
 MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
                                VariantCollectionPtrOrAcquisition collection,
                                CanonicalQuery* cq,
@@ -224,6 +226,10 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         return Status::OK();
     }
 
+    if (MONGO_unlikely(sleepWhileMultiplanning.shouldFail())) {
+        sleepWhileMultiplanning.execute(
+            [&](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+    }
     // Adds the amount of time taken by pickBestPlan() to executionTime. There's lots of execution
     // work that happens here, so this is needed for the time accounting to make sense.
     auto optTimer = getOptTimer();

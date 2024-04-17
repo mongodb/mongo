@@ -378,6 +378,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     auto const curOp = CurOp::get(opCtx);
     OpDebug* const opDebug = &curOp->debug();
     auto const dbName = request.getDbName();
+    curOp->beginQueryPlanningTimer();
 
     if (request.getRemove().value_or(false)) {
         auto deleteRequest = DeleteRequest{};
