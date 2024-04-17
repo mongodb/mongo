@@ -189,7 +189,8 @@ bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag);
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      std::function<std::unique_ptr<Key>(void)> makeKey,
-                     bool requiresFullQueryStatsFeatureFlag = true);
+                     bool requiresFullQueryStatsFeatureFlag = true,
+                     bool willNeverExhaust = false);
 
 /**
  * Writes query stats to the query stats store for the operation identified by `queryStatsKeyHash`.
@@ -198,7 +199,7 @@ void registerRequest(OperationContext* opCtx,
  * functions:
  *  - collectQueryStatsMongod/collectQueryStatsMongos in the case of requests that span one
  *    operation
- *  - ClientCursor::dispose/ClusterClientCursorImpl::kill in the case of requests that span
+ *  - writeQueryStatsOnCursorDisposeOrKill() in the case of requests that span
  *    multiple operations (via getMore)
  */
 void writeQueryStats(OperationContext* opCtx,
@@ -206,5 +207,18 @@ void writeQueryStats(OperationContext* opCtx,
                      std::unique_ptr<Key> key,
                      uint64_t queryExecMicros,
                      uint64_t firstResponseExecMicros,
-                     uint64_t docsReturned);
+                     uint64_t docsReturned,
+                     bool willNeverExhaust = false);
+
+/**
+ * Called from ClientCursor::dispose/ClusterClientCursorImpl::kill to set up and writeQueryStats()
+ * at the end of life of a cursor.
+ */
+void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
+                                          boost::optional<size_t> queryStatsKeyHash,
+                                          std::unique_ptr<Key> key,
+                                          bool willNeverExhaust,
+                                          uint64_t queryExecMicros,
+                                          uint64_t firstResponseExecMicros,
+                                          uint64_t docsReturned);
 }  // namespace mongo::query_stats

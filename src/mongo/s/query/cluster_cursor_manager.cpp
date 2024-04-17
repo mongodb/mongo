@@ -604,10 +604,44 @@ void collectQueryStatsMongos(OperationContext* opCtx, std::unique_ptr<query_stat
 
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor) {
     cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
+
+    // For a change stream query that never ends, we want to collect query stats on the initial
+    // query and each getMore. Here we record the initial query.
+    // TODO SERVER-89058 Modify comment to include tailable cursors.
+    if (cursor->getQueryStatsWillNeverExhaust()) {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+
+        int64_t execTime = opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count();
+
+        query_stats::writeQueryStats(opCtx,
+                                     opDebug.queryStatsInfo.keyHash,
+                                     cursor->takeKey(),
+                                     execTime,
+                                     execTime,
+                                     opDebug.additiveMetrics.nreturned.value_or(0),
+                                     cursor->getQueryStatsWillNeverExhaust());
+    }
 }
 
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor) {
     cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
+
+    // For a change stream query that never ends, we want to update query stats for every getMore on
+    // the cursor.
+    // TODO SERVER-89058 Modify comment to include tailable cursors.
+    if (cursor->getQueryStatsWillNeverExhaust()) {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+
+        int64_t execTime = opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count();
+
+        query_stats::writeQueryStats(opCtx,
+                                     opDebug.queryStatsInfo.keyHash,
+                                     nullptr,
+                                     execTime,
+                                     execTime,
+                                     opDebug.additiveMetrics.nreturned.value_or(0),
+                                     cursor->getQueryStatsWillNeverExhaust());
+    }
 }
 
 }  // namespace mongo

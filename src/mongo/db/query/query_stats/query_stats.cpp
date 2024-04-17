@@ -238,7 +238,8 @@ bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag) {
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      std::function<std::unique_ptr<Key>(void)> makeKey,
-                     bool requiresFullQueryStatsFeatureFlag) {
+                     bool requiresFullQueryStatsFeatureFlag,
+                     bool willNeverExhaust) {
     if (!isQueryStatsEnabled(opCtx->getServiceContext(), requiresFullQueryStatsFeatureFlag)) {
         LOGV2_DEBUG(8473000,
                     5,
@@ -283,6 +284,8 @@ void registerRequest(OperationContext* opCtx,
                     "collection"_attr = collection);
         return;
     }
+
+    opDebug.queryStatsInfo.willNeverExhaust = willNeverExhaust;
     // There are a few cases where a query shape can be larger than the original query. For example,
     // {$exists: false} in the input query serializes to {$not: {$exists: true}. In rare cases where
     // an input query has thousands of clauses, the cumulative bloat that shapification adds results
@@ -319,8 +322,13 @@ void writeQueryStats(OperationContext* opCtx,
                      std::unique_ptr<Key> key,
                      const uint64_t queryExecMicros,
                      const uint64_t firstResponseExecMicros,
-                     const uint64_t docsReturned) {
-    if (!key) {
+                     const uint64_t docsReturned,
+                     bool willNeverExhaust) {
+    // Generally we expect a 'key' to write query stats. However, for a change stream query, we
+    // expect it has no 'key' after its first writeQueryStats(), but it must have a
+    // 'queryStatsKeyHash' for its entry to be updated.
+    // TODO SERVER-89058 Modify comment to include tailable cursors.
+    if (!key && !(willNeverExhaust && queryStatsKeyHash)) {
         return;
     }
 
@@ -339,9 +347,11 @@ void writeQueryStats(OperationContext* opCtx,
     }
     auto&& queryStatsStore =
         QueryStatsStoreManager::get(opCtx->getServiceContext())->getQueryStatsStore();
-    dassert(absl::HashOf(*key) == queryStatsKeyHash,
-            "Expecting query stats key to hash to the given hash. Is the OpCtx state being "
-            "incorrectly re-used?");
+    if (key) {
+        dassert(absl::HashOf(*key) == queryStatsKeyHash,
+                "Expecting query stats key to hash to the given hash. Is the OpCtx state being "
+                "incorrectly re-used?");
+    }
     auto&& [statusWithMetrics, partitionLock] =
         queryStatsStore.getWithPartitionLock(*queryStatsKeyHash);
     if (statusWithMetrics.isOK()) {
@@ -351,6 +361,12 @@ void writeQueryStats(OperationContext* opCtx,
                                 queryExecMicros,
                                 firstResponseExecMicros,
                                 docsReturned);
+    }
+
+    // It is possible a cursor that lives forever has no key associated with it and its entry may
+    // have been evicted.
+    if (willNeverExhaust && !key) {
+        return;
     }
 
     // Otherwise we didn't find an existing entry. Try to create one.
@@ -380,4 +396,41 @@ void writeQueryStats(OperationContext* opCtx,
                             firstResponseExecMicros,
                             docsReturned);
 }
+
+void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
+                                          boost::optional<size_t> queryStatsKeyHash,
+                                          std::unique_ptr<Key> key,
+                                          bool willNeverExhaust,
+                                          const uint64_t queryExecMicros,
+                                          const uint64_t firstResponseExecMicros,
+                                          const uint64_t docsReturned) {
+    // It is discouraged but technically possible for a user to enable queryStats on the mongods of
+    // a replica set. In this case, a cursor will be created for each mongod. However, the
+    // queryStatsKey is behind a unique_ptr on CurOp. The ClientCursor constructor std::moves the
+    // queryStatsKey so it uniquely owns it (and also makes the queryStatsKey on CurOp now a
+    // nullptr) and copies over the queryStatsKeyHash as the latter is a cheap copy.
+    // In the case of sharded $search, two cursors will be created per mongod. In this way,
+    // two cursors are part of the same thread/operation, and therefore share a OpCtx/CurOp/OpDebug.
+    // The first cursor that is created will own the queryStatsKey and have a copy of the
+    // queryStatsKeyHash. On the other hand, the second one will only have a copy of the hash since
+    // the queryStatsKey will be null on CurOp from being std::move'd in the first cursor
+    // construction call. To not trip the tassert in writeQueryStats and because all cursors are
+    // guaranteed to have a copy of the hash, we check that the cursor has a key
+    if (key && opCtx) {
+        query_stats::writeQueryStats(opCtx,
+                                     queryStatsKeyHash,
+                                     std::move(key),
+                                     queryExecMicros,
+                                     firstResponseExecMicros,
+                                     docsReturned,
+                                     willNeverExhaust);
+    } else if (willNeverExhaust && opCtx) {
+        // Since we already recorded information about the possible getMores associated with a
+        // cursor that never ends, the only information left to record is about the kill/dispose
+        // cursor operation. This operation is not timed and does not have any metrics associated
+        // with it.
+        query_stats::writeQueryStats(opCtx, queryStatsKeyHash, nullptr, 0, 0, 0, willNeverExhaust);
+    }
+}
+
 }  // namespace mongo::query_stats

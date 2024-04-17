@@ -831,14 +831,19 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         auto collectionType =
             determineCollectionType(ctx, resolvedView, hasChangeStream, isCollectionless);
 
-        query_stats::registerRequest(opCtx, origNss, [&]() {
-            return std::make_unique<query_stats::AggKey>(requestForQueryStats,
-                                                         *pipeline,
-                                                         expCtx,
-                                                         pipelineInvolvedNamespaces,
-                                                         origNss,
-                                                         collectionType);
-        });
+        query_stats::registerRequest(
+            opCtx,
+            origNss,
+            [&]() {
+                return std::make_unique<query_stats::AggKey>(requestForQueryStats,
+                                                             *pipeline,
+                                                             expCtx,
+                                                             pipelineInvolvedNamespaces,
+                                                             origNss,
+                                                             collectionType);
+            },
+            /*requiresFullQueryStatsFeatureFlag*/ true,
+            hasChangeStream);
     }
 
     if (resolvedView.has_value()) {
