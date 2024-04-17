@@ -138,7 +138,7 @@ TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        boost::optional<std::string> tenantId,
                                        RandomAccessOplogBuffer* oplogBuffer,
                                        std::shared_ptr<executor::TaskExecutor> executor,
-                                       ThreadPool* writerPool,
+                                       ThreadPool* workerPool,
                                        Timestamp resumeBatchingTs)
     : AbstractAsyncComponent(executor.get(),
                              std::string("TenantOplogApplier_") + migrationUuid.toString()),
@@ -149,7 +149,7 @@ TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
       _tenantId(tenantId),
       _oplogBuffer(oplogBuffer),
       _executor(std::move(executor)),
-      _writerPool(writerPool),
+      _workerPool(workerPool),
       _resumeBatchingTs(resumeBatchingTs),
       _options([&] {
           switch (protocol) {
@@ -366,7 +366,7 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
         if (writerVectors[i].empty())
             continue;
 
-        _writerPool->schedule([this, &writer = writerVectors.at(i), &status = statusVector.at(i)](
+        _workerPool->schedule([this, &writer = writerVectors.at(i), &status = statusVector.at(i)](
                                   auto scheduleStatus) {
             if (!scheduleStatus.isOK()) {
                 status = scheduleStatus;
@@ -375,7 +375,7 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
             }
         });
     }
-    _writerPool->waitForIdle();
+    _workerPool->waitForIdle();
 
     // Make sure all the workers succeeded.
     for (const auto& status : statusVector) {
@@ -793,7 +793,7 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
         greatestOplogSlotUsed = *slotIter++;
     }
 
-    const size_t numOplogThreads = _writerPool->getStats().options.maxThreads;
+    const size_t numOplogThreads = _workerPool->getStats().options.maxThreads;
     const size_t numOpsPerThread = std::max(std::size_t(minOplogEntriesPerThread.load()),
                                             (nonSessionOps.size() / numOplogThreads));
     LOGV2_DEBUG(4886003,
@@ -821,7 +821,7 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
         if (thread == numOplogThreads - 1) {
             numOps = numOpsRemaining;
         }
-        _writerPool->schedule([=, this, &status = statusVector.at(thread)](auto scheduleStatus) {
+        _workerPool->schedule([=, this, &status = statusVector.at(thread)](auto scheduleStatus) {
             if (!scheduleStatus.isOK()) {
                 status = scheduleStatus;
             } else {
@@ -840,7 +840,7 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
     // Dispatch noop writes for oplog entries from the same session into the same writer thread.
     size_t sessionThreadNum = 0;
     for (const auto& s : sessionOps) {
-        _writerPool->schedule(
+        _workerPool->schedule(
             [=, this, &status = statusVector.at(numOplogThreads + sessionThreadNum)](
                 auto scheduleStatus) {
                 if (!scheduleStatus.isOK()) {
@@ -856,7 +856,7 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
         sessionThreadNum++;
     }
 
-    _writerPool->waitForIdle();
+    _workerPool->waitForIdle();
 
     // Make sure all the workers succeeded.
     for (const auto& status : statusVector) {
@@ -1140,7 +1140,7 @@ std::vector<Lock::TenantLock> TenantOplogApplier::_acquireIntentExclusiveTenantL
 std::vector<std::vector<ApplierOperation>> TenantOplogApplier::_fillWriterVectors(
     OperationContext* opCtx, TenantOplogBatch* batch) {
     std::vector<std::vector<ApplierOperation>> writerVectors(
-        _writerPool->getStats().options.maxThreads);
+        _workerPool->getStats().options.maxThreads);
     CachedCollectionProperties collPropertiesCache;
 
     for (auto&& op : batch->ops) {
@@ -1303,13 +1303,13 @@ Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<ApplierOperatio
     return status;
 }
 
-std::unique_ptr<ThreadPool> makeTenantMigrationWriterPool() {
-    return makeTenantMigrationWriterPool(tenantApplierThreadCount);
+std::unique_ptr<ThreadPool> makeTenantMigrationWorkerPool() {
+    return makeTenantMigrationWorkerPool(tenantApplierThreadCount);
 }
 
-std::unique_ptr<ThreadPool> makeTenantMigrationWriterPool(int threadCount) {
-    return makeReplWriterPool(
-        threadCount, "TenantMigrationWriter"_sd, true /*  isKillableByStepdown */);
+std::unique_ptr<ThreadPool> makeTenantMigrationWorkerPool(int threadCount) {
+    return makeReplWorkerPool(
+        threadCount, "TenantMigrationWorker"_sd, true /*  isKillableByStepdown */);
 }
 
 }  // namespace repl

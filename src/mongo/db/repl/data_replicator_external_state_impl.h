@@ -101,7 +101,7 @@ public:
         ReplicationConsistencyMarkers* consistencyMarkers,
         StorageInterface* storageInterface,
         const OplogApplier::Options& options,
-        ThreadPool* writerPool) final;
+        ThreadPool* workerPool) final;
 
     StatusWith<ReplSetConfig> getCurrentConfig() const override;
 

@@ -68,7 +68,7 @@ StatusWith<std::shared_ptr<InitialSyncerInterface>> InitialSyncerFactory::makeIn
     const std::string& initialSyncMethod,
     InitialSyncerInterface::Options opts,
     std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-    ThreadPool* writerPool,
+    ThreadPool* workerPool,
     StorageInterface* storage,
     ReplicationProcess* replicationProcess,
     const InitialSyncerInterface::OnCompletionFn& onCompletion) {
@@ -80,7 +80,7 @@ StatusWith<std::shared_ptr<InitialSyncerInterface>> InitialSyncerFactory::makeIn
     }
     return fn->second(opts,
                       std::move(dataReplicatorExternalState),
-                      writerPool,
+                      workerPool,
                       storage,
                       replicationProcess,
                       onCompletion);

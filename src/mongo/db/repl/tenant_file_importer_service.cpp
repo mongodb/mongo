@@ -289,8 +289,8 @@ TenantFileImporterService::MigrationHandle::MigrationHandle(const UUID& migratio
     : migrationId(migrationId),
       startMigrationOpTime(startMigrationOpTime),
       eventQueue(std::make_unique<Queue>()),
-      writerPool(
-          makeReplWriterPool(tenantApplierThreadCount, "TenantFileImporterServiceWriter"_sd)),
+      workerPool(
+          makeReplWorkerPool(tenantApplierThreadCount, "TenantFileImporterServiceWriter"_sd)),
       sharedData(std::make_unique<TenantMigrationSharedData>(
           getGlobalServiceContext()->getFastClockSource(), migrationId)) {
     stats.fileCopyStart = Date_t::now();
@@ -433,7 +433,7 @@ void TenantFileImporterService::_handleEvents(const UUID& migrationId) {
 
     std::unique_ptr<DBClientConnection> donorConnection;
     Queue* eventQueue;
-    ThreadPool* writerPool;
+    ThreadPool* workerPool;
     TenantMigrationSharedData* sharedData;
 
     ON_BLOCK_EXIT([this, opId = opCtx->getOpID(), &migrationId] {
@@ -456,7 +456,7 @@ void TenantFileImporterService::_handleEvents(const UUID& migrationId) {
         _mh->opCtx = opCtx;
 
         eventQueue = _mh->eventQueue.get();
-        writerPool = _mh->writerPool.get();
+        workerPool = _mh->workerPool.get();
         sharedData = _mh->sharedData.get();
     }
 
@@ -500,7 +500,7 @@ void TenantFileImporterService::_handleEvents(const UUID& migrationId) {
                 _cloneFile(opCtx,
                            migrationId,
                            donorConnection.get(),
-                           writerPool,
+                           workerPool,
                            sharedData,
                            event.metadataDoc);
                 continue;
@@ -545,7 +545,7 @@ void TenantFileImporterService::_handleEvents(const UUID& migrationId) {
 void TenantFileImporterService::_cloneFile(OperationContext* opCtx,
                                            const UUID& migrationId,
                                            DBClientConnection* clientConnection,
-                                           ThreadPool* writerPool,
+                                           ThreadPool* workerPool,
                                            TenantMigrationSharedData* sharedData,
                                            const BSONObj& metadataDoc) {
     if (MONGO_unlikely(skipCloneFiles.shouldFail())) {
@@ -579,7 +579,7 @@ void TenantFileImporterService::_cloneFile(OperationContext* opCtx,
                                            clientConnection->getServerHostAndPort(),
                                            clientConnection,
                                            repl::StorageInterface::get(cc().getServiceContext()),
-                                           writerPool);
+                                           workerPool);
 
     ON_BLOCK_EXIT([this, &migrationId] {
         stdx::lock_guard lk(_mutex);
@@ -780,8 +780,8 @@ void TenantFileImporterService::_interrupt(WithLock lk, const UUID& migrationId)
         _mh->donorConnection->shutdownAndDisallowReconnect();
     }
 
-    if (_mh->writerPool) {
-        _mh->writerPool->shutdown();
+    if (_mh->workerPool) {
+        _mh->workerPool->shutdown();
     }
 
     if (_mh->sharedData) {
@@ -820,7 +820,7 @@ void TenantFileImporterService::_resetMigrationHandle(boost::optional<const UUID
     _resetInProgress = true;
 
     auto workerThread = _mh->workerThread.get();
-    auto writerPool = _mh->writerPool.get();
+    auto workerPool = _mh->workerPool.get();
     lk.unlock();
 
     LOGV2(7800207,
@@ -830,8 +830,8 @@ void TenantFileImporterService::_resetMigrationHandle(boost::optional<const UUID
         workerThread->join();
     }
 
-    if (writerPool) {
-        writerPool->join();
+    if (workerPool) {
+        workerPool->join();
     }
 
     lk.lock();

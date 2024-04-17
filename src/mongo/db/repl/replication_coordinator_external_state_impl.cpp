@@ -319,7 +319,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
         _replicationProcess->getConsistencyMarkers(),
         _storageInterface,
         OplogApplier::Options(OplogApplication::Mode::kSecondary),
-        _writerPool.get());
+        _workerPool.get());
 
     invariant(!_bgSync);
     _bgSync = std::make_unique<BackgroundSync>(
@@ -366,7 +366,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
     auto oldBgSync = std::move(_bgSync);
     auto oldWriter = std::move(_oplogWriter);
     auto oldApplier = std::move(_oplogApplier);
-    auto oldWriterPool = std::move(_writerPool);
+    auto oldWorkerPool = std::move(_workerPool);
     auto oldWriterExecutor = std::move(_oplogWriterTaskExecutor);
     auto oldApplierExecutor = std::move(_oplogApplierTaskExecutor);
     lock.unlock();
@@ -429,10 +429,10 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
 
     // Once the writer pool's shutdown() is called, scheduling new tasks will return error, so
     // we shutdown writer pool after the applier exits to avoid new tasks being scheduled.
-    if (oldWriterPool) {
+    if (oldWorkerPool) {
         LOGV2(5698300, "Stopping replication applier writer pool");
-        oldWriterPool->shutdown();
-        oldWriterPool->join();
+        oldWorkerPool->shutdown();
+        oldWorkerPool->join();
     }
 
     if (oldWriterExecutor) {
@@ -481,7 +481,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads() {
     _taskExecutor = makeTaskExecutor(_service, "ReplCoordExternExecutorPool", "ReplCoordExtern");
     _taskExecutor->startup();
 
-    _writerPool = makeReplWriterPool();
+    _workerPool = makeReplWorkerPool();
 
     _startedThreads = true;
 }
@@ -535,7 +535,7 @@ ReplicationCoordinatorExternalStateImpl::getSharedTaskExecutor() const {
 }
 
 ThreadPool* ReplicationCoordinatorExternalStateImpl::getDbWorkThreadPool() const {
-    return _writerPool.get();
+    return _workerPool.get();
 }
 
 Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(OperationContext* opCtx,

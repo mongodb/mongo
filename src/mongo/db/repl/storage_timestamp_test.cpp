@@ -1426,7 +1426,7 @@ TEST_F(StorageTimestampTest, SecondarySetIndexMultikeyOnInsert) {
 
     DoNothingOplogApplierObserver observer;
     auto storageInterface = repl::StorageInterface::get(_opCtx);
-    auto writerPool = repl::makeReplWriterPool();
+    auto workerPool = repl::makeReplWorkerPool();
     repl::OplogApplierImpl oplogApplier(
         nullptr,  // task executor. not required for applyOplogBatch().
         nullptr,  // oplog buffer. not required for applyOplogBatch().
@@ -1435,7 +1435,7 @@ TEST_F(StorageTimestampTest, SecondarySetIndexMultikeyOnInsert) {
         _consistencyMarkers,
         storageInterface,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
-        writerPool.get());
+        workerPool.get());
     ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(oplogApplier.applyOplogBatch(_opCtx, ops)));
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
@@ -1504,7 +1504,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
 
     DoNothingOplogApplierObserver observer;
     auto storageInterface = repl::StorageInterface::get(_opCtx);
-    auto writerPool = repl::makeReplWriterPool();
+    auto workerPool = repl::makeReplWorkerPool();
     repl::OplogApplierImpl oplogApplier(
         nullptr,  // task executor. not required for applyOplogBatch().
         nullptr,  // oplog buffer. not required for applyOplogBatch().
@@ -1513,7 +1513,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
         _consistencyMarkers,
         storageInterface,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
-        writerPool.get());
+        workerPool.get());
 
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
 
@@ -1597,7 +1597,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
 
     DoNothingOplogApplierObserver observer;
     auto storageInterface = repl::StorageInterface::get(_opCtx);
-    auto writerPool = repl::makeReplWriterPool();
+    auto workerPool = repl::makeReplWorkerPool();
     repl::OplogApplierImpl oplogApplier(
         nullptr,  // task executor. not required for applyOplogBatch().
         nullptr,  // oplog buffer. not required for applyOplogBatch().
@@ -1606,7 +1606,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
         _consistencyMarkers,
         storageInterface,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
-        writerPool.get());
+        workerPool.get());
 
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
 

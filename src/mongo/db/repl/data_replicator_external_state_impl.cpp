@@ -157,7 +157,7 @@ std::unique_ptr<OplogApplier> DataReplicatorExternalStateImpl::makeOplogApplier(
     ReplicationConsistencyMarkers* consistencyMarkers,
     StorageInterface* storageInterface,
     const OplogApplier::Options& options,
-    ThreadPool* writerPool) {
+    ThreadPool* workerPool) {
     return std::make_unique<OplogApplierImpl>(getTaskExecutor(),
                                               oplogBuffer,
                                               observer,
@@ -165,7 +165,7 @@ std::unique_ptr<OplogApplier> DataReplicatorExternalStateImpl::makeOplogApplier(
                                               consistencyMarkers,
                                               storageInterface,
                                               options,
-                                              writerPool);
+                                              workerPool);
 }
 
 StatusWith<ReplSetConfig> DataReplicatorExternalStateImpl::getCurrentConfig() const {

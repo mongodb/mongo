@@ -273,7 +273,7 @@ public:
         ReplicationConsistencyMarkers* consistencyMarkers,
         StorageInterface* storageInterface,
         const OplogApplier::Options& options,
-        ThreadPool* writerPool) final {
+        ThreadPool* workerPool) final {
         MONGO_UNREACHABLE;
     };
 
@@ -2043,7 +2043,7 @@ void ShardMergeRecipientService::Instance::_cleanupOnMigrationCompletion(Status 
         using std::swap;
         swap(savedDonorOplogFetcher, _donorOplogFetcher);
         swap(savedTenantOplogApplier, _tenantOplogApplier);
-        swap(savedWriterPool, _writerPool);
+        swap(savedWriterPool, _workerPool);
         swap(savedDonorFilenameBackupCursorFileFetcher, _donorFilenameBackupCursorFileFetcher);
         swap(savedBackupCursorKeepAliveFuture, _backupCursorKeepAliveFuture);
     }
@@ -2174,7 +2174,7 @@ void ShardMergeRecipientService::Instance::_startOplogApplier() {
                                                                boost::none,
                                                                _donorOplogBuffer.get(),
                                                                **_scopedExecutor,
-                                                               _writerPool.get());
+                                                               _workerPool.get());
 
     LOGV2_DEBUG(7339750,
                 1,
@@ -2202,7 +2202,7 @@ void ShardMergeRecipientService::Instance::_setup(ConnectionPair connectionPair)
     _client = std::move(connectionPair.first);
     _oplogFetcherClient = std::move(connectionPair.second);
 
-    _writerPool = makeTenantMigrationWriterPool();
+    _workerPool = makeTenantMigrationWorkerPool();
 
     _sharedData = std::make_unique<TenantMigrationSharedData>(_serviceContext->getFastClockSource(),
                                                               getMigrationUUID());

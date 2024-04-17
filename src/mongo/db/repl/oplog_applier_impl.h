@@ -75,7 +75,7 @@ public:
      * Constructs this OplogApplier with specific options.
      * During steady state replication, _run() obtains batches of operations to apply
      * from the oplogBuffer. During the oplog application phase, the batch of operations is
-     * distributed across writer threads in 'writerPool'. Each writer thread applies its own vector
+     * distributed across writer threads in 'workerPool'. Each writer thread applies its own vector
      * of operations using 'func'. The writer thread pool is not owned by us.
      */
     OplogApplierImpl(executor::TaskExecutor* executor,
@@ -85,7 +85,7 @@ public:
                      ReplicationConsistencyMarkers* consistencyMarkers,
                      StorageInterface* storageInterface,
                      const Options& options,
-                     ThreadPool* writerPool);
+                     ThreadPool* workerPool);
 
     void fillWriterVectors_forTest(OperationContext* opCtx,
                                    std::vector<OplogEntry>* ops,
@@ -132,7 +132,7 @@ private:
 
     // Pool of worker threads for writing ops to the databases.
     // Not owned by us.
-    ThreadPool* const _writerPool;
+    ThreadPool* const _workerPool;
 
     StorageInterface* const _storageInterface;
 

@@ -211,7 +211,7 @@ public:
         repl::replWriterThreadCount = numThreads;  // Repl worker thread count
         repl::replWriterMinThreadCount = numThreads;
 
-        _oplogWriterPool = repl::makeReplWriterPool();
+        _oplogWriterPool = repl::makeReplWorkerPool();
 
         _oplogWriter = std::make_unique<repl::OplogWriterImpl>(
             nullptr,

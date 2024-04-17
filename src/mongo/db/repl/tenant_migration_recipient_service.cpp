@@ -288,7 +288,7 @@ public:
         ReplicationConsistencyMarkers* consistencyMarkers,
         StorageInterface* storageInterface,
         const OplogApplier::Options& options,
-        ThreadPool* writerPool) final {
+        ThreadPool* workerPool) final {
         MONGO_UNREACHABLE;
     };
 
@@ -1674,7 +1674,7 @@ Future<void> TenantMigrationRecipientService::Instance::_startTenantAllDatabaseC
         _client->getServerHostAndPort(),
         _client.get(),
         repl::StorageInterface::get(cc().getServiceContext()),
-        _writerPool.get(),
+        _workerPool.get(),
         _tenantId);
     LOGV2_DEBUG(4881100,
                 1,
@@ -2054,7 +2054,7 @@ void TenantMigrationRecipientService::Instance::_cleanupOnDataSyncCompletion(Sta
         using std::swap;
         swap(savedDonorOplogFetcher, _donorOplogFetcher);
         swap(savedTenantOplogApplier, _tenantOplogApplier);
-        swap(savedWriterPool, _writerPool);
+        swap(savedWriterPool, _workerPool);
     }
 
     joinTarget(savedDonorOplogFetcher);
@@ -2209,7 +2209,7 @@ void TenantMigrationRecipientService::Instance::_startOplogApplier() {
         _tenantId,
         _donorOplogBuffer.get(),
         **_scopedExecutor,
-        _writerPool.get(),
+        _workerPool.get(),
         resumeOpTime.getTimestamp());
 
     LOGV2_DEBUG(4881202,
@@ -2240,9 +2240,9 @@ void TenantMigrationRecipientService::Instance::_setup() {
             uassertStatusOK(_taskState.getInterruptStatus());
         }
 
-        // Reuse the _writerPool for retry of the future chain.
-        if (!_writerPool) {
-            _writerPool = makeTenantMigrationWriterPool();
+        // Reuse the _workerPool for retry of the future chain.
+        if (!_workerPool) {
+            _workerPool = makeTenantMigrationWorkerPool();
         }
 
         ResumePhase resumePhase = [&] {

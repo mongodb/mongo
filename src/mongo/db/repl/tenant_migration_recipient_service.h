@@ -619,7 +619,7 @@ public:
 
         // Writer pool to do storage write operation. Used by tenant collection cloner and by
         // tenant oplog applier.
-        std::unique_ptr<ThreadPool> _writerPool;  //(M)
+        std::unique_ptr<ThreadPool> _workerPool;  //(M)
         // Data shared by cloners. Follow TenantMigrationSharedData synchronization rules.
         std::unique_ptr<TenantMigrationSharedData> _sharedData;  // (S)
         // Indicates whether the main task future continuation chain state kicked off by run().

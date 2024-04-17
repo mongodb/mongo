@@ -471,10 +471,10 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
                                    ReplicationConsistencyMarkers* consistencyMarkers,
                                    StorageInterface* storageInterface,
                                    const OplogApplier::Options& options,
-                                   ThreadPool* writerPool)
+                                   ThreadPool* workerPool)
     : OplogApplier(executor, oplogBuffer, observer, options),
       _replCoord(replCoord),
-      _writerPool(writerPool),
+      _workerPool(workerPool),
       _storageInterface(storageInterface),
       _consistencyMarkers(consistencyMarkers) {
 
@@ -487,7 +487,7 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
         nullptr /* executor */,
         nullptr /* writeBuffer */,
         nullptr /* applyBuffer */,
-        writerPool,
+        workerPool,
         replCoord,
         storageInterface,
         consistencyMarkers,
@@ -631,14 +631,14 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
     // Increment the batch size stat.
     oplogApplicationBatchSize.increment(ops.size());
 
-    std::vector<WorkerMultikeyPathInfo> multikeyVector(_writerPool->getStats().options.maxThreads);
+    std::vector<WorkerMultikeyPathInfo> multikeyVector(_workerPool->getStats().options.maxThreads);
     {
         // Each node records cumulative batch application stats for itself using this timer.
         TimerHolder timer(&applyBatchStats);
 
         // We must wait for the all work we've dispatched to complete before leaving this block
         // because the spawned threads refer to objects on the stack
-        ON_BLOCK_EXIT([&] { _writerPool->waitForIdle(); });
+        ON_BLOCK_EXIT([&] { _workerPool->waitForIdle(); });
 
         // Write ops into the oplog collection and change collections if needed.
         //
@@ -664,7 +664,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         std::vector<std::vector<OplogEntry>> derivedOps;
 
         std::vector<std::vector<ApplierOperation>> writerVectors(
-            _writerPool->getStats().options.maxThreads);
+            _workerPool->getStats().options.maxThreads);
         _fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
 
         // Wait for oplog writes to finish.
@@ -686,7 +686,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
             _consistencyMarkers->getMinValid(opCtx) < ops.front().getOpTime();
 
         {
-            std::vector<Status> statusVector(_writerPool->getStats().options.maxThreads,
+            std::vector<Status> statusVector(_workerPool->getStats().options.maxThreads,
                                              Status::OK());
             // Doles out all the work to the writer pool threads. writerVectors is not modified,
             // but applyOplogBatchPerWorker will modify the vectors that it contains.
@@ -695,7 +695,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                 if (writerVectors[i].empty())
                     continue;
 
-                _writerPool->schedule([this,
+                _workerPool->schedule([this,
                                        &writer = writerVectors.at(i),
                                        &status = statusVector.at(i),
                                        &multikeyVector = multikeyVector.at(i),
@@ -710,7 +710,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                 });
             }
 
-            _writerPool->waitForIdle();
+            _workerPool->waitForIdle();
 
             // If any of the statuses is not ok, return error.
             for (auto it = statusVector.cbegin(); it != statusVector.cend(); ++it) {
