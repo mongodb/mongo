@@ -130,6 +130,29 @@ int RdKafka::socket_cb_trampoline(int domain,
   return handle->socket_cb_->socket_cb(domain, type, protocol);
 }
 
+
+int RdKafka::resolve_cb_trampoline(const char *node,
+                                   const char *service,
+                                   const struct addrinfo *hints,
+                                   struct addrinfo **res,
+                                   void *opaque) {
+  RdKafka::HandleImpl *handle = static_cast<RdKafka::HandleImpl *>(opaque);
+
+  return handle->resolve_cb_->resolve_cb(node, service, hints, res);
+}
+
+
+int RdKafka::connect_cb_trampoline(int sockfd,
+                                   const struct sockaddr *addr,
+                                   int addrlen,
+                                   const char *id,
+                                   void *opaque) {
+  RdKafka::HandleImpl *handle = static_cast<RdKafka::HandleImpl *>(opaque);
+
+  return handle->connect_cb_->connect_cb(sockfd, addr, addrlen, id);
+}
+
+
 int RdKafka::open_cb_trampoline(const char *pathname,
                                 int flags,
                                 mode_t mode,
@@ -286,6 +309,18 @@ void RdKafka::HandleImpl::set_common_config(const RdKafka::ConfImpl *confimpl) {
     rd_kafka_conf_set_socket_cb(confimpl->rk_conf_,
                                 RdKafka::socket_cb_trampoline);
     socket_cb_ = confimpl->socket_cb_;
+  }
+
+  if (confimpl->resolve_cb_) {
+    rd_kafka_conf_set_resolve_cb(confimpl->rk_conf_,
+                                RdKafka::resolve_cb_trampoline);
+    resolve_cb_ = confimpl->resolve_cb_;
+  }
+
+    if (confimpl->connect_cb_) {
+    rd_kafka_conf_set_connect_cb(confimpl->rk_conf_,
+                                 RdKafka::connect_cb_trampoline);
+    connect_cb_ = confimpl->connect_cb_;
   }
 
   if (confimpl->ssl_cert_verify_cb_) {

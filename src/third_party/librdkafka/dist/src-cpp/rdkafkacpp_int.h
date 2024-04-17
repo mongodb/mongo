@@ -75,6 +75,16 @@ int stats_cb_trampoline(rd_kafka_t *rk,
                         size_t json_len,
                         void *opaque);
 int socket_cb_trampoline(int domain, int type, int protocol, void *opaque);
+int resolve_cb_trampoline(const char *node,
+                          const char *service,
+                          const struct addrinfo *hints,
+                          struct addrinfo **res,
+                          void *opaque);
+int connect_cb_trampoline(int sockfd,
+                          const struct sockaddr *addr,
+                          int addrlen,
+                          const char *id,
+                          void *opaque);
 int open_cb_trampoline(const char *pathname,
                        int flags,
                        mode_t mode,
@@ -566,6 +576,8 @@ class ConfImpl : public Conf {
       dr_cb_(NULL),
       event_cb_(NULL),
       socket_cb_(NULL),
+      resolve_cb_(NULL),
+      connect_cb_(NULL),
       open_cb_(NULL),
       partitioner_cb_(NULL),
       partitioner_kp_cb_(NULL),
@@ -712,6 +724,41 @@ class ConfImpl : public Conf {
     return Conf::CONF_OK;
   }
 
+  Conf::ConfResult set(const std::string &name,
+                       ResolveCb *resolve_cb,
+                       std::string &errstr) {
+    if (name != "resolve_cb") {
+      errstr = "Invalid value type, expected RdKafka::ResolveCb";
+      return Conf::CONF_INVALID;
+    }
+
+    if (!rk_conf_) {
+      errstr = "Requires RdKafka::Conf::CONF_GLOBAL object";
+      return Conf::CONF_INVALID;
+    }
+
+    resolve_cb_ = resolve_cb;
+    return Conf::CONF_OK;
+  }
+
+
+  Conf::ConfResult set(const std::string &name,
+                       ConnectCb *connect_cb,
+                       std::string &errstr) {
+    if (name != "connect_cb") {
+      errstr = "Invalid value type, expected RdKafka::ConnectCb";
+      return Conf::CONF_INVALID;
+    }
+
+    if (!rk_conf_) {
+      errstr = "Requires RdKafka::Conf::CONF_GLOBAL object";
+      return Conf::CONF_INVALID;
+    }
+
+    connect_cb_ = connect_cb;
+    return Conf::CONF_OK;
+  }
+
 
   Conf::ConfResult set(const std::string &name,
                        OpenCb *open_cb,
@@ -837,8 +884,10 @@ class ConfImpl : public Conf {
         name.compare("partitioner_cb") == 0 ||
         name.compare("partitioner_key_pointer_cb") == 0 ||
         name.compare("socket_cb") == 0 || name.compare("open_cb") == 0 ||
+        name.compare("resolve_cb") == 0 ||
         name.compare("rebalance_cb") == 0 ||
         name.compare("offset_commit_cb") == 0 ||
+        name.compare("connect_cb") == 0 ||
         name.compare("oauthbearer_token_refresh_cb") == 0 ||
         name.compare("ssl_cert_verify_cb") == 0 ||
         name.compare("set_engine_callback_data") == 0 ||
@@ -913,6 +962,20 @@ class ConfImpl : public Conf {
     return Conf::CONF_OK;
   }
 
+  Conf::ConfResult get(ResolveCb *&resolve_cb) const {
+    if (!rk_conf_)
+      return Conf::CONF_INVALID;
+    resolve_cb = this->resolve_cb_;
+    return Conf::CONF_OK;
+  }
+
+  Conf::ConfResult get(ConnectCb *&connect_cb) const {
+    if (!rk_conf_)
+      return Conf::CONF_INVALID;
+    connect_cb = this->connect_cb_;
+    return Conf::CONF_OK;
+  }
+
   Conf::ConfResult get(OpenCb *&open_cb) const {
     if (!rk_conf_)
       return Conf::CONF_INVALID;
@@ -979,6 +1042,8 @@ class ConfImpl : public Conf {
   DeliveryReportCb *dr_cb_;
   EventCb *event_cb_;
   SocketCb *socket_cb_;
+  ResolveCb *resolve_cb_;
+  ConnectCb *connect_cb_;
   OpenCb *open_cb_;
   PartitionerCb *partitioner_cb_;
   PartitionerKeyPointerCb *partitioner_kp_cb_;
@@ -1171,6 +1236,8 @@ class HandleImpl : virtual public Handle {
   ConsumeCb *consume_cb_;
   EventCb *event_cb_;
   SocketCb *socket_cb_;
+  ResolveCb *resolve_cb_;
+  ConnectCb *connect_cb_;
   OpenCb *open_cb_;
   DeliveryReportCb *dr_cb_;
   PartitionerCb *partitioner_cb_;

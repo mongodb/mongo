@@ -79,6 +79,15 @@ typedef SSIZE_T ssize_t;
 #define RD_EXPORT
 #endif
 
+#ifndef _WIN32
+#include <netdb.h>
+#else
+#define WIN32_MEAN_AND_LEAN
+#include <winsock2.h>
+#include <ws2ipdef.h>
+#include <ws2tcpip.h>
+#endif
+
 /**@endcond*/
 
 extern "C" {
@@ -1143,6 +1152,60 @@ class RD_EXPORT SocketCb {
 
 
 /**
+ * @brief \b Portability: ResolveCb callback class
+ *
+ */
+class RD_EXPORT ResolveCb {
+ public:
+  /**
+   * @brief Resolve callback
+   *
+   * The resolve callback is responsible for resolving hostnames.
+   *
+   * It is typically not required to register an alternative resolve
+   * implementation
+   *
+   * @returns 0 if successful, or non-zero on error.
+   */
+  virtual int resolve_cb(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res) = 0;
+
+  virtual ~ResolveCb() {
+  }
+};
+
+
+/**
+ * @brief \b Portability: ConnectCb callback class
+ *
+ */
+class RD_EXPORT ConnectCb {
+ public:
+  /**
+   * @brief Set connect callback.
+   *
+   * The connect callback is responsible for connecting socket \p sockfd
+   * to peer address \p addr.
+   * The \p id field contains the broker identifier.
+   *
+   * \p connect_cb shall return 0 on success (socket connected) or an error
+   * number (errno) on error.
+   *
+   * The callback's \p opaque argument is the opaque set with
+   * rd_kafka_conf_set_opaque().
+   *
+   * @remark The callback will be called from an internal librdkafka thread.
+   */
+  virtual int connect_cb(int sockfd,
+                         const struct sockaddr *addr,
+                         int addrlen,
+                         const char *id) = 0;
+
+  virtual ~ConnectCb() {
+  }
+};
+
+
+/**
  * @brief \b Portability: OpenCb callback class
  *
  */
@@ -1272,6 +1335,16 @@ class RD_EXPORT Conf {
                                SocketCb *socket_cb,
                                std::string &errstr) = 0;
 
+  /** @brief Use with \p name = \c \"resolve_cb\" */
+  virtual Conf::ConfResult set(const std::string &name,
+                               ResolveCb *resolve_cb,
+                               std::string &errstr) = 0;
+
+  /** @brief Use with \p name = \c \"connect_cb\" */
+  virtual Conf::ConfResult set(const std::string &name,
+                               ConnectCb *connect_cb,
+                               std::string &errstr) = 0;
+
   /** @brief Use with \p name = \c \"open_cb\" */
   virtual Conf::ConfResult set(const std::string &name,
                                OpenCb *open_cb,
@@ -1387,6 +1460,16 @@ class RD_EXPORT Conf {
    *  @returns CONF_OK if the property was set previously set and
    *           returns the value in \p socket_cb. */
   virtual Conf::ConfResult get(SocketCb *&socket_cb) const = 0;
+
+  /** @brief Query single configuration value
+   *  @returns CONF_OK if the property was set previously set and
+   *           returns the value in \p connect_cb. */
+  virtual Conf::ConfResult get(ConnectCb *&connect_cb) const = 0;
+
+  /** @brief Query single configuration value
+   *  @returns CONF_OK if the property was set previously set and
+   *           returns the value in \p resolve_cb. */
+  virtual Conf::ConfResult get(ResolveCb *&resolve_cb) const = 0;
 
   /** @brief Query single configuration value
    *  @returns CONF_OK if the property was set previously set and
