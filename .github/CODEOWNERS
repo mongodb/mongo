@@ -129,7 +129,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/concurrency/**/exception_util* @10gen/server-service-architecture
 
 # The following patterns are parsed from ./src/mongo/db/ftdc/OWNERS.yml
-/src/mongo/db/ftdc/**/* @10gen/server-service-architecture
+/src/mongo/db/ftdc/**/* @10gen/server-service-architecture @markbenvenuto
 
 # The following patterns are parsed from ./src/mongo/db/index/OWNERS.yml
 /src/mongo/db/index/**/index_access_method* @10gen/server-storage-execution
