@@ -74,7 +74,6 @@ void appendIfNonZero(StringData fieldName, int64_t value, BSONObjBuilder* builde
 WiredTigerStats::WiredTigerStats(WT_SESSION* session) {
     invariant(session);
 
-    // TODO SERVER-88233: stats cursors are expensive to fetch and consider caching them
     WT_CURSOR* c;
     uassert(ErrorCodes::CursorNotFound,
             "Unable to open statistics cursor",
