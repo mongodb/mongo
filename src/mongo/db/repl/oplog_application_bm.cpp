@@ -215,7 +215,7 @@ public:
                 std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
         _oplogBuffer = std::make_unique<repl::OplogBufferBlockingQueue>(kOplogBufferSize);
-        _oplogApplierThreadPool = repl::makeReplWriterPool();
+        _oplogApplierThreadPool = repl::makeReplWorkerPool();
 
         // Act as a secondary to get optimizations due to parallizing 'prepare' oplog entries. But
         // do not include in the benchmark the time to write to the oplog.

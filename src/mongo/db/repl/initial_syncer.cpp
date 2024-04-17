@@ -220,13 +220,13 @@ ServiceContext::ConstructorActionRegisterer initialSyncerRegisterer(
             "logical",
             [](InitialSyncerInterface::Options opts,
                std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-               ThreadPool* writerPool,
+               ThreadPool* workerPool,
                StorageInterface* storage,
                ReplicationProcess* replicationProcess,
                const InitialSyncerInterface::OnCompletionFn& onCompletion) {
                 return std::make_shared<InitialSyncer>(opts,
                                                        std::move(dataReplicatorExternalState),
-                                                       writerPool,
+                                                       workerPool,
                                                        storage,
                                                        replicationProcess,
                                                        onCompletion);
@@ -236,7 +236,7 @@ ServiceContext::ConstructorActionRegisterer initialSyncerRegisterer(
 InitialSyncer::InitialSyncer(
     InitialSyncerInterface::Options opts,
     std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-    ThreadPool* writerPool,
+    ThreadPool* workerPool,
     StorageInterface* storage,
     ReplicationProcess* replicationProcess,
     const OnCompletionFn& onCompletion)
@@ -245,7 +245,7 @@ InitialSyncer::InitialSyncer(
       _dataReplicatorExternalState(std::move(dataReplicatorExternalState)),
       _exec(_dataReplicatorExternalState->getSharedTaskExecutor()),
       _clonerExec(_exec),
-      _writerPool(writerPool),
+      _workerPool(workerPool),
       _storage(storage),
       _replicationProcess(replicationProcess),
       _onCompletion(onCompletion),
@@ -1186,7 +1186,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                                                 getGlobalServiceContext()->getFastClockSource());
     _client = _createClientFn();
     _initialSyncState = std::make_unique<InitialSyncState>(std::make_unique<AllDatabaseCloner>(
-        _sharedData.get(), _syncSource, _client.get(), _storage, _writerPool));
+        _sharedData.get(), _syncSource, _client.get(), _storage, _workerPool));
 
     // Create oplog applier.
     auto consistencyMarkers = _replicationProcess->getConsistencyMarkers();
@@ -1197,7 +1197,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                                                                    consistencyMarkers,
                                                                    _storage,
                                                                    options,
-                                                                   _writerPool);
+                                                                   _workerPool);
 
     _initialSyncState->beginApplyingTimestamp = lastOpTime.getTimestamp();
     _initialSyncState->beginFetchingTimestamp = beginFetchingOpTime.getTimestamp();

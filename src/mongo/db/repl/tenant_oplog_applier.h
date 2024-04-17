@@ -126,7 +126,7 @@ public:
                        boost::optional<std::string> tenantId,
                        RandomAccessOplogBuffer* oplogBuffer,
                        std::shared_ptr<executor::TaskExecutor> executor,
-                       ThreadPool* writerPool,
+                       ThreadPool* workerPool,
                        Timestamp resumeBatchingTs = Timestamp());
 
     ~TenantOplogApplier() override;
@@ -244,7 +244,7 @@ private:
         _executor;  // (R)
                     // Pool of worker threads for writing ops to the databases.
     // Not owned by us.
-    ThreadPool* const _writerPool;  // (S)
+    ThreadPool* const _workerPool;  // (S)
     // Keeps track of last applied donor and recipient optimes by the tenant oplog applier.
     // This gets updated only on batch boundaries.
     OpTimePair _lastAppliedOpTimesUpToLastBatch;  // (M)
@@ -262,10 +262,10 @@ private:
 };
 
 /**
- * Creates the default thread pool for writer tasks.
+ * Creates the default thread pool for worker tasks.
  */
-std::unique_ptr<ThreadPool> makeTenantMigrationWriterPool();
-std::unique_ptr<ThreadPool> makeTenantMigrationWriterPool(int threadCount);
+std::unique_ptr<ThreadPool> makeTenantMigrationWorkerPool();
+std::unique_ptr<ThreadPool> makeTenantMigrationWorkerPool(int threadCount);
 
 }  // namespace repl
 }  // namespace mongo

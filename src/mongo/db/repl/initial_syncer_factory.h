@@ -71,7 +71,7 @@ public:
     using CreateInitialSyncerFunction = std::function<std::shared_ptr<InitialSyncerInterface>(
         InitialSyncerInterface::Options opts,
         std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-        ThreadPool* writerPool,
+        ThreadPool* workerPool,
         StorageInterface* storage,
         ReplicationProcess* replicationProcess,
         const InitialSyncerInterface::OnCompletionFn& onCompletion)>;
@@ -86,7 +86,7 @@ public:
         const std::string& initialSyncMethod,
         InitialSyncerInterface::Options opts,
         std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-        ThreadPool* writerPool,
+        ThreadPool* workerPool,
         StorageInterface* storage,
         ReplicationProcess* replicationProcess,
         const InitialSyncerInterface::OnCompletionFn& onCompletion);

@@ -73,7 +73,7 @@ public:
     OplogWriterImpl(executor::TaskExecutor* executor,
                     OplogBuffer* writeBuffer,
                     OplogBuffer* applyBuffer,
-                    ThreadPool* writerPool,
+                    ThreadPool* workerPool,
                     ReplicationCoordinator* replCoord,
                     StorageInterface* storageInterface,
                     ReplicationConsistencyMarkers* consistencyMarkers,
@@ -148,7 +148,7 @@ private:
 
     // Pool of worker threads for writing oplog entries.
     // Not owned by us.
-    ThreadPool* const _writerPool;
+    ThreadPool* const _workerPool;
 
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;

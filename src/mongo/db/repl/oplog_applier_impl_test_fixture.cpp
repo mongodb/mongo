@@ -373,7 +373,7 @@ Status OplogApplierImplTest::runOpInitialSync(const OplogEntry& op) {
 Status OplogApplierImplTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
     NoopOplogApplierObserver observer;
     auto storageInterface = getStorageInterface();
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
         nullptr,  // oplogBuffer
@@ -382,7 +382,7 @@ Status OplogApplierImplTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
         getConsistencyMarkers(),
         storageInterface,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
-        writerPool.get());
+        workerPool.get());
     // Idempotency tests apply the same batch of oplog entries multiple times in a loop, which would
     // result in out-of-order oplog inserts. So we truncate the oplog collection first before
     // calling applyOplogBatch.

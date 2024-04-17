@@ -224,7 +224,7 @@ private:
     void _cloneFile(OperationContext* opCtx,
                     const UUID& migrationId,
                     DBClientConnection* clientConnection,
-                    ThreadPool* writerPool,
+                    ThreadPool* workerPool,
                     TenantMigrationSharedData* sharedData,
                     const BSONObj& metadataDoc);
 
@@ -306,7 +306,7 @@ private:
         const std::unique_ptr<Queue> eventQueue;
 
         // ThreadPool used by TenantFileCloner to do storage write operations.
-        const std::unique_ptr<ThreadPool> writerPool;
+        const std::unique_ptr<ThreadPool> workerPool;
 
         // Shared between the importer service and TenantFileCloners
         const std::unique_ptr<TenantMigrationSharedData> sharedData;

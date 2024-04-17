@@ -113,7 +113,7 @@ protected:
 
     ServiceContext* _serviceContext;
     ServiceContext::UniqueOperationContext _opCtxHolder;
-    std::unique_ptr<ThreadPool> _writerPool;
+    std::unique_ptr<ThreadPool> _workerPool;
     std::unique_ptr<ReplicationConsistencyMarkers> _consistencyMarkers;
     std::unique_ptr<CountOpsObserver> _observer;
 };
@@ -139,13 +139,13 @@ void OplogWriterImplTest::setUp() {
 
     repl::createOplog(opCtx());
 
-    _writerPool = makeReplWriterPool();
+    _workerPool = makeReplWorkerPool();
     _observer = std::make_unique<CountOpsObserver>();
 }
 
 void OplogWriterImplTest::tearDown() {
     _opCtxHolder = {};
-    _writerPool = {};
+    _workerPool = {};
     _consistencyMarkers = {};
     _observer = {};
     StorageInterface::set(_serviceContext, {});
@@ -157,7 +157,7 @@ OperationContext* OplogWriterImplTest::opCtx() const {
 }
 
 ThreadPool* OplogWriterImplTest::getWriterPool() const {
-    return _writerPool.get();
+    return _workerPool.get();
 }
 
 ReplicationCoordinator* OplogWriterImplTest::getReplCoord() const {
@@ -183,7 +183,7 @@ DEATH_TEST_F(OplogWriterImplTest, WriteEmptyBatchFails, "!ops.empty()") {
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
-                                nullptr,  // writerPool
+                                nullptr,  // workerPool
                                 getReplCoord(),
                                 getStorageInterface(),
                                 getConsistencyMarkers(),
@@ -201,7 +201,7 @@ TEST_F(OplogWriterImplTest, WriteOplogCollectionOnly) {
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
-                                nullptr,  // writerPool
+                                nullptr,  // workerPool
                                 getReplCoord(),
                                 getStorageInterface(),
                                 getConsistencyMarkers(),
@@ -234,7 +234,7 @@ TEST_F(OplogWriterImplTest, WriteChangeCollectionsOnly) {
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
-                                nullptr,  // writerPool
+                                nullptr,  // workerPool
                                 getReplCoord(),
                                 getStorageInterface(),
                                 getConsistencyMarkers(),
@@ -267,7 +267,7 @@ TEST_F(OplogWriterImplTest, WriteBothOplogAndChangeCollections) {
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
-                                nullptr,  // writerPool
+                                nullptr,  // workerPool
                                 getReplCoord(),
                                 getStorageInterface(),
                                 getConsistencyMarkers(),
@@ -293,7 +293,7 @@ TEST_F(OplogWriterImplTest, WriteNeitherOplogNorChangeCollections) {
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
-                                nullptr,  // writerPool
+                                nullptr,  // workerPool
                                 getReplCoord(),
                                 getStorageInterface(),
                                 getConsistencyMarkers(),
@@ -319,7 +319,7 @@ TEST_F(OplogWriterImplTest, finalizeOplogBatchCorrectlyUpdatesOpTimes) {
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
-                                nullptr,  // writerPool
+                                nullptr,  // workerPool
                                 getReplCoord(),
                                 getStorageInterface(),
                                 getConsistencyMarkers(),

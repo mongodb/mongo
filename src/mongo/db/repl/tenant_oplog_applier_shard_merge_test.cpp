@@ -177,7 +177,7 @@ public:
             std::make_shared<TenantMigrationRecipientAccessBlocker>(service, kMigrationUuid);
         TenantMigrationAccessBlockerRegistry::get(service).add(kTenantId, std::move(recipientMtab));
 
-        _writerPool = makeTenantMigrationWriterPool(1);
+        _workerPool = makeTenantMigrationWorkerPool(1);
         _applier = std::make_shared<TenantOplogApplier>(kMigrationUuid,
                                                         MigrationProtocolEnum::kShardMerge,
                                                         OpTime(),
@@ -185,15 +185,15 @@ public:
                                                         boost::none,
                                                         &_oplogBuffer,
                                                         _executor,
-                                                        _writerPool.get());
+                                                        _workerPool.get());
     }
 
     void tearDown() override {
         _applier->shutdown();
         _applier->join();
 
-        _writerPool->shutdown();
-        _writerPool->join();
+        _workerPool->shutdown();
+        _workerPool->join();
 
         _executor->shutdown();
         _executor->join();
@@ -230,7 +230,7 @@ protected:
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     ServiceContext::UniqueOperationContext _opCtx;
     TenantOplogApplierTestOpObserver* _opObserver;  // Owned by service context opObserverRegistry
-    std::unique_ptr<ThreadPool> _writerPool;
+    std::unique_ptr<ThreadPool> _workerPool;
     std::shared_ptr<TenantOplogApplier> _applier;
 
 

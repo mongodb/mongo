@@ -165,7 +165,7 @@ public:
 
     InitialSyncer(InitialSyncerInterface::Options opts,
                   std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-                  ThreadPool* writerPool,
+                  ThreadPool* workerPool,
                   StorageInterface* storage,
                   ReplicationProcess* replicationProcess,
                   const OnCompletionFn& onCompletion);
@@ -655,7 +655,7 @@ private:
     // NetworkInterfaceMock is unaware of this and this causes our unit tests to deadlock.
     std::shared_ptr<executor::TaskExecutor> _clonerExec;               // (R)
     std::unique_ptr<executor::ScopedTaskExecutor> _clonerAttemptExec;  // (X)
-    ThreadPool* _writerPool;                                           // (R)
+    ThreadPool* _workerPool;                                           // (R)
     StorageInterface* _storage;                                        // (R)
     ReplicationProcess* _replicationProcess;                           // (S)
 

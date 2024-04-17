@@ -275,7 +275,7 @@ private:
     // Also used by database and collection cloners to perform storage operations.
     // Cloners and oplog application run in separate phases of initial sync so it is fine to share
     // this thread pool.
-    std::unique_ptr<ThreadPool> _writerPool;
+    std::unique_ptr<ThreadPool> _workerPool;
 
     // Writes a noop every 10 seconds.
     std::unique_ptr<NoopWriter> _noopWriter;

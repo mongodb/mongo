@@ -126,7 +126,7 @@ public:
         ReplicationConsistencyMarkers* consistencyMarkers,
         StorageInterface* storageInterface,
         const OplogApplier::Options& options,
-        ThreadPool* writerPool) = 0;
+        ThreadPool* workerPool) = 0;
 
     /**
      * Returns the current in-memory replica set config if there is one, or an error why there

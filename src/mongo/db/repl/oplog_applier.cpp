@@ -151,7 +151,7 @@ const OplogApplier::Options& OplogApplier::getOptions() const {
     return _options;
 }
 
-std::unique_ptr<ThreadPool> makeReplWriterPool() {
+std::unique_ptr<ThreadPool> makeReplWorkerPool() {
     // Reduce content pinned in cache by single oplog batch on small machines by reducing the number
     // of threads of ReplWriter to reduce the number of concurrent open WT transactions.
     if (replWriterThreadCount < replWriterMinThreadCount) {
@@ -163,14 +163,14 @@ std::unique_ptr<ThreadPool> makeReplWriterPool() {
     }
     auto numberOfThreads =
         std::min(replWriterThreadCount, 2 * static_cast<int>(ProcessInfo::getNumAvailableCores()));
-    return makeReplWriterPool(numberOfThreads);
+    return makeReplWorkerPool(numberOfThreads);
 }
 
-std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount) {
-    return makeReplWriterPool(threadCount, "ReplWriterWorker"_sd);
+std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount) {
+    return makeReplWorkerPool(threadCount, "ReplWriterWorker"_sd);
 }
 
-std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount,
+std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount,
                                                StringData name,
                                                bool isKillableByStepdown) {
     ThreadPool::Options options;

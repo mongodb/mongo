@@ -1124,7 +1124,7 @@ Status TrackOpsAppliedApplier::applyOplogBatchPerWorker(
 }
 
 DEATH_TEST_F(OplogApplierImplTest, MultiApplyAbortsWhenNoOperationsAreGiven, "!ops.empty()") {
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     TrackOpsAppliedApplier oplogApplier(
         nullptr,  // executor
@@ -1134,7 +1134,7 @@ DEATH_TEST_F(OplogApplierImplTest, MultiApplyAbortsWhenNoOperationsAreGiven, "!o
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
     oplogApplier.applyOplogBatch(_opCtx.get(), {}).getStatus().ignore();
 }
 
@@ -1144,7 +1144,7 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
                                           StorageInterface* const storageInterface,
                                           const NamespaceString& nss,
                                           const CollectionOptions& options) {
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     createCollection(opCtx, nss, options);
 
     auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("a" << 1));
@@ -1159,7 +1159,7 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
         consistencyMarkers,
         storageInterface,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
     auto lastOpTime = unittest::assertGet(oplogApplier.applyOplogBatch(opCtx, {op}));
     ASSERT_EQUALS(op.getOpTime(), lastOpTime);
 
@@ -1230,7 +1230,7 @@ TEST_F(OplogApplierImplTest,
     auto secondRetryableOp = makeInsertDocumentOplogEntryWithSessionInfo(
         secondInsertOpTime, nss, BSON("_id" << 2), sessionInfo);
 
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -1240,10 +1240,10 @@ TEST_F(OplogApplierImplTest,
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
 
     std::vector<std::vector<ApplierOperation>> writerVectors(
-        writerPool->getStats().options.maxThreads);
+        workerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedOps;
     std::vector<OplogEntry> ops{firstRetryableOp, secondRetryableOp};
     oplogApplier.fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
@@ -1488,7 +1488,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierRetryableUpdate) {
 
     setServerParameter("replWriterThreadCount", 1);
     setServerParameter("replWriterMinThreadCount", 1);
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -1498,7 +1498,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierRetryableUpdate) {
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {updateOp, deleteOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
                                                   NamespaceString::kConfigImagesNamespace);
@@ -1548,7 +1548,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierFirstRetryableUpdate
 
     setServerParameter("replWriterThreadCount", 1);
     setServerParameter("replWriterMinThreadCount", 1);
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -1558,7 +1558,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierFirstRetryableUpdate
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {updateOp, deleteOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
                                                   NamespaceString::kConfigImagesNamespace);
@@ -1613,7 +1613,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteAfterLaterRetryableUpdate) {
 
     setServerParameter("replWriterThreadCount", 1);
     setServerParameter("replWriterMinThreadCount", 1);
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -1623,7 +1623,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteAfterLaterRetryableUpdate) {
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {deleteOp, updateOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
                                                   NamespaceString::kConfigImagesNamespace);
@@ -1692,7 +1692,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierRetryableInternalTra
 
     setServerParameter("replWriterThreadCount", 1);
     setServerParameter("replWriterMinThreadCount", 1);
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -1702,7 +1702,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierRetryableInternalTra
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {applyOpsOp, deleteOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
                                                   NamespaceString::kConfigImagesNamespace);
@@ -1763,7 +1763,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteAfterLaterRetryableInternalTransa
 
     setServerParameter("replWriterThreadCount", 1);
     setServerParameter("replWriterMinThreadCount", 1);
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -1773,7 +1773,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteAfterLaterRetryableInternalTransa
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {deleteOp, applyOpsOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
                                                   NamespaceString::kConfigImagesNamespace);
@@ -1837,7 +1837,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteBeforeEarlierRetryableUpd
 
     setServerParameter("replWriterThreadCount", 1);
     setServerParameter("replWriterMinThreadCount", 1);
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -1847,7 +1847,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteBeforeEarlierRetryableUpd
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {updateOp, applyOpsOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
                                                   NamespaceString::kConfigImagesNamespace);
@@ -1906,7 +1906,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteAfterLaterRetryableUpdate
 
     setServerParameter("replWriterThreadCount", 1);
     setServerParameter("replWriterMinThreadCount", 1);
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -1916,7 +1916,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteAfterLaterRetryableUpdate
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {applyOpsOp, updateOp}));
     CollectionReader collectionReaderConfigImages(_opCtx.get(),
                                                   NamespaceString::kConfigImagesNamespace);
@@ -2004,7 +2004,7 @@ protected:
                         << " into " << nss.toStringForErrorMsg() << " first doc: " << docs.front();
             };
 
-        _writerPool = makeReplWriterPool();
+        _workerPool = makeReplWorkerPool();
     }
 
     void tearDown() override {
@@ -2041,7 +2041,7 @@ protected:
     boost::optional<OplogEntry> _commitOp;
     std::map<NamespaceString, SimpleBSONObjSet> _insertedDocs;
     std::vector<BSONObj> _insertedOplogDocs;
-    std::unique_ptr<ThreadPool> _writerPool;
+    std::unique_ptr<ThreadPool> _workerPool;
 
 private:
     Mutex _insertMutex = MONGO_MAKE_LATCH("MultiOplogEntryOplogApplierImplTest::_insertMutex");
@@ -2057,7 +2057,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionSepar
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     // Apply a batch with only the first operation.  This should result in the first oplog entry
     // being put in the oplog and updating the transaction table, but not actually being applied
@@ -2119,7 +2119,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionAllAt
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
-        _writerPool.get());
+        _workerPool.get());
 
     // Apply both inserts and the commit in a single batch.  We expect no oplog entries to
     // be inserted (because we've set skipWritesToOplog), and both entries to be committed.
@@ -2177,7 +2177,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionTwoBa
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     // Insert the first entry in its own batch.  This should result in the oplog entry being written
     // but the entry should not be applied as it is part of a pending transaction.
@@ -2302,7 +2302,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyTwoTransactionsOneBatch) {
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     // Note the insert counter so we can check it later.  It is necessary to use opCounters as
     // inserts are idempotent so we will not detect duplicate inserts just by checking inserts in
@@ -2379,7 +2379,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyNontransactionalRetryableW
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     // Insert the applyops entry in its own batch.  This should result in the oplog entry being
     // written and the operations being applied.
@@ -2454,7 +2454,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyNontransactionalRetryableW
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     // Insert the first entry in its own batch.  This should result in the oplog entry being written
     // and the operations being applied.
@@ -2558,7 +2558,7 @@ protected:
                     << " into " << nss.toStringForErrorMsg() << " first doc: " << docs.front();
         };
 
-        _writerPool = makeReplWriterPool();
+        _workerPool = makeReplWorkerPool();
     }
 
     void tearDown() override {
@@ -2579,7 +2579,7 @@ protected:
     boost::optional<OplogEntry> _commitOp;
     std::map<NamespaceString, std::vector<BSONObj>> _docs;
     std::vector<BSONObj> _oplogDocs;
-    std::unique_ptr<ThreadPool> _writerPool;
+    std::unique_ptr<ThreadPool> _workerPool;
 
 private:
     Mutex _mutex = MONGO_MAKE_LATCH("MultiOplogEntryOplogApplierImplTest::_mutex");
@@ -2636,7 +2636,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     // Insert the first entry in its own batch.  This should result in the oplog entry being written
     // but the entry should not be applied as it is part of a pending transaction.
@@ -2706,7 +2706,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     // Insert the first entry in its own batch.  This should result in the oplog entry being written
     // but the entry should not be applied as it is part of a pending transaction.
@@ -2808,7 +2808,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionStea
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     // Apply a batch with the insert operations.  This should result in the oplog entries
     // being put in the oplog and updating the transaction table, but not actually being applied
@@ -2871,7 +2871,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortPreparedTransactio
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     // Apply a batch with the insert operations.  This should result in the oplog entries
     // being put in the oplog and updating the transaction table, but not actually being applied
@@ -2925,7 +2925,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInit
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
-        _writerPool.get());
+        _workerPool.get());
     // Apply a batch with the insert operations.  This should result in the oplog entries
     // being put in the oplog and updating the transaction table, but not actually being applied
     // because they are part of a pending transaction.
@@ -2998,7 +2998,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionReco
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
-        _writerPool.get());
+        _workerPool.get());
 
     // Apply a batch with the insert operations.  This should have no effect, because this is
     // recovery.
@@ -3056,7 +3056,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplySingleApplyOpsPreparedT
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
 
     // Apply a batch with only the prepare applyOps. This should result in the prepare being put in
@@ -3100,7 +3100,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyEmptyApplyOpsPreparedTr
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     auto emptyPrepareApplyOp = makeCommandOplogEntryWithSessionInfoAndStmtIds(
         {Timestamp(Seconds(1), 3), 1LL},
@@ -3153,7 +3153,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortSingleApplyOpsPrep
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
     // Apply a batch with only the prepare applyOps. This should result in the prepare being put in
@@ -3195,7 +3195,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kInitialSync),
-        _writerPool.get());
+        _workerPool.get());
 
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
 
@@ -3253,7 +3253,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
-        _writerPool.get());
+        _workerPool.get());
 
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
 
@@ -3351,7 +3351,7 @@ protected:
                                                            {StmtId(1)},
                                                            _prepareWithDeletesOp->getOpTime());
 
-        _writerPool = makeReplWriterPool(64);
+        _workerPool = makeReplWorkerPool(64);
 
         _opObserver->onDeleteFn = [&](OperationContext*,
                                       const CollectionPtr& coll,
@@ -3394,7 +3394,7 @@ TEST_F(MultiPreparedTransactionsInOneBatchTest, CommitAndAbortMultiPreparedTrans
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        _writerPool.get());
+        _workerPool.get());
 
     // Apply a batch with multiple prepares and regular CRUD ops.
     getStorageInterface()->oplogDiskLocRegister(
@@ -4649,7 +4649,7 @@ TEST_F(OplogApplierImplTxnTableTest, SimpleWriteWithTxn) {
                                    sessionInfo,
                                    date);
 
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
 
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
@@ -4660,7 +4660,7 @@ TEST_F(OplogApplierImplTxnTableTest, SimpleWriteWithTxn) {
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOp}));
 
@@ -4690,7 +4690,7 @@ TEST_F(OplogApplierImplTxnTableTest, WriteWithTxnMixedWithDirectWriteToTxnTable)
                                    {},
                                    Date_t::now());
 
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -4700,7 +4700,7 @@ TEST_F(OplogApplierImplTxnTableTest, WriteWithTxnMixedWithDirectWriteToTxnTable)
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
 
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOp, deleteOp}));
@@ -4744,7 +4744,7 @@ TEST_F(OplogApplierImplTxnTableTest, InterleavedWriteWithTxnMixedWithDirectDelet
                                     sessionInfo,
                                     date);
 
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -4754,7 +4754,7 @@ TEST_F(OplogApplierImplTxnTableTest, InterleavedWriteWithTxnMixedWithDirectDelet
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOp, deleteOp, insertOp2}));
 
@@ -4787,7 +4787,7 @@ TEST_F(OplogApplierImplTxnTableTest, InterleavedWriteWithTxnMixedWithDirectUpdat
         {},
         Date_t::now());
 
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -4797,7 +4797,7 @@ TEST_F(OplogApplierImplTxnTableTest, InterleavedWriteWithTxnMixedWithDirectUpdat
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOp, updateOp}));
 
@@ -4851,7 +4851,7 @@ TEST_F(OplogApplierImplTxnTableTest, RetryableWriteThenMultiStatementTxnWriteOnS
                                                        {StmtId(1)},
                                                        txnInsertOpTime);
 
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -4861,7 +4861,7 @@ TEST_F(OplogApplierImplTxnTableTest, RetryableWriteThenMultiStatementTxnWriteOnS
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
 
     ASSERT_OK(
         oplogApplier.applyOplogBatch(_opCtx.get(), {retryableInsertOp, txnInsertOp, txnCommitOp}));
@@ -4921,7 +4921,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiStatementTxnWriteThenRetryableWriteOnS
                                             sessionInfo,
                                             date);
 
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -4931,7 +4931,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiStatementTxnWriteThenRetryableWriteOnS
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
 
     ASSERT_OK(
         oplogApplier.applyOplogBatch(_opCtx.get(), {txnInsertOp, txnCommitOp, retryableInsertOp}));
@@ -4994,7 +4994,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
     auto opNoTxn = makeInsertDocumentOplogEntryWithSessionInfo(
         {Timestamp(Seconds(7), 0), 1LL}, ns3, BSON("_id" << 0), info);
 
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -5004,7 +5004,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(
         _opCtx.get(),
@@ -5077,7 +5077,7 @@ TEST_F(OplogApplierImplTxnTableTest, SessionMigrationNoOpEntriesShouldUpdateTxnT
                                                 insertSessionInfo,
                                                 outerInsertDate);
 
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -5087,7 +5087,7 @@ TEST_F(OplogApplierImplTxnTableTest, SessionMigrationNoOpEntriesShouldUpdateTxnT
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOplog}));
 
@@ -5109,7 +5109,7 @@ TEST_F(OplogApplierImplTxnTableTest, PreImageNoOpEntriesShouldNotUpdateTxnTable)
                                                   preImageSessionInfo,
                                                   preImageDate);
 
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -5119,7 +5119,7 @@ TEST_F(OplogApplierImplTxnTableTest, PreImageNoOpEntriesShouldNotUpdateTxnTable)
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {preImageOplog}));
 
@@ -5143,7 +5143,7 @@ TEST_F(OplogApplierImplTxnTableTest, NonMigrateNoOpEntriesShouldNotUpdateTxnTabl
                                 sessionInfo,
                                 Date_t::now());
 
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -5153,7 +5153,7 @@ TEST_F(OplogApplierImplTxnTableTest, NonMigrateNoOpEntriesShouldNotUpdateTxnTabl
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-        writerPool.get());
+        workerPool.get());
 
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {oplog}));
 
@@ -5883,7 +5883,7 @@ protected:
         _lsid2 = makeLogicalSessionId(_opCtx.get());
 
         NoopOplogApplierObserver observer;
-        _writerPool = makeReplWriterPool();
+        _workerPool = makeReplWorkerPool();
         _applier = std::make_unique<TrackOpsAppliedApplier>(
             nullptr,  // executor
             nullptr,  // oplogBuffer
@@ -5892,7 +5892,7 @@ protected:
             getConsistencyMarkers(),
             getStorageInterface(),
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-            _writerPool.get());
+            _workerPool.get());
     }
 
     auto makePrepareOplogEntry(const std::vector<BSONObj>& docs,
@@ -5972,7 +5972,7 @@ protected:
 
 protected:
     std::unique_ptr<TrackOpsAppliedApplier> _applier;
-    std::unique_ptr<ThreadPool> _writerPool;
+    std::unique_ptr<ThreadPool> _workerPool;
     NamespaceString _nss;
     NamespaceString _cmdNss;
     boost::optional<UUID> _uuid;
@@ -5985,7 +5985,7 @@ protected:
 TEST_F(PreparedTxnSplitTest, MultiplePrepareTxnsInSameBatch) {
     // Scale the test by the number of writer threads, so it does not start failing if maxThreads
     // changes.
-    const int kNumEntries = _writerPool->getStats().options.maxThreads * 1000;
+    const int kNumEntries = _workerPool->getStats().options.maxThreads * 1000;
 
     std::vector<OplogEntry> prepareOps;
     std::vector<BSONObj> cruds1;
@@ -6007,7 +6007,7 @@ TEST_F(PreparedTxnSplitTest, MultiplePrepareTxnsInSameBatch) {
     prepareOps.push_back(makePrepareOplogEntry(cruds1, {Timestamp(1, 1), 1}, _lsid1, _txnNum1));
     prepareOps.push_back(makePrepareOplogEntry(cruds2, {Timestamp(1, 2), 1}, _lsid2, _txnNum2));
 
-    WriterVectors prepareWriterVectors(_writerPool->getStats().options.maxThreads);
+    WriterVectors prepareWriterVectors(_workerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedPrepareOps;
     _applier->fillWriterVectors_forTest(
         _opCtx.get(), &prepareOps, &prepareWriterVectors, &derivedPrepareOps);
@@ -6048,7 +6048,7 @@ TEST_F(PreparedTxnSplitTest, MultiplePrepareTxnsInSameBatch) {
     commitOps.push_back(
         makeAbortOplogEntry({Timestamp(3, 2), 1}, _lsid2, _txnNum2, prepareOps[1].getOpTime()));
 
-    WriterVectors commitWriterVectors(_writerPool->getStats().options.maxThreads);
+    WriterVectors commitWriterVectors(_workerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedCommitOps;
     _applier->fillWriterVectors_forTest(
         _opCtx.get(), &commitOps, &commitWriterVectors, &derivedCommitOps);
@@ -6090,7 +6090,7 @@ TEST_F(PreparedTxnSplitTest, SingleEmptyPrepareTransaction) {
     std::vector<OplogEntry> prepareOps;
     prepareOps.push_back(makePrepareOplogEntry({}, {Timestamp(1, 1), 1}, _lsid1, _txnNum1));
 
-    WriterVectors prepareWriterVectors(_writerPool->getStats().options.maxThreads);
+    WriterVectors prepareWriterVectors(_workerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedPrepareOps;
     _applier->fillWriterVectors_forTest(
         _opCtx.get(), &prepareOps, &prepareWriterVectors, &derivedPrepareOps);
@@ -6125,7 +6125,7 @@ TEST_F(PreparedTxnSplitTest, SingleEmptyPrepareTransaction) {
     commitOps.push_back(makeCommitOplogEntry(
         {Timestamp(3, 1), 1}, Timestamp(2, 1), _lsid1, _txnNum1, prepareOps[0].getOpTime()));
 
-    WriterVectors commitWriterVectors(_writerPool->getStats().options.maxThreads);
+    WriterVectors commitWriterVectors(_workerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedCommitOps;
     _applier->fillWriterVectors_forTest(
         _opCtx.get(), &commitOps, &commitWriterVectors, &derivedCommitOps);
@@ -6301,7 +6301,7 @@ protected:
     void setUp() override {
         OplogApplierImplTest::setUp();
         NoopOplogApplierObserver observer;
-        _writerPool = makeReplWriterPool();
+        _workerPool = makeReplWorkerPool();
         _applier = std::make_unique<TrackOpsAppliedApplier>(
             nullptr,  // executor
             nullptr,  // oplogBuffer
@@ -6310,7 +6310,7 @@ protected:
             getConsistencyMarkers(),
             getStorageInterface(),
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
-            _writerPool.get());
+            _workerPool.get());
     }
 
     struct GlobalIndexCrudOp {
@@ -6378,7 +6378,7 @@ protected:
 
 protected:
     std::unique_ptr<TrackOpsAppliedApplier> _applier;
-    std::unique_ptr<ThreadPool> _writerPool;
+    std::unique_ptr<ThreadPool> _workerPool;
 };
 
 TEST_F(GlobalIndexTest, SameUUIDSameDocKeyToSameWriter) {
@@ -6394,7 +6394,7 @@ TEST_F(GlobalIndexTest, SameUUIDSameDocKeyToSameWriter) {
         {{uuid1, GlobalIndexCrudOp::Type::Insert, key1, sameDocKey},
          {uuid1, GlobalIndexCrudOp::Type::Insert, key2, sameDocKey}});
 
-    WriterVectors writerVectors(_writerPool->getStats().options.maxThreads);
+    WriterVectors writerVectors(_workerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedOps;
     _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
     filterConfigTransactionsEntryFromWriterVectors(writerVectors);
@@ -6417,7 +6417,7 @@ TEST_F(GlobalIndexTest, SameUUIDSameDocKeyToSameWriter) {
 TEST_F(GlobalIndexTest, LargeBatchSameUUIDDifferentDocKeyAssignsAtLeastOneOpToEachWriter) {
     // Scale the test by the number of writer threads, so it does not start failing if maxThreads
     // changes.
-    const int kNumEntries = _writerPool->getStats().options.maxThreads * 1000;
+    const int kNumEntries = _workerPool->getStats().options.maxThreads * 1000;
     const UUID uuid1 = UUID::gen();
     std::vector<GlobalIndexCrudOp> opBatch;
     opBatch.reserve(kNumEntries);
@@ -6433,7 +6433,7 @@ TEST_F(GlobalIndexTest, LargeBatchSameUUIDDifferentDocKeyAssignsAtLeastOneOpToEa
 
     auto ops = makeGlobalIndexCrudApplyOpsOplogBatch(opBatch);
 
-    WriterVectors writerVectors(_writerPool->getStats().options.maxThreads);
+    WriterVectors writerVectors(_workerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedOps;
     _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
 
@@ -6449,7 +6449,7 @@ TEST_F(GlobalIndexTest, LargeBatchSameUUIDDifferentDocKeyAssignsAtLeastOneOpToEa
 TEST_F(GlobalIndexTest, LargeBatchDifferentUUIDAssignsAtLeastOneOpToEachWriter) {
     // Scale the test by the number of writer threads, so it does not start failing if maxThreads
     // changes.
-    const int kNumEntries = _writerPool->getStats().options.maxThreads * 1000;
+    const int kNumEntries = _workerPool->getStats().options.maxThreads * 1000;
     std::vector<GlobalIndexCrudOp> opBatch;
     opBatch.reserve(kNumEntries);
 
@@ -6463,7 +6463,7 @@ TEST_F(GlobalIndexTest, LargeBatchDifferentUUIDAssignsAtLeastOneOpToEachWriter) 
 
     auto ops = makeGlobalIndexCrudApplyOpsOplogBatch(opBatch);
 
-    WriterVectors writerVectors(_writerPool->getStats().options.maxThreads);
+    WriterVectors writerVectors(_workerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedOps;
     _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
 

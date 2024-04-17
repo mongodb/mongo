@@ -758,7 +758,7 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
                                  recoveryMode == RecoveryMode::kRollbackFromStableTimestamp)
         ? OplogApplication::Mode::kStableRecovering
         : OplogApplication::Mode::kUnstableRecovering;
-    auto writerPool = makeReplWriterPool();
+    auto workerPool = makeReplWorkerPool();
     auto* replCoord = ReplicationCoordinator::get(opCtx);
     OplogApplierImpl oplogApplier(nullptr,
                                   &oplogBuffer,
@@ -767,7 +767,7 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
                                   _consistencyMarkers,
                                   _storageInterface,
                                   OplogApplier::Options(oplogApplicationMode),
-                                  writerPool.get());
+                                  workerPool.get());
 
     OplogApplier::BatchLimits batchLimits;
     batchLimits.bytes = getBatchLimitOplogBytes(opCtx, _storageInterface);
