@@ -63,7 +63,7 @@ std::pair<boost::optional<Milliseconds>, bool> getRequestOrDefaultMaxTimeMS(
     // Check if the defaultMaxTimeMS can be bypassed.
     const auto bypassDefaultMaxTimeMS =
         AuthorizationSession::get(opCtx->getClient())
-            ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(boost::none),
+            ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(tenantId),
                                                ActionType::bypassDefaultMaxTimeMS);
     if (bypassDefaultMaxTimeMS) {
         return {boost::none, false};

@@ -242,6 +242,11 @@ public:
     ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
     }
+
+    bool allowedWithSecurityToken() const override {
+        // This is a test only command, we can safely allow it with multi-tenancy.
+        return true;
+    }
 };
 
 MONGO_REGISTER_COMMAND(CmdSleep).testOnly().forShard();
