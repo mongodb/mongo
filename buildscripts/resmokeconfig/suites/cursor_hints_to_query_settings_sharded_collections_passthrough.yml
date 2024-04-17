@@ -5,10 +5,15 @@ test_kind: js_test
 
 selector:
   roots:
+    - jstests/aggregation/**/*.js
     - jstests/core/**/*.js
   exclude_files:
     # TODO SERVER-86996 Apply QuerySettings for queries involving timeseries collections.
     - jstests/core/timeseries/**/*.js
+
+    # TODO SERVER-23229: Projection incorrectly returns null value instead of missing field to user if
+    # projection is covered.
+    - jstests/aggregation/bugs/groupMissing.js
 
     # TODO SERVER-29449: Re-enable once 'executionStats.nReturned' is correct for sharded queries
     # with a limit or for distinct commands.
@@ -17,12 +22,18 @@ selector:
     - jstests/core/**/explain4.js
     - jstests/core/**/sortk.js
 
-    # TODO: Remove after fixing SERVER-32563. The implementation of explain for the count command is
+    # TODO SERVER-32563: The implementation of explain for the count command is
     # incorrect on sharded collections.
     - jstests/core/**/explain_count.js
     - jstests/core/**/explain_server_params.js
 
+    # Test which asserts on the number of execution metrics. The additional commands emitted by
+    # this suite might cause the test to fail.
+    - jstests/aggregation/sources/geonear/geonear_hint.js
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+
     # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
+    - jstests/aggregation/match_swapping_renamed_fields.js
     - jstests/core/**/expr_index_use.js
     - jstests/core/**/index_multikey.js
     - jstests/core/**/optimized_match_explain.js
@@ -57,6 +68,10 @@ selector:
     - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
     - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
     - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+
+    # This test makes assertions about whether aggregations will need to spill to disk, which assumes
+    # all the data is located on a single shard.
+    - jstests/aggregation/spill_to_disk.js
 
     # Query settings do not force indexes, and therefore empty filter will result in collection scans.
     - jstests/core/index/geo/geo6.js
