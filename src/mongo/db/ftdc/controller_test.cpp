@@ -287,14 +287,8 @@ void FTDCControllerTest::testFull(UseMultiServiceSchema multiServiceSchema) {
 
     ASSERT_EQUALS(files.size(), 1UL);
 
-    auto alog = files[0];
-
-    std::vector<BSONObj> allDocs;
-    allDocs.insert(allDocs.end(), docsRotate.cbegin(), docsRotate.cend());
-    allDocs.insert(allDocs.end(), docsPeriodicMetadata.cbegin(), docsPeriodicMetadata.cend());
-    allDocs.insert(allDocs.end(), docsPeriodic.cbegin(), docsPeriodic.cend());
-
-    ValidateDocumentList(alog, allDocs, FTDCValidationMode::kStrict);
+    ValidateDocumentListByType(
+        files[0], docsRotate, docsPeriodic, docsPeriodicMetadata, FTDCValidationMode::kStrict);
 }
 
 TEST_F(FTDCControllerTest, TestFullSingleServiceSchema) {
@@ -389,17 +383,12 @@ void FTDCControllerTest::testStartAsDisabled(UseMultiServiceSchema multiServiceS
         docsPeriodicMetadata = insertNewSchemaDocuments(docsPeriodicMetadata, "shard");
     }
 
-    std::vector<BSONObj> allDocs;
-    allDocs.insert(allDocs.end(), docsPeriodicMetadata.cbegin(), docsPeriodicMetadata.cend());
-    allDocs.insert(allDocs.end(), docsPeriodic.cbegin(), docsPeriodic.cend());
-
     auto files = scanDirectory(dir);
 
     ASSERT_EQUALS(files.size(), 1UL);
 
-    auto alog = files[0];
-
-    ValidateDocumentList(alog, allDocs, FTDCValidationMode::kStrict);
+    ValidateDocumentListByType(
+        files[0], {}, docsPeriodic, docsPeriodicMetadata, FTDCValidationMode::kStrict);
 }
 
 TEST_F(FTDCControllerTest, TestStartAsDisabledSingleServiceSchema) {
