@@ -52,9 +52,7 @@ assertCoordinateMultiUpdateReturns(st.rs0.getPrimary(), ErrorCodes.OK);
 // Verify _shardsvrCoordinateMultiUpdate only runs on shard servers.
 assertCoordinateMultiUpdateReturns(st.rs0.getSecondary(), ErrorCodes.NotWritablePrimary);
 assertCoordinateMultiUpdateReturns(st.s, ErrorCodes.CommandNotFound);
-assertCoordinateMultiUpdateReturns(
-    replicaSet.getPrimary(),
-    [ErrorCodes.ShardingStateNotInitialized, ErrorCodes.NoShardingEnabled_OBSOLETE]);
+assertCoordinateMultiUpdateReturns(replicaSet.getPrimary(), ErrorCodes.ShardingStateNotInitialized);
 
 replicaSet.stopSet();
 st.stop();

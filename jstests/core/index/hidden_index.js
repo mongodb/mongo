@@ -178,12 +178,11 @@ assert.eq(idxSpec.hidden, true);
 // Can't hide any index in a system collection.
 const systemColl = db.getSiblingDB("admin").system.version;
 assert.commandWorked(systemColl.createIndex({a: 1}));
-// The collMod command throws NoShardingEnabled_OBSOLETE on DDL coordinator implementation and
+// The collMod command throws ShardingStateNotInitialized on DDL coordinator implementation and
 // BadValue on old implementation.
 assert.commandFailedWithCode(systemColl.hideIndex("a_1"), [
     ErrorCodes.ShardingStateNotInitialized,
-    ErrorCodes.BadValue,                    // TODO (SERVER-83326): Remove this code
-    ErrorCodes.NoShardingEnabled_OBSOLETE,  // TODO (SERVER-83326): Remove this code
+    ErrorCodes.BadValue,
 ]);
 assert.commandFailedWithCode(systemColl.createIndex({a: 1}, {hidden: true}), 2);
 

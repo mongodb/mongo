@@ -57,7 +57,6 @@ jsTest.log(
 const standaloneReplSet = new ReplSetTest({nodes: 1});
 standaloneReplSet.startSet();
 standaloneReplSet.initiate();
-checkCoordinatorCommandsRejected(
-    standaloneReplSet.getPrimary(),
-    [ErrorCodes.ShardingStateNotInitialized, ErrorCodes.NoShardingEnabled_OBSOLETE]);
+checkCoordinatorCommandsRejected(standaloneReplSet.getPrimary(),
+                                 ErrorCodes.ShardingStateNotInitialized);
 standaloneReplSet.stopSet();

@@ -273,7 +273,7 @@ error_codes:
   - {code: 190, name: MasterSlaveConnectionFailure}
   - {code: 191, name: OBSOLETE_BalancerLostDistributedLock}
   - {code: 192, name: FailPointEnabled}
-  - {code: 193, name: NoShardingEnabled_OBSOLETE}
+  - {code: 193, name: OBSOLETE_NoShardingEnabled}
   - {code: 194, name: BalancerInterrupted}
   - {code: 195, name: ViewPipelineMaxSizeExceeded}
   - {code: 197, name: InvalidIndexSpecificationOption}

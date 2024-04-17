@@ -20,9 +20,8 @@ function assertShardingNotEnabled(node) {
             lastMod: NumberInt(5),
         }
     };
-    assert.commandFailedWithCode(
-        node.getDB('test').runCommand(findCmd),
-        [ErrorCodes.ShardingStateNotInitialized, ErrorCodes.NoShardingEnabled_OBSOLETE]);
+    assert.commandFailedWithCode(node.getDB('test').runCommand(findCmd),
+                                 ErrorCodes.ShardingStateNotInitialized);
 }
 
 {

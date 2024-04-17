@@ -476,8 +476,7 @@ let viewsCommandTests = {
         // This command is only expected to fail with the errors below when it is run against
         // a standalone replica set mongod.
         expectFailure: !TestData.testingReplicaSetEndpoint,
-        expectedErrorCode:
-            [ErrorCodes.ShardingStateNotInitialized, ErrorCodes.NoShardingEnabled_OBSOLETE],
+        expectedErrorCode: ErrorCodes.ShardingStateNotInitialized,
         isAdminCommand: true,
         skipSharded: true,  // mongos is tested in views/views_sharded.js
     },
@@ -717,8 +716,7 @@ let viewsCommandTests = {
         },
         skipSharded: true,
         expectFailure: true,
-        expectedErrorCode:
-            [ErrorCodes.ShardingStateNotInitialized, ErrorCodes.NoShardingEnabled_OBSOLETE],
+        expectedErrorCode: ErrorCodes.ShardingStateNotInitialized,
         isAdminCommand: true,
     },
     splitVector: {

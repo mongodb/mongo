@@ -67,7 +67,7 @@ public:
 
     // DO NOT ADD NEW USAGES
     //
-    // TODO (SERVER-84334): This method is necessary to get tests that use multiple sharding
+    // TODO (SERVER-89417): This method is necessary to get tests that use multiple sharding
     // fixtures to work. Without it and due to the multiple inheritance of fixtures, certain tests
     // invoke the `create` method above more than once.
     //
@@ -116,7 +116,7 @@ public:
      * Based on pollClusterRole above, returns true if recovery has completed successfully and the
      * node is running under the ShardServer role.
      *
-     * TODO (SERVER-83326): Usages of this method should go away because we shouldn't have code that
+     * TODO (SERVER-89417): Usages of this method should go away because we shouldn't have code that
      * makes decisions based on the role of the node. Instead, code should just use acquisitions
      * which under the hood will ensure that the correct behaviour is achieved based on the current
      * role of the node and any other code should rely on awaitClusterRoleRecovery in order to
