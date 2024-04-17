@@ -56,7 +56,8 @@ extern void __wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, ui
 extern void __wt_epoch_raw(WT_SESSION_IMPL *session, struct timespec *tsp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_map_file(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session);
-extern void __wt_prepare_remap_resize_file(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session);
+extern void __wt_prepare_remap_resize_file(
+  WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_off_t len, bool *remap);
 extern void __wt_release_without_remap(WT_FILE_HANDLE *file_handle);
 extern void __wt_remap_resize_file(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session);
 extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds)
