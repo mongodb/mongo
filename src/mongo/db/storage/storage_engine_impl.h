@@ -415,7 +415,6 @@ private:
                          RecordId catalogId,
                          const NamespaceString& nss,
                          bool forRepair,
-                         Timestamp minVisibleTs,
                          Timestamp minValidTs);
 
     Status _dropCollections(OperationContext* opCtx, const std::vector<UUID>& toDrop);
