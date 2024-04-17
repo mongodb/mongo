@@ -107,7 +107,6 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
             indexDesc);
 
     _uniqueIndex = indexDesc->unique();
-    _ridFormat = _coll.getPtr()->getRecordStore()->keyFormat();
     _entry = indexCatalog->getEntry(indexDesc);
     tassert(4938503,
             str::stream() << "expected IndexCatalogEntry for index named: " << _indexName,
@@ -316,9 +315,9 @@ PlanState IndexScanStageBase::getNext() {
     }
 
     if (_recordIdSlot) {
-        _nextRid = _nextKeyString.decodeRecordId(_ridFormat);
+        auto nextRid = _nextKeyString.getRecordId();
         _recordIdAccessor.reset(
-            false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_nextRid));
+            false, value::TypeTags::RecordId, value::bitcastFrom<const RecordId*>(nextRid));
     }
 
     if (_snapshotIdSlot) {

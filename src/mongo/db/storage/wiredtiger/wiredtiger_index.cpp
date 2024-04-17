@@ -1235,16 +1235,15 @@ protected:
         }
         invariant(!_id.isNull());
 
-        _kvView = {
-            newKeyData, /* ksData */
-            ksSize,
-            newKeyData + ksSize,                       /* ridData */
-            static_cast<int32_t>(newKeySize) - ksSize, /* ridSize */
-            newValueData,                              /* typeBitsData */
-            static_cast<int32_t>(newValueSize),        /* typeBitsSize */
-            _version,
-            true /* isRecordIdAtEndOfKeyString */
-        };
+        _kvView = {newKeyData, /* ksData */
+                   ksSize,
+                   newKeyData + ksSize,                       /* ridData */
+                   static_cast<int32_t>(newKeySize) - ksSize, /* ridSize */
+                   newValueData,                              /* typeBitsData */
+                   static_cast<int32_t>(newValueSize),        /* typeBitsSize */
+                   _version,
+                   true, /* isRecordIdAtEndOfKeyString */
+                   &_id};
     }
 
     void checkKeyIsOrdered(const char* newKeyData, size_t newKeySize) {
@@ -1414,16 +1413,15 @@ public:
                 invariant(!_id.isNull());
 
                 auto typeBitsData = static_cast<const char*>(br.pos());
-                _kvView = {
-                    newKeyData,                                        /* ksData */
-                    static_cast<int32_t>(newKeySize),                  /* ksSize */
-                    newValueData,                                      /* ridData */
-                    static_cast<int32_t>(typeBitsData - newValueData), /* ridSize */
-                    typeBitsData,
-                    static_cast<int32_t>(br.remaining()), /* typeBitsSize */
-                    _version,
-                    false /* isRecordIdAtEndOfKeyString */
-                };
+                _kvView = {newKeyData,                                        /* ksData */
+                           static_cast<int32_t>(newKeySize),                  /* ksSize */
+                           newValueData,                                      /* ridData */
+                           static_cast<int32_t>(typeBitsData - newValueData), /* ridSize */
+                           typeBitsData,
+                           static_cast<int32_t>(br.remaining()), /* typeBitsSize */
+                           _version,
+                           false, /* isRecordIdAtEndOfKeyString */
+                           &_id};
 
                 // Check validity of the remaining buffer as TypeBits.
                 key_string::TypeBits::getReaderFromBuffer(_version, &br);
@@ -1514,16 +1512,15 @@ public:
         invariant(!_id.isNull());
 
         auto typeBitsData = static_cast<const char*>(br.pos());
-        _kvView = {
-            newKeyData,                                        /* ksData */
-            static_cast<int32_t>(newKeySize),                  /* ksSize */
-            newValueData,                                      /* ridData */
-            static_cast<int32_t>(typeBitsData - newValueData), /* ridSize */
-            typeBitsData,
-            static_cast<int32_t>(br.remaining()), /* typeBitsSize */
-            _version,
-            false /* isRecordIdAtEndOfKeyString */
-        };
+        _kvView = {newKeyData,                                        /* ksData */
+                   static_cast<int32_t>(newKeySize),                  /* ksSize */
+                   newValueData,                                      /* ridData */
+                   static_cast<int32_t>(typeBitsData - newValueData), /* ridSize */
+                   typeBitsData,
+                   static_cast<int32_t>(br.remaining()), /* typeBitsSize */
+                   _version,
+                   false, /* isRecordIdAtEndOfKeyString */
+                   &_id};
 
         // Check validity of the remaining buffer as TypeBits.
         key_string::TypeBits::getReaderFromBuffer(_version, &br);

@@ -66,12 +66,14 @@ TEST(SortedDataInterface, SortedDataKeyValueViewTest) {
                                            tb.getBuffer(),
                                            tb.getSize(),
                                            version,
-                                           true);
+                                           true,
+                                           &rid);
         auto value = view.getValueCopy();
         auto bsonObj = key_string::toBson(value, ALL_ASCENDING);
         ASSERT_BSONOBJ_EQ(bsonObj, BSONObj::stripFieldNames(key));
-        auto decodedRid = view.decodeRecordId(KeyFormat::String);
-        ASSERT_EQ(rid, decodedRid);
+        ASSERT_EQ(&rid, view.getRecordId());
+        ASSERT_EQ(*view.getRecordId(),
+                  key_string::decodeRecordIdStrAtEnd(value.getBuffer(), value.getSize()));
     }
 }
 

@@ -187,10 +187,8 @@ protected:
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
     const IndexCatalogEntry* _entry{nullptr};
     boost::optional<Ordering> _ordering{boost::none};
-    KeyFormat _ridFormat;
     SortedDataKeyValueView _nextKeyString;
     value::KeyStringEntry _key;
-    RecordId _nextRid;
 
     // This buffer stores values that are projected out of the index entry. Values in the
     // '_accessors' list that are pointers point to data in this buffer.
