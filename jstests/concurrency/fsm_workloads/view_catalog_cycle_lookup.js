@@ -8,6 +8,7 @@
  * @tags: [requires_fcv_51]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 export const $config = (function() {
@@ -79,6 +80,9 @@ export const $config = (function() {
          * is expected at view create/modification time.
          */
         function remapViewToView(db, collName) {
+            if (this.shouldSkipTest) {
+                return;
+            }
             if (this.isSBELookupEnabled) {
                 return;
             }
@@ -99,6 +103,9 @@ export const $config = (function() {
          * error as it is expected at view create/modification time.
          */
         function remapViewToCollection(db, collName) {
+            if (this.shouldSkipTest) {
+                return;
+            }
             if (this.isSBELookupEnabled) {
                 return;
             }
@@ -113,6 +120,9 @@ export const $config = (function() {
         }
 
         function readFromView(db, collName) {
+            if (this.shouldSkipTest) {
+                return;
+            }
             if (this.isSBELookupEnabled) {
                 return;
             }
@@ -157,6 +167,14 @@ export const $config = (function() {
     };
 
     function setup(db, collName, cluster) {
+        // TODO SERVER-88936: Remove this field and associated checks once the flag is active on
+        // last-lts.
+        this.shouldSkipTest = TestData.runInsideTransaction && cluster.isSharded() &&
+            !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'AllowAdditionalParticipants');
+        if (this.shouldSkipTest) {
+            return;
+        }
+
         const coll = db[collName];
 
         assert.commandWorked(coll.insert({a: 1, b: 2}));
