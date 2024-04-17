@@ -272,34 +272,35 @@ IndexEntry createIndexEntry(BSONObj keyPattern, const std::string& indexName) {
                       nullptr);
 }
 
-QueryPlannerParams extractFromBmParams(PlanCacheClassicBenchmarkParameters params) {
-    QueryPlannerParams qpp{QueryPlannerParams::ArgsForTest{}};
+std::unique_ptr<QueryPlannerParams> extractFromBmParams(
+    PlanCacheClassicBenchmarkParameters params) {
+    auto qpp = std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForTest{});
     // Add the index to the QueryPlannerParams and to the IndexSpec, if specified.
     switch (params.index) {
         case kNoIndex:
             break;
         case kSingleFieldIndex:
-            qpp.mainCollectionInfo.indexes.push_back(createIndexEntry(BSON("a" << 1), "a_1"));
+            qpp->mainCollectionInfo.indexes.push_back(createIndexEntry(BSON("a" << 1), "a_1"));
             break;
         case kTwoFieldCompoundIndex:
-            qpp.mainCollectionInfo.indexes.push_back(
+            qpp->mainCollectionInfo.indexes.push_back(
                 createIndexEntry(BSON("a" << 1 << "b" << 1), "a_1_b_1"));
             break;
         case kTwoIndexes:
             // {a: 1}
-            qpp.mainCollectionInfo.indexes.push_back(createIndexEntry(BSON("a" << 1), "a_1"));
+            qpp->mainCollectionInfo.indexes.push_back(createIndexEntry(BSON("a" << 1), "a_1"));
 
             // {b: 1}
-            qpp.mainCollectionInfo.indexes.push_back(createIndexEntry(BSON("b" << 1), "b_1"));
+            qpp->mainCollectionInfo.indexes.push_back(createIndexEntry(BSON("b" << 1), "b_1"));
 
             // If we are in the test case for the AND of two indexes, we want to turn on index
             // intersection.
             if (params.filter == kAndFilter) {
-                qpp.mainCollectionInfo.options = QueryPlannerParams::INDEX_INTERSECTION;
+                qpp->mainCollectionInfo.options = QueryPlannerParams::INDEX_INTERSECTION;
             }
             break;
         case kManyFieldCompoundIndex: {
-            qpp.mainCollectionInfo.indexes.push_back(
+            qpp->mainCollectionInfo.indexes.push_back(
                 createIndexEntry(createManyFieldIndexKey(), "a_1_many_fields"));
             break;
         }
@@ -331,7 +332,7 @@ void BM_PlanCacheClassic(benchmark::State& state) {
     auto callbacks = createCallback(*cq, *decision);
 
     auto params = extractFromBmParams(bmParams);
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, *params);
     ASSERT_OK(statusWithMultiPlanSolns.getStatus());
 
     auto solns = std::move(statusWithMultiPlanSolns.getValue());
@@ -423,7 +424,7 @@ void BM_PlanCacheClassic(benchmark::State& state) {
 
     for (auto curState : state) {
         auto cs = planCache->getCacheEntryIfActive(planCacheKey);
-        auto statusWithQs = QueryPlanner::planFromCache(*cq.get(), params, *cs->cachedPlan.get());
+        auto statusWithQs = QueryPlanner::planFromCache(*cq.get(), *params, *cs->cachedPlan.get());
 
         state.PauseTiming();
         // Assert state is as expected before std::moving it away.

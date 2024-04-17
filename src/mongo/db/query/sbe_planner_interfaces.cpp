@@ -41,7 +41,7 @@ SbeRuntimePlanner::SbeRuntimePlanner(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
-    QueryPlannerParams plannerParams,
+    std::unique_ptr<QueryPlannerParams> plannerParams,
     boost::optional<size_t> cachedPlanHash,
     std::unique_ptr<sbe::RuntimePlanner> runtimePlanner,
     std::vector<std::unique_ptr<QuerySolution>> solutions,
@@ -56,7 +56,7 @@ SbeRuntimePlanner::SbeRuntimePlanner(
       _remoteCursors(std::move(remoteCursors)),
       _remoteExplains(std::move(remoteExplains)) {
     // Do the runtime planning and pick the best candidate plan.
-    _candidates = runtimePlanner->plan(_plannerParams, std::move(solutions), std::move(roots));
+    _candidates = runtimePlanner->plan(*_plannerParams, std::move(solutions), std::move(roots));
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SbeRuntimePlanner::makeExecutor(
@@ -66,7 +66,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SbeRuntimePlanner::makeExec
                                                        std::move(canonicalQuery),
                                                        std::move(_candidates),
                                                        _collections,
-                                                       _plannerParams.mainCollectionInfo.options,
+                                                       _plannerParams->mainCollectionInfo.options,
                                                        std::move(nss),
                                                        std::move(_yieldPolicy),
                                                        std::move(_remoteCursors),
@@ -79,7 +79,7 @@ SbeSingleSolutionPlanner::SbeSingleSolutionPlanner(
     CanonicalQuery* cq,
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
-    QueryPlannerParams plannerParams,
+    std::unique_ptr<QueryPlannerParams> plannerParams,
     std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
     boost::optional<size_t> cachedPlanHash,
@@ -101,7 +101,7 @@ SbeSingleSolutionPlanner::SbeSingleSolutionPlanner(
     if (!isRecoveredPinnedCacheEntry) {
         if (!cq->cqPipeline().empty()) {
             _solution = QueryPlanner::extendWithAggPipeline(
-                *cq, std::move(_solution), _plannerParams.secondaryCollectionsInfo);
+                *cq, std::move(_solution), _plannerParams->secondaryCollectionsInfo);
             _root = stage_builder::buildSlotBasedExecutableTree(
                 opCtx, collections, *cq, *(_solution), _yieldPolicy.get());
         }
@@ -129,7 +129,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SbeSingleSolutionPlanner::m
                                                        std::move(_solution),
                                                        std::move(_root),
                                                        {},
-                                                       _plannerParams.mainCollectionInfo.options,
+                                                       _plannerParams->mainCollectionInfo.options,
                                                        std::move(nss),
                                                        std::move(_yieldPolicy),
                                                        _isRecoveredFromPlanCache,

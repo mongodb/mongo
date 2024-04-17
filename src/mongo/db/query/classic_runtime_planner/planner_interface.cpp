@@ -70,11 +70,11 @@ PlanYieldPolicy::YieldPolicy ClassicPlannerInterface::yieldPolicy() const {
 }
 
 const QueryPlannerParams& ClassicPlannerInterface::plannerParams() {
-    return _plannerData.plannerParams;
+    return *_plannerData.plannerParams;
 }
 
 size_t ClassicPlannerInterface::plannerOptions() const {
-    return _plannerData.plannerParams.mainCollectionInfo.options;
+    return _plannerData.plannerParams->mainCollectionInfo.options;
 }
 
 boost::optional<size_t> ClassicPlannerInterface::cachedPlanHash() const {

@@ -101,8 +101,8 @@ protected:
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kRead)));
 
-        QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
-        params.mainCollectionInfo.indexes = _indices;
+        auto params = std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForTest{});
+        params->mainCollectionInfo.indexes = _indices;
         PlannerDataForSBE plannerData{expCtx->opCtx,
                                       cq.get(),
                                       std::make_unique<WorkingSet>(),
