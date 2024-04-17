@@ -13,6 +13,9 @@ selector:
   - jstests/sharding/query/explain_cmd.js
   # TODO: (SERVER-64972): add change stream support for batched deletes.
   - jstests/sharding/change_stream_no_orphans.js
+  # TODO: (SERVER-89361): Investigate why this returns the wrong number of documents deleted even if it
+  # doesn't actually delete all of them.
+  - jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

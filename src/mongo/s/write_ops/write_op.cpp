@@ -29,7 +29,24 @@
 
 #include "mongo/s/write_ops/write_op.h"
 
+
+#include <absl/container/flat_hash_set.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <ostream>
+#include <string>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/write_ops/batch_write_op.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -79,6 +96,16 @@ write_ops::WriteError combineOpErrors(const std::vector<ChildWriteOp const*>& er
                                  Status(MultipleErrorsOccurredInfo(errB.arr()), msg.str()));
 }
 
+bool isSafeToIgnoreErrorInPartiallyAppliedOp(write_ops::WriteError& error) {
+    // UUID mismatch errors are safe to ignore if the actualCollection is null in conjuntion with
+    // other successful operations. This is true because it means we wrongly targeted a non-owning
+    // shard with the operation and we wouldn't have applied any modifications anyway.
+    //
+    // Note this is only safe if we're using ShardVersion::IGNORED since we're ignoring any
+    // placement concern and broadcasting to all shards.
+    return error.getStatus().code() == ErrorCodes::CollectionUUIDMismatch &&
+        !error.getStatus().extraInfo<CollectionUUIDMismatchInfo>()->actualCollection();
+}
 }  // namespace
 
 const BatchItemRef& WriteOp::getWriteItem() const {
@@ -182,7 +209,29 @@ void WriteOp::_updateOpState() {
         _state = WriteOpState_Ready;
     } else if (!childErrors.empty()) {
         _error = combineOpErrors(childErrors);
-        _state = WriteOpState_Error;
+        bool isTargetingAllShardsWithSVIgnored =
+            childErrors.front()
+                ->endpoint->shardVersion
+                .map([&](const auto& cv) { return ChunkVersion::isIgnoredVersion(cv); })
+                .get_value_or(false);
+        // There are errors that are safe to ignore if they were correctly applied to other shards
+        // and we're using ShardVersion::IGNORED. They are safe to ignore as they can be interpreted
+        // as no-ops if the shard response had been instead a successful result since they wouldn't
+        // have modified any data. As a result, we can swallow the errors and treat them as a
+        // successful operation.
+        if (isTargetingAllShardsWithSVIgnored && isSafeToIgnoreErrorInPartiallyAppliedOp(*_error) &&
+            !_successfulShardSet.empty()) {
+            if (!hasPendingChild) {
+                _error.reset();
+                _state = WriteOpState_Completed;
+            } else {
+                // As this error is acceptable we wait until all other operations finish to take a
+                // decision.
+                return;
+            }
+        } else {
+            _state = WriteOpState_Error;
+        }
     } else if (hasPendingChild && _inTxn) {
         // Return early here since this means that there were no errors while in txn
         // but there are still ops that have not yet finished.
