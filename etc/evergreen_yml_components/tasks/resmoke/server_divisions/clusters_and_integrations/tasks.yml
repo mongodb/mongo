@@ -1578,6 +1578,9 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
+        vars:
+          # We do this because otherwise the task will OOM on TSAN variants. The "requires_large_host_tsan" tag doesn't work for non-gen tasks.
+          use_large_distro: "true"
 
   - <<: *benchmark_template
     name: benchmarks_sharding
