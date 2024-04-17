@@ -270,17 +270,21 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
     return Status::OK();
 }
 
-ShardId selectLeastLoadedShard(OperationContext* opCtx) {
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    auto allShardIds = shardRegistry->getAllShardIds(opCtx);
-    uassert(ErrorCodes::ShardNotFound, "No shards found", !allShardIds.empty());
+ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
+    const auto shardsAndOpTime = uassertStatusOKWithContext(
+        Grid::get(opCtx)->catalogClient()->getAllShards(
+            opCtx, repl::ReadConcernLevel::kSnapshotReadConcern, true /* excludeDraining */),
+        "Cannot retrieve updated shard list from config server");
 
-    ShardId candidateShardId = allShardIds[0];
+    const auto& nonDrainingShards = shardsAndOpTime.value;
+    uassert(ErrorCodes::ShardNotFound, "No non-draining shard found", !nonDrainingShards.empty());
+
+    auto candidateShardId = ShardId{nonDrainingShards.front().getName()};
 
     auto candidateSize = uassertStatusOK(retrieveTotalShardSize(opCtx, candidateShardId));
 
-    for (size_t i = 1; i < allShardIds.size(); i++) {
-        const ShardId shardId = allShardIds[i];
+    for (size_t i = 1; i < nonDrainingShards.size(); i++) {
+        const auto shardId = ShardId(nonDrainingShards[i].getName());
 
         const auto currentSize = uassertStatusOK(retrieveTotalShardSize(opCtx, shardId));
 

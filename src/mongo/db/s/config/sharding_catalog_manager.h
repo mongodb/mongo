@@ -918,6 +918,16 @@ private:
                                                                    OperationContext* opCtx);
     Status _updateClusterCardinalityParameterAfterRemoveShardIfNeeded(const Lock::ExclusiveLock&,
                                                                       OperationContext* opCtx);
+    /*
+     * Commits the new database metadata for a createDatabase operation.
+     *
+     * Throws ShardNotFound if the proposed 'primaryShard' is found to not exist or be draining.
+     * This check (and the actual) commit, is done under the _kShardMembershipLock to ensure
+     * synchronization with removeShard operations.
+     */
+    DatabaseType _commitCreateDatabase(OperationContext* opCtx,
+                                       const DatabaseName& dbName,
+                                       const ShardId& primaryShard);
 
     // The owning service context
     ServiceContext* const _serviceContext;
