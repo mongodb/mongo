@@ -43,10 +43,15 @@ export class QuerySettingsIndexHintsTests {
         const isMinMaxQuery = "min" in command || "max" in command;
         const isTriviallyFalse = everyWinningPlan(
             explain, (winningPlan) => isEofPlan(db, winningPlan) || isAlwaysFalsePlan(winningPlan));
+        const {defaultReadPreference, defaultReadConcernLevel, networkErrorAndTxnOverrideConfig} =
+            TestData;
+        const performsSecondaryReads =
+            defaultReadPreference && defaultReadPreference.mode == "secondary";
+        const isInTxnPassthrough = networkErrorAndTxnOverrideConfig &&
+            networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions;
+        const willRetryOnNetworkErrors = networkErrorAndTxnOverrideConfig &&
+            networkErrorAndTxnOverrideConfig.retryOnNetworkErrors;
         const shouldCheckPlanCache =
-            // Checking plan cache for query settings doesn't work reliably if collections are moved
-            // between shards randomly because that causes plan cache invalidation.
-            !TestData.runningWithBalancer &&
             // Single solution plans are not cached in classic, therefore do not perform plan cache
             // checks for classic.
             getEngine(explain) === "sbe" &&
@@ -57,7 +62,18 @@ export class QuerySettingsIndexHintsTests {
             // Similarly, trivially false plans are not cached.
             !isTriviallyFalse &&
             // Subplans are cached differently from normal plans.
-            !planHasStage(db, explain, "OR");
+            !planHasStage(db, explain, "OR") &&
+            // If query is executed on secondaries, do not assert the cache.
+            !performsSecondaryReads &&
+            // Do not check plan cache if causal consistency is enabled.
+            !db.getMongo().isCausalConsistency() &&
+            // $planCacheStats can not be run in transactions.
+            !isInTxnPassthrough &&
+            // Retrying on network errors most likely is related to stepdown, which does not go
+            // together with plan cache clear.
+            !willRetryOnNetworkErrors &&
+            // If read concern is explicitly set, avoid plan cache checks.
+            !defaultReadConcernLevel;
 
         if (!shouldCheckPlanCache) {
             return;

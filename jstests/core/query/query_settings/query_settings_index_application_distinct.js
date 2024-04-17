@@ -1,11 +1,9 @@
 // Tests query settings are applied to distinct queries regardless of the query engine (SBE or
 // classic).
 // @tags: [
-//   # $planCacheStats can not be run with specified read preferences/concerns.
-//   assumes_read_preference_unchanged,
-//   assumes_read_concern_unchanged,
-//   # $planCacheStats can not be run in transactions.
-//   does_not_support_transactions,
+//   # Balancer may impact the explain output (e.g. data was previously present on both shards and
+//   # now only on one).
+//   assumes_balancer_off,
 //   directly_against_shardsvrs_incompatible,
 //   simulate_atlas_proxy_incompatible,
 //   # 'planCacheClear' command is not allowed with the security token.
