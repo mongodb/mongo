@@ -1187,15 +1187,20 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         auto collectionType = determineCollectionType(
             ctx, resolvedView, liteParsedPipeline.hasChangeStream(), isCollectionless);
         NamespaceStringSet pipelineInvolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
-        query_stats::registerRequest(opCtx, origNss, [&]() {
-            return std::make_unique<query_stats::AggKey>(requestForQueryStats,
-                                                         *pipeline,
-                                                         expCtx,
-                                                         std::move(pipelineInvolvedNamespaces),
-                                                         origNss,
-                                                         collectionType);
-        });
+        query_stats::registerRequest(
+            opCtx,
+            origNss,
+            [&]() {
+                return std::make_unique<query_stats::AggKey>(requestForQueryStats,
+                                                             *pipeline,
+                                                             expCtx,
+                                                             std::move(pipelineInvolvedNamespaces),
+                                                             origNss,
+                                                             collectionType);
+            },
+            liteParsedPipeline.hasChangeStream());
     }
+
 
     if (resolvedView.has_value()) {
         expCtx->startExpressionCounters();

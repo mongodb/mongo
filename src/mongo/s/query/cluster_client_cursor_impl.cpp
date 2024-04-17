@@ -88,7 +88,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
-      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)) {
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
+      _queryStatsWillNeverExhaust(CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -108,7 +109,9 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
-      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)) {
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
+      _queryStatsWillNeverExhaust(
+          std::move(CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -150,13 +153,12 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
             "Cannot kill a cluster client cursor that has already been killed",
             !_hasBeenKilled);
 
-    if (_queryStatsKey && opCtx) {
-        auto snapshot = query_stats::captureMetrics(
-            opCtx, query_stats::microsecondsToUint64(_firstResponseExecutionTime), _metrics);
-
-        query_stats::writeQueryStats(
-            opCtx, _queryStatsKeyHash, std::move(_queryStatsKey), snapshot);
-    }
+    query_stats::writeQueryStatsOnCursorDisposeOrKill(opCtx,
+                                                      _queryStatsKeyHash,
+                                                      std::move(_queryStatsKey),
+                                                      _queryStatsWillNeverExhaust,
+                                                      _firstResponseExecutionTime,
+                                                      _metrics);
 
     _root->kill(opCtx);
     _hasBeenKilled = true;
@@ -257,6 +259,10 @@ boost::optional<std::size_t> ClusterClientCursorImpl::getQueryStatsKeyHash() con
     return _queryStatsKeyHash;
 }
 
+bool ClusterClientCursorImpl::getQueryStatsWillNeverExhaust() const {
+    return _queryStatsWillNeverExhaust;
+}
+
 APIParameters ClusterClientCursorImpl::getAPIParameters() const {
     return _params.apiParameters;
 }
@@ -301,7 +307,7 @@ bool ClusterClientCursorImpl::shouldOmitDiagnosticInformation() const {
     return _shouldOmitDiagnosticInformation;
 }
 
-std::unique_ptr<query_stats::Key> ClusterClientCursorImpl::getKey() {
+std::unique_ptr<query_stats::Key> ClusterClientCursorImpl::takeKey() {
     return std::move(_queryStatsKey);
 }
 

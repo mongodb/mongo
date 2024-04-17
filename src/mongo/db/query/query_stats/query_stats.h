@@ -190,7 +190,8 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
  */
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<Key>(void)> makeKey);
+                     std::function<std::unique_ptr<Key>(void)> makeKey,
+                     bool willNeverExhaust = false);
 
 /**
  * Convert an optional Duration to a count of Microseconds uint64_t.
@@ -229,13 +230,25 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
  * functions:
  *  - collectQueryStatsMongod/collectQueryStatsMongos in the case of requests that span one
  *    operation
- *  - ClientCursor::dispose/ClusterClientCursorImpl::kill in the case of requests that span
+ *  - writeQueryStatsOnCursorDisposeOrKill() in the case of requests that span
  *    multiple operations (via getMore)
  */
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
                      std::unique_ptr<Key> key,
                      const QueryStatsSnapshot& snapshot,
-                     std::unique_ptr<SupplementalStatsEntry> supplementalMetrics = nullptr);
+                     std::unique_ptr<SupplementalStatsEntry> supplementalMetrics = nullptr,
+                     bool willNeverExhaust = false);
+
+/**
+ * Called from ClientCursor::dispose/ClusterClientCursorImpl::kill to set up and writeQueryStats()
+ * at the end of life of a cursor.
+ */
+void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
+                                          boost::optional<size_t> queryStatsKeyHash,
+                                          std::unique_ptr<Key> key,
+                                          bool willNeverExhaust,
+                                          boost::optional<Microseconds> firstResponseExecutionTime,
+                                          OpDebug::AdditiveMetrics metrics);
 
 }  // namespace mongo::query_stats
