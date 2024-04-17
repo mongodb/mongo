@@ -972,6 +972,31 @@ DEDUPE_SYMBOL_LINKFLAGS = select({
     "//conditions:default": [],
 })
 
+MTUNE_MARCH_COPTS = select({
+    # If we are enabling vectorization in sandybridge mode, we'd
+    # rather not hit the 256 wide vector instructions because the
+    # heavy versions can cause clock speed reductions.
+    "//bazel/config:linux_x86_64": [
+        "-march=sandybridge",
+        "-mtune=generic",
+        "-mprefer-vector-width=128",
+    ],
+    "//bazel/config:linux_aarch64": [
+        "-march=armv8.2-a",
+        "-mtune=generic",
+    ],
+    "//bazel/config:linux_ppc64le": [
+        "-mcpu=power8",
+        "-mtune=power8",
+        "-mcmodel=medium",
+    ],
+    "//bazel/config:linux_s390x": [
+        "-march=z196",
+        "-mtune=zEC12",
+    ],
+    "//conditions:default": [],
+})
+
 MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-Isrc",
     "-Isrc/third_party/boost",
@@ -989,7 +1014,7 @@ MONGO_GLOBAL_COPTS = MONGO_GLOBAL_INCLUDE_DIRECTORIES + WINDOWS_COPTS + LIBCXX_C
                      GCC_OR_CLANG_WARNINGS_COPTS + GCC_OR_CLANG_GENERAL_COPTS + \
                      FLOATING_POINT_COPTS + MACOS_WARNINGS_COPTS + CLANG_WARNINGS_COPTS + \
                      CLANG_FNO_LIMIT_DEBUG_INFO + COMPRESS_DEBUG_COPTS + DEBUG_TYPES_SECTION_FLAGS + \
-                     IMPLICIT_FALLTHROUGH_COPTS
+                     IMPLICIT_FALLTHROUGH_COPTS + MTUNE_MARCH_COPTS
 
 MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS + \
                          UNDEFINED_SANITIZER_LINKFLAGS + THREAD_SANITIZER_LINKFLAGS + \
