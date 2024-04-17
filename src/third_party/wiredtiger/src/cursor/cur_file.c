@@ -9,13 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * Define functions that increment histogram statistics for cursor read and write operations
- * latency.
- */
-WT_STAT_USECS_HIST_INCR_FUNC(opread, perf_hist_opread_latency)
-WT_STAT_USECS_HIST_INCR_FUNC(opwrite, perf_hist_opwrite_latency)
-
-/*
  * Wrapper for substituting checkpoint state when doing checkpoint cursor operations.
  *
  * A checkpoint cursor has two extra things in it: a dummy transaction (always), and a dhandle for

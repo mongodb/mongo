@@ -771,6 +771,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
     WT_PAGE_WALK_SKIP_STATS walk_skip_stats;
     WT_SESSION_IMPL *session;
     size_t total_skipped, skipped;
+    uint64_t time_start;
     uint32_t flags;
     bool key_out_of_bounds, newpage, need_walk, repositioned, restart;
 #ifdef HAVE_DIAGNOSTIC
@@ -784,6 +785,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
     total_skipped = 0;
     walk_skip_stats.total_del_pages_skipped = 0;
     walk_skip_stats.total_inmem_del_pages_skipped = 0;
+    WT_NOT_READ(time_start, 0);
 
     WT_STAT_CONN_DATA_INCR(session, cursor_next);
 
@@ -804,6 +806,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
      */
     if (F_ISSET(cursor, WT_CURSTD_BOUND_LOWER) && !WT_CURSOR_IS_POSITIONED(cbt)) {
         repositioned = true;
+        time_start = __wt_clock(session);
         WT_ERR(__wt_btcur_bounds_position(session, cbt, true, &need_walk));
         if (!need_walk) {
             __wt_value_return(cbt, cbt->upd_value);
@@ -947,6 +950,15 @@ err:
     if (walk_skip_stats.total_inmem_del_pages_skipped != 0)
         WT_STAT_CONN_DATA_INCRV(session, cursor_tree_walk_inmem_del_page_skip,
           walk_skip_stats.total_inmem_del_pages_skipped);
+
+    /*
+     * If we positioned the cursor using bounds, which is similar to a search, update the read
+     * latency histogram.
+     *
+     * This includes the traversal if need_walk is true.
+     */
+    if (repositioned)
+        __wt_stat_usecs_hist_incr_opread(session, WT_CLOCKDIFF_US(__wt_clock(session), time_start));
 
     switch (ret) {
     case 0:
