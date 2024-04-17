@@ -21,7 +21,7 @@ testAccumAgainstGroup(coll, "$max");
 
 // Test the behavior of min/max over a non-numeric field. Note that $min and $max order values by
 // type per the BSON spec, so there will always be a value to return.
-const documents = [
+let documents = [
     {_id: 1, "str": "Inlet"},
     {_id: 2, "str": "compressing Supervisor Synchronised"},
     {_id: 3, "str": "fuchsia"},
@@ -30,7 +30,7 @@ const documents = [
     {_id: 6, "str": "Security Mouse"},
 ];
 
-const expectedResults = [
+let expectedResults = [
     {maxStr: "Security Mouse", minStr: "Security Mouse"},
     {maxStr: "Security Mouse", minStr: "Louisiana system-worthy Borders"},
     {maxStr: "transmit Ohio AI", minStr: "Louisiana system-worthy Borders"},
@@ -58,5 +58,34 @@ let results = coll.aggregate([{
 assert.eq(expectedResults.length, results.length);
 for (let index = 0; index < results.length; index++) {
     assert.eq(expectedResults[index].maxStr, results[index].maxStr);
+    assert.eq(expectedResults[index].minStr, results[index].minStr);
+}
+
+// The test below is to ensure that memory estimation does not return negative values (SERVER-89408
+// ).
+documents = [
+    {_id: 0, "num": 10, "str": "ABCDEFGHIJK"},
+    {_id: 1, "num": 3, "str": "ABCDE"},
+    {_id: 2, "num": 5, "str": "AB"},
+]
+
+expectedResults = [{minStr: "ABCDEFGHIJK"}, {minStr: "AB"}, {minStr: "AB"}]
+
+coll.drop();
+for (let i = 0; i < documents.length; i++) {
+    assert.commandWorked(coll.insert(documents[i]));
+}
+
+results =
+    coll.aggregate([{
+            $setWindowFields: {
+                sortBy: {"num": -1},
+                output: {"minStr": {$min: "$str", window: {documents: ["unbounded", "current"]}}}
+            }
+        }])
+        .toArray();
+
+assert.eq(expectedResults.length, results.length);
+for (let index = 0; index < results.length; index++) {
     assert.eq(expectedResults[index].minStr, results[index].minStr);
 }

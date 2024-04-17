@@ -146,8 +146,11 @@ size_t WindowStage::getMemoryEstimation() {
     for (size_t windowIdx = 0; windowIdx < _windows.size(); ++windowIdx) {
         size_t frameSize = getWindowFrameSize(windowIdx);
         for (size_t exprIdx = 0; exprIdx < _windowInitCodes[windowIdx].size(); ++exprIdx) {
-            windowMemorySize +=
-                _windowStateMemoryEstimators[windowIdx][exprIdx].estimate(frameSize);
+            // There is a state only when the window is removable, i.e has lower bound.
+            if (_windows[windowIdx].lowBoundExpr) {
+                windowMemorySize +=
+                    _windowStateMemoryEstimators[windowIdx][exprIdx].estimate(frameSize);
+            }
         }
     }
     return rowMemorySize + windowMemorySize;
@@ -520,7 +523,7 @@ void WindowStage::setPartition(int id) {
     for (size_t windowIdx = 0; windowIdx < _windows.size(); windowIdx++) {
         auto& windowAccessors = _outWindowAccessors[windowIdx];
         auto& windowInitCodes = _windowInitCodes[windowIdx];
-        auto& memoryEstimators = _windowStateMemoryEstimators[windowIdx];
+        auto& stateMemoryEstimators = _windowStateMemoryEstimators[windowIdx];
 
         for (size_t exprIdx = 0; exprIdx < windowInitCodes.size(); ++exprIdx) {
             if (windowInitCodes[exprIdx]) {
@@ -529,7 +532,7 @@ void WindowStage::setPartition(int id) {
             } else {
                 windowAccessors[exprIdx]->reset();
             }
-            memoryEstimators[exprIdx].reset();
+            stateMemoryEstimators[exprIdx].reset();
         }
     }
 }
@@ -579,7 +582,7 @@ PlanState WindowStage::getNext() {
         auto& windowAccessors = _outWindowAccessors[windowIdx];
         auto& windowAddCodes = _windowAddCodes[windowIdx];
         auto& windowRemoveCodes = _windowRemoveCodes[windowIdx];
-        auto& windowMemoryEstimators = _windowStateMemoryEstimators[windowIdx];
+        auto& windowStateMemoryEstimators = _windowStateMemoryEstimators[windowIdx];
 
         // Add documents into window.
         for (size_t id = idRange.second + 1;; id++) {
@@ -616,14 +619,17 @@ PlanState WindowStage::getNext() {
                 }
                 idRange.second = id;
 
-                // Sample window state memory if needed.
-                auto frameSize = getWindowFrameSize(windowIdx);
-                for (size_t exprIdx = 0; exprIdx < windowAddCodes.size(); ++exprIdx) {
-                    auto& memoryEstimator = windowMemoryEstimators[exprIdx];
-                    if (memoryEstimator.shouldSample(frameSize)) {
-                        auto [tag, value] = windowAccessors[exprIdx]->getViewOfValue();
-                        auto memory = size_estimator::estimate(tag, value);
-                        memoryEstimator.sample(frameSize, memory);
+                // There is no state when the window is non-removable
+                if (_windows[windowIdx].lowBoundExpr) {
+                    auto frameSize = getWindowFrameSize(windowIdx);
+                    for (size_t exprIdx = 0; exprIdx < windowAddCodes.size(); ++exprIdx) {
+                        auto& stateMemoryEstimator = windowStateMemoryEstimators[exprIdx];
+                        // Sample window state memory if needed.
+                        if (stateMemoryEstimator.shouldSample(frameSize)) {
+                            auto [tag, value] = windowAccessors[exprIdx]->getViewOfValue();
+                            auto memory = size_estimator::estimate(tag, value);
+                            stateMemoryEstimator.sample(frameSize, memory);
+                        }
                     }
                 }
             } else {
