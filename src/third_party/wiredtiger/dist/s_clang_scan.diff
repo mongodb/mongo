@@ -1,7 +1,8 @@
 # This file contains a set of ignored warnings from the clang static analyzer. Comments are stripped
 # from the file before it is compared against the clang output.
 wiredtiger/src/btree/bt_delete.c The left operand of '!=' is a garbage value [core.UndefinedBinaryOperatorResult]
-wiredtiger/src/btree/bt_sync.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
+wiredtiger/src/btree/bt_sync_obsolete.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
+wiredtiger/src/btree/bt_sync_obsolete.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
 wiredtiger/src/btree/bt_sync_obsolete.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
 wiredtiger/src/include/intpack_inline.h Assigned value is garbage or undefined [core.uninitialized.Assign]
 wiredtiger/src/reconcile/rec_row.c Branch condition evaluates to a garbage value [core.uninitialized.Branch]

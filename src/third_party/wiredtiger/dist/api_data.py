@@ -552,10 +552,17 @@ connection_runtime_config = [
             periodic checkpoints''',
             min='0', max='100000'),
         ]),
-    Config('checkpoint_cleanup', 'none', r'''
-        control how aggressively obsolete content is removed when creating checkpoints.
-        Default to none, which means no additional work is done to find obsolete content.
-        ''', choices=['none', 'reclaim_space']),
+    Config('checkpoint_cleanup', '', r'''
+        periodically checkpoint cleanup the database.''',
+        type='category', subconfig=[
+        Config('method', 'none', r'''
+            control how aggressively obsolete content is removed by reading the internal pages.
+            Default to none, which means no additional work is done to find obsolete content.
+            ''', choices=['none', 'reclaim_space']),
+        Config('wait', '300', r'''
+            seconds to wait between each checkpoint cleanup''',
+            min='60', max='100000'),
+        ]),
     Config('debug_mode', '', r'''
         control the settings of various extended debugging features''',
         type='category', subconfig=[
@@ -1857,6 +1864,14 @@ methods = {
 ]),
 
 'WT_SESSION.checkpoint' : Method([
+    Config('debug', '', r'''
+        configure debug specific behavior on a checkpoint. Generally only used for internal testing
+        purposes''',
+        type='category', subconfig=[
+        Config('checkpoint_cleanup', 'false', r'''
+            if true, checkpoint cleanup thread is triggered to perform the checkpoint cleanup''',
+            type='boolean'),
+        ]),
     Config('drop', '', r'''
         specify a list of checkpoints to drop. The list may additionally contain one of the
         following keys: \c "from=all" to drop all checkpoints, \c "from=<checkpoint>" to drop

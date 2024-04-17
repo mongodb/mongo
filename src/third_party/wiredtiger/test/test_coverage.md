@@ -11,7 +11,7 @@
 |Backup||[test_txn04.py](../test/suite/test_txn04.py)
 |Backup|Cursors|[test_backup01.py](../test/suite/test_backup01.py), [test_backup11.py](../test/suite/test_backup11.py)
 |Checkpoint||[test_checkpoint02.py](../test/suite/test_checkpoint02.py)
-|Checkpoint|Garbage Collection|[test_gc01.py](../test/suite/test_gc01.py)
+|Checkpoint|Checkpoint Cleanup|[test_cc01.py](../test/suite/test_cc01.py)
 |Checkpoint|History Store|[test_checkpoint03.py](../test/suite/test_checkpoint03.py)
 |Checkpoint|Metadata|[test_checkpoint_snapshot01.py](../test/suite/test_checkpoint_snapshot01.py)
 |Checkpoint|Obsolete Data|[test_checkpoint08.py](../test/suite/test_checkpoint08.py)

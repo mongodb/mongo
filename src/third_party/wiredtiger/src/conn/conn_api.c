@@ -1245,6 +1245,7 @@ err:
      * writes and we're about to do a final checkpoint separately from the checkpoint server.
      */
     WT_TRET(__wt_background_compact_server_destroy(session));
+    WT_TRET(__wt_checkpoint_cleanup_destroy(session));
     WT_TRET(__wt_checkpoint_server_destroy(session));
 
     /* Perform a final checkpoint and shut down the global transaction state. */
@@ -3051,10 +3052,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__wt_config_gets(session, cfg, "cache_cursors", &cval));
     if (cval.val)
         F_SET(conn, WT_CONN_CACHE_CURSORS);
-
-    WT_ERR(__wt_config_gets(session, cfg, "checkpoint_cleanup", &cval));
-    if (WT_CONFIG_LIT_MATCH("reclaim_space", cval))
-        F_SET(conn, WT_CONN_CKPT_CLEANUP_SKIP_INT);
 
     WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
     if (cval.val)
