@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -128,6 +129,16 @@ private:
 
     std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(
         OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor);
+
+    sharded_agg_helpers::DispatchShardPipelineResults _queryOnceWithNaturalOrder(
+        OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
+
+    void _writeOnceWithNaturalOrder(
+        OperationContext* opCtx,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+        CancellationToken cancelToken,
+        sharded_agg_helpers::DispatchShardPipelineResults& dispatchResults);
 
     void _runOnceWithNaturalOrder(OperationContext* opCtx,
                                   std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
