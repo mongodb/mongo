@@ -102,6 +102,11 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, mirrorReads: {sampli
         jsTestLog(`Seen ${mirrorableReadsSeen} mirrored reads so far`);
         return initialMirrorableReadsSeen + kOperations <= mirrorableReadsSeen;
     }, "Failed to update FTDC metrics within time limit", 30000);
+    assert.soon(() => {
+        // Mirrored reads from this test should finish processing before we get
+        // processedAsSecondary in the next test.
+        return getMirroredReadsProcessedAsSecondary() == kOperations * 2;
+    }, "Failed to wait for processedAsSecondary to converge", 30000);
 }
 
 {
