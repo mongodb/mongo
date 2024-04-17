@@ -31,8 +31,10 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
  */
 var setUp = function(rst) {
     var configDB = st.s.getDB('config');
-    assert.commandWorked(configDB.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(
+        configDB.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
     assert.commandWorked(configDB.adminCommand({shardCollection: kShardedNs, key: {x: 1}}));
+    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: kShardedNs}));
 
     // Each time we drop the database we have to re-enable profiling. Enable profiling on 'admin'
     // to test the $currentOp aggregation stage.
