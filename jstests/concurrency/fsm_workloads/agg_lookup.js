@@ -4,6 +4,7 @@
  * Runs a $lookup aggregation simultaneously with updates.
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
+import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 export const $config = (function() {
     const data = {numDocs: 100};
@@ -30,6 +31,9 @@ export const $config = (function() {
 
                     arr = cursor.toArray();
                 } catch (e) {
+                    if (TransactionsUtil.isTransientTransactionError(e)) {
+                        throw e;
+                    }
                     if (TestData.runningWithShardStepdowns) {
                         // When running with stepdowns, we expect to sometimes see the query
                         // killed.
@@ -93,6 +97,12 @@ export const $config = (function() {
                 jsTestLog("Using nested loop join");
                 this.allowDiskUse = false;
             }
+        }
+
+        // Advance each router's cluster time to be >= the time of the writes, so the first
+        // global snapshots chosen by each is guaranteed to include the inserted documents.
+        if (cluster.isSharded()) {
+            cluster.synchronizeMongosClusterTimes();
         }
     }
 

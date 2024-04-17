@@ -58,10 +58,13 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/query/async_results_merger.h"
 #include "mongo/s/query/results_merger_test_fixture.h"
+#include "mongo/s/session_catalog_router.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
@@ -1825,6 +1828,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorReturnsHighWaterMarkSortKey) 
     scheduleNetworkResponse({kTestNss, CursorId(789), emptyBatch, boost::none, pbrtThirdCursor});
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtSecondCursor);
     ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Advance the second cursor again, so that it surpasses the other two. The third cursor becomes
     // the new high water mark.
@@ -1834,6 +1838,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorReturnsHighWaterMarkSortKey) 
     scheduleNetworkResponse({kTestNss, CursorId(789), emptyBatch, boost::none, pbrtThirdCursor});
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtThirdCursor);
     ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Advance the third cursor such that the first cursor becomes the high water mark.
     pbrtThirdCursor = makePostBatchResumeToken(Timestamp(1, 7));
@@ -1842,6 +1847,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorReturnsHighWaterMarkSortKey) 
     scheduleNetworkResponse({kTestNss, CursorId(789), emptyBatch, boost::none, pbrtThirdCursor});
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtFirstCursor);
     ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Clean up the cursors.
     std::vector<BSONObj> cleanupBatch = {};
@@ -1908,6 +1914,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     // The high water mark has not advanced from its previous value.
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), initialHighWaterMark);
     ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
 
     // If the "config.shards" cursor returns a result, this document does not advance the HWM. We
     // consume this event internally but do not return it to the client, and its resume token is not
@@ -1947,6 +1954,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
                              pbrtConfigCursor});
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), initialHighWaterMark);
     ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
 
     // If none of the above criteria obtain, then the "config.shards" cursor is eligible to advance
     // the ARM's high water mark. The only reason we allow the config.shards cursor to participate
@@ -1963,6 +1971,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     ASSERT_BSONOBJ_GT(arm->getHighWaterMark(), initialHighWaterMark);
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtConfigCursor);
     ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Clean up the cursors.
     std::vector<BSONObj> cleanupBatch = {};
@@ -2108,6 +2117,14 @@ TEST_F(AsyncResultsMergerTest, GetMoresShouldIncludeLSIDAndTxnNumIfSpecified) {
     const TxnNumber txnNumber = 5;
     operationContext()->setTxnNumber(txnNumber);
 
+    operationContext()->setInMultiDocumentTransaction();
+
+    RouterOperationContextSession session(operationContext());
+    TransactionRouter::get(operationContext())
+        .beginOrContinueTxn(
+            operationContext(), txnNumber, TransactionRouter::TransactionActions::kStart);
+    TransactionRouter::get(operationContext()).setDefaultAtClusterTime(operationContext());
+
     std::vector<RemoteCursor> cursors;
     cursors.emplace_back(
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
@@ -2121,8 +2138,10 @@ TEST_F(AsyncResultsMergerTest, GetMoresShouldIncludeLSIDAndTxnNumIfSpecified) {
         ASSERT_EQ(parseSessionIdFromCmd(request.cmdObj), lsid);
         ASSERT_EQ(request.cmdObj["txnNumber"].numberLong(), txnNumber);
 
-        return CursorResponse(kTestNss, 1LL, {BSON("x" << 1)})
-            .toBSON(CursorResponse::ResponseType::SubsequentResponse);
+        BSONObjBuilder bob{CursorResponse(kTestNss, 1LL, {BSON("x" << 1)})
+                               .toBSON(CursorResponse::ResponseType::SubsequentResponse)};
+        bob.appendBool("readOnly", true);
+        return bob.obj();
     });
 
     // Subsequent requests still pass the txnNumber.
@@ -2137,10 +2156,115 @@ TEST_F(AsyncResultsMergerTest, GetMoresShouldIncludeLSIDAndTxnNumIfSpecified) {
 
         ASSERT_EQ(parseSessionIdFromCmd(request.cmdObj), lsid);
         ASSERT_EQ(request.cmdObj["txnNumber"].numberLong(), txnNumber);
-
-        return CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
-            .toBSON(CursorResponse::ResponseType::SubsequentResponse);
+        BSONObjBuilder bob{CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+                               .toBSON(CursorResponse::ResponseType::SubsequentResponse)};
+        bob.appendBool("readOnly", true);
+        return bob.obj();
     });
+}
+
+TEST_F(AsyncResultsMergerTest, ProcessAdditionalParticipants) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagAllowAdditionalParticipants", true);
+
+    auto lsid = makeLogicalSessionIdForTest();
+    operationContext()->setLogicalSessionId(lsid);
+
+    const TxnNumber txnNumber = 5;
+    operationContext()->setTxnNumber(txnNumber);
+
+    operationContext()->setInMultiDocumentTransaction();
+
+    RouterOperationContextSession session(operationContext());
+    TransactionRouter::get(operationContext())
+        .beginOrContinueTxn(
+            operationContext(), txnNumber, TransactionRouter::TransactionActions::kStart);
+    TransactionRouter::get(operationContext()).setDefaultAtClusterTime(operationContext());
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // The first scheduled getMore should pass the txnNumber the ARM was constructed with.
+    ASSERT_OK(arm->nextEvent().getStatus());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+
+        ASSERT_EQ(parseSessionIdFromCmd(request.cmdObj), lsid);
+        ASSERT_EQ(request.cmdObj["txnNumber"].numberLong(), txnNumber);
+
+        BSONObjBuilder bob{CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+                               .toBSON(CursorResponse::ResponseType::SubsequentResponse)};
+        bob.appendBool("readOnly", true);
+        std::vector<BSONObj> additionalParticipants = {
+            BSON("shardId" << kTestShardIds[1] << "readOnly" << true)};
+        bob.appendElements(
+            BSON(TxnResponseMetadata::kAdditionalParticipantsFieldName << additionalParticipants));
+        return bob.obj();
+    });
+
+    // Process responses.
+    ASSERT(arm->ready());
+    ASSERT_OK(arm->nextReady().getStatus());
+
+    auto addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
+    ASSERT(addedShard);
+    ASSERT_EQ(addedShard->readOnly, TransactionRouter::Participant::ReadOnly::kReadOnly);
+}
+
+TEST_F(AsyncResultsMergerTest, ProcessAdditionalParticipantsEvenIfKilled) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagAllowAdditionalParticipants", true);
+
+    auto lsid = makeLogicalSessionIdForTest();
+    operationContext()->setLogicalSessionId(lsid);
+
+    const TxnNumber txnNumber = 5;
+    operationContext()->setTxnNumber(txnNumber);
+
+    operationContext()->setInMultiDocumentTransaction();
+
+    RouterOperationContextSession session(operationContext());
+    TransactionRouter::get(operationContext())
+        .beginOrContinueTxn(
+            operationContext(), txnNumber, TransactionRouter::TransactionActions::kStart);
+    TransactionRouter::get(operationContext()).setDefaultAtClusterTime(operationContext());
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // The first scheduled getMore should pass the txnNumber the ARM was constructed with.
+    ASSERT_OK(arm->nextEvent().getStatus());
+    arm->detachFromOperationContext();
+    // The reply comes after we've sent the request.
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+
+        ASSERT_EQ(parseSessionIdFromCmd(request.cmdObj), lsid);
+        ASSERT_EQ(request.cmdObj["txnNumber"].numberLong(), txnNumber);
+
+        BSONObjBuilder bob{CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+                               .toBSON(CursorResponse::ResponseType::SubsequentResponse)};
+        bob.appendBool("readOnly", true);
+        std::vector<BSONObj> additionalParticipants = {
+            BSON("shardId" << kTestShardIds[1] << "readOnly" << true)};
+        bob.appendElements(
+            BSON(TxnResponseMetadata::kAdditionalParticipantsFieldName << additionalParticipants));
+        return bob.obj();
+    });
+
+    // Proceed to kill the ARM. We haven't yet processed the additional participants.
+    auto addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
+    ASSERT_FALSE(addedShard);
+    arm->reattachToOperationContext(operationContext());
+    arm->kill(operationContext());
+    // We now have killed the ARM. Additional participants should be processed.
+    addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
+    ASSERT(addedShard);
+    ASSERT_EQ(addedShard->readOnly, TransactionRouter::Participant::ReadOnly::kReadOnly);
 }
 
 DEATH_TEST_F(AsyncResultsMergerTest,

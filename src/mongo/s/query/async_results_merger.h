@@ -278,6 +278,18 @@ public:
 
 private:
     /**
+     * Contains the original response received by the shard. This is necessary for processing
+     * additional transaction participants.
+     */
+    struct RemoteResponse {
+        RemoteResponse(ShardId shardId, BSONObj originalResponse)
+            : shardId(std::move(shardId)), originalResponse(std::move(originalResponse)) {}
+
+        ShardId shardId;
+        BSONObj originalResponse;
+    };
+
+    /**
      * We instantiate one of these per remote host. It contains the buffer of results we've
      * retrieved from the host but not yet returned, as well as the cursor id, and any error
      * reported from the remote.
@@ -395,14 +407,14 @@ private:
                                                            const RemoteCursorData& remote);
 
     /**
-     * Helper to schedule a command asking the remote node for another batch of results.
+     * Helper to create the getMore command asking the remote node for another batch of results.
      *
      * The 'remoteIndex' gives the position of the remote node from which we are retrieving the
      * batch in '_remotes'.
-     *
-     * Returns success if the command to retrieve the next batch was scheduled successfully.
      */
-    Status _askForNextBatch(WithLock, size_t remoteIndex);
+    BSONObj _makeRequest(WithLock,
+                         size_t remoteIndex,
+                         const ServerGlobalParams::FCVSnapshot& fcvSnapshot);
 
     /**
      * Checks whether or not the remote cursors are all exhausted.
@@ -518,6 +530,12 @@ private:
      */
     void _setInitialHighWaterMark();
 
+    /**
+     * Process additional participants received in the responses if necessary.
+     */
+    void _processAdditionalTransactionParticipants(OperationContext* opCtx);
+
+
     OperationContext* _opCtx;
     std::shared_ptr<executor::TaskExecutor> _executor;
     AsyncResultsMergerParams _params;
@@ -531,6 +549,8 @@ private:
 
     // Data tracking the state of our communication with each of the remote nodes.
     std::vector<RemoteCursorData> _remotes;
+    // List of pending responses to be processed for additional participants.
+    std::queue<RemoteResponse> _remoteResponses;
 
     // The top of this priority queue is the index into '_remotes' for the remote host that has the
     // next document to return, according to the sort order. Used only if there is a sort.

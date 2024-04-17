@@ -182,6 +182,11 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/shared_request_handling",
         "$BUILD_DIR/mongo/db/vector_clock",
         "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
+        # Linking to cluster_commands is necessary for async_results_merger_test.cpp since it
+        # requires linking to the getMore command. Otherwise the test fails due to a uassert
+        # being thrown.
+        '$BUILD_DIR/mongo/s/commands/cluster_commands',
+        '$BUILD_DIR/mongo/s/commands/cluster_commands_common',
         "$BUILD_DIR/mongo/s/sharding_mongos_test_fixture",
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "async_results_merger",

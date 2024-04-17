@@ -4,7 +4,6 @@
 import {
     withTxnAndAutoRetryOnMongos
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";  // For isSharded.
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const session = db.getMongo().startSession({causalConsistency: false});
 const testDB = session.getDatabase("test");
@@ -29,14 +28,6 @@ const foreignDoc = {
     val: 9
 };
 assert.commandWorked(foreignColl.insert(foreignDoc, {writeConcern: {w: "majority"}}));
-
-// TODO SERVER-84470 $lookup is currently not supported on a sharded collection within a
-// transaction due to the possibility of a deadlock as a consequence of serializing on the same
-// session. This behaviour extends to unsplittable collections as well since they are not guaranteed
-// to be on the primary shard. Remove remove `|| FixtureHelpers.isUnsplittable(foreignColl)` once
-// unsplittable collection are supported.
-const isForeignSharded =
-    FixtureHelpers.isSharded(foreignColl) || FixtureHelpers.isUnsplittable(foreignColl)
 
 const txnOptions = {
     readConcern: {level: "snapshot"}
@@ -74,12 +65,10 @@ withTxnAndAutoRetryOnMongos(session, () => {
     assert(!cursor.hasNext());
 
     // Perform aggregations that look at other collections.
-    // TODO: SERVER-39162 Sharded $lookup is not supported in transactions.
-    if (!isForeignSharded) {
-        jsTestLog("Testing $lookup within a transaction.");
+    jsTestLog("Testing $lookup within a transaction.");
 
-        const lookupDoc = Object.merge(testDoc, {lookup: [foreignDoc]});
-        cursor = coll.aggregate({
+    const lookupDoc = Object.merge(testDoc, {lookup: [foreignDoc]});
+    cursor = coll.aggregate({
                 $lookup: {
                     from: foreignColl.getName(),
                     localField: "foreignKey",
@@ -87,12 +76,12 @@ withTxnAndAutoRetryOnMongos(session, () => {
                     as: "lookup",
                 }
             });
-        assert.docEq(lookupDoc, cursor.next());
-        assert(!cursor.hasNext());
+    assert.docEq(lookupDoc, cursor.next());
+    assert(!cursor.hasNext());
 
-        jsTestLog("Testing $graphLookup within a transaction.");
+    jsTestLog("Testing $graphLookup within a transaction.");
 
-        cursor = coll.aggregate({
+    cursor = coll.aggregate({
                 $graphLookup: {
                     from: foreignColl.getName(),
                     startWith: "$foreignKey",
@@ -101,9 +90,8 @@ withTxnAndAutoRetryOnMongos(session, () => {
                     as: "lookup"
                 }
             });
-        assert.docEq(lookupDoc, cursor.next());
-        assert(!cursor.hasNext());
-    }
+    assert.docEq(lookupDoc, cursor.next());
+    assert(!cursor.hasNext());
 
     jsTestLog("Testing $count within a transaction.");
 

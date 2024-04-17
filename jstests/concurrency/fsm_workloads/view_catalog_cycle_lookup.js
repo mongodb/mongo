@@ -7,6 +7,9 @@
  *
  * @tags: [requires_fcv_51]
  */
+
+import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+
 export const $config = (function() {
     // Use the workload name as a prefix for the view names, since the workload name is assumed
     // to be unique.
@@ -116,13 +119,25 @@ export const $config = (function() {
 
             const viewName = this.getRandomView(this.viewList);
             const res = db.runCommand({find: viewName});
+
+            // If we encountered some transaction failure propagate this upwards so it gets
+            // automatically retried.
+            if (TransactionsUtil.isTransientTransactionError(res)) {
+                throw res;
+            }
+
             // When initializing an aggregation on a view, the server briefly releases its
             // collection lock before creating and iterating the cursor on the underlying namespace.
             // In this short window of time, it's possible that that namespace has been dropped and
             // replaced with a view.
+            //
             // TODO (SERVER-35635): It would be more appropriate for the server to return
             // OperationFailed, as CommandNotSupportedOnView is misleading.
+            // TODO SERVER-XXXXX: The mergeCursors sent by mongos to mongod might get killed during
+            // a remapping and return a somewhat misleading CursorNotFound error. Ideally it should
+            // be remapped to an OperationFailed error.
             assert(res.ok === 1 || res.code === ErrorCodes.CommandNotSupportedOnView ||
+                       res.code === ErrorCodes.CursorNotFound ||
                        res.code === ErrorCodes.CommandOnShardedViewNotSupportedOnMongod,
                    () => tojson(res));
         }

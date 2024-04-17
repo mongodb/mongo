@@ -75,9 +75,7 @@ const testAddingParticipants = function(expectedParticipants,
             shard, "hangAfterAcquiringCollectionCatalog", {collection: foreignColl}));
     });
 
-    // Run the $lookup in another thread. Choose a batchSize > 0 to avoid needing to send a getMore
-    // to get the results.
-    // TODO SERVER-84470 Remove batchSize parameter
+    // Run the $lookup in another thread.
     const runAggRequest =
         (mongosConn, dbName, collName, pipeline, sessionId, txnNum, startTransaction) => {
             let mongos = new Mongo(mongosConn);
@@ -86,7 +84,7 @@ const testAddingParticipants = function(expectedParticipants,
             let aggCmd = {
                 aggregate: collName,
                 pipeline: pipeline,
-                cursor: {batchSize: 5},
+                cursor: {},
                 lsid: lsid,
                 txnNumber: NumberLong(txnNum),
                 stmtId: NumberInt(0),

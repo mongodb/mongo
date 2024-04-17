@@ -55,9 +55,6 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
-  - jstests/concurrency/fsm_workloads/agg_lookup.js
-  - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
   - jstests/concurrency/fsm_workloads/auth_create_role.js
   - jstests/concurrency/fsm_workloads/auth_create_user.js
   - jstests/concurrency/fsm_workloads/auth_drop_role.js

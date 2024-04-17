@@ -48,9 +48,11 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/async_results_merger.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -105,6 +107,24 @@ int compareSortKeys(BSONObj leftSortKey, BSONObj rightSortKey, BSONObj sortKeyPa
     // ICU comparison keys as part of the $sortKey meta projection.
     const BSONObj::ComparisonRulesSet rules = 0;  // 'considerFieldNames' flag is not set.
     return leftSortKey.woCompare(rightSortKey, sortKeyPattern, rules);
+}
+
+void processAdditionaTransactionParticipantFromResponse(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const BSONObj& originalResponse,
+    const ServerGlobalParams::FCVSnapshot& fcvSnapshot) {
+    if (gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
+        transaction_request_sender_details::processReplyMetadata(opCtx, shardId, originalResponse);
+    }
+}
+
+void processAdditionaTransactionParticipantFromResponse(OperationContext* opCtx,
+                                                        const ShardId& shardId,
+                                                        const BSONObj& originalResponse) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    processAdditionaTransactionParticipantFromResponse(
+        opCtx, shardId, originalResponse, fcvSnapshot);
 }
 
 }  // namespace
@@ -217,6 +237,11 @@ bool AsyncResultsMerger::ready() {
 
 void AsyncResultsMerger::detachFromOperationContext() {
     stdx::lock_guard<Latch> lk(_mutex);
+    // Before we're done detaching we do a last attempt to process any additional responses
+    // received. This ensures that the only possible state for ARM to have unprocessed responses is
+    // when it's been stashed between cursor checkouts or after it's been marked as killed.
+    _processAdditionalTransactionParticipants(_opCtx);
+
     _opCtx = nullptr;
     // If we were about ready to return a boost::none because a tailable cursor reached the end of
     // the batch, that should no longer apply to the next use - when we are reattached to a
@@ -365,6 +390,11 @@ StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
         return Status(ErrorCodes::IllegalOperation, "AsyncResultsMerger killed");
     }
 
+    // We process additional transaction participants that have been put in the queue for
+    // processing. Note that this should only occur if the response was received while the cursor
+    // was detached from an operation.
+    _processAdditionalTransactionParticipants(_opCtx);
+
     if (!_status.isOK()) {
         return _status;
     }
@@ -375,6 +405,16 @@ StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
     }
 
     return _params.getSort() ? _nextReadySorted(lk) : _nextReadyUnsorted(lk);
+}
+
+void AsyncResultsMerger::_processAdditionalTransactionParticipants(OperationContext* opCtx) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    while (!_remoteResponses.empty()) {
+        const auto& response = _remoteResponses.front();
+        processAdditionaTransactionParticipantFromResponse(
+            opCtx, response.shardId, response.originalResponse, fcvSnapshot);
+        _remoteResponses.pop();
+    }
 }
 
 ClusterQueryResult AsyncResultsMerger::_nextReadySorted(WithLock) {
@@ -442,8 +482,9 @@ ClusterQueryResult AsyncResultsMerger::_nextReadyUnsorted(WithLock) {
     return {};
 }
 
-Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
-    invariant(_opCtx, "Cannot schedule a getMore without an OperationContext");
+BSONObj AsyncResultsMerger::_makeRequest(WithLock,
+                                         size_t remoteIndex,
+                                         const ServerGlobalParams::FCVSnapshot& fcvSnapshot) {
     auto& remote = _remotes[remoteIndex];
 
     invariant(!remote.cbHandle.isValid());
@@ -467,44 +508,31 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
     if (_params.getRequestQueryStatsFromRemotes()) {
         getMoreRequest.setIncludeQueryStatsMetrics(true);
     }
-    BSONObj cmdObj = getMoreRequest.toBSON({});
-
+    BSONObjBuilder bob;
+    getMoreRequest.serialize(BSONObj{}, &bob);
     if (_params.getSessionId()) {
-        BSONObjBuilder newCmdBob(std::move(cmdObj));
-
-        BSONObjBuilder lsidBob(
-            newCmdBob.subobjStart(OperationSessionInfoFromClient::kSessionIdFieldName));
+        BSONObjBuilder lsidBob{
+            bob.subobjStart(OperationSessionInfoFromClient::kSessionIdFieldName)};
         _params.getSessionId()->serialize(&lsidBob);
         lsidBob.doneFast();
 
-        if (_params.getTxnNumber()) {
-            newCmdBob.append(OperationSessionInfoFromClient::kTxnNumberFieldName,
-                             *_params.getTxnNumber());
+        // When the feature flag is enabled the command gets processed with
+        // transaction_request_sender_details::attachTxnDetails. Using that method would add
+        // startOrContinue which is unrecognized by versions earlier than 8.0 as it is part of the
+        // feature flag.
+        if (!gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
+            if (_params.getTxnNumber()) {
+                bob.append(OperationSessionInfoFromClient::kTxnNumberFieldName,
+                           *_params.getTxnNumber());
+            }
+
+            if (_params.getAutocommit()) {
+                bob.append(OperationSessionInfoFromClient::kAutocommitFieldName,
+                           *_params.getAutocommit());
+            }
         }
-
-        if (_params.getAutocommit()) {
-            newCmdBob.append(OperationSessionInfoFromClient::kAutocommitFieldName,
-                             *_params.getAutocommit());
-        }
-
-        cmdObj = newCmdBob.obj();
     }
-
-    executor::RemoteCommandRequest request(
-        remote.getTargetHost(), remote.cursorNss.dbName(), cmdObj, _opCtx);
-
-    auto callbackStatus =
-        _executor->scheduleRemoteCommand(request, [this, remoteIndex](auto const& cbData) {
-            stdx::lock_guard<Latch> lk(this->_mutex);
-            this->_handleBatchResponse(lk, cbData, remoteIndex);
-        });
-
-    if (!callbackStatus.isOK()) {
-        return callbackStatus.getStatus();
-    }
-
-    remote.cbHandle = callbackStatus.getValue();
-    return Status::OK();
+    return bob.obj();
 }
 
 Status AsyncResultsMerger::scheduleGetMores() {
@@ -528,7 +556,11 @@ Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
         return interruptStatus;
     }
 
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+
     // Schedule remote work on hosts for which we need more results.
+    std::vector<size_t> remoteIdxs;
+    std::vector<AsyncRequestsSender::Request> asyncRequests;
     for (size_t i = 0; i < _remotes.size(); ++i) {
         auto& remote = _remotes[i];
 
@@ -540,12 +572,45 @@ Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
         if (!remote.hasNext() && !remote.exhausted() && !remote.cbHandle.isValid()) {
             // If this remote is not exhausted and there is no outstanding request for it, schedule
             // work to retrieve the next batch.
-            auto nextBatchStatus = _askForNextBatch(lk, i);
-            if (!nextBatchStatus.isOK()) {
-                return nextBatchStatus;
-            }
+            auto req = _makeRequest(lk, i, fcvSnapshot);
+            remoteIdxs.emplace_back(i);
+            asyncRequests.emplace_back(remote.shardId, std::move(req));
         }
     }
+
+    // Build the batch of requests to send if inside a transaction.
+    std::vector<executor::RemoteCommandRequest> executorRequests;
+    auto txnRequests = [&] {
+        if (gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
+            return transaction_request_sender_details::attachTxnDetails(_opCtx,
+                                                                        std::move(asyncRequests));
+        }
+        return std::move(asyncRequests);
+    }();
+    for (size_t i = 0; i < txnRequests.size(); i++) {
+        const auto& remote = _remotes[remoteIdxs[i]];
+        auto cmdObj = std::move(txnRequests[i].cmdObj);
+        executorRequests.emplace_back(
+            remote.getTargetHost(), remote.cursorNss.dbName(), cmdObj, _opCtx);
+    }
+
+    for (size_t i = 0; i < executorRequests.size(); i++) {
+        const auto remoteIndex = remoteIdxs[i];
+        auto& remote = _remotes[remoteIndex];
+        auto& request = executorRequests[i];
+        auto callbackStatus =
+            _executor->scheduleRemoteCommand(request, [this, remoteIndex](auto const& cbData) {
+                stdx::lock_guard<Latch> lk(this->_mutex);
+                this->_handleBatchResponse(lk, cbData, remoteIndex);
+            });
+
+        if (!callbackStatus.isOK()) {
+            return callbackStatus.getStatus();
+        }
+
+        remote.cbHandle = callbackStatus.getValue();
+    }
+
     return Status::OK();
 }
 
@@ -723,7 +788,22 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                                               CbData const& cbData,
                                               size_t remoteIndex) {
     // Got a response from remote, so indicate we are no longer waiting for one.
-    _remotes[remoteIndex].cbHandle = executor::TaskExecutor::CallbackHandle();
+    auto& remote = _remotes[remoteIndex];
+    remote.cbHandle = executor::TaskExecutor::CallbackHandle();
+
+    if (cbData.response.isOK()) {
+        if (_opCtx) {
+            processAdditionaTransactionParticipantFromResponse(
+                _opCtx, remote.shardId, cbData.response.data);
+        } else {
+            // We store the original unprocessed response in order to process additional transaction
+            // participants when reading it with an attached opCtx. As this operation can occur
+            // after a while the BSON must be owned since otherwise we would be pointing to invalid
+            // memory.
+            invariant(cbData.response.data.isOwned());
+            _remoteResponses.emplace(remote.shardId, cbData.response.data);
+        }
+    }
 
     //  On shutdown, there is no need to process the response.
     if (_lifecycleState != kAlive) {
@@ -780,6 +860,7 @@ void AsyncResultsMerger::_processBatchResults(WithLock lk,
         _cleanUpFailedBatch(lk, response.status, remoteIndex);
         return;
     }
+
     auto cursorResponseStatus = _parseCursorResponse(response.data, remote);
     if (!cursorResponseStatus.isOK()) {
         _cleanUpFailedBatch(lk,
@@ -811,12 +892,6 @@ void AsyncResultsMerger::_processBatchResults(WithLock lk,
     if (_tailableMode == TailableModeEnum::kTailable && !remote.hasNext()) {
         invariant(_remotes.size() == 1);
         _eofNext = true;
-    } else if (!remote.hasNext() && !remote.exhausted() && _lifecycleState == kAlive && _opCtx) {
-        // If this is normal or tailable-awaitData cursor and we still don't have anything buffered
-        // after receiving this batch, we can schedule work to retrieve the next batch right away.
-        // Be careful only to do this when '_opCtx' is non-null, since it is illegal to schedule a
-        // remote command on a user's behalf without a non-null OperationContext.
-        remote.status = _askForNextBatch(lk, remoteIndex);
     }
 }
 
@@ -858,7 +933,9 @@ bool AsyncResultsMerger::_addBatchToBuffer(WithLock lk,
 }
 
 void AsyncResultsMerger::_signalCurrentEventIfReady(WithLock lk) {
-    if (_ready(lk) && _currentEvent.isValid()) {
+    // We signal if we're ready to respond or if there are no more pending requests to be received.
+    // In the latter case we expect the caller to schedule more getMore requests.
+    if ((_ready(lk) || !_haveOutstandingBatchRequests(lk)) && _currentEvent.isValid()) {
         // To prevent ourselves from signalling the event twice, we set '_currentEvent' as
         // invalid after signalling it.
         _executor->signalEvent(_currentEvent);
@@ -927,6 +1004,18 @@ stdx::shared_future<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     _killCompleteInfo.emplace();
 
     _scheduleKillCursors(lk, opCtx);
+
+    // We do a last attempt to process the pending additional transaction participants if executing
+    // under the same transaction. Processing additional participants on a different transaction
+    // would result in modifying the list of participants of a transaction that has nothing to do
+    // with the original one.
+    if (opCtx->inMultiDocumentTransaction() &&
+        opCtx->getLogicalSessionId() == _params.getSessionId().map([&](const auto& lsid) {
+            return makeLogicalSessionId(lsid, opCtx);
+        }) &&
+        opCtx->getTxnNumber() == _params.getTxnNumber()) {
+        _processAdditionalTransactionParticipants(opCtx);
+    }
 
     if (!_haveOutstandingBatchRequests(lk)) {
         _lifecycleState = kKillComplete;
