@@ -157,10 +157,6 @@ void ReplicaSetMonitorManager::_setupTaskExecutorAndStatsInLock() {
         return;
     }
 
-    if (!_stats) {
-        _stats = std::make_shared<ReplicaSetMonitorManagerStats>();
-    }
-
     // construct task executor
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     auto networkConnectionHook = std::make_unique<ReplicaSetMonitorManagerNetworkConnectionHook>();
@@ -239,7 +235,6 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitorForHost(const 
 
 vector<string> ReplicaSetMonitorManager::getAllSetNames() const {
     vector<string> allNames;
-
     stdx::lock_guard<Latch> lk(_mutex);
 
     for (const auto& entry : _monitors) {
@@ -330,30 +325,31 @@ void ReplicaSetMonitorManager::removeAllMonitors() {
 }
 
 void ReplicaSetMonitorManager::report(BSONObjBuilder* builder, bool forFTDC) {
-    // Don't hold _mutex the whole time to avoid ever taking a monitor's mutex while holding the
-    // manager's mutex.  Otherwise we could get a deadlock between the manager's, monitor's, and
-    // ShardRegistry's mutex due to the ReplicaSetMonitor's AsynchronousConfigChangeHook
-    // potentially calling ShardRegistry::updateConfigServerConnectionString.
-    auto setNames = getAllSetNames();
-
-    builder->appendNumber("numReplicaSetMonitorsCreated", _numMonitorsCreated);
+    std::vector<std::shared_ptr<ReplicaSetMonitor>> monitors;
+    int numMonitorsCreated;
+    // Gather relevant data under the lock. Separate out writing it to BSON.
+    {
+        stdx::lock_guard lk(_mutex);
+        _doGarbageCollectionLocked(lk);
+        for (const auto& [_, weakMonitor] : _monitors) {
+            if (auto monitor = weakMonitor.lock())
+                monitors.push_back(std::move(monitor));
+        }
+        numMonitorsCreated = _numMonitorsCreated;
+    }
+    // Now write out the data.
+    builder->appendNumber("numReplicaSetMonitorsCreated", numMonitorsCreated);
 
     {
         BSONObjBuilder setStats(
             builder->subobjStart(forFTDC ? "replicaSetPingTimesMillis" : "replicaSets"));
 
-        for (const auto& setName : setNames) {
-            auto monitor = getMonitor(setName);
-            if (!monitor) {
-                continue;
-            }
+        for (const auto& monitor : monitors) {
             monitor->appendInfo(setStats, forFTDC);
         }
     }
 
-    if (_stats) {
-        _stats->report(builder, forFTDC);
-    }
+    _stats->report(builder, forFTDC);
 }
 
 std::shared_ptr<executor::TaskExecutor> ReplicaSetMonitorManager::getExecutor() {

@@ -244,8 +244,9 @@ private:
     // Used for tests.
     Counter64 _monitorsGarbageCollected;
 
-    // Internally synchronized.
-    std::shared_ptr<ReplicaSetMonitorManagerStats> _stats;
+    // Pointee is internally synchronized.
+    const std::shared_ptr<ReplicaSetMonitorManagerStats> _stats =
+        std::make_shared<ReplicaSetMonitorManagerStats>();
 };
 
 }  // namespace mongo
