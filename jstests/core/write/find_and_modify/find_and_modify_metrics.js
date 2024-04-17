@@ -15,6 +15,9 @@
  *   does_not_support_config_fuzzer,
  *   # Multi clients run concurrently and may modify the serverStatus metrices read in this test.
  *   multi_clients_incompatible,
+ *   # The metrics checked in the test may be spoiled by data movement
+ *   # TODO SERVER-89482 consider adapting this test to also account for balancing
+ *   assumes_balancer_off,
  * ]
  */
 const testDB = db.getSiblingDB(jsTestName());
