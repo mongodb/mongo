@@ -4,6 +4,7 @@ test_kind: js_test
 
 selector:
   roots:
+    - jstests/aggregation/**/*.js
     - jstests/core/**/*.js
   exclude_files:
     # TODO SERVER-86996 Apply QuerySettings for queries involving timeseries collections.
@@ -19,6 +20,11 @@ selector:
     - jstests/core/query/index_deduplication.js
     - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
     - jstests/core/return_key.js
+
+    # Test which asserts on the number of execution metrics. The additional commands emitted by
+    # this suite might cause the test to fail.
+    - jstests/aggregation/sources/geonear/geonear_hint.js
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
 
     # This suite emits additional explains alongside the tested command. This interferes with the number of
     # expected plan cache entries.
