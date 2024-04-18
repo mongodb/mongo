@@ -107,10 +107,12 @@ executor:
         queryAnalysisWriterIntervalSecs: 1
         defaultConfigCommandTimeoutMS: 90000
         skipDroppingHashedShardKeyIndex: true
-        featureFlagAllMongodsAreSharded: 1
+        # TODO SERVER-89498 Re-enable.
+        # featureFlagAllMongodsAreSharded: 1
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2
-    use_auto_bootstrap_procedure: 1
+    # TODO SERVER-89498 Re-enable.
+    # use_auto_bootstrap_procedure: 1
     enable_balancer: true
     random_migrations: true

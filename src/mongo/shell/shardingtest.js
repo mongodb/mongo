@@ -2119,6 +2119,9 @@ var ShardingTest = function ShardingTest(params) {
                 const configShardDoc = this.keyFile
                     ? authutil.asCluster(csrsPrimary, this.keyFile, getConfigShardDoc)
                     : getConfigShardDoc();
+
+                // TODO SERVER-89498: This check is flaky and should be fixed before re-enabling the
+                // autobootstrap procedure. See BF-31879 for more details.
                 return configShardDoc.host == this.configRS.getURL();
             });
         }

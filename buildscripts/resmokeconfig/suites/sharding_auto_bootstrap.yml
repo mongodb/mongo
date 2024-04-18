@@ -17,5 +17,6 @@ executor:
       global_vars:
         TestData:
           configShard: true
-          useAutoBootstrapProcedure: true
+          # TODO SERVER-89498 Re-enable.
+          # useAutoBootstrapProcedure: true
       nodb: ""

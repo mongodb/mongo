@@ -106,5 +106,7 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        featureFlagAllMongodsAreSharded: 1
-    use_auto_bootstrap_procedure: 1
+        # TODO SERVER-89498 Re-enable.
+        # featureFlagAllMongodsAreSharded: 1
+    # TODO SERVER-89498 Re-enable.
+    # use_auto_bootstrap_procedure: 1
