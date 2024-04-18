@@ -49,6 +49,14 @@ build --bes_keywords=repo:mongo
 build --jobs=200
 common --remote_upload_local_results=False
 
+# Settings specific for clang-tidy
+--config=clang-tidy
+build:clang-tidy --aspects @bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
+build:clang-tidy --output_groups=report
+build:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config
+build:clang-tidy --@bazel_clang_tidy//:clang_tidy_executable=@mongo_toolchain//:clang_tidy
+build:clang-tidy --@bazel_clang_tidy//:clang_tidy_additional_deps=@mongo_toolchain//:all
+
 # if you don't have access to the remote execution cluster above, use the local config
 # described below.
 # pass local config to SCons like:

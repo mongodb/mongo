@@ -2,6 +2,14 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
 load("//bazel/toolchains:mongo_toolchain.bzl", "toolchain_download")
 
+http_archive(
+    name = "bazel_clang_tidy",
+    # Note: strip_prefix is necessary to refer to the `@bazel_clang_tidy` package
+    strip_prefix = "bazel_clang_tidy-1.1",
+    # TODO(80396): Figure out how to get the sha256 of the release tarball
+    url = "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.1.tar.gz",
+)
+
 setup_local_config_platform(name = "local_config_platform")
 
 toolchain_download(name = "mongo_toolchain")

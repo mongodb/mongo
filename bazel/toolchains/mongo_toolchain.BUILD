@@ -172,3 +172,12 @@ cc_toolchain_suite(
         "{bazel_toolchain_cpu}": ":cc_mongo_toolchain",
     },
 )
+
+# This file group makes it possible to set the clang-tidy configuration setting:
+#   --@bazel_clang_tidy//:clang_tidy_executable=@mongo_toolchain//:clang_tidy
+filegroup(
+    name = "clang_tidy",
+    srcs = [
+        "v4/bin/clang-tidy",
+    ],
+)
