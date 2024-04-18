@@ -2473,7 +2473,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_P
     auto* cellBlock = value::bitcastTo<value::CellBlock*>(cellVal);
 
     const auto& positionInfo = cellBlock->filterPositionInfo();
-    tassert(7953901, "Only top-level cell values are supported", emptyPositionInfo(positionInfo));
+    uassert(7953901, "Only top-level cell values are supported", emptyPositionInfo(positionInfo));
     // Return the input unchanged.
     return moveFromStack(0);
 }
