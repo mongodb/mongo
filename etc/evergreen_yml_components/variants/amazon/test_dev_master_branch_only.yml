@@ -58,7 +58,7 @@ variables:
     packager_arch: aarch64
     packager_distro: amazon2
     repo_edition: enterprise
-    large_distro_name: amazon2-arm64-large
+    large_distro_name: amazon2-arm64-atlas-large
     core_analyzer_distro_name: amazon2-arm64-xlarge
     num_scons_link_jobs_available: 0.99
 
@@ -332,11 +332,11 @@ buildvariants:
   - &enterprise-amazon-linux2-arm64-all-feature-flags-template
     <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
     name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
-    display_name: "! Amazon Linux 2 arm64 Enterprise (all feature flags)"
+    display_name: "! Amazon Linux 2 arm64 Atlas Enterprise (all feature flags)"
     tags: ["required"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - amazon2-arm64-small
+      - amazon2-arm64-atlas-small
     stepback: true
     expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
       <<: *amazon_linux2_arm64_dynamic_expansions
@@ -356,15 +356,15 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
-          - amazon2-arm64-large
+          - amazon2-arm64-atlas-large
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
-          - amazon2-arm64-large
+          - amazon2-arm64-atlas-large
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
-          - amazon2-arm64-large
+          - amazon2-arm64-atlas-large
 
   - &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
     <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
