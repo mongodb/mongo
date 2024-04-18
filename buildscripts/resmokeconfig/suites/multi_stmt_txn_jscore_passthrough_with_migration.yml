@@ -275,6 +275,9 @@ selector:
     - assumes_no_implicit_index_creation
     - assumes_unsharded_collection
     - cannot_create_unique_index_when_using_hashed_shard_key
+    # This suite performs balancing of unsharded collection in background
+    # using moveCollection that changes collections UUID
+    - assumes_stable_collection_uuid
     - assumes_balancer_off
     - requires_fastcount
     # Transactions are not allowed to operate on capped collections.

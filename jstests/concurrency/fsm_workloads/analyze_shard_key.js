@@ -9,6 +9,9 @@
  *  uses_transactions,
  *  resource_intensive,
  *  incompatible_with_concurrency_simultaneous,
+ *  # TODO SERVER-89503 Re-enable this test in suites with balancer once
+ *  # the relative issue is solved.
+ *  assumes_balancer_off,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

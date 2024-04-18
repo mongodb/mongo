@@ -2,12 +2,14 @@
  * Testing random migration failpoint
  * @tags: [
  *  requires_fcv_80,
- *  featureFlagReshardingImprovements,
- *  featureFlagMoveCollection,
- *  featureFlagTrackUnshardedCollectionsUponCreation,
- *  requires_sharding
+ *  featureFlagTrackUnshardedCollectionsUponMoveCollection,
  * ]
  */
+
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+
+// TODO SERVER-89399: re-enable the hook once it properly serialize with resharding operations
+TestData.skipCheckShardFilteringMetadata = true;
 
 // The mongod secondaries are set to priority 0 to prevent the primaries from stepping down during
 // migrations on slow evergreen builders.
@@ -18,56 +20,73 @@ var st = new ShardingTest({
         configOptions: {
             setParameter: {
                 "failpoint.balancerShouldReturnRandomMigrations": "{mode: 'alwaysOn'}",
+                "reshardingMinimumOperationDurationMillis": 0,
+                "balancerMigrationsThrottlingMs": 0,
             }
         }
     }
 });
 
-const dbName = "balancer_should_Return_random_migrations_failpoint";
-const collName = "testColl";
-const fullCollName = dbName + "." + collName;
+const dbNames = ["db0", "db1"];
 const numDocuments = 25;
-const testDB = st.s.getDB(dbName);
+const timeFieldName = 'time';
 
-// Load the data as an (unsplitable) collection
-let bulk = testDB[collName].initializeUnorderedBulkOp();
-for (let i = 0; i < numDocuments; ++i) {
-    bulk.insert({"Surname": "Smith", "Age": i});
-}
-assert.commandWorked(bulk.execute());
+// Setup collections
+{
+    for (const dbName of dbNames) {
+        let db = st.getDB(dbName);
 
-// Find in which shard is the collection at the current moment
-function getDataShard(collName) {
-    try {
-        const docsS0 = st.rs0.getPrimary().getCollection(fullCollName).countDocuments({});
-        const docsS1 = st.rs1.getPrimary().getCollection(fullCollName).countDocuments({});
-        if (docsS0 == numDocuments)
-            return st.rs0;
-        else if (docsS1 == numDocuments)
-            return st.rs1;
-    } catch (e) {
-        if (e.code != ErrorCodes.QueryPlanKilled) {
-            throw e;
+        // Create unsharded collection
+        let bulk = db.unsharded.initializeUnorderedBulkOp();
+        for (let i = 0; i < numDocuments; ++i) {
+            bulk.insert({"Surname": "Smith", "Age": i});
         }
+        assert.commandWorked(bulk.execute());
+
+        // Create sharded collection
+        st.adminCommand({shardCollection: `${dbName}.sharded`, key: {x: 1}});
+
+        // Create timeseries collection
+        assert.commandWorked(
+            db.createCollection('timeseries', {timeseries: {timeField: timeFieldName}}));
+
+        // Create view
+        assert.commandWorked(db.createCollection('view', {viewOn: 'unsharded'}));
     }
-    // If we get here the collection might have been moved during the execution of the function
-    // We should simply retry to get a new position
-    return null;
 }
 
-var initialShard;
-assert.soon(() => {
-    initialShard = getDataShard(fullCollName);
-    return initialShard != null;
-});
+// Get the data shard for a given collection
+function getDataShard(nss) {
+    // wait until the collection gets tracked
+    // We need to wait because collection get tracked only on the db
+    assert.soon(() => {
+        return st.s.getCollection('config.collections').countDocuments({_id: nss}) > 0;
+    }, `Timed out waiting for collection ${nss} to get tracked`);
 
-// We expect that the balancer will eventually move the collection with random migrations to
-// another shard. We check that all docs were moved at a given time
-assert.soon(() => {
-    const currentShard = getDataShard(fullCollName);
-    if (currentShard != null && initialShard != currentShard) {
-        return true;
+    let chunk = findChunksUtil.findOneChunkByNs(st.getDB('config'), nss);
+    assert(chunk, `Couldn't find chunk for collection ${nss}`);
+    return chunk.shard;
+}
+
+// Store the initial shard for every namespace
+// Map: namespace -> shardId
+let initialPlacements = {};
+
+// TODO SERVER-83878 add 'system.buckets.timeseries' to the list of trackable collections
+const trackableCollections = ['unsharded'];
+for (const dbName of dbNames) {
+    for (const collName of trackableCollections) {
+        const fullName = `${dbName}.${collName}`;
+        initialPlacements[fullName] = getDataShard(fullName);
     }
-});
+}
+
+jsTest.log(`Intial placement: ${tojson(initialPlacements)}`);
+
+for (const [nss, initialShard] of Object.entries(initialPlacements)) {
+    assert.soon(() => {
+        return getDataShard(nss) != initialShard;
+    }, `Data shard for collection ${nss} didn't change`);
+}
 
 st.stop();

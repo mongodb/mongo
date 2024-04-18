@@ -371,7 +371,7 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
 /**
  * Returns true if the provenance is moveCollection or balancerMoveCollection.
  */
-bool isMoveCollection(boost::optional<ProvenanceEnum> provenance);
+bool isMoveCollection(const boost::optional<ProvenanceEnum>& provenance);
 
 /**
  * Helper function to create a thread pool for _markKilledExecutor member of resharding POS.

@@ -5,6 +5,8 @@
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
 //   requires_fastcount,
+//   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer
+//   assumes_balancer_off,
 // ]
 
 //
