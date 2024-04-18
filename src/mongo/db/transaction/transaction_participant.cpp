@@ -344,7 +344,10 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                                            entry.getOpTime());
             }
         }
-        result.affectedNamespaces.emplace(entry.getNss());
+
+        if (!entry.getNss().isEmpty()) {
+            result.affectedNamespaces.emplace(entry.getNss());
+        }
     };
 
     // Restore the current timestamp read source after fetching transaction history, which may
