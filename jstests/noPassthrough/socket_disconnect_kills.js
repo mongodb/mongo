@@ -4,7 +4,7 @@
 // 2. Open a new client with sockettimeoutms set (to force the disconnect) and a special appname
 //    (to allow easy checking for the specific connection)
 // 3. Run the tested command on the special connection and wait for it to timeout
-// 4. Use an existing client to check current op for that special appname.  Return true if it's
+// 4. Use an existing client to check current op for that special appname and check if it's
 //    still there at the end of a timeout
 // 5. Disable the fail point
 //
@@ -16,27 +16,39 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
-const testName = "socket_disconnect_kills";
+const kTestName = jsTestName();
 
 // Used to generate unique appnames
 let id = 0;
 
+function getCurOpCount(client, id) {
+    return client.getDB("admin")
+        .aggregate([
+            {$currentOp: {localOps: true}},
+            {$match: {appName: kTestName + id}},
+        ])
+        .itcount();
+}
+
 // client - A client connection for curop (and that holds the hostname)
 // pre - A callback to run with the timing out socket
 // post - A callback to run after everything else has resolved (cleanup)
+// expectCleanUp - whether or not to expect the operation to be cleaned up on network failure.
 //
 // Returns false if the op was gone from current op
-function check(client, pre, post) {
+function check(client, pre, post, {expectCleanUp}) {
     const interval = 200;
     const timeout = 10000;
     const socketTimeout = 5000;
 
     const host = client.host;
 
+    const msg = "operation " + (expectCleanUp ? "" : "not ") + "cleaned up on client disconnect.";
+
     // Make a socket which will timeout
     id++;
     let conn =
-        new Mongo(`mongodb://${host}/?socketTimeoutMS=${socketTimeout}&appName=${testName}${id}`);
+        new Mongo(`mongodb://${host}/?socketTimeoutMS=${socketTimeout}&appName=${kTestName}${id}`);
 
     // Make sure it works at all
     assert.commandWorked(conn.adminCommand({ping: 1}));
@@ -53,24 +65,13 @@ function check(client, pre, post) {
             }
         }, [], "error doing query: failed: network error while attempting");
 
-        // Spin until the op leaves currentop, or timeout passes
-        const start = new Date();
-
-        while (1) {
-            if (!client.getDB("admin")
-                     .aggregate([
-                         {$currentOp: {localOps: true}},
-                         {$match: {appName: testName + id}},
-                     ])
-                     .itcount()) {
-                return false;
-            }
-
-            if (((new Date()).getTime() - start.getTime()) > timeout) {
-                return true;
-            }
-
-            sleep(interval);
+        if (expectCleanUp) {
+            assert.soon(() => {
+                return (getCurOpCount(client, id) == 0);
+            }, msg, timeout, interval);
+        } else {
+            sleep(timeout);
+            assert.gt(getCurOpCount(client, id), 0);
         }
     } finally {
         post();
@@ -105,7 +106,7 @@ function runWithCmdFailPointEnabled(client) {
                      assert.commandWorked(client.adminCommand({
                          configureFailPoint: failPointName,
                          mode: "alwaysOn",
-                         data: {appName: testName + id},
+                         data: {appName: kTestName + id},
                      }));
 
                      entry[1](client);
@@ -118,16 +119,16 @@ function runWithCmdFailPointEnabled(client) {
 }
 
 function checkClosedEarly(client, pre, post) {
-    assert(!check(client, pre, post), "operation killed on socket disconnect");
+    check(client, pre, post, {expectCleanUp: true});
 }
 
 function checkNotClosedEarly(client, pre, post) {
-    assert(check(client, pre, post), "operation not killed on socket disconnect");
+    check(client, pre, post, {expectCleanUp: false});
 }
 
 function runCommand(cmd) {
     return function(client) {
-        assert.commandWorked(client.getDB(testName).runCommand(cmd));
+        assert.commandWorked(client.getDB(kTestName).runCommand(cmd));
     };
 }
 
@@ -138,13 +139,13 @@ function testUnsendableCompletedResponsesCounted(client) {
         client.adminCommand({serverStatus: 1}).metrics.operation.unsendableCompletedResponses;
     id++;
     const host = client.host;
-    let conn = new Mongo(`mongodb://${host}/?appName=${testName}${id}`);
+    let conn = new Mongo(`mongodb://${host}/?appName=${kTestName}${id}`);
     // Make sure the new connection works.
     assert.commandWorked(conn.adminCommand({ping: 1}));
 
     // Ensure that after the next command completes, the server fails to send the response.
     let fp = configureFailPoint(
-        client, "sessionWorkflowDelayOrFailSendMessage", {appName: testName + id});
+        client, "sessionWorkflowDelayOrFailSendMessage", {appName: kTestName + id});
 
     // Should fail because the server will close the connection after receiving a simulated network
     // error sinking the response to the client.
@@ -162,11 +163,11 @@ function runTests(client) {
     let admin = client.getDB("admin");
 
     // set timeout for js function execution to 100 ms to speed up tests that run inf loop.
-    assert.commandWorked(client.getDB(testName).adminCommand(
+    assert.commandWorked(client.getDB(kTestName).adminCommand(
         {setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}));
-    assert.commandWorked(client.getDB(testName).test.insert({x: 1}));
-    assert.commandWorked(client.getDB(testName).test.insert({x: 2}));
-    assert.commandWorked(client.getDB(testName).test.insert({x: 3}));
+    assert.commandWorked(client.getDB(kTestName).test.insert({x: 1}));
+    assert.commandWorked(client.getDB(kTestName).test.insert({x: 2}));
+    assert.commandWorked(client.getDB(kTestName).test.insert({x: 3}));
 
     [[checkClosedEarly, runCommand({find: "test", filter: {}})],
      [
@@ -201,8 +202,8 @@ function runTests(client) {
             checkClosedEarly,
             function(client) {
                 let result = assert.commandWorked(
-                    client.getDB(testName).runCommand({find: "test", filter: {}, batchSize: 0}));
-                assert.commandWorked(client.getDB(testName).runCommand(
+                    client.getDB(kTestName).runCommand({find: "test", filter: {}, batchSize: 0}));
+                assert.commandWorked(client.getDB(kTestName).runCommand(
                     {getMore: result.cursor.id, collection: "test"}));
             }
         ]].forEach(runWithCuropFailPointEnabled(client,
