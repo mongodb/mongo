@@ -224,6 +224,14 @@ public:
         return _fromOplogApplication;
     }
 
+    void setPreserveEmptyTS(OptionalBool preserveEmptyTS) {
+        _preserveEmptyTS = preserveEmptyTS;
+    }
+
+    OptionalBool getPreserveEmptyTS() const {
+        return _preserveEmptyTS;
+    }
+
     void setExplain(boost::optional<ExplainOptions::Verbosity> verbosity) {
         _explain = verbosity;
     }
@@ -376,6 +384,8 @@ private:
     OptionalBool _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
 
     OptionalBool _isTimeseriesNamespace;
+
+    OptionalBool _preserveEmptyTS;
 
     // Flags controlling the update.
 
