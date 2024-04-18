@@ -205,6 +205,10 @@ public:
                 // not tracked yet or must always be local
                 if (isUnsplittable && !isFromCreateUnsplittableCommand) {
                     if (isAlwaysUntracked(opCtx, ns(), request())) {
+                        uassert(ErrorCodes::IllegalOperation,
+                                fmt::format("Tracking of collection '{}' is not supported.",
+                                            ns().toStringForErrorMsg()),
+                                !isTrackCollectionIfExists);
                         return _createUntrackedCollection(opCtx);
                     }
 

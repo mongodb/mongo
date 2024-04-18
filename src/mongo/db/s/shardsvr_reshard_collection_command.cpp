@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/db/s/reshard_collection_coordinator_document_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
@@ -96,7 +97,7 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            if (request().getProvenance() == ProvenanceEnum::kMoveCollection) {
+            if (resharding::isMoveCollection(request().getProvenance())) {
                 bool clusterHasTwoOrMoreShards = [&]() {
                     auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
                     auto* clusterCardinalityParam =

@@ -8,6 +8,8 @@
 //
 //   # Uses index building in background
 //   requires_background_index,
+//   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer
+//   assumes_balancer_off,
 // ]
 //
 //

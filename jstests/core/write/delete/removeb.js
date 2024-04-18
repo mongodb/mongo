@@ -3,6 +3,8 @@
 //   requires_non_retryable_writes,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
+//   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer
+//   assumes_balancer_off,
 // ]
 
 // Test removal of Records that have been reused since the remove operation began.  SERVER-5198

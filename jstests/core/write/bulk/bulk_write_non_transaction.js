@@ -11,7 +11,9 @@
  *   # Contains commands that fail which will fail the entire transaction
  *   does_not_support_transactions,
  *   operations_longer_than_stepdown_interval,
- *   requires_fcv_80
+ *   requires_fcv_80,
+ *   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer
+ *   assumes_balancer_off,
  * ]
  */
 import {

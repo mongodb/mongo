@@ -6,7 +6,7 @@
  *   requires_non_retryable_commands,
  *   simulate_atlas_proxy_incompatible,
  *   requires_fcv_80,
- *   # TODO SERVER-87047: re-enable test in suites with random migrations
+ *   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer.
  *   assumes_balancer_off,
  * ]
  */
