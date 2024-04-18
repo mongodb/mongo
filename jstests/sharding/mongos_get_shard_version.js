@@ -10,7 +10,7 @@
 // whether the server has been compiled with the code coverage flag, we assume the compiler flags
 // used to build the mongo shell are the same as the ones used to build the server.
 const isCodeCoverageEnabled = buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage');
-const isStepdownSuite = typeof ContinuousStepdown !== 'undefined';
+const isStepdownSuite = TestData.runningWithConfigStepdowns;
 if (isStepdownSuite && isCodeCoverageEnabled) {
     print('Skipping test during stepdown suite because splitChunk command would take too long');
     quit();

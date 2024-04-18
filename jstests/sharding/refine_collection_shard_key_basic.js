@@ -700,7 +700,7 @@ validateUnrelatedCollAfterRefine(oldCollArr, oldChunkArr, oldTagsArr);
 
 // Verify that all shards in the namespace 'db.foo' eventually refresh. NOTE: This will only succeed
 // in a linear jstest without failovers.
-const isStepdownSuite = typeof ContinuousStepdown !== 'undefined';
+const isStepdownSuite = TestData.runningWithConfigStepdowns;
 if (!isStepdownSuite) {
     dropAndReshardColl(oldKeyDoc);
     assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));

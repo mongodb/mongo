@@ -21,6 +21,9 @@ globalThis.ShardingTest =
     class ShardingTestWithContinuousFailover extends ShardingTestWithContinuousPrimaryStepdown {
     constructor(params) {
         super(params);
+        // Set the feature on the test configuration; this will allow js tests to selectively
+        // skip/alter test cases.
+        TestData.runningWithConfigStepdowns = true;
         // Automatically start the continuous stepdown thread on the config server replica set.
         this.startContinuousFailover();
     }
