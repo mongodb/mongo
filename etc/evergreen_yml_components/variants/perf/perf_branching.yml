@@ -252,29 +252,30 @@ buildvariants:
     tasks: &linux_3_shard_tasks
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
-      - name: ycsb.2023-09
-      - name: ycsb_single_thread
-      - name: ycsb_w1.2023-09
-      - name: crud_workloads_majority
-      - name: crud_workloads_w1
-      - name: misc_workloads
-      - name: map_reduce_workloads
-      - name: smoke_test
       - name: canaries_only
-      - name: mongos_workloads
-        cron: *high-value-workload-cron
-      - name: mongos_large_catalog_workloads
-      - name: move_chunk_workloads
-        cron: *high-value-workload-cron
       - name: change_streams_latency
         cron: *high-value-workload-cron
       - name: change_streams_listen_throughput
         cron: *high-value-workload-cron
       - name: change_streams_multi_mongos
-      - name: tsbs_query_sharded
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: map_reduce_workloads
+      - name: misc_workloads
+      - name: mongos_large_catalog_workloads
+      - name: mongos_workloads
+        cron: *high-value-workload-cron
+      - name: move_chunk_workloads
+        cron: *high-value-workload-cron
+      - name: smoke_test
       - name: tsbs_query_finance_sharded
-      - name: tsbs_query_sharded_balancer
       - name: tsbs_query_finance_sharded_balancer
+      - name: tsbs_query_sharded
+      - name: tsbs_query_sharded_balancer
+      - name: ycsb.2023-09
+      - name: ycsb_read_concern_available.2023-09
+      - name: ycsb_single_thread
+      - name: ycsb_w1.2023-09
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-node-replSet.arm.aws.2023-11

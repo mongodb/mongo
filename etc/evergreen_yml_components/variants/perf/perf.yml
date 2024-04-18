@@ -1071,30 +1071,6 @@ buildvariants:
       - name: smoke_test
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
-    name: perf-shard-lite-read-concern-available.arm.aws.2023-11
-    display_name: Shard Lite ReadConcern Available ARM AWS 2023-11
-    cron: "0 0 * * 4" # 00:00 on Thursday
-    modules: *perf_modules
-    expansions:
-      mongodb_setup_release: 2022-11
-      mongodb_setup: shard-lite-read-concern-available
-      infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: shard-lite
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *perf_project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: amazon2-arm64-compile
-    run_on:
-      - "rhel70-perf-shard-lite"
-    tasks:
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
-      - name: ycsb.2023-09
-      - name: linkbench
-
-  - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-shard-lite-all-feature-flags.arm.aws.2023-11
     display_name: all feature flags Shard Lite ARM AWS 2023-11
     cron: "0 0 * * 4" # 00:00 on Thursday
