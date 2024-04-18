@@ -26,6 +26,7 @@ executor:
     mixed_bin_versions: old_new_new
     mongod_options:
       set_parameters:
+        enableAutoCompaction: 1
         enableTestCommands: 1
     num_nodes: 3
     old_bin_version: last_continuous

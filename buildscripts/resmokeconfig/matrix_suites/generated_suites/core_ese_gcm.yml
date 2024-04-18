@@ -22,6 +22,7 @@ executor:
       encryptionCipherMode: AES256-GCM
       encryptionKeyFile: src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
       set_parameters:
+        enableAutoCompaction: 1
         enableTestCommands: 1
   hooks:
   - class: ValidateCollections
