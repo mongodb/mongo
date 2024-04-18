@@ -145,6 +145,8 @@ last-continuous:
     ticket: SERVER-82717
   - test_file: jstests/core/query/bittest.js
     ticket: SERVER-88173
+  - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
+    ticket: SERVER-86253
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -352,6 +354,8 @@ last-lts:
     ticket: SERVER-82717
   - test_file: jstests/core/query/bittest.js
     ticket: SERVER-88173
+  - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
+    ticket: SERVER-86253
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

@@ -350,5 +350,13 @@ ServerStatusMetricField<Counter64> displayUpdateManyCount("query.updateManyCount
 Counter64 deleteManyCount;
 ServerStatusMetricField<Counter64> displayeleteManyCount("query.deleteManyCount", &deleteManyCount);
 
+Counter64 internalRetryableWriteCount;
+ServerStatusMetricField<Counter64> displayYnternalRetryableWriteCount(
+    "query.internalRetryableWriteCount", &internalRetryableWriteCount);
+
+Counter64 externalRetryableWriteCount;
+ServerStatusMetricField<Counter64> displayExternalRetryableWriteCount(
+    "query.externalRetryableWriteCount", &externalRetryableWriteCount);
+
 ValidatorCounters validatorCounters;
 }  // namespace mongo
