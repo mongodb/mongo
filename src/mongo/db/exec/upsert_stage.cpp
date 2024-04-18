@@ -278,6 +278,7 @@ void UpsertStage::_generateNewDocumentFromSuppliedDoc(const FieldRefSet& immutab
             suppliedDoc, write_ops::UpdateModification::ClassicTag{}, true /* isReplacement */),
         {});
     replacementDriver.setLogOp(false);
+    replacementDriver.setPreserveEmptyTS(static_cast<bool>(_params.request->getPreserveEmptyTS()));
 
     // We do not validate for storage, as we will validate the full document before inserting.
     // However, we ensure that no immutable fields are modified.
