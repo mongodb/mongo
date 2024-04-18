@@ -30,5 +30,5 @@ db-contrib-tool setup-repro-env \
   --evgVersionsFile multiversion-downloads.json \
   $version
 
-version_dir=$(find /data/install -type d -iname "*$version*")
-mv $version_dir/dist-test $(pwd)
+dist_test_dir=$(find /data/install -type d -iname "dist-test")
+mv "$dist_test_dir" "$(pwd)"
