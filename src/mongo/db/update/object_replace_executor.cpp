@@ -58,10 +58,10 @@ namespace {
 constexpr StringData kIdFieldName = "_id"_sd;
 }  // namespace
 
-ObjectReplaceExecutor::ObjectReplaceExecutor(BSONObj replacement, bool fromOplogApplication)
+ObjectReplaceExecutor::ObjectReplaceExecutor(BSONObj replacement, bool preserveEmptyTimestamps)
     : _replacementDoc(replacement.getOwned()),
       _containsId(false),
-      _fromOplogApplication(fromOplogApplication) {
+      _preserveEmptyTimestamps(preserveEmptyTimestamps) {
     // Check for the existence of the "_id" field, and if approrpriate replace all zero-valued
     // timestamps with the current time.
     for (auto&& elem : _replacementDoc) {
@@ -73,9 +73,9 @@ ObjectReplaceExecutor::ObjectReplaceExecutor(BSONObj replacement, bool fromOplog
 
         // For updates that originated from the oplog, we're required to apply the update exactly
         // as it was recorded (even if it contains zero-valued timestamps). Therefore, we should
-        // only replace zero-valued timestamps with the current time when '_fromOplogApplication'
+        // only replace zero-valued timestamps with the current time when '_preserveEmptyTimestamps'
         // is false.
-        if (!_fromOplogApplication && elem.type() == BSONType::bsonTimestamp) {
+        if (!_preserveEmptyTimestamps && elem.type() == BSONType::bsonTimestamp) {
             auto timestampView = DataView(const_cast<char*>(elem.value()));
 
             // We don't need to do an endian-safe read here, because 0 is 0 either way.

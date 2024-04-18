@@ -299,6 +299,7 @@ UpdateResult Helpers::upsert(OperationContext* opCtx,
     request.setUpsert();
     if (fromMigrate) {
         request.setSource(OperationSource::kFromMigrate);
+        request.setPreserveEmptyTS(true);
     }
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
@@ -319,6 +320,7 @@ void Helpers::update(OperationContext* opCtx,
     request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(updateMod));
     if (fromMigrate) {
         request.setSource(OperationSource::kFromMigrate);
+        request.setPreserveEmptyTS(true);
     }
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 

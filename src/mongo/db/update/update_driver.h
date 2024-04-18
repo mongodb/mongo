@@ -206,6 +206,13 @@ public:
         _containsDotsAndDollarsField = containsDotsAndDollarsField;
     }
 
+    bool preserveEmptyTS() const {
+        return _preserveEmptyTS;
+    }
+    void setPreserveEmptyTS(bool preserveEmptyTS) {
+        _preserveEmptyTS = preserveEmptyTS;
+    }
+
     /**
      * Serialize the update expression to Value. Output of this method is expected to, when parsed,
      * produce a logically equivalent update expression.
@@ -242,6 +249,8 @@ private:
 
     // True if this update comes from an oplog application.
     bool _fromOplogApplication = false;
+
+    bool _preserveEmptyTS = false;
 
     // True if this update is guaranteed not to contain dots or dollars fields and should skip the
     // check.
