@@ -262,6 +262,9 @@ selector:
     # TODO SERVER-87065: Add this back in once we prevent it from erroring
     # when validation hook is run.
     - jstests/core/write/update/update_blank1.js
+    # For inserts on time-series collections, mongod does _not_ replace empty timestamp values
+    # with the current time.
+    - jstests/core/query/empty_ts.js
 
   exclude_with_any_tags:
     - requires_sharding

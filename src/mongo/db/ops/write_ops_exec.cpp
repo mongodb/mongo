@@ -1183,8 +1183,12 @@ WriteResult performInserts(OperationContext* opCtx,
     for (auto&& doc : wholeOp.getDocuments()) {
         const auto currentOpIndex = nextOpIndex++;
         const bool isLastDoc = (&doc == &wholeOp.getDocuments().back());
+        const bool preserveEmptyTimestamps = source == OperationSource::kFromMigrate;
         bool containsDotsAndDollarsField = false;
-        auto fixedDoc = fixDocumentForInsert(opCtx, doc, &containsDotsAndDollarsField);
+
+        auto fixedDoc =
+            fixDocumentForInsert(opCtx, doc, preserveEmptyTimestamps, &containsDotsAndDollarsField);
+
         const StmtId stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
         const bool wasAlreadyExecuted = opCtx->isRetryableWrite() &&
             txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtId);

@@ -787,8 +787,11 @@ bool handleGroupedInserts(OperationContext* opCtx,
 
         auto idx = firstOpIdx + i;
         auto& doc = insertDocs[i];
+        const bool preserveEmptyTimestamps = false;
         bool containsDotsAndDollarsField = false;
-        auto fixedDoc = fixDocumentForInsert(opCtx, doc, &containsDotsAndDollarsField);
+
+        auto fixedDoc =
+            fixDocumentForInsert(opCtx, doc, preserveEmptyTimestamps, &containsDotsAndDollarsField);
 
         auto stmtId = opCtx->isRetryableWrite() ? bulk_write_common::getStatementId(req, idx)
                                                 : kUninitializedStmtId;

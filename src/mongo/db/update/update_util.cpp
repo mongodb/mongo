@@ -101,6 +101,7 @@ void generateNewDocumentFromSuppliedDoc(OperationContext* opCtx,
         write_ops::UpdateModification(suppliedDoc, write_ops::UpdateModification::ReplacementTag{}),
         {});
     replacementDriver.setLogOp(false);
+    replacementDriver.setPreserveEmptyTS(static_cast<bool>(request->getPreserveEmptyTS()));
 
     // We do not validate for storage, as we will validate the full document before inserting.
     // However, we ensure that no immutable fields are modified.
