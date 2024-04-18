@@ -71,7 +71,7 @@ public:
             if (request().getToShard().has_value()) {
                 toShard = request().getToShard().get();
             } else {
-                toShard = shardutil::selectLeastLoadedShard(opCtx);
+                toShard = shardutil::selectLeastLoadedNonDrainingShard(opCtx);
             }
 
             std::vector<mongo::ShardKeyRange> destinationShard = {toShard};

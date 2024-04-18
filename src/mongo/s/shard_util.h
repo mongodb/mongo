@@ -127,9 +127,10 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
 
 /**
  * Selects the shard with the least amount of data by checking the total size of each shard in the
- * shard registry. Will return ShardNotFound if no shard is found.
+ * shard registry. Considers only shards that are not currently draining. Will return ShardNotFound
+ * if no shard is found.
  */
-ShardId selectLeastLoadedShard(OperationContext* opCtx);
+ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx);
 
 }  // namespace shardutil
 }  // namespace mongo
