@@ -218,8 +218,9 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         uassert(ErrorCodes::CommandFailed,
-                "This command can only be used in standalone mode",
-                !repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
+                "This command can only be used in standalone mode or for magicRestore",
+                !repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() ||
+                    storageGlobalParams.magicRestore);
 
         uassert(ErrorCodes::CommandFailed,
                 "This command can only be run during a restore procedure",
