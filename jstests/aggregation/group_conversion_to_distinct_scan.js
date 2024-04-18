@@ -242,7 +242,7 @@ assertPipelineResultsAndExplain({
         pipeline,
         expectedOutput,
         hint: {$natural: 1},
-        expectsIndexFilter: true,
+        expectsIndexFilter: !TestData.isHintsToQuerySettingsSuite,
         validateExplain: (explain) => assertPlanUsesDistinctScan(explain, keyPattern),
     });
 
@@ -253,7 +253,7 @@ assertPipelineResultsAndExplain({
         pipeline,
         expectedOutput,
         hint: {_id: 1},
-        expectsIndexFilter: true,
+        expectsIndexFilter: !TestData.isHintsToQuerySettingsSuite,
         validateExplain: (explain) => assertPlanUsesDistinctScan(explain, keyPattern),
     });
 
