@@ -356,10 +356,13 @@ def test_install_is_complete(test_args: TestArgs):
         raise RuntimeError("Required group `{}' is not in configured groups: {}".format(
             test_args['mongo_groupname'], mongo_user_groups))
 
-    if user_info.pw_dir != test_args['mongo_home_dir']:
-        raise RuntimeError(
-            "Configured home directory `{}' does not match required path `{}'".format(
-                user_info.pw_dir, test_args['mongo_home_dir']))
+    if test_args['package_manager'] in ('yum', 'zypper'):
+        # Only RPM-based distros create the home directory. Debian/Ubuntu
+        # distros use a non-existent directory in /home
+        if user_info.pw_dir != test_args['mongo_home_dir']:
+            raise RuntimeError(
+                "Configured home directory `{}' does not match required path `{}'".format(
+                    user_info.pw_dir, test_args['mongo_home_dir']))
 
     if user_info.pw_shell != test_args['mongo_user_shell']:
         raise RuntimeError("Configured user shell `{}' does not match required path `{}'".format(
