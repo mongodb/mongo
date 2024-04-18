@@ -225,7 +225,8 @@ function mergeAllChunksOnShardTest(st, testDB) {
 
 function mergeAllChunksWithMaxNumberOfChunksTest(st, testDB) {
     // Skip this test if running in a suite with stepdowns
-    if (typeof ContinuousStepdown !== 'undefined') {
+    if (TestData.runningWithConfigStepdowns) {
+        jsTest.log(`Skipping mergeAllChunksWithMaxNumberOfChunksTest`);
         return;
     }
 
