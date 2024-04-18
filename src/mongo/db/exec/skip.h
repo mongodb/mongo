@@ -72,8 +72,13 @@ public:
 private:
     WorkingSet* _ws;
 
-    // We drop the first _toSkip results that we would have returned.
-    long long _toSkip;
+    // The number of results left to skip. This number is decremented during query execution as we
+    // successfully skip a document.
+    long long _leftToSkip;
+
+    // Represents the number of results to skip. Unlike '_leftToSkip', this remains constant and
+    // is used when gathering statistics in explain.
+    const long long _skipAmount;
 
     // Stats
     SkipStats _specificStats;

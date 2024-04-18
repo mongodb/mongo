@@ -13,8 +13,6 @@ selector:
   exclude_files:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
-    # TODO SERVER-88949 Re-enable optimize_away_pipeline test
-    - jstests/aggregation/optimize_away_pipeline.js
   exclude_with_any_tags:
     # Used to tag tests which cannot run in the 'repeat_queries' suites.
     - does_not_support_repeated_reads
