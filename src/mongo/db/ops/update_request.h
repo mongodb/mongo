@@ -212,6 +212,14 @@ public:
         return _fromOplogApplication;
     }
 
+    void setPreserveEmptyTS(OptionalBool preserveEmptyTS) {
+        _preserveEmptyTS = preserveEmptyTS;
+    }
+
+    OptionalBool getPreserveEmptyTS() const {
+        return _preserveEmptyTS;
+    }
+
     void setExplain(boost::optional<ExplainOptions::Verbosity> verbosity) {
         _explain = verbosity;
     }
@@ -349,6 +357,8 @@ private:
     // True if this update is allowed to modify the shard key without the specifying the full shard
     // key.
     OptionalBool _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
+
+    OptionalBool _preserveEmptyTS;
 
     // Flags controlling the update.
 

@@ -331,7 +331,10 @@ bool handleInsertOp(OperationContext* opCtx,
 
     auto stmtId = getStatementId(opCtx, req, currentOpIdx);
     bool containsDotsAndDollarsField = false;
-    auto fixedDoc = fixDocumentForInsert(opCtx, op->getDocument(), &containsDotsAndDollarsField);
+    const bool preserveEmptyTimestamps = false;
+
+    auto fixedDoc = fixDocumentForInsert(
+        opCtx, op->getDocument(), preserveEmptyTimestamps, &containsDotsAndDollarsField);
 
     // TODO SERVER-72988: handle retryable writes.
     if (!fixedDoc.isOK()) {
