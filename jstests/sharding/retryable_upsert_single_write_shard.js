@@ -42,7 +42,11 @@ assert.commandWorked(db.runCommand(updateCmd));
 assert.commandWorked(coll.insertOne({x: -50}));
 
 // Failover shard0 to cause it to forget the in memory txn state from being a txn participant.
-ShardingStateTest.failoverToMember(st.rs0, st.rs0.getSecondary());
+const secondary = st.rs0.getSecondary();
+ShardingStateTest.failoverToMember(st.rs0, secondary);
+
+// Await until RS connection in shell is updated.
+_awaitRSHostViaRSMonitor(secondary.name, {ok: true, ismaster: true}, st.rs0.name);
 
 // Retry the earlier retryable upsert.
 db = st.s.getDB(jsTestName());
