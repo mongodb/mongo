@@ -45,7 +45,7 @@ SkipStage::SkipStage(ExpressionContext* expCtx,
                      long long toSkip,
                      WorkingSet* ws,
                      std::unique_ptr<PlanStage> child)
-    : PlanStage(kStageType, expCtx), _ws(ws), _toSkip(toSkip) {
+    : PlanStage(kStageType, expCtx), _ws(ws), _leftToSkip(toSkip), _skipAmount(toSkip) {
     _children.emplace_back(std::move(child));
 }
 
@@ -61,9 +61,9 @@ PlanStage::StageState SkipStage::doWork(WorkingSetID* out) {
 
     if (PlanStage::ADVANCED == status) {
         // If we're still skipping results...
-        if (_toSkip > 0) {
+        if (_leftToSkip > 0) {
             // ...drop the result.
-            --_toSkip;
+            --_leftToSkip;
             _ws->free(id);
             return PlanStage::NEED_TIME;
         }
@@ -80,7 +80,7 @@ PlanStage::StageState SkipStage::doWork(WorkingSetID* out) {
 
 unique_ptr<PlanStageStats> SkipStage::getStats() {
     _commonStats.isEOF = isEOF();
-    _specificStats.skip = _toSkip;
+    _specificStats.skip = _skipAmount;
     unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_SKIP);
     ret->specific = std::make_unique<SkipStats>(_specificStats);
     ret->children.emplace_back(child()->getStats());
