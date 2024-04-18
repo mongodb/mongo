@@ -9,19 +9,10 @@ import {
     ShardSplitTest
 } from "jstests/serverless/libs/shard_split_test.js";
 
-function runBasicShardSplitTest({useMultitenancy} = {
-    multitenancy: false
-}) {
-    jsTestLog("Starting to run shard split with multitenancy " +
-              (useMultitenancy ? "enabled" : "disabled"));
+function runBasicShardSplitTest() {
+    jsTestLog("Starting to run shard split ");
     const tenantIds = [ObjectId(), ObjectId()];
     const testOptions = {quickGarbageCollection: true};
-    if (useMultitenancy) {
-        Object.assign(testOptions, {
-            nodeOptions:
-                {setParameter: {multitenancySupport: true, dbCheckHealthLogEveryNBatches: 1}}
-        });
-    }
     const test = new ShardSplitTest(testOptions);
     test.addRecipientNodes();
     test.donor.awaitSecondaryNodes();
@@ -47,5 +38,4 @@ function runBasicShardSplitTest({useMultitenancy} = {
     test.stop();
 }
 
-runBasicShardSplitTest({useMultitenancy: false});
-runBasicShardSplitTest({useMultitenancy: true});
+runBasicShardSplitTest();

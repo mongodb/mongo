@@ -19,10 +19,9 @@ import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 // Disabling featureFlagRequireTenantID to allow using a tenantId prefix and
 // reusing the same code to test garbage collection with and without multitenancy support.
-function runTest({multitenancySupport}) {
+function runTest() {
     const setParameter = {
         tenantMigrationGarbageCollectionDelayMS: 0,
-        multitenancySupport,
         featureFlagRequireTenantID: false,
     };
 
@@ -120,7 +119,4 @@ function runTest({multitenancySupport}) {
     tenantMigrationTest.stop();
 }
 
-// TODO SERVER-87536 Re-enable this test when multitenancy is enabled.
-// runTest({multitenancySupport: true});
-
-runTest({multitenancySupport: false});
+runTest();
