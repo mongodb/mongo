@@ -152,7 +152,7 @@ const shardNames = [st.rs0.name];
         collation: QuerySamplingUtil.generateRandomCollation(),
         new: true,
         upsert: false,
-        let : {var0: 1}
+        let : {var0: {$literal: "$nonExistentFieldName"}}
     };
     const diff = {y: 'u', z: 'u'};
 

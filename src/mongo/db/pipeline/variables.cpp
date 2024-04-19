@@ -42,6 +42,21 @@
 
 namespace mongo {
 
+namespace {
+
+// We need to be careful when serializing values, e.g. to populate the 'let' parameter of a command
+// to be sent over the wire. First, missing values should be serialied as $$REMOVE, otherwise they
+// might be incorrectly omitted or serialized as empty objects ({}). Also, we should wrap values in
+// $literal to avoid a scenario like the following: suppose we had a user-defined 'let' specified as
+// {let: {a: {$literal: "$notAFieldName"}}}. On mongos, this will be evaluated to the string
+// "$notAFieldName". When we serialize it again for the shard commands, it must appear as {$literal:
+// "$notAFieldName"}, not simply "$notAFieldName", since the latter will be treated as a field name
+// by mongods.
+Value serializeValue(Value val) {
+    return val.missing() ? Value("$$REMOVE"_sd) : Value(DOC("$literal" << val));
+}
+}  // namespace
+
 using namespace std::string_literals;
 
 constexpr Variables::Id Variables::kRootId;
@@ -425,8 +440,9 @@ std::set<Variables::Id> VariablesParseState::getDefinedVariableIDs() const {
 BSONObj VariablesParseState::serialize(const Variables& vars) const {
     auto bob = BSONObjBuilder{};
     for (auto&& [var_name, id] : _variables)
-        if (vars.hasValue(id))
-            bob << var_name << Value(DOC("$literal" << vars.getValue(id)));
+        if (vars.hasValue(id)) {
+            bob << var_name << serializeValue(vars.getValue(id));
+        }
 
     // System variables have to be added separately since the variable IDs are reserved and not
     // allocated like normal variables, and so not present in '_variables'.
@@ -438,8 +454,9 @@ std::pair<LegacyRuntimeConstants, BSONObj> VariablesParseState::transitionalComp
     const Variables& vars) const {
     auto bob = BSONObjBuilder{};
     for (auto&& [var_name, id] : _variables)
-        if (vars.hasValue(id))
-            bob << var_name << Value(DOC("$literal" << vars.getValue(id)));
+        if (vars.hasValue(id)) {
+            bob << var_name << serializeValue(vars.getValue(id));
+        }
 
     return {vars.transitionalExtractRuntimeConstants(), bob.obj()};
 }
