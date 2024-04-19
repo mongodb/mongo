@@ -48,7 +48,7 @@ In each of platform or build variant group directory there can be these files:
 
   - these files are merged into `etc/evergreen.yml` which is used for `mongodb-mongo-master` project on master branch
   - after branching on all new branches these files are NOT used
-  - **important**: all tests that are running on these build variants will NOT run on a new branch projects
+  - **important**: all tests that are running on these build variants will NOT run on a new branch `mongodb-mongo-vX.Y` project
 
 - `test_release.yml`
 
@@ -65,4 +65,4 @@ In each of platform or build variant group directory there can be these files:
 
   - these files are merged into `etc/evergreen_nightly.yml` which is used for `mongodb-mongo-master-nightly` project on master branch
   - after branching on all new branches these files are NOT used
-  - **important**: all tests that are running on these build variants will NOT run on a new branch projects
+  - **important**: all tests that are running on these build variants will NOT run on a new branch `mongodb-mongo-vX.Y` project
