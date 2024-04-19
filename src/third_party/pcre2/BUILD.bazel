@@ -1,13 +1,6 @@
-# -*- mode: python -*-
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 
-Import("env")
-
-env = env.Clone()
-
-env.Append(CPPDEFINES=[
-    ('PCRE2_CODE_UNIT_WIDTH', 8),
-    'HAVE_CONFIG_H',
-], )
+package(default_visibility = ["//visibility:public"])
 
 # Directories that include generated config.h for various platforms
 #
@@ -22,15 +15,10 @@ env.Append(CPPDEFINES=[
 #  -DPCRE_SUPPORT_UNICODE_PROPERTIES:BOOL="1" -DPCREGREP_BUFSIZE:STRING="20480"
 #  -DPCRE_MATCH_LIMIT:STRING="200000" -DPCRE_PARENS_NEST_LIMIT:STRING="250"
 #  -DPCRE_SUPPORT_UTF:BOOL="1"
-#
-if env.TargetOSIs('windows'):
-    env.Append(CPPPATH=["build_windows"])
-else:
-    env.Append(CPPPATH=["build_posix"])
 
-env.BazelLibrary(
-    target="pcre2",
-    source=[
+mongo_cc_library(
+    name = "pcre2",
+    srcs = [
         "src/pcre2_auto_possess.c",
         "src/pcre2_chartables.c",
         "src/pcre2_compile.c",
@@ -52,11 +40,54 @@ env.BazelLibrary(
         "src/pcre2_serialize.c",
         "src/pcre2_string_utils.c",
         "src/pcre2_study.c",
-        "src/pcre2_xclass.c",
         "src/pcre2_substitute.c",
         "src/pcre2_substring.c",
         "src/pcre2_tables.c",
         "src/pcre2_ucd.c",
         "src/pcre2_valid_utf.c",
+        "src/pcre2_xclass.c",
+    ] + [
+        # internal headers
+        "src/pcre2_internal.h",
+        "src/pcre2_intmodedep.h",
+        "src/pcre2_jit_neon_inc.h",
+        "src/pcre2_jit_simd_inc.h",
+        "src/pcre2_ucp.h",
+        "src/pcre2posix.h",
+        "src/sljit/sljitConfig.h",
+        "src/sljit/sljitConfigInternal.h",
+        "src/sljit/sljitLir.h",
+    ] + select({
+        # internal platform-specific headers
+        "@platforms//os:windows": [
+            "build_windows/config.h",
+        ],
+        "//conditions:default": [
+            "build_posix/config.h",
+        ],
+    }),
+    hdrs = [
+        "src/pcre2.h",
+    ] + [
+        # C files compiled only as includes
+        "src/pcre2_jit_match.c",
+        "src/pcre2_jit_misc.c",
+        "src/pcre2_ucptables.c",
+    ],
+    copts = select({
+        "@platforms//os:windows": [
+            "-Isrc/third_party/pcre2/build_windows",
+        ],
+        "//conditions:default": [
+            "-Isrc/third_party/pcre2/build_posix",
+        ],
+    }),
+    defines = [
+        "PCRE2_STATIC",
+    ],
+    includes = ["src"],
+    local_defines = [
+        "PCRE2_CODE_UNIT_WIDTH=8",
+        "HAVE_CONFIG_H",
     ],
 )
