@@ -462,7 +462,9 @@ BSONObj BucketUnpacker::getNextBson() {
 
     // Add computed meta projections.
     for (auto&& name : _spec.computedMetaProjFields()) {
-        builder.appendAs(_computedMetaProjections[name], name);
+        if (_computedMetaProjections[name]) {
+            builder.appendAs(_computedMetaProjections[name], name);
+        }
     }
 
     return builder.obj();
