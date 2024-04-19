@@ -1882,27 +1882,26 @@ BSONObj TransactionRouter::Router::_commitWithRecoveryToken(OperationContext* op
             recoveryToken.getRecoveryShardId());
     const auto& recoveryShardId = *recoveryToken.getRecoveryShardId();
 
-    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
     auto coordinateCommitCmd = [&] {
         CoordinateCommitTransaction coordinateCommitCmd;
         coordinateCommitCmd.setDbName(DatabaseName::kAdmin);
         coordinateCommitCmd.setParticipants({});
-
-        auto rawCoordinateCommit = coordinateCommitCmd.toBSON(
+        return coordinateCommitCmd.toBSON(
             BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
-
-        return attachTxnFieldsIfNeeded(opCtx, recoveryShardId, rawCoordinateCommit);
     }();
 
-    auto recoveryShard = uassertStatusOK(shardRegistry->getShard(opCtx, recoveryShardId));
-    return uassertStatusOK(recoveryShard->runCommandWithFixedRetryAttempts(
-                               opCtx,
-                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                               DatabaseName::kAdmin,
-                               coordinateCommitCmd,
-                               Shard::RetryPolicy::kIdempotent))
-        .response;
+    MultiStatementTransactionRequestsSender ars(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+        DatabaseName::kAdmin,
+        {{recoveryShardId, coordinateCommitCmd}},
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        Shard::RetryPolicy::kIdempotent);
+
+    const auto response = ars.next();
+    invariant(ars.done());
+    uassertStatusOK(response.swResponse);
+    return response.swResponse.getValue().data;
 }
 
 void TransactionRouter::Router::_logSlowTransaction(OperationContext* opCtx,
