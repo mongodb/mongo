@@ -139,6 +139,7 @@ private:
     }
 
     ServiceContext::UniqueOperationContext _opCtx;
+    FailPointEnableBlock _skipDirectConnectionChecks{"skipDirectConnectionChecks"};
 };
 
 void BM_refreshOplogTruncateAFterPointIfPrimary(benchmark::State& state) {
