@@ -41,6 +41,16 @@
 
 namespace mongo {
 
+namespace transaction_request_sender_details {
+std::vector<AsyncRequestsSender::Request> attachTxnDetails(
+    OperationContext* opCtx, const std::vector<AsyncRequestsSender::Request>& requests);
+
+void processReplyMetadata(OperationContext* opCtx, const AsyncRequestsSender::Response& response);
+void processReplyMetadata(OperationContext* opCtx,
+                          const ShardId& shardId,
+                          const BSONObj& responseBson);
+}  // namespace transaction_request_sender_details
+
 /**
  * Wrapper for AsyncRequestSender that attaches multi-statement transaction related fields to
  * remote requests and also perform multi-statement transaction related post processing when

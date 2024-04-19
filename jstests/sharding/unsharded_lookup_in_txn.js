@@ -46,11 +46,10 @@ const pipeline = [{
 const kBatchSize = 2;
 
 const testLookupDoesNotSeeDocumentsOutsideSnapshot = function() {
-    // TODO SERVER-84470 Remove this check once lookup on unsplittable collection still on the
-    // primary is supported
-    const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    if (isTrackUnshardedUponCreationEnabled) {
+    // TODO SERVER-88936 Remove this check once allow additional participants is enabled on last-lts
+    const additionalTxnParticipantsAllowed =
+        FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'), "AllowAdditionalParticipants");
+    if (!additionalTxnParticipantsAllowed) {
         return;
     }
 

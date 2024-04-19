@@ -7,6 +7,10 @@
  *
  * @tags: [requires_fcv_51]
  */
+
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+
 export const $config = (function() {
     // Use the workload name as a prefix for the view names, since the workload name is assumed
     // to be unique.
@@ -76,6 +80,9 @@ export const $config = (function() {
          * is expected at view create/modification time.
          */
         function remapViewToView(db, collName) {
+            if (this.shouldSkipTest) {
+                return;
+            }
             if (this.isSBELookupEnabled) {
                 return;
             }
@@ -96,6 +103,9 @@ export const $config = (function() {
          * error as it is expected at view create/modification time.
          */
         function remapViewToCollection(db, collName) {
+            if (this.shouldSkipTest) {
+                return;
+            }
             if (this.isSBELookupEnabled) {
                 return;
             }
@@ -110,19 +120,34 @@ export const $config = (function() {
         }
 
         function readFromView(db, collName) {
+            if (this.shouldSkipTest) {
+                return;
+            }
             if (this.isSBELookupEnabled) {
                 return;
             }
 
             const viewName = this.getRandomView(this.viewList);
             const res = db.runCommand({find: viewName});
+
+            // If we encountered some transaction failure propagate this upwards so it gets
+            // automatically retried.
+            if (TransactionsUtil.isTransientTransactionError(res)) {
+                throw res;
+            }
+
             // When initializing an aggregation on a view, the server briefly releases its
             // collection lock before creating and iterating the cursor on the underlying namespace.
             // In this short window of time, it's possible that that namespace has been dropped and
             // replaced with a view.
+            //
             // TODO (SERVER-35635): It would be more appropriate for the server to return
             // OperationFailed, as CommandNotSupportedOnView is misleading.
+            // TODO SERVER-XXXXX: The mergeCursors sent by mongos to mongod might get killed during
+            // a remapping and return a somewhat misleading CursorNotFound error. Ideally it should
+            // be remapped to an OperationFailed error.
             assert(res.ok === 1 || res.code === ErrorCodes.CommandNotSupportedOnView ||
+                       res.code === ErrorCodes.CursorNotFound ||
                        res.code === ErrorCodes.CommandOnShardedViewNotSupportedOnMongod,
                    () => tojson(res));
         }
@@ -142,6 +167,14 @@ export const $config = (function() {
     };
 
     function setup(db, collName, cluster) {
+        // TODO SERVER-88936: Remove this field and associated checks once the flag is active on
+        // last-lts.
+        this.shouldSkipTest = TestData.runInsideTransaction && cluster.isSharded() &&
+            !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'AllowAdditionalParticipants');
+        if (this.shouldSkipTest) {
+            return;
+        }
+
         const coll = db[collName];
 
         assert.commandWorked(coll.insert({a: 1, b: 2}));

@@ -1938,6 +1938,7 @@ void ExecCommandDatabase::_commandExec() {
     }
     _execContext.behaviors.setPrepareConflictBehaviorForReadConcern(opCtx, getInvocation());
 
+    _extraFieldsBuilder.resetToEmpty();
     _execContext.getReplyBuilder()->reset();
 
     if (OperationShardingState::isComingFromRouter(opCtx)) {

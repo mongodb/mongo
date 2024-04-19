@@ -80,7 +80,8 @@ namespace mongo {
 /**
  * Test fixture which is useful to both the tests for AsyncResultsMerger and BlockingResultsMerger.
  */
-class ResultsMergerTestFixture : public ShardingTestFixture {
+class ResultsMergerTestFixture : public virtual service_context_test::RouterRoleOverride,
+                                 public ShardingTestFixture {
 public:
     static const HostAndPort kTestConfigShardHost;
     static const std::vector<ShardId> kTestShardIds;
