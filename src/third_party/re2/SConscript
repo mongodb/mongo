@@ -20,7 +20,7 @@ if re2_env.ToolchainIs('msvc'):
         ],
     )
 
-re2_env.Library(
+re2_env.BazelLibrary(
     target="re2",
     source=[
         "dist/re2/bitmap256.cc",

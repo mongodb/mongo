@@ -1,0 +1,93 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "re2",
+    srcs = [
+        "dist/re2/bitmap256.cc",
+        "dist/re2/bitstate.cc",
+        "dist/re2/compile.cc",
+        "dist/re2/dfa.cc",
+        "dist/re2/filtered_re2.cc",
+        "dist/re2/mimics_pcre.cc",
+        "dist/re2/nfa.cc",
+        "dist/re2/onepass.cc",
+        "dist/re2/parse.cc",
+        "dist/re2/perl_groups.cc",
+        "dist/re2/prefilter.cc",
+        "dist/re2/prefilter_tree.cc",
+        "dist/re2/prog.cc",
+        "dist/re2/re2.cc",
+        "dist/re2/regexp.cc",
+        "dist/re2/set.cc",
+        "dist/re2/simplify.cc",
+        "dist/re2/tostring.cc",
+        "dist/re2/unicode_casefold.cc",
+        "dist/re2/unicode_groups.cc",
+        "dist/util/rune.cc",
+        "dist/util/strutil.cc",
+    ] + [
+        # Internal headers
+        "dist/re2/bitmap256.h",
+        "dist/re2/filtered_re2.h",
+        "dist/re2/pod_array.h",
+        "dist/re2/prefilter.h",
+        "dist/re2/prefilter_tree.h",
+        "dist/re2/prog.h",
+        "dist/re2/re2.h",
+        "dist/re2/regexp.h",
+        "dist/re2/set.h",
+        "dist/re2/sparse_array.h",
+        "dist/re2/sparse_set.h",
+        "dist/re2/stringpiece.h",
+        "dist/re2/testing/exhaustive_tester.h",
+        "dist/re2/testing/regexp_generator.h",
+        "dist/re2/testing/string_generator.h",
+        "dist/re2/testing/tester.h",
+        "dist/re2/unicode_casefold.h",
+        "dist/re2/unicode_groups.h",
+        "dist/re2/walker-inl.h",
+        "dist/util/logging.h",
+        "dist/util/malloc_counter.h",
+        "dist/util/pcre.h",
+        "dist/util/strutil.h",
+        "dist/util/utf.h",
+    ],
+    hdrs = [
+        "dist/re2/re2.h",
+    ],
+    copts = select({
+        "//bazel/config:gcc_or_clang": [
+            "-pthread",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:windows": [
+            # The POSIX name for this item is deprecated
+            "/wd4996",
+        ],
+        "//conditions:default": [],
+    }),
+    includes = [
+        "dist",
+    ],
+    local_defines = select({
+        "@platforms//os:windows": [
+            "NOMINMAX",
+        ],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/third_party/abseil-cpp:absl_base",
+        "//src/third_party/abseil-cpp:absl_flags",
+        "//src/third_party/abseil-cpp:absl_raw_hash_set",
+        "//src/third_party/abseil-cpp:absl_str_format_internal",
+        "//src/third_party/abseil-cpp:absl_strings",
+        "//src/third_party/abseil-cpp:absl_synchronization",
+    ],
+)
