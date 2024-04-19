@@ -1027,7 +1027,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_openBackupCursor(
 
     const auto aggregateCommandRequestObj = [] {
         AggregateCommandRequest aggRequest(
-            NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin),
+            NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kLocal),
             {BSON("$backupCursor" << BSONObj())});
         // We must set a writeConcern on internal commands.
         aggRequest.setWriteConcern(WriteConcernOptions());
@@ -1151,7 +1151,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_openBackupCursor(
     _donorFilenameBackupCursorFileFetcher = std::make_unique<Fetcher>(
         _backupCursorExecutor.get(),
         _client->getServerHostAndPort(),
-        DatabaseName::kAdmin,
+        DatabaseName::kLocal,
         aggregateCommandRequestObj,
         fetcherCallback,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
