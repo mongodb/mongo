@@ -35,6 +35,8 @@
  *   requires_fcv_80,
  *   # setParameter is not allowed with signed security.
  *   not_allowed_with_signed_security_token,
+ *   # $accumulator requires server-side scripting
+ *   requires_scripting,
  * ]
  */
 
@@ -635,7 +637,50 @@ const doc_t3_sD_x1_adotb1 = {
             },
         ],
         // For {s: "D"}, {$sort: {x: 1}} will return 'doc_t3_sD_x1_adotb1' first and then
-        // 'doc_t1_sD_x3_adotb0'. Hence, 'o' value will be [{b: 1}, {b: 0}].
+        // 'doc_t1_sD_x3_adotb0'. Hence, 'a' value will be [{b: 1}, {b: 0}].
+        expected: [
+            {_id: "A", lx: 2, a: [{c: 1}]},
+            {_id: "D", lx: 3, a: [{b: 1}, {b: 0}]},
+        ],
+        verifyThis: (pipeline, explain) => verifySortNotAbsorbed(pipeline, explain)
+    });
+})();
+
+(function testNotOptimizedMixedLastAndAccumulatorJs() {
+    runTestCase({
+        docs: [
+            doc_t1_sD_x3_adotb0,
+            doc_t2_sA_x2_adotc1,
+            doc_t3_sD_x1_adotb1,
+        ],
+        pipeline: [
+            {$sort: {x: 1}},
+            {
+                $group: {
+                    _id: "$s",
+                    lx: {$last: "$x"},
+                    // This simulates $push.
+                    a: {
+                        $accumulator: {
+                            init: function() {
+                                return [];
+                            },
+                            accumulate: function(state, fieldA) {
+                                state.push(fieldA);
+                                return state;
+                            },
+                            accumulateArgs: ["$a"],
+                            merge: function(state1, state2) {
+                                return state1.concat(state2);
+                            },
+                            lang: "js"
+                        }
+                    },
+                }
+            },
+        ],
+        // For {s: "D"}, {$sort: {x: 1}} will return 'doc_t3_sD_x1_adotb1' first and then
+        // 'doc_t1_sD_x3_adotb0'. Hence, 'a' value will be [{b: 1}, {b: 0}].
         expected: [
             {_id: "A", lx: 2, a: [{c: 1}]},
             {_id: "D", lx: 3, a: [{b: 1}, {b: 0}]},
