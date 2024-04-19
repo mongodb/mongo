@@ -8,11 +8,11 @@ import {getChunkSkipsFromShard, getOptimizer} from "jstests/libs/analyze_plan.js
 const st = new ShardingTest({shards: 1});
 const coll = st.s0.getCollection("foo.bar");
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: coll.getDB() + ""}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: coll.getDB().getName()}));
 
 jsTest.log('Tests with _id : 1 shard key');
 coll.drop();
-assert.commandWorked(st.s0.adminCommand({shardCollection: coll + "", key: {_id: 1}}));
+assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 st.printShardingStatus();
 
 assert.commandWorked(
@@ -58,7 +58,8 @@ switch (getOptimizer(explainOut)) {
 
 jsTest.log('Tests with _id : hashed shard key');
 coll.drop();
-assert.commandWorked(st.s0.adminCommand({shardCollection: coll + "", key: {_id: "hashed"}}));
+assert.commandWorked(
+    st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
 st.printShardingStatus();
 
 // Insert some data
@@ -76,7 +77,7 @@ assert.eq(1, coll.find({_id: true}, {_id: 0}).explain(true).executionStats.total
 
 jsTest.log('Tests with compound shard key');
 coll.drop();
-assert.commandWorked(st.s0.adminCommand({shardCollection: coll + "", key: {a: 1, b: 1}}));
+assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {a: 1, b: 1}}));
 st.printShardingStatus();
 
 // Insert some data
@@ -128,7 +129,7 @@ switch (getOptimizer(explainOut)) {
 
 jsTest.log('Tests with nested shard key');
 coll.drop();
-assert.commandWorked(st.s0.adminCommand({shardCollection: coll + "", key: {'a.b': 1}}));
+assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {'a.b': 1}}));
 st.printShardingStatus();
 
 // Insert some data
@@ -165,10 +166,11 @@ switch (getOptimizer(explainOut)) {
 
 jsTest.log('Tests with bad data with no shard key');
 coll.drop();
-assert.commandWorked(st.s0.adminCommand({shardCollection: coll + "", key: {a: 1}}));
+assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 st.printShardingStatus();
 
 // Insert some bad data manually on the shard
+assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: coll.getFullName()}));
 assert.commandWorked(st.shard0.getCollection(coll.toString()).insert({_id: "bad data", c: true}));
 
 // Index without shard key query - not covered but succeeds
