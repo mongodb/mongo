@@ -105,7 +105,7 @@ void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(opCtx,
                                                                                        nss()));
 
-    uassert(ErrorCodes::IllegalOperation,
+    uassert(ErrorCodes::NamespaceCannotBeSharded,
             "Can't convert a sharded collection to a capped collection",
             !chunkManager.isSharded());
 

@@ -95,13 +95,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Convert the collection to capped.
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
-        if (isMongos(db)) {
-            return;  // convertToCapped can't be run against a mongos.
-        }
         jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
         assert.commandFailedWithCode(
-            db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
-            [ErrorCodes.CommandNotSupportedOnView, ErrorCodes.NamespaceNotFound]);
+            db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
+                ErrorCodes.CommandNotSupportedOnView,
+                ErrorCodes.NamespaceNotFound,
+                ErrorCodes.NamespaceCannotBeSharded,
+                ErrorCodes.IllegalOperation
+            ]);
     };
 
     $config.teardown = function teardown(db) {
