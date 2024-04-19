@@ -5,6 +5,17 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 variables:
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &generic_linux_compile_expansions # The most commonly used compile expansions.
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
+
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
@@ -25,7 +36,6 @@ variables:
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_debug_aubsan_compile_variant_dependency
     depends_on:
@@ -76,7 +86,6 @@ variables:
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - aubsan_options: &aubsan_options >-
       UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
@@ -94,7 +103,6 @@ variables:
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &aubsan-lite-required-expansions
     compile_variant: *linux_debug_aubsan_compile_variant_name
@@ -396,31 +404,13 @@ buildvariants:
       - name: disk_wiredtiger
       - name: generate_buildid_to_debug_symbols_mapping
 
-  - &rhel80-debug-aubsan-lite-all-feature-flags-required-template
-    <<: *linux_debug_aubsan_compile_variant_dependency
-    name: &rhel80-debug-aubsan-lite-all-feature-flags-required rhel80-debug-aubsan-lite-all-feature-flags-required
-    display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
-    tags: ["required"]
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-    run_on:
-      - rhel80-build
-    expansions:
-      <<: *aubsan-lite-required-expansions
-      # To force disable feature flags even on the all feature flags variant, please use this file:
-      # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
-      test_flags: >-
-        --runAllFeatureFlagTests
-    tasks:
-      - name: jsCore
-      - name: jsCore_txns
-      - name: jsCore_column_store_indexes
-      - name: jsCore_wildcard_indexes
-
-  - <<: *rhel80-debug-aubsan-lite-all-feature-flags-required-template
+  - <<: *linux_debug_aubsan_compile_variant_dependency
     name: &rhel80-debug-aubsan-all-feature-flags rhel80-debug-aubsan-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - rhel80-build
     expansions:
       <<: *aubsan-lite-required-expansions
       # To force disable feature flags even on the all feature flags variant, please use this file:
@@ -445,87 +435,53 @@ buildvariants:
         distros:
           - rhel80-large
 
-  - &enterprise-rhel80-debug-tsan-template
-    name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan
-    display_name: "* TSAN Enterprise RHEL 8.0 DEBUG"
+  - <<: *linux_debug_aubsan_compile_variant_dependency
+    name: &rhel80-debug-aubsan-experimental-all-feature-flags rhel80-debug-aubsan-experimental-all-feature-flags
+    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG Experimental (all feature flags)"
+    tags: ["suggested"]
+    cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - rhel80-build
+    expansions:
+      <<: *aubsan-lite-required-expansions
+      # To force disable feature flags even on the all feature flags variant, please use this file:
+      # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
+      test_flags: >-
+        --runAllFeatureFlagTests
+    tasks:
+      - name: .multiversion_fuzzer
+      - name: .multiversion_passthrough
+      - name: .random_multiversion_ds
+      - name: .watchdog
+
+  - name: &rhel80-debug-aubsan-benchmarks rhel80-debug-aubsan-benchmarks
+    display_name: "* {A,UB}SAN Enterprise RHEL 8.0 DEBUG (Benchmarks)"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel80-large
-    stepback: false
-    expansions: &enterprise-rhel80-debug-tsan-expansions-template
-      additional_package_targets: >-
-        archive-mongocryptd
-        archive-mongocryptd-debug
-      lang_environment: LANG=C
-      toolchain_version: stable
-      compile_variant: *enterprise-rhel80-debug-tsan
-      # If you add anything to san_options, make sure the appropriate
-      # changes are also made to SConstruct.
-      #
-      # TODO SERVER-49121: die_after_fork=0 is a temporary setting to
-      # allow tests to continue while we figure out why we're running
-      # afoul of it.
-      #
-      # TODO SERVER-65936: report_thread_leaks=0 suppresses reporting
-      # thread leaks, which we have because we don't do a clean shutdown
-      # of the ServiceContext.
-      #
-      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=5:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+      - rhel80-build
+    expansions:
+      <<: *generic_linux_compile_expansions
+      separate_debug: off
+      san_options: *aubsan_options
       compile_flags: >-
-        --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
         --dbg=on
         --opt=on
         --allocator=system
-        --sanitize=thread
+        --sanitize=undefined,address
         --ssl
-        --use-libunwind=off
-        --link-model=dynamic
         -j$(grep -c ^processor /proc/cpuinfo)
+        --link-model=dynamic
         --use-diagnostic-latches=on
-      # Avoid starting too many mongod's under TSAN build.
-      resmoke_jobs_factor: 0.3
-      scons_cache_scope: shared
-      separate_debug: off
-      large_distro_name: &enterprise-rhel80-debug-tsan-large-distro-name rhel80-xlarge
-      xlarge_distro_name: rhel80-xxlarge
-      core_analyzer_distro_name: rhel80-xxlarge
-      multiversion_platform: rhel80
-      multiversion_edition: enterprise
       test_flags: >-
-        --excludeWithAnyTags=tsan_incompatible
+        --benchmarkRepetitions=1
+      compile_variant: *rhel80-debug-aubsan-benchmarks
     tasks:
-      - name: compile_test_serial_TG
-      - name: compile_test_parallel_unittest_stream_TG
-      - name: compile_integration_and_test_parallel_stream_TG
-      - name: .development_critical !.requires_large_host !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
-      - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
+      - name: compile_upload_benchmarks_TG
         distros:
-          - *enterprise-rhel80-debug-tsan-large-distro-name
-      - name: .development_critical .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
-        distros:
-          - *enterprise-rhel80-debug-tsan-large-distro-name
-      - name: .release_critical !.requires_large_host !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
-      - name: .release_critical .requires_large_host !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
-        distros:
-          - *enterprise-rhel80-debug-tsan-large-distro-name
-      - name: .release_critical .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
-        distros:
-          - *enterprise-rhel80-debug-tsan-large-distro-name
-      - name: .default !.requires_large_host !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
-      - name: .default .requires_large_host !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
-        distros:
-          - *enterprise-rhel80-debug-tsan-large-distro-name
-      - name: .default .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
-        distros:
-          - *enterprise-rhel80-debug-tsan-large-distro-name
-      - name: .non_deterministic !.requires_large_host !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
-      - name: .non_deterministic .requires_large_host !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
-        distros:
-          - *enterprise-rhel80-debug-tsan-large-distro-name
-      - name: .non_deterministic .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.requires_all_feature_flags
-        distros:
-          - *enterprise-rhel80-debug-tsan-large-distro-name
+          - rhel80-xlarge
+      - name: .benchmarks
 
   - name: &enterprise-rhel80-unoptimized-64-bit enterprise-rhel80-unoptimized-64-bit
     display_name: "~ Enterprise RHEL 8.0 DEBUG (Unoptimized)"

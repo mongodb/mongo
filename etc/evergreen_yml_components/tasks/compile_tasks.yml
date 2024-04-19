@@ -2867,18 +2867,6 @@ task_groups:
       - archive_dist_test
       - archive_dist_test_debug
 
-  - <<: *compile_task_group_template
-    name: compile_test_benchmark_serial_TG
-    tasks:
-      - compile_dist_test
-      - archive_dist_test
-      - archive_dist_test_debug
-      - compile_dbtest
-      - run_dbtest
-      - archive_dbtest
-      - compile_upload_benchmarks
-      - compile_upload_benchmarks_debug
-
   # The *no_unittests_TG taskgroups are useful for static builds,
   # were the static binaries of the unittests can take up to
   # a terabyte of data.

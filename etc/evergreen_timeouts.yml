@@ -92,10 +92,6 @@ overrides:
     - task: aggregation_multiversion_fuzzer_last_lts
       exec_timeout: 300 # 5 hours
 
-  rhel80-debug-ubsan:
-    - task: update_timeseries_fuzzer
-      exec_timeout: 150 # 2.5 hours
-
   rhel80-debug-ubsan-classic-engine:
     - task: update_timeseries_fuzzer
       exec_timeout: 150 # 2.5 hours
