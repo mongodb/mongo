@@ -41,6 +41,7 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
@@ -258,10 +259,11 @@ bool DocumentSourceGroup::tryToAbsorbTopKSort(
         } else if (accumulators[i].expr.name == AccumulatorFirstN::kName ||
                    accumulators[i].expr.name == AccumulatorLastN::kName ||
                    accumulators[i].expr.name == AccumulatorMergeObjects::kName ||
-                   accumulators[i].expr.name == AccumulatorPush::kName) {
-            // If there's any $firstN, $lastN, $mergeObjects and/or $push accumulators which depends
-            // on the order, we cannot absorb the $sort into $group because they rely on the ordered
-            // input from $sort.
+                   accumulators[i].expr.name == AccumulatorPush::kName ||
+                   accumulators[i].expr.name == AccumulatorJs::kName) {
+            // If there's any $firstN, $lastN, $mergeObjects, $push, and/or $accumulator
+            // accumulators which depends on the order, we cannot absorb the $sort into $group
+            // because they rely on the ordered input from $sort.
             return false;
         }
     }
