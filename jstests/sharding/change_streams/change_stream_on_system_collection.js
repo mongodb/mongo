@@ -12,6 +12,10 @@
 import {assertChangeStreamEventEq} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
+// This test involves opening change stream on the internal collection, which is not allowed through
+// a router.
+TestData.replicaSetEndpointIncompatible = true;
+
 // Asserts that the next event in a change stream connected to via cursor 'changeStreamCursor' is
 // equal to 'eventDocument'.
 function assertNextChangeStreamEventEquals(changeStreamCursor, eventDocument) {

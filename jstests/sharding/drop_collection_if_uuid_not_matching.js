@@ -10,6 +10,9 @@
  * ]
  */
 
+// This test requires running commands directly against the shard.
+TestData.replicaSetEndpointIncompatible = true;
+
 const dbName = "test";
 
 const st = new ShardingTest({shards: 1});

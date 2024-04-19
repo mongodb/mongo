@@ -4,6 +4,9 @@
  * @tags: [requires_fcv_70]
  */
 
+// This test requires running commands directly against the shard.
+TestData.replicaSetEndpointIncompatible = true;
+
 // Set this to opt into the 'samplesPerSecond' check.
 TestData.testingDiagnosticsEnabled = false;
 

@@ -3435,11 +3435,16 @@ var ReplSetTest = function ReplSetTest(opts) {
         if (jsTest.options().nonClusteredConfigTransactions) {
             options.setParameter.featureFlagClusteredConfigTransactions = false;
         }
+        if (TestData.replicaSetEndpointIncompatible) {
+            options.setParameter.featureFlagReplicaSetEndpoint = false;
+        }
+
         const olderThan73 =
             MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor('7.3'),
                                            MongoRunner.getBinVersionFor(options.binVersion)) === 1;
         if (olderThan73) {
             delete options.setParameter.featureFlagClusteredConfigTransactions;
+            delete options.setParameter.featureFlagReplicaSetEndpoint;
         }
 
         const olderThan81 =
@@ -3692,6 +3697,49 @@ var ReplSetTest = function ReplSetTest(opts) {
         }
     };
 
+    ReplSetTest.prototype.isReplicaSetEndpointActive = function() {
+        _callHello(this);
+
+        for (let node of this._liveNodes) {
+            const helloRes = node.getDB("admin")._helloOrLegacyHello();
+            if (!helloRes.configsvr && !this.useAutoBootstrapProcedure) {
+                return false;
+            }
+
+            let shardDocs;
+            try {
+                shardDocs = asCluster(
+                    this, node, () => node.getCollection("config.shards").find().toArray());
+            } catch (e) {
+                if (e.code == ErrorCodes.NotPrimaryOrSecondary) {
+                    // This node has been removed from the replica set.
+                    continue;
+                }
+                throw e;
+            }
+            if (shardDocs.length != 1) {
+                return false;
+            }
+            if (shardDocs[0]._id != "config") {
+                return false;
+            }
+            return asCluster(this, node, () => {
+                const serverStatusRes = assert.commandWorked(node.adminCommand({serverStatus: 1}));
+                const olderThan73 =
+                    MongoRunner.compareBinVersions(
+                        MongoRunner.getBinVersionFor("7.3"),
+                        MongoRunner.getBinVersionFor(serverStatusRes.version)) === 1;
+                if (olderThan73) {
+                    return false;
+                }
+                const getParameterRes = assert.commandWorked(
+                    node.adminCommand({getParameter: 1, featureFlagReplicaSetEndpoint: 1}));
+                return getParameterRes.featureFlagReplicaSetEndpoint.value;
+            });
+        }
+        return false;
+    };
+
     /**
      * Kill all members of this replica set. When calling this function, we expect all live nodes to
      * exit cleanly. If we expect a node to exit with a nonzero exit code, use the stop function to
@@ -3709,6 +3757,15 @@ var ReplSetTest = function ReplSetTest(opts) {
 
             opts.noCleanData = true;
         }
+
+        const primary = _callHello(this);
+        // TODO (SERVER-83433): Add back the test coverage for running db hash check and validation
+        // on replica set that is fsync locked and has replica set endpoint enabled.
+        if ((!opts.hasOwnProperty("skipCheckDBHashes") || !opts.hasOwnProperty("skipValidation")) &&
+            primary && this._liveNodes.length > 0 && this.isReplicaSetEndpointActive()) {
+            opts = Object.assign({}, opts, {skipCheckDBHashes: true, skipValidation: true});
+        }
+
         // Check to make sure data is the same on all nodes.
         const skipChecks = jsTest.options().skipCheckDBHashes || (opts && opts.skipCheckDBHashes);
         if (!skipChecks) {
@@ -3719,7 +3776,6 @@ var ReplSetTest = function ReplSetTest(opts) {
             // - the primary goes down and none can be elected (so fsync lock/unlock commands fail)
             // - the replica set is in an unrecoverable inconsistent state. E.g. the replica set
             //   is partitioned.
-            let primary = _callHello(this);
             if (primary && this._liveNodes.length > 1) {  // skip for sets with 1 live node
                 // Auth only on live nodes because authutil.assertAuthenticate
                 // refuses to log in live connections if some secondaries are down.

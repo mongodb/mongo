@@ -12,6 +12,9 @@
  */
 import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
+// This test requires running transactions directly against the shard.
+TestData.replicaSetEndpointIncompatible = true;
+
 const kDbName = "testDb";
 const kCollName = "testColl";
 

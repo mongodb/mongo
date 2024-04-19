@@ -19,6 +19,7 @@ const st = new ShardingTest({
 });
 const primary = st.rs0.getPrimary();
 const secondary = st.rs0.getSecondary();
+const isReplicaSetEndpointActive = st.isReplicaSetEndpointActive();
 
 const testDB = primary.getDB(dbName);
 const adminDB = testDB.getSiblingDB("admin");
@@ -46,7 +47,13 @@ let res = secondarySessionDb.runCommand({
     autocommit: false
 });
 assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
-assert.eq(res.errorLabels, ["TransientTransactionError"]);
+if (isReplicaSetEndpointActive) {
+    // TODO (SERVER-88825): Make sure replica set endpoint return TransientTransactionError write
+    // command is run on a secondary.
+    assert(!res.hasOwnProperty("errorLabels"), res);
+} else {
+    assert.eq(res.errorLabels, ["TransientTransactionError"], res);
+}
 
 jsTest.log("failCommand with errorLabels but without errorCode or writeConcernError should not " +
            "interfere with server's error labels attaching");
@@ -67,7 +74,13 @@ res = secondarySessionDb.runCommand({
 });
 assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
 // Server should continue to return TransientTransactionError label.
-assert.eq(res.errorLabels, ["TransientTransactionError"]);
+if (isReplicaSetEndpointActive) {
+    // TODO (SERVER-88825): Make sure replica set endpoint return TransientTransactionError write
+    // command is run on a secondary.
+    assert(!res.hasOwnProperty("errorLabels"), res);
+} else {
+    assert.eq(res.errorLabels, ["TransientTransactionError"], res);
+}
 assert.commandWorked(secondary.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 jsTest.log("Insert as a retryable write on secondary should fail with retryable error labels");
@@ -77,7 +90,12 @@ res = secondarySessionDb.runCommand(
     {insert: collName, documents: [{_id: "insert-1"}], txnNumber: NumberLong(txnNumber)});
 
 assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
-assert.eq(res.errorLabels, ["RetryableWriteError"], res);
+if (isReplicaSetEndpointActive) {
+    // TODO (PM-3038): Mongos communicates retryable error labels from shards to drivers.
+    assert(!res.hasOwnProperty("errorLabels"), res);
+} else {
+    assert.eq(res.errorLabels, ["RetryableWriteError"], res);
+}
 secondarySession.endSession();
 
 jsTest.log("failCommand should be able to return errors with TransientTransactionError");
@@ -115,34 +133,38 @@ assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
-jsTest.log(
-    "NotWritablePrimary returned by commitTransaction command is not TransientTransactionError but" +
-    " RetryableWriteError");
-// commitTransaction will attempt to perform a noop write in response to a NoSuchTransaction
-// error and non-empty writeConcern. This will throw NotWritablePrimary.
-res = secondarySessionDb.adminCommand({
-    commitTransaction: 1,
-    txnNumber: NumberLong(secondarySession.getTxnNumber_forTesting() + 1),
-    autocommit: false,
-    writeConcern: {w: "majority"}
-});
-assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
-assert.eq(res.errorLabels, ["RetryableWriteError"], res);
+if (!isReplicaSetEndpointActive) {
+    // This test expects the two commands below to run directly against the shard (i.e. bypass
+    // the router).
+    jsTest.log(
+        "NotWritablePrimary returned by commitTransaction command is not TransientTransactionError but" +
+        " RetryableWriteError");
+    // commitTransaction will attempt to perform a noop write in response to a NoSuchTransaction
+    // error and non-empty writeConcern. This will throw NotWritablePrimary.
+    res = secondarySessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(secondarySession.getTxnNumber_forTesting() + 1),
+        autocommit: false,
+        writeConcern: {w: "majority"}
+    });
+    assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
+    assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 
-jsTest.log(
-    "NotWritablePrimary returned by coordinateCommitTransaction command is not TransientTransactionError" +
-    " but RetryableWriteError");
-// coordinateCommitTransaction will attempt to perform a noop write in response to a
-// NoSuchTransaction error and non-empty writeConcern. This will throw NotWritablePrimary.
-res = secondarySessionDb.adminCommand({
-    coordinateCommitTransaction: 1,
-    participants: [],
-    txnNumber: NumberLong(secondarySession.getTxnNumber_forTesting() + 1),
-    autocommit: false,
-    writeConcern: {w: "majority"}
-});
-assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
-assert.eq(res.errorLabels, ["RetryableWriteError"], res);
+    jsTest.log(
+        "NotWritablePrimary returned by coordinateCommitTransaction command is not TransientTransactionError" +
+        " but RetryableWriteError");
+    // coordinateCommitTransaction will attempt to perform a noop write in response to a
+    // NoSuchTransaction error and non-empty writeConcern. This will throw NotWritablePrimary.
+    res = secondarySessionDb.adminCommand({
+        coordinateCommitTransaction: 1,
+        participants: [],
+        txnNumber: NumberLong(secondarySession.getTxnNumber_forTesting() + 1),
+        autocommit: false,
+        writeConcern: {w: "majority"}
+    });
+    assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
+    assert.eq(res.errorLabels, ["RetryableWriteError"], res);
+}
 
 jsTest.log("ShutdownInProgress returned by write commands is TransientTransactionError");
 session.startTransaction();
@@ -170,7 +192,12 @@ assert.commandWorked(testDB.adminCommand({
 }));
 res = session.commitTransaction_forTesting();
 assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
-assert.eq(res.errorLabels, ["RetryableWriteError"], res);
+if (isReplicaSetEndpointActive) {
+    // TODO (PM-3038): Mongos communicates retryable error labels from shards to drivers.
+    assert(!res.hasOwnProperty("errorLabels"), res);
+} else {
+    assert.eq(res.errorLabels, ["RetryableWriteError"], res);
+}
 assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 jsTest.log("ShutdownInProgress returned by coordinateCommitTransaction command is not" +
@@ -189,7 +216,12 @@ res = sessionDb.adminCommand({
     autocommit: false
 });
 assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
-assert.eq(res.errorLabels, ["RetryableWriteError"], res);
+if (isReplicaSetEndpointActive) {
+    // TODO (PM-3038): Mongos communicates retryable error labels from shards to drivers.
+    assert(!res.hasOwnProperty("errorLabels"), res);
+} else {
+    assert.eq(res.errorLabels, ["RetryableWriteError"], res);
+}
 assert.commandWorked(session.abortTransaction_forTesting());
 assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
@@ -209,7 +241,14 @@ assert.soon(
         return adminDB
                    .aggregate([
                        {$currentOp: {}},
-                       {$match: {"command.drop": collName, waitingForLock: true}}
+                       isReplicaSetEndpointActive
+                           ? {
+                                 $match: {
+                                     "command._shardsvrParticipantBlock": collName,
+                                     "command.blockType": "ReadsAndWrites"
+                                 }
+                             }
+                           : {$match: {"command.drop": collName, waitingForLock: true}}
                    ])
                    .itcount() === 1;
     },
@@ -260,7 +299,12 @@ res = sessionDb.adminCommand({
     autocommit: false
 });
 assert.commandFailedWithCode(res, ErrorCodes.HostUnreachable);
-assert.eq(res.errorLabels, ["RetryableWriteError"], res);
+if (isReplicaSetEndpointActive) {
+    // TODO (PM-3038): Mongos communicates retryable error labels from shards to drivers.
+    assert(!res.hasOwnProperty("errorLabels"), res);
+} else {
+    assert.eq(res.errorLabels, ["RetryableWriteError"], res);
+}
 assert.commandWorked(session.abortTransaction_forTesting());
 assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 

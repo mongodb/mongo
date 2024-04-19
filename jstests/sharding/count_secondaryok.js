@@ -74,4 +74,6 @@ try {
     print("Non-secondaryOk'd connection failed.");
 }
 
-st.stop();
+// TODO (SERVER-83433): Add back the test coverage for running db hash check on replica
+// set that is fsync locked and has replica set endpoint enabled.
+st.stop({skipValidation: st.isReplicaSetEndpointActive()});

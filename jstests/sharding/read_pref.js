@@ -154,10 +154,14 @@ var doTest = function() {
     assert.eq(replTest.getPrimary().name, explainServer);
     assert.eq(1, explain.executionStats.nReturned);
 
+    // TODO (SERVER-83433): Add back the test coverage for running db hash check and validation
+    // on replica set that is fsync locked and has replica set endpoint enabled.
+    const stopOpts = {skipValidation: replTest.isReplicaSetEndpointActive()};
+
     // Kill all members except one
     var stoppedNodes = [];
     for (var x = 0; x < NODES - 1; x++) {
-        replTest.stop(x);
+        replTest.stop(x, null, stopOpts);
         stoppedNodes.push(replTest.nodes[x]);
     }
 
@@ -181,7 +185,7 @@ var doTest = function() {
         getExplain("primary");
     });
 
-    st.stop();
+    st.stop(stopOpts);
 };
 
 doTest();

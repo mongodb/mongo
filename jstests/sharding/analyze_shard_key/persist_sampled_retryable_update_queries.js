@@ -6,6 +6,9 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
+// This test requires running commands directly against the shard.
+TestData.replicaSetEndpointIncompatible = true;
+
 // Make the periodic job for writing sampled queries have a period of 1 second to speed up the test.
 const queryAnalysisWriterIntervalSecs = 1;
 

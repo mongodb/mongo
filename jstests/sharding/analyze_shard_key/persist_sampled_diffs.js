@@ -9,6 +9,9 @@ import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
+// This test requires running commands directly against the shard.
+TestData.replicaSetEndpointIncompatible = true;
+
 const testCases = [];
 
 // multi=false update.

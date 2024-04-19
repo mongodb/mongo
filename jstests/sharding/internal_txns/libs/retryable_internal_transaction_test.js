@@ -40,6 +40,10 @@ export function getOplogEntriesForTxnWithRetries(rs, lsid, txnNumber) {
 }
 
 export function RetryableInternalTransactionTest(collectionOptions = {}) {
+    // This test requires running prepareTransaction and commitTransaction directly against the
+    // shard.
+    TestData.replicaSetEndpointIncompatible = true;
+
     // Transactions with more than two operations will have the behavior of large transactions and
     // span multiple oplog entries.
     const maxNumberOfTransactionOperationsInSingleOplogEntry = 2;

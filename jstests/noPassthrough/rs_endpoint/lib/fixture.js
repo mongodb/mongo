@@ -188,6 +188,9 @@ export var ReplicaSetEndpointTest = class {
 
     tearDown() {
         MongoRunner.stopMongos(this._mongos);
+        // Log out the the test user (_shard0TestUser) to force stopSet() to reauthenticate this
+        // connection with the admin user (if needed) when doing the tear down.
+        assert(this.shard0AuthDB.logout());
         this._shard0Rst.stopSet();
         this._shard1Rst.stopSet();
     }

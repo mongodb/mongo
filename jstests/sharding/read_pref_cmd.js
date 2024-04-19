@@ -156,7 +156,8 @@ let assertCmdRanOnExpectedNodes = function(conn, isMongos, rsNodes, cmdTestCase)
  *          hedge {Object} hedge options of the form {enabled: <bool>}.
  * @param expectedNode {string} which node should this run on: "primary", "secondary", or "any".
  */
-let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNode}) {
+let testConnReadPreference = function(
+    conn, isMongos, isReplicaSetEndpointActive, rst, {readPref, expectedNode}) {
     let rsNodes = rst.nodes;
     jsTest.log(`Testing ${isMongos ? "mongos" : "mongod"} connection with readPreference mode: ${
         readPref.mode}, tag sets: ${tojson(readPref.tagSets)}, hedge ${tojson(readPref.hedge)}`);
@@ -165,6 +166,8 @@ let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNo
     let shardedColl = conn.getCollection(kShardedNs);
     conn.setSecondaryOk(false);  // purely rely on readPref
     conn.setReadPref(readPref.mode, readPref.tagSets, readPref.hedge);
+
+    const isRouter = isMongos || isReplicaSetEndpointActive;
 
     /**
      * Performs the command and checks whether the command was routed to the
@@ -217,7 +220,7 @@ let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNo
     };
 
     // Test inline mapReduce on sharded collection.
-    if (isMongos) {
+    if (isRouter) {
         const comment = 'mapReduce_inline_sharded_' + ObjectId();
         cmdTest({
             mapreduce: kShardedCollName,
@@ -233,7 +236,7 @@ let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNo
 
     // Test inline mapReduce on unsharded collection.
     conn.getDB(kDbName).runCommand({create: kUnshardedCollName});
-    if (isMongos) {
+    if (isRouter) {
         const comment = 'mapReduce_inline_unsharded_' + ObjectId();
         cmdTest(
             {
@@ -254,7 +257,7 @@ let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNo
     }
 
     // Test non-inline mapReduce on sharded collection.
-    if (isMongos) {
+    if (isRouter) {
         const comment = 'mapReduce_noninline_sharded_' + ObjectId();
         cmdTest({
             mapreduce: kShardedCollName,
@@ -263,13 +266,13 @@ let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNo
             out: {replace: 'mrOut'},
             comment: comment
         },
-                allowedOnSecondary.kAlways,
+                isMongos ? allowedOnSecondary.kAlways : allowedOnSecondary.kNever,
                 false,
                 formatProfileQuery(kShardedNs, {aggregate: kShardedCollName, comment: comment}));
     }
 
     // Test non-inline mapReduce on unsharded collection.
-    if (isMongos) {
+    if (isRouter) {
         const comment = 'mapReduce_noninline_unsharded_' + ObjectId();
         cmdTest(
             {
@@ -279,7 +282,7 @@ let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNo
                 out: {replace: 'mrOut'},
                 comment: comment
             },
-            allowedOnSecondary.kAlways,
+            isMongos ? allowedOnSecondary.kAlways : allowedOnSecondary.kNever,
             false,
             formatProfileQuery(kUnshardedNs, {aggregate: kUnshardedCollName, comment: comment}));
     } else {
@@ -319,7 +322,7 @@ let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNo
             false,
             formatProfileQuery(kShardedNs, {
                 aggregate: kShardedCollName,
-                pipeline: [isMongos ? {$project: {_id: true, x: true}} : {$project: {x: 1}}]
+                pipeline: [isRouter ? {$project: {_id: true, x: true}} : {$project: {x: 1}}]
             }));
 
     const isMultiversion = jsTest.options().shardMixedBinVersions ||
@@ -335,12 +338,12 @@ let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNo
                 false,
                 formatProfileQuery(kUnshardedNs, {
                     aggregate: kUnshardedCollName,
-                    pipeline: [isMongos ? {$project: {_id: true, x: true}} : {$project: {x: 1}}]
+                    pipeline: [isRouter ? {$project: {_id: true, x: true}} : {$project: {x: 1}}]
                 }));
     }
 
     // Test $currentOp aggregation stage.
-    if (!isMongos) {
+    if (!isRouter) {
         let curOpComment = 'agg_currentOp_' + ObjectId();
 
         // A $currentOp without any foreign namespaces takes no collection locks and will not be
@@ -463,7 +466,7 @@ let testBadMode = function(conn, isMongos, rsNodes, readPref) {
     }
 };
 
-var testAllModes = function(conn, rst, isMongos) {
+var testAllModes = function(conn, rst, isMongos, isReplicaSetEndpointActive) {
     // The primary is tagged with { tag: "one" } and one of the secondaries is
     // tagged with { tag: "two" }. We can use this to test the interaction between
     // modes, tags, and hedge options. Test a bunch of combinations.
@@ -509,7 +512,7 @@ var testAllModes = function(conn, rst, isMongos) {
         // Run testCursorReadPreference() first since testConnReadPreference() sets the connection's
         // read preference.
         testCursorReadPreference(conn, isMongos, rst.nodes, testCase);
-        testConnReadPreference(conn, isMongos, rst, testCase);
+        testConnReadPreference(conn, isMongos, isReplicaSetEndpointActive, rst, testCase);
 
         tearDown(rst);
     });
@@ -541,6 +544,7 @@ var testAllModes = function(conn, rst, isMongos) {
 
 let st = new ShardingTest({shards: {rs0: {nodes: nodeCount}}});
 st.stopBalancer();
+const isReplicaSetEndpointActive = st.isReplicaSetEndpointActive();
 
 awaitRSClientHosts(st.s, st.rs0.nodes);
 
@@ -631,7 +635,7 @@ st.rs0.nodes.forEach(function(conn) {
 assert.commandWorked(
     st.s.adminCommand({setParameter: 1, logComponentVerbosity: {network: {verbosity: 3}}}));
 
-testAllModes(replConn, st.rs0, false);
+testAllModes(replConn, st.rs0, false, isReplicaSetEndpointActive);
 
 jsTest.log('Starting test for mongos connection');
 
@@ -644,7 +648,7 @@ assert(replicaSetMonitorProtocol === "streamable" || replicaSetMonitorProtocol =
 
 let failPoint = configureFailPoint(st.s, "sdamServerSelectorIgnoreLatencyWindow");
 
-testAllModes(st.s, st.rs0, true);
+testAllModes(st.s, st.rs0, true, isReplicaSetEndpointActive);
 failPoint.off();
 
 st.stop();

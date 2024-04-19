@@ -9,6 +9,9 @@ import {
     makePrepareTransactionCmdObj
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
+// This test requires running transactions directly against the shard.
+TestData.replicaSetEndpointIncompatible = true;
+
 const st = new ShardingTest({shards: 1});
 let shard0Primary = st.rs0.getPrimary();
 

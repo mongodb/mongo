@@ -59,8 +59,13 @@ function runTests(conn, rst) {
     const testDbName = "testDb-" + extractUUIDFromObject(UUID());
     const testCollName0 = "testColl0";
     const testCollName1 = "testColl1";
+
     const adminDb = conn.getDB("admin");
     const testDb = conn.getDB(testDbName);
+
+    const primary = rst.getPrimary();
+    const primaryTestDb = primary.getDB(testDbName);
+    const isReplicaSetEndpointActive = rst.isReplicaSetEndpointActive();
 
     runTestForCmd(adminDb,
                   makeTestConfigureAnalyzerCmdObj,
@@ -77,11 +82,11 @@ function runTests(conn, rst) {
                   testDbName,
                   testCollName0,
                   false /* requiresCollectionToExist */);
-    runTestForCmd(rst.getPrimary().getDB(testDbName),
+    runTestForCmd(primaryTestDb,
                   makeTestAnalyzeShardKeyAggregateCmdObj,
                   testDbName,
                   testCollName0,
-                  true /* requiresCollectionToExist */);
+                  !isReplicaSetEndpointActive /* requiresCollectionToExist */);
 
     assert.commandWorked(testDb.createCollection(testCollName1));
 
@@ -100,7 +105,7 @@ function runTests(conn, rst) {
                   testDbName,
                   testCollName0,
                   false /* requiresCollectionToExist */);
-    runTestForCmd(rst.getPrimary().getDB(testDbName),
+    runTestForCmd(primaryTestDb,
                   makeTestAnalyzeShardKeyAggregateCmdObj,
                   testDbName,
                   testCollName0,

@@ -2,6 +2,9 @@
 // Tests split vector locations with force : true
 //
 
+// TODO (SERVER-87574): Performing splitVector across dbs isn't supported via mongos.
+TestData.replicaSetEndpointIncompatible = true;
+
 var options = {
     chunkSize: 1,  // MB
 };
@@ -35,14 +38,14 @@ assert.commandWorked(bulk.execute());
 
 jsTest.log("Get split points of the chunk using force : true...");
 
-var splitKeys = shardAdmin
-                    .runCommand({
+var splitKeys = assert
+                    .commandWorked(shardAdmin.runCommand({
                         splitVector: coll + "",
                         keyPattern: {_id: 1},
                         min: {_id: 0},
                         max: {_id: MaxKey},
                         force: true
-                    })
+                    }))
                     .splitKeys;
 
 printjson(splitKeys);

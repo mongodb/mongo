@@ -522,6 +522,10 @@ var ShardingTest = function ShardingTest(params) {
         }
     };
 
+    ShardingTest.prototype.isReplicaSetEndpointActive = function() {
+        return numShards == 1 && this._rs[0].test.isReplicaSetEndpointActive();
+    };
+
     ShardingTest.prototype.stop = function(opts = {}) {
         this.checkMetadataConsistency();
         this.checkUUIDsConsistentAcrossCluster();

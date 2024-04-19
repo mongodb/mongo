@@ -3,6 +3,10 @@
  * are only legal in sharded clusters (e.g., the two phase commit commands).
  * @tags: [uses_transactions]
  */
+
+// This test requires running transactions directly against the shard.
+TestData.replicaSetEndpointIncompatible = true;
+
 const dbName = "test";
 
 const txnNumber = 0;

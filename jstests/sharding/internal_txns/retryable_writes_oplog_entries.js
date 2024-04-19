@@ -14,6 +14,9 @@ import {
     makePrepareTransactionCmdObj,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
+// This test requires running prepareTransaction and commitTransaction directly against the shard.
+TestData.replicaSetEndpointIncompatible = true;
+
 const kDbName = "testDb";
 const kCollName = "testColl";
 

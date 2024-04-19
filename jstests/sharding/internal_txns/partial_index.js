@@ -6,6 +6,12 @@
  */
 import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
+// TODO (SERVER-88675): DDL commands against config and admin database are not allowed via a router
+// but are allowed via a direct connection to the config server or shard.
+// This test involves dropping an index in the 'config' database which is not allowed through a
+// router.
+TestData.replicaSetEndpointIncompatible = true;
+
 const kDbName = "testDb";
 const kCollName = "testColl";
 const kConfigTxnNs = "config.transactions";
@@ -60,13 +66,14 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         const indexSpecs =
             assert.commandWorked(configDB.runCommand({"listIndexes": "transactions"}))
                 .cursor.firstBatch;
-        assert.eq(indexSpecs.length, 1);
+        assert.eq(indexSpecs.length, 1, indexSpecs);
         const idIndexSpec = indexSpecs[0];
         assert.eq(idIndexSpec.key, {"_id": 1});
     }
 
     function indexRecreationTest(expectRecreateAfterDrop) {
-        st.rs0.getPrimary().getCollection(kConfigTxnNs).dropIndex(kPartialIndexName);
+        assert.commandWorked(
+            st.rs0.getPrimary().getCollection(kConfigTxnNs).dropIndex(kPartialIndexName));
         st.rs0.awaitReplication();
 
         st.rs0.nodes.forEach(node => {

@@ -12,6 +12,8 @@
 // transaction's storage engine transaction. Therefore, when the prepared transaction is aborted,
 // the write to image collection only gets rolled back on secondaries.
 TestData.skipCheckDBHashes = true;
+// This test requires running transactions directly against the shard.
+TestData.replicaSetEndpointIncompatible = true;
 
 import {
     makeAbortTransactionCmdObj,

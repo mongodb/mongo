@@ -4,6 +4,10 @@
  *
  * @tags: [requires_sharding, uses_transactions, uses_prepare_transaction]
  */
+
+// This test requires running transactions directly against the shard.
+TestData.replicaSetEndpointIncompatible = true;
+
 const collName = "restart_transactions";
 
 function runTest(routerDB, directDB) {

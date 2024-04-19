@@ -51,16 +51,22 @@ const impls = {
         const runOnDb = conn.getDB(testCase.runOnDb);
         const state = testObj.setup && testObj.setup(runOnDb);
 
+        let cmdDb = runOnDb;
+        if (testObj.hasOwnProperty("runOnDb")) {
+            assert.eq(typeof (testObj.runOnDb), "function");
+            cmdDb = runOnDb.getSiblingDB(testObj.runOnDb(state));
+        }
+
         const command = (typeof (testObj.command) === "function")
             ? testObj.command(state, testCase.commandArgs)
             : testObj.command;
         command['comment'] = {comment: true};
-        const res = runOnDb.runCommand(command);
+        const res = cmdDb.runCommand(command);
         assert(res.ok == 1 || testCase.expectFail || res.code == ErrorCodes.CommandNotSupported,
                tojson(res));
 
         if (testObj.teardown) {
-            testObj.teardown(runOnDb, res);
+            testObj.teardown(cmdDb, res);
         }
 
         if (disableSearchFailpoint) {

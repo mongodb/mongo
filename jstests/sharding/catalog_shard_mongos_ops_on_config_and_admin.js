@@ -4,7 +4,11 @@
  *
  * @tags: [requires_fcv_80]
  */
+
 var st = new ShardingTest({mongos: 1, shards: 1, config: 1, configShard: true});
+// TODO (SERVER-88675): DDL commands against config and admin database are not allowed via a router
+// but are allowed via a direct connection to the config server or shard.
+const isReplicaSetEndpointActive = st.isReplicaSetEndpointActive();
 
 let mongosAdminDB = st.s0.getDB("admin");
 let mongosConfigDB = st.s0.getDB("config");
@@ -73,13 +77,25 @@ assert.commandWorked(res);
 // Mongos commands on the config database that previoulsy failed that should succeed when run
 // directly on the config server
 {
-    assert.commandWorked(
-        configSvrAdminDB.runCommand({renameCollection: "config.shards", to: "config.joe"}));
+    const renameRes0 =
+        configSvrAdminDB.runCommand({renameCollection: "config.shards", to: "config.joe"});
+    const renameRes1 =
+        configSvrAdminDB.runCommand({renameCollection: "config.joe", to: "config.shards"});
 
-    assert.commandWorked(
-        configSvrAdminDB.runCommand({renameCollection: "config.joe", to: "config.shards"}));
+    if (isReplicaSetEndpointActive) {
+        assert.commandFailedWithCode(renameRes0, ErrorCodes.IllegalOperation);
+        assert.commandFailedWithCode(renameRes1, ErrorCodes.IllegalOperation);
+    } else {
+        assert.commandWorked(renameRes0);
+        assert.commandWorked(renameRes1);
+    }
 
-    assert.commandWorked(configSvrConfigDB.runCommand({drop: "shards"}));
+    const dropRes = configSvrConfigDB.runCommand({drop: "shards"});
+    if (isReplicaSetEndpointActive) {
+        assert.commandFailedWithCode(dropRes, ErrorCodes.IllegalOperation);
+    } else {
+        assert.commandWorked(dropRes);
+    }
 }
 
 // Mongos commands on the admin database that previously failed that should still fail when run
@@ -97,13 +113,28 @@ assert.commandWorked(res);
 // directly on the config server.
 // Note: renameCollection and drop will still fail for certain collections in the admin databases.
 {
-    assert.commandWorked(
-        configSvrAdminDB.runCommand({renameCollection: "admin.system.roles", to: "admin.joe"}));
+    const renameRes0 =
+        configSvrAdminDB.runCommand({renameCollection: "admin.system.roles", to: "admin.joe"});
+    if (isReplicaSetEndpointActive) {
+        assert.commandFailedWithCode(renameRes0, ErrorCodes.IllegalOperation);
+    } else {
+        assert.commandWorked(renameRes0);
+    }
 
-    assert.commandWorked(
-        configSvrAdminDB.runCommand({renameCollection: "admin.joe", to: "admin.system.roles"}));
+    const renameRes1 =
+        configSvrAdminDB.runCommand({renameCollection: "admin.joe", to: "admin.system.roles"});
+    if (isReplicaSetEndpointActive) {
+        assert.commandFailedWithCode(renameRes1, ErrorCodes.IllegalOperation);
+    } else {
+        assert.commandWorked(renameRes1);
+    }
 
-    assert.commandWorked(configSvrAdminDB.runCommand({drop: "system.healthLog"}));
+    const dropRes = configSvrConfigDB.runCommand({drop: "system.healthLog"});
+    if (isReplicaSetEndpointActive) {
+        assert.commandFailedWithCode(dropRes, ErrorCodes.IllegalOperation);
+    } else {
+        assert.commandWorked(dropRes);
+    }
 }
 
 // TODO SERVER-74570: Enable parallel shutdown
