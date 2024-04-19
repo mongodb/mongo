@@ -371,10 +371,10 @@ void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
     try {
         const auto& coll = _localCatalogClient->getCollection(
             opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
-        const auto& timeseriesField = coll.getTimeseriesFields();
-        if (timeseriesField) {
-            uassertStatusOK(
-                checkForTimeseriesTimeFieldKeyRange(actualRange, timeseriesField->getTimeField()));
+        const auto& isShardedTimeseries = coll.getTimeseriesFields() && !coll.getUnsplittable();
+        if (isShardedTimeseries) {
+            uassertStatusOK(checkForTimeseriesTimeFieldKeyRange(
+                actualRange, coll.getTimeseriesFields()->getTimeField()));
         }
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // collection doesn't exist or not sharded, skip range check for time-series collection.
