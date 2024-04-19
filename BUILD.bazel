@@ -19,10 +19,19 @@ alias(
     actual = "//buildscripts:codeowners",
 )
 
-# This file group makes it possible to set the clang-tidy configuration setting:
-#   --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config
-filegroup(
+# This rule makes it possible to set the clang-tidy configuration setting:
+genrule(
     name = "clang_tidy_config",
-    srcs = [".clang-tidy"],
+    srcs = [
+        ".clang-tidy.in",
+    ],
+    outs = [".clang-tidy"],
+
+    # Note: we use sed to substitute the known good value `build/compiledb/mongo`; testing
+    # has confirmed that this is the correct value.
+    cmd = """
+    cp $(location .clang-tidy.in) $@ && \
+    sed -i 's|@MONGO_BUILD_DIR@|$(RULEDIR)/src/mongo|g' $@
+    """,
     visibility = ["//visibility:public"],
 )
