@@ -795,6 +795,28 @@ TimeseriesTest.run((insert) => {
     }
 
     {
+        // Test the case where a computed meta field is computed to missing.
+        const res =
+            coll.aggregate([{"$project": {"_id": 0, [metaFieldName]: "$$REMOVE"}}]).toArray();
+        assert.eq(res.length, coll.count(), res);
+        for (let doc of res) {
+            assert.eq(doc, {}, res);
+        }
+    }
+
+    {
+        // Test the case where a computed meta field is computed to missing because of a project
+        // out.
+        const res = coll.aggregate([
+                            {"$project": {[metaFieldName]: 0}},
+                            {"$project": {[metaFieldName]: "$" + metaFieldName}},
+                            {$match: {a: 1}}
+                        ])
+                        .toArray();
+        assert.eq(res.length, 0, res);
+    }
+
+    {
         // Test the case where a field is projected out and then projected back in.
         const res = coll.aggregate([
                             {"$project": {"_id": 0, [metaFieldName]: 1}},
