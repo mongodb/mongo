@@ -113,6 +113,9 @@ function testSlowQueryLog(conn, db, collName) {
     const kDelayMillis = 50;
     const kDelayMicros = kDelayMillis * 1000;
 
+    // clear server log to make sure there's only one slow log entry when we check
+    assert.commandWorked(db.adminCommand({clearLog: "global"}));
+
     // run a parallel shell that can wait for admission control
     let parallelShell =
         startParallelShell(funWithArgs((dbName, collName) => {
