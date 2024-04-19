@@ -3139,7 +3139,7 @@ TEST(PipelineOptimizationTest, MatchOnFmodShouldSwapWithAdjacentStage) {
 
 class ChangeStreamPipelineOptimizationTest : public ServiceContextTest {
 public:
-    struct ExpCtxOptionsStruct {
+    struct ExpressionContextOptionsStruct {
         bool inMongos;
     };
 
@@ -3147,28 +3147,27 @@ public:
         : ChangeStreamPipelineOptimizationTest(NamespaceString::createNamespaceString_forTest(
               boost::none, "unittests", "pipeline_test")) {}
 
-    ChangeStreamPipelineOptimizationTest(NamespaceString nss) {
+    ChangeStreamPipelineOptimizationTest(const NamespaceString& nss) {
         _opCtx = _testServiceContext.makeOperationContext();
         _expCtx = make_intrusive<ExpressionContextForTest>(_opCtx.get(), nss);
     }
 
-    boost::intrusive_ptr<ExpressionContextForTest> getExpCtx(ExpCtxOptionsStruct options) {
+    void setExpCtx(ExpressionContextOptionsStruct options) {
         _expCtx->opCtx = _opCtx.get();
         _expCtx->uuid = UUID::gen();
         _expCtx->inMongos = options.inMongos;
         setMockReplicationCoordinatorOnOpCtx(_expCtx->opCtx);
-        return _expCtx;
     }
 
-    BSONObj changestream(const std::string& stageStr) {
+    BSONObj changestreamStage(const std::string& stageStr) {
         return fromjson("{$changeStream: " + stageStr + "}");
     }
 
-    BSONObj match(const std::string& stageStr) {
+    BSONObj matchStage(const std::string& stageStr) {
         return fromjson("{$match: " + stageStr + "}");
     }
 
-    BSONObj redact(const std::string& stageStr) {
+    BSONObj redactStage(const std::string& stageStr) {
         return fromjson("{$redact: " + stageStr + "}");
     }
 
@@ -3185,9 +3184,9 @@ private:
 };
 
 TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookUpSize) {
-    auto expCtx = getExpCtx({.inMongos = false});
-    auto pipeline =
-        makePipeline({changestream("{fullDocument: 'updateLookup', showExpandedEvents: true}")});
+    setExpCtx({.inMongos = false});
+    auto pipeline = makePipeline(
+        {changestreamStage("{fullDocument: 'updateLookup', showExpandedEvents: true}")});
     ASSERT_EQ(pipeline->getSources().size(), getChangeStreamStageSize());
 
     // Make sure the change lookup is at the end.
@@ -3195,13 +3194,13 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookUpSize) {
 }
 
 TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
-    auto expCtx = getExpCtx({.inMongos = false});
+    setExpCtx({.inMongos = false});
 
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
     auto pipeline =
-        makePipeline({changestream("{fullDocument: 'updateLookup', showExpandedEvents: true}"),
-                      match("{extra: 'predicate'}")});
+        makePipeline({changestreamStage("{fullDocument: 'updateLookup', showExpandedEvents: true}"),
+                      matchStage("{extra: 'predicate'}")});
     pipeline->optimizePipeline();
 
     // Make sure the $match stage has swapped before the change look up.
@@ -3209,13 +3208,13 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupSwapsWithIndepend
 }
 
 TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage) {
-    auto expCtx = getExpCtx({.inMongos = false});
+    setExpCtx({.inMongos = false});
 
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added eve
     auto pipeline =
-        makePipeline({changestream("{fullDocument: 'updateLookup', showExpandedEvents: true}"),
-                      match("{fullDocument: null}")});
+        makePipeline({changestreamStage("{fullDocument: 'updateLookup', showExpandedEvents: true}"),
+                      matchStage("{fullDocument: null}")});
     pipeline->optimizePipeline();
 
     // Make sure the $match stage stays at the end.
@@ -3223,12 +3222,12 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMa
 }
 
 TEST_F(ChangeStreamPipelineOptimizationTest, FullDocumentBeforeChangeLookupSize) {
-    auto expCtx = getExpCtx({.inMongos = false});
+    setExpCtx({.inMongos = false});
 
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
     auto pipeline = makePipeline(
-        {changestream("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}")});
+        {changestreamStage("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}")});
     ASSERT_EQ(pipeline->getSources().size(), getChangeStreamStageSize());
 
     // Make sure the pre-image lookup is at the end.
@@ -3237,13 +3236,13 @@ TEST_F(ChangeStreamPipelineOptimizationTest, FullDocumentBeforeChangeLookupSize)
 
 TEST_F(ChangeStreamPipelineOptimizationTest,
        FullDocumentBeforeChangeLookupSwapsWithIndependentMatch) {
-    auto expCtx = getExpCtx({.inMongos = false});
+    setExpCtx({.inMongos = false});
 
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
     auto pipeline = makePipeline(
-        {changestream("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}"),
-         match("{extra: 'predicate'}")});
+        {changestreamStage("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}"),
+         matchStage("{extra: 'predicate'}")});
     pipeline->optimizePipeline();
 
     // Make sure the $match stage has swapped before the change look up.
@@ -3252,13 +3251,13 @@ TEST_F(ChangeStreamPipelineOptimizationTest,
 
 TEST_F(ChangeStreamPipelineOptimizationTest,
        FullDocumentBeforeChangeDoesNotSwapWithMatchOnPreImage) {
-    auto expCtx = getExpCtx({.inMongos = false});
+    setExpCtx({.inMongos = false});
 
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
     auto pipeline = makePipeline(
-        {changestream("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}"),
-         match("{fullDocumentBeforeChange: null}")});
+        {changestreamStage("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}"),
+         matchStage("{fullDocumentBeforeChange: null}")});
     pipeline->optimizePipeline();
 
     // Make sure the $match stage stays at the end.
@@ -3266,10 +3265,11 @@ TEST_F(ChangeStreamPipelineOptimizationTest,
 }
 
 TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamHandleTopologyChangeSwapsWithRedact) {
-    auto expCtx = getExpCtx(
+    setExpCtx(
         {.inMongos = true});  // To enforce the $_internalChangeStreamHandleTopologyChange stage.
 
-    auto pipeline = makePipeline({changestream("{showExpandedEvents: true}"), redact("'$$PRUNE'")});
+    auto pipeline =
+        makePipeline({changestreamStage("{showExpandedEvents: true}"), redactStage("'$$PRUNE'")});
     pipeline->optimizePipeline();
 
     // Assert that $redact swaps with $_internalChangeStreamHandleTopologyChange after optimization.
@@ -4556,7 +4556,7 @@ using PipelineMustRunOnMongoSTest = AggregationContextFixture;
 
 TEST_F(PipelineMustRunOnMongoSTest, UnsplittablePipelineMustRunOnMongoS) {
     setExpCtx({.inMongos = true, .allowDiskUse = false});
-    auto pipeline = makePipeline({match("{x: 5}"), runOnMongos()});
+    auto pipeline = makePipeline({matchStage("{x: 5}"), runOnMongos()});
     ASSERT_TRUE(pipeline->requiredToRunOnMongos());
 
     pipeline->optimizePipeline();
@@ -4565,7 +4565,7 @@ TEST_F(PipelineMustRunOnMongoSTest, UnsplittablePipelineMustRunOnMongoS) {
 
 TEST_F(PipelineMustRunOnMongoSTest, UnsplittableMongoSPipelineAssertsIfDisallowedStagePresent) {
     setExpCtx({.inMongos = true, .allowDiskUse = true});
-    auto pipeline = makePipeline({match("{x: 5}"), runOnMongos(), sort("{x: 1}")});
+    auto pipeline = makePipeline({matchStage("{x: 5}"), runOnMongos(), sortStage("{x: 1}")});
     pipeline->optimizePipeline();
 
     // The entire pipeline must run on mongoS, but $sort cannot do so when 'allowDiskUse' is true.
@@ -4578,7 +4578,7 @@ DEATH_TEST_F(PipelineMustRunOnMongoSTest,
              "invariant") {
     setExpCtx({.inMongos = true, .allowDiskUse = false});
     auto pipeline =
-        makePipeline({match("{x: 5}"), split(HostTypeRequirement::kNone), runOnMongos()});
+        makePipeline({matchStage("{x: 5}"), splitStage(HostTypeRequirement::kNone), runOnMongos()});
 
     // We don't need to run the entire pipeline on mongoS because we can split at
     // $_internalSplitPipeline.
@@ -4607,10 +4607,11 @@ public:
 };
 
 TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStagePresent) {
-    auto expCtx = setExpCtx({.inMongos = true, .allowDiskUse = true});
+    setExpCtx({.inMongos = true, .allowDiskUse = true});
+    auto expCtx = getExpCtx();
     expCtx->mongoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
-    auto pipeline =
-        makePipeline({match("{x: 5}"), split(HostTypeRequirement::kNone), runOnMongos(), out()});
+    auto pipeline = makePipeline(
+        {matchStage("{x: 5}"), splitStage(HostTypeRequirement::kNone), runOnMongos(), outStage()});
 
     // We don't need to run the entire pipeline on mongoS because we can split at
     // $_internalSplitPipeline.
@@ -4625,8 +4626,8 @@ TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStageP
 
 TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShardSideOfSplit) {
     setExpCtx({.inMongos = true, .allowDiskUse = false});
-    auto pipeline =
-        makePipeline({match("{x: 5}"), runOnMongos(), split(HostTypeRequirement::kAnyShard)});
+    auto pipeline = makePipeline(
+        {matchStage("{x: 5}"), runOnMongos(), splitStage(HostTypeRequirement::kAnyShard)});
     pipeline->optimizePipeline();
 
     // The 'runOnMongos' stage comes before any splitpoint, so this entire pipeline must run on
@@ -4640,7 +4641,7 @@ TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShar
 TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineRunsUnsplitOnMongoSIfSplitpointIsEligible) {
     setExpCtx({.inMongos = true, .allowDiskUse = false});
     auto pipeline =
-        makePipeline({match("{x: 5}"), runOnMongos(), split(HostTypeRequirement::kNone)});
+        makePipeline({matchStage("{x: 5}"), runOnMongos(), splitStage(HostTypeRequirement::kNone)});
     pipeline->optimizePipeline();
 
     // The 'runOnMongos' stage is before the splitpoint, so this entire pipeline must run on mongoS.
@@ -4657,8 +4658,10 @@ using HostTypeRequirement = StageConstraints::HostTypeRequirement;
 
 TEST_F(PipelineDeferredMergeSortTest, StageWithDeferredSortDoesNotSplit) {
     setExpCtx({.inMongos = true, .allowDiskUse = false});
-    auto splitPipeline = makeAndSplitPipeline(
-        {mockDeferredSort(), swappable(), split(HostTypeRequirement::kNone), match("{b: 5}")});
+    auto splitPipeline = makeAndSplitPipeline({mockDeferredSortStage(),
+                                               swappableStage(),
+                                               splitStage(HostTypeRequirement::kNone),
+                                               matchStage("{b: 5}")});
     verifyPipelineForDeferredMergeSortTest(std::move(splitPipeline),
                                            2 /* shardsPipelineSize */,
                                            2 /* mergePipelineSize */,
@@ -4667,11 +4670,11 @@ TEST_F(PipelineDeferredMergeSortTest, StageWithDeferredSortDoesNotSplit) {
 
 TEST_F(PipelineDeferredMergeSortTest, EarliestSortIsSelectedIfDeferred) {
     setExpCtx({.inMongos = true, .allowDiskUse = false});
-    auto splitPipeline = makeAndSplitPipeline({mockDeferredSort(),
-                                               swappable(),
-                                               sort("{NO: 1}"),
-                                               split(HostTypeRequirement::kNone),
-                                               match("{b: 5}")});
+    auto splitPipeline = makeAndSplitPipeline({mockDeferredSortStage(),
+                                               swappableStage(),
+                                               sortStage("{NO: 1}"),
+                                               splitStage(HostTypeRequirement::kNone),
+                                               matchStage("{b: 5}")});
     verifyPipelineForDeferredMergeSortTest(std::move(splitPipeline),
                                            2 /* shardsPipelineSize */,
                                            3 /* mergePipelineSize */,
@@ -4680,10 +4683,10 @@ TEST_F(PipelineDeferredMergeSortTest, EarliestSortIsSelectedIfDeferred) {
 
 TEST_F(PipelineDeferredMergeSortTest, StageThatCantSwapGoesToMergingHalf) {
     setExpCtx({.inMongos = true, .allowDiskUse = false});
-    auto match1 = match("{a: 5}");
-    auto match2 = match("{b: 5}");
+    auto match1 = matchStage("{a: 5}");
+    auto match2 = matchStage("{b: 5}");
     auto splitPipeline = makeAndSplitPipeline(
-        {mockDeferredSort(), match1, split(HostTypeRequirement::kNone), match2});
+        {mockDeferredSortStage(), match1, splitStage(HostTypeRequirement::kNone), match2});
     verifyPipelineForDeferredMergeSortTest(std::move(splitPipeline),
                                            1 /* shardsPipelineSize */,
                                            3 /* mergePipelineSize */,
@@ -4695,7 +4698,7 @@ TEST_F(PipelineDeferredMergeSortTest, StageThatCantSwapGoesToMergingHalf) {
 
 class PipelineInitialSource : public ServiceContextTest {
 public:
-    std::unique_ptr<Pipeline, PipelineDeleter> getPipeline(const std::string& pipelineStr) {
+    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(const std::string& pipelineStr) {
         std::vector<BSONObj> rawPipeline = {fromjson(pipelineStr)};
         auto opCtx = makeOperationContext();
         boost::intrusive_ptr<ExpressionContextForTest> ctx = new ExpressionContextForTest(
@@ -4705,12 +4708,12 @@ public:
 };
 
 TEST_F(PipelineInitialSource, GeoNearInitialQuery) {
-    auto pipe = getPipeline("{$geoNear: {distanceField: 'd', near: [0, 0], query: {a: 1}}}");
+    auto pipe = makePipeline("{$geoNear: {distanceField: 'd', near: [0, 0], query: {a: 1}}}");
     ASSERT_BSONOBJ_EQ(pipe->getInitialQuery(), BSON("a" << 1));
 }
 
 TEST_F(PipelineInitialSource, MatchInitialQuery) {
-    auto pipe = getPipeline("{$match: {'a': 4}}");
+    auto pipe = makePipeline("{$match: {'a': 4}}");
     ASSERT_BSONOBJ_EQ(pipe->getInitialQuery(), BSON("a" << 4));
 }
 
@@ -4719,21 +4722,20 @@ namespace pipeline_validate {
 
 class PipelineValidateTest : public AggregationContextFixture {
 public:
-    struct ExpCtxOptionsStruct {
+    struct ExpressionContextOptionsStruct {
         bool hasCollectionName;
         bool setMockReplCoord;
     };
 
-    boost::intrusive_ptr<mongo::ExpressionContextForTest> getExpCtx(ExpCtxOptionsStruct options) {
+    boost::intrusive_ptr<mongo::ExpressionContextForTest> getExpCtx(
+        ExpressionContextOptionsStruct options) {
         auto ctx = AggregationContextFixture::getExpCtx();
 
         // The db name string is always set to "a" (collectionless or not).
-        if (!options.hasCollectionName) {
-            ctx->ns = NamespaceString::makeCollectionlessAggregateNSS(
-                DatabaseName::createDatabaseName_forTest(boost::none, "a"));
-        } else {
-            ctx->ns = kTestNss;  // Sets to a.collection when there should be a collection name.
-        }
+        ctx->ns = (options.hasCollectionName)
+            ? kTestNss  // Sets to a.collection when there should be a collection name.
+            : NamespaceString::makeCollectionlessAggregateNSS(
+                  DatabaseName::createDatabaseName_forTest(boost::none, "a"));
 
         if (options.setMockReplCoord) {
             setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
@@ -4856,9 +4858,8 @@ TEST_F(PipelineValidateTest, TopLevelPipelineValidatedForStagesIllegalInTransact
 
     // Make a pipeline with a legal $match, and then an illegal mock stage, and verify that pipeline
     // creation fails with the expected error code.
-    auto matchStage = DocumentSourceMatch::create(BSON("_id" << 3), ctx);
     ASSERT_THROWS_CODE(
-        makePipeline({match("{_id: 3}"), DocumentSourceDisallowedInTransactions::create(ctx)}),
+        makePipeline({matchStage("{_id: 3}"), DocumentSourceDisallowedInTransactions::create(ctx)}),
         AssertionException,
         ErrorCodes::OperationNotSupportedInTransaction);
 }
@@ -5099,16 +5100,18 @@ using PipelineRenameTracking = AggregationContextFixture;
 
 TEST_F(PipelineRenameTracking, ReportsIdentityMapWhenEmpty) {
     auto expCtx = getExpCtx();
-    auto pipeline = makePipeline({mock()});
+    auto pipeline = makePipeline({mockStage()});
     {
         // Tracking renames backwards.
-        trackPipelineRenames(
-            makePipeline({mock()}), {"a", "b", "c.d"} /* pathsOfInterest */, Tracking::backwards);
+        trackPipelineRenames(makePipeline({mockStage()}),
+                             {"a", "b", "c.d"} /* pathsOfInterest */,
+                             Tracking::backwards);
     }
     {
         // Tracking renames forwards.
-        trackPipelineRenames(
-            makePipeline({mock()}), {"a", "b", "c.d"} /* pathsOfInterest */, Tracking::forwards);
+        trackPipelineRenames(makePipeline({mockStage()}),
+                             {"a", "b", "c.d"} /* pathsOfInterest */,
+                             Tracking::forwards);
     }
 }
 
@@ -5133,19 +5136,19 @@ TEST_F(PipelineRenameTracking, ReportsIdentityWhenNoStageModifiesAnything) {
     auto expCtx = getExpCtx();
     {
         // Tracking renames backwards.
-        trackPipelineRenames(makePipeline({mock(), NoModifications::create(expCtx)}),
+        trackPipelineRenames(makePipeline({mockStage(), NoModifications::create(expCtx)}),
                              {"a", "b", "c.d"} /* pathsOfInterest */,
                              Tracking::backwards);
     }
     {
         // Tracking renames forwards.
-        trackPipelineRenames(makePipeline({mock(), NoModifications::create(expCtx)}),
+        trackPipelineRenames(makePipeline({mockStage(), NoModifications::create(expCtx)}),
                              {"a", "b", "c.d"} /* pathsOfInterest */,
                              Tracking::forwards);
     }
     {
         // Tracking renames backwards.
-        trackPipelineRenames(makePipeline({mock(),
+        trackPipelineRenames(makePipeline({mockStage(),
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx)}),
@@ -5154,7 +5157,7 @@ TEST_F(PipelineRenameTracking, ReportsIdentityWhenNoStageModifiesAnything) {
     }
     {
         // Tracking renames forwards.
-        trackPipelineRenames(makePipeline({mock(),
+        trackPipelineRenames(makePipeline({mockStage(),
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx)}),
@@ -5182,7 +5185,7 @@ public:
 
 TEST_F(PipelineRenameTracking, DoesNotReportRenamesIfAStageDoesNotSupportTrackingThem) {
     auto expCtx = getExpCtx();
-    auto pipeline = makePipeline({mock(),
+    auto pipeline = makePipeline({mockStage(),
                                   NoModifications::create(expCtx),
                                   NotSupported::create(expCtx),
                                   NoModifications::create(expCtx)});
@@ -5218,7 +5221,7 @@ public:
 
 TEST_F(PipelineRenameTracking, ReportsNewNamesWhenSingleStageRenames) {
     auto expCtx = getExpCtx();
-    auto pipeline = makePipeline({mock(), RenamesAToB::create(expCtx)});
+    auto pipeline = makePipeline({mockStage(), RenamesAToB::create(expCtx)});
     {
         // Tracking backwards.
         auto renames = semantic_analysis::renamedPaths(
@@ -5285,25 +5288,25 @@ TEST_F(PipelineRenameTracking, ReportsIdentityMapWhenGivenEmptyIteratorRange) {
     auto expCtx = getExpCtx();
     {
         // Tracking backwards.
-        trackPipelineRenamesOnEmptyRange(makePipeline({mock(), RenamesAToB::create(expCtx)}),
+        trackPipelineRenamesOnEmptyRange(makePipeline({mockStage(), RenamesAToB::create(expCtx)}),
                                          {"b"} /* pathsOfInterest */,
                                          Tracking::backwards);
     }
     {
         // Tracking forwards.
-        trackPipelineRenamesOnEmptyRange(makePipeline({mock(), RenamesAToB::create(expCtx)}),
+        trackPipelineRenamesOnEmptyRange(makePipeline({mockStage(), RenamesAToB::create(expCtx)}),
                                          {"b"} /* pathsOfInterest */,
                                          Tracking::forwards);
     }
     {
         // Tracking backwards.
-        trackPipelineRenamesOnEmptyRange(makePipeline({mock(), RenamesAToB::create(expCtx)}),
+        trackPipelineRenamesOnEmptyRange(makePipeline({mockStage(), RenamesAToB::create(expCtx)}),
                                          {"b", "c.d"} /* pathsOfInterest */,
                                          Tracking::backwards);
     }
     {
         // Tracking forwards.
-        trackPipelineRenamesOnEmptyRange(makePipeline({mock(), RenamesAToB::create(expCtx)}),
+        trackPipelineRenamesOnEmptyRange(makePipeline({mockStage(), RenamesAToB::create(expCtx)}),
                                          {"b", "c.d"} /* pathsOfInterest */,
                                          Tracking::forwards);
     }
@@ -5327,7 +5330,7 @@ TEST_F(PipelineRenameTracking, ReportsNewNameAcrossMultipleRenames) {
     {
         // Tracking backwards.
         auto pipeline =
-            makePipeline({mock(), RenamesAToB::create(expCtx), RenamesBToC::create(expCtx)});
+            makePipeline({mockStage(), RenamesAToB::create(expCtx), RenamesBToC::create(expCtx)});
         auto stages = pipeline->getSources();
         auto renames = semantic_analysis::renamedPaths(stages.crbegin(), stages.crend(), {"c"});
         ASSERT(static_cast<bool>(renames));
@@ -5338,7 +5341,7 @@ TEST_F(PipelineRenameTracking, ReportsNewNameAcrossMultipleRenames) {
     {
         // Tracking forwards.
         auto pipeline =
-            makePipeline({mock(), RenamesAToB::create(expCtx), RenamesBToC::create(expCtx)});
+            makePipeline({mockStage(), RenamesAToB::create(expCtx), RenamesBToC::create(expCtx)});
         auto stages = pipeline->getSources();
         auto renames = semantic_analysis::renamedPaths(stages.cbegin(), stages.cend(), {"a"});
         ASSERT(static_cast<bool>(renames));
@@ -5366,14 +5369,14 @@ TEST_F(PipelineRenameTracking, CanHandleBackAndForthRename) {
     {
         // Tracking backwards.
         trackPipelineRenames(
-            makePipeline({mock(), RenamesAToB::create(expCtx), RenamesBToA::create(expCtx)}),
+            makePipeline({mockStage(), RenamesAToB::create(expCtx), RenamesBToA::create(expCtx)}),
             {"a"} /* pathsOfInterest */,
             Tracking::backwards);
     }
     {
         // Tracking forwards.
         trackPipelineRenames(
-            makePipeline({mock(), RenamesAToB::create(expCtx), RenamesBToA::create(expCtx)}),
+            makePipeline({mockStage(), RenamesAToB::create(expCtx), RenamesBToA::create(expCtx)}),
             {"a"} /* pathsOfInterest */,
             Tracking::forwards);
     }
@@ -5389,9 +5392,9 @@ protected:
 TEST_F(InvolvedNamespacesTest, NoInvolvedNamespacesForMatchSortProject) {
     boost::intrusive_ptr<ExpressionContext> expCtx(getExpCtx());
     auto pipeline = makePipeline(
-        {mock(),
-         match("{x: 1}"),
-         sort("{y: -1}"),
+        {mockStage(),
+         matchStage("{x: 1}"),
+         sortStage("{y: -1}"),
          DocumentSourceProject::create(BSON("x" << 1 << "y" << 1), expCtx, "$project"_sd)});
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT(involvedNssSet.empty());
@@ -5405,7 +5408,7 @@ TEST_F(InvolvedNamespacesTest, IncludesLookupNamespace) {
     expCtx->setResolvedNamespace(lookupNss, {resolvedNss, std::vector<BSONObj>{}});
     auto lookupSpec =
         fromjson("{$lookup: {from: 'foo', as: 'x', localField: 'foo_id', foreignField: '_id'}}");
-    auto pipeline = makePipeline({mock(), lookup(lookupSpec)});
+    auto pipeline = makePipeline({mockStage(), lookupStage(lookupSpec)});
 
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 1UL);
@@ -5426,7 +5429,7 @@ TEST_F(InvolvedNamespacesTest, IncludesGraphLookupNamespace) {
         "  connectToField: 'y',"
         "  startWith: '$start'"
         "}}");
-    auto pipeline = makePipeline({mockDeferredSort(), graphLookup(graphLookupSpec)});
+    auto pipeline = makePipeline({mockDeferredSortStage(), graphLookupStage(graphLookupSpec)});
 
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 1UL);
@@ -5451,7 +5454,7 @@ TEST_F(InvolvedNamespacesTest, IncludesLookupSubpipelineNamespaces) {
         "  as: 'x', "
         "  pipeline: [{$lookup: {from: 'foo_inner', as: 'y', pipeline: []}}]"
         "}}");
-    auto pipeline = makePipeline({mock(), lookup(lookupSpec)});
+    auto pipeline = makePipeline({mockStage(), lookupStage(lookupSpec)});
 
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 2UL);
@@ -5483,7 +5486,7 @@ TEST_F(InvolvedNamespacesTest, IncludesGraphLookupSubPipeline) {
         "  connectToField: 'y',"
         "  startWith: '$start'"
         "}}");
-    auto pipeline = makePipeline({mock(), graphLookup(graphLookupSpec)});
+    auto pipeline = makePipeline({mockStage(), graphLookupStage(graphLookupSpec)});
 
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 2UL);
@@ -5528,7 +5531,7 @@ TEST_F(InvolvedNamespacesTest, IncludesAllCollectionsWhenResolvingViews) {
         "  ]"
         "}}");
     auto pipeline = makePipeline(
-        {mock(), DocumentSourceFacet::createFromBson(facetSpec.firstElement(), expCtx)});
+        {mockStage(), DocumentSourceFacet::createFromBson(facetSpec.firstElement(), expCtx)});
 
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 3UL);

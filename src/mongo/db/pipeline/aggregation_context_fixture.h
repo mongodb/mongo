@@ -53,7 +53,7 @@ enum class Tracking { forwards, backwards };
  */
 class AggregationContextFixture : public ServiceContextTest {
 public:
-    struct ExpCtxOptionsStruct {
+    struct ExpressionContextOptionsStruct {
         bool inMongos = false;
         bool allowDiskUse = true;
     };
@@ -81,10 +81,9 @@ public:
         return _opCtx.get();
     }
 
-    boost::intrusive_ptr<ExpressionContextForTest> setExpCtx(ExpCtxOptionsStruct options) {
+    void setExpCtx(ExpressionContextOptionsStruct options) {
         _expCtx->inMongos = options.inMongos;
         _expCtx->allowDiskUse = options.allowDiskUse;
-        return _expCtx;
     }
 
     /*
@@ -124,11 +123,11 @@ public:
     }
 
     // Start of functions that are used for making parts of the sources for making a pipeline.
-    boost::intrusive_ptr<DocumentSourceMock> mock() {
+    boost::intrusive_ptr<DocumentSourceMock> mockStage() {
         return DocumentSourceMock::createForTest(_expCtx);
     }
 
-    boost::intrusive_ptr<DocumentSourceDeferredMergeSort> mockDeferredSort() {
+    boost::intrusive_ptr<DocumentSourceDeferredMergeSort> mockDeferredSortStage() {
         return DocumentSourceDeferredMergeSort::create(_expCtx);
     }
 
@@ -136,38 +135,38 @@ public:
         return DocumentSourceMustRunOnMongoS::create(_expCtx);
     }
 
-    boost::intrusive_ptr<DocumentSourceMatch> match(const std::string& matchStr) {
+    boost::intrusive_ptr<DocumentSourceMatch> matchStage(const std::string& matchStr) {
         return DocumentSourceMatch::create(fromjson(matchStr), _expCtx);
     }
 
-    boost::intrusive_ptr<DocumentSource> split(
+    boost::intrusive_ptr<DocumentSource> splitStage(
         const StageConstraints::HostTypeRequirement& mergeType) {
         return DocumentSourceInternalSplitPipeline::create(_expCtx, mergeType);
     }
 
-    boost::intrusive_ptr<DocumentSource> out() {
+    boost::intrusive_ptr<DocumentSource> outStage() {
         auto outSpec = fromjson("{$out: 'outcoll'}");
         return DocumentSourceOut::createFromBson(outSpec["$out"], _expCtx);
     }
 
-    boost::intrusive_ptr<DocumentSource> project(const std::string& projectStr) {
+    boost::intrusive_ptr<DocumentSource> projectStage(const std::string& projectStr) {
         auto outSpec = fromjson("{$out: 'outcoll'}");
         return DocumentSourceOut::createFromBson(outSpec["$out"], _expCtx);
     }
 
-    boost::intrusive_ptr<DocumentSource> lookup(const BSONObj& lookupSpec) {
+    boost::intrusive_ptr<DocumentSource> lookupStage(const BSONObj& lookupSpec) {
         return DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), _expCtx);
     }
 
-    boost::intrusive_ptr<DocumentSource> graphLookup(const BSONObj& graphLookupSpec) {
+    boost::intrusive_ptr<DocumentSource> graphLookupStage(const BSONObj& graphLookupSpec) {
         return DocumentSourceGraphLookUp::createFromBson(graphLookupSpec.firstElement(), _expCtx);
     }
 
-    boost::intrusive_ptr<DocumentSource> sort(const std::string& sortStr) {
+    boost::intrusive_ptr<DocumentSource> sortStage(const std::string& sortStr) {
         return DocumentSourceSort::create(_expCtx, fromjson(sortStr));
     }
 
-    boost::intrusive_ptr<DocumentSourceCanSwapWithSort> swappable() {
+    boost::intrusive_ptr<DocumentSourceCanSwapWithSort> swappableStage() {
         return DocumentSourceCanSwapWithSort::create(_expCtx);
     }
     // End of functions that are used for making parts of the sources for making a pipeline.
@@ -179,35 +178,31 @@ public:
 
     sharded_agg_helpers::SplitPipeline makeAndSplitPipeline(
         const Pipeline::SourceContainer& sources) {
-        return sharded_agg_helpers::splitPipeline((makePipeline(sources)));
+        auto pipeline = makePipeline(sources);
+        return sharded_agg_helpers::splitPipeline(std::move(pipeline));
     }
 
     void verifyPipelineForDeferredMergeSortTest(
         const sharded_agg_helpers::SplitPipeline& splitPipeline,
         size_t shardsPipelineSize,
         size_t mergePipelineSize,
-        const BSONObj& expectedBsonObj) {
+        const BSONObj& shardCursorSortSpec) {
         // Verify that we've split the pipeline at the SplitPipeline stage, not on the deferred.
         ASSERT_EQ(splitPipeline.shardsPipeline->getSources().size(), shardsPipelineSize);
         ASSERT_EQ(splitPipeline.mergePipeline->getSources().size(), mergePipelineSize);
 
         // Verify the sort is correct.
         ASSERT(splitPipeline.shardCursorsSortSpec);
-        ASSERT_BSONOBJ_EQ(splitPipeline.shardCursorsSortSpec.value(), expectedBsonObj);
+        ASSERT_BSONOBJ_EQ(splitPipeline.shardCursorsSortSpec.value(), shardCursorSortSpec);
     }
 
     void trackPipelineRenames(const std::unique_ptr<Pipeline, PipelineDeleter>& pipeline,
                               const mongo::OrderedPathSet& pathsOfInterest,
                               Tracking dir) {
-        boost::optional<StringMap<std::string>> renames;
         const auto& stages = pipeline->getSources();
-        if (dir == Tracking::forwards) {
-            renames =
-                semantic_analysis::renamedPaths(stages.cbegin(), stages.cend(), pathsOfInterest);
-        } else {
-            renames =
-                semantic_analysis::renamedPaths(stages.crbegin(), stages.crend(), pathsOfInterest);
-        }
+        auto renames = (dir == Tracking::forwards)
+            ? semantic_analysis::renamedPaths(stages.cbegin(), stages.cend(), pathsOfInterest)
+            : semantic_analysis::renamedPaths(stages.crbegin(), stages.crend(), pathsOfInterest);
 
         ASSERT(renames.has_value());
         auto nameMap = *renames;
@@ -221,17 +216,12 @@ public:
         const std::unique_ptr<Pipeline, PipelineDeleter>& pipeline,
         const mongo::OrderedPathSet& pathsOfInterest,
         Tracking dir) {
-        boost::optional<StringMap<std::string>> renames;
         const auto& stages = pipeline->getSources();
-        if (dir == Tracking::forwards) {
-            renames =
-                semantic_analysis::renamedPaths(stages.cbegin(), stages.cbegin(), pathsOfInterest);
-        } else {
-            renames = semantic_analysis::renamedPaths(
-                stages.crbegin(), stages.crbegin(), pathsOfInterest);
-        }
+        auto renames = (dir == Tracking::forwards)
+            ? semantic_analysis::renamedPaths(stages.cbegin(), stages.cbegin(), pathsOfInterest)
+            : semantic_analysis::renamedPaths(stages.crbegin(), stages.crbegin(), pathsOfInterest);
 
-        ASSERT(static_cast<bool>(renames));
+        ASSERT(renames.has_value());
         auto nameMap = *renames;
         ASSERT_EQ(nameMap.size(), pathsOfInterest.size());
         for (const auto& p : pathsOfInterest) {
