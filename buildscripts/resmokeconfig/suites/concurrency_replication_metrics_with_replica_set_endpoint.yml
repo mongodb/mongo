@@ -65,6 +65,5 @@ executor:
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         queryAnalysisWriterIntervalSecs: 1
         featureFlagAllMongodsAreSharded: true
-        featureFlagReplicaSetEndpoint: true
     use_auto_bootstrap_procedure: 1
     num_nodes: 3

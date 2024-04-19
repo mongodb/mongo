@@ -10,7 +10,7 @@ import {checkClusterParameter} from "jstests/sharding/libs/cluster_cardinality_p
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 function isRSEndpointEnabled(conn) {
-    return FeatureFlagUtil.isPresentAndEnabled(conn, "RSEndpointClusterCardinalityParameter");
+    return FeatureFlagUtil.isPresentAndEnabled(conn, "ReplicaSetEndpoint");
 }
 
 function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
@@ -42,7 +42,7 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
         if (!oldVersionIs73) {
             // In v7.3, the cluster parameter 'hasTwoOrMoreShards' gets reset to 1 when the number
             // of shards goes from 2 to 1. In all other versions (assuming
-            // featureFlagRSEndpointClusterCardinalityParameter is disabled), the cluster parameter
+            // featureFlagReplicaSetEndpoint is disabled), the cluster parameter
             // will not be reset on removeShard.
             checkClusterParameter(st.configRS, true);
             checkClusterParameter(st.rs0, true);

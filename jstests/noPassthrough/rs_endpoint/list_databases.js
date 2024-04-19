@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_80,
+ *   featureFlagReplicaSetEndpoint,
  *   featureFlagRouterPort,
  * ]
  */
@@ -16,12 +17,7 @@ function containsDbName(listDatabasesRes, dbName) {
     return false;
 }
 
-const st = new ShardingTest({
-    shards: 1,
-    rs: {nodes: 1, setParameter: {featureFlagReplicaSetEndpoint: true}},
-    configShard: true,
-    embeddedRouter: true
-});
+const st = new ShardingTest({shards: 1, rs: {nodes: 1}, configShard: true, embeddedRouter: true});
 
 const shard0Primary = st.rs0.getPrimary();
 const router = new Mongo(shard0Primary.routerHost);

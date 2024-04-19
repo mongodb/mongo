@@ -73,7 +73,6 @@ executor:
       bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
-        featureFlagAllMongodsAreSharded: 1
-        featureFlagReplicaSetEndpoint: 1
+        featureFlagAllMongodsAreSharded: true
     use_auto_bootstrap_procedure: 1
     num_nodes: 1
