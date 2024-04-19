@@ -78,14 +78,16 @@ const shardNames = [st.rs0.name];
     expectedSampledQueryDocs.push({
         filter: {"cmd.updates.0.q": updateOp0.q},
         cmdName: cmdName,
-        cmdObj: Object.assign({}, originalCmdObj, {updates: [updateOp0]}),
+        cmdObj:
+            Object.assign({}, originalCmdObj, {updates: [updateOp0], let : {var1: {$literal: 1}}}),
         diff: diff0,
         shardNames
     });
     expectedSampledQueryDocs.push({
         filter: {"cmd.updates.0.q": updateOp1.q},
         cmdName: cmdName,
-        cmdObj: Object.assign({}, originalCmdObj, {updates: [updateOp1]}),
+        cmdObj:
+            Object.assign({}, originalCmdObj, {updates: [updateOp1], let : {var1: {$literal: 1}}}),
         diff: diff1,
         shardNames
     });
@@ -148,7 +150,7 @@ const shardNames = [st.rs0.name];
         collation: QuerySamplingUtil.generateRandomCollation(),
         new: true,
         upsert: false,
-        let : {var0: 1}
+        let : {var0: {$literal: "$nonExistentFieldName"}}
     };
     const diff = {y: 'u', z: 'u'};
 

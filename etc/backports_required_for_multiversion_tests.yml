@@ -567,6 +567,12 @@ last-continuous:
     ticket: SERVER-83119
   - test_file: jstests/sharding/eof_plan.js
     ticket: SERVER-83119
+  - test_file: jstests/core/command_let_variables_expressions.js
+    ticket: SERVER-89268
+  - test_file: jstests/sharding/analyze_shard_key/sample_write_queries_sharded.js
+    ticket: SERVER-89268
+  - test_file: jstests/sharding/analyze_shard_key/sample_write_queries_unsharded.js
+    ticket: SERVER-89268
   - test_file: jstests/change_streams/split_large_event_with_other_stages.js
     ticket: SERVER-85848
   - test_file: jstests/sharding/timeseries_drop.js
@@ -1208,6 +1214,12 @@ last-lts:
     ticket: SERVER-83119
   - test_file: jstests/sharding/eof_plan.js
     ticket: SERVER-83119
+  - test_file: jstests/core/command_let_variables_expressions.js
+    ticket: SERVER-89268
+  - test_file: jstests/sharding/analyze_shard_key/sample_write_queries_sharded.js
+    ticket: SERVER-89268
+  - test_file: jstests/sharding/analyze_shard_key/sample_write_queries_unsharded.js
+    ticket: SERVER-89268
   - test_file: jstests/change_streams/split_large_event_with_other_stages.js
     ticket: SERVER-85848
   - test_file: jstests/sharding/timeseries_drop.js
