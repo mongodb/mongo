@@ -50,6 +50,12 @@
 
 namespace mongo {
 
+#ifdef _WIN32
+const auto sleepDelay = 250;
+#else
+const auto sleepDelay = 100;
+#endif
+
 class TestPeriodicThread : public WatchdogPeriodicThread {
 public:
     TestPeriodicThread(Milliseconds period) : WatchdogPeriodicThread(period, "testPeriodic") {}
@@ -120,7 +126,7 @@ TEST_F(PeriodicThreadTest, Basic) {
     std::uint32_t lastCounter = testThread.getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     ASSERT_EQ(lastCounter, testThread.getCounter());
 }
@@ -142,7 +148,7 @@ TEST_F(PeriodicThreadTest, PauseAndStop) {
     std::uint32_t pauseCounter = testThread.getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     // We could have had one more run of the loop as we paused - allow for that case
     // but no other runs of the thread.
@@ -154,7 +160,7 @@ TEST_F(PeriodicThreadTest, PauseAndStop) {
     std::uint32_t stopCounter = testThread.getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     ASSERT_EQ(stopCounter, testThread.getCounter());
 }
@@ -176,7 +182,7 @@ TEST_F(PeriodicThreadTest, PauseAndResume) {
     std::uint32_t pauseCounter = testThread.getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     // We could have had one more run of the loop as we paused - allow for that case
     // but no other runs of the thread.
@@ -272,7 +278,7 @@ TEST_F(WatchdogCheckThreadTest, Basic) {
     std::uint32_t lastCounter = counterCheckPtr->getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     ASSERT_EQ(lastCounter, counterCheckPtr->getCounter());
 }
@@ -383,7 +389,7 @@ TEST_F(WatchdogMonitorThreadTest, SleepyHungCheck) {
 
     monitorThread.start();
 
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     deathEvent.wait();
 
@@ -419,7 +425,7 @@ TEST_F(WatchdogMonitorTest, SleepyHungCheck) {
 
     monitor.start();
 
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     deathEvent.wait();
 
@@ -482,7 +488,7 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
     std::uint32_t pauseCounter = counterCheckPtr->getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     // We could have had one more run of the loop as we paused - allow for that case
     // but no other runs of the thread.
@@ -516,7 +522,7 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
 
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     ASSERT_EQ(lastCounter, counterCheckPtr->getCounter());
     ASSERT_EQ(lastCheckGeneration, monitor.getCheckGeneration());
