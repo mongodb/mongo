@@ -1768,7 +1768,8 @@ void ExecCommandDatabase::_initiateCommand() {
                 opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMS,
                                          ErrorCodes::MaxTimeMSExpired);
             }
-            opCtx->setUsesDefaultMaxTimeMS(usesDefaultMaxTimeMS);
+            opCtx->setUsesDefaultMaxTimeMS(_requestArgs.getUsesDefaultMaxTimeMS().value_or(false) ||
+                                           usesDefaultMaxTimeMS);
         }
     }
 

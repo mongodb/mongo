@@ -40,7 +40,7 @@ namespace mongo {
 namespace rpc {
 
 /**
- * Hook for attaching client and auth metadata for requests made on behalf of a user.
+ * Hook for attaching client, auth, and time-out metadata for requests made on behalf of a user.
  */
 class ClientMetadataPropagationEgressHook : public rpc::EgressMetadataHook {
 public:

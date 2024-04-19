@@ -145,6 +145,9 @@ structs:
             maxTimeMSOpOnly:
                 type: IDLAnyType
                 forward_to_shards: false
+            usesDefaultMaxTimeMS:
+                type: bool
+                forward_to_shards: false
             $configTime:
                 type: IDLAnyType
                 cpp_name: "dollarConfigTime"
