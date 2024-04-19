@@ -82,7 +82,6 @@ struct WiredTigerBackup {
     WT_CURSOR* dupCursor = nullptr;
     std::set<std::string> logFilePathsSeenByExtendBackupCursor;
     std::set<std::string> logFilePathsSeenByGetNextBatch;
-    BackupBlock::IdentToNamespaceAndUUIDMap identToNamespaceAndUUIDMap;
 
     // 'wtBackupCursorMutex' provides concurrency control between beginNonBlockingBackup(),
     // endNonBlockingBackup(), and getNextBatch() because we stream the output of the backup cursor.

@@ -290,8 +290,9 @@ public:
 
 DevNullKVEngine::DevNullKVEngine() {
     _mockBackupBlocks.push_back(BackupBlock(/*opCtx=*/nullptr,
+                                            /*nss=*/boost::none,
+                                            /*uuid=*/boost::none,
                                             "filename.wt",
-                                            /*identToNamespaceAndUUIDMap=*/{},
                                             /*checkpointTimestamp=*/boost::none));
 }
 
@@ -338,6 +339,9 @@ public:
     BSONObj getMetadataObject(UUID backupId) {
         return BSONObj();
     }
+
+    void setCatalogEntries(const stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>&
+                               identsToNsAndUUID) {}
 
     StatusWith<std::deque<BackupBlock>> getNextBatch(OperationContext* opCtx,
                                                      const std::size_t batchSize) {

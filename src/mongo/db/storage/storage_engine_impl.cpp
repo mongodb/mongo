@@ -48,7 +48,6 @@
 #include "mongo/db/storage/deferred_drop_record_store.h"
 #include "mongo/db/storage/durable_catalog_impl.h"
 #include "mongo/db/storage/durable_history_pin.h"
-#include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
@@ -91,12 +90,6 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
           TimestampMonitor::TimestampType::kMinOfCheckpointAndOldest,
           [this](OperationContext* opCtx, Timestamp timestamp) {
               _onMinOfCheckpointAndOldestTimestampChanged(opCtx, timestamp);
-          }),
-      _historicalIdentTimestampListener(
-          TimestampMonitor::TimestampType::kCheckpoint,
-          [serviceContext = opCtx->getServiceContext()](OperationContext* opCtx,
-                                                        Timestamp timestamp) {
-              HistoricalIdentTracker::get(opCtx).removeEntriesOlderThan(timestamp);
           }),
       _collectionCatalogCleanupTimestampListener(
           TimestampMonitor::TimestampType::kOldest,
@@ -897,7 +890,6 @@ void StorageEngineImpl::startTimestampMonitor() {
         _engine.get(), getGlobalServiceContext()->getPeriodicRunner());
 
     _timestampMonitor->addListener(&_minOfCheckpointAndOldestTimestampListener);
-    _timestampMonitor->addListener(&_historicalIdentTimestampListener);
     _timestampMonitor->addListener(&_collectionCatalogCleanupTimestampListener);
 }
 
