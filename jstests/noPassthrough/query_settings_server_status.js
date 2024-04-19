@@ -68,11 +68,11 @@ function runTest({expectedQueryShapeConfiguration, assertionFunc}) {
     // Check that all the expected nodes have emitted their own set of metrics.
     // Since the test is running in a sharded cluster environment, the number of data points should
     // equal 2 (noMongos) + 2 (noShards) * 3 (noNodesPerReplSet) = 8.
-    assert.eq(allDataPoints.length, 8, "Insufficient data points.");
+    assert.eq(allDataPoints.length, 8, `expected 8 data points but found ${tojson(allDataPoints)}`);
     const representativeDataPoint = allDataPoints[0];
     assert(
         allDataPoints.every((dataPoint) => bsonWoCompare(dataPoint, representativeDataPoint) == 0),
-        "Expected all data points to be equal.")
+        `expected all data points to be equal, but found ${tojson(allDataPoints)}`);
     assertionFunc(representativeDataPoint);
 }
 
