@@ -391,8 +391,7 @@ StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
     }
 
     // We process additional transaction participants that have been put in the queue for
-    // processing. Note that this should only occur if the response was received while the cursor
-    // was detached from an operation.
+    // processing. This can happen at any time since receiving a response is asynchronous in nature.
     _processAdditionalTransactionParticipants(_opCtx);
 
     if (!_status.isOK()) {
@@ -792,17 +791,15 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
     remote.cbHandle = executor::TaskExecutor::CallbackHandle();
 
     if (cbData.response.isOK()) {
-        if (_opCtx) {
-            processAdditionaTransactionParticipantFromResponse(
-                _opCtx, remote.shardId, cbData.response.data);
-        } else {
-            // We store the original unprocessed response in order to process additional transaction
-            // participants when reading it with an attached opCtx. As this operation can occur
-            // after a while the BSON must be owned since otherwise we would be pointing to invalid
-            // memory.
-            invariant(cbData.response.data.isOwned());
-            _remoteResponses.emplace(remote.shardId, cbData.response.data);
-        }
+        // We store the original unprocessed response in order to process additional transaction
+        // participants when reading it. Additional transaction participants processing cannot occur
+        // here since access to the underlying transaction router is not thread-safe.
+        //
+        // To avoid memory issues we delay processing until the actual owner thread of the
+        // TransactionRouter reads the responses. As this operation can occur after a while the
+        // BSON must be owned since otherwise we would be pointing to invalid memory.
+        invariant(cbData.response.data.isOwned());
+        _remoteResponses.emplace(remote.shardId, cbData.response.data);
     }
 
     //  On shutdown, there is no need to process the response.
