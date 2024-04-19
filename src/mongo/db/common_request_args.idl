@@ -90,6 +90,9 @@ structs:
       maxTimeMSOpOnly:
         type: IDLAnyType
         optional: true
+      usesDefaultMaxTimeMS:
+        type: safeBool
+        optional: true
       help:
         type: safeBool
         optional: true

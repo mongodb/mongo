@@ -53,6 +53,12 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
 
         WriteBlockBypass::get(opCtx).writeAsMetadata(metadataBob);
 
+        // If the request is using the 'defaultMaxTimeMS' value, attaches the field so shards can
+        // record the metrics correctly.
+        if (opCtx->usesDefaultMaxTimeMS()) {
+            metadataBob->appendBool("usesDefaultMaxTimeMS", true);
+        }
+
         return Status::OK();
     } catch (...) {
         return exceptionToStatus();

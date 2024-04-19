@@ -212,6 +212,11 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            usesDefaultMaxTimeMS:
+                type: bool
+                forward_to_shards: false
+                optional: true
+                stability: "internal"
             $configTime:
                 type: timestamp
                 cpp_name: "dollarConfigTime"
