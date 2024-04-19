@@ -208,7 +208,7 @@ void AggregatedIndexUsageTracker::forEachFeature(OnFeatureFn&& onFeature) const 
 }
 
 long long AggregatedIndexUsageTracker::getCount() const {
-    return _count.load();
+    return _count.loadRelaxed();
 }
 
 class IndexStatsSSS : public ServerStatusSection {
@@ -232,8 +232,8 @@ public:
         globalFeatures->forEachFeature(
             [&featuresBuilder](const std::string& feature, const IndexFeatureStats& stats) {
                 BSONObjBuilder featureBuilder = featuresBuilder.subobjStart(feature);
-                featureBuilder.append("count", stats.count.load());
-                featureBuilder.append("accesses", stats.accesses.load());
+                featureBuilder.append("count", stats.count.loadRelaxed());
+                featureBuilder.append("accesses", stats.accesses.loadRelaxed());
                 featureBuilder.done();
             });
         featuresBuilder.done();
