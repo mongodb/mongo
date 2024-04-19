@@ -73,7 +73,7 @@ public:
     };
 
     FlowControlTicketholder(int startTickets) : _tickets(startTickets), _inShutdown(false) {
-        _totalTimeAcquiringMicros.store(0);
+        _totalTimeAcquiringMicros.storeRelaxed(0);
     }
 
     static FlowControlTicketholder* get(ServiceContext* service);
@@ -87,7 +87,7 @@ public:
     void getTicket(OperationContext* opCtx, FlowControlTicketholder::CurOp* stats);
 
     std::int64_t totalTimeAcquiringMicros() const {
-        return _totalTimeAcquiringMicros.load();
+        return _totalTimeAcquiringMicros.loadRelaxed();
     }
 
     void setInShutdown();

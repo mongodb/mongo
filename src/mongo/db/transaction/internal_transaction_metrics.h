@@ -54,28 +54,28 @@ public:
         return _started.loadRelaxed();
     }
     void incrementStarted() {
-        _started.fetchAndAdd(1);
+        _started.fetchAndAddRelaxed(1);
     }
 
     std::int64_t getRetriedTransactions() const {
         return _retriedTransactions.loadRelaxed();
     }
     void incrementRetriedTransactions() {
-        _retriedTransactions.fetchAndAdd(1);
+        _retriedTransactions.fetchAndAddRelaxed(1);
     }
 
     std::int64_t getRetriedCommits() const {
         return _retriedCommits.loadRelaxed();
     }
     void incrementRetriedCommits() {
-        _retriedCommits.fetchAndAdd(1);
+        _retriedCommits.fetchAndAddRelaxed(1);
     }
 
     std::int64_t getSucceeded() const {
         return _succeeded.loadRelaxed();
     }
     void incrementSucceeded() {
-        _succeeded.fetchAndAdd(1);
+        _succeeded.fetchAndAddRelaxed(1);
     }
 
 private:

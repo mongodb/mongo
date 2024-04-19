@@ -59,99 +59,99 @@ ServerTransactionsMetrics* ServerTransactionsMetrics::get(OperationContext* opCt
 }
 
 unsigned long long ServerTransactionsMetrics::getCurrentActive() const {
-    return _currentActive.load();
+    return _currentActive.loadRelaxed();
 }
 
 void ServerTransactionsMetrics::decrementCurrentActive() {
-    _currentActive.fetchAndSubtract(1);
+    _currentActive.fetchAndSubtractRelaxed(1);
 }
 
 void ServerTransactionsMetrics::incrementCurrentActive() {
-    _currentActive.fetchAndAdd(1);
+    _currentActive.fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getCurrentInactive() const {
-    return _currentInactive.load();
+    return _currentInactive.loadRelaxed();
 }
 
 void ServerTransactionsMetrics::decrementCurrentInactive() {
-    _currentInactive.fetchAndSubtract(1);
+    _currentInactive.fetchAndSubtractRelaxed(1);
 }
 
 void ServerTransactionsMetrics::incrementCurrentInactive() {
-    _currentInactive.fetchAndAdd(1);
+    _currentInactive.fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getCurrentOpen() const {
-    return _currentOpen.load();
+    return _currentOpen.loadRelaxed();
 }
 
 void ServerTransactionsMetrics::decrementCurrentOpen() {
-    _currentOpen.fetchAndSubtract(1);
+    _currentOpen.fetchAndSubtractRelaxed(1);
 }
 
 void ServerTransactionsMetrics::incrementCurrentOpen() {
-    _currentOpen.fetchAndAdd(1);
+    _currentOpen.fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalStarted() const {
-    return _totalStarted.load();
+    return _totalStarted.loadRelaxed();
 }
 
 void ServerTransactionsMetrics::incrementTotalStarted() {
-    _totalStarted.fetchAndAdd(1);
+    _totalStarted.fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalAborted() const {
-    return _totalAborted.load();
+    return _totalAborted.loadRelaxed();
 }
 
 void ServerTransactionsMetrics::incrementTotalAborted() {
-    _totalAborted.fetchAndAdd(1);
+    _totalAborted.fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalCommitted() const {
-    return _totalCommitted.load();
+    return _totalCommitted.loadRelaxed();
 }
 
 void ServerTransactionsMetrics::incrementTotalCommitted() {
-    _totalCommitted.fetchAndAdd(1);
+    _totalCommitted.fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalPrepared() const {
-    return _totalPrepared.load();
+    return _totalPrepared.loadRelaxed();
 }
 
 void ServerTransactionsMetrics::incrementTotalPrepared() {
-    _totalPrepared.fetchAndAdd(1);
+    _totalPrepared.fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalPreparedThenCommitted() const {
-    return _totalPreparedThenCommitted.load();
+    return _totalPreparedThenCommitted.loadRelaxed();
 }
 
 void ServerTransactionsMetrics::incrementTotalPreparedThenCommitted() {
-    _totalPreparedThenCommitted.fetchAndAdd(1);
+    _totalPreparedThenCommitted.fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalPreparedThenAborted() const {
-    return _totalPreparedThenAborted.load();
+    return _totalPreparedThenAborted.loadRelaxed();
 }
 
 void ServerTransactionsMetrics::incrementTotalPreparedThenAborted() {
-    _totalPreparedThenAborted.fetchAndAdd(1);
+    _totalPreparedThenAborted.fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getCurrentPrepared() const {
-    return _currentPrepared.load();
+    return _currentPrepared.loadRelaxed();
 }
 
 void ServerTransactionsMetrics::incrementCurrentPrepared() {
-    _currentPrepared.fetchAndAdd(1);
+    _currentPrepared.fetchAndAddRelaxed(1);
 }
 
 void ServerTransactionsMetrics::decrementCurrentPrepared() {
-    _currentPrepared.fetchAndSubtract(1);
+    _currentPrepared.fetchAndSubtractRelaxed(1);
 }
 
 void ServerTransactionsMetrics::updateLastTransaction(size_t operationCount,
@@ -167,16 +167,16 @@ void ServerTransactionsMetrics::updateLastTransaction(size_t operationCount,
 }
 
 void ServerTransactionsMetrics::updateStats(TransactionsStats* stats, bool includeLastCommitted) {
-    stats->setCurrentActive(_currentActive.load());
-    stats->setCurrentInactive(_currentInactive.load());
-    stats->setCurrentOpen(_currentOpen.load());
-    stats->setTotalAborted(_totalAborted.load());
-    stats->setTotalCommitted(_totalCommitted.load());
-    stats->setTotalStarted(_totalStarted.load());
-    stats->setTotalPrepared(_totalPrepared.load());
-    stats->setTotalPreparedThenCommitted(_totalPreparedThenCommitted.load());
-    stats->setTotalPreparedThenAborted(_totalPreparedThenAborted.load());
-    stats->setCurrentPrepared(_currentPrepared.load());
+    stats->setCurrentActive(_currentActive.loadRelaxed());
+    stats->setCurrentInactive(_currentInactive.loadRelaxed());
+    stats->setCurrentOpen(_currentOpen.loadRelaxed());
+    stats->setTotalAborted(_totalAborted.loadRelaxed());
+    stats->setTotalCommitted(_totalCommitted.loadRelaxed());
+    stats->setTotalStarted(_totalStarted.loadRelaxed());
+    stats->setTotalPrepared(_totalPrepared.loadRelaxed());
+    stats->setTotalPreparedThenCommitted(_totalPreparedThenCommitted.loadRelaxed());
+    stats->setTotalPreparedThenAborted(_totalPreparedThenAborted.loadRelaxed());
+    stats->setCurrentPrepared(_currentPrepared.loadRelaxed());
 
     stdx::lock_guard<Latch> lg(_mutex);
     if (_lastCommittedTransaction && includeLastCommitted) {

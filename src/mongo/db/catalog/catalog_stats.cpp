@@ -100,7 +100,7 @@ public:
         stats.capped = catalogStats.userCapped;
         stats.clustered = catalogStats.userClustered;
         stats.internalCollections = catalogStats.internal;
-        stats.timeseriesExtendedRange = requiresTimeseriesExtendedRangeSupport.load();
+        stats.timeseriesExtendedRange = requiresTimeseriesExtendedRangeSupport.loadRelaxed();
         stats.csfle = catalogStats.csfle;
         stats.queryableEncryption = catalogStats.queryableEncryption;
 

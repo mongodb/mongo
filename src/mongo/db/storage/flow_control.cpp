@@ -239,17 +239,17 @@ BSONObj FlowControl::generateSection(OperationContext* opCtx,
                                      const BSONElement& configElement) const {
     BSONObjBuilder bob;
     // Most of these values are only computed and meaningful when flow control is enabled.
-    bob.append("enabled", gFlowControlEnabled.load());
-    bob.append("targetRateLimit", _lastTargetTicketsPermitted.load());
+    bob.append("enabled", gFlowControlEnabled.loadRelaxed());
+    bob.append("targetRateLimit", _lastTargetTicketsPermitted.loadRelaxed());
     bob.append("timeAcquiringMicros",
                FlowControlTicketholder::get(opCtx)->totalTimeAcquiringMicros());
     // Ensure sufficient significant figures of locksPerOp are reported in FTDC, which stores data
     // as integers.
-    bob.append("locksPerKiloOp", _lastLocksPerOp.load() * 1000);
-    bob.append("sustainerRate", _lastSustainerAppliedCount.load());
-    bob.append("isLagged", _isLagged.load());
-    bob.append("isLaggedCount", _isLaggedCount.load());
-    bob.append("isLaggedTimeMicros", _isLaggedTimeMicros.load());
+    bob.append("locksPerKiloOp", _lastLocksPerOp.loadRelaxed() * 1000);
+    bob.append("sustainerRate", _lastSustainerAppliedCount.loadRelaxed());
+    bob.append("isLagged", _isLagged.loadRelaxed());
+    bob.append("isLaggedCount", _isLaggedCount.loadRelaxed());
+    bob.append("isLaggedTimeMicros", _isLaggedTimeMicros.loadRelaxed());
 
     return bob.obj();
 }
