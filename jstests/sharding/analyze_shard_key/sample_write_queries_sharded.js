@@ -105,14 +105,16 @@ const expectedSampledQueryDocs = [];
     expectedSampledQueryDocs.push({
         filter: {"cmd.updates.0.q": updateOp0.q},
         cmdName: cmdName,
-        cmdObj: Object.assign({}, originalCmdObj0, {updates: [updateOp0]}),
+        cmdObj:
+            Object.assign({}, originalCmdObj0, {updates: [updateOp0], let : {var1: {$literal: 1}}}),
         diff: diff0,
         shardNames: shardNames0
     });
     expectedSampledQueryDocs.push({
         filter: {"cmd.updates.0.q": updateOp1.q},
         cmdName: cmdName,
-        cmdObj: Object.assign({}, originalCmdObj0, {updates: [updateOp1]}),
+        cmdObj:
+            Object.assign({}, originalCmdObj0, {updates: [updateOp1], let : {var1: {$literal: 1}}}),
         diff: diff1,
         shardNames: shardNames1
     });
@@ -149,7 +151,8 @@ const expectedSampledQueryDocs = [];
     expectedSampledQueryDocs.push({
         filter: {"cmd.updates.0.q": updateOp2.q},
         cmdName: cmdName,
-        cmdObj: Object.assign({}, originalCmdObj1, {updates: [updateOp2]}),
+        cmdObj:
+            Object.assign({}, originalCmdObj1, {updates: [updateOp2], let : {var1: {$literal: 1}}}),
         diff: diff2,
         shardNames: shardNames2
     });
@@ -239,7 +242,7 @@ const expectedSampledQueryDocs = [];
     expectedSampledQueryDocs.push({
         filter: {"cmd.query": originalCmdObj0.query},
         cmdName: cmdName,
-        cmdObj: Object.assign({}, originalCmdObj0),
+        cmdObj: Object.assign({}, originalCmdObj0, {let : {var0: {$literal: 1}}}),
         diff: diff0,
         shardNames: shardNames0
     });
@@ -268,7 +271,7 @@ const expectedSampledQueryDocs = [];
     expectedSampledQueryDocs.push({
         filter: {"cmd.query": originalCmdObj1.query},
         cmdName: cmdName,
-        cmdObj: Object.assign({}, originalCmdObj1),
+        cmdObj: Object.assign({}, originalCmdObj1, {let : {var0: {$literal: 1}}}),
         diff: diff1,
         shardNames: shardNames1
     });

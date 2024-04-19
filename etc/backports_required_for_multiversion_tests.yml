@@ -43,6 +43,12 @@ last-continuous:
       ticket: SERVER-88173
     - test_file: jstests/core/query/query_settings/query_settings_index_application_aggregate.js
       ticket: SERVER-88629
+    - test_file: jstests/core/command_let_variables_expressions.js
+      ticket: SERVER-89268
+    - test_file: jstests/sharding/analyze_shard_key/sample_write_queries_sharded.js
+      ticket: SERVER-89268
+    - test_file: jstests/sharding/analyze_shard_key/sample_write_queries_unsharded.js
+      ticket: SERVER-89268
     - test_file: jstests/sharding/balancer_should_return_random_migrations_failpoint.js
       ticket: SERVER-89395
     - test_file: jstests/core/query/explain/explain_skip.js
@@ -72,6 +78,12 @@ last-lts:
       ticket: SERVER-88173
     - test_file: jstests/core/query/query_settings/query_settings_index_application_aggregate.js
       ticket: SERVER-88629
+    - test_file: jstests/core/command_let_variables_expressions.js
+      ticket: SERVER-89268
+    - test_file: jstests/sharding/analyze_shard_key/sample_write_queries_sharded.js
+      ticket: SERVER-89268
+    - test_file: jstests/sharding/analyze_shard_key/sample_write_queries_unsharded.js
+      ticket: SERVER-89268
     - test_file: jstests/sharding/balancer_should_return_random_migrations_failpoint.js
       ticket: SERVER-89395
     - test_file: jstests/core/query/explain/explain_skip.js

@@ -231,16 +231,9 @@ std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* o
 
     // Replace the 'letParams' expressions with their values.
     if (auto letParams = findCommand->getLet()) {
-        BSONObjBuilder result;
-
         const auto& vars = query.getExpCtx()->variables;
         const auto& vps = query.getExpCtx()->variablesParseState;
-        for (BSONElement elem : *letParams) {
-            StringData name = elem.fieldNameStringData();
-            result << name << vars.getUserDefinedValue(vps.getVariable(name));
-        }
-
-        findCommand->setLet(result.obj());
+        findCommand->setLet(vars.toBSON(vps, *letParams));
     }
 
     // ExpressionContext may contain query settings that were looked up in QuerySettingsManager.

@@ -1,7 +1,7 @@
 /*
  * This jstest demonstrates simple ways to retrieve null and undefined data from a collection using
  * $type.
- * @tags: [assumes_no_implicit_index_creation]
+ * @tags: [does_not_support_transactions]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

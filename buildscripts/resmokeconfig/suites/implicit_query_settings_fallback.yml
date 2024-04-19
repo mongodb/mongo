@@ -15,6 +15,9 @@ selector:
     - jstests/core/columnstore/**/*.js
     - jstests/core/query/project/projection_semantics.js
 
+    # TODO SERVER-89609: re-enable this test.
+    - jstests/core/command_let_variables_expressions.js
+
     # TODO SERVER-89344: Fix explain output for '$unionWith' queries.
     - jstests/aggregation/sources/unionWith/unionWith_explain.js
 
