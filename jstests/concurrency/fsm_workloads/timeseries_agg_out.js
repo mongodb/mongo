@@ -21,6 +21,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from 'jstests/concurrency/fsm_workloads/agg_out.js';
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     const timeFieldName = 'time';
@@ -95,13 +96,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Convert the collection to capped.
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
-        if (isMongos(db)) {
-            return;  // convertToCapped can't be run against a mongos.
+        if (!FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'ConvertToCappedCoordinator')) {
+            return;  // convertToCapped can't be run in older versions.
         }
+
         jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
         assert.commandFailedWithCode(
-            db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
-            [ErrorCodes.CommandNotSupportedOnView, ErrorCodes.NamespaceNotFound]);
+            db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
+                ErrorCodes.CommandNotSupportedOnView,
+                ErrorCodes.NamespaceNotFound,
+                ErrorCodes.NamespaceCannotBeSharded
+            ]);
     };
 
     $config.teardown = function teardown(db) {
