@@ -870,7 +870,7 @@ bool AuthorizationSessionImpl::_isAuthorizedForPrivilege(const Privilege& privil
 
 void AuthorizationSessionImpl::setImpersonatedUserData(const UserName& username,
                                                        const std::vector<RoleName>& roles) {
-    _impersonatedUserName = std::make_shared<UserName>(username);
+    std::atomic_store(&_impersonatedUserName, std::make_shared<UserName>(username));
     _impersonatedRoleNames = roles;
 }
 
@@ -923,13 +923,13 @@ bool AuthorizationSessionImpl::isUsingLocalhostBypass() {
 
 // Clear the vectors of impersonated usernames and roles.
 void AuthorizationSessionImpl::clearImpersonatedUserData() {
-    _impersonatedUserName.reset();
+    std::atomic_store(&_impersonatedUserName, {});
     _impersonatedRoleNames.clear();
 }
 
 
 bool AuthorizationSessionImpl::isImpersonating() const {
-    return _impersonatedUserName != nullptr;
+    return std::atomic_load(&_impersonatedUserName) != nullptr;
 }
 
 auto AuthorizationSessionImpl::checkCursorSessionPrivilege(
