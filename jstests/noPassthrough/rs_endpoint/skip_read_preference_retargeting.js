@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_fcv_80,
- *   featureFlagReplicaSetEndpoint,
  *   featureFlagRouterPort,
  * ]
  */
@@ -17,6 +16,7 @@ const rst = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
+            featureFlagReplicaSetEndpoint: true,
             // TODO (SERVER-84243): When the feature flag below is enabled, the collections in this
             // test would be tracked so a read on a secondary may trigger a catalog cache refresh.
             // The router service on mongod currently uses the ShardServerCatalogCacheLoader.

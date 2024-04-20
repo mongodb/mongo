@@ -158,6 +158,14 @@ feature_flags:
     cpp_varname: feature_flags::gFeatureFlagReplicaSetEndpoint
     default: false
     shouldBeFCVGated: true
+  featureFlagRSEndpointClusterCardinalityParameter:
+    description: >-
+        When enabled, this feature flag will allow the cluster cardinality cluster parameter to
+        reset its value to false when the second shard is removed from a cluster. This feature
+        flag should be enabled at the same time as the replica set endpoint feature flag.
+    cpp_varname: feature_flags::gFeatureFlagRSEndpointClusterCardinalityParameter
+    default: false
+    shouldBeFCVGated: true
   featureFlag80CollectionCreationPath:
     description: "Feature flag protecting all codepaths that rely on the 8.0 way of collection creation in a
                   sharded cluster. Namely, no implicit creations by the shards and no usage of the

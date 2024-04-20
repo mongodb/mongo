@@ -5,7 +5,6 @@
  *
  * @tags: [
  *   requires_fcv_80,
- *   featureFlagReplicaSetEndpoint,
  *   featureFlagRouterPort,
  * ]
  */
@@ -42,7 +41,7 @@ function dropCollection(host, dbName, collName) {
 
 const st = ShardingTest({
     shards: 1,
-    rs: {nodes: 1},
+    rs: {nodes: 1, setParameter: {featureFlagReplicaSetEndpoint: true}},
     configShard: true,
     embeddedRouter: true,
 });

@@ -165,6 +165,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagAllMongodsAreSharded: true
+        featureFlagReplicaSetEndpoint: true
         # Allow many initial sync attempts. Initial sync may fail if the sync source does not have
         # an oplog yet because it has not conducted its own initial sync yet.
         numInitialSyncAttempts: 10000000

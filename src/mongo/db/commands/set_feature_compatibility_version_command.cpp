@@ -241,7 +241,8 @@ void _setShardedClusterCardinalityParameter(
     // again after a second shard has been added. The replica set endpoint requires the cluster
     // parameter to be correct (go back to false when the second shard is removed) so we will need
     // to update the cluster parameter whenever replica set endpoint is enabled.
-    if (feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabledOnVersion(requestedVersion)) {
+    if (feature_flags::gFeatureFlagRSEndpointClusterCardinalityParameter.isEnabledOnVersion(
+            requestedVersion)) {
         // The config.shards collection is stable during FCV changes, so query that to discover the
         // current number of shards.
         DBDirectClient client(opCtx);

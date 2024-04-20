@@ -4,7 +4,6 @@
  *
  * @tags: [
  *    requires_fcv_80,
- *    featureFlagReplicaSetEndpoint,
  *    featureFlagRouterPort,
  *    requires_persistence,
  * ]
@@ -165,7 +164,7 @@ function runTests(shard0Primary, shard0Secondary, tearDownFunc, isMultitenant) {
 {
     jsTest.log("Running tests for a standalone bootstrapped as a single-shard cluster");
     const node = MongoRunner.runMongod({
-        setParameter: {featureFlagAllMongodsAreSharded: true},
+        setParameter: {featureFlagAllMongodsAreSharded: true, featureFlagReplicaSetEndpoint: true},
     });
     const tearDownFunc = () => MongoRunner.stopMongod(node);
 
@@ -180,6 +179,7 @@ function runTests(shard0Primary, shard0Secondary, tearDownFunc, isMultitenant) {
         nodeOptions: {
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
+                featureFlagReplicaSetEndpoint: true,
             }
         },
         useAutoBootstrapProcedure: true,
@@ -198,7 +198,7 @@ function runTests(shard0Primary, shard0Secondary, tearDownFunc, isMultitenant) {
     jsTest.log("Running tests for a single-shard cluster");
     const st = new ShardingTest({
         shards: 1,
-        rs: {nodes: 2},
+        rs: {nodes: 2, setParameter: {featureFlagReplicaSetEndpoint: true}},
         configShard: true,
         embeddedRouter: true,
     });
@@ -214,8 +214,13 @@ function runTests(shard0Primary, shard0Secondary, tearDownFunc, isMultitenant) {
     const rst = new ReplSetTest({
         name: jsTest.name() + "_multitenant",
         nodes: 2,
-        nodeOptions:
-            {setParameter: {featureFlagAllMongodsAreSharded: true, multitenancySupport: true}},
+        nodeOptions: {
+            setParameter: {
+                featureFlagAllMongodsAreSharded: true,
+                featureFlagReplicaSetEndpoint: true,
+                multitenancySupport: true
+            }
+        },
     });
     rst.startSet();
     rst.initiate();

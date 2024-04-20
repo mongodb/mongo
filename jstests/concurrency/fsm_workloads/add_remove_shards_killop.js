@@ -4,13 +4,12 @@
  *
  * This workload can't run in antithesis suites since it uses connCache.
  * @tags: [
- *  requires_fcv_81,
- *  featureFlagReplicaSetEndpoint,
  *  requires_sharding,
  *  requires_non_retryable_writes,
  *  catches_command_failures,
  *  uses_curop_agg_stage,
  *  antithesis_incompatible,
+ *  featureFlagRSEndpointClusterCardinalityParameter,
  * ]
  */
 

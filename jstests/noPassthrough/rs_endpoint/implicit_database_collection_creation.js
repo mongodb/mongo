@@ -8,7 +8,6 @@
  *
  * @tags: [
  *   requires_fcv_80,
- *   featureFlagReplicaSetEndpoint,
  *   featureFlagRouterPort,
  *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   featureFlagSecurityToken,
@@ -204,6 +203,7 @@ function runTests(getShard0PrimaryFunc,
     const shard1Rst = new ReplSetTest({
         name: shard1Name,
         nodes: 2,
+        nodeOptions: {setParameter: {featureFlagReplicaSetEndpoint: true}}
     });
     shard1Rst.startSet({shardsvr: ""});
     shard1Rst.initiate();
@@ -287,6 +287,7 @@ function getReplicaSetRestartOptions(maintenanceMode, setParameterOpts) {
     jsTest.log("Running tests for a standalone bootstrapped as a single-shard cluster");
     const setParameterOpts = {
         featureFlagAllMongodsAreSharded: true,
+        featureFlagReplicaSetEndpoint: true,
     };
     let node = MongoRunner.runMongod({setParameter: setParameterOpts});
     const getShard0PrimaryFunc = () => {
@@ -310,7 +311,10 @@ function getReplicaSetRestartOptions(maintenanceMode, setParameterOpts) {
 
 {
     jsTest.log("Running tests for a replica set bootstrapped as a single-shard cluster");
-    const setParameterOpts = {featureFlagAllMongodsAreSharded: true};
+    const setParameterOpts = {
+        featureFlagAllMongodsAreSharded: true,
+        featureFlagReplicaSetEndpoint: true,
+    };
     const rst = new ReplSetTest({
         // TODO (SERVER-83433): Make the replica set have secondaries to get test coverage for
         // running db hash check while the replica set is fsync locked.
@@ -336,12 +340,16 @@ function getReplicaSetRestartOptions(maintenanceMode, setParameterOpts) {
 
 {
     jsTest.log("Running tests for a single-shard cluster");
+    const setParameterOpts = {
+        featureFlagReplicaSetEndpoint: true,
+    };
     const st = new ShardingTest({
         shards: 1,
         rs: {
             // TODO (SERVER-83433): Make the replica set have secondaries to get test coverage
             // for running db hash check while the replica set is fsync locked.
-            nodes: 1
+            nodes: 1,
+            setParameter: setParameterOpts
         },
         configShard: true,
         embeddedRouter: true,
@@ -351,7 +359,7 @@ function getReplicaSetRestartOptions(maintenanceMode, setParameterOpts) {
     };
     const restartFunc = (maintenanceMode) => {
         st.rs0.stopSet(null /* signal */, true /*forRestart */);
-        const restartOpts = getReplicaSetRestartOptions(maintenanceMode, {} /* setParameterOpts */);
+        const restartOpts = getReplicaSetRestartOptions(maintenanceMode, setParameterOpts);
         st.rs0.startSet(restartOpts);
     };
     const tearDownFunc = () => st.stop();
@@ -369,6 +377,7 @@ function getReplicaSetRestartOptions(maintenanceMode, setParameterOpts) {
     const vtsKey = "secret";
     const setParameterOpts = {
         featureFlagAllMongodsAreSharded: true,
+        featureFlagReplicaSetEndpoint: true,
         multitenancySupport: true,
         testOnlyValidatedTenancyScopeKey: vtsKey,
     };

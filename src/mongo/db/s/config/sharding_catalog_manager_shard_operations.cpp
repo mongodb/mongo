@@ -836,7 +836,7 @@ Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterRemoveShar
     // handle direct connections properly.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (fcvSnapshot.isVersionInitialized() &&
-        !feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabled(fcvSnapshot)) {
+        !feature_flags::gFeatureFlagRSEndpointClusterCardinalityParameter.isEnabled(fcvSnapshot)) {
         return Status::OK();
     }
 

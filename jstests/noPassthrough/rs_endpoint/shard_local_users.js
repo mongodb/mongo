@@ -6,7 +6,6 @@
  *
  * @tags: [
  *   requires_fcv_80,
- *   featureFlagReplicaSetEndpoint,
  *   featureFlagRouterPort,
  *   featureFlagFailOnDirectShardOperations,
  *   requires_persistence,
@@ -228,6 +227,7 @@ function runTests(shard0Primary, tearDownFunc) {
     const node = MongoRunner.runMongod({
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
+            featureFlagReplicaSetEndpoint: true,
         },
         keyFile
     });
@@ -244,6 +244,7 @@ function runTests(shard0Primary, tearDownFunc) {
         nodeOptions: {
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
+                featureFlagReplicaSetEndpoint: true,
             }
         },
         useAutoBootstrapProcedure: true,
@@ -260,7 +261,17 @@ function runTests(shard0Primary, tearDownFunc) {
 
 {
     jsTest.log("Running tests for a single-shard cluster");
-    const st = new ShardingTest({shards: 1, rs: {nodes: 2}, configShard: true, keyFile});
+    const st = new ShardingTest({
+        shards: 1,
+        rs: {
+            nodes: 2,
+            setParameter: {
+                featureFlagReplicaSetEndpoint: true,
+            }
+        },
+        configShard: true,
+        keyFile
+    });
     const tearDownFunc = () => st.stop();
 
     runTests(st.rs0.getPrimary() /* shard0Primary */, tearDownFunc);
