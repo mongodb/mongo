@@ -269,15 +269,6 @@ bool isSharded(const ShardsvrCreateCollectionRequest& request) {
     return !isUnsplittable(request);
 }
 
-bool isTimeseries(const ShardsvrCreateCollectionRequest& request) {
-    return request.getTimeseries().has_value();
-}
-
-bool isTimeseries(const boost::optional<CollectionAcquisition>& collection) {
-    return collection.has_value() && collection->exists() &&
-        collection->getCollectionPtr()->getTimeseriesOptions().has_value();
-}
-
 // NOTES on the 'collation' optional parameter contained by the shardCollection() request:
 // 1. It specifies the ordering criteria that will be applied when comparing chunk boundaries
 // during sharding operations (such as move/mergeChunks).
@@ -335,6 +326,9 @@ BSONObj resolveCollationForUserQueries(OperationContext* opCtx,
     const auto actualCollator = [&]() -> const CollatorInterface* {
         const auto& coll = autoColl.getCollection();
         if (coll) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "can't shard a capped collection",
+                    isUnsplittable || !coll->isCapped());
             return coll->getDefaultCollator();
         }
 
@@ -537,22 +531,9 @@ void broadcastDropCollection(OperationContext* opCtx,
         expectedUUID);
 }
 
-/**
- * Return the collection acquisition for the target namespace.
- *
- * If the collection exists and is timeseries or
- * if we are attempting to create an unexistent timeseries collection
- * we will use the bucket namespace as target.
- *
- * In all the other cases the acquisition for the @originalNss is returned.
- *
- * This function throw en error in case the namespace already exists and is a normal view.
- **/
 CollectionAcquisition acquireTargetCollection(OperationContext* opCtx,
                                               const NamespaceString& originalNss,
                                               const ShardsvrCreateCollectionRequest& request) {
-
-    // 1. Acquire the original Nss.
     auto collOrView = acquireCollectionOrViewMaybeLockFree(
         opCtx,
         CollectionOrViewAcquisitionRequest(originalNss,
@@ -561,9 +542,9 @@ CollectionAcquisition acquireTargetCollection(OperationContext* opCtx,
                                            repl::ReadConcernArgs::get(opCtx),
                                            AcquisitionPrerequisites::OperationType::kRead,
                                            AcquisitionPrerequisites::kCanBeView));
-    // In case an existing timeseries is found, return the bucket namespace.
     if (collOrView.isView()) {
         // Namespace exists in local catalog and is a view
+
         tassert(8119030,
                 "Found view definition on a prohibited bucket namesapce '{}'"_format(
                     originalNss.toStringForErrorMsg()),
@@ -583,61 +564,9 @@ CollectionAcquisition acquireTargetCollection(OperationContext* opCtx,
                                                     AcquisitionPrerequisites::OperationType::kRead,
                                                     request.getCollectionUUID()));
     }
-    // Return an non empty acquisition.
-    if (collOrView.collectionExists()) {
-        return collOrView.getCollection();
-    }
 
-    // 2. originalNss is empty, search for the opposite nss: in case the originalNss is a bucket
-    // seach for the view. In case it was a collection search for the bucket.
-    if (originalNss.isTimeseriesBucketsCollection()) {
-        auto mainColl = acquireCollectionOrViewMaybeLockFree(
-            opCtx,
-            CollectionOrViewAcquisitionRequest(originalNss.getTimeseriesViewNamespace(),
-                                               request.getCollectionUUID(),
-                                               {},  // placement version
-                                               repl::ReadConcernArgs::get(opCtx),
-                                               AcquisitionPrerequisites::OperationType::kRead,
-                                               AcquisitionPrerequisites::kCanBeView));
-        if (mainColl.collectionExists()) {
-            return mainColl.getCollection();
-        }
-
-    } else {
-        auto bucketColl = acquireCollectionOrViewMaybeLockFree(
-            opCtx,
-            CollectionOrViewAcquisitionRequest(originalNss.makeTimeseriesBucketsNamespace(),
-                                               request.getCollectionUUID(),
-                                               {},  // placement version
-                                               repl::ReadConcernArgs::get(opCtx),
-                                               AcquisitionPrerequisites::OperationType::kRead,
-                                               AcquisitionPrerequisites::kCanBeView));
-        // In case the bucket collection is found or we are attempting to create an unexistent
-        // timeseries, return the bucket nss. This is done to provide nss translation when the
-        // collection does not exists.
-        if (bucketColl.collectionExists() || isTimeseries(request)) {
-            return bucketColl.getCollection();
-        }
-    }
-
-    // Return an empty acquisition. No need for translation.
+    // The namespace either exists and is a collection or doesn't exist
     return collOrView.getCollection();
-}
-
-bool isBucketWithoutTheView(OperationContext* opCtx, const NamespaceString& targetNss) {
-    // found a bucket nss but not view.
-    if (targetNss.isTimeseriesBucketsCollection()) {
-        auto coll = acquireCollectionOrViewMaybeLockFree(
-            opCtx,
-            CollectionOrViewAcquisitionRequest(targetNss.getTimeseriesViewNamespace(),
-                                               {},  // placement version
-                                               repl::ReadConcernArgs::get(opCtx),
-                                               AcquisitionPrerequisites::OperationType::kRead,
-                                               AcquisitionPrerequisites::kCanBeView));
-        // view must not exist
-        return !coll.isView();
-    }
-    return false;
 }
 
 void checkLocalCatalogCollectionOptions(OperationContext* opCtx,
@@ -659,27 +588,6 @@ void checkLocalCatalogCollectionOptions(OperationContext* opCtx,
         // are incompatible with the one from the existing collection.
         uassertStatusOK(createCollectionLocally(opCtx, targetNss, request));
         return;
-    }
-
-    uassert(ErrorCodes::InvalidOptions,
-            "can't shard a capped collection",
-            (isSharded(request) && !targetColl->getCollectionPtr()->isCapped()) ||
-                isUnsplittable(request));
-
-
-    if (isTimeseries(request)) {
-        uassert(ErrorCodes::InvalidOptions,
-                "Found existing collection with no `timeseries` options. The `timeseries` options "
-                "provided must match the ones of the existing collection.",
-                isTimeseries(targetColl));
-
-        uassert(
-            ErrorCodes::InvalidOptions,
-            "The `timeseries` options provided must match the ones of the existing collection. Requested {} but found {}"_format(
-                request.getTimeseries()->toBSON().toString(),
-                targetColl->getCollectionPtr()->getTimeseriesOptions()->toBSON().toString()),
-            timeseries::optionsAreEqual(*request.getTimeseries(),
-                                        *targetColl->getCollectionPtr()->getTimeseriesOptions()));
     }
 }
 
@@ -887,14 +795,6 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
 
     checkShardingCatalogCollectionOptions(opCtx, targetNss, request, cri);
 
-    const bool isRequestForATimeseriesView =
-        isTimeseries(request) && !originalNss.isTimeseriesBucketsCollection();
-    if (isRequestForATimeseriesView && isBucketWithoutTheView(opCtx, *optTargetNss)) {
-        // For a timeseries request, the bucket collection already exists and it's tracked but the
-        // view is missing locally. We need to create it. Proceed with the coordinator.
-        return boost::none;
-    }
-
     // The collection already exists and match the requested options
     CreateCollectionResponse response(cri.getCollectionVersion());
     response.setCollectionUUID(cri.cm.getUUID());
@@ -939,12 +839,6 @@ void checkCommandArguments(OperationContext* opCtx,
         uassert(5731591,
                 "Sharding a buckets collection is not allowed",
                 !originalNss.isTimeseriesBucketsCollection());
-
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Namespace too long. Namespace: "
-                              << originalNss.toStringForErrorMsg()
-                              << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
-                originalNss.size() <= NamespaceString::MaxNsShardedCollectionLen);
     }
 
     if (originalNss.dbName() == DatabaseName::kConfig) {
@@ -989,19 +883,14 @@ void logStartCreateCollection(OperationContext* opCtx,
 void enterCriticalSectionsOnCoordinator(OperationContext* opCtx,
                                         const BSONObj& critSecReason,
                                         const NamespaceString& originalNss) {
-
-    auto mainNss = originalNss.isTimeseriesBucketsCollection()
-        ? originalNss.getTimeseriesViewNamespace()
-        : originalNss;
-
     ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx, mainNss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+        opCtx, originalNss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
     // Preventively acquire the critical section protecting the buckets namespace that the
     // creation of a timeseries collection would require.
     ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
         opCtx,
-        mainNss.makeTimeseriesBucketsNamespace(),
+        originalNss.makeTimeseriesBucketsNamespace(),
         critSecReason,
         ShardingCatalogClient::kMajorityWriteConcern);
 }
@@ -1010,38 +899,140 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
                                        bool throwIfReasonDiffers,
                                        const BSONObj& critSecReason,
                                        const NamespaceString& originalNss) {
-
-    auto mainNss = originalNss.isTimeseriesBucketsCollection()
-        ? originalNss.getTimeseriesViewNamespace()
-        : originalNss;
-
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
         opCtx,
-        mainNss.makeTimeseriesBucketsNamespace(),
+        originalNss,
         critSecReason,
         ShardingCatalogClient::kMajorityWriteConcern,
         throwIfReasonDiffers);
 
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
         opCtx,
-        mainNss,
+        originalNss.makeTimeseriesBucketsNamespace(),
         critSecReason,
         ShardingCatalogClient::kMajorityWriteConcern,
         throwIfReasonDiffers);
 }
 
-/*
- * Check the requested shardKey is a timefield, then convert it to a shardKey compatible for the
- * bucket collection.
+/**
+ * Updates the parameters contained in request based on the content of the local catalog and returns
+ * an equivalent descriptor that may be persisted with the recovery document.
  */
-BSONObj validateAndTranslateShardKey(OperationContext* opCtx,
-                                     const boost::optional<TimeseriesOptions>& timeseriesOpts,
-                                     const BSONObj& shardKey) {
-    shardkeyutil::validateTimeseriesShardKey(
-        timeseriesOpts->getTimeField(), timeseriesOpts->getMetaField(), shardKey);
+TranslatedRequestParams translateRequestParameters(OperationContext* opCtx,
+                                                   const ShardsvrCreateCollectionRequest& request,
+                                                   const NamespaceString& originalNss) {
+    auto performCheckOnCollectionUUID = [opCtx, request](const NamespaceString& resolvedNss) {
+        AutoGetCollection coll{
+            opCtx,
+            resolvedNss,
+            MODE_IS,
+            AutoGetCollection::Options{}.expectedUUID(request.getCollectionUUID())};
+    };
 
-    return uassertStatusOK(
-        timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(*timeseriesOpts, shardKey));
+    const auto makeTranslateRequestParams =
+        [](const NamespaceString& nss,
+           const KeyPattern& keyPattern,
+           const BSONObj& collation,
+           const boost::optional<TimeseriesOptions>& timeseries) {
+            auto translatedRequestParams = TranslatedRequestParams(nss, keyPattern, collation);
+            translatedRequestParams.setTimeseries(timeseries);
+            return translatedRequestParams;
+        };
+
+    auto bucketsNs = originalNss.makeTimeseriesBucketsNamespace();
+    // Hold reference to the catalog for collection lookup without locks to be safe.
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto existingBucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
+
+    auto targetingStandardCollection = !request.getTimeseries() && !existingBucketsColl;
+
+    if (targetingStandardCollection) {
+        const auto& resolvedNamespace = originalNss;
+        performCheckOnCollectionUUID(resolvedNamespace);
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Namespace too long. Namespace: "
+                              << resolvedNamespace.toStringForErrorMsg()
+                              << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
+                resolvedNamespace.size() <= NamespaceString::MaxNsShardedCollectionLen);
+        return makeTranslateRequestParams(
+            resolvedNamespace,
+            *request.getShardKey(),
+            resolveCollationForUserQueries(opCtx,
+                                           resolvedNamespace,
+                                           request.getCollation(),
+                                           request.getUnsplittable(),
+                                           request.getRegisterExistingCollectionInGlobalCatalog()),
+            boost::none /* timeseries */);
+    }
+
+    // The request is targeting a new or existing Timeseries collection and the request has not been
+    // patched yet.
+    const auto& resolvedNamespace = bucketsNs;
+    performCheckOnCollectionUUID(resolvedNamespace);
+
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Namespace too long. Namespace: "
+                          << resolvedNamespace.toStringForErrorMsg()
+                          << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
+            resolvedNamespace.size() <= NamespaceString::MaxNsShardedCollectionLen);
+
+    // Consolidate the related request parameters...
+    auto existingTimeseriesOptions = [&bucketsNs, &existingBucketsColl] {
+        if (!existingBucketsColl) {
+            return boost::optional<TimeseriesOptions>();
+        }
+
+        uassert(6159000,
+                str::stream() << "the collection '" << bucketsNs.toStringForErrorMsg()
+                              << "' does not have 'timeseries' options",
+                existingBucketsColl->getTimeseriesOptions());
+        return existingBucketsColl->getTimeseriesOptions();
+    }();
+
+    auto timeseriesOptions = [&]() -> boost::optional<TimeseriesOptions> {
+        if (request.getTimeseries() && existingTimeseriesOptions) {
+            uassert(
+                5731500,
+                str::stream() << "the 'timeseries' spec provided must match that of exists '"
+                              << originalNss.toStringForErrorMsg() << "' collection",
+                timeseries::optionsAreEqual(*request.getTimeseries(), *existingTimeseriesOptions));
+            return request.getTimeseries();
+        } else if (!request.getTimeseries()) {
+            return existingTimeseriesOptions;
+        }
+        return request.getTimeseries();
+    }();
+
+    if (request.getUnsplittable()) {
+        return makeTranslateRequestParams(
+            resolvedNamespace,
+            request.getShardKey().value(),
+            resolveCollationForUserQueries(opCtx,
+                                           resolvedNamespace,
+                                           request.getCollation(),
+                                           request.getUnsplittable(),
+                                           request.getRegisterExistingCollectionInGlobalCatalog()),
+            timeseriesOptions);
+    }
+
+    // check that they are consistent with the requested shard key before creating the key pattern
+    // object.
+    auto timeFieldName = timeseriesOptions->getTimeField();
+    auto metaFieldName = timeseriesOptions->getMetaField();
+    shardkeyutil::validateTimeseriesShardKey(timeFieldName, metaFieldName, *request.getShardKey());
+
+    KeyPattern keyPattern(
+        uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
+            *timeseriesOptions, *request.getShardKey())));
+    return makeTranslateRequestParams(
+        resolvedNamespace,
+        keyPattern,
+        resolveCollationForUserQueries(opCtx,
+                                       resolvedNamespace,
+                                       request.getCollation(),
+                                       request.getUnsplittable(),
+                                       request.getRegisterExistingCollectionInGlobalCatalog()),
+        timeseriesOptions);
 }
 
 /**
@@ -1147,17 +1138,12 @@ boost::optional<InitialSplitPolicy::ShardCollectionConfig> createChunks(
 void enterCriticalSectionsOnCoordinatorToBlockReads(OperationContext* opCtx,
                                                     const BSONObj& critSecReason,
                                                     const NamespaceString& originalNss) {
-
-    auto mainNss = originalNss.isTimeseriesBucketsCollection()
-        ? originalNss.getTimeseriesViewNamespace()
-        : originalNss;
-
     ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx, mainNss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+        opCtx, originalNss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
     ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx,
-        mainNss.makeTimeseriesBucketsNamespace(),
+        originalNss.makeTimeseriesBucketsNamespace(),
         critSecReason,
         ShardingCatalogClient::kMajorityWriteConcern);
 }
@@ -1169,13 +1155,11 @@ boost::optional<UUID> createCollectionAndIndexes(
     OperationContext* opCtx,
     const ShardKeyPattern& shardKeyPattern,
     const ShardsvrCreateCollectionRequest& request,
-    const NamespaceString& originalNss,
-    const NamespaceString& translatedNss,
+    const NamespaceString& nss,
     const boost::optional<mongo::TranslatedRequestParams>& translatedRequestParams,
     const ShardId& dataShard,
     bool isUpdatedCoordinatorDoc) {
-    LOGV2_DEBUG(
-        5277903, 2, "Create collection createCollectionAndIndexes", logAttrs(translatedNss));
+    LOGV2_DEBUG(5277903, 2, "Create collection createCollectionAndIndexes", logAttrs(nss));
 
     // TODO (SERVER-87284): We can remove this tassert once translatedRequestParams stops being
     // optional.
@@ -1191,32 +1175,33 @@ boost::optional<UUID> createCollectionAndIndexes(
         allowCollectionCreation.emplace(opCtx);
     }
 
-    auto translatedRequest = request;
-    translatedRequest.setCollation(translatedRequestParams->getCollation());
-    translatedRequest.setTimeseries(translatedRequestParams->getTimeseries());
+    if (isUnsplittable(request) || translatedRequestParams->getTimeseries()) {
+        const auto localNss =
+            translatedRequestParams->getTimeseries() ? nss.getTimeseriesViewNamespace() : nss;
 
-    // The creation is on the original nss in order to support timeseries creation using the
-    // directly the bucket nss. In that case, we do not want to create the view. This feature is
-    // currently used by mongorestore and mongosync.
-    auto createStatus = createCollectionLocally(opCtx, originalNss, translatedRequest);
-    if (!createStatus.isOK() && createStatus.code() == ErrorCodes::NamespaceExists) {
-        LOGV2_DEBUG(5909400, 3, "Collection namespace already exists", logAttrs(originalNss));
-    } else {
-        uassertStatusOK(createStatus);
+        auto translatedRequest = request;
+        translatedRequest.setCollation(translatedRequestParams->getCollation());
+        translatedRequest.setTimeseries(translatedRequestParams->getTimeseries());
+        auto createStatus = createCollectionLocally(opCtx, localNss, translatedRequest);
+        if (!createStatus.isOK() && createStatus.code() == ErrorCodes::NamespaceExists) {
+            LOGV2_DEBUG(5909400, 3, "Collection namespace already exists", logAttrs(localNss));
+        } else {
+            uassertStatusOK(createStatus);
+        }
     }
 
-    shardkeyutil::validateShardKeyIsNotEncrypted(opCtx, translatedNss, shardKeyPattern);
+    shardkeyutil::validateShardKeyIsNotEncrypted(opCtx, nss, shardKeyPattern);
 
     // The shard key index for unsplittable collection { _id : 1 } is already implicitly created
     // for unsplittable collections.
     if (isUnsplittable(request)) {
-        return *sharding_ddl_util::getCollectionUUID(opCtx, translatedNss);
+        return *sharding_ddl_util::getCollectionUUID(opCtx, nss);
     }
     auto indexCreated = false;
     if (request.getImplicitlyCreateIndex().value_or(true)) {
         indexCreated = shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
             opCtx,
-            translatedNss,
+            nss,
             shardKeyPattern,
             translatedRequestParams->getCollation(),
             request.getUnique().value_or(false),
@@ -1229,7 +1214,7 @@ boost::optional<UUID> createCollectionAndIndexes(
                 "Must have an index compatible with the proposed shard key",
                 validShardKeyIndexExists(
                     opCtx,
-                    translatedNss,
+                    nss,
                     shardKeyPattern,
                     translatedRequestParams->getCollation(),
                     request.getUnique().value_or(false) &&
@@ -1250,7 +1235,7 @@ boost::optional<UUID> createCollectionAndIndexes(
                                         ShardingCatalogClient::kMajorityWriteConcern,
                                         &ignoreResult));
 
-    return *sharding_ddl_util::getCollectionUUID(opCtx, translatedNss);
+    return *sharding_ddl_util::getCollectionUUID(opCtx, nss);
 }
 
 void generateCommitEventForChangeStreams(
@@ -1423,128 +1408,6 @@ OptionsAndIndexes CreateCollectionCoordinatorLegacy::_getCollectionOptionsAndInd
             idIndex};
 }
 
-/**
- * Updates the parameters contained in request based on the content of the local catalog and returns
- * an equivalent descriptor that may be persisted with the recovery document.
- * This is the LEGACY implementation and it's only used by the legacy coordinator.
- */
-TranslatedRequestParams CreateCollectionCoordinatorLegacy::_translateRequestParameters(
-    OperationContext* opCtx) {
-
-    auto performCheckOnCollectionUUID = [opCtx, this](const NamespaceString& resolvedNss) {
-        AutoGetCollection coll{
-            opCtx,
-            resolvedNss,
-            MODE_IS,
-            AutoGetCollection::Options{}.expectedUUID(_request.getCollectionUUID())};
-    };
-
-    const auto makeTranslateRequestParams =
-        [](const NamespaceString& nss,
-           const KeyPattern& keyPattern,
-           const BSONObj& collation,
-           const boost::optional<TimeseriesOptions>& timeseries) {
-            auto translatedRequestParams = TranslatedRequestParams(nss, keyPattern, collation);
-            translatedRequestParams.setTimeseries(timeseries);
-            return translatedRequestParams;
-        };
-
-    auto bucketsNs = originalNss().makeTimeseriesBucketsNamespace();
-    // Hold reference to the catalog for collection lookup without locks to be safe.
-    auto catalog = CollectionCatalog::get(opCtx);
-    auto existingBucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
-
-    auto targetingStandardCollection = !_request.getTimeseries() && !existingBucketsColl;
-
-    if (targetingStandardCollection) {
-        const auto& resolvedNamespace = originalNss();
-        performCheckOnCollectionUUID(resolvedNamespace);
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Namespace too long. Namespace: "
-                              << resolvedNamespace.toStringForErrorMsg()
-                              << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
-                resolvedNamespace.size() <= NamespaceString::MaxNsShardedCollectionLen);
-        return makeTranslateRequestParams(
-            resolvedNamespace,
-            *_request.getShardKey(),
-            resolveCollationForUserQueries(opCtx,
-                                           resolvedNamespace,
-                                           _request.getCollation(),
-                                           _request.getUnsplittable(),
-                                           _request.getRegisterExistingCollectionInGlobalCatalog()),
-            boost::none /* timeseries */);
-    }
-
-    // The request is targeting a new or existing Timeseries collection and the request has not been
-    // patched yet.
-    const auto& resolvedNamespace = bucketsNs;
-    performCheckOnCollectionUUID(resolvedNamespace);
-
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Namespace too long. Namespace: "
-                          << resolvedNamespace.toStringForErrorMsg()
-                          << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
-            resolvedNamespace.size() <= NamespaceString::MaxNsShardedCollectionLen);
-
-    // Consolidate the related request parameters...
-    auto existingTimeseriesOptions = [&bucketsNs, &existingBucketsColl] {
-        if (!existingBucketsColl) {
-            return boost::optional<TimeseriesOptions>();
-        }
-
-        uassert(6159000,
-                str::stream() << "the collection '" << bucketsNs.toStringForErrorMsg()
-                              << "' does not have 'timeseries' options",
-                existingBucketsColl->getTimeseriesOptions());
-        return existingBucketsColl->getTimeseriesOptions();
-    }();
-
-    auto timeseriesOptions = [&]() -> boost::optional<TimeseriesOptions> {
-        if (_request.getTimeseries() && existingTimeseriesOptions) {
-            uassert(
-                5731500,
-                str::stream() << "the 'timeseries' spec provided must match that of exists '"
-                              << originalNss().toStringForErrorMsg() << "' collection",
-                timeseries::optionsAreEqual(*_request.getTimeseries(), *existingTimeseriesOptions));
-            return _request.getTimeseries();
-        } else if (!_request.getTimeseries()) {
-            return existingTimeseriesOptions;
-        }
-        return _request.getTimeseries();
-    }();
-
-    if (_request.getUnsplittable()) {
-        return makeTranslateRequestParams(
-            resolvedNamespace,
-            _request.getShardKey().value(),
-            resolveCollationForUserQueries(opCtx,
-                                           resolvedNamespace,
-                                           _request.getCollation(),
-                                           _request.getUnsplittable(),
-                                           _request.getRegisterExistingCollectionInGlobalCatalog()),
-            timeseriesOptions);
-    }
-
-    // check that they are consistent with the requested shard key before creating the key pattern
-    // object.
-    auto timeFieldName = timeseriesOptions->getTimeField();
-    auto metaFieldName = timeseriesOptions->getMetaField();
-    shardkeyutil::validateTimeseriesShardKey(timeFieldName, metaFieldName, *_request.getShardKey());
-
-    KeyPattern keyPattern(
-        uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
-            *timeseriesOptions, *_request.getShardKey())));
-    return makeTranslateRequestParams(
-        resolvedNamespace,
-        keyPattern,
-        resolveCollationForUserQueries(opCtx,
-                                       resolvedNamespace,
-                                       _request.getCollation(),
-                                       _request.getUnsplittable(),
-                                       _request.getRegisterExistingCollectionInGlobalCatalog()),
-        timeseriesOptions);
-}
-
 ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -1662,7 +1525,8 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                 enterCriticalSectionsOnCoordinator(opCtx, _critSecReason, originalNss());
 
                 // Translate request parameters and persist them in the coordinator document
-                _doc.setTranslatedRequestParams(_translateRequestParameters(opCtx));
+                _doc.setTranslatedRequestParams(
+                    translateRequestParameters(opCtx, _request, originalNss()));
                 _updateStateDocument(opCtx, CreateCollectionCoordinatorDocumentLegacy(_doc));
 
                 ShardKeyPattern shardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
@@ -1683,7 +1547,6 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                 _collectionUUID = createCollectionAndIndexes(opCtx,
                                                              shardKeyPattern,
                                                              _request,
-                                                             originalNss(),
                                                              nss(),
                                                              _doc.getTranslatedRequestParams(),
                                                              ShardingState::get(opCtx)->shardId(),
@@ -2158,45 +2021,7 @@ void CreateCollectionCoordinator::_translateRequestParameters() {
     auto* opCtx = opCtxHolder.get();
     getForwardableOpMetadata().setOn(opCtx);
 
-    // In case timeseries options are already in the local catalog, they must be used. After the
-    // checkPrecoditions phase we have the guarantee for the request's timeseries options to be
-    // either empty or identical to the local catalog's ones.
-    NamespaceString targetNs;
-    boost::optional<TimeseriesOptions> timeseriesOpts;
-    {
-        auto coll = acquireTargetCollection(opCtx, originalNss(), _request);
-        targetNs = coll.nss();
-        if (coll.exists()) {
-            timeseriesOpts = coll.getCollectionPtr()->getTimeseriesOptions();
-        } else {
-            timeseriesOpts = _request.getTimeseries();
-        }
-    }
-
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Namespace too long. Namespace: " << targetNs.toStringForErrorMsg()
-                          << " has length " << targetNs.size() << " but max lenth is "
-                          << NamespaceString::MaxNsShardedCollectionLen,
-            targetNs.size() <= NamespaceString::MaxNsShardedCollectionLen);
-
-    const auto resolvedCollator =
-        resolveCollationForUserQueries(opCtx,
-                                       targetNs,
-                                       _request.getCollation(),
-                                       _request.getUnsplittable(),
-                                       _request.getRegisterExistingCollectionInGlobalCatalog());
-
-    // Assign the correct shard key: in case of timeseries, the shard key must be converted.
-    KeyPattern keyPattern;
-    if (timeseriesOpts && isSharded(_request)) {
-        keyPattern = validateAndTranslateShardKey(opCtx, timeseriesOpts, *_request.getShardKey());
-    } else {
-        keyPattern = *_request.getShardKey();
-    }
-    auto translatedRequestParams = TranslatedRequestParams(targetNs, keyPattern, resolvedCollator);
-    translatedRequestParams.setTimeseries(timeseriesOpts);
-    _doc.setTranslatedRequestParams(std::move(translatedRequestParams));
-
+    _doc.setTranslatedRequestParams(translateRequestParameters(opCtx, _request, originalNss()));
     const auto& originalDataShard = [&] {
         auto cri = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss()));
@@ -2285,7 +2110,6 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator(
         _uuid = createCollectionAndIndexes(opCtx,
                                            shardKeyPattern,
                                            _request,
-                                           originalNss(),
                                            nss(),
                                            _doc.getTranslatedRequestParams(),
                                            *_doc.getOriginalDataShard(),

@@ -115,14 +115,17 @@ void runCreateCommandDirectClient(OperationContext* opCtx,
 bool isAlwaysUntracked(OperationContext* opCtx,
                        NamespaceString&& nss,
                        const ShardsvrCreateCollection& request) {
+    bool isFromCreateCommand = !request.getIsFromCreateUnsplittableCollectionTestCommand();
+    bool isTimeseries = request.getTimeseries().has_value();
     bool isView = request.getViewOn().has_value();
     bool hasApiParams = APIParameters::get(opCtx).getParamsPassed();
 
+    // TODO SERVER-83878 Remove isFromCreateCommand && isTimeseries
     // TODO SERVER-83713 Reconsider isFLE2StateCollection check
     // TODO SERVER-83714 Reconsider isFLE2StateCollection check
     // TODO SERVER-86018 Remove hasApiParams
     return isView || nss.isFLE2StateCollection() || nss.isNamespaceAlwaysUntracked() ||
-        hasApiParams;
+        (isFromCreateCommand && isTimeseries) || hasApiParams;
 }
 
 class ShardsvrCreateCollectionCommand final : public TypedCommand<ShardsvrCreateCollectionCommand> {

@@ -14,9 +14,6 @@
  *   requires_timeseries,
  *   # This test depends on stats read from the primary node in replica sets.
  *   assumes_read_preference_unchanged,
- *   # TODO SERVER-89349 remove this tag once moveCollection correctly leaves only 1 document in the
- *   # bucket collection.
- *  assumes_balancer_off,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

@@ -6,7 +6,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js"
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // TODO SERVER-89399: re-enable the hook once it properly serialize with resharding operations
@@ -73,15 +72,8 @@ function getDataShard(nss) {
 // Map: namespace -> shardId
 let initialPlacements = {};
 
-let trackableCollections = ['unsharded'];
-
-// TODO SERVER-84744 remove the feature flag
-const isReshardingForTimeseriesEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB('admin'), 'ReshardingForTimeseries');
-if (isReshardingForTimeseriesEnabled) {
-    trackableCollections.push('system.buckets.timeseries');
-}
-
+// TODO SERVER-83878 add 'system.buckets.timeseries' to the list of trackable collections
+const trackableCollections = ['unsharded'];
 for (const dbName of dbNames) {
     for (const collName of trackableCollections) {
         const fullName = `${dbName}.${collName}`;

@@ -158,10 +158,10 @@ export const $config = (function() {
 
     function teardown(db, collName, cluster) {
         if (TestData.runningWithBalancer) {
-            // Stop balancing  so that it does not cause the TTLMonitor to fail rounds due to
-            // ongoing migration critical sections. TTLMonitor will retry on the next round, but it
-            // might not converge in time for the following assertion to pass.
-            assert.commandWorked(db.adminCommand({balancerStop: 1, maxTimeMS: 600000}));
+            // Disallow balancing 'ns' so that it does not cause the TTLMonitor to fail rounds due
+            // to ongoing migration critical sections. TTLMonitor will retry on the next round, but
+            // it might not converge in time for the following assertion to pass.
+            BalancerHelper.disableBalancerForCollection(db, db[collName].getFullName());
             BalancerHelper.joinBalancerRound(db);
         }
 

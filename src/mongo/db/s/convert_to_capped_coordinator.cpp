@@ -112,10 +112,6 @@ void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
     if (chunkManager.hasRoutingTable()) {
         invariant(chunkManager.isUnsplittable());
 
-        uassert(ErrorCodes::IllegalOperation,
-                "Can't convert a timeseries collection to a capped collection",
-                !chunkManager.getTimeseriesFields());
-
         const auto& selfShardId = ShardingState::get(opCtx)->shardId();
         std::set<ShardId> shards;
         chunkManager.getAllShardIds(&shards);

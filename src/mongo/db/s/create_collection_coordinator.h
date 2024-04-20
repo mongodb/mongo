@@ -163,8 +163,6 @@ private:
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
 
-    TranslatedRequestParams _translateRequestParameters(OperationContext* opCtx);
-
     const mongo::ShardsvrCreateCollectionRequest _request;
 
     const BSONObj _critSecReason;
