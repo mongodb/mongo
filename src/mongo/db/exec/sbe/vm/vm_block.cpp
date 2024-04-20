@@ -1677,14 +1677,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockArithm
             "First argument of block arithmetic operation must be block of values representing a "
             "bitmask or Nothing",
             bitsetTag == value::TypeTags::valueBlock || bitsetTag == value::TypeTags::Nothing);
-    value::Value* bitsetVals = nullptr;
-    value::TypeTags* bitsetTags = nullptr;
+    const value::Value* bitsetVals = nullptr;
+    const value::TypeTags* bitsetTags = nullptr;
     size_t valsNum = 0;
     if (bitsetTag == value::TypeTags::valueBlock) {
         auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
         auto bitset = bitsetBlock->extract();
-        bitsetVals = const_cast<value::Value*>(bitset.vals());
-        bitsetTags = const_cast<value::TypeTags*>(bitset.tags());
+        bitsetVals = bitset.vals();
+        bitsetTags = bitset.tags();
         valsNum = bitset.count();
     }
 
