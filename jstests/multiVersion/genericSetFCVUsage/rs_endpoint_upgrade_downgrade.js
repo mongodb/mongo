@@ -3,8 +3,9 @@
  * set works across upgrade and downgrade.
  *
  * @tags: [
- *    featureFlagRouterPort,
  *    requires_fcv_80,
+ *    featureFlagReplicaSetEndpoint,
+ *    featureFlagRouterPort,
  * ]
  */
 
@@ -81,7 +82,6 @@ function runStandaloneTest(oldBinVersion, oldFCVVersion) {
             binVersion: "latest",
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
-                featureFlagReplicaSetEndpoint: true,
             }
         });
         assert.soon(() => {
@@ -118,7 +118,6 @@ function runReplicaSetTest(oldBinVersion, oldFCVVersion) {
             binVersion: "latest",
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
-                featureFlagReplicaSetEndpoint: true,
             }
         });
         assert.commandWorked(rst.getPrimary().adminCommand(

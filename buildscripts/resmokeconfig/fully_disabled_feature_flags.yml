@@ -13,5 +13,4 @@
 - featureFlagUpdateDocumentShardKeyUsingTransactionApi
 - featureFlagAllMongodsAreSharded
 - featureFlagGRPC
-- featureFlagReplicaSetEndpoint
 - featureFlagCreateCollectionInPreparedTransactions

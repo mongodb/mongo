@@ -30,7 +30,7 @@
  *
  * @tags: [
  *   requires_fcv_80,
- *   featureFlagRSEndpointClusterCardinalityParameter
+ *   featureFlagReplicaSetEndpoint,
  * ]
  */
 import {ReplicaSetEndpointTest} from "jstests/noPassthrough/rs_endpoint/lib/fixture.js";

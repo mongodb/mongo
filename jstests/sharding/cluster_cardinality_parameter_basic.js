@@ -33,8 +33,8 @@ jsTest.log("Checking the cluster parameter while the cluster contains one shard 
 // binVersion is 7.3 or the replica set endpoint feature flag is enabled.
 let binVersion =
     assert.commandWorked(st.configRS.getPrimary().adminCommand({serverStatus: 1})).version;
-let rsEndpointEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.configRS.getPrimary(), "RSEndpointClusterCardinalityParameter");
+let rsEndpointEnabled =
+    FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "ReplicaSetEndpoint");
 const expectedHasTwoOrMoreShards =
     MongoRunner.compareBinVersions(binVersion, "7.3") != 0 && !rsEndpointEnabled;
 checkClusterParameter(st.configRS, expectedHasTwoOrMoreShards);

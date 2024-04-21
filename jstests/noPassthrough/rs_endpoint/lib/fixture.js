@@ -120,11 +120,6 @@ export var ReplicaSetEndpointTest = class {
             // TODO (SERVER-83433): Make the replica set have secondaries to get test coverage
             // for running db hash check while the replica set is fsync locked.
             nodes: 1,
-            nodeOptions: {
-                setParameter: {
-                    featureFlagReplicaSetEndpoint: true,
-                }
-            },
             isRouterServer: true,
             keyFile: this._keyFile
         });

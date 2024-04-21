@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_80,
+ *   featureFlagReplicaSetEndpoint,
  *   featureFlagRouterPort,
  *   featureFlagSecurityToken,
  *   requires_persistence,
@@ -153,7 +154,7 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
 {
     jsTest.log("Running tests for a standalone bootstrapped as a single-shard cluster");
     const node = MongoRunner.runMongod({
-        setParameter: {featureFlagAllMongodsAreSharded: true, featureFlagReplicaSetEndpoint: true},
+        setParameter: {featureFlagAllMongodsAreSharded: true},
     });
     const tearDownFunc = () => MongoRunner.stopMongod(node);
 
@@ -170,7 +171,6 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
         nodeOptions: {
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
-                featureFlagReplicaSetEndpoint: true,
             }
         },
         useAutoBootstrapProcedure: true,
@@ -191,8 +191,7 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
         rs: {
             // TODO (SERVER-83433): Make the replica set have secondaries to get test coverage
             // for running db hash check while the replica set is fsync locked.
-            nodes: 1,
-            setParameter: {featureFlagReplicaSetEndpoint: true}
+            nodes: 1
         },
         configShard: true,
         embeddedRouter: true,
@@ -216,7 +215,6 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
             auth: "",
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
-                featureFlagReplicaSetEndpoint: true,
                 multitenancySupport: true,
                 testOnlyValidatedTenancyScopeKey: vtsKey,
             }

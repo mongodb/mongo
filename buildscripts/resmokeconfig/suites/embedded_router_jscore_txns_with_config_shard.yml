@@ -29,12 +29,16 @@ selector:
 executor:
   archive:
     hooks:
-      - CheckReplDBHash
+      # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set
+      # that is fsync locked and has replica set endpoint enabled.
+      # - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config: {}
   hooks:
-    - class: CheckReplDBHash
+    # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set
+    # that is fsync locked and has replica set endpoint enabled.
+    # - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections
     - class: CheckOrphansDeleted
