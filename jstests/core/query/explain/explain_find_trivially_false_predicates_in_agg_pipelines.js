@@ -8,7 +8,10 @@
  *   # Explain for the aggregate command cannot run within a multi-document transaction
  *   does_not_support_transactions,
  *   # Explain command does not support read concerns other than local
- *   assumes_read_concern_local
+ *   assumes_read_concern_local,
+ *   # Tests with balancer also enable 'random_migrations: true' which results in a different
+ *   # sharded $lookup plan that cannot be verified whether it has an EOF.
+ *   assumes_balancer_off
  * ]
  */
 
