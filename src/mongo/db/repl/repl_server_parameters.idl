@@ -772,6 +772,15 @@ server_parameters:
         default: ""
         validator: { callback: 'validateHostAndPort' }
 
+    skipApplyingDbCheckBatchOnSecondary:
+        description: >-
+            Parameter for whether dbcheck batches should be applied on secondaries.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: skipApplyingDbCheckBatchOnSecondary
+        default: false
+
+
 feature_flags:
     featureFlagRetryableFindAndModify:
         description: >-

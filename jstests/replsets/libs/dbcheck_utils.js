@@ -56,6 +56,12 @@ export const logQueries = {
             {"operation": "dbCheckStop", "severity": "info"}
         ]
     },
+    writeConcernErrorQuery: {severity: "error", "msg": "dbCheck failed waiting for writeConcern"},
+    skipApplyingBatchOnSecondaryQuery: {
+        severity: "warning",
+        "msg":
+            "skipping applying dbcheck batch because the 'skipApplyingDbCheckBatchOnSecondary' parameter is on",
+    },
 };
 
 // Apply function on all secondary nodes except arbiters.
