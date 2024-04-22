@@ -6,6 +6,9 @@
  */
 (function() {
 "use strict";
+
+load('jstests/libs/auto_retry_transaction_in_sharding.js');
+
 const st = new ShardingTest({shards: 2, mongos: 2});
 const dbName = "db";
 
@@ -27,9 +30,11 @@ function checkCommand(cmd, collName, withinTransaction) {
     });
 
     let session;
+    let txnOptions;
     if (withinTransaction) {
         session = st.s1.getDB(dbName).getMongo().startSession();
-        session.startTransaction({readConcern: {level: "snapshot"}});
+        txnOptions = {readConcern: {level: "snapshot"}};
+        session.startTransaction(txnOptions);
     }
     // Drop and recreate the collection on the primary shard. Now the collection resides on the
     // primary shard rather than the secondary. Note that we are only doing this in one mongos so
@@ -44,7 +49,10 @@ function checkCommand(cmd, collName, withinTransaction) {
     // the request with the correct shard. No exception should be passed to the user in this case.
     if (withinTransaction) {
         const sessionColl = session.getDatabase(dbName).getCollection(collName);
-        assert.commandWorked(sessionColl.runCommand(Object.extend(cmd, {collectionUUID: newUuid})));
+        retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+            assert.commandWorked(
+                sessionColl.runCommand(Object.extend(cmd, {collectionUUID: newUuid})));
+        }, txnOptions);
         session.commitTransaction();
     } else {
         assert.commandWorked(st.s1.getDB(dbName)[collName].runCommand(

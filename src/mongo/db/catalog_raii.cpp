@@ -79,6 +79,27 @@ void verifyDbAndCollection(OperationContext* opCtx,
             !resolvedNss.isSystemDotViews() || modeColl != MODE_IX);
 
     if (!db || !coll) {
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() &&
+            verifyWriteEligible && opCtx->inMultiDocumentTransaction()) {
+            // The collection does not exist on the catalog snapshotted by this transaction. Make
+            // sure it really didn't exist at the point-in-time this transaction reads at. Throw if
+            // it did.
+            const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+            if (readTimestamp) {
+                const auto pitCollection =
+                    CollectionCatalog::get(opCtx)->establishConsistentCollection(
+                        opCtx, nsOrUUID, readTimestamp);
+                if (pitCollection) {
+                    // Collection existed at the point-in-time this transaction executes at, but was
+                    // since dropped. Throw a conflict.
+                    throwWriteConflictException(
+                        str::stream() << "Unable to write to collection '" << resolvedNss
+                                      << "' due to catalog changes; please retry the operation");
+                }
+            }
+        }
+
         return;
     }
 
