@@ -1885,14 +1885,22 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
      */
     switch (btree->evict_start_type) {
     case WT_EVICT_WALK_NEXT:
+        /* Each time when evict_ref is null, alternate between linear and random walk */
+        if (btree->evict_ref == NULL && (++btree->linear_walk_restarts) & 1)
+            goto rand_next;
         break;
     case WT_EVICT_WALK_PREV:
+        /* Each time when evict_ref is null, alternate between linear and random walk */
+        if (btree->evict_ref == NULL && (++btree->linear_walk_restarts) & 1)
+            goto rand_prev;
         FLD_SET(walk_flags, WT_READ_PREV);
         break;
     case WT_EVICT_WALK_RAND_PREV:
+rand_prev:
         FLD_SET(walk_flags, WT_READ_PREV);
     /* FALLTHROUGH */
     case WT_EVICT_WALK_RAND_NEXT:
+rand_next:
         read_flags = WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT |
           WT_READ_NOTFOUND_OK | WT_READ_RESTART_OK;
         if (btree->evict_ref == NULL) {
