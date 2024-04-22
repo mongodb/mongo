@@ -83,7 +83,10 @@ protected:
     /**
      * Verifies that running the given commands through mongos will succeed.
      */
-    void testNoErrors(BSONObj targetedCmd, BSONObj scatterGatherCmd = BSONObj());
+    std::vector<DbResponse> testNoErrors(BSONObj targetedCmd, BSONObj scatterGatherCmd = BSONObj());
+
+    std::vector<DbResponse> testNoErrorsOutsideTransaction(BSONObj targetedCmd,
+                                                           BSONObj scatterGatherCmd = BSONObj());
 
     /**
      * Verifies that the given commands will retry on a snapshot error.

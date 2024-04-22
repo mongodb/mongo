@@ -1937,6 +1937,273 @@ TEST_F(BatchWriteExecTest, StaleEpochIsNotRetryable) {
     future.default_timed_get();
 }
 
+TEST_F(BatchWriteExecTest, FireAndForgetBatchInsertGetsReplyWithOnlyOkStatus) {
+    const int kNumDocsToInsert = 5;
+    const std::string kDocValue("sample");
+
+    std::vector<BSONObj> docsToInsert;
+    docsToInsert.reserve(kNumDocsToInsert);
+    for (int i = 0; i < kNumDocsToInsert; i++) {
+        docsToInsert.push_back(BSON("_id" << i << "otherField" << kDocValue));
+    }
+
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments(docsToInsert);
+        return insertOp;
+    }());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        // Set Unacknowledged WC for a "fire & forget" request
+        auto opCtx = operationContext();
+        opCtx->setWriteConcern(
+            WriteConcernOptions::parse(WriteConcernOptions::Unacknowledged).getValue());
+        BatchWriteExec::executeBatch(opCtx, singleShardNSTargeter, request, &response, &stats);
+
+        // The reply should only contain an OK status, without any further detail on
+        // the ops actually executed across the cluster.
+        BatchedCommandResponse expectedReplyToFireAndForgetRequest;
+        expectedReplyToFireAndForgetRequest.setStatus(Status::OK());
+        ASSERT_EQUALS(response.toBSON().woCompare(expectedReplyToFireAndForgetRequest.toBSON()), 0);
+    });
+
+    expectInsertsReturnSuccess(docsToInsert.begin(), docsToInsert.end());
+
+    future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTest, FireAndForgetBatchUpdateGetsReplyWithOnlyOkStatus) {
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        updateOp.setUpdates(std::vector{write_ops::UpdateOpEntry(
+            BSON("_id" << 100),
+            write_ops::UpdateModification::parseFromClassicUpdate(BSON("Key" << 100)))});
+        return updateOp;
+    }());
+
+    const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
+
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
+                                                const BatchItemRef& itemRef,
+                                                bool* useTwoPhaseWriteProtocol,
+                                                bool* isNonTargetedWriteWithoutShardKeyWithExactId,
+                                                std::set<ChunkRange>* chunkRange) const override {
+            invariant(chunkRange == nullptr);
+            return std::vector{ShardEndpoint(kShardName1,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {100, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                                             boost::none),
+                               ShardEndpoint(kShardName2,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {101, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                                             boost::none)};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        nss,
+        {MockRange(ShardEndpoint(
+                       kShardName1,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {100, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none),
+                   BSON("x" << MINKEY),
+                   BSON("x" << 0)),
+         MockRange(ShardEndpoint(
+                       kShardName2,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {101, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none),
+                   BSON("x" << 0),
+                   BSON("x" << MAXKEY))});
+
+    auto future = launchAsync([&] {
+        // Set Unacknowledged WC for a "fire & forget" request
+        auto opCtx = operationContext();
+        opCtx->setWriteConcern(
+            WriteConcernOptions::parse(WriteConcernOptions::Unacknowledged).getValue());
+
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(opCtx, multiShardNSTargeter, request, &response, &stats);
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(0);
+        response.addToErrDetails(write_ops::WriteError(
+            0,
+            Status(StaleConfigInfo(
+                       nss,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {101, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {105, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       ShardId(kShardName2)),
+                   "Stale error")));
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(2);
+
+        return response.toBSON();
+    });
+
+    // The reply should only contain an OK status, without any further detail on
+    // the ops actually executed across the cluster.
+    // (Despite of a "fire and forget" request, child batches still need to be internally processed
+    // before returning a reply).
+    auto response = future.default_timed_get();
+    BatchedCommandResponse expectedReplyToFireAndForgetRequest;
+    expectedReplyToFireAndForgetRequest.setStatus(Status::OK());
+    ASSERT_EQUALS(response.toBSON().woCompare(expectedReplyToFireAndForgetRequest.toBSON()), 0);
+}
+
+TEST_F(BatchWriteExecTest, FireAndForgetBatchDeleteGetsReplyWithOnlyOkStatus) {
+    // Try to update the single doc where a let param is used in the shard key.
+    const auto let = BSON("y" << 100);
+    const auto rtc = LegacyRuntimeConstants{Date_t::now(), Timestamp(1, 1)};
+    const auto q = BSON("x"
+                        << "$$y");
+    BatchedCommandRequest deleteRequest([&] {
+        write_ops::DeleteCommandRequest deleteOp(nss);
+        deleteOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        deleteOp.setLet(let);
+        deleteOp.setLegacyRuntimeConstants(rtc);
+        deleteOp.setDeletes(std::vector{write_ops::DeleteOpEntry(q, false)});
+        return deleteOp;
+    }());
+
+    const static auto epoch = OID::gen();
+
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+    protected:
+        std::vector<ShardEndpoint> targetDelete(OperationContext* opCtx,
+                                                const BatchItemRef& itemRef,
+                                                bool* useTwoPhaseWriteProtocol,
+                                                bool* isNonTargetedWriteWithoutShardKeyWithExactId,
+                                                std::set<ChunkRange>* chunkRange) const override {
+            invariant(chunkRange == nullptr);
+            return std::vector{ShardEndpoint(
+                kShardName2,
+                ShardVersionFactory::make(ChunkVersion({epoch, Timestamp(1, 1)}, {101, 200}),
+                                          boost::optional<CollectionIndexes>(boost::none)),
+                boost::none)};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        nss,
+        {MockRange(ShardEndpoint(
+                       kShardName1,
+                       ShardVersionFactory::make(ChunkVersion({epoch, Timestamp(1, 1)}, {100, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none),
+                   BSON("x" << MINKEY),
+                   BSON("x" << 0)),
+         MockRange(ShardEndpoint(
+                       kShardName2,
+                       ShardVersionFactory::make(ChunkVersion({epoch, Timestamp(1, 1)}, {101, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none),
+                   BSON("x" << 0),
+                   BSON("x" << MAXKEY))});
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+
+        // Set Unacknowledged WC for a "fire & forget" request
+        auto opCtx = operationContext();
+        opCtx->setWriteConcern(
+            WriteConcernOptions::parse(WriteConcernOptions::Unacknowledged).getValue());
+
+        BatchWriteExec::executeBatch(opCtx, multiShardNSTargeter, deleteRequest, &response, &stats);
+
+        return response;
+    });
+
+    // The update will hit the first shard.
+    onCommandForPoolExecutor(
+        [&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(kTestShardHost2, request.target);
+
+            BatchedCommandResponse response;
+            response.setStatus(Status::OK());
+
+            // Check that let params are propigated to shards.
+            const auto opMsgRequest = static_cast<OpMsgRequest>(request);
+            const auto actualBatchedUpdate(BatchedCommandRequest::parseDelete(opMsgRequest));
+            ASSERT_BSONOBJ_EQ(let, actualBatchedUpdate.getLet().value_or(BSONObj()));
+            ASSERT_EQUALS(actualBatchedUpdate.getLegacyRuntimeConstants()->getLocalNow(),
+                          rtc.getLocalNow());
+            ASSERT_EQUALS(actualBatchedUpdate.getLegacyRuntimeConstants()->getClusterTime(),
+                          rtc.getClusterTime());
+
+            // Check that let params are only forwarded and not evaluated.
+            auto expectedQ = BSON("x"
+                                  << "$$y");
+            for (auto&& u : actualBatchedUpdate.getDeleteRequest().getDeletes())
+                ASSERT_BSONOBJ_EQ(expectedQ, u.getQ());
+
+            return response.toBSON();
+        });
+
+    // The reply should only contain an OK status, without any further detail on
+    // the ops actually executed across the cluster.
+    // (Despite of a "fire and forget" request, child batches still need to be internally processed
+    // before returning a reply).
+    auto response = future.default_timed_get();
+    BatchedCommandResponse expectedReplyToFireAndForgetRequest;
+    expectedReplyToFireAndForgetRequest.setStatus(Status::OK());
+    ASSERT_EQUALS(response.toBSON().woCompare(expectedReplyToFireAndForgetRequest.toBSON()), 0);
+}
+
 TEST_F(BatchWriteExecTest, TenantMigrationAbortedErrorOrderedOp) {
     const std::vector<BSONObj> expected{BSON("x" << 1), BSON("x" << 2), BSON("x" << 3)};
     BatchedCommandRequest request([&] {

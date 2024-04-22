@@ -28,7 +28,6 @@
  */
 
 #include "mongo/bson/json.h"
-#include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
 
@@ -108,6 +107,46 @@ TEST_F(ClusterBulkWriteTest, AttachesAtClusterTimeForSnapshotReadConcern) {
 TEST_F(ClusterBulkWriteTest, SnapshotReadConcernWithAfterClusterTime) {
     RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
     testSnapshotReadConcernWithAfterClusterTime(kBulkWriteCmdTargeted, kBulkWriteCmdScatterGather);
+}
+
+TEST_F(ClusterBulkWriteTest, FireAndForgetRequestGetsReplyWithOnlyOkStatus) {
+    RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
+
+    auto asFireAndForgetRequest = [](const BSONObj& cmdObj) {
+        BSONObjBuilder bob(cmdObj);
+        bob.append("lsid", makeLogicalSessionIdForTest().toBSON());
+        bob.append("txnNumber", TxnNumber(1));
+        bob.append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::Unacknowledged);
+        bob.doneFast();
+        return bob.obj();
+    };
+
+    const auto bulkCmdresponses =
+        testNoErrorsOutsideTransaction(asFireAndForgetRequest(kBulkWriteCmdTargeted),
+                                       asFireAndForgetRequest(kBulkWriteCmdScatterGather));
+
+    // A "fire & forget" bulk write is replied with the expected schema, but no meaningful value.
+    const auto expectedBulkCommandReplySection =
+        BulkWriteCommandReply(
+            BulkWriteCommandResponseCursor(
+                0 /* cursorId */,
+                {} /* firstBatch */,
+                NamespaceString::createNamespaceString_forTest("admin.$cmd.bulkWrite")),
+            0 /*nErrors*/,
+            0 /*nInserted*/,
+            0 /*nMatched*/,
+            0 /*nModified*/,
+            0 /*nUpserted*/,
+            0 /*nDeleted*/)
+            .toBSON();
+    for (const auto& response : bulkCmdresponses) {
+        ASSERT_FALSE(response.shouldRunAgainForExhaust);
+        ASSERT(!response.nextInvocation);
+        const auto responseObj = OpMsgRequest::parse(response.response).body;
+        ASSERT_EQ(1, responseObj.getIntField("ok"));
+        ASSERT_TRUE(expectedBulkCommandReplySection.isPrefixOf(
+            responseObj, SimpleBSONElementComparator::kInstance));
+    }
 }
 
 }  // namespace
