@@ -114,5 +114,45 @@ TEST_F(ClusterBulkWriteTest, SnapshotReadConcernWithAfterClusterTime) {
     testSnapshotReadConcernWithAfterClusterTime(kBulkWriteCmdTargeted, kBulkWriteCmdScatterGather);
 }
 
+TEST_F(ClusterBulkWriteTest, FireAndForgetRequestGetsReplyWithOnlyOkStatus) {
+    RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
+
+    auto asFireAndForgetRequest = [](const BSONObj& cmdObj) {
+        BSONObjBuilder bob(cmdObj);
+        bob.append("lsid", makeLogicalSessionIdForTest().toBSON());
+        bob.append("txnNumber", TxnNumber(1));
+        bob.append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::Unacknowledged);
+        bob.doneFast();
+        return bob.obj();
+    };
+
+    const auto bulkCmdresponses =
+        testNoErrorsOutsideTransaction(asFireAndForgetRequest(kBulkWriteCmdTargeted),
+                                       asFireAndForgetRequest(kBulkWriteCmdScatterGather));
+
+    // A "fire & forget" bulk write is replied with the expected schema, but no meaningful value.
+    const auto expectedBulkCommandReplySection =
+        BulkWriteCommandReply(
+            BulkWriteCommandResponseCursor(
+                0 /* cursorId */,
+                {} /* firstBatch */,
+                NamespaceString::createNamespaceString_forTest("admin.$cmd.bulkWrite")),
+            0 /*nErrors*/,
+            0 /*nInserted*/,
+            0 /*nMatched*/,
+            0 /*nModified*/,
+            0 /*nUpserted*/,
+            0 /*nDeleted*/)
+            .toBSON();
+    for (const auto& response : bulkCmdresponses) {
+        ASSERT_FALSE(response.shouldRunAgainForExhaust);
+        ASSERT(!response.nextInvocation);
+        const auto responseObj = OpMsgRequest::parse(response.response).body;
+        ASSERT_EQ(1, responseObj.getIntField("ok"));
+        ASSERT_TRUE(expectedBulkCommandReplySection.isPrefixOf(
+            responseObj, SimpleBSONElementComparator::kInstance));
+    }
+}
+
 }  // namespace
 }  // namespace mongo
