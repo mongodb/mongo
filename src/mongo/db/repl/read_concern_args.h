@@ -168,7 +168,9 @@ public:
      * If the RC was specified as an empty BSON object this will still be true (unlike isEmpty()).
      * False represents an absent or missing read concern, ie. one which wasn't present at all.
      */
-    bool isSpecified() const;
+    bool isSpecified() const {
+        return _specified;
+    }
 
     /**
      * Returns true if this ReadConcernArgs represents an implicit default read concern.
@@ -178,20 +180,31 @@ public:
     /**
      *  Returns default kLocalReadConcern if _level is not set.
      */
-    ReadConcernLevel getLevel() const;
+    ReadConcernLevel getLevel() const {
+        return _level.value_or(ReadConcernLevel::kLocalReadConcern);
+    }
+
     /**
      * Checks whether _level is explicitly set.
      */
-    bool hasLevel() const;
+    bool hasLevel() const {
+        return _level.has_value();
+    }
 
     /**
      * Returns the opTime. Deprecated: will be replaced with getArgsAfterClusterTime.
      */
-    boost::optional<OpTime> getArgsOpTime() const;
+    boost::optional<OpTime> getArgsOpTime() const {
+        return _opTime;
+    }
 
-    boost::optional<LogicalTime> getArgsAfterClusterTime() const;
+    boost::optional<LogicalTime> getArgsAfterClusterTime() const {
+        return _afterClusterTime;
+    }
 
-    boost::optional<LogicalTime> getArgsAtClusterTime() const;
+    boost::optional<LogicalTime> getArgsAtClusterTime() const {
+        return _atClusterTime;
+    }
 
     /**
      * Returns a BSON object of the form:

@@ -198,32 +198,8 @@ bool ReadConcernArgs::isEmpty() const {
     return !_afterClusterTime && !_opTime && !_atClusterTime && !_level;
 }
 
-bool ReadConcernArgs::isSpecified() const {
-    return _specified;
-}
-
 bool ReadConcernArgs::isImplicitDefault() const {
     return getProvenance().isImplicitDefault();
-}
-
-ReadConcernLevel ReadConcernArgs::getLevel() const {
-    return _level.value_or(ReadConcernLevel::kLocalReadConcern);
-}
-
-bool ReadConcernArgs::hasLevel() const {
-    return _level.has_value();
-}
-
-boost::optional<OpTime> ReadConcernArgs::getArgsOpTime() const {
-    return _opTime;
-}
-
-boost::optional<LogicalTime> ReadConcernArgs::getArgsAfterClusterTime() const {
-    return _afterClusterTime;
-}
-
-boost::optional<LogicalTime> ReadConcernArgs::getArgsAtClusterTime() const {
-    return _atClusterTime;
 }
 
 Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
