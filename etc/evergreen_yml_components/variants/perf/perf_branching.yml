@@ -30,18 +30,6 @@ variables:
       - name: compile_mongocrypt_shlib
         variant: amazon2-arm64-mongocrypt-shlib-compile
 
-  - &al2023_arm64_compile_variant_dependency
-    depends_on:
-      - name: package_new_compile
-        variant: al2023-arm64-compile
-
-  - &al2023_al2_arm64_compile_variant_dependency
-    depends_on:
-      - name: package_new_compile
-        variant: al2023-arm64-compile
-      - name: package_new_compile
-        variant: amazon2-arm64-compile
-
   - &schedule_variant_auto_tasks_task
     name: schedule_variant_auto_tasks
     activate: false
