@@ -77,6 +77,18 @@ void ValidateDocumentList(const std::vector<BSONObj>& docs1,
                           FTDCValidationMode mode);
 
 /**
+ * Validate the documents in a file matches the documents in the specified vectors, which
+ * are sorted by type.
+ *
+ * Unit Test ASSERTs if there is mismatch.
+ */
+void ValidateDocumentListByType(const boost::filesystem::path& p,
+                                const std::vector<BSONObj>& expectedOnRotateMetadata,
+                                const std::vector<BSONObj>& expectedMetrics,
+                                const std::vector<BSONObj>& expectedPeriodicMetadata,
+                                FTDCValidationMode mode);
+
+/**
  * Delete a file if it exists.
  */
 void deleteFileIfNeeded(const boost::filesystem::path& p);

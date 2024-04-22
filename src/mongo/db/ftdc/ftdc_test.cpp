@@ -66,25 +66,114 @@ BSONObj filteredFTDCCopy(const BSONObj& obj) {
     }
     return builder.obj();
 }
-}  // namespace
 
+template <class T>
+using FTDCReadResultToListMapper =
+    std::function<T(const std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t>&)>;
 
-void ValidateDocumentList(const boost::filesystem::path& p,
-                          const std::vector<BSONObj>& docs,
-                          FTDCValidationMode mode) {
+template <class T>
+std::vector<T> loadFTDCAsList(const boost::filesystem::path& p,
+                              FTDCReadResultToListMapper<T>&& mapper) {
     FTDCFileReader reader;
 
     ASSERT_OK(reader.open(p));
 
-    std::vector<BSONObj> list;
+    std::vector<T> list;
     auto sw = reader.hasNext();
     while (sw.isOK() && sw.getValue()) {
-        list.emplace_back(std::get<1>(reader.next()).getOwned());
+        list.emplace_back(mapper(reader.next()));
         sw = reader.hasNext();
     }
 
     ASSERT_OK(sw);
+    return list;
+}
 
+std::vector<BSONObj> loadFTDCAsDocumentList(const boost::filesystem::path& p) {
+    return loadFTDCAsList<BSONObj>(p, [](auto& result) { return std::get<1>(result).getOwned(); });
+}
+
+std::vector<std::pair<FTDCBSONUtil::FTDCType, BSONObj>> loadFTDCAsDocumentListWithType(
+    const boost::filesystem::path& p) {
+    return loadFTDCAsList<std::pair<FTDCBSONUtil::FTDCType, BSONObj>>(p, [](auto& result) {
+        return std::make_pair(std::get<0>(result), std::get<1>(result).getOwned());
+    });
+}
+
+void compareFTDCDocuments(FTDCValidationMode mode, BSONObj actual, BSONObj expected) {
+    if (mode == FTDCValidationMode::kStrict) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(actual != expected)) {
+            std::cout << actual << " vs " << expected << std::endl;
+            ASSERT_BSONOBJ_EQ(actual, expected);
+        }
+    } else {
+        BSONObj left = filteredFTDCCopy(actual);
+        BSONObj right = filteredFTDCCopy(expected);
+        if (SimpleBSONObjComparator::kInstance.evaluate(left != right)) {
+            std::cout << left << " vs " << right << std::endl;
+            ASSERT_BSONOBJ_EQ(left, right);
+        }
+    }
+}
+
+void ValidateDocumentListByType(const std::vector<std::pair<FTDCBSONUtil::FTDCType, BSONObj>>& docs,
+                                const std::vector<BSONObj>& expectedOnRotateMetadata,
+                                const std::vector<BSONObj>& expectedMetrics,
+                                const std::vector<BSONObj>& expectedPeriodicMetadata,
+                                FTDCValidationMode mode) {
+    auto expectedSize =
+        expectedOnRotateMetadata.size() + expectedMetrics.size() + expectedPeriodicMetadata.size();
+    ASSERT_EQUALS(docs.size(), expectedSize);
+
+    auto ai = docs.begin();
+    auto bi = expectedOnRotateMetadata.begin();
+    auto ci = expectedMetrics.begin();
+    auto di = expectedPeriodicMetadata.begin();
+    while (ai != docs.end()) {
+        switch (ai->first) {
+            case FTDCBSONUtil::FTDCType::kMetadata:
+                ASSERT_FALSE(bi == expectedOnRotateMetadata.end());
+                compareFTDCDocuments(mode, ai->second, *bi);
+                bi++;
+                break;
+            case FTDCBSONUtil::FTDCType::kMetricChunk:
+                ASSERT_FALSE(ci == expectedMetrics.end());
+                compareFTDCDocuments(mode, ai->second, *ci);
+                ci++;
+                break;
+            case FTDCBSONUtil::FTDCType::kPeriodicMetadata:
+                ASSERT_FALSE(di == expectedPeriodicMetadata.end());
+                compareFTDCDocuments(mode, ai->second, *di);
+                di++;
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+        ai++;
+    }
+
+    ASSERT_TRUE(ai == docs.end());
+    ASSERT_TRUE(bi == expectedOnRotateMetadata.end());
+    ASSERT_TRUE(ci == expectedMetrics.end());
+    ASSERT_TRUE(di == expectedPeriodicMetadata.end());
+}
+
+}  // namespace
+
+void ValidateDocumentListByType(const boost::filesystem::path& p,
+                                const std::vector<BSONObj>& expectedOnRotateMetadata,
+                                const std::vector<BSONObj>& expectedMetrics,
+                                const std::vector<BSONObj>& expectedPeriodicMetadata,
+                                FTDCValidationMode mode) {
+    auto list = loadFTDCAsDocumentListWithType(p);
+    ValidateDocumentListByType(
+        list, expectedOnRotateMetadata, expectedMetrics, expectedPeriodicMetadata, mode);
+}
+
+void ValidateDocumentList(const boost::filesystem::path& p,
+                          const std::vector<BSONObj>& docs,
+                          FTDCValidationMode mode) {
+    auto list = loadFTDCAsDocumentList(p);
     ValidateDocumentList(list, docs, mode);
 }
 
@@ -97,20 +186,7 @@ void ValidateDocumentList(const std::vector<BSONObj>& docs1,
     auto bi = docs2.begin();
 
     while (ai != docs1.end() && bi != docs2.end()) {
-        if (mode == FTDCValidationMode::kStrict) {
-            if (SimpleBSONObjComparator::kInstance.evaluate(*ai != *bi)) {
-                std::cout << *ai << " vs " << *bi << std::endl;
-                ASSERT_BSONOBJ_EQ(*ai, *bi);
-            }
-        } else {
-            BSONObj left = filteredFTDCCopy(*ai);
-            BSONObj right = filteredFTDCCopy(*bi);
-            if (SimpleBSONObjComparator::kInstance.evaluate(left != right)) {
-                std::cout << left << " vs " << right << std::endl;
-                ASSERT_BSONOBJ_EQ(left, right);
-            }
-        }
-
+        compareFTDCDocuments(mode, *ai, *bi);
         ++ai;
         ++bi;
     }
