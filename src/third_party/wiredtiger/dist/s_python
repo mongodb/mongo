@@ -7,7 +7,7 @@ cd_top
 
 # Check Python coding standards: check for tab characters.
 # Ignore generated files.
-egrep '	' `git ls-files -- '*.py'` |
+grep -E '	' `git ls-files -- '*.py'` |
     sed -e 's/:.*//' \
     -e '/swig_wiredtiger.py/d' \
     -e '/\/wiredtiger.py/d' \
@@ -21,7 +21,7 @@ test -s $t && {
 # Check Python coding standards: check for uncommented trailing semi-colons.
 # Don't check too widely, there are third-party tools that fail this test as
 # well as scripts in this directory that output C code, and so fail the test.
-egrep '^[^#]*;$' `find lang test -name '*.py'`> $t
+grep -E '^[^#]*;$' `find lang test -name '*.py'`> $t
 test -s $t && {
     echo 'trailing semi-colons in selected Python code:'
     cat $t

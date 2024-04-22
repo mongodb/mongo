@@ -98,7 +98,7 @@ last_commit_from_dev() { python3 "$DIST_DIR"/common_functions.py last_commit_fro
 
 # Initialise the pygrep for MacOS.
 use_pygrep() {
-  [[ "$(uname -s)" == Darwin ]] && EGREP="$DIST_DIR/pygrep.py -E" FGREP="$DIST_DIR/pygrep.py -F" || EGREP=egrep FGREP=fgrep
+  [[ "$(uname -s)" == Darwin ]] && EGREP="$DIST_DIR/pygrep.py -E" FGREP="$DIST_DIR/pygrep.py -F" || EGREP="grep -E" FGREP="grep -F"
 }
 
 # Get a list of changed files from the last commit from the dev branch.

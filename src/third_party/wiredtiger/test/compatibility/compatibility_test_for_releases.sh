@@ -31,7 +31,7 @@ get_prev_version()
     # from the end of the list. That is, get a list of releases in numeric order, then pick out
     # the last release (argument "1"), the next-to-last release (argument "2") and so on. Assumes
     # WiredTiger releases are tagged with just numbers and decimal points.
-    echo "$(git tag | egrep '^[0-9][0-9.]*$' | sort -g | tail -$1 | head -1)"
+    echo "$(git tag | grep -E '^[0-9][0-9.]*$' | sort -g | tail -$1 | head -1)"
 }
 
 #############################################################

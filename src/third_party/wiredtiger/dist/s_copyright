@@ -18,7 +18,7 @@ RET=0
 check()
 {
     # Skip files in which WiredTiger holds no rights.
-    if egrep -q "skip	$1" dist/s_copyright.list; then
+    if grep -E -q "skip[[:space:]]+$1" dist/s_copyright.list; then
         return 0;
     fi
 
@@ -118,7 +118,7 @@ check test/syscall/wt2336_base/base.run
 # copyright notice, we give it to MongoDB, from 2008 to now.
 special_copyright()
 {
-    cnt=`egrep "$3" $1 | wc -l`
+    cnt=`grep -E "$3" $1 | wc -l`
     if test $cnt -ne $2; then
         echo "$1: copyright information is incorrect"
         RET=1

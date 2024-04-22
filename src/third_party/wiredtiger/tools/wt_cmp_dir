@@ -124,7 +124,7 @@ init_wt_utility
 dir1="$1"
 shift
 if [ "$ignore_regexp" != '' ]; then
-    files1=$(wtfiles "$dir1" | egrep -v "$ignore_regexp")
+    files1=$(wtfiles "$dir1" | grep -E -v "$ignore_regexp")
 else
     files1=$(wtfiles "$dir1")
 fi
@@ -144,7 +144,7 @@ fi
 # The next argument is the second directory
 dir2="$1"
 if [ "$ignore_regexp" != '' ]; then
-    files2=$(wtfiles "$dir2" | egrep -v "$ignore_regexp")
+    files2=$(wtfiles "$dir2" | grep -E -v "$ignore_regexp")
 else
     files2=$(wtfiles "$dir2")
 fi

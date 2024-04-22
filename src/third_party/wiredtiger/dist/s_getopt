@@ -6,7 +6,7 @@ cd_dist
 check_fast_mode_flag
 
 # Complain if someone uses the wrong getopt.
-find ../src ../test ../bench -name '*.c' | filter_if_fast ../ | xargs egrep '[^a-z_]getopt\(' > $t
+find ../src ../test ../bench -name '*.c' | filter_if_fast ../ | xargs grep -E '[^a-z_]getopt\(' > $t
 
 test -s $t && {
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="

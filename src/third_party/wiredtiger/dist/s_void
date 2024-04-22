@@ -194,7 +194,7 @@ SUBDIRS="bench ext src test"
 # Parallel execution: if it's the main onvocation of the script, collect the file names
 # to process and run them in subprocesses.
 is_main_run && {
-    find $SUBDIRS -name '*.c' -o -name '*_inline.h' | egrep -Ev '/windows_shim\.c$' |
+    find $SUBDIRS -name '*.c' -o -name '*_inline.h' | grep -Ev '/windows_shim\.c$' |
     do_in_parallel
     exit $?
 }
