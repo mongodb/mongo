@@ -559,7 +559,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
      */
     WT_INTL_FOREACH_BEGIN (session, parent->page, child) {
         /* It isn't safe to evict if there is a child on the pre-fetch queue. */
-        if (F_ISSET(child, WT_REF_FLAG_PREFETCH)) {
+        if (F_ISSET_ATOMIC_8(child, WT_REF_FLAG_PREFETCH)) {
             busy = true;
             break;
         }

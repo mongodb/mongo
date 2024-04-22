@@ -1724,10 +1724,17 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
         WT_RET(ds->f(ds, " | page_type: ["));
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
             WT_RET(ds->f(ds, "%s", "internal"));
-        if (F_ISSET(ref, WT_REF_FLAG_LEAF))
+        else
             WT_RET(ds->f(ds, "%s", "leaf"));
-        if (F_ISSET(ref, WT_REF_FLAG_READING))
-            WT_RET(ds->f(ds, ", %s", "reading"));
+        WT_RET(ds->f(ds, "]"));
+    }
+
+    if (ref->flags_atomic != 0) {
+        WT_RET(ds->f(ds, " | flags_atomic: [ "));
+        if (F_ISSET_ATOMIC_8(ref, WT_REF_FLAG_READING))
+            WT_RET(ds->f(ds, "%s", "reading "));
+        if (F_ISSET_ATOMIC_8(ref, WT_REF_FLAG_PREFETCH))
+            WT_RET(ds->f(ds, "%s", "prefetch "));
         WT_RET(ds->f(ds, "]"));
     }
 

@@ -126,7 +126,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
      * rare, so it's better to do the safe thing.)
      */
     if (previous_state == WT_REF_DISK)
-        F_SET(ref, WT_REF_FLAG_READING);
+        F_SET_ATOMIC_8(ref, WT_REF_FLAG_READING);
 
     /*
      * Get the address: if there is no address, the page was deleted and a subsequent search or
@@ -227,7 +227,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     }
 
 skip_read:
-    F_CLR(ref, WT_REF_FLAG_READING);
+    F_CLR_ATOMIC_8(ref, WT_REF_FLAG_READING);
     WT_REF_SET_STATE(ref, WT_REF_MEM);
 
     WT_ASSERT(session, ret == 0);
@@ -241,7 +241,7 @@ err:
     if (ref->page != NULL)
         __wt_ref_out(session, ref);
 
-    F_CLR(ref, WT_REF_FLAG_READING);
+    F_CLR_ATOMIC_8(ref, WT_REF_FLAG_READING);
     WT_REF_SET_STATE(ref, previous_state);
 
     __wt_buf_free(session, &tmp);
@@ -337,7 +337,7 @@ read:
             if (LF_ISSET(WT_READ_NO_WAIT))
                 return (WT_NOTFOUND);
 
-            if (F_ISSET(ref, WT_REF_FLAG_READING)) {
+            if (F_ISSET_ATOMIC_8(ref, WT_REF_FLAG_READING)) {
                 if (LF_ISSET(WT_READ_CACHE))
                     return (WT_NOTFOUND);
 
