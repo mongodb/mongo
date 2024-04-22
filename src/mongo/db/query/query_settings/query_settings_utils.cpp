@@ -184,7 +184,8 @@ RepresentativeQueryInfo createRepresentativeInfoFind(OperationContext* opCtx,
             "Collection namespace string must be provided for setQuerySettings command",
             nssOrUuid.isNamespaceString());
 
-    auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, nssOrUuid.nss());
+    auto expCtx = ExpressionContext::makeBlankExpressionContext(
+        opCtx, nssOrUuid.nss(), findCommandRequest->getLet());
     auto parsedFindCommand = uassertStatusOK(parsed_find_command::parse(
         expCtx,
         ParsedFindCommandParams{.findCommand = std::move(findCommandRequest),
