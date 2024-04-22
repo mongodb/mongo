@@ -42,7 +42,10 @@ st.s0.getDB('admin').auth('admin', 'pwd');
 st.s0.getDB('admin').createRole({
     role: 'myRole',
     roles: [],
-    privileges: [{resource: {cluster: true}, actions: ['invalidateUserCache', 'setParameter']}]
+    privileges: [{
+        resource: {cluster: true},
+        actions: ['invalidateUserCache', 'getParameter', 'setParameter', 'getLog', 'dbStats']
+    }]
 });
 st.s0.getDB('test').createUser({
     user: 'spencer',
@@ -147,6 +150,60 @@ assert(db3.auth('spencer', 'pwd'));
     // We manually invalidate the cache on s1/db3.
     db3.adminCommand("invalidateUserCache");
     hasAuthzError(db3.foo.update({}, {$inc: {a: 1}}));
+})();
+
+/**
+ * Test we do not flush the cache and generate a new userCacheGeneration if there are no user
+ * changes.
+ */
+(function testKeepingCacheIfNoChange() {
+    jsTestLog(
+        "Testing cache generation stays the same and the user cache is not flushed if there are no changes");
+
+    const cacheIntervalBeforeTest =
+        assert
+            .commandWorked(
+                db1.adminCommand({getParameter: 1, userCacheInvalidationIntervalSecs: 1}))
+            .userCacheInvalidationIntervalSecs;
+
+    // Set the invalidation interval for 5 seconds
+    assert.commandWorked(db1.adminCommand({setParameter: 1, userCacheInvalidationIntervalSecs: 5}));
+
+    // Get current cache generation
+    const cfg1 = st.configRS.getPrimary().getDB('admin');
+    assert(cfg1.auth('root', 'pwd'));
+    const genBeforeChange = assert.commandWorked(cfg1.runCommand({_getUserCacheGeneration: 1}));
+
+    // Update user role so cacheGeneration gets updated and grab current time
+    let currentTime = Date.now();
+    db1.getSiblingDB('admin').revokePrivilegesFromRole(
+        "myRole", [{resource: {db: 'test', collection: ''}, actions: ['dbStats']}]);
+
+    // Look for cache generation change that happened after currentTime
+    let genAfterChange;
+    assert.soon(() => {
+        genAfterChange = assert.commandWorked(cfg1.runCommand({_getUserCacheGeneration: 1}));
+        return genBeforeChange.cacheGeneration != genAfterChange.cacheGeneration;
+    });
+
+    // Set userCacheInvalidationIntervalSecs to 1 second and check current cache generation does not
+    // change after no user changes
+    currentTime = Date.now();
+    assert.commandWorked(db1.adminCommand({setParameter: 1, userCacheInvalidationIntervalSecs: 1}));
+
+    // Sleep 3 seconds to give enough time for the userCacheInvalidator job to run
+    sleep(3000);
+
+    const genAfterNoChange = assert.commandWorked(cfg1.runCommand({_getUserCacheGeneration: 1}));
+    assert.eq(genAfterChange.cacheGeneration,
+              genAfterNoChange.cacheGeneration,
+              "User cache generation changed after no user change.");
+
+    cfg1.logout();
+
+    // Set userCacheInvalidationInterval back to value before the test
+    assert.commandWorked(db1.adminCommand(
+        {setParameter: 1, userCacheInvalidationIntervalSecs: cacheIntervalBeforeTest}));
 })();
 
 (function testModifyingUser() {

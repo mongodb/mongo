@@ -206,6 +206,8 @@ void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* o
 void UserCacheInvalidator::run() try {
     auto opCtx = cc().makeOperationContext();
     ScopedSetRouterService guard(opCtx.get());
+
+    // Get current cache generation from the config server.
     auto swCurrentGeneration = getCurrentCacheGeneration(opCtx.get());
     if (!swCurrentGeneration.isOK()) {
         LOGV2_WARNING(20266,
@@ -228,6 +230,7 @@ void UserCacheInvalidator::run() try {
               "previousGeneration"_attr = oidOrTimestampToString(_previousGeneration),
               "currentGeneration"_attr = oidOrTimestampToString(swCurrentGeneration.getValue()));
         try {
+            // Invalidate user cache from router server.
             AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
         } catch (const DBException& e) {
             LOGV2_WARNING(20268, "Error invalidating user cache", "error"_attr = e.toStatus());
