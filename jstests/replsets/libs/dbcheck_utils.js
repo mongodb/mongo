@@ -46,6 +46,12 @@ const logQueries = {
             {"operation": "dbCheckStop", "severity": "info"}
         ]
     },
+    writeConcernErrorQuery: {severity: "error", "msg": "dbCheck failed waiting for writeConcern"},
+    skipApplyingBatchOnSecondaryQuery: {
+        severity: "warning",
+        "msg":
+            "skipping applying dbcheck batch because the 'skipApplyingDbCheckBatchOnSecondary' parameter is on",
+    },
 };
 
 // Apply function on all secondary nodes except arbiters.
@@ -438,7 +444,7 @@ const assertForDbCheckErrorsForAllNodes =
  * Utility for checking if the featureFlagSecondaryIndexChecksInDbCheck is on.
  */
 function checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(conn) {
-    return FeatureFlagUtil.isPresentAndEnabled(conn, 'SecondaryIndexChecksInDbCheck');
+    return FeatureFlagUtil.isEnabled(conn.getDB("admin"), 'SecondaryIndexChecksInDbCheck');
 }
 
 function checkNumSnapshots(debugBuild, expectedNumSnapshots) {
