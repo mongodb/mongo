@@ -283,5 +283,11 @@ void serializeLsidAndTxnNumber(OperationContext* opCtx, BSONObjBuilder* builder)
     sessionInfo.serialize(builder);
 }
 
+void serializeLsid(OperationContext* opCtx, BSONObjBuilder* builder) {
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(opCtx->getLogicalSessionId());
+    sessionInfo.serialize(builder);
+}
+
 }  // namespace logical_session_id_helpers
 }  // namespace mongo

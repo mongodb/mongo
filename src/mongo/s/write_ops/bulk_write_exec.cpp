@@ -1136,7 +1136,13 @@ std::vector<BulkWriteReplyItem> exhaustCursorForReplyItems(
         bob.append("getMore", id);
         bob.append("collection", collection);
 
-        logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &bob);
+        if (opCtx->inMultiDocumentTransaction()) {
+            logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &bob);
+        } else {
+            // Only want to append logical session id for retryable writes and not txnNumber.
+            // txnNumber cannot be sent to a getMore command since it is not retryable.
+            logical_session_id_helpers::serializeLsid(opCtx, &bob);
+        }
 
         std::vector<AsyncRequestsSender::Request> requests;
         requests.emplace_back(targetedBatch.getShardId(), bob.obj());

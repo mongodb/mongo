@@ -93,6 +93,29 @@ function runTest(retryableWrite) {
               "Found unexpected ns in bulkWrite command response: " + tojson(res));
 
     coll.drop();
+
+    // Make sure that a getMore that occurs naturally (16MB size limit) also works.
+    coll.insert({_id: 1});
+
+    let bulkOps = [];
+
+    for (let i = 0; i < 100000; i++) {
+        bulkOps.push({insert: 0, document: {_id: 1}});
+    }
+
+    cmdObj = {bulkWrite: 1, ops: bulkOps, nsInfo: [{ns: "test.coll"}], ordered: false};
+
+    if (retryableWrite) {
+        cmdObj.txnNumber = NumberLong(0);
+    }
+
+    // Make sure a properly formed request has successful result.
+    var res = assert.commandWorked(db.adminCommand(cmdObj));
+
+    // All these writes are against the same unsharded collection and should be sent in one batch to
+    // a single mongos. If this causes a getMore to be needed on the result from mongos that means
+    // we would have needed to run a getMore against mongod.
+    assert.neq(res.cursor.id, 0);
 }
 
 runTest(false /* retryableWrite */);

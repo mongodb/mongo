@@ -139,5 +139,7 @@ namespace logical_session_id_helpers {
 
 void serializeLsidAndTxnNumber(OperationContext* opCtx, BSONObjBuilder* builder);
 
+void serializeLsid(OperationContext* opCtx, BSONObjBuilder* builder);
+
 }  // namespace logical_session_id_helpers
 }  // namespace mongo
