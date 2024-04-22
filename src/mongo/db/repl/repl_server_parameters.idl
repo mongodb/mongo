@@ -855,6 +855,15 @@ server_parameters:
             gt: 0 
         redact: false
 
+    skipApplyingDbCheckBatchOnSecondary:
+        description: >-
+            Parameter for whether dbcheck batches should be applied on secondaries.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: skipApplyingDbCheckBatchOnSecondary
+        default: false
+        redact: false
+
     dbCheckMaxInternalRetries:
         description: >-
             The maximum number of internal retries that dbCheck will run on a batch.
