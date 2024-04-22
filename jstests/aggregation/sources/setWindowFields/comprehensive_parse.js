@@ -64,6 +64,7 @@ const windows = {
 // The list of sort definitions to test.
 const sortBys = {
     none: null,
+    expr: {partitionSeq: {$meta: "randVal"}},
     asc: {partitionSeq: 1},
     desc: {partitionSeq: -1},
     asc_date: {date: 1},
@@ -103,17 +104,10 @@ function constructQuery(wf, window, sortBy, partitionBy) {
 }
 
 // Given an element of each of the lists above, what is the expected
-// result.  The output should be 'SKIP', 'OK' or the expected integer
+// result.  The output should be 'OK' or the expected integer
 // error code.
 function expectedResult(wfType, windowType, sortType, partitionType) {
     // Static errors all come first.
-
-    // Skip range windows over dates or that are over descending windows.
-    if (windowType.endsWith('range')) {
-        if (sortType.endsWith('date') || sortType.startsWith('desc')) {
-            return 'SKIP';
-        }
-    }
 
     // Derivative and integral require an ascending sort
     // and an explicit window.
@@ -128,6 +122,11 @@ function expectedResult(wfType, windowType, sortType, partitionType) {
             return ErrorCodes.FailedToParse;
         }
 
+        // '$derivative requires a non-expression sortBy'.
+        if (sortType == "expr") {
+            return ErrorCodes.FailedToParse;
+        }
+
     } else if (wfType.startsWith('integral')) {
         // Integral requires a sort.
         if (sortType == 'none') {
@@ -136,6 +135,11 @@ function expectedResult(wfType, windowType, sortType, partitionType) {
 
         // Integral requires single column sort
         if (sortType == 'multi') {
+            return ErrorCodes.FailedToParse;
+        }
+
+        // '$integral requires a non-expression sortBy'.
+        if (sortType == "expr") {
             return ErrorCodes.FailedToParse;
         }
 
@@ -178,9 +182,23 @@ function expectedResult(wfType, windowType, sortType, partitionType) {
     }
 
     // Range based windows require a sort over a single field.
-    if (windowType.endsWith('range') && (sortType == 'none' || sortType == 'multi')) {
-        // 'Range-based window require sortBy a single field'.
-        return 5339902;
+    if (windowType.endsWith('range')) {
+        if (sortType == 'none' || sortType == 'multi') {
+            // 'Range-based window require sortBy a single field'.
+            return 5339902;
+        }
+        if (sortType == 'expr') {
+            // 'Range-based bounds require a non-expression sortBy'
+            return 8947400;
+        }
+        if (sortType.startsWith('desc')) {
+            // 'Range-based bounds require an ascending sortBy'.
+            return 8947401;
+        }
+        if (sortType.endsWith('date') && !partitionType.endsWith('array')) {
+            // 'For windows that involve date or time ranges, a unit must be provided.'
+            return 5429413;
+        }
     }
 
     if (partitionType === 'static_array') {
@@ -237,10 +255,6 @@ function* makeTests() {
                         expectedResult: expectedResult(wfType, windowType, sortType, partitionType)
                     };
 
-                    if (test.expectedResult == 'SKIP') {
-                        continue;
-                    }
-
                     yield test;
                 }
             }
@@ -250,12 +264,15 @@ function* makeTests() {
 
 // Run all the combinations generated in makeTests.
 for (const test of makeTests()) {
+    const errorMsg = "Command was: " + tojson(test.query);
     if (test.expectedResult == ErrorCodes.OK) {
         assert.commandWorked(
-            coll.runCommand({aggregate: coll.getName(), pipeline: [test.query], cursor: {}}));
+            coll.runCommand({aggregate: coll.getName(), pipeline: [test.query], cursor: {}}),
+            errorMsg);
     } else {
         assert.commandFailedWithCode(
             coll.runCommand({aggregate: coll.getName(), pipeline: [test.query], cursor: {}}),
-            test.expectedResult);
+            test.expectedResult,
+            errorMsg);
     }
 }

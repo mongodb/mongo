@@ -249,6 +249,11 @@ WindowBounds WindowBounds::parse(BSONElement args,
         uassert(5339902,
                 "Range-based bounds require sortBy a single field",
                 sortBy && sortBy->size() == 1);
+        const SortPattern::SortPatternPart& part = *sortBy->begin();
+        uassert(8947400,
+                "Range-based bounds require a non-expression sortBy",
+                part.fieldPath && !part.expression);
+        uassert(8947401, "Range-based bounds require an ascending sortBy", part.isAscending);
         return bounds;
     }
 }
