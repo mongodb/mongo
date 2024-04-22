@@ -414,13 +414,31 @@ __wt_block_off_remove_overlap(
     if (before != NULL && before->off + before->size > off) {
         WT_RET(__block_off_remove(session, block, el, before->off, &ext));
 
+        WT_ASSERT(session, ext->off + ext->size >= off + size);
+
         /* Calculate overlapping extents. */
         a_off = ext->off;
         a_size = off - ext->off;
         b_off = off + size;
         b_size = ext->size - (a_size + size);
+
+        if (a_size > 0) {
+            __wt_verbose_debug2(session, WT_VERB_BLOCK,
+              "%s: %" PRIdMAX "-%" PRIdMAX " range shrinks to %" PRIdMAX "-%" PRIdMAX, el->name,
+              (intmax_t)before->off, (intmax_t)before->off + (intmax_t)before->size,
+              (intmax_t)(a_off), (intmax_t)(a_off + a_size));
+        }
+
+        if (b_size > 0) {
+            __wt_verbose_debug2(session, WT_VERB_BLOCK,
+              "%s: %" PRIdMAX "-%" PRIdMAX " range shrinks to %" PRIdMAX "-%" PRIdMAX, el->name,
+              (intmax_t)before->off, (intmax_t)before->off + (intmax_t)before->size,
+              (intmax_t)(b_off), (intmax_t)(b_off + b_size));
+        }
     } else if (after != NULL && off + size > after->off) {
         WT_RET(__block_off_remove(session, block, el, after->off, &ext));
+
+        WT_ASSERT(session, off == ext->off && off + size <= ext->off + ext->size);
 
         /*
          * Calculate overlapping extents. There's no initial overlap since the after extent
@@ -430,6 +448,13 @@ __wt_block_off_remove_overlap(
         a_size = 0;
         b_off = off + size;
         b_size = ext->size - (b_off - ext->off);
+
+        if (b_size > 0)
+            __wt_verbose_debug2(session, WT_VERB_BLOCK,
+              "%s: %" PRIdMAX "-%" PRIdMAX " range shrinks to %" PRIdMAX "-%" PRIdMAX, el->name,
+              (intmax_t)after->off, (intmax_t)after->off + (intmax_t)after->size, (intmax_t)(b_off),
+              (intmax_t)(b_off + b_size));
+
     } else
         return (WT_NOTFOUND);
 
@@ -437,13 +462,13 @@ __wt_block_off_remove_overlap(
      * If there are overlaps, insert the item; re-use the extent structure and save the allocation
      * (we know there's no need to merge).
      */
-    if (a_size != 0) {
+    if (a_size > 0) {
         ext->off = a_off;
         ext->size = a_size;
         WT_RET(__block_ext_insert(session, el, ext));
         ext = NULL;
     }
-    if (b_size != 0) {
+    if (b_size > 0) {
         if (ext == NULL)
             WT_RET(__block_off_insert(session, el, b_off, b_size));
         else {
