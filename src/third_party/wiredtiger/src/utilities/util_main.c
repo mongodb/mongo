@@ -84,8 +84,7 @@ main(int argc, char *argv[])
     size_t len;
     int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
     char *p, *secretkey;
-    const char *cmd_config, *conn_config, *p1, *p2, *p3, *readonly_config, *rec_config,
-      *salvage_config, *session_config;
+    const char *cmd_config, *config, *p1, *p2, *p3, *readonly_config, *rec_config, *salvage_config;
     bool backward_compatible, disable_prefetch, logoff, meta_verify, readonly, recover, salvage;
 
     conn = NULL;
@@ -107,7 +106,7 @@ main(int argc, char *argv[])
         return (EXIT_FAILURE);
     }
 
-    cmd_config = conn_config = readonly_config = salvage_config = session_config = secretkey = NULL;
+    cmd_config = config = readonly_config = salvage_config = secretkey = NULL;
     /*
      * We default to returning an error if recovery needs to be run. Generally we expect this to be
      * run after a clean shutdown. The printlog command disables logging entirely. If recovery is
@@ -215,7 +214,7 @@ main(int argc, char *argv[])
             goto done;
         } else if (strcmp(command, "create") == 0) {
             func = util_create;
-            conn_config = "create";
+            config = "create";
         }
         break;
     case 'd':
@@ -231,10 +230,10 @@ main(int argc, char *argv[])
             func = util_list;
         else if (strcmp(command, "load") == 0) {
             func = util_load;
-            conn_config = "create";
+            config = "create";
         } else if (strcmp(command, "loadtext") == 0) {
             func = util_loadtext;
-            conn_config = "create";
+            config = "create";
         }
         break;
     case 'p':
@@ -252,7 +251,7 @@ main(int argc, char *argv[])
             func = util_salvage;
         else if (strcmp(command, "stat") == 0) {
             func = util_stat;
-            conn_config = "statistics=(all)";
+            config = "statistics=(all)";
         }
         break;
     case 't':
@@ -267,11 +266,7 @@ main(int argc, char *argv[])
         if (strcmp(command, "verify") == 0) {
             func = util_verify;
             if (disable_prefetch)
-                conn_config = "prefetch=(available=false,default=false)";
-            else {
-                conn_config = "prefetch=(available=true,default=false)";
-                session_config = "prefetch=(enabled=true)";
-            }
+                config = "prefetch=(available=false,default=false)";
         }
         break;
     case 'w':
@@ -291,8 +286,8 @@ open:
     len = 10; /* some slop */
     p1 = p2 = p3 = "";
     len += strlen("error_prefix=wt");
-    if (conn_config != NULL)
-        len += strlen(conn_config);
+    if (config != NULL)
+        len += strlen(config);
     if (cmd_config != NULL)
         len += strlen(cmd_config);
     if (readonly_config != NULL)
@@ -311,15 +306,15 @@ open:
         goto err;
     }
     if ((ret = __wt_snprintf(p, len, "error_prefix=wt,%s,%s,%s,%s,%s%s%s%s",
-           conn_config == NULL ? "" : conn_config, cmd_config == NULL ? "" : cmd_config,
+           config == NULL ? "" : config, cmd_config == NULL ? "" : cmd_config,
            readonly_config == NULL ? "" : readonly_config, rec_config,
            salvage_config == NULL ? "" : salvage_config, p1, p2, p3)) != 0) {
         (void)util_err(NULL, ret, NULL);
         goto err;
     }
-    conn_config = p;
+    config = p;
 
-    if ((ret = wiredtiger_open(home, verbose ? verbose_handler : NULL, conn_config, &conn)) != 0) {
+    if ((ret = wiredtiger_open(home, verbose ? verbose_handler : NULL, config, &conn)) != 0) {
         (void)util_err(NULL, ret, NULL);
         fprintf(stderr,
           "Note: this issue typically arises from running wt util in an incorrect directory or not "
@@ -341,7 +336,7 @@ open:
     if (func == NULL && meta_verify)
         goto done;
 
-    if ((ret = conn->open_session(conn, NULL, session_config, &session)) != 0) {
+    if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
         (void)util_err(NULL, ret, NULL);
         goto err;
     }
