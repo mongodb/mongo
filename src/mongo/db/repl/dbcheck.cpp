@@ -1082,7 +1082,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             // TODO SERVER-78399: Clean up handling minKey/maxKey once feature flag is removed.
             // If the dbcheck oplog entry doesn't contain batchStart, convert minKey to a BSONObj to
             // be used as batchStart.
-            BSONObj batchStart, batchEnd;
+            BSONObj batchStart, batchEnd, batchId;
             if (!invocation.getBatchStart()) {
                 batchStart = BSON("_id" << invocation.getMinKey().elem());
             } else {
@@ -1094,22 +1094,45 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                 batchEnd = invocation.getBatchEnd().get();
             }
 
-            if (!skipDbCheck) {
+            if (!skipDbCheck && !repl::skipApplyingDbCheckBatchOnSecondary.load()) {
                 return dbCheckBatchOnSecondary(opCtx, opTime, invocation, batchStart, batchEnd);
             }
+
+            if (invocation.getBatchId()) {
+                batchId = invocation.getBatchId().get().toBSON();
+            }
+
+            auto warningMsg = "cannot execute dbcheck due to ongoing " + oplogApplicationMode;
+            if (repl::skipApplyingDbCheckBatchOnSecondary.load()) {
+                warningMsg =
+                    "skipping applying dbcheck batch because the "
+                    "'skipApplyingDbCheckBatchOnSecondary' parameter is on";
+            }
+
+            LOGV2_DEBUG(8888500,
+                        3,
+                        "skipping applying dbcheck batch",
+                        "reason"_attr = warningMsg,
+                        "batchStart"_attr = batchStart,
+                        "batchEnd"_attr = batchEnd,
+                        "batchId"_attr = batchId);
+
 
             BSONObjBuilder data;
             data.append("batchStart", batchStart);
             data.append("batchEnd", batchEnd);
-            auto healthLogEntry = mongo::dbCheckHealthLogEntry(
-                invocation.getSecondaryIndexCheckParameters(),
-                invocation.getNss(),
-                boost::none /*collectionUUID*/,
-                SeverityEnum::Warning,
-                "cannot execute dbcheck due to ongoing " + oplogApplicationMode,
-                ScopeEnum::Cluster,
-                type,
-                data.obj());
+            if (!batchId.isEmpty()) {
+                data.append("batchId", batchId);
+            }
+            auto healthLogEntry =
+                mongo::dbCheckHealthLogEntry(invocation.getSecondaryIndexCheckParameters(),
+                                             invocation.getNss(),
+                                             boost::none /*collectionUUID*/,
+                                             SeverityEnum::Warning,
+                                             warningMsg,
+                                             ScopeEnum::Cluster,
+                                             type,
+                                             data.obj());
             HealthLogInterface::get(Client::getCurrent()->getServiceContext())
                 ->log(*healthLogEntry);
             return Status::OK();
