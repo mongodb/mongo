@@ -38,6 +38,17 @@ export const logQueries = {
         {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]},
     infoBatchQuery: {"severity": "info", "operation": "dbCheckBatch"},
     inconsistentBatchQuery: {"severity": "error", "msg": "dbCheck batch inconsistent"},
+    startStopQuery: {
+        $or: [
+            {"operation": "dbCheckStart", "severity": "info"},
+            {"operation": "dbCheckStop", "severity": "info"}
+        ]
+    },
+    skipApplyingBatchOnSecondaryQuery: {
+        severity: "warning",
+        "msg":
+            "skipping applying dbcheck batch because the 'skipApplyingDbCheckBatchOnSecondary' parameter is on",
+    }
 };
 
 // Apply function on all secondary nodes except arbiters.
