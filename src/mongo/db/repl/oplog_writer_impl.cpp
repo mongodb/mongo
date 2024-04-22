@@ -194,6 +194,10 @@ void OplogWriterImpl::_run() {
             rsSyncApplyStop.pauseWhileSet(opCtx);
         }
 
+        // Transition to SECONDARY state, if possible.
+        // TODO (SERVER-88447): investigate if this should be called here.
+        _replCoord->finishRecoveryIfEligible(opCtx);
+
         auto batch = _batcher.getNextBatch(opCtx, Seconds(1));
         if (batch.empty()) {
             if (inShutdown()) {
