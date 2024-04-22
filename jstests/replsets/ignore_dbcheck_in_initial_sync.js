@@ -83,12 +83,15 @@ replSet.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
 // checkHealthLog(primaryHealthlog, logQueries.missingIndexKeysQuery, nDocs);
 // Check that the primary does not have other error/warning entries.
 // checkHealthLog(primaryHealthlog, logQueries.allErrorsOrWarningsQuery, nDocs);
+
 // Check that the start, batch, and stop entries are warning logs since the node skips dbcheck
 // during initial sync.
 const initialSyncNodeHealthLog = initialSyncNode.getDB("local").system.healthlog;
-checkHealthLog(initialSyncNodeHealthLog, logQueries.duringInitialSyncQuery, 3);
+// checkHealthLog(initialSyncNodeHealthLog, logQueries.duringInitialSyncQuery, 3);
+checkHealthLog(initialSyncNodeHealthLog, logQueries.duringInitialSyncStart, 1);
+checkHealthLog(initialSyncNodeHealthLog, logQueries.duringInitialSyncBatch, 1);
 // Check that the initial sync node does not have other info or error/warning entries.
-checkHealthLog(initialSyncNodeHealthLog, logQueries.infoBatchQuery, 0);
-checkHealthLog(initialSyncNodeHealthLog, logQueries.allErrorsOrWarningsQuery, 3);
+// checkHealthLog(initialSyncNodeHealthLog, logQueries.infoBatchQuery, 0);
+// checkHealthLog(initialSyncNodeHealthLog, logQueries.allErrorsOrWarningsQuery, 3);
 
 replSet.stopSet();

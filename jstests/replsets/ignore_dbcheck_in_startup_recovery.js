@@ -2,7 +2,7 @@
  * Test that dbcheck command will be ignored during startup recovery.
  *
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   featureFlagSecondaryIndexChecksInDbCheck, requires_persistence
  * ]
  */
 
