@@ -586,14 +586,6 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
     // request.
     batchedRequest.evaluateAndReplaceLetParams(opCtx);
 
-    // "Fire and forget" batch writes requested by the external clients need to be upgraded
-    // to w: 1 for potential writeErrors to be properly managed.
-    if (auto wc = opCtx->getWriteConcern();
-        !wc.requiresWriteAcknowledgement() && !opCtx->inMultiDocumentTransaction()) {
-        wc.w = 1;
-        opCtx->setWriteConcern(wc);
-    }
-
     // Record the namespace that the write must be run on. It may differ from the request if this is
     // a timeseries collection.
     NamespaceString nss = batchedRequest.getNS();
