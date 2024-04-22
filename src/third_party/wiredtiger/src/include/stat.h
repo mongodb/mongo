@@ -1093,6 +1093,7 @@ struct __wt_dsrc_stats {
     int64_t btree_compact_pages_skipped;
     int64_t btree_compact_bytes_rewritten_expected;
     int64_t btree_compact_pages_rewritten_expected;
+    int64_t btree_checkpoint_pages_reconciled;
     int64_t btree_compact_skipped;
     int64_t btree_column_fix;
     int64_t btree_column_tws;
