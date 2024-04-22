@@ -345,6 +345,36 @@ buildvariants:
   - name: jsCore
   - name: jsCore_txns
 
+- name: run-all-affected-jstests
+  display_name: "! Run All Affected JStests"
+  patch_only: true
+  run_on:
+  - rhel80-medium
+  expansions:
+    large_distro_name: rhel80-large
+    burn_in_tag_include_all_required_and_suggested: true
+    burn_in_tag_exclude_build_variants: >-
+      macos-debug-suggested
+    burn_in_tag_include_build_variants: >-
+      enterprise-rhel-80-64-bit-inmem
+    burn_in_tag_compile_task_dependency: archive_dist_test_debug
+    compile_variant: *linux_x86_dynamic_compile_variant_name
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: *linux_x86_dynamic_compile_variant_name
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+  - name: version_burn_in_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+  tasks:
+  - name: burn_in_tags_gen
+
 - <<: *enterprise-rhel-80-64-bit-dynamic-template
   name: &commit-queue commit-queue
   display_name: "~ Commit Queue"
