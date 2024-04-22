@@ -51,7 +51,7 @@ void InternalBucketGeoWithinMatchExpression::debugString(StringBuilder& debug,
     _debugAddSpace(debug, indentationLevel);
 
     BSONObjBuilder builder;
-    serialize(&builder, true);
+    serialize(&builder, {});
     debug << builder.obj().toString() << "\n";
 
     const auto* tag = getTag();
@@ -194,13 +194,17 @@ bool InternalBucketGeoWithinMatchExpression::_matchesBSONObj(const BSONObj& obj)
 }
 
 void InternalBucketGeoWithinMatchExpression::serialize(BSONObjBuilder* builder,
+                                                       const SerializationOptions& opts,
                                                        bool includePath) const {
     BSONObjBuilder bob(builder->subobjStart(InternalBucketGeoWithinMatchExpression::kName));
+    // Serialize the geometry shape.
     BSONObjBuilder withinRegionBob(
         bob.subobjStart(InternalBucketGeoWithinMatchExpression::kWithinRegion));
-    withinRegionBob.append(_geoContainer->getGeoElement());
+    opts.appendLiteral(&withinRegionBob, _geoContainer->getGeoElement());
     withinRegionBob.doneFast();
-    bob.append(InternalBucketGeoWithinMatchExpression::kField, _field);
+    // Serialize the field which is being searched over.
+    bob.append(InternalBucketGeoWithinMatchExpression::kField,
+               opts.serializeFieldPathFromString(_field));
     bob.doneFast();
 }
 

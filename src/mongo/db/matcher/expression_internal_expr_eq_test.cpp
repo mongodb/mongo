@@ -264,7 +264,7 @@ TEST(InternalExprEqMatchExpression, SerializesCorrectly) {
                                      operand.firstElement());
 
     BSONObjBuilder bob;
-    eq.serialize(&bob, true);
+    eq.serialize(&bob, {});
 
     ASSERT_BSONOBJ_EQ(BSON("x" << BSON("$_internalExprEq" << 5)), bob.obj());
 }

@@ -9,6 +9,7 @@
  *   requires_non_retryable_commands,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
+ *   references_foreign_collection,
  * ]
  */
 (function() {

@@ -143,9 +143,8 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDu
                                "sporadic failure, please try again.");
 }
 
-Value DocumentSourceSampleFromRandomCursor::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(getSourceName() << DOC("size" << _size)));
+Value DocumentSourceSampleFromRandomCursor::serialize(const SerializationOptions& opts) const {
+    return Value(DOC(getSourceName() << DOC("size" << opts.serializeLiteral(_size))));
 }
 
 DepsTracker::State DocumentSourceSampleFromRandomCursor::getDependencies(DepsTracker* deps) const {

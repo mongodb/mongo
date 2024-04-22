@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {

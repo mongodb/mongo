@@ -34,6 +34,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/client/shard_registry.h"

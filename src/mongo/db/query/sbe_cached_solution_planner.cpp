@@ -74,6 +74,7 @@ CandidatePlans CachedSolutionPlanner::plan(
                                                         std::move(roots[0].first),
                                                         std::move(roots[0].second),
                                                         maxReadsBeforeReplan);
+
     auto explainer = plan_explainer_factory::make(
         candidate.root.get(),
         &candidate.data,

@@ -61,7 +61,8 @@ using std::vector;
 using DocumentSourceLookUpTest = AggregationContextFixture;
 
 const long long kDefaultMaxCacheSize = internalDocumentSourceLookupCacheSizeBytes.load();
-const auto kExplain = ExplainOptions::Verbosity::kQueryPlanner;
+const auto kExplain =
+    SerializationOptions{boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 
 // For tests which need to run in a replica set context.
 class ReplDocumentSourceLookUpTest : public DocumentSourceLookUpTest {
@@ -656,6 +657,51 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithCollation) {
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
 }
 
+// Tests that $lookup with '$documents' can be round tripped.
+TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithDocumentsPipelineStage) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs = NamespaceString("unittest", "$cmd.aggregate");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+    auto originalBSON =
+        BSON("$lookup" << BSON("localField"
+                               << "y"
+                               << "foreignField"
+                               << "x"
+                               << "pipeline"
+                               << BSON_ARRAY(BSON("$documents"
+                                                  << BSON_ARRAY(BSON("x" << 5) << BSON("y" << 15))))
+                               << "as"
+                               << "as"));
+    auto lookupStage = DocumentSourceLookUp::createFromBson(originalBSON.firstElement(), expCtx);
+
+    //
+    // Serialize the $lookup stage and confirm contents.
+    //
+    vector<Value> serialization;
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    lookupStage->serializeToArray(serialization, opts);
+    auto serializedDoc = serialization[0].getDocument();
+    ASSERT_EQ(serializedDoc["$lookup"].getType(), BSONType::Object);
+
+    // Ensure the $documents desugared to $queue properly.
+    auto serializedStage = serializedDoc["$lookup"].getDocument();
+    ASSERT_EQ(serializedStage["pipeline"].getType(), BSONType::Array);
+    ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 4UL);
+
+    ASSERT_EQ(serializedStage["pipeline"][0].getType(), BSONType::Object);
+    ASSERT_EQ(serializedStage["pipeline"][0]["$queue"].getType(), BSONType::Array);
+
+    auto roundTripped =
+        DocumentSourceLookUp::createFromBson(serializedDoc.toBson().firstElement(), expCtx);
+
+    vector<Value> newSerialization;
+    roundTripped->serializeToArray(newSerialization, opts);
+
+    ASSERT_EQ(newSerialization.size(), 1UL);
+    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
 
 // $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace that isn't
 // config.cache.chunks*.
@@ -1106,13 +1152,10 @@ TEST_F(DocumentSourceLookUpTest, ExprEmbeddedInMatchExpressionShouldBeOptimized)
     auto& matchSource = dynamic_cast<const DocumentSourceMatch&>(*secondSource);
 
     // Ensure that the '$$var' in the embedded expression got optimized to ExpressionConstant.
-    BSONObjBuilder builder;
-    matchSource.getMatchExpression()->serialize(&builder);
-    auto serializedMatch = builder.obj();
     auto expectedMatch =
         fromjson("{$and: [{_id: {$_internalExprEq: 5}}, {$expr: {$eq: ['$_id', {$const: 5}]}}]}");
 
-    ASSERT_VALUE_EQ(Value(serializedMatch), Value(expectedMatch));
+    ASSERT_VALUE_EQ(Value(matchSource.getMatchExpression()->serialize()), Value(expectedMatch));
 }
 
 TEST_F(DocumentSourceLookUpTest,
@@ -1424,6 +1467,58 @@ TEST_F(DocumentSourceLookUpTest, ShouldNotCacheIfCorrelatedStageIsAbsorbedIntoPl
         fromjson("[{mock: {}}, {$addFields: {varField: {$sum: ['$x', {$const: 0}]}}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
+}
+
+TEST_F(DocumentSourceLookUpTest, RedactsCorrectlyWithPipeline) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+
+    BSONArrayBuilder pipeline;
+    pipeline << BSON("$match" << BSON("a"
+                                      << "myStr"));
+    pipeline << BSON("$project" << BSON("_id" << 0 << "a" << 1));
+    auto docSource = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << fromNs.coll() << "localField"
+                                      << "foo"
+                                      << "foreignField"
+                                      << "bar"
+                                      << "let"
+                                      << BSON("var1"
+                                              << "$x")
+                                      << "pipeline" << pipeline.arr() << "as"
+                                      << "out"))
+            .firstElement(),
+        expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$lookup": {
+                "from": "HASH<coll>",
+                "as": "HASH<out>",
+                "localField": "HASH<foo>",
+                "foreignField": "HASH<bar>",
+                "let": {
+                    "HASH<var1>": "$HASH<x>"
+                },
+                "pipeline": [
+                    {
+                        "$match": {
+                            "HASH<a>": {
+                                "$eq": "?string"
+                            }
+                        }
+                    },
+                    {
+                        "$project": {
+                            "HASH<a>": true,
+                            "HASH<_id>": false
+                        }
+                    }
+                ]
+            }
+        })",
+        redact(*docSource));
 }
 
 }  // namespace

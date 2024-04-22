@@ -95,9 +95,9 @@ DocumentSource::GetNextResult DocumentSourceInternalApplyOplogUpdate::doGetNext(
     return Document(doc.getObject());
 }
 
-Value DocumentSourceInternalApplyOplogUpdate::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{kStageName, Document{{kOplogUpdateFieldName, _oplogUpdate}}}});
+Value DocumentSourceInternalApplyOplogUpdate::serialize(const SerializationOptions& opts) const {
+    return Value(Document{
+        {kStageName, Document{{kOplogUpdateFieldName, opts.serializeLiteral(_oplogUpdate)}}}});
 }
 
 }  // namespace mongo

@@ -605,7 +605,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distr
     return DocumentSourceWriter::distributedPlanLogic();
 }
 
-Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
     DocumentSourceMergeSpec spec;
     spec.setTargetNss(_outputNs);
     spec.setLet([&]() -> boost::optional<BSONObj> {
@@ -615,11 +615,27 @@ Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> 
 
         BSONObjBuilder bob;
         for (auto&& [name, expr] : *_letVariables) {
-            bob << name << expr->serialize(static_cast<bool>(explain));
+            bob << opts.serializeFieldPathFromString(name) << expr->serialize(opts);
         }
         return bob.obj();
     }());
-    spec.setWhenMatched(MergeWhenMatchedPolicy{_descriptor.mode.first, _pipeline});
+    spec.setWhenMatched(MergeWhenMatchedPolicy{
+        _descriptor.mode.first, [&]() -> boost::optional<std::vector<BSONObj>> {
+            if (!_pipeline.has_value()) {
+                return boost::none;
+            }
+            auto expCtxWithLetVariables = pExpCtx->copyWith(pExpCtx->ns);
+            if (spec.getLet()) {
+                BSONObjBuilder cleanLetSpecBuilder;
+                for (auto&& [name, expr] : *_letVariables) {
+                    cleanLetSpecBuilder.append(name, BSONObj{});
+                }
+                expCtxWithLetVariables->variables.seedVariablesWithLetParameters(
+                    expCtxWithLetVariables.get(), cleanLetSpecBuilder.obj());
+            }
+            return Pipeline::parse(_pipeline.value(), expCtxWithLetVariables)
+                ->serializeToBson(opts);
+        }()});
     spec.setWhenNotMatched(_descriptor.mode.second);
     spec.setOn([&]() {
         std::vector<std::string> mergeOnFields;
@@ -629,7 +645,7 @@ Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> 
         return mergeOnFields;
     }());
     spec.setTargetCollectionVersion(_targetCollectionVersion);
-    return Value(Document{{getSourceName(), spec.toBSON()}});
+    return Value(Document{{getSourceName(), spec.toBSON(opts)}});
 }
 
 std::pair<DocumentSourceMerge::BatchObject, int> DocumentSourceMerge::makeBatchObject(

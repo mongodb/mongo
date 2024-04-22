@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
+#include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -188,6 +189,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
 std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
     if (!pipeline.empty() &&
         (pipeline[0].hasField(DocumentSourceDocuments::kStageName) ||
+         pipeline[0].hasField(DocumentSourceQueue::kStageName) ||
          pipeline[0].hasField("$search"_sd))) {
         return {pipeline[0]};
     }
@@ -1057,44 +1059,61 @@ void DocumentSourceLookUp::appendSpecificExecStats(MutableDocument& doc) const {
     doc["indexesUsed"] = Value{std::move(indexesUsedVec)};
 }
 
-void DocumentSourceLookUp::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
-
+void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
+                                            const SerializationOptions& opts) const {
     // Support alternative $lookup from config.cache.chunks* namespaces.
     auto fromValue = (pExpCtx->ns.db() == _fromNs.db())
-        ? Value(_fromNs.coll())
-        : Value(Document{{"db", _fromNs.db()}, {"coll", _fromNs.coll()}});
+        ? Value(opts.serializeIdentifier(_fromNs.coll()))
+        : Value(Document{{"db", opts.serializeIdentifier(_fromNs.db())},
+                         {"coll", opts.serializeIdentifier(_fromNs.coll())}});
 
-    MutableDocument output(
-        Document{{getSourceName(), Document{{"from", fromValue}, {"as", _as.fullPath()}}}});
+    MutableDocument output(Document{
+        {getSourceName(), Document{{"from", fromValue}, {"as", opts.serializeFieldPath(_as)}}}});
 
     if (hasLocalFieldForeignFieldJoin()) {
-        output[getSourceName()]["localField"] = Value(_localField->fullPath());
-        output[getSourceName()]["foreignField"] = Value(_foreignField->fullPath());
+        output[getSourceName()]["localField"] = Value(opts.serializeFieldPath(_localField.value()));
+        output[getSourceName()]["foreignField"] =
+            Value(opts.serializeFieldPath(_foreignField.value()));
     }
 
     // Add a pipeline field if only-pipeline syntax was used (to ensure the output is valid $lookup
     // syntax) or if a $match was absorbed.
-    auto pipeline = _userPipeline.get_value_or(std::vector<BSONObj>());
+    auto serializedPipeline = [&]() -> std::vector<BSONObj> {
+        auto pipeline = _userPipeline.get_value_or(std::vector<BSONObj>());
+        if (opts.transformIdentifiers ||
+            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+            return Pipeline::parse(pipeline, _fromExpCtx)->serializeToBson(opts);
+        }
+        return pipeline;
+    }();
     if (_additionalFilter) {
-        pipeline.emplace_back(BSON("$match" << *_additionalFilter));
+        auto serializedFilter = [&]() -> BSONObj {
+            if (opts.transformIdentifiers ||
+                opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+                auto filter =
+                    uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, pExpCtx));
+                return filter->serialize(opts);
+            }
+            return *_additionalFilter;
+        }();
+        serializedPipeline.emplace_back(BSON("$match" << serializedFilter));
     }
-    if (!hasLocalFieldForeignFieldJoin() || pipeline.size() > 0) {
+    if (!hasLocalFieldForeignFieldJoin() || serializedPipeline.size() > 0) {
         MutableDocument exprList;
         for (auto letVar : _letVariables) {
-            exprList.addField(letVar.name,
-                              letVar.expression->serialize(static_cast<bool>(explain)));
+            exprList.addField(opts.serializeFieldPathFromString(letVar.name),
+                              letVar.expression->serialize(opts));
         }
         output[getSourceName()]["let"] = Value(exprList.freeze());
 
-        output[getSourceName()]["pipeline"] = Value(pipeline);
+        output[getSourceName()]["pipeline"] = Value(serializedPipeline);
     }
 
     if (_hasExplicitCollation) {
         output[getSourceName()]["_internalCollation"] = Value(_fromExpCtx->getCollatorBSON());
     }
 
-    if (explain) {
+    if (opts.verbosity) {
         if (_unwindSrc) {
             const boost::optional<FieldPath> indexPath = _unwindSrc->indexPath();
             output[getSourceName()]["unwinding"] =
@@ -1102,8 +1121,11 @@ void DocumentSourceLookUp::serializeToArray(
                           << _unwindSrc->preserveNullAndEmptyArrays() << "includeArrayIndex"
                           << (indexPath ? Value(indexPath->fullPath()) : Value())));
         }
-
-        if (explain.get() >= ExplainOptions::Verbosity::kExecStats) {
+        // Conflict is .get() vs .value(), changed in 6.1 during
+        // https://jira.mongodb.org/browse/SERVER-68246. Going to stick with 7.0's version of
+        // '.value()', I think there is no meaningful difference here since line 1080 check that the
+        // optional is set.
+        if (opts.verbosity.value() >= ExplainOptions::Verbosity::kExecStats) {
             appendSpecificExecStats(output);
         }
 

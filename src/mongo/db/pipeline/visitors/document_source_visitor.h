@@ -67,6 +67,7 @@ class DocumentSourceSingleDocumentTransformation;
 class DocumentSourceSkip;
 class DocumentSourceSort;
 class DocumentSourceTeeConsumer;
+class DocumentSourceQueryStats;
 class DocumentSourceUnionWith;
 class DocumentSourceUnwind;
 
@@ -125,6 +126,7 @@ public:
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceSkip> source) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceSort> source) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceTeeConsumer> source) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceQueryStats> source) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceUnionWith> source) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceUnwind> source) = 0;
 };

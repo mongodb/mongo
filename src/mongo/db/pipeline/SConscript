@@ -63,12 +63,10 @@ env.Library(
     )
 
 env.Library(
-    target='aggregation_request_helper',
-    source=[
-        'aggregation_request_helper.cpp',
+    target='aggregation_request_helper', source=[
         'aggregate_command.idl',
-    ],
-    LIBDEPS=[
+        'aggregation_request_helper.cpp',
+    ], LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/namespace_string',
@@ -80,8 +78,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/write_concern_options',
         '$BUILD_DIR/mongo/idl/idl_parser',
         'document_sources_idl',
-    ]
-)
+    ])
 
 env.Library(
     target='variable_validation',
@@ -95,6 +92,7 @@ env.Library(
 env.Library(
     target='expression_context',
     source=[
+        '$BUILD_DIR/mongo/db/query/query_shape/cmd_with_let_shape.cpp',
         'expression.cpp',
         'expression_context.cpp',
         'expression_function.cpp',
@@ -115,6 +113,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
         '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/db/query/query_shape/query_shape_common',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
@@ -274,6 +273,8 @@ pipelineEnv.Library(
         'abt/field_map_builder.cpp',
         'abt/match_expression_visitor.cpp',
         'abt/utils.cpp',
+        '$BUILD_DIR/mongo/db/query/query_shape/agg_cmd_shape.cpp',
+        '$BUILD_DIR/mongo/db/query/query_stats/agg_key.cpp',
         'document_source.cpp',
         'document_source_add_fields.cpp',
         'document_source_bucket.cpp',
@@ -298,6 +299,7 @@ pipelineEnv.Library(
         'document_source_internal_inhibit_optimization.cpp',
         'document_source_internal_shard_filter.cpp',
         'document_source_internal_shred_documents.cpp',
+        'document_source_internal_shardserver_info.cpp',
         'document_source_internal_split_pipeline.cpp',
         'document_source_internal_unpack_bucket.cpp',
         'document_source_limit.cpp',
@@ -312,6 +314,7 @@ pipelineEnv.Library(
         'document_source_out.cpp',
         'document_source_plan_cache_stats.cpp',
         'document_source_project.cpp',
+        'document_source_query_stats.cpp',
         'document_source_queue.cpp',
         'document_source_redact.cpp',
         'document_source_replace_root.cpp',
@@ -350,7 +353,6 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
         '$BUILD_DIR/mongo/db/exec/bucket_unpacker',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
@@ -483,11 +485,14 @@ env.Library(
         'document_source_merge_modes.idl',
         'document_source_merge_spec.cpp',
         'document_source_parsing_validators.cpp',
+        'document_source_query_stats.idl',
+        'document_source_query_stats_validators.cpp',
         'document_source_replace_root.idl',
         'document_source_set_window_fields.idl',
         'document_source_union_with.idl',
         'document_source_set_variable_from_subpipeline.idl',
         'exchange_spec.idl',
+        'resume_token.idl',
         'resume_token.cpp',
         'storage_stats_spec.idl',
         'value.idl',
@@ -495,6 +500,8 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
+        '$BUILD_DIR/mongo/db/query/query_stats/query_stats_parse',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/s/common_s',
@@ -566,6 +573,7 @@ env.CppUnitTest(
         'abt/pipeline_test.cpp',
         'accumulator_js_test.cpp' if get_option('js-engine') != 'none' else [],
         'accumulator_test.cpp',
+        'agg_cmd_shape_test.cpp',
         'aggregation_request_test.cpp',
         'change_stream_event_transform_test.cpp',
         'change_stream_expired_pre_image_remover_test.cpp',
@@ -580,9 +588,11 @@ env.CppUnitTest(
         'document_source_change_stream_add_post_image_test.cpp',
         'document_source_change_stream_test.cpp',
         'document_source_check_resume_token_test.cpp',
+        'document_source_coll_stats_test.cpp',
         'document_source_count_test.cpp',
         'document_source_current_op_test.cpp',
         'document_source_densify_test.cpp',
+        'document_source_documents_test.cpp',
         'document_source_exchange_test.cpp',
         'document_source_facet_test.cpp',
         'document_source_find_and_modify_image_lookup_test.cpp',
@@ -611,8 +621,11 @@ env.CppUnitTest(
         'document_source_skip_test.cpp',
         'document_source_sort_by_count_test.cpp',
         'document_source_sort_test.cpp',
+        'document_source_query_stats_test.cpp',
         'document_source_union_with_test.cpp',
+        'document_source_internal_all_collection_stats_test.cpp',
         'document_source_internal_compute_geo_near_distance_test.cpp',
+        'document_source_internal_convert_bucket_index_stats_test.cpp',
         'document_source_internal_unpack_bucket_test/extract_or_build_project_to_internalize_test.cpp',
         'document_source_internal_unpack_bucket_test/create_predicates_on_bucket_level_field_test.cpp',
         'document_source_internal_unpack_bucket_test/extract_project_for_pushdown_test.cpp',
@@ -633,7 +646,9 @@ env.CppUnitTest(
         'expression_date_test.cpp',
         'expression_field_path_test.cpp',
         'expression_find_internal_test.cpp',
+        'expression_function_test.cpp',
         'expression_javascript_test.cpp' if get_option('js-engine') != 'none' else [],
+        'expression_let_test.cpp',
         'expression_nary_test.cpp',
         'expression_object_test.cpp',
         'expression_or_test.cpp',

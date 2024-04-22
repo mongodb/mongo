@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/collection_type.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -54,6 +55,10 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_stats/find_key.h"
+#include "mongo/db/query/query_stats/key.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -111,25 +116,6 @@ std::unique_ptr<FindCommandRequest> translateNtoReturnToLimitOrBatchSize(
     return findCmd;
 }
 
-// Parses the command object to a FindCommandRequest. If the client request did not specify any
-// runtime constants, make them available to the query here.
-std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(OperationContext* opCtx,
-                                                                       NamespaceString nss,
-                                                                       BSONObj cmdObj) {
-    auto findCommand = query_request_helper::makeFromFindCommand(
-        std::move(cmdObj),
-        std::move(nss),
-        APIParameters::get(opCtx).getAPIStrict().value_or(false));
-
-    // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
-    if (shouldDoFLERewrite(findCommand)) {
-        invariant(findCommand->getNamespaceOrUUID().nss());
-        processFLEFindD(opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
-    }
-
-    return translateNtoReturnToLimitOrBatchSize(std::move(findCommand));
-}
-
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
     const FindCommandRequest& findCommand,
@@ -145,38 +131,13 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         // ExpressionContext.
         collator = collPtr->getDefaultCollator()->clone();
     }
-
-    // Although both 'find' and 'aggregate' commands have an ExpressionContext, some of the data
-    // members in the ExpressionContext are used exclusively by the aggregation subsystem. This
-    // includes the following fields which here we simply initialize to some meaningless default
-    // value:
-    //  - explain
-    //  - fromMongos
-    //  - needsMerge
-    //  - bypassDocumentValidation
-    //  - mongoProcessInterface
-    //  - resolvedNamespaces
-    //  - uuid
-    //
-    // As we change the code to make the find and agg systems more tightly coupled, it would make
-    // sense to start initializing these fields for find operations as well.
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx,
-        verbosity,
-        false,  // fromMongos
-        false,  // needsMerge
-        findCommand.getAllowDiskUse().value_or(allowDiskUseByDefault.load()),
-        false,  // bypassDocumentValidation
-        false,  // isMapReduceCommand
-        findCommand.getNamespaceOrUUID().nss().value_or(NamespaceString()),
-        findCommand.getLegacyRuntimeConstants(),
-        std::move(collator),
-        nullptr,  // mongoProcessInterface
-        StringMap<ExpressionContext::ResolvedNamespace>{},
-        boost::none,                             // uuid
-        findCommand.getLet(),                    // let
-        CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
-    );
+    auto expCtx =
+        make_intrusive<ExpressionContext>(opCtx,
+                                          findCommand,
+                                          std::move(collator),
+                                          CurOp::get(opCtx)->dbProfileLevel() > 0,  // mayDbProfile
+                                          verbosity,
+                                          allowDiskUseByDefault.load());
     if (storageGlobalParams.readOnly) {
         // Disallow disk use if in read-only mode.
         expCtx->allowDiskUse = false;
@@ -197,6 +158,45 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
     curOp->setNS_inlock(nss.ns());
 }
 
+/**
+ * Parses the grammar elements like 'filter', 'sort', and 'projection' from the raw
+ * 'FindCommandRequest', and tracks internal state like begining the operation's timer and recording
+ * query shape stats (if enabled).
+ */
+std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
+    OperationContext* opCtx,
+    const AutoGetCollectionForReadCommandMaybeLockFree& ctx,
+    const NamespaceString& nss,
+    BSONObj requestBody,
+    std::unique_ptr<FindCommandRequest> findCommand,
+    const CollectionPtr& collection) {
+    // Fill out curop information.
+    beginQueryOp(opCtx, nss, requestBody);
+    // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+
+    auto expCtx =
+        makeExpressionContext(opCtx, *findCommand, collection, boost::none /* verbosity */);
+
+    auto parsedRequest = uassertStatusOK(
+        parsed_find_command::parse(expCtx,
+                                   std::move(findCommand),
+                                   extensionsCallback,
+                                   MatchExpressionParser::kAllowAllSpecialFeatures));
+
+    // Register query stats collection. Exclude queries against collections with encrypted fields.
+    // It is important to do this before canonicalizing and optimizing the query, each of which
+    // would alter the query shape.
+    if (!(collection && collection.get()->getCollectionOptions().encryptedFieldConfig)) {
+        query_stats::registerRequest(opCtx, nss, [&]() {
+            return std::make_unique<query_stats::FindKey>(
+                expCtx, *parsedRequest, ctx.getCollectionType());
+        });
+    }
+
+    return uassertStatusOK(
+        CanonicalQuery::canonicalize(std::move(expCtx), std::move(parsedRequest)));
+}
 /**
  * A command for running .find() queries.
  */
@@ -322,7 +322,7 @@ public:
             const auto nss = ctx->getNss();
 
             // Parse the command BSON to a FindCommandRequest.
-            auto findCommand = parseCmdObjectToFindCommandRequest(opCtx, nss, _request.body);
+            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, nss, _request.body);
 
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
@@ -372,8 +372,8 @@ public:
                 try {
                     // An empty PrivilegeVector is acceptable because these privileges are only
                     // checked on getMore and explain will not open a cursor.
-                    uassertStatusOK(runAggregate(
-                        opCtx, nss, aggRequest, viewAggCmd, PrivilegeVector(), result));
+                    uassertStatusOK(
+                        runAggregate(opCtx, aggRequest, viewAggCmd, PrivilegeVector(), result));
                 } catch (DBException& error) {
                     if (error.code() == ErrorCodes::InvalidPipelineOperator) {
                         uasserted(ErrorCodes::InvalidPipelineOperator,
@@ -419,10 +419,10 @@ public:
             // Parse the command BSON to a FindCommandRequest. Pass in the parsedNss in case cmdObj
             // does not have a UUID.
             auto parsedNss = NamespaceString{CommandHelpers::parseNsFromCommand(_dbName, cmdObj)};
-            const bool isExplain = false;
             const bool isOplogNss = (parsedNss == NamespaceString::kRsOplogNamespace);
             auto findCommand =
-                parseCmdObjectToFindCommandRequest(opCtx, std::move(parsedNss), cmdObj);
+                _parseCmdObjectToFindCommandRequest(opCtx, std::move(parsedNss), cmdObj);
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
 
             // Only allow speculative majority for internal commands that specify the correct flag.
             uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
@@ -542,21 +542,8 @@ public:
                     findCommand->getResumeAfter(), isClusteredCollection));
             }
 
-            // Fill out curop information.
-            beginQueryOp(opCtx, nss, _request.body);
-
-            // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
-            const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-
-            auto expCtx =
-                makeExpressionContext(opCtx, *findCommand, collection, boost::none /* verbosity */);
-            auto cq = uassertStatusOK(
-                CanonicalQuery::canonicalize(opCtx,
-                                             std::move(findCommand),
-                                             isExplain,
-                                             std::move(expCtx),
-                                             extensionsCallback,
-                                             MatchExpressionParser::kAllowAllSpecialFeatures));
+            auto cq = parseQueryAndBeginOperation(
+                opCtx, *ctx, nss, _request.body, std::move(findCommand), collection);
 
             // If we are running a query against a view, or if we are trying to test the new
             // optimizer, redirect this query through the aggregation system.
@@ -573,6 +560,9 @@ public:
                 auto viewAggregationCommand =
                     uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
 
+                // This doesn't directly call 'runAggregate()' so it doesn't need to adapt to the
+                // new API on v6.0. @Alyssa this suggests we should look into view performance more
+                // carefully on v6.0. The perf of this code path may have different characteristics?
                 BSONObj aggResult = CommandHelpers::runCommandDirectly(
                     opCtx, OpMsgRequest::fromDBAndBody(_dbName, std::move(viewAggregationCommand)));
                 auto status = getStatusFromCommandResult(aggResult);
@@ -626,7 +616,7 @@ public:
                 // there is no ClientCursor id, and then return.
                 const long long numResults = 0;
                 const CursorId cursorId = 0;
-                endQueryOp(opCtx, collection, *exec, numResults, cursorId);
+                endQueryOp(opCtx, collection, *exec, numResults, boost::none, cmdObj);
                 auto bodyBuilder = result->getBodyBuilder();
                 appendCursorResponseObject(
                     cursorId, nss.ns(), BSONArray(), boost::none, &bodyBuilder);
@@ -725,11 +715,9 @@ public:
                     pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(
                         opCtx->getRemainingMaxTimeMicros());
                 }
-                pinnedCursor.getCursor()->setNReturnedSoFar(numResults);
-                pinnedCursor.getCursor()->incNBatches();
 
                 // Fill out curop based on the results.
-                endQueryOp(opCtx, collection, *cursorExec, numResults, cursorId);
+                endQueryOp(opCtx, collection, *cursorExec, numResults, pinnedCursor, cmdObj);
 
                 if (stashResourcesForGetMore) {
                     // Collect storage stats now before we stash the recovery unit. These stats are
@@ -744,7 +732,7 @@ public:
                         opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
                 }
             } else {
-                endQueryOp(opCtx, collection, *exec, numResults, cursorId);
+                endQueryOp(opCtx, collection, *exec, numResults, boost::none, cmdObj);
             }
 
             // Generate the response object to send to the client.
@@ -785,6 +773,25 @@ public:
     private:
         const OpMsgRequest _request;
         const StringData _dbName;
+
+        // Parses the command object to a FindCommandRequest. If the client request did not specify
+        // any runtime constants, make them available to the query here.
+        std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
+            OperationContext* opCtx, NamespaceString nss, BSONObj cmdObj) {
+            auto findCommand = query_request_helper::makeFromFindCommand(
+                std::move(cmdObj),
+                std::move(nss),
+                APIParameters::get(opCtx).getAPIStrict().value_or(false));
+
+            // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
+            if (shouldDoFLERewrite(findCommand)) {
+                invariant(findCommand->getNamespaceOrUUID().nss());
+                processFLEFindD(
+                    opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
+            }
+
+            return translateNtoReturnToLimitOrBatchSize(std::move(findCommand));
+        }
     };
 
 } findCmd;

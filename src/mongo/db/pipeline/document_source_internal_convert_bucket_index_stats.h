@@ -77,7 +77,7 @@ public:
                 ChangeStreamRequirement::kDenylist};
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;

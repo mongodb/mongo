@@ -114,11 +114,10 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
     return Document::fromBsonWithMetaData(*next.getResult());
 }
 
-Value DocumentSourceMergeCursors::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceMergeCursors::serialize(const SerializationOptions& opts) const {
     invariant(!_blockingResultsMerger);
     invariant(_armParams);
-    return Value(Document{{kStageName, _armParams->toBSON()}});
+    return Value(Document{{kStageName, _armParams->toBSON(opts)}});
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(

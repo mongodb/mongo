@@ -59,6 +59,7 @@
 #include "mongo/db/pipeline/document_source_operation_metrics.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_plan_cache_stats.h"
+#include "mongo/db/pipeline/document_source_query_stats.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_redact.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
@@ -603,6 +604,10 @@ public:
     }
 
     void visit(const DocumentSourceTeeConsumer* source) override {
+        unsupportedStage(source);
+    }
+
+    void visit(const DocumentSourceQueryStats* source) override {
         unsupportedStage(source);
     }
 

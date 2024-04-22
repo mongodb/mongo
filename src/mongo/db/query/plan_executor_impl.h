@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
 #include <boost/optional.hpp>
 #include <queue>
 

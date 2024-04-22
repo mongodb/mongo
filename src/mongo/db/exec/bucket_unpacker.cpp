@@ -986,9 +986,9 @@ BSONObj BucketSpec::pushdownPredicate(
 
     BSONObjBuilder result;
     if (metaOnlyPredicate)
-        metaOnlyPredicate->serialize(&result);
+        metaOnlyPredicate->serialize(&result, {});
     if (bucketMetricPredicate)
-        bucketMetricPredicate->serialize(&result);
+        bucketMetricPredicate->serialize(&result, {});
     return result.obj();
 }
 

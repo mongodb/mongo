@@ -78,6 +78,28 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
 
 }  // namespace
 
+DocumentSourceUnionWith::DocumentSourceUnionWith(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
+    : DocumentSource(kStageName, expCtx), _pipeline(std::move(pipeline)) {
+    // If this pipeline is being run as part of explain, then cache a copy to use later during
+    // serialization.
+    if (expCtx->explain >= ExplainOptions::Verbosity::kExecStats) {
+        _cachedPipeline = _pipeline->getSources();
+    }
+}
+
+DocumentSourceUnionWith::DocumentSourceUnionWith(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    NamespaceString unionNss,
+    std::vector<BSONObj> pipeline)
+    : DocumentSourceUnionWith(expCtx,
+                              buildPipelineFromViewDefinition(
+                                  expCtx, expCtx->getResolvedNamespace(unionNss), pipeline)) {
+    _userNss = std::move(unionNss);
+    _userPipeline = std::move(pipeline);
+}
+
 DocumentSourceUnionWith::~DocumentSourceUnionWith() {
     if (_pipeline && _pipeline->getContext()->explain) {
         _pipeline->dispose(pExpCtx->opCtx);
@@ -197,9 +219,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         pipeline = unionWithSpec.getPipeline().value_or(std::vector<BSONObj>{});
     }
     return make_intrusive<DocumentSourceUnionWith>(
-        expCtx,
-        buildPipelineFromViewDefinition(
-            expCtx, expCtx->getResolvedNamespace(std::move(unionNss)), std::move(pipeline)));
+        expCtx, std::move(unionNss), std::move(pipeline));
 }
 
 DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
@@ -320,9 +340,9 @@ void DocumentSourceUnionWith::doDispose() {
     }
 }
 
-Value DocumentSourceUnionWith::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const {
     auto collectionless = _pipeline->getContext()->ns.isCollectionlessAggregateNS();
-    if (explain) {
+    if (opts.verbosity) {
         // There are several different possible states depending on the explain verbosity as well as
         // the other stages in the pipeline:
         //  * If verbosity is queryPlanner, then the sub-pipeline should be untouched and we can
@@ -332,9 +352,9 @@ Value DocumentSourceUnionWith::serialize(boost::optional<ExplainOptions::Verbosi
         //  $limit stage after the $unionWith which results in only reading from the base collection
         //  branch and not the sub-pipeline.
         Pipeline* pipeCopy = nullptr;
-        if (*explain == ExplainOptions::Verbosity::kQueryPlanner) {
+        if (*opts.verbosity == ExplainOptions::Verbosity::kQueryPlanner) {
             pipeCopy = Pipeline::create(_pipeline->getSources(), _pipeline->getContext()).release();
-        } else if (*explain >= ExplainOptions::Verbosity::kExecStats &&
+        } else if (*opts.verbosity >= ExplainOptions::Verbosity::kExecStats &&
                    _executionState > ExecutionProgress::kIteratingSource) {
             // We've either exhausted the sub-pipeline or at least started iterating it. Use the
             // cached pipeline to get the explain output since the '_pipeline' may have been
@@ -344,32 +364,43 @@ Value DocumentSourceUnionWith::serialize(boost::optional<ExplainOptions::Verbosi
             // The plan does not require reading from the sub-pipeline, so just include the
             // serialization in the explain output.
             BSONArrayBuilder bab;
-            for (auto&& stage : _pipeline->serialize(explain))
+            for (auto&& stage : _pipeline->serialize(opts))
                 bab << stage;
             auto spec = collectionless
                 ? DOC("pipeline" << bab.arr())
-                : DOC("coll" << _pipeline->getContext()->ns.coll() << "pipeline" << bab.arr());
+                : DOC("coll" << opts.serializeIdentifier(_pipeline->getContext()->ns.coll())
+                             << "pipeline" << bab.arr());
             return Value(DOC(getSourceName() << spec));
         }
 
         invariant(pipeCopy);
         BSONObj explainLocal =
-            pExpCtx->mongoProcessInterface->preparePipelineAndExplain(pipeCopy, *explain);
+            pExpCtx->mongoProcessInterface->preparePipelineAndExplain(pipeCopy, *opts.verbosity);
         LOGV2_DEBUG(4553501, 3, "$unionWith attached cursor to pipeline for explain");
         // We expect this to be an explanation of a pipeline -- there should only be one field.
         invariant(explainLocal.nFields() == 1);
 
-        auto spec = collectionless ? DOC("pipeline" << explainLocal.firstElement())
-                                   : DOC("coll" << _pipeline->getContext()->ns.coll() << "pipeline"
-                                                << explainLocal.firstElement());
+        auto spec = collectionless
+            ? DOC("pipeline" << explainLocal.firstElement())
+            : DOC("coll" << opts.serializeIdentifier(_pipeline->getContext()->ns.coll())
+                         << "pipeline" << explainLocal.firstElement());
         return Value(DOC(getSourceName() << spec));
     } else {
-        BSONArrayBuilder bab;
-        for (auto&& stage : _pipeline->serialize())
-            bab << stage;
-        auto spec = collectionless
-            ? DOC("pipeline" << bab.arr())
-            : DOC("coll" << _pipeline->getContext()->ns.coll() << "pipeline" << bab.arr());
+        // Query shapes must reflect the original, unresolved and unoptimized pipeline, so we need a
+        // special case here if we are serializing the stage for that purpose. Otherwise, we should
+        // return the current (optimized) pipeline for introspection with explain, etc.
+        auto serializedPipeline = [&]() -> std::vector<BSONObj> {
+            if (opts.transformIdentifiers ||
+                opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+                return Pipeline::parse(_userPipeline, _pipeline->getContext())
+                    ->serializeToBson(opts);
+            }
+            return _pipeline->serializeToBson(opts);
+        }();
+
+        auto spec = collectionless ? DOC("pipeline" << serializedPipeline)
+                                   : DOC("coll" << opts.serializeIdentifier(_userNss.coll())
+                                                << "pipeline" << serializedPipeline);
         return Value(DOC(getSourceName() << spec));
     }
 }

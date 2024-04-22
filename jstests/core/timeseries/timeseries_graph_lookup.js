@@ -5,6 +5,7 @@
  *   does_not_support_transactions,
  *   requires_timeseries,
  *   requires_fcv_51,
+ *   references_foreign_collection,
  * ]
  */
 (function() {

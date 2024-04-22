@@ -1,4 +1,3 @@
-
 (function() {
 load("jstests/libs/fts.js");
 load("jstests/aggregation/extras/utils.js");  // For resultsEq.

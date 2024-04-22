@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sort_key_comparator.h"
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 namespace mongo {
 
@@ -85,7 +86,7 @@ public:
      */
     static void serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
                                 const boost::intrusive_ptr<Expression>& argument,
-                                bool explain,
+                                const SerializationOptions& options,
                                 MutableDocument& md);
 
 protected:
@@ -136,7 +137,7 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       bool explain) const final;
+                       const SerializationOptions& options = {}) const final;
 
     void reset() final;
 
@@ -207,7 +208,7 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       bool explain) const final;
+                       const SerializationOptions& options = {}) const final;
 
     void reset() final;
 
@@ -322,7 +323,7 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       bool explain) const final;
+                       const SerializationOptions& options = {}) const final;
 
     void reset() final;
 

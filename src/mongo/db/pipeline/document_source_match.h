@@ -126,8 +126,7 @@ public:
                 ChangeStreamRequirement::kAllowlist};
     }
 
-    Value serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override;
 
     /**
      * Attempts to combine with any subsequent $match stages, joining the query objects with a

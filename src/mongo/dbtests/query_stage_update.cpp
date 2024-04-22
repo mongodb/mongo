@@ -55,15 +55,6 @@
 #include "mongo/db/update/update_driver.h"
 #include "mongo/dbtests/dbtests.h"
 
-#define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
-    try {                                                                          \
-        EXPRESSION;                                                                \
-    } catch (const AssertionException& e) {                                        \
-        ::str::stream err;                                                         \
-        err << "Threw an exception incorrectly: " << e.toString();                 \
-        ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
-    }
-
 namespace QueryStageUpdate {
 
 using std::make_unique;

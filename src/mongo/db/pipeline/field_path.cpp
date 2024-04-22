@@ -74,7 +74,7 @@ string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffix) {
     return str::stream() << prefix << "." << suffix;
 }
 
-FieldPath::FieldPath(std::string inputPath)
+FieldPath::FieldPath(std::string inputPath, bool validateFieldNames)
     : _fieldPath(std::move(inputPath)),
       _fieldPathDotPosition{string::npos},
       _fieldHash{kHashUninitialized} {
@@ -98,7 +98,10 @@ FieldPath::FieldPath(std::string inputPath)
             "FieldPath is too long",
             pathLength <= BSONDepth::getMaxAllowableDepth());
     for (size_t i = 0; i < pathLength; ++i) {
-        uassertValidFieldName(getFieldName(i));
+        const auto& fieldName = getFieldName(i);
+        if (validateFieldNames) {
+            uassertValidFieldName(fieldName);
+        }
     }
 }
 

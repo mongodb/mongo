@@ -59,7 +59,7 @@ void InternalSchemaAllowedPropertiesMatchExpression::debugString(StringBuilder& 
     _debugAddSpace(debug, indentationLevel);
 
     BSONObjBuilder builder;
-    serialize(&builder, true);
+    serialize(&builder, {});
     debug << builder.obj().toString() << "\n";
 
     const auto* tag = getTag();
@@ -128,29 +128,29 @@ bool InternalSchemaAllowedPropertiesMatchExpression::_matchesBSONObj(const BSONO
 }
 
 void InternalSchemaAllowedPropertiesMatchExpression::serialize(BSONObjBuilder* builder,
+                                                               const SerializationOptions& opts,
                                                                bool includePath) const {
     BSONObjBuilder expressionBuilder(
         builder->subobjStart(InternalSchemaAllowedPropertiesMatchExpression::kName));
 
     std::vector<StringData> sortedProperties(_properties.begin(), _properties.end());
     std::sort(sortedProperties.begin(), sortedProperties.end());
-    expressionBuilder.append("properties", sortedProperties);
-
+    opts.appendLiteral(&expressionBuilder, "properties", sortedProperties);
+    // This will be serialized to "i", which is the parser chosen namePlaceholder. Using this
+    // unmodified will have a similar effect to serializing to "?", however it preserves round trip
+    // parsing.
     expressionBuilder.append("namePlaceholder", _namePlaceholder);
 
     BSONArrayBuilder patternPropertiesBuilder(expressionBuilder.subarrayStart("patternProperties"));
-    for (auto&& item : _patternProperties) {
-        BSONObjBuilder itemBuilder(patternPropertiesBuilder.subobjStart());
-        itemBuilder.appendRegex("regex", item.first.rawRegex);
-
-        BSONObjBuilder subexpressionBuilder(itemBuilder.subobjStart("expression"));
-        item.second->getFilter()->serialize(&subexpressionBuilder, includePath);
-        subexpressionBuilder.doneFast();
+    for (auto&& [pattern, expression] : _patternProperties) {
+        patternPropertiesBuilder << BSON(
+            "regex" << opts.serializeLiteral(BSONRegEx(pattern.rawRegex)) << "expression"
+                    << expression->getFilter()->serialize(opts, includePath));
     }
     patternPropertiesBuilder.doneFast();
 
     BSONObjBuilder otherwiseBuilder(expressionBuilder.subobjStart("otherwise"));
-    _otherwise->getFilter()->serialize(&otherwiseBuilder, includePath);
+    _otherwise->getFilter()->serialize(&otherwiseBuilder, opts, includePath);
     otherwiseBuilder.doneFast();
     expressionBuilder.doneFast();
 }

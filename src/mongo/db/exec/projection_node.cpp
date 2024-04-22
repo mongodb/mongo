@@ -48,7 +48,8 @@ void ProjectionNode::addProjectionForPath(const FieldPath& path) {
 void ProjectionNode::_addProjectionForPath(const FieldPath& path) {
     makeOptimizationsStale();
     if (path.getPathLength() == 1) {
-        _projectedFields.insert(path.fullPath());
+        auto it = _projectedFields.insert(_projectedFields.end(), path.fullPath());
+        _projectedFieldsSet.insert(StringData(*it));
         return;
     }
     // FieldPath can't be empty, so it is safe to obtain the first path component here.
@@ -143,7 +144,7 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
     while (it.more()) {
         auto fieldName = it.fieldName();
 
-        if (_projectedFields.find(fieldName) != _projectedFields.end()) {
+        if (_projectedFieldsSet.find(fieldName) != _projectedFieldsSet.end()) {
             if (isIncl) {
                 outputProjectedField(fieldName, it.next().second, outputDoc);
             } else {
@@ -274,25 +275,27 @@ void ProjectionNode::optimize() {
     _maxFieldsToProject = maxFieldsToProject();
 }
 
-Document ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Document ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explain,
+                                   const SerializationOptions& options) const {
     MutableDocument outputDoc;
-    serialize(explain, &outputDoc);
+    serialize(explain, &outputDoc, options);
     return outputDoc.freeze();
 }
 
 void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explain,
-                               MutableDocument* output) const {
+                               MutableDocument* output,
+                               const SerializationOptions& options) const {
     // Determine the boolean value for projected fields in the explain output.
     const bool projVal = isIncluded();
 
     // Always put "_id" first if it was projected (implicitly or explicitly).
-    if (_projectedFields.find("_id") != _projectedFields.end()) {
-        output->addField("_id", Value(projVal));
+    if (_projectedFieldsSet.find("_id") != _projectedFieldsSet.end()) {
+        output->addField(options.serializeFieldPath("_id"), Value(projVal));
     }
 
     for (auto&& projectedField : _projectedFields) {
         if (projectedField != "_id") {
-            output->addField(projectedField, Value(projVal));
+            output->addField(options.serializeFieldPathFromString(projectedField), Value(projVal));
         }
     }
 
@@ -300,13 +303,14 @@ void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explai
         auto childIt = _children.find(field);
         if (childIt != _children.end()) {
             MutableDocument subDoc;
-            childIt->second->serialize(explain, &subDoc);
-            output->addField(field, subDoc.freezeToValue());
+            childIt->second->serialize(explain, &subDoc, options);
+            output->addField(options.serializeFieldPathFromString(field), subDoc.freezeToValue());
         } else {
             invariant(_policies.computedFieldsPolicy == ComputedFieldsPolicy::kAllowComputedFields);
             auto expressionIt = _expressions.find(field);
             invariant(expressionIt != _expressions.end());
-            output->addField(field, expressionIt->second->serialize(static_cast<bool>(explain)));
+            output->addField(options.serializeFieldPathFromString(field),
+                             expressionIt->second->serialize(options));
         }
     }
 }

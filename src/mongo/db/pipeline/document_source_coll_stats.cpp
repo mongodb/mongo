@@ -129,8 +129,8 @@ DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
     return {Document(makeStatsForNs(pExpCtx, pExpCtx->ns, _collStatsSpec))};
 }
 
-Value DocumentSourceCollStats::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{getSourceName(), _collStatsSpec.toBSON()}});
+Value DocumentSourceCollStats::serialize(const SerializationOptions& opts) const {
+    return Value(Document{{getSourceName(), _collStatsSpec.toBSON(opts)}});
 }
 
 }  // namespace mongo

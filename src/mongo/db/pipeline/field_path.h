@@ -69,9 +69,11 @@ public:
      *
      * Field names are validated using uassertValidFieldName().
      */
-    /* implicit */ FieldPath(std::string inputPath);
-    /* implicit */ FieldPath(StringData inputPath) : FieldPath(inputPath.toString()) {}
-    /* implicit */ FieldPath(const char* inputPath) : FieldPath(std::string(inputPath)) {}
+    /* implicit */ FieldPath(std::string inputPath, bool validateFieldNames = true);
+    /* implicit */ FieldPath(StringData inputPath, bool validateFieldNames = true)
+        : FieldPath(inputPath.toString(), validateFieldNames) {}
+    /* implicit */ FieldPath(const char* inputPath, bool validateFieldNames = true)
+        : FieldPath(std::string(inputPath), validateFieldNames) {}
 
     /**
      * Returns the number of path elements in the field path.
@@ -139,6 +141,7 @@ public:
     std::string fullPathWithPrefix() const {
         return prefix + _fieldPath;
     }
+
     /**
      * A FieldPath like this but missing the first element (useful for recursion).
      * Precondition getPathLength() > 1.

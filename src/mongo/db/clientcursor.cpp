@@ -51,6 +51,7 @@
 #include "mongo/db/cursor_server_params.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/background.h"
@@ -81,6 +82,49 @@ static ServerStatusMetricField<Counter64> dCursorStatsTotalOpened("cursor.totalO
 static ServerStatusMetricField<Counter64> dCursorStatsMoreThanOneBatch(
     "cursor.moreThanOneBatch", &cursorStatsMoreThanOneBatch);
 
+static Counter64 cursorStatsLifespanLessThan1Second;
+static Counter64 cursorStatsLifespanLessThan5Seconds;
+static Counter64 cursorStatsLifespanLessThan15Seconds;
+static Counter64 cursorStatsLifespanLessThan30Seconds;
+static Counter64 cursorStatsLifespanLessThan1Minute;
+static Counter64 cursorStatsLifespanLessThan10Minutes;
+static Counter64 cursorStatsLifespanGreaterThanOrEqual10Minutes;
+
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan1Second(
+    "cursor.lifespan.lessThan1Second", &cursorStatsLifespanLessThan1Second);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan5Seconds(
+    "cursor.lifespan.lessThan5Seconds", &cursorStatsLifespanLessThan5Seconds);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan15Seconds(
+    "cursor.lifespan.lessThan15Seconds", &cursorStatsLifespanLessThan15Seconds);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan30Seconds(
+    "cursor.lifespan.lessThan30Seconds", &cursorStatsLifespanLessThan30Seconds);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan1Minute(
+    "cursor.lifespan.lessThan1Minute", &cursorStatsLifespanLessThan1Minute);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan10Minutes(
+    "cursor.lifespan.lessThan10Minutes", &cursorStatsLifespanLessThan10Minutes);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanGreaterThanOrEqual10Minutes(
+    "cursor.lifespan.greaterThanOrEqual10Minutes", &cursorStatsLifespanGreaterThanOrEqual10Minutes);
+
+void incrementCursorLifespanMetric(Date_t birth, Date_t death) {
+    auto elapsed = death - birth;
+
+    if (elapsed < Seconds(1)) {
+        cursorStatsLifespanLessThan1Second.increment();
+    } else if (elapsed < Seconds(5)) {
+        cursorStatsLifespanLessThan5Seconds.increment();
+    } else if (elapsed < Seconds(15)) {
+        cursorStatsLifespanLessThan15Seconds.increment();
+    } else if (elapsed < Seconds(30)) {
+        cursorStatsLifespanLessThan30Seconds.increment();
+    } else if (elapsed < Minutes(1)) {
+        cursorStatsLifespanLessThan1Minute.increment();
+    } else if (elapsed < Minutes(10)) {
+        cursorStatsLifespanLessThan10Minutes.increment();
+    } else {
+        cursorStatsLifespanGreaterThanOrEqual10Minutes.increment();
+    }
+}
+
 ClientCursor::ClientCursor(ClientCursorParams params,
                            CursorId cursorId,
                            OperationContext* operationUsingCursor,
@@ -105,6 +149,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _planSummary(_exec->getPlanExplainer().getPlanSummary()),
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
+      _queryStatsKeyHash(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.keyHash),
+      _queryStatsKey(std::move(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.key)),
       _opKey(operationUsingCursor->getOperationKey()) {
     invariant(_exec);
     invariant(_operationUsingCursor);
@@ -129,19 +175,33 @@ ClientCursor::~ClientCursor() {
         // needs to keep data pinned.
         _stashedRecoveryUnit->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
     }
+}
+
+void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now) {
+    if (_disposed) {
+        return;
+    }
+
+    if (_queryStatsKeyHash && opCtx) {
+        query_stats::writeQueryStats(opCtx,
+                                     _queryStatsKeyHash,
+                                     std::move(_queryStatsKey),
+                                     _metrics.executionTime.value_or(Microseconds{0}).count(),
+                                     _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
+                                     _metrics.nreturned.value_or(0));
+    }
+
+    if (now) {
+        incrementCursorLifespanMetric(_createdDate, *now);
+    }
 
     cursorStatsOpen.decrement();
     if (isNoTimeout()) {
         cursorStatsOpenNoTimeout.decrement();
     }
 
-    if (_nBatchesReturned > 1)
+    if (_metrics.nBatches && *_metrics.nBatches > 1) {
         cursorStatsMoreThanOneBatch.increment();
-}
-
-void ClientCursor::dispose(OperationContext* opCtx) {
-    if (_disposed) {
-        return;
     }
 
     _exec->dispose(opCtx);
@@ -152,7 +212,7 @@ GenericCursor ClientCursor::toGenericCursor() const {
     GenericCursor gc;
     gc.setCursorId(cursorid());
     gc.setNs(nss());
-    gc.setNDocsReturned(_nReturnedSoFar);
+    gc.setNDocsReturned(_metrics.nreturned.value_or(0));
     gc.setTailable(isTailable());
     gc.setAwaitData(isAwaitData());
     gc.setNoCursorTimeout(isNoTimeout());
@@ -265,24 +325,12 @@ void ClientCursorPin::deleteUnderlying() {
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
     invariant(_cursorManager);
-    // Note the following subtleties of this method's implementation:
-    // - We must unpin the cursor (by clearing the '_operationUsingCursor' field) before
-    //   destruction, since it is an error to delete a pinned cursor.
-    // - In addition, we must deregister the cursor before clearing the '_operationUsingCursor'
-    //   field, since it is an error to unpin a registered cursor without holding the appropriate
-    //   cursor manager mutex. By first deregistering the cursor, we ensure that no other thread can
-    //   access '_cursor', meaning that it is safe for us to write to '_operationUsingCursor'
-    //   without holding the CursorManager mutex.
 
-    _cursorManager->deregisterCursor(_cursor);
-
-    // Make sure the cursor is disposed and unpinned before being destroyed.
-    _cursor->dispose(_opCtx);
-    _cursor->_operationUsingCursor = nullptr;
-    delete _cursor;
+    std::unique_ptr<ClientCursor, ClientCursor::Deleter> ownedCursor(_cursor);
+    _cursor = nullptr;
+    _cursorManager->deregisterAndDestroyCursor(_opCtx, std::move(ownedCursor));
 
     cursorStatsOpenPinned.decrement();
-    _cursor = nullptr;
     _shouldSaveRecoveryUnit = false;
 }
 
@@ -352,6 +400,23 @@ void _appendCursorStats(BSONObjBuilder& b) {
 
 void startClientCursorMonitor() {
     getClientCursorMonitor(getGlobalServiceContext()).go();
+}
+
+void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCursor) {
+    pinnedCursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
+}
+
+void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stats::Key> key) {
+    // If we haven't registered a cursor to prepare for getMore requests, we record
+    // query stats directly.
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    int64_t execTime = opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count();
+    query_stats::writeQueryStats(opCtx,
+                                 opDebug.queryStatsInfo.keyHash,
+                                 std::move(key),
+                                 execTime,
+                                 execTime,
+                                 opDebug.additiveMetrics.nreturned.value_or(0));
 }
 
 }  // namespace mongo

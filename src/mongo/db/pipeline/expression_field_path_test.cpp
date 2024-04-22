@@ -200,6 +200,72 @@ TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue
     ASSERT_VALUE_EQ(Value(), constantExpr->getValue());
 }
 
+TEST(FieldPath, SerializeWithRedaction) {
+    SerializationOptions options = SerializationOptions::kMarkIdentifiers_FOR_TEST;
+
+    auto expCtx = ExpressionContextForTest{};
+    intrusive_ptr<Expression> expression =
+        ExpressionFieldPath::createPathFromString(&expCtx, "bar", expCtx.variablesParseState);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "\"$HASH<bar>\"",
+        expression->serialize(options));
+
+    // Repeat with a dotted path.
+    expression =
+        ExpressionFieldPath::createPathFromString(&expCtx, "a.b.c", expCtx.variablesParseState);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "\"$HASH<a>.HASH<b>.HASH<c>\"",
+        expression->serialize(options));
+
+    auto expr = [&](const std::string& json) {
+        return Expression::parseExpression(&expCtx, fromjson(json), expCtx.variablesParseState);
+    };
+
+    // Expression with multiple field paths.
+    expression = expr(R"({$and: [{$gt: ["$foo", 5]}, {$lt: ["$foo", 10]}]})");
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$and": [
+                {
+                    "$gt": [
+                        "$HASH<foo>",
+                        {
+                            "$const": 5
+                        }
+                    ]
+                },
+                {
+                    "$lt": [
+                        "$HASH<foo>",
+                        {
+                            "$const": 10
+                        }
+                    ]
+                }
+            ]
+        })",
+        expression->serialize(options).getDocument());
+
+    // Test that a variable followed by user fields is properly hashed.
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+
+    expression = expr(R"({$gt: ["$$ROOT.a.b", 5]})");
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$gt":["$$ROOT.HASH<a>.HASH<b>","?number"]})",
+        expression->serialize(options).getDocument());
+
+    expression = expr(R"({$gt: ["$foo", "$$NOW"]})");
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$gt":["$HASH<foo>","$$NOW"]})",
+        expression->serialize(options).getDocument());
+
+    // Repeat the above test with a dotted path.
+    expression = expr(R"({$gt: ["$foo.a.b", "$$NOW"]})");
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$gt":["$HASH<foo>.HASH<a>.HASH<b>","$$NOW"]})",
+        expression->serialize(options).getDocument());
+}
+
 /** The field path itself is a dependency. */
 class Dependencies {
 public:
@@ -424,7 +490,7 @@ public:
             ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b.c");
         ASSERT_BSONOBJ_BINARY_EQ(BSON("foo"
                                       << "$a.b.c"),
-                                 BSON("foo" << expression->serialize(false)));
+                                 BSON("foo" << expression->serialize(SerializationOptions{})));
     }
 };
 
@@ -436,7 +502,7 @@ public:
         intrusive_ptr<Expression> expression =
             ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b.c");
         BSONArrayBuilder bab;
-        bab << expression->serialize(false);
+        bab << expression->serialize(SerializationOptions{});
         ASSERT_BSONOBJ_BINARY_EQ(BSON_ARRAY("$a.b.c"), bab.arr());
     }
 };

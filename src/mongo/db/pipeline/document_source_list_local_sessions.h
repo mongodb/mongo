@@ -101,8 +101,9 @@ public:
         return DocumentSourceListLocalSessions::kStageName.rawData();
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        return Value(Document{{getSourceName(), _spec.toBSON()}});
+    Value serialize(
+        const SerializationOptions& opts = SerializationOptions{}) const final override {
+        return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {

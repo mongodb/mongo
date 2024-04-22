@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 namespace mongo {
 using namespace fmt::literals;
@@ -66,8 +67,11 @@ NamespaceString mergeTargetNssParseFromBSON(const BSONElement& elem) {
 
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
                                    StringData fieldName,
-                                   BSONObjBuilder* bob) {
-    bob->append(fieldName, BSON("db" << targetNss.db() << "coll" << targetNss.coll()));
+                                   BSONObjBuilder* bob,
+                                   const SerializationOptions& opts) {
+    bob->append(fieldName,
+                BSON("db" << opts.serializeIdentifier(targetNss.db()) << "coll"
+                          << opts.serializeIdentifier(targetNss.coll())));
 }
 
 std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem) {
@@ -104,11 +108,12 @@ std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem) {
 
 void mergeOnFieldsSerializeToBSON(const std::vector<std::string>& fields,
                                   StringData fieldName,
-                                  BSONObjBuilder* bob) {
+                                  BSONObjBuilder* bob,
+                                  const SerializationOptions& opts) {
     if (fields.size() == 1) {
-        bob->append(fieldName, fields.front());
+        bob->append(fieldName, opts.serializeFieldPathFromString(fields.front()));
     } else {
-        bob->append(fieldName, fields);
+        bob->append(fieldName, opts.serializeFieldPathFromString(fields));
     }
 }
 

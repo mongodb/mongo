@@ -345,12 +345,27 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
         responseBuilder.setPostBatchResumeToken(ccc->getPostBatchResumeToken());
     }
 
+    bool exhausted = cursorState != ClusterCursorManager::CursorState::NotExhausted;
+    int nShards = ccc->getNumRemotes();
+
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    // Fill out the aggregation metrics in CurOp, and record queryStats metrics, before detaching
+    // the cursor from its opCtx.
+    opDebug.nShards = std::max(opDebug.nShards, nShards);
+    opDebug.cursorExhausted = exhausted;
+    opDebug.additiveMetrics.nBatches = 1;
+    CurOp::get(opCtx)->setEndOfOpMetrics(responseBuilder.numDocs());
+    if (exhausted) {
+        collectQueryStatsMongos(opCtx, ccc->getKey());
+    } else {
+        collectQueryStatsMongos(opCtx, ccc);
+    }
+
     ccc->detachFromOperationContext();
 
-    int nShards = ccc->getNumRemotes();
     CursorId clusterCursorId = 0;
 
-    if (cursorState == ClusterCursorManager::CursorState::NotExhausted) {
+    if (!exhausted) {
         auto authUsers = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames();
         clusterCursorId = uassertStatusOK(Grid::get(opCtx)->getCursorManager()->registerCursor(
             opCtx,
@@ -359,15 +374,8 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
             ClusterCursorManager::CursorType::MultiTarget,
             ClusterCursorManager::CursorLifetime::Mortal,
             authUsers));
+        opDebug.cursorid = clusterCursorId;
     }
-
-    // Fill out the aggregation metrics in CurOp.
-    if (clusterCursorId > 0) {
-        CurOp::get(opCtx)->debug().cursorid = clusterCursorId;
-    }
-    CurOp::get(opCtx)->debug().nShards = std::max(CurOp::get(opCtx)->debug().nShards, nShards);
-    CurOp::get(opCtx)->debug().cursorExhausted = (clusterCursorId == 0);
-    CurOp::get(opCtx)->debug().nreturned = responseBuilder.numDocs();
 
     responseBuilder.done(clusterCursorId, requestedNss.ns());
 
@@ -599,12 +607,13 @@ AggregationTargeter AggregationTargeter::make(
     }();
 
     // Determine whether this aggregation must be dispatched to all shards in the cluster.
-    const bool mustRunOnAll =
-        sharded_agg_helpers::mustRunOnAllShards(executionNss, hasChangeStream, startsWithDocuments);
+    const bool mustRunOnAllShards = sharded_agg_helpers::checkIfMustRunOnAllShards(
+        executionNss, hasChangeStream, startsWithDocuments);
 
     // If we don't have a routing table, then this is either a $changeStream which must run on all
     // shards or a $documents stage which must not.
-    invariant(cm || (mustRunOnAll && hasChangeStream) || (startsWithDocuments && !mustRunOnAll));
+    invariant(cm || (mustRunOnAllShards && hasChangeStream) ||
+              (startsWithDocuments && !mustRunOnAllShards));
 
     // A pipeline is allowed to passthrough to the primary shard iff the following conditions are
     // met:
@@ -616,7 +625,7 @@ AggregationTargeter AggregationTargeter::make(
     //    $currentOp.
     // 4. Doesn't need transformation via DocumentSource::serialize(). For example, list sessions
     //    needs to include information about users that can only be deduced on mongos.
-    if (cm && !cm->isSharded() && !mustRunOnAll && allowedToPassthrough &&
+    if (cm && !cm->isSharded() && !mustRunOnAllShards && allowedToPassthrough &&
         !involvesShardedCollections) {
         return AggregationTargeter{TargetingPolicy::kPassthrough, nullptr, cm};
     } else {

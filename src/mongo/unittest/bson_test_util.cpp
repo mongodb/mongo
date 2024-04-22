@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/unittest/bson_test_util.h"
 
 namespace mongo {

@@ -492,6 +492,8 @@ error_codes:
 
     - {code: 379, name: DatabaseMetadataRefreshCanceled, categories: [InternalOnly]}
 
+    - {code: 387, name: EncounteredFLEPayloadWhileApplyingHmac}
+
     - {code: 388, name: TransactionTooLargeForCache}
 
     # This error code is not generated internally in mongod/s servers, but must be parsed and

@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/list_indexes_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -146,11 +147,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalConvertBucketIndexSta
 }
 
 Value DocumentSourceInternalConvertBucketIndexStats::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+    const SerializationOptions& opts) const {
     MutableDocument out;
-    out.addField(timeseries::kTimeFieldName, Value{_timeseriesOptions.timeField});
+    out.addField(timeseries::kTimeFieldName,
+                 Value{opts.serializeFieldPathFromString(_timeseriesOptions.timeField)});
     if (_timeseriesOptions.metaField) {
-        out.addField(timeseries::kMetaFieldName, Value{*_timeseriesOptions.metaField});
+        out.addField(timeseries::kMetaFieldName,
+                     Value{opts.serializeFieldPathFromString(*_timeseriesOptions.metaField)});
     }
     return Value(DOC(getSourceName() << out.freeze()));
 }

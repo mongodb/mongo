@@ -76,13 +76,10 @@ void InternalSchemaFmodMatchExpression::debugString(StringBuilder& debug,
     debug << "\n";
 }
 
-BSONObj InternalSchemaFmodMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder objMatchBob;
-    BSONArrayBuilder arrBuilder(objMatchBob.subarrayStart("$_internalSchemaFmod"));
-    arrBuilder.append(_divisor);
-    arrBuilder.append(_remainder);
-    arrBuilder.doneFast();
-    return objMatchBob.obj();
+void InternalSchemaFmodMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    bob->append("$_internalSchemaFmod"_sd,
+                BSON_ARRAY(opts.serializeLiteral(_divisor) << opts.serializeLiteral(_remainder)));
 }
 
 bool InternalSchemaFmodMatchExpression::equivalent(const MatchExpression* other) const {

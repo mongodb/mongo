@@ -11,6 +11,7 @@
  *   requires_non_retryable_commands,
  *   # Tenant migrations don't support applyOps.
  *   tenant_migration_incompatible,
+ *   references_foreign_collection,
  * ]
  */
 (function() {

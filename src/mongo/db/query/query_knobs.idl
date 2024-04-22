@@ -29,8 +29,9 @@
 global:
   cpp_namespace: "mongo"
   cpp_includes:
-    - "mongo/db/query/plan_cache_size_parameter.h"
     - "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
+    - "mongo/db/query/util/memory_util.h"
+    - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
     - "mongo/platform/atomic_proxy.h"
     - "mongo/platform/atomic_word.h"
 
@@ -905,6 +906,59 @@ server_parameters:
       lte: 
         expr: 8 * 1024 * 1024 # 8MB
     default: 0
+
+  internalQueryStatsRateLimit:
+    description: "The maximum number of queries per second that are sampled for query stats.
+      If the rate of queries goes above this number, then rate limiting will kick in, and any
+      further queries will not be sampled. To sample all queries, this can be set to -1. This can be
+      set to 0 to turn queryStats off completely."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryStatsRateLimit"
+    cpp_vartype: AtomicWord<int>
+    default: 0
+    validator:
+      gte: -1
+    on_update: query_stats_util::onQueryStatsSamplingRateUpdate
+
+  internalQueryStatsCacheSize:
+    description: "The maximum amount of memory that the system will allocate for the query queryStats
+      cache. This will accept values in either of the following formats:
+      1. <number>% indicates a percentage of the physical memory available to the process. E.g.: 15%.
+      2. <number>(MB|GB), indicates the amount of memory in MB or GB. E.g.: 1.5GB, 100MB.
+      The default value is 1%, which means 1% of the physical memory available to the process."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryStatsCacheSize"
+    cpp_vartype: synchronized_value<std::string>
+    default: "1%"
+    on_update: query_stats_util::onQueryStatsStoreSizeUpdate
+    validator:
+      callback: query_stats_util::validateQueryStatsStoreSize
+
+  internalQueryStatsErrorsAreCommandFatal:
+    description: "Whether errors in the $queryStats stage cause the aggregation pipeline to
+      immediately fail and report the error. Note that this is always the case for debug builds."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryStatsErrorsAreCommandFatal"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalQueryAggMulticastTimeoutMS:
+    description: "Timeout in MS for requests to shard servers when aggregations are sent to all shard servers"
+    set_at: [ startup ]
+    cpp_vartype: int
+    cpp_varname: internalQueryAggMulticastTimeoutMS
+    default: 60000
+    validator:
+      gte: 0
+  
+  internalQueryAggMulticastMaxConcurrency:
+    description: "Max number of concurrent requests when aggregations are sent to all shard servers"
+    set_at: startup
+    cpp_vartype: int
+    cpp_varname: internalQueryAggMulticastMaxConcurrency
+    default: 100
+    validator:
+      gte: 1
 
 # Note for adding additional query knobs:
 #

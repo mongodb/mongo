@@ -1566,11 +1566,12 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
             if (idx > 0) {
                 *ss << ", ";
             }
-            *ss << "{" << groupName << ": " << exprObj->serialize(false).toString() << "}";
+            *ss << "{" << groupName << ": " << exprObj->serialize(SerializationOptions{}).toString()
+                << "}";
             ++idx;
         }
     } else {
-        *ss << "{_id: " << groupByExpression->serialize(false).toString() << "}";
+        *ss << "{_id: " << groupByExpression->serialize(SerializationOptions{}).toString() << "}";
     }
     *ss << '\n';
     addIndent(ss, indent + 1);
@@ -1581,7 +1582,11 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
         }
         auto& acc = accumulators[idx];
         *ss << "{" << acc.fieldName << ": {" << acc.expr.name << ": "
-            << acc.expr.argument->serialize(true).toString() << "}}";
+            << acc.expr.argument
+                   ->serialize(SerializationOptions{
+                       boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)})
+                   .toString()
+            << "}}";
     }
     *ss << "]" << '\n';
     addCommon(ss, indent);

@@ -281,9 +281,50 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
     MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
     auto childCq = assertGet(CanonicalQuery::makeForSubplanner(opCtx.get(), *baseCq, 0));
 
-    BSONObjBuilder expectedFilter;
-    firstClauseExpr->serialize(&expectedFilter);
-    ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getFilter(), expectedFilter.obj());
+    ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getFilter(), firstClauseExpr->serialize());
+
+    ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getProjection(),
+                      baseCq->getFindCommandRequest().getProjection());
+    ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getSort(),
+                      baseCq->getFindCommandRequest().getSort());
+    ASSERT_TRUE(childCq->getExplain());
+}
+
+TEST(CanonicalQueryTest, CanonicalizeFromBaseQueryWithSpecialFeature) {
+    // Like the above test, but use $text which is a 'special feature' not always allowed. This is
+    // meant to reproduce SERVER-XYZ.
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    const bool isExplain = true;
+    const std::string cmdStr = R"({
+        find:'bogusns',
+        filter: {
+            $or:[
+                {a: 'foo'},
+                {$text: {$search: 'bar'}}
+            ]
+        },
+        projection: {a:1},
+        sort: {b:1},
+        $db: 'test'
+    })";
+    auto findCommand = query_request_helper::makeFromFindCommandForTests(fromjson(cmdStr));
+    auto baseCq =
+        assertGet(CanonicalQuery::canonicalize(opCtx.get(),
+                                               std::move(findCommand),
+                                               isExplain,
+                                               nullptr,
+                                               ExtensionsCallbackNoop(),
+                                               MatchExpressionParser::kAllowAllSpecialFeatures));
+
+    // Note: be sure to use the second child to get $text, since we 'normalize' and sort the
+    // MatchExpression tree as part of canonicalization. This will put the text search clause
+    // second.
+    MatchExpression* secondClauseExpr = baseCq->root()->getChild(1);
+    auto childCq = assertGet(CanonicalQuery::makeForSubplanner(opCtx.get(), *baseCq, 1));
+
+    ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getFilter(), secondClauseExpr->serialize());
 
     ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getProjection(),
                       baseCq->getFindCommandRequest().getProjection());

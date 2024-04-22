@@ -91,8 +91,7 @@ public:
                 UnionRequirement::kNotAllowed};
     }
 
-    Value serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     /**
      * Creates a new $out stage from the given arguments.

@@ -32,6 +32,7 @@
 #include <bitset>
 
 #include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast.h"
 
 namespace mongo::projection_executor {

@@ -719,12 +719,9 @@ public:
             // documents.
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
-            cursorPin->incNReturnedSoFar(numResults);
-            cursorPin->incNBatches();
-
-            // Ensure log and profiler include the number of results returned in this getMore's
-            // response batch.
-            curOp->debug().nreturned = numResults;
+            curOp->debug().additiveMetrics.nBatches = 1;
+            curOp->setEndOfOpMetrics(numResults);
+            collectQueryStatsMongod(opCtx, cursorPin);
 
             if (respondWithId) {
                 cursorDeleter.dismiss();

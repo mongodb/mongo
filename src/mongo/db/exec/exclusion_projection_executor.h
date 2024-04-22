@@ -99,10 +99,12 @@ protected:
  */
 class ExclusionProjectionExecutor : public ProjectionExecutor {
 public:
-    ExclusionProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                ProjectionPolicies policies,
-                                bool allowFastPath = false)
-        : ProjectionExecutor(expCtx, policies), _root(new ExclusionNode(_policies)) {}
+    ExclusionProjectionExecutor(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        ProjectionPolicies policies,
+        bool allowFastPath = false,
+        boost::optional<projection_ast::ProjectionPathASTNode> proj = boost::none)
+        : ProjectionExecutor(expCtx, policies, proj), _root(new ExclusionNode(_policies)) {}
 
     TransformerType getType() const final {
         return TransformerType::kExclusionProjection;
@@ -116,16 +118,17 @@ public:
         return _root.get();
     }
 
-    Document serializeTransformation(
-        boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
+                                     const SerializationOptions& options = {}) const final {
         MutableDocument output;
 
         // The ExclusionNode tree in '_root' will always have a top-level _id node if _id is to be
         // excluded. If the _id node is not present, then explicitly set {_id: true} to avoid
         // ambiguity in the expected behavior of the serialized projection.
-        _root->serialize(explain, &output);
-        if (output.peek()["_id"].missing()) {
-            output.addField("_id", Value{true});
+        _root->serialize(explain, &output, options);
+        auto idFieldName = options.serializeFieldPath("_id");
+        if (output.peek()[idFieldName].missing()) {
+            output.addField(idFieldName, Value{true});
         }
         return output.freeze();
     }

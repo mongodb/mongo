@@ -144,7 +144,7 @@ TEST(AssertUtils, UassertNamedCodeWithTwoCategories) {
 }
 
 MONGO_STATIC_ASSERT(!error_details::isNamedCode<19999>);
-// ExceptionFor<ErrorCodes::Error(19999)> invalidType;  // Must not compile.
+// ExceptionFor<ErrorCodes::Error19999)> invalidType;  // Must not compile.
 
 TEST(AssertUtils, UassertNumericCode) {
     ASSERT_CATCHES(19999, DBException);

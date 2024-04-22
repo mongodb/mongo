@@ -74,13 +74,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
     return new DocumentSourceListSessions(query, pExpCtx, spec.getAllUsers(), spec.getUsers());
 }
 
-Value DocumentSourceListSessions::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceListSessions::serialize(const SerializationOptions& opts) const {
     ListSessionsSpec spec;
     spec.setAllUsers(_allUsers);
     spec.setUsers(_users);
     spec.setPredicate(_predicate);
-    return Value(Document{{getSourceName(), spec.toBSON()}});
+    return Value(Document{{getSourceName(), spec.toBSON(opts)}});
 }
 
 }  // namespace mongo

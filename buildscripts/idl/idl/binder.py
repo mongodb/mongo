@@ -271,6 +271,7 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     ast_struct.qualified_cpp_name = _get_struct_qualified_cpp_name(struct)
     ast_struct.allow_global_collection_name = struct.allow_global_collection_name
     ast_struct.non_const_getter = struct.non_const_getter
+    ast_struct.query_shape_component = struct.query_shape_component
 
     # Validate naming restrictions
     if ast_struct.name.startswith("array<"):
@@ -306,6 +307,20 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
 
             if not _is_duplicate_field(ctxt, ast_struct.name, ast_struct.fields, ast_field):
                 ast_struct.fields.append(ast_field)
+
+            # Verify that each field on the struct defines a query shape type on the field if and only if
+            # query_shape_component is defined on the struct.
+            if not field.hidden and struct.query_shape_component and ast_field.query_shape is None:
+                ctxt.add_must_declare_shape_type(ast_field, ast_struct.name, ast_field.name)
+
+            if not struct.query_shape_component and ast_field.query_shape is not None:
+                ctxt.add_must_be_query_shape_component(ast_field, ast_struct.name, ast_field.name)
+
+            if ast_field.query_shape == ast.QueryShapeFieldType.ANONYMIZE and not (
+                    ast_field.type.cpp_type in ["std::string", "std::vector<std::string>"]
+                    or 'string' in ast_field.type.bson_serialization_type):
+                ctxt.add_query_shape_anonymize_must_be_string(ast_field, ast_field.name,
+                                                              ast_field.type.cpp_type)
 
     # Fill out the field comparison_order property as needed
     if ast_struct.generate_comparison_operators and ast_struct.fields:
@@ -420,6 +435,7 @@ def _bind_struct_type(struct):
     ast_type.name = struct.name
     ast_type.cpp_type = _get_struct_qualified_cpp_name(struct)
     ast_type.bson_serialization_type = ["object"]
+    ast_type.is_query_shape_component = struct.query_shape_component
     return ast_type
 
 
@@ -969,6 +985,7 @@ def _bind_type(idltype):
     ast_type.bindata_subtype = idltype.bindata_subtype
     ast_type.serializer = _normalize_method_name(idltype.cpp_type, idltype.serializer)
     ast_type.deserializer = _normalize_method_name(idltype.cpp_type, idltype.deserializer)
+    ast_type.is_query_shape_component = True
     return ast_type
 
 
@@ -992,6 +1009,11 @@ def _bind_field(ctxt, parsed_spec, field):
     ast_field.non_const_getter = field.non_const_getter
     ast_field.unstable = field.unstable
     ast_field.always_serialize = field.always_serialize
+
+    if field.query_shape is not None:
+        ast_field.query_shape = ast.QueryShapeFieldType.bind(field.query_shape)
+        if ast_field.query_shape is None:
+            ctxt.add_invalid_query_shape_value(ast_field, field.query_shape)
 
     ast_field.cpp_name = field.name
     if field.cpp_name:
@@ -1073,6 +1095,8 @@ def _bind_field(ctxt, parsed_spec, field):
         if ast_field.validator is None:
             return None
 
+    if ast_field.should_shapify and not ast_field.type.is_query_shape_component:
+        ctxt.add_must_be_query_shape_component(ast_field, ast_field.type.name, ast_field.name)
     return ast_field
 
 

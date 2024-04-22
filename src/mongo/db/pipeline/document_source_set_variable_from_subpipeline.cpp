@@ -54,13 +54,12 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(
     // to check the FCV.
     feature_flags::gFeatureFlagSearchShardedFacets.isEnabledAndIgnoreFCV());
 
-Value DocumentSourceSetVariableFromSubPipeline::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceSetVariableFromSubPipeline::serialize(const SerializationOptions& opts) const {
     const auto var = "$$" + Variables::getBuiltinVariableName(_variableID);
     SetVariableFromSubPipelineSpec spec;
     tassert(625298, "SubPipeline cannot be null during serialization", _subPipeline);
-    spec.setSetVariable(var);
-    spec.setPipeline(_subPipeline->serializeToBson(explain));
+    spec.setSetVariable(opts.serializeIdentifier(var));
+    spec.setPipeline(_subPipeline->serializeToBson(opts));
     return Value(DOC(getSourceName() << spec.toBSON()));
 }
 

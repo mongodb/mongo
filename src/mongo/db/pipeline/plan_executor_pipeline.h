@@ -29,12 +29,14 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
 #include <queue>
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 namespace mongo {
 
@@ -155,7 +157,9 @@ public:
      * providing the level of detail specified by 'verbosity'.
      */
     std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const {
-        return _pipeline->writeExplainOps(verbosity);
+        auto opts = SerializationOptions{};
+        opts.verbosity = verbosity;
+        return _pipeline->writeExplainOps(opts);
     }
 
     void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {}

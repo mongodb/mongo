@@ -61,6 +61,7 @@ namespace mongo::logv2 {
     X(kNetwork,                , "network"               , "NETWORK" , kDefault) \
     X(kProcessHealth,          , "processHealth"         , "HEALTH"  , kDefault) \
     X(kQuery,                  , "query"                 , "QUERY"   , kDefault) \
+    X(kQueryStats,             , "queryStats"            , "QRYSTATS", kDefault) \
     X(kReplication,            , "replication"           , "REPL"    , kDefault) \
     X(kReplicationElection,    , "election"              , "ELECTION", kReplication) \
     X(kReplicationHeartbeats,  , "heartbeats"            , "REPL_HB" , kReplication) \

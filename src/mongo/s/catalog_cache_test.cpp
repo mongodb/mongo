@@ -33,6 +33,8 @@
 
 #include <boost/optional/optional_io.hpp>
 
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader_mock.h"

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include <boost/optional.hpp>
 #include <functional>
 
@@ -36,6 +37,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
@@ -205,29 +207,28 @@ public:
      * Increments the cursor's tracked number of query results returned so far by 'n'.
      */
     void incNReturnedSoFar(std::uint64_t n) {
-        _nReturnedSoFar += n;
+        _metrics.incrementNreturned(n);
     }
 
-    /**
-     * Sets the cursor's tracked number of query results returned so far to 'n'.
-     */
-    void setNReturnedSoFar(std::uint64_t n) {
-        invariant(n >= _nReturnedSoFar);
-        _nReturnedSoFar = n;
+    void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics) {
+        _metrics.add(newMetrics);
+        if (!_firstResponseExecutionTime) {
+            _firstResponseExecutionTime = _metrics.executionTime;
+        }
     }
 
     /**
      * Returns the number of batches returned by this cursor so far.
      */
     std::uint64_t getNBatches() const {
-        return _nBatchesReturned;
+        return _metrics.nBatches.value_or(0);
     }
 
     /**
      * Increments the number of batches returned so far by one.
      */
     void incNBatches() {
-        ++_nBatchesReturned;
+        _metrics.incrementNBatches();
     }
 
     Date_t getLastUseDate() const {
@@ -353,9 +354,10 @@ private:
     /**
      * Disposes this ClientCursor's PlanExecutor. Must be called before deleting a ClientCursor to
      * ensure it has a chance to clean up any resources it is using. Can be called multiple times.
-     * It is an error to call any other method after calling dispose().
+     * It is an error to call any other method after calling dispose(). If 'now' is specified,
+     * will track cursor lifespan metrics.
      */
-    void dispose(OperationContext* opCtx);
+    void dispose(OperationContext* opCtx, boost::optional<Date_t> now);
 
     bool isNoTimeout() const {
         return _isNoTimeout;
@@ -388,13 +390,6 @@ private:
     // Tracks whether dispose() has been called, to make sure it happens before destruction. It is
     // an error to use a ClientCursor once it has been disposed.
     bool _disposed = false;
-
-    // Tracks the number of results returned by this cursor so far. Tracked only as debugging info
-    // for display in $currentOp output.
-    std::uint64_t _nReturnedSoFar = 0;
-
-    // Tracks the number of batches returned by this cursor so far.
-    std::uint64_t _nBatchesReturned = 0;
 
     // Holds an owned copy of the command specification received from the client.
     const BSONObj _originatingCommand;
@@ -450,11 +445,22 @@ private:
     boost::optional<uint32_t> _planCacheKey;
     boost::optional<uint32_t> _queryHash;
 
+    // If boost::none, query stats should not be collected for this cursor.
+    boost::optional<std::size_t> _queryStatsKeyHash;
+    // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
+    // Useful for diagnostics like queryStats.
+    OpDebug::AdditiveMetrics _metrics;
+    // The Key used by query stats to generate the query stats store key.
+    std::unique_ptr<query_stats::Key> _queryStatsKey;
+
     // The client OperationKey associated with this cursor.
     boost::optional<OperationKey> _opKey;
 
     // Flag indicating that a client has requested to kill the cursor.
     bool _killPending = false;
+
+    // The execution time collected from the initial operation prior to any getMore requests.
+    boost::optional<Microseconds> _firstResponseExecutionTime;
 };
 
 /**
@@ -562,4 +568,17 @@ private:
 
 void startClientCursorMonitor();
 
+
+/**
+ * Records certain metrics for the current operation on OpDebug and aggregates those metrics for
+ * query stats use. If a cursor pin is provided, metrics are aggregated on the cursor; otherwise,
+ * metrics are written directly to the query stats store.
+ * NOTE: Metrics are taken from opDebug.additiveMetrics, so CurOp::setEndOfOpMetrics must be called
+ * *prior* to calling these.
+ *
+ * Currently, query stats are only collected for find and aggregate requests (and their subsequent
+ * getMore requests), so these should only be called from those request paths.
+ */
+void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& cursor);
+void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stats::Key> key);
 }  // namespace mongo

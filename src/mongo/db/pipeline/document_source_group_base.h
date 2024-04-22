@@ -54,7 +54,7 @@ public:
     using Accumulators = std::vector<boost::intrusive_ptr<AccumulatorState>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     GetModPathsReturn getModifiedPaths() const final;
@@ -200,7 +200,7 @@ protected:
     }
 
     virtual void serializeAdditionalFields(
-        MutableDocument& out, boost::optional<ExplainOptions::Verbosity> explain) const {};
+        MutableDocument& out, const SerializationOptions& opts = SerializationOptions{}) const {};
 
     // If the expression for the '_id' field represents a non-empty object, we track its fields'
     // names in '_idFieldNames'.

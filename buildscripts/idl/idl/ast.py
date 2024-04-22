@@ -34,6 +34,7 @@ This is a lossy translation from the IDL Syntax tree as the IDL AST only contain
 the enums and structs that need code generated for them, and just enough information to do that.
 """
 from abc import ABCMeta, abstractmethod
+import enum
 from typing import Any, Dict, List, Optional
 
 from . import common, errors
@@ -113,6 +114,9 @@ class Type(common.SourceLocation):
         # A variant can have at most one alternative type which is a struct. Otherwise, if we saw
         # a sub-object while parsing BSON, we wouldn't know which struct to interpret it as.
         self.variant_struct_type = None  # type: Type
+        # Marks whether this type is a query shape component.
+        # Can only be true if is_struct is true.
+        self.is_query_shape_component = False  # type: bool
         super(Type, self).__init__(file_name, line, column)
 
 
@@ -144,6 +148,9 @@ class Struct(common.SourceLocation):
         self.allow_global_collection_name = False  # type: bool
         self.non_const_getter = False  # type: bool
         self.cpp_validator_func = None  # type: str
+
+        # Determines whether or not this IDL struct can be a component of a query shape. See WRITING-13831.
+        self.query_shape_component = False  # type: bool
         super(Struct, self).__init__(file_name, line, column)
 
 
@@ -182,6 +189,34 @@ class Validator(common.SourceLocation):
         self.callback = None  # type: Optional[str]
 
         super(Validator, self).__init__(file_name, line, column)
+
+
+@enum.unique
+class QueryShapeFieldType(enum.Enum):
+    """Enum describing how to treat a field in the context of query shape computation."""
+
+    # Abstract literal from shape.
+    LITERAL = enum.auto()
+    # Leave value as-is in shape.
+    PARAMETER = enum.auto()
+    # Anonymize string value.
+    ANONYMIZE = enum.auto()
+    # IDL type uses custom serializer -- defer to that serializer.
+    CUSTOM = enum.auto()
+
+    @classmethod
+    def bind(cls, string_value):
+        # type: (Optional[str]) -> Optional[QueryShapeFieldType]
+        """Parses the string to the enum type."""
+        if string_value is None:
+            return None
+        bindings = {
+            "literal": cls.LITERAL,
+            "parameter": cls.PARAMETER,
+            "anonymize": cls.ANONYMIZE,
+            "custom": cls.CUSTOM,
+        }
+        return bindings.get(string_value, None)
 
 
 class Field(common.SourceLocation):
@@ -223,7 +258,25 @@ class Field(common.SourceLocation):
         # Validation rules.
         self.validator = None  # type: Optional[Validator]
 
+        # Determines whether or not this field represents a literal value that should be abstracted when serializing a query shape.
+        # See WRITING-13831 for details on query shape.
+        self.query_shape = None  # type: Optional[QueryShapeFieldType]
+
         super(Field, self).__init__(file_name, line, column)
+
+    @property
+    def should_serialize_with_options(self):
+        # type: () -> bool
+        """Returns true if the IDL compiler should add a call to serialization options for this field."""
+        return self.query_shape is not None and self.query_shape in [
+            QueryShapeFieldType.LITERAL, QueryShapeFieldType.ANONYMIZE
+        ]
+
+    @property
+    def should_shapify(self):
+        # type: () -> bool
+        """Returns true if the IDL compiler should treat this field as a query literal."""
+        return self.query_shape is not None and self.query_shape != QueryShapeFieldType.PARAMETER
 
 
 class Privilege(common.SourceLocation):

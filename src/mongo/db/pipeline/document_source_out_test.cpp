@@ -114,5 +114,24 @@ TEST_F(DocumentSourceOutTest, SerializeToString) {
     ASSERT_EQ(reSerialized["$out"]["coll"].getStringData(), "some_collection");
 }
 
+TEST_F(DocumentSourceOutTest, Redaction) {
+    auto spec = fromjson(R"({
+            $out: {
+                db: "foo",
+                coll: "bar"
+            }
+        })");
+    auto docSource = DocumentSourceOut::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            $out: {
+                coll: "HASH<bar>",
+                db: "HASH<foo>"
+            }
+        })",
+        redact(*docSource));
+}
+
 }  // namespace
 }  // namespace mongo

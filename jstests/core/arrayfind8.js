@@ -81,7 +81,6 @@ function checkQuery(subQuery, bothMatch, elemMatch, nonElemMatch, additionalCons
     insertValueIfNotNull(bothMatch);
     insertValueIfNotNull(elemMatch);
     insertValueIfNotNull(nonElemMatch);
-
     checkMatch(bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatchQuery, 'unindexed');
 
     // Check matching and index bounds for a single key index.

@@ -372,24 +372,25 @@ void DocumentSourceBucketAuto::doDispose() {
     _sortedInput.reset();
 }
 
-Value DocumentSourceBucketAuto::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceBucketAuto::serialize(const SerializationOptions& opts) const {
     MutableDocument insides;
 
-    insides["groupBy"] = _groupByExpression->serialize(static_cast<bool>(explain));
-    insides["buckets"] = Value(_nBuckets);
+    insides["groupBy"] = _groupByExpression->serialize(opts);
+    insides["buckets"] = opts.serializeLiteral(_nBuckets);
 
     if (_granularityRounder) {
-        insides["granularity"] = Value(_granularityRounder->getName());
+        //"granularity" only supports some strings, so a specific representative value is used if
+        // necessary.
+        insides["granularity"] =
+            opts.serializeLiteral(_granularityRounder->getName(), Value("R5"_sd));
     }
 
     MutableDocument outputSpec(_accumulatedFields.size());
     for (auto&& accumulatedField : _accumulatedFields) {
         intrusive_ptr<AccumulatorState> accum = accumulatedField.makeAccumulator();
-        outputSpec[accumulatedField.fieldName] =
-            Value(accum->serialize(accumulatedField.expr.initializer,
-                                   accumulatedField.expr.argument,
-                                   static_cast<bool>(explain)));
+        outputSpec[opts.serializeFieldPathFromString(accumulatedField.fieldName)] =
+            Value(accum->serialize(
+                accumulatedField.expr.initializer, accumulatedField.expr.argument, opts));
     }
     insides["output"] = outputSpec.freezeToValue();
 

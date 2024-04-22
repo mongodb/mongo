@@ -71,8 +71,9 @@ public:
     }
 
 private:
-    virtual Value serialize(boost::optional<ExplainOptions::Verbosity>) const override {
-        MONGO_UNREACHABLE;
+    virtual Value serialize(
+        const SerializationOptions& opts = SerializationOptions{}) const final override {
+        MONGO_UNREACHABLE_TASSERT(7484301);
     }
 };
 

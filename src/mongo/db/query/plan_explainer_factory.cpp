@@ -34,6 +34,8 @@
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/util/duration.h"
+#include <ratio>
 
 namespace mongo::plan_explainer_factory {
 std::unique_ptr<PlanExplainer> make(PlanStage* root) {

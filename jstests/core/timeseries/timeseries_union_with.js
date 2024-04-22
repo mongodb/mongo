@@ -8,6 +8,7 @@
  *   # migrations may result in writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
  *   tenant_migration_incompatible,
+ *   references_foreign_collection,
  * ]
  */
 (function() {

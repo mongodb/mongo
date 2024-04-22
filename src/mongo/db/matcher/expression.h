@@ -41,6 +41,7 @@
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matchable.h"
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -477,19 +478,42 @@ public:
     void addDependencies(DepsTracker* deps) const;
 
     /**
-     * Serialize the MatchExpression to BSON, appending to 'out'. Output of this method is expected
-     * to be a valid query object, that, when parsed, produces a logically equivalent
-     * MatchExpression. If 'includePath' is false then the serialization should assume it's in a
-     * context where the path has been serialized elsewhere, such as within an $elemMatch value.
+     * Serialize the MatchExpression to BSON, appending to 'out'.
+     *
+     * See 'SerializationOptions' for some options.
+     *
+     * Generally, the output of this method is expected to be a valid query object that, when
+     * parsed, produces a logically equivalent MatchExpression. However, if special options are set,
+     * this no longer holds.
+     *
+     * If 'options.literalPolicy' is set to 'kToDebugTypeString', the result is no longer expected
+     * to re-parse, since we will put strings in places where strings may not be accpeted
+     * syntactically (e.g. a number is always expected, as in with the $mod expression).
+     *
+     * includePath:
+     * If set to false, serializes without including the path. For example {a: {$gt: 2}} would
+     * serialize as just {$gt: 2}.
+     *
+     * It is expected that most callers want to set 'includePath' to true to get a correct
+     * serialization. Internally, we may set this to false if we have a situation where an outer
+     * expression serializes a path and we don't want to repeat the path in the inner expression.
+
+     * For example in {a: {$elemMatch: {$eq: 2}}} the "a" is serialized by the $elemMatch, and
+     * should not be serialized by the EQ child.
+     * The $elemMatch will serialize {a: {$elemMatch: <recurse>}} and the EQ will serialize just
+     * {$eq: 2} instead of its usual {a: {$eq: 2}}.
      */
-    virtual void serialize(BSONObjBuilder* out, bool includePath = true) const = 0;
+    virtual void serialize(BSONObjBuilder* out,
+                           const SerializationOptions& options = {},
+                           bool includePath = true) const = 0;
 
     /**
-     * Convenience method which serializes this MatchExpression to a BSONObj.
+     * Convenience method which serializes this MatchExpression to a BSONObj. See the override with
+     * a BSONObjBuilder* argument for details.
      */
-    BSONObj serialize(bool includePath = true) const {
+    BSONObj serialize(const SerializationOptions& options = {}, bool includePath = true) const {
         BSONObjBuilder bob;
-        serialize(&bob, includePath);
+        serialize(&bob, options, includePath);
         return bob.obj();
     }
 

@@ -142,7 +142,6 @@ public:
                 opCtx, !Pipeline::aggHasWriteStage(_request.body));
 
             uassertStatusOK(runAggregate(opCtx,
-                                         _aggregationRequest.getNamespace(),
                                          _aggregationRequest,
                                          _liteParsedPipeline,
                                          _request.body,
@@ -165,7 +164,6 @@ public:
                      rpc::ReplyBuilderInterface* result) override {
 
             uassertStatusOK(runAggregate(opCtx,
-                                         _aggregationRequest.getNamespace(),
                                          _aggregationRequest,
                                          _liteParsedPipeline,
                                          _request.body,

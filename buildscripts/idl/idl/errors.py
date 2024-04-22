@@ -128,6 +128,12 @@ ERROR_ID_DUPLICATE_ACCESS_CHECK = "ID0087"
 ERROR_ID_DUPLICATE_PRIVILEGE = "ID0088"
 ERROR_ID_EMPTY_ACCESS_CHECK = "ID0089"
 ERROR_ID_MISSING_ACCESS_CHECK = "ID0090"
+ERROR_ID_FIELD_MUST_DECLARE_SHAPE_LITERAL = "ID0094"
+ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL = "ID0095"
+ERROR_ID_INVALID_TYPE_FOR_SHAPIFY = "ID0096"
+ERROR_ID_QUERY_SHAPE_PROPERTIES_MUTUALLY_EXCLUSIVE = "ID0097"
+ERROR_ID_QUERY_SHAPE_PROPERTY_CANNOT_BE_FALSE = "ID0098"
+ERROR_ID_QUERY_SHAPE_INVALID_VALUE = "ID0102"
 
 
 class IDLError(Exception):
@@ -368,6 +374,15 @@ class ParserContext(object):
         if node.value == "true":
             return True
         return False
+
+    def get_required_bool(self, node):
+        # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> bool
+        """Get a YAML bool and enforce it is specified."""
+        boolean_value = yaml.safe_load(node.value)
+        if not isinstance(boolean_value, bool):
+            self._add_node_error(node, ERROR_ID_IS_NODE_VALID_BOOL,
+                                 "Illegal bool value, expected either 'true' or 'false'.")
+        return boolean_value
 
     def get_list(self, node):
         # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> List[str]
@@ -966,6 +981,34 @@ class ParserContext(object):
         # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_MISSING_ACCESS_CHECK,
                         'Command "%s" has api_version != "" but is missing access_check.' % (name))
+
+    def add_must_declare_shape_type(self, location, struct_name, field_name):
+        # type: (common.SourceLocation, str, str) -> None
+        """Add an error about a field not specifying either query_shape_literal or query_shape_anonymize if the struct is query_shape_component."""
+        self._add_error(
+            location, ERROR_ID_FIELD_MUST_DECLARE_SHAPE_LITERAL,
+            f"Field '{field_name}' must specify either 'query_shape_literal' or 'query_shape_anonymize' since struct '{struct_name}' is a query shape component."
+        )
+
+    def add_must_be_query_shape_component(self, location, struct_name, field_name):
+        # type: (common.SourceLocation, str, str) -> None
+        """Add an error about specifying 'query_shape_literal' without being a shape component."""
+        self._add_error(
+            location, ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL,
+            f"Field '{field_name}' cannot specify 'query_shape_literal' property since struct '{struct_name}' is not a query shape component."
+        )
+
+    def add_query_shape_anonymize_must_be_string(self, location, field_name, field_type):
+        """Add an error about field paths needing to be strings."""
+        self._add_error(
+            location, ERROR_ID_INVALID_TYPE_FOR_SHAPIFY,
+            f"In order for {field_name} to be marked as a query shape fieldpath, it must have a string type, not {field_type}."
+        )
+
+    def add_invalid_query_shape_value(self, location, query_shape_value):
+        """Assert that the query shape value is one of the accepted values."""
+        self._add_error(location, ERROR_ID_QUERY_SHAPE_INVALID_VALUE,
+                        f"'{query_shape_value}' is not a valid value for 'query_shape'.")
 
 
 def _assert_unique_error_messages():

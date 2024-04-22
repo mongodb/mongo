@@ -211,15 +211,27 @@ public:
      */
     virtual boost::optional<uint32_t> getQueryHash() const = 0;
 
+    virtual boost::optional<std::size_t> getQueryStatsKeyHash() const = 0;
     /**
      * Returns the number of batches returned by this cursor.
      */
-    virtual std::uint64_t getNBatches() const = 0;
+    std::uint64_t getNBatches() const {
+        return _metrics.nBatches.value_or(0);
+    }
 
     /**
      * Increment the number of batches returned so far by one.
      */
-    virtual void incNBatches() = 0;
+    void incNBatches() {
+        _metrics.incrementNBatches();
+    }
+
+    void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics) {
+        _metrics.add(newMetrics);
+        if (!_firstResponseExecutionTime) {
+            _firstResponseExecutionTime = _metrics.executionTime;
+        }
+    }
 
     //
     // maxTimeMS support.
@@ -244,6 +256,20 @@ public:
     void setLeftoverMaxTimeMicros(Microseconds leftoverMaxTimeMicros) {
         _leftoverMaxTimeMicros = leftoverMaxTimeMicros;
     }
+
+    /**
+     * Returns and releases ownership of the Key associated with the request this
+     * cursor is handling.
+     */
+    virtual std::unique_ptr<query_stats::Key> getKey() = 0;
+
+protected:
+    // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
+    // Useful for diagnostics like queryStats.
+    OpDebug::AdditiveMetrics _metrics;
+
+    // The execution time collected from the initial operation prior to any getMore requests.
+    boost::optional<Microseconds> _firstResponseExecutionTime;
 
 private:
     // Unused maxTime budget for this cursor.

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include <boost/optional.hpp>
 #include <string>
 #include <vector>
@@ -54,7 +55,8 @@ struct MergeWhenMatchedPolicy {
  */
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
                                    StringData fieldName,
-                                   BSONObjBuilder* bob);
+                                   BSONObjBuilder* bob,
+                                   const SerializationOptions& opts = {});
 NamespaceString mergeTargetNssParseFromBSON(const BSONElement& elem);
 
 /**
@@ -63,7 +65,8 @@ NamespaceString mergeTargetNssParseFromBSON(const BSONElement& elem);
  */
 void mergeOnFieldsSerializeToBSON(const std::vector<std::string>& fields,
                                   StringData fieldName,
-                                  BSONObjBuilder* bob);
+                                  BSONObjBuilder* bob,
+                                  const SerializationOptions& opts = {});
 std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem);
 
 /**

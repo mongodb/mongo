@@ -62,8 +62,10 @@ public:
         debug << name() << ": 1\n";
     }
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final {
-        out->append(name(), 1);
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const final {
+        opts.appendLiteral(out, name(), 1);
     }
 
     bool equivalent(const MatchExpression* other) const final {

@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 /**
@@ -47,7 +49,6 @@ public:
     PlanExplainerImpl(PlanStage* root, const PlanEnumeratorExplainInfo& explainInfo)
         : PlanExplainer{explainInfo}, _root{root} {}
     PlanExplainerImpl(PlanStage* root) : _root{root} {}
-
     const ExplainVersion& getVersion() const final;
     bool isMultiPlan() const final;
     std::string getPlanSummary() const final;

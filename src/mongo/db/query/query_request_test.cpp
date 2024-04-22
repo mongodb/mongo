@@ -36,6 +36,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"

@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/s/query/sharded_agg_test_fixture.h"

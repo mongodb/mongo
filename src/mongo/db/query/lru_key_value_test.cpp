@@ -64,15 +64,15 @@ struct ValueType {
 struct TrivialBudgetEstimator {
     static constexpr size_t kSize = 1;
 
-    size_t operator()(const ValueType&) {
+    size_t operator()(const int&, const ValueType&) {
         return kSize;
     }
 
-    size_t operator()(const std::shared_ptr<int>&) {
+    size_t operator()(const int&, const std::unique_ptr<int>&) {
         return kSize;
     }
 
-    size_t operator()(const std::unique_ptr<int>&) {
+    size_t operator()(const int&, const std::shared_ptr<int>) {
         return kSize;
     }
 };
@@ -87,7 +87,7 @@ struct NonTrivialEntry {
 };
 
 struct NonTrivialBudgetEstimator {
-    size_t operator()(const std::shared_ptr<NonTrivialEntry>& value) {
+    size_t operator()(const int& key, const std::shared_ptr<NonTrivialEntry> value) {
         return value->budgetSize;
     }
 };
@@ -95,8 +95,40 @@ struct NonTrivialBudgetEstimator {
 using NonTrivialTestSharedPtrValue =
     LRUKeyValue<size_t, std::shared_ptr<NonTrivialEntry>, NonTrivialBudgetEstimator>;
 
-template <typename Key, typename Value, typename Estimator>
-void assertInKVStore(LRUKeyValue<Key, Value, Estimator>& cache, Key key, Value value) {
+class NonTrivialInsertionEvictionListener {
+public:
+    NonTrivialInsertionEvictionListener() {
+        keyTotal = 0;
+        valueTotal = 0;
+        budgetTotal = 0;
+    }
+
+    void onInsert(const int& k, const ValueType& v, size_t budget) {
+        keyTotal += k;
+        valueTotal += v.val;
+        budgetTotal += budget;
+    }
+
+    void onEvict(const int& k, const ValueType& v, size_t budget) {
+        keyTotal -= k;
+        valueTotal -= v.val;
+        budgetTotal -= budget;
+    }
+
+    void onClear(size_t budget) {
+        budgetTotal -= budget;
+    }
+
+    static size_t keyTotal;
+    static size_t valueTotal;
+    static size_t budgetTotal;
+};
+size_t NonTrivialInsertionEvictionListener::keyTotal;
+size_t NonTrivialInsertionEvictionListener::valueTotal;
+size_t NonTrivialInsertionEvictionListener::budgetTotal;
+
+template <typename Key, typename Value, typename Estimator, typename Listener>
+void assertInKVStore(LRUKeyValue<Key, Value, Estimator, Listener>& cache, Key key, Value value) {
     ASSERT_TRUE(cache.hasKey(key));
     auto s = cache.get(key);
     ASSERT(s.isOK());
@@ -105,8 +137,8 @@ void assertInKVStore(LRUKeyValue<Key, Value, Estimator>& cache, Key key, Value v
     ASSERT_EQUALS(*(kvItr->second), *value);
 }
 
-template <typename Key, typename Value, typename Estimator>
-void assertNotInKVStore(LRUKeyValue<Key, Value, Estimator>& cache, Key key) {
+template <typename Key, typename Value, typename Estimator, typename Listener>
+void assertNotInKVStore(LRUKeyValue<Key, Value, Estimator, Listener>& cache, Key key) {
     ASSERT_FALSE(cache.hasKey(key));
     auto s = cache.get(key);
     ASSERT(!s.isOK());
@@ -295,10 +327,10 @@ TEST(LRUKeyValueTest, IterationTest) {
     cache.add(2, std::make_shared<int>(2));
 
     auto i = cache.begin();
-    ASSERT_EQUALS(i->first, 2);
+    ASSERT_EQUALS(*i->first, 2);
     ASSERT_EQUALS(*i->second, 2);
     ++i;
-    ASSERT_EQUALS(i->first, 1);
+    ASSERT_EQUALS(*i->first, 1);
     ASSERT_EQUALS(*i->second, 1);
     ++i;
     ASSERT(i == cache.end());
@@ -356,7 +388,8 @@ TEST(LRUKeyValueTest, UniquePtrKeyValue) {
     assertNotInKVStore(cacheForEviction, 1);  // The entry with key '1' has been Evicted.
 }
 
-using TestScalarValue = LRUKeyValue<int, ValueType, TrivialBudgetEstimator>;
+using TestScalarValue =
+    LRUKeyValue<int, ValueType, TrivialBudgetEstimator, NonTrivialInsertionEvictionListener>;
 
 void assertValueInKVStore(TestScalarValue& cache, int key, ValueType value) {
     ASSERT_TRUE(cache.hasKey(key));
@@ -373,8 +406,16 @@ TEST(LRUKeyValueTest, ScalarKeyValue) {
     assertValueInKVStore(cache, 1, ValueType{2});
     assertNotInKVStore(cache, 3);
 
+    ASSERT_EQUALS(NonTrivialInsertionEvictionListener::keyTotal, 1);
+    ASSERT_EQUALS(NonTrivialInsertionEvictionListener::valueTotal, 2);
+    ASSERT_EQUALS(NonTrivialInsertionEvictionListener::budgetTotal, 1);
+
     cache.add(1, ValueType{3});
     assertValueInKVStore(cache, 1, ValueType{3});
+
+    ASSERT_EQUALS(NonTrivialInsertionEvictionListener::keyTotal, 1);
+    ASSERT_EQUALS(NonTrivialInsertionEvictionListener::valueTotal, 3);
+    ASSERT_EQUALS(NonTrivialInsertionEvictionListener::budgetTotal, 1);
 
     // Test eviction.
     TestScalarValue cacheForEviction{2};
@@ -384,6 +425,18 @@ TEST(LRUKeyValueTest, ScalarKeyValue) {
 
     ASSERT_EQUALS(cacheForEviction.size(), static_cast<size_t>(2));
     assertNotInKVStore(cacheForEviction, 1);  // The entry with key '1' has been Evicted.
+
+    ASSERT_EQUALS(NonTrivialInsertionEvictionListener::keyTotal, 5);
+    ASSERT_EQUALS(NonTrivialInsertionEvictionListener::valueTotal, 5);
+    ASSERT_EQUALS(NonTrivialInsertionEvictionListener::budgetTotal, 2);
+
+    // Clear the remaining values.
+    cacheForEviction.clear();
+
+    assertNotInKVStore(cacheForEviction, 2);  // The entry with key '2' has been Evicted.
+    assertNotInKVStore(cacheForEviction, 3);  // The entry with key '3' has been Evicted.
+
+    ASSERT_EQUALS(NonTrivialInsertionEvictionListener::budgetTotal, 0);
 }
 
 }  // namespace

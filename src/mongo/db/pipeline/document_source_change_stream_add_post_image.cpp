@@ -217,15 +217,14 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPo
         pExpCtx, nss, *resumeTokenData.uuid, documentKey, std::move(readConcern));
 }
 
-Value DocumentSourceChangeStreamAddPostImage::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return explain
+Value DocumentSourceChangeStreamAddPostImage::serialize(const SerializationOptions& opts) const {
+    return opts.verbosity
         ? Value(Document{
               {DocumentSourceChangeStream::kStageName,
                Document{{"stage"_sd, kStageName},
                         {kFullDocumentFieldName, FullDocumentMode_serializer(_fullDocumentMode)}}}})
-        : Value(Document{{kStageName,
-                          DocumentSourceChangeStreamAddPostImageSpec(_fullDocumentMode).toBSON()}});
+        : Value(Document{
+              {kStageName,
+               DocumentSourceChangeStreamAddPostImageSpec(_fullDocumentMode).toBSON(opts)}});
 }
-
 }  // namespace mongo

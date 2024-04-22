@@ -205,7 +205,9 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::inprog
         << ActionType::shardingState
         << ActionType::allCollectionStats
-        << ActionType::shardedDataDistribution;
+        << ActionType::shardedDataDistribution
+        << ActionType::queryStatsRead
+        << ActionType::queryStatsReadTransformed;
 
     // clusterMonitor role actions that target a database (or collection) resource
     clusterMonitorRoleDatabaseActions

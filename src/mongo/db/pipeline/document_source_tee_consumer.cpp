@@ -71,9 +71,8 @@ void DocumentSourceTeeConsumer::doDispose() {
     _bufferSource->dispose(_facetId);
 }
 
-Value DocumentSourceTeeConsumer::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceTeeConsumer::serialize(const SerializationOptions& opts) const {
     // We only serialize this stage in the context of explain.
-    return explain ? Value(DOC(_stageName << Document())) : Value();
+    return opts.verbosity ? Value(DOC(_stageName << Document())) : Value();
 }
 }  // namespace mongo

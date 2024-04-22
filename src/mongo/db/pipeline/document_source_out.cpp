@@ -210,8 +210,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     return create(targetNS, expCtx);
 }
 
-Value DocumentSourceOut::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(kStageName << DOC("db" << _outputNs.db() << "coll" << _outputNs.coll())));
+Value DocumentSourceOut::serialize(const SerializationOptions& opts) const {
+    MutableDocument spec;
+    spec["coll"] = Value(opts.serializeIdentifier(_outputNs.coll()));
+    spec["db"] = Value(opts.serializeIdentifier(_outputNs.db()));
+    return Value(Document{{kStageName, spec.freezeToValue()}});
 }
 
 void DocumentSourceOut::waitWhileFailPointEnabled() {

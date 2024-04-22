@@ -5,6 +5,10 @@
  * Cannot implicitly shard accessed collections because of not being able to create unique index
  * using hashed shard key pattern.
  * @tags: [
+ *   # On the v6.0 branch the python driver version used does not support reading the output of
+ *   # $queryStats for DBRefs, which are technically invalid DBRefs like
+ *   # { $ref: { $eq: "?object" } }, { $id: { $eq: "?object" } }.
+ *   skip_for_query_stats,
  *   assumes_unsharded_collection,
  * ]
  */

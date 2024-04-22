@@ -70,7 +70,8 @@ public:
 
         // Serialize the DocumentSourceGroup and DocumentSourceSort from $sortByCount so that we can
         // check the explain output to make sure $group and $sort have the correct fields.
-        const auto explain = ExplainOptions::Verbosity::kQueryPlanner;
+        const auto explain =
+            SerializationOptions{boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
         vector<Value> explainedStages;
         groupStage->serializeToArray(explainedStages, explain);
         sortStage->serializeToArray(explainedStages, explain);

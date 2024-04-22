@@ -475,15 +475,17 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
         expCtx, BucketUnpacker{std::move(bucketSpec)}, 3600, assumeClean);
 }
 
-void DocumentSourceInternalUnpackBucket::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& array,
+                                                          const SerializationOptions& opts) const {
+    auto explain = opts.verbosity;
+
     MutableDocument out;
     auto behavior =
         _bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude ? kInclude : kExclude;
     const auto& spec = _bucketUnpacker.bucketSpec();
     std::vector<Value> fields;
     for (auto&& field : spec.fieldSet()) {
-        fields.emplace_back(field);
+        fields.emplace_back(opts.serializeFieldPathFromString(field));
     }
     if (((_bucketUnpacker.includeMetaField() &&
           _bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude) ||
@@ -492,23 +494,26 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
         std::find(spec.computedMetaProjFields().cbegin(),
                   spec.computedMetaProjFields().cend(),
                   *spec.metaField()) == spec.computedMetaProjFields().cend())
-        fields.emplace_back(*spec.metaField());
+        fields.emplace_back(opts.serializeFieldPathFromString(*spec.metaField()));
 
     out.addField(behavior, Value{std::move(fields)});
-    out.addField(timeseries::kTimeFieldName, Value{spec.timeField()});
+    out.addField(timeseries::kTimeFieldName,
+                 Value{opts.serializeFieldPathFromString(spec.timeField())});
     if (spec.metaField()) {
-        out.addField(timeseries::kMetaFieldName, Value{*spec.metaField()});
+        out.addField(timeseries::kMetaFieldName,
+                     Value{opts.serializeFieldPathFromString(*spec.metaField())});
     }
-    out.addField(kBucketMaxSpanSeconds, Value{_bucketMaxSpanSeconds});
+    out.addField(kBucketMaxSpanSeconds, opts.serializeLiteral(Value{_bucketMaxSpanSeconds}));
     if (_assumeNoMixedSchemaData)
-        out.addField(kAssumeNoMixedSchemaData, Value(_assumeNoMixedSchemaData));
+        out.addField(kAssumeNoMixedSchemaData,
+                     opts.serializeLiteral(Value(_assumeNoMixedSchemaData)));
 
     if (spec.usesExtendedRange()) {
         // Include this flag so that 'explain' is more helpful.
         // But this is not so useful for communicating from one process to another,
         // because mongos and/or the primary shard don't know whether any other shard
         // has extended-range data.
-        out.addField(kUsesExtendedRange, Value{true});
+        out.addField(kUsesExtendedRange, opts.serializeLiteral(Value{true}));
     }
 
     if (!spec.computedMetaProjFields().empty())
@@ -517,34 +522,40 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
                          std::transform(spec.computedMetaProjFields().cbegin(),
                                         spec.computedMetaProjFields().cend(),
                                         std::back_inserter(compFields),
-                                        [](auto&& projString) { return Value{projString}; });
+                                        [opts](auto&& projString) {
+                                            return Value{
+                                                opts.serializeFieldPathFromString(projString)};
+                                        });
                          return compFields;
                      }()});
 
     if (_bucketUnpacker.includeMinTimeAsMetadata()) {
-        out.addField(kIncludeMinTimeAsMetadata, Value{_bucketUnpacker.includeMinTimeAsMetadata()});
+        out.addField(kIncludeMinTimeAsMetadata,
+                     opts.serializeLiteral(Value{_bucketUnpacker.includeMinTimeAsMetadata()}));
     }
     if (_bucketUnpacker.includeMaxTimeAsMetadata()) {
-        out.addField(kIncludeMaxTimeAsMetadata, Value{_bucketUnpacker.includeMaxTimeAsMetadata()});
+        out.addField(kIncludeMaxTimeAsMetadata,
+                     opts.serializeLiteral(Value{_bucketUnpacker.includeMaxTimeAsMetadata()}));
     }
 
     if (_wholeBucketFilter) {
-        out.addField(kWholeBucketFilter, Value{_wholeBucketFilter->serialize()});
+        out.addField(kWholeBucketFilter, Value{_wholeBucketFilter->serialize(opts)});
     }
     if (_eventFilter) {
-        out.addField(kEventFilter, Value{_eventFilter->serialize()});
+        out.addField(kEventFilter, Value{_eventFilter->serialize(opts)});
     }
 
     if (!explain) {
         array.push_back(Value(DOC(getSourceName() << out.freeze())));
         if (_sampleSize) {
             auto sampleSrc = DocumentSourceSample::create(pExpCtx, *_sampleSize);
-            sampleSrc->serializeToArray(array);
+            sampleSrc->serializeToArray(array, opts);
         }
     } else {
         if (_sampleSize) {
-            out.addField("sample", Value{static_cast<long long>(*_sampleSize)});
-            out.addField("bucketMaxCount", Value{_bucketMaxCount});
+            out.addField("sample",
+                         opts.serializeLiteral(Value{static_cast<long long>(*_sampleSize)}));
+            out.addField("bucketMaxCount", opts.serializeLiteral(Value{_bucketMaxCount}));
         }
         array.push_back(Value(DOC(getSourceName() << out.freeze())));
     }
@@ -1447,9 +1458,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
         // Create a loose bucket predicate and push it before the unpacking stage.
         if (predicates.loosePredicate) {
-            BSONObjBuilder bob;
-            predicates.loosePredicate->serialize(&bob);
-            container->insert(itr, DocumentSourceMatch::create(bob.obj(), pExpCtx));
+            container->insert(
+                itr, DocumentSourceMatch::create(predicates.loosePredicate->serialize(), pExpCtx));
 
             // Give other stages a chance to optimize with the new $match.
             return std::prev(itr) == container->begin() ? std::prev(itr)

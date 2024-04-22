@@ -135,6 +135,5 @@ DEATH_TEST_REGEX(InternalSchemaAllElemMatchFromIndexMatchExpression,
 
     objMatch.getValue()->getChild(1);
 }
-
 }  // namespace
 }  // namespace mongo

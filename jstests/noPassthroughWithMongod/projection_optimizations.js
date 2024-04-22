@@ -25,7 +25,8 @@ let result = runFindWithProjection({
     expected: [{a: 1, b: false}]
 });
 // Query should be optimized and covered.
-assert(isIndexOnly(db, getWinningPlan(result.explain().queryPlanner)));
+const winningPlan = getWinningPlan(result.explain().queryPlanner);
+assert(isIndexOnly(db, winningPlan), winningPlan);
 
 result = runFindWithProjection(
     {projection: {a: {$and: ['$a', true, 1]}}, expected: [{_id: 0, a: true}]});

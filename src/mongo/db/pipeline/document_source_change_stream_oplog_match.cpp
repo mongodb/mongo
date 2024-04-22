@@ -204,16 +204,26 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOpti
     return nextChangeStreamStageItr;
 }
 
-Value DocumentSourceChangeStreamOplogMatch::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
-        return Value(
-            Document{{DocumentSourceChangeStream::kStageName,
-                      Document{{"stage"_sd, "internalOplogMatch"_sd}, {"filter"_sd, _predicate}}}});
+Value DocumentSourceChangeStreamOplogMatch::serialize(const SerializationOptions& opts) const {
+    BSONObjBuilder builder;
+    if (opts.verbosity) {
+        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
+        sub.append("stage"_sd, kStageName);
+        sub.append(DocumentSourceChangeStreamOplogMatchSpec::kFilterFieldName,
+                   getMatchExpression()->serialize(opts));
+        sub.done();
+    } else {
+        BSONObjBuilder sub(builder.subobjStart(kStageName));
+        if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged ||
+            opts.transformIdentifiers) {
+            sub.append(DocumentSourceChangeStreamOplogMatchSpec::kFilterFieldName,
+                       getMatchExpression()->serialize(opts));
+        } else {
+            DocumentSourceChangeStreamOplogMatchSpec(_predicate).serialize(&sub);
+        }
+        sub.done();
     }
-
-    DocumentSourceChangeStreamOplogMatchSpec spec(_predicate);
-    return Value(Document{{DocumentSourceChangeStreamOplogMatch::kStageName, spec.toBSON()}});
+    return Value(builder.obj());
 }
 
 }  // namespace mongo

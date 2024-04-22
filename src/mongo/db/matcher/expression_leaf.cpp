@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -93,8 +94,10 @@ void ComparisonMatchExpressionBase::debugString(StringBuilder& debug, int indent
     debug << "\n";
 }
 
-BSONObj ComparisonMatchExpressionBase::getSerializedRightHandSide() const {
-    return BSON(name() << _rhs);
+void ComparisonMatchExpressionBase::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                                  const SerializationOptions& opts,
+                                                                  bool includePath) const {
+    opts.appendLiteral(bob, name(), _rhs);
 }
 
 ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
@@ -290,15 +293,19 @@ void RegexMatchExpression::debugString(StringBuilder& debug, int indentationLeve
     debug << "\n";
 }
 
-BSONObj RegexMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder regexBuilder;
-    regexBuilder.append("$regex", _regex);
+void RegexMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                         const SerializationOptions& opts,
+                                                         bool includePath) const {
+    // We need to be careful to generate a valid regex representative value, and the default string
+    // "?" is not valid.
+    opts.appendLiteral(bob, "$regex", _regex, Value("\\?"_sd));
 
     if (!_flags.empty()) {
-        regexBuilder.append("$options", _flags);
+        // We need to make sure the $options value can be re-parsed as legal regex options, so
+        // we'll set the representative value in this case to be the empty string rather than
+        // "?", which is the standard representative for string values.
+        opts.appendLiteral(bob, "$options", _flags, Value(""_sd));
     }
-
-    return regexBuilder.obj();
 }
 
 void RegexMatchExpression::serializeToBSONTypeRegex(BSONObjBuilder* out) const {
@@ -371,8 +378,11 @@ void ModMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
     debug << "\n";
 }
 
-BSONObj ModMatchExpression::getSerializedRightHandSide() const {
-    return BSON("$mod" << BSON_ARRAY(_divisor << _remainder));
+void ModMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                       const SerializationOptions& opts,
+                                                       bool includePath) const {
+    bob->append("$mod",
+                BSON_ARRAY(opts.serializeLiteral(_divisor) << opts.serializeLiteral(_remainder)));
 }
 
 bool ModMatchExpression::equivalent(const MatchExpression* other) const {
@@ -407,8 +417,10 @@ void ExistsMatchExpression::debugString(StringBuilder& debug, int indentationLev
     debug << "\n";
 }
 
-BSONObj ExistsMatchExpression::getSerializedRightHandSide() const {
-    return BSON("$exists" << true);
+void ExistsMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                          const SerializationOptions& opts,
+                                                          bool includePath) const {
+    opts.appendLiteral(bob, "$exists", true);
 }
 
 bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
@@ -490,9 +502,45 @@ void InMatchExpression::debugString(StringBuilder& debug, int indentationLevel) 
     debug << "\n";
 }
 
-BSONObj InMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder inBob;
-    BSONArrayBuilder arrBob(inBob.subarrayStart("$in"));
+namespace {
+/**
+ * Reduces the potentially large vector of elements to just the first of each "canonical" type.
+ * Different types of numbers are not considered distinct.
+ *
+ * For example, collapses [2, 4, NumberInt(3), "string", "another", 3, 5] into just [2, "string"].
+ */
+std::vector<Value> justFirstOfEachType(std::vector<BSONElement> elems) {
+    stdx::unordered_set<int> seenTypes;
+    std::vector<Value> result;
+    for (auto&& elem : elems) {
+        bool inserted = seenTypes.insert(canonicalizeBSONType(elem.type())).second;
+        if (inserted) {
+            // A new type.
+            result.emplace_back(elem);
+        }
+    }
+    return result;
+}
+}  // namespace
+
+void InMatchExpression::serializeToShape(BSONObjBuilder* bob,
+                                         const SerializationOptions& opts) const {
+    std::vector<Value> firstOfEachType = justFirstOfEachType(_equalitySet);
+    if (hasRegex()) {
+        firstOfEachType.emplace_back(BSONRegEx());
+    }
+    opts.appendLiteral(bob, "$in", std::move(firstOfEachType));
+}
+
+void InMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                      const SerializationOptions& opts,
+                                                      bool includePath) const {
+    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+        serializeToShape(bob, opts);
+        return;
+    }
+
+    BSONArrayBuilder arrBob(bob->subarrayStart("$in"));
     for (auto&& _equality : _equalitySet) {
         arrBob.append(_equality);
     }
@@ -502,7 +550,6 @@ BSONObj InMatchExpression::getSerializedRightHandSide() const {
         arrBob.append(regexBob.obj().firstElement());
     }
     arrBob.doneFast();
-    return inBob.obj();
 }
 
 bool InMatchExpression::equivalent(const MatchExpression* other) const {
@@ -864,7 +911,9 @@ void BitTestMatchExpression::debugString(StringBuilder& debug, int indentationLe
     }
 }
 
-BSONObj BitTestMatchExpression::getSerializedRightHandSide() const {
+void BitTestMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                           const SerializationOptions& opts,
+                                                           bool includePath) const {
     std::string opString = "";
 
     switch (matchType()) {
@@ -889,8 +938,10 @@ BSONObj BitTestMatchExpression::getSerializedRightHandSide() const {
         arrBob.append(static_cast<int32_t>(bitPosition));
     }
     arrBob.doneFast();
-
-    return BSON(opString << arrBob.arr());
+    // Unfortunately this cannot be done without copying the array into the BSONObjBuilder, since
+    // `opts.appendLiteral` may choose to append this actual array, a representative empty array, or
+    // a debug string.
+    opts.appendLiteral(bob, opString, arrBob.arr());
 }
 
 bool BitTestMatchExpression::equivalent(const MatchExpression* other) const {

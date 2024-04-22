@@ -72,7 +72,7 @@ public:
 
     void serializeToArray(
         std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+        const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
@@ -201,8 +201,8 @@ private:
                        uint64_t limit,
                        uint64_t maxMemoryUsageBytes);
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        MONGO_UNREACHABLE;  // Should call serializeToArray instead.
+    Value serialize(const SerializationOptions& opts) const final override {
+        MONGO_UNREACHABLE_TASSERT(7484302);  // Should call serializeToArray instead.
     }
 
     /**

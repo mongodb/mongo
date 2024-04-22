@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
 #include <boost/optional.hpp>
+#include <cstddef>
 #include <memory>
 
 #include "mongo/base/status.h"
@@ -563,6 +565,10 @@ public:
     boost::optional<BSONElement> getComment() {
         // The '_comment' object, if present, will only ever have one field.
         return _comment ? boost::optional<BSONElement>(_comment->firstElement()) : boost::none;
+    }
+
+    boost::optional<BSONObj> getCommentOwnedCopy() const {
+        return _comment.has_value() ? boost::optional<BSONObj>{_comment->copy()} : boost::none;
     }
 
     /**

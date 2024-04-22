@@ -56,7 +56,7 @@ Status clearSbeCacheOnParameterChangeHelper() {
 }
 
 Status onPlanCacheSizeUpdate(const std::string& str) {
-    auto newSize = PlanCacheSizeParameter::parse(str);
+    auto newSize = memory_util::MemorySize::parse(str);
     if (!newSize.isOK()) {
         return newSize.getStatus();
     }

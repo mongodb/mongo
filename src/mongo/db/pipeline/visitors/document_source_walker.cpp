@@ -54,6 +54,7 @@
 #include "mongo/db/pipeline/document_source_operation_metrics.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_plan_cache_stats.h"
+#include "mongo/db/pipeline/document_source_query_stats.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_redact.h"
 #include "mongo/db/pipeline/document_source_sample.h"
@@ -126,6 +127,7 @@ void DocumentSourceWalker::walk(const Pipeline& pipeline) {
                 visitHelper<DocumentSourceSingleDocumentTransformation>(ds) ||
                 visitHelper<DocumentSourceSkip>(ds) || visitHelper<DocumentSourceSort>(ds) ||
                 visitHelper<DocumentSourceTeeConsumer>(ds) ||
+                visitHelper<DocumentSourceQueryStats>(ds) ||
                 visitHelper<DocumentSourceUnionWith>(ds) || visitHelper<DocumentSourceUnwind>(ds)
                 // TODO: uncomment after fixing dependency
                 //&& visitHelper<DocumentSourceUpdateOnAddShard>(ds)

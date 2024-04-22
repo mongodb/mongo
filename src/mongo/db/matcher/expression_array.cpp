@@ -101,10 +101,13 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
     _sub->debugString(debug, indentationLevel + 1);
 }
 
-BSONObj ElemMatchObjectMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder subBob;
-    _sub->serialize(&subBob, true);
-    return BSON("$elemMatch" << subBob.obj());
+void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                                   const SerializationOptions& opts,
+                                                                   bool includePath) const {
+    BSONObjBuilder elemMatchBob = bob->subobjStart("$elemMatch");
+    SerializationOptions options = opts;
+    _sub->serialize(&elemMatchBob, options, true);
+    elemMatchBob.doneFast();
 }
 
 MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOptimizer() const {
@@ -170,14 +173,15 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indent
     }
 }
 
-BSONObj ElemMatchValueMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder emBob;
-
+void ElemMatchValueMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                                  const SerializationOptions& opts,
+                                                                  bool includePath) const {
+    BSONObjBuilder emBob = bob->subobjStart("$elemMatch");
+    SerializationOptions options = opts;
     for (auto&& child : _subs) {
-        child->serialize(&emBob, false);
+        child->serialize(&emBob, options, false);
     }
-
-    return BSON("$elemMatch" << emBob.obj());
+    emBob.doneFast();
 }
 
 MatchExpression::ExpressionOptimizerFunc ElemMatchValueMatchExpression::getOptimizer() const {
@@ -215,8 +219,10 @@ void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel
     }
 }
 
-BSONObj SizeMatchExpression::getSerializedRightHandSide() const {
-    return BSON("$size" << _size);
+void SizeMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                        const SerializationOptions& opts,
+                                                        bool includePath) const {
+    opts.appendLiteral(bob, "$size", _size);
 }
 
 bool SizeMatchExpression::equivalent(const MatchExpression* other) const {

@@ -196,8 +196,9 @@ void AccumulatorInternalJsReduce::reset() {
 // Returns this accumulator serialized as a Value along with the reduce function.
 Document AccumulatorInternalJsReduce::serialize(boost::intrusive_ptr<Expression> initializer,
                                                 boost::intrusive_ptr<Expression> argument,
-                                                bool explain) const {
-    return DOC(kName << DOC("data" << argument->serialize(explain) << "eval" << _funcSource));
+                                                const SerializationOptions& options) const {
+    return DOC(kName << DOC("data" << argument->serialize(options) << "eval"
+                                   << options.serializeLiteral(_funcSource)));
 }
 
 REGISTER_ACCUMULATOR(accumulator, AccumulatorJs::parse);
@@ -235,15 +236,16 @@ std::string parseFunction(StringData fieldName,
 
 Document AccumulatorJs::serialize(boost::intrusive_ptr<Expression> initializer,
                                   boost::intrusive_ptr<Expression> argument,
-                                  bool explain) const {
+                                  const SerializationOptions& options) const {
     MutableDocument args;
-    args.addField("init", Value(_init));
-    args.addField("initArgs", Value(initializer->serialize(explain)));
-    args.addField("accumulate", Value(_accumulate));
-    args.addField("accumulateArgs", Value(argument->serialize(explain)));
-    args.addField("merge", Value(_merge));
+
+    args.addField("init", options.serializeLiteral(_init));
+    args.addField("initArgs", initializer->serialize(options));
+    args.addField("accumulate", options.serializeLiteral(_accumulate));
+    args.addField("accumulateArgs", argument->serialize(options));
+    args.addField("merge", options.serializeLiteral(_merge));
     if (_finalize) {
-        args.addField("finalize", Value(*_finalize));
+        args.addField("finalize", options.serializeLiteral(*_finalize));
     }
     args.addField("lang", Value("js"_sd));
     return DOC(kName << args.freeze());

@@ -82,12 +82,10 @@ public:
         debug << "\n";
     }
 
-    BSONObj getSerializedRightHandSide() const final {
-        BSONObjBuilder subBuilder;
-        BSONArrayBuilder arrBuilder(subBuilder.subarrayStart(name()));
-        _typeSet.toBSONArray(&arrBuilder);
-        arrBuilder.doneFast();
-        return subBuilder.obj();
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final {
+        bob->appendArray(name(), _typeSet.toBSONArray());
     }
 
     bool equivalent(const MatchExpression* other) const final {
@@ -256,10 +254,19 @@ public:
         debug << "\n";
     }
 
-    BSONObj getSerializedRightHandSide() const final {
-        BSONObjBuilder bob;
-        bob.append(name(), _binDataSubType);
-        return bob.obj();
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final {
+        if (opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) {
+            bob->append(name(), _binDataSubType);
+        } else {
+            // There is some fancy serialization logic to get the above BSONObjBuilder append to
+            // work. We just want to make sure we're doing the same thing here.
+            static_assert(BSONObjAppendFormat<decltype(_binDataSubType)>::value == NumberInt,
+                          "Expecting that the BinData sub type should be specified and serialized "
+                          "as an int.");
+            opts.appendLiteral(bob, name(), static_cast<int>(_binDataSubType));
+        }
     }
 
     bool equivalent(const MatchExpression* other) const final {

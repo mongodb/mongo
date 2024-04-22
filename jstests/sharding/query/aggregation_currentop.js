@@ -13,7 +13,7 @@
  * applicable.
  *
  * This test requires replica set configuration and user credentials to persist across a restart.
- * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
+ * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction, requires_fcv_60]
  */
 
 // Restarts cause issues with authentication for awaiting replication.
@@ -411,7 +411,8 @@ function runCommonTests(conn, curOpSpec) {
         explain: true
     }));
 
-    let expectedStages = [{$currentOp: {idleConnections: true}}, {$match: {desc: {$eq: "test"}}}];
+    let expectedStages =
+        [{$currentOp: {idleConnections: true, allUsers: false}}, {$match: {desc: {$eq: "test"}}}];
 
     if (isRemoteShardCurOp) {
         assert.docEq(explainPlan.splitPipeline.shardsPart, expectedStages);

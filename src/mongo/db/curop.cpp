@@ -51,6 +51,9 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/storage/storage_engine_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -60,7 +63,6 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
 #include "mongo/util/system_tick_source.h"
-#include <mongo/db/stats/timer_stats.h>
 
 namespace mongo {
 
@@ -322,6 +324,18 @@ void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
     _ns = nss.ns();
 }
 
+void CurOp::setEndOfOpMetrics(long long nreturned) {
+    _debug.additiveMetrics.nreturned = nreturned;
+    // A non-none queryStatsInfo.keyHash indicates the current query is being tracked for queryStats
+    // and therefore the executionTime needs to be recorded as part of that effort. executionTime is
+    // set with the final executionTime in completeAndLogOperation, but for query stats collection
+    // we want it set before incrementing cursor metrics using OpDebug's AdditiveMetrics. The value
+    // set here will be overwritten later in completeAndLogOperation.
+    if (_debug.queryStatsInfo.keyHash) {
+        _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
+    }
+}
+
 void CurOp::setMessage_inlock(StringData message) {
     if (_progressMeter.isActive()) {
         LOGV2_ERROR(20527,
@@ -418,9 +432,10 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
 
     // Obtain the total execution time of this operation.
     done();
-    _debug.executionTime = duration_cast<Microseconds>(elapsedTimeExcludingPauses());
-
-    const auto executionTimeMillis = durationCount<Milliseconds>(_debug.executionTime);
+    _debug.additiveMetrics.executionTime =
+        duration_cast<Microseconds>(elapsedTimeExcludingPauses());
+    const auto executionTimeMillis =
+        durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime);
 
     if (_debug.isReplOplogGetMore) {
         oplogGetMoreStats.recordMillis(executionTimeMillis);
@@ -822,6 +837,10 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->addDeepCopy("planSummary", curop.getPlanSummary().toString());
     }
 
+    if (planningTime > Microseconds::zero()) {
+        pAttrs->add("planningTimeMicros", durationCount<Microseconds>(planningTime));
+    }
+
     if (prepareConflictDurationMillis > Milliseconds::zero()) {
         pAttrs->add("prepareConflictDuration", prepareConflictDurationMillis);
     }
@@ -860,6 +879,7 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("replanReason", redact(*replanReason));
     }
     OPDEBUG_TOATTR_HELP_OPTIONAL("nMatched", additiveMetrics.nMatched);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("nBatches", additiveMetrics.nBatches);
     OPDEBUG_TOATTR_HELP_OPTIONAL("nModified", additiveMetrics.nModified);
     OPDEBUG_TOATTR_HELP_OPTIONAL("ninserted", additiveMetrics.ninserted);
     OPDEBUG_TOATTR_HELP_OPTIONAL("ndeleted", additiveMetrics.ndeleted);
@@ -874,7 +894,7 @@ void OpDebug::report(OperationContext* opCtx,
                                additiveMetrics.temporarilyUnavailableErrors);
 
     pAttrs->add("numYields", curop.numYields());
-    OPDEBUG_TOATTR_HELP(nreturned);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("nreturned", additiveMetrics.nreturned);
 
     if (queryHash) {
         pAttrs->addDeepCopy("queryHash", zeroPaddedHex(*queryHash));
@@ -965,7 +985,10 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
-    pAttrs->add("durationMillis", durationCount<Milliseconds>(executionTime));
+    // durationMillis should always be present for any operation
+    pAttrs->add(
+        "durationMillis",
+        durationCount<Milliseconds>(additiveMetrics.executionTime.value_or(Microseconds{0})));
 }
 
 #define OPDEBUG_APPEND_NUMBER2(b, x, y) \
@@ -1026,6 +1049,7 @@ void OpDebug::append(OperationContext* opCtx,
         b.append("replanReason", *replanReason);
     }
     OPDEBUG_APPEND_OPTIONAL(b, "nMatched", additiveMetrics.nMatched);
+    OPDEBUG_APPEND_OPTIONAL(b, "nBatches", additiveMetrics.nBatches);
     OPDEBUG_APPEND_OPTIONAL(b, "nModified", additiveMetrics.nModified);
     OPDEBUG_APPEND_OPTIONAL(b, "ninserted", additiveMetrics.ninserted);
     OPDEBUG_APPEND_OPTIONAL(b, "ndeleted", additiveMetrics.ndeleted);
@@ -1043,7 +1067,7 @@ void OpDebug::append(OperationContext* opCtx,
     OPDEBUG_APPEND_OPTIONAL(b, "dataThroughputAverage", dataThroughputAverage);
 
     b.appendNumber("numYield", curop.numYields());
-    OPDEBUG_APPEND_NUMBER(b, nreturned);
+    OPDEBUG_APPEND_OPTIONAL(b, "nreturned", additiveMetrics.nreturned);
 
     if (queryHash) {
         b.append("queryHash", zeroPaddedHex(*queryHash));
@@ -1117,7 +1141,10 @@ void OpDebug::append(OperationContext* opCtx,
         b.append("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
-    b.appendNumber("millis", durationCount<Milliseconds>(executionTime));
+    // millis should always be present for any operation
+    b.appendNumber(
+        "millis",
+        durationCount<Milliseconds>(additiveMetrics.executionTime.value_or(Microseconds{0})));
 
     if (!curop.getPlanSummary().empty()) {
         b.append("planSummary", curop.getPlanSummary());
@@ -1126,6 +1153,10 @@ void OpDebug::append(OperationContext* opCtx,
     if (totalOplogSlotDurationMicros > Microseconds::zero()) {
         b.appendNumber("totalOplogSlotDurationMicros",
                        durationCount<Microseconds>(totalOplogSlotDurationMicros));
+    }
+
+    if (planningTime > Microseconds::zero()) {
+        b.appendNumber("planningTimeMicros", durationCount<Microseconds>(planningTime));
     }
 
     if (!execStats.isEmpty()) {
@@ -1279,6 +1310,9 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     addIfNeeded("nMatched", [](auto field, auto args, auto& b) {
         OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nMatched);
     });
+    addIfNeeded("nBatches", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nBatches);
+    });
     addIfNeeded("nModified", [](auto field, auto args, auto& b) {
         OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nModified);
     });
@@ -1322,7 +1356,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
         b.appendNumber(field, args.curop.numYields());
     });
     addIfNeeded("nreturned", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_NUMBER2(b, field, args.op.nreturned);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nreturned);
     });
 
     addIfNeeded("queryHash", [](auto field, auto args, auto& b) {
@@ -1426,10 +1460,14 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     // the profiler (OpDebug::append) and the log file (OpDebug::report), so for the profile filter
     // we support both names.
     addIfNeeded("millis", [](auto field, auto args, auto& b) {
-        b.appendNumber(field, durationCount<Milliseconds>(args.op.executionTime));
+        b.appendNumber(field,
+                       durationCount<Milliseconds>(
+                           args.op.additiveMetrics.executionTime.value_or(Microseconds{0})));
     });
     addIfNeeded("durationMillis", [](auto field, auto args, auto& b) {
-        b.appendNumber(field, durationCount<Milliseconds>(args.op.executionTime));
+        b.appendNumber(field,
+                       durationCount<Milliseconds>(
+                           args.op.additiveMetrics.executionTime.value_or(Microseconds{0})));
     });
 
     addIfNeeded("planSummary", [](auto field, auto args, auto& b) {
@@ -1443,6 +1481,10 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
             b.appendNumber(field,
                            durationCount<Microseconds>(args.op.totalOplogSlotDurationMicros));
         }
+    });
+
+    addIfNeeded("planningTimeMicros", [](auto field, auto args, auto& b) {
+        b.appendNumber(field, durationCount<Microseconds>(args.op.planningTime));
     });
 
     addIfNeeded("execStats", [](auto field, auto args, auto& b) {
@@ -1572,12 +1614,12 @@ void OpDebug::appendResolvedViewsInfo(BSONObjBuilder& builder) const {
 namespace {
 
 /**
- * Adds two boost::optional long longs together. Returns boost::none if both 'lhs' and 'rhs' are
- * uninitialized, or the sum of 'lhs' and 'rhs' if they are both initialized. Returns 'lhs' if only
- * 'rhs' is uninitialized and vice-versa.
+ * Adds two boost::optionals of the same type with an operator+() together. Returns boost::none if
+ * both 'lhs' and 'rhs' are uninitialized, or the sum of 'lhs' and 'rhs' if they are both
+ * initialized. Returns 'lhs' if only 'rhs' is uninitialized and vice-versa.
  */
-boost::optional<long long> addOptionalLongs(const boost::optional<long long>& lhs,
-                                            const boost::optional<long long>& rhs) {
+template <typename T>
+boost::optional<T> addOptionals(const boost::optional<T>& lhs, const boost::optional<T>& rhs) {
     if (!rhs) {
         return lhs;
     }
@@ -1586,24 +1628,29 @@ boost::optional<long long> addOptionalLongs(const boost::optional<long long>& lh
 }  // namespace
 
 void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
-    keysExamined = addOptionalLongs(keysExamined, otherMetrics.keysExamined);
-    docsExamined = addOptionalLongs(docsExamined, otherMetrics.docsExamined);
-    nMatched = addOptionalLongs(nMatched, otherMetrics.nMatched);
-    nModified = addOptionalLongs(nModified, otherMetrics.nModified);
-    ninserted = addOptionalLongs(ninserted, otherMetrics.ninserted);
-    ndeleted = addOptionalLongs(ndeleted, otherMetrics.ndeleted);
-    nUpserted = addOptionalLongs(nUpserted, otherMetrics.nUpserted);
-    keysInserted = addOptionalLongs(keysInserted, otherMetrics.keysInserted);
-    keysDeleted = addOptionalLongs(keysDeleted, otherMetrics.keysDeleted);
+    keysExamined = addOptionals(keysExamined, otherMetrics.keysExamined);
+    docsExamined = addOptionals(docsExamined, otherMetrics.docsExamined);
+    nMatched = addOptionals(nMatched, otherMetrics.nMatched);
+    nreturned = addOptionals(nreturned, otherMetrics.nreturned);
+    nBatches = addOptionals(nBatches, otherMetrics.nBatches);
+    nModified = addOptionals(nModified, otherMetrics.nModified);
+    ninserted = addOptionals(ninserted, otherMetrics.ninserted);
+    ndeleted = addOptionals(ndeleted, otherMetrics.ndeleted);
+    nUpserted = addOptionals(nUpserted, otherMetrics.nUpserted);
+    keysInserted = addOptionals(keysInserted, otherMetrics.keysInserted);
+    keysDeleted = addOptionals(keysDeleted, otherMetrics.keysDeleted);
     prepareReadConflicts.fetchAndAdd(otherMetrics.prepareReadConflicts.load());
     writeConflicts.fetchAndAdd(otherMetrics.writeConflicts.load());
     temporarilyUnavailableErrors.fetchAndAdd(otherMetrics.temporarilyUnavailableErrors.load());
+    executionTime = addOptionals(executionTime, otherMetrics.executionTime);
 }
 
 void OpDebug::AdditiveMetrics::reset() {
     keysExamined = boost::none;
     docsExamined = boost::none;
     nMatched = boost::none;
+    nreturned = boost::none;
+    nBatches = boost::none;
     nModified = boost::none;
     ninserted = boost::none;
     ndeleted = boost::none;
@@ -1613,17 +1660,20 @@ void OpDebug::AdditiveMetrics::reset() {
     prepareReadConflicts.store(0);
     writeConflicts.store(0);
     temporarilyUnavailableErrors.store(0);
+    executionTime = boost::none;
 }
 
 bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) const {
     return keysExamined == otherMetrics.keysExamined && docsExamined == otherMetrics.docsExamined &&
-        nMatched == otherMetrics.nMatched && nModified == otherMetrics.nModified &&
+        nMatched == otherMetrics.nMatched && nreturned == otherMetrics.nreturned &&
+        nBatches == otherMetrics.nBatches && nModified == otherMetrics.nModified &&
         ninserted == otherMetrics.ninserted && ndeleted == otherMetrics.ndeleted &&
         nUpserted == otherMetrics.nUpserted && keysInserted == otherMetrics.keysInserted &&
         keysDeleted == otherMetrics.keysDeleted &&
         prepareReadConflicts.load() == otherMetrics.prepareReadConflicts.load() &&
         writeConflicts.load() == otherMetrics.writeConflicts.load() &&
-        temporarilyUnavailableErrors.load() == otherMetrics.temporarilyUnavailableErrors.load();
+        temporarilyUnavailableErrors.load() == otherMetrics.temporarilyUnavailableErrors.load() &&
+        executionTime == otherMetrics.executionTime;
 }
 
 void OpDebug::AdditiveMetrics::incrementWriteConflicts(long long n) {
@@ -1648,6 +1698,20 @@ void OpDebug::AdditiveMetrics::incrementKeysDeleted(long long n) {
     *keysDeleted += n;
 }
 
+void OpDebug::AdditiveMetrics::incrementNreturned(long long n) {
+    if (!nreturned) {
+        nreturned = 0;
+    }
+    *nreturned += n;
+}
+
+void OpDebug::AdditiveMetrics::incrementNBatches() {
+    if (!nBatches) {
+        nBatches = 0;
+    }
+    ++(*nBatches);
+}
+
 void OpDebug::AdditiveMetrics::incrementNinserted(long long n) {
     if (!ninserted) {
         ninserted = 0;
@@ -1662,6 +1726,13 @@ void OpDebug::AdditiveMetrics::incrementNUpserted(long long n) {
     *nUpserted += n;
 }
 
+void OpDebug::AdditiveMetrics::incrementExecutionTime(Microseconds n) {
+    if (!executionTime) {
+        executionTime = Microseconds{0};
+    }
+    *executionTime += n;
+}
+
 void OpDebug::AdditiveMetrics::incrementPrepareReadConflicts(long long n) {
     prepareReadConflicts.fetchAndAdd(n);
 }
@@ -1672,6 +1743,8 @@ string OpDebug::AdditiveMetrics::report() const {
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysExamined", keysExamined);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("docsExamined", docsExamined);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("nMatched", nMatched);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("nreturned", nreturned);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("nBatches", nBatches);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("nModified", nModified);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("ninserted", ninserted);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("ndeleted", ndeleted);
@@ -1681,6 +1754,9 @@ string OpDebug::AdditiveMetrics::report() const {
     OPDEBUG_TOSTRING_HELP_ATOMIC("prepareReadConflicts", prepareReadConflicts);
     OPDEBUG_TOSTRING_HELP_ATOMIC("writeConflicts", writeConflicts);
     OPDEBUG_TOSTRING_HELP_ATOMIC("temporarilyUnavailableErrors", temporarilyUnavailableErrors);
+    if (executionTime) {
+        s << " durationMillis:" << durationCount<Milliseconds>(*executionTime);
+    }
 
     return s.str();
 }
@@ -1689,6 +1765,8 @@ void OpDebug::AdditiveMetrics::report(logv2::DynamicAttributes* pAttrs) const {
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", keysExamined);
     OPDEBUG_TOATTR_HELP_OPTIONAL("docsExamined", docsExamined);
     OPDEBUG_TOATTR_HELP_OPTIONAL("nMatched", nMatched);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("nreturned", nreturned);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("nBatches", nBatches);
     OPDEBUG_TOATTR_HELP_OPTIONAL("nModified", nModified);
     OPDEBUG_TOATTR_HELP_OPTIONAL("ninserted", ninserted);
     OPDEBUG_TOATTR_HELP_OPTIONAL("ndeleted", ndeleted);
@@ -1698,6 +1776,9 @@ void OpDebug::AdditiveMetrics::report(logv2::DynamicAttributes* pAttrs) const {
     OPDEBUG_TOATTR_HELP_ATOMIC("prepareReadConflicts", prepareReadConflicts);
     OPDEBUG_TOATTR_HELP_ATOMIC("writeConflicts", writeConflicts);
     OPDEBUG_TOATTR_HELP_ATOMIC("temporarilyUnavailableErrors", temporarilyUnavailableErrors);
+    if (executionTime) {
+        pAttrs->add("durationMillis", durationCount<Milliseconds>(*executionTime));
+    }
 }
 
 BSONObj OpDebug::AdditiveMetrics::reportBSON() const {
@@ -1705,6 +1786,8 @@ BSONObj OpDebug::AdditiveMetrics::reportBSON() const {
     OPDEBUG_APPEND_OPTIONAL(b, "keysExamined", keysExamined);
     OPDEBUG_APPEND_OPTIONAL(b, "docsExamined", docsExamined);
     OPDEBUG_APPEND_OPTIONAL(b, "nMatched", nMatched);
+    OPDEBUG_APPEND_OPTIONAL(b, "nreturned", nreturned);
+    OPDEBUG_APPEND_OPTIONAL(b, "nBatches", nBatches);
     OPDEBUG_APPEND_OPTIONAL(b, "nModified", nModified);
     OPDEBUG_APPEND_OPTIONAL(b, "ninserted", ninserted);
     OPDEBUG_APPEND_OPTIONAL(b, "ndeleted", ndeleted);
@@ -1714,6 +1797,9 @@ BSONObj OpDebug::AdditiveMetrics::reportBSON() const {
     OPDEBUG_APPEND_ATOMIC(b, "prepareReadConflicts", prepareReadConflicts);
     OPDEBUG_APPEND_ATOMIC(b, "writeConflicts", writeConflicts);
     OPDEBUG_APPEND_ATOMIC(b, "temporarilyUnavailableErrors", temporarilyUnavailableErrors);
+    if (executionTime) {
+        b.appendNumber("durationMillis", durationCount<Milliseconds>(*executionTime));
+    }
     return b.obj();
 }
 

@@ -85,8 +85,7 @@ private:
         : DocumentSource(kStageName, expCtx), _mergeType(mergeType) {}
 
     GetNextResult doGetNext() final;
-
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
     HostTypeRequirement _mergeType = HostTypeRequirement::kNone;
 };
 

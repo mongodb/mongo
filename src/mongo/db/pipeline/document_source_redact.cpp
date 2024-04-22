@@ -169,8 +169,8 @@ intrusive_ptr<DocumentSource> DocumentSourceRedact::optimize() {
     return this;
 }
 
-Value DocumentSourceRedact::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(getSourceName() << _expression.get()->serialize(static_cast<bool>(explain))));
+Value DocumentSourceRedact::serialize(const SerializationOptions& opts) const {
+    return Value(DOC(getSourceName() << _expression.get()->serialize(opts)));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceRedact::createFromBson(

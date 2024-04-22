@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <iostream>
+
 #include "mongo/db/query/plan_executor_factory.h"
 
 #include "mongo/db/exec/plan_stage.h"
@@ -40,6 +42,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/duration.h"
 
 namespace mongo::plan_executor_factory {
 
@@ -65,6 +68,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 yieldPolicy);
 }
 
+
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<WorkingSet> ws,
@@ -74,6 +78,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     size_t plannerOptions,
     NamespaceString nss,
     std::unique_ptr<QuerySolution> qs) {
+
     return make(expCtx->opCtx,
                 std::move(ws),
                 std::move(rt),
@@ -98,6 +103,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy) {
     dassert(collection);
+
     try {
         auto execImpl = new PlanExecutorImpl(opCtx,
                                              std::move(ws),
@@ -128,7 +134,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
     auto&& [rootStage, data] = root;
-
     LOGV2_DEBUG(4822860,
                 5,
                 "SBE plan",
@@ -157,7 +162,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     size_t plannerOptions,
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
-
     LOGV2_DEBUG(4822861,
                 5,
                 "SBE plan",

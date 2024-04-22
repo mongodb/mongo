@@ -138,6 +138,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     Timer cmdTimer;
 
     auto parsedMr = MapReduceCommandRequest::parse(IDLParserErrorContext("mapReduce"), cmd);
+    auto curop = CurOp::get(opCtx);
+    curop->beginQueryPlanningTimer();
     auto expCtx = makeExpressionContext(opCtx, parsedMr, verbosity);
     auto runnablePipeline = [&]() {
         auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);
@@ -146,10 +148,10 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     }();
     auto exec = plan_executor_factory::make(expCtx, std::move(runnablePipeline));
     auto&& explainer = exec->getPlanExplainer();
-
+    // Store the plan summary string in CurOp.
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(explainer.getPlanSummary());
+        curop->setPlanSummary_inlock(explainer.getPlanSummary());
     }
 
     try {

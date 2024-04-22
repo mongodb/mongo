@@ -65,6 +65,20 @@ public:
     }
 
     /**
+     * Returns a count of 'type' nodes in expression tree.
+     */
+    static size_t countNodes(const MatchExpression* root, MatchExpression::MatchType type) {
+        size_t sum = 0;
+        if (type == root->matchType()) {
+            sum = 1;
+        }
+        for (size_t i = 0; i < root->numChildren(); ++i) {
+            sum += countNodes(root->getChild(i), type);
+        }
+        return sum;
+    }
+
+    /**
      * Assumes the provided BSONObj is of the form {field1: -+1, ..., field2: -+1}
      * Returns a BSONObj with the values negated.
      */

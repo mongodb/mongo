@@ -662,7 +662,7 @@ bool appendEmptyResultSet(OperationContext* opCtx,
                           const std::string& ns) {
     invariant(!status.isOK());
 
-    CurOp::get(opCtx)->debug().nreturned = 0;
+    CurOp::get(opCtx)->debug().additiveMetrics.nreturned = 0;
     CurOp::get(opCtx)->debug().nShards = 0;
 
     if (status == ErrorCodes::NamespaceNotFound) {

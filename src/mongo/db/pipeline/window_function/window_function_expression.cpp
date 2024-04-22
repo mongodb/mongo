@@ -310,12 +310,12 @@ boost::intrusive_ptr<Expression> ExpressionFirstLast::parse(
 
 template <typename WindowFunctionN, typename AccumulatorNType>
 Value ExpressionN<WindowFunctionN, AccumulatorNType>::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+    const SerializationOptions& opts) const {
     auto acc = buildAccumulatorOnly();
-    MutableDocument result(acc->serialize(nExpr, _input, static_cast<bool>(explain)));
+    MutableDocument result(acc->serialize(nExpr, _input, opts));
 
     MutableDocument windowField;
-    _bounds.serialize(windowField);
+    _bounds.serialize(windowField, opts);
     result[kWindowArg] = windowField.freezeToValue();
     return result.freezeToValue();
 }

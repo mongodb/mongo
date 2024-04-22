@@ -1032,6 +1032,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         if any(command.api_version for command in spec.commands):
             header_list.append('mongo/db/commands.h')
 
+        # Include serialization options only if there is a struct which is part of a query shape.
+        if any(struct.query_shape_component for struct in spec.structs):
+            header_list.append('mongo/db/query/query_shape/serialization_options.h')
+
         header_list.sort()
 
         for include in header_list:
@@ -1875,6 +1879,23 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             self._gen_command_deserializer(struct, "request.body")
 
+    def _gen_single_field_serialize_expression(self, template_params, field, bson_cpp_type):
+        """Helper to append the code to serialize a single field, as part of a custom type."""
+        expression = bson_cpp_type.gen_serializer_expression(
+            self._writer, _access_member(field),
+            field.query_shape == ast.QueryShapeFieldType.CUSTOM)
+        template_params['expression'] = expression
+        if not field.should_serialize_with_options:
+            self._writer.write_template('builder->append(${field_name}, ${expression});')
+        elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
+            self._writer.write_template(
+                'options.serializeLiteral(${expression}).serializeForIDL(${field_name}, builder);')
+        else:
+            assert field.query_shape == ast.QueryShapeFieldType.ANONYMIZE
+            self._writer.write_template(
+                'builder->append(${field_name}, options.serializeFieldPathFromString(${expression}));'
+            )
+
     def _gen_serializer_method_custom(self, field):
         # type: (ast.Field) -> None
         """Generate the serialize method definition for a custom type."""
@@ -1895,14 +1916,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_template(
                         'BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));')
                     with self._block('for (const auto& item : ${access_member}) {', '}'):
-                        expression = bson_cpp_type.gen_serializer_expression(self._writer, 'item')
+                        expression = bson_cpp_type.gen_serializer_expression(
+                            self._writer, 'item',
+                            field.query_shape == ast.QueryShapeFieldType.CUSTOM)
                         template_params['expression'] = expression
                         self._writer.write_template('arrayBuilder.append(${expression});')
                 else:
-                    expression = bson_cpp_type.gen_serializer_expression(
-                        self._writer, _access_member(field))
-                    template_params['expression'] = expression
-                    self._writer.write_template('builder->append(${field_name}, ${expression});')
+                    self._gen_single_field_serialize_expression(template_params, field,
+                                                                bson_cpp_type)
 
             elif field.type.bson_serialization_type[0] == 'any':
                 # Any types are special
@@ -1918,14 +1939,17 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         # Call a method like class::method(BSONArrayBuilder*)
                         self._writer.write_template('item.${method_name}(&arrayBuilder);')
                 else:
+                    template_params[
+                        'query_shape_options'] = ', options' if field.query_shape == ast.QueryShapeFieldType.CUSTOM else ''
                     if writer.is_function(field.type.serializer):
-                        # Call a method like method(value, StringData, BSONObjBuilder*)
                         self._writer.write_template(
-                            '${method_name}(${access_member}, ${field_name}, builder);')
+                            '${method_name}(${access_member}, ${field_name}, builder${query_shape_options});'
+                        )
                     else:
-                        # Call a method like class::method(StringData, BSONObjBuilder*)
+                        # Call a method like class::method(StringData, BSONObjBuilder*, SerializationOptions)
                         self._writer.write_template(
-                            '${access_member}.${method_name}(${field_name}, builder);')
+                            '${access_member}.${method_name}(${field_name}, builder${query_shape_options});'
+                        )
 
             else:
                 method_name = writer.get_method_name(field.type.serializer)
@@ -1960,18 +1984,29 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if field.chained:
                 # Just directly call the serializer for chained structs without opening up a nested
                 # document.
-                self._writer.write_template('${access_member}.serialize(builder);')
+                if not field.should_serialize_with_options:
+                    self._writer.write_template('${access_member}.serialize(builder);')
+                else:
+                    self._writer.write_template('${access_member}.serialize(builder, options);')
+
             elif field.type.is_array:
                 self._writer.write_template(
                     'BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));')
                 with self._block('for (const auto& item : ${access_member}) {', '}'):
                     self._writer.write_line(
                         'BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());')
-                    self._writer.write_line('item.serialize(&subObjBuilder);')
+                    if not field.should_serialize_with_options:
+                        self._writer.write_line('item.serialize(&subObjBuilder);')
+                    else:
+                        self._writer.write_line('item.serialize(&subObjBuilder, options);')
             else:
                 self._writer.write_template(
                     'BSONObjBuilder subObjBuilder(builder->subobjStart(${field_name}));')
-                self._writer.write_template('${access_member}.serialize(&subObjBuilder);')
+                if not field.should_serialize_with_options:
+                    self._writer.write_template('${access_member}.serialize(&subObjBuilder);')
+                else:
+                    self._writer.write_template(
+                        '${access_member}.serialize(&subObjBuilder, options);')
 
     def _gen_serializer_method_variant(self, field):
         # type: (ast.Field) -> None
@@ -1990,18 +2025,44 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     template_params[
                         'cpp_type'] = 'std::vector<' + variant_type.cpp_type + '>' if variant_type.is_array else variant_type.cpp_type
 
-                    with self._block('[builder](const ${cpp_type}& value) {', '},'):
+                    template_params['param_opt'] = "builder"
+                    if field.should_serialize_with_options:
+                        template_params['param_opt'] += ', options'
+                    with self._block('[${param_opt}](const ${cpp_type}& value) {', '},'):
                         bson_cpp_type = cpp_types.get_bson_cpp_type(variant_type)
                         if bson_cpp_type and bson_cpp_type.has_serializer():
                             assert not field.type.is_array
                             expression = bson_cpp_type.gen_serializer_expression(
-                                self._writer, 'value')
+                                self._writer, 'value',
+                                field.query_shape == ast.QueryShapeFieldType.CUSTOM)
                             template_params['expression'] = expression
-                            self._writer.write_template(
-                                'builder->append(${field_name}, ${expression});')
+                            if not field.should_serialize_with_options:
+                                self._writer.write_template(
+                                    'builder->append(${field_name}, ${expression});')
+                            elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
+                                self._writer.write_template(
+                                    'options.serializeLiteral(${expression}).serializeForIDL(${field_name}, builder);'
+                                )
+                            elif field.query_shape == ast.QueryShapeFieldType.ANONYMIZE:
+                                self._writer.write_template(
+                                    'builder->append(${field_name}, options.serializeFieldPathFromString(${expression}));'
+                                )
+                            else:
+                                assert False
                         else:
-                            self._writer.write_template(
-                                'idl::idlSerialize(builder, ${field_name}, value);')
+                            if not field.should_serialize_with_options:
+                                self._writer.write_template(
+                                    'idl::idlSerialize(builder, ${field_name}, value);')
+                            elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
+                                self._writer.write_template(
+                                    'options.serializeLiteral(value).serializeForIDL(${field_name}, builder);'
+                                )
+                            elif field.query_shape == ast.QueryShapeFieldType.ANONYMIZE:
+                                self._writer.write_template(
+                                    'idl::idlSerialize(builder, ${field_name}, options.serializeFieldPathFromString(value));'
+                                )
+                            else:
+                                assert False
 
     def _gen_serializer_method_common(self, field):
         # type: (ast.Field) -> None
@@ -2030,11 +2091,27 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 elif field.type.is_variant:
                     self._gen_serializer_method_variant(field)
                 else:
-                    # Generate default serialization using BSONObjBuilder::append
-                    # Note: BSONObjBuilder::append has overrides for std::vector also
-                    self._writer.write_line(
-                        'builder->append(%s, %s);' % (_get_field_constant_name(field),
-                                                      _access_member(field)))
+                    # Generate default serialization
+                    # Note: BSONObjBuilder::append, which all three branches use, has overrides for std::vector also
+                    if not field.should_serialize_with_options:
+                        self._writer.write_line(
+                            'builder->append(%s, %s);' % (_get_field_constant_name(field),
+                                                          _access_member(field)))
+                    elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
+                        # serializeLiteral expects an ImplicitValue, which can't be constructed with an int64_t
+                        expression_cast = ""
+                        if field.type.cpp_type == "std::int64_t":
+                            expression_cast = "(long long)"
+                        self._writer.write_line(
+                            'options.serializeLiteral(%s%s).serializeForIDL(%s, builder);'
+                            % (expression_cast, _access_member(field),
+                               _get_field_constant_name(field)))
+                    elif field.query_shape == ast.QueryShapeFieldType.ANONYMIZE:
+                        self._writer.write_line(
+                            'builder->append(%s, options.serializeFieldPathFromString(%s));' %
+                            (_get_field_constant_name(field), _access_member(field)))
+                    else:
+                        assert False
             else:
                 self._gen_serializer_method_struct(field)
 

@@ -28,7 +28,6 @@
  */
 
 #pragma once
-
 #include <fmt/format.h>
 #include <list>
 #include <memory>
@@ -40,30 +39,56 @@
 namespace mongo {
 
 /**
+ * 'InsertionEvictionListener' class to use with 'LRUBudgetTracker' that will always noop.
+ */
+class NoopInsertionEvictionListener {
+public:
+    // Called when a key-value pair is being inserted. Parameters are the key-value pair and its
+    // estimated size.
+    template <class K, class V>
+    void onInsert(const K&, const V&, size_t) {}
+
+    // Called when a key-value pair is being evicted. Parameters are the key-value pair and its
+    // estimated size.
+    template <class K, class V>
+    void onEvict(const K&, const V&, size_t) {}
+
+    // Called when the cache is being cleared. Parameter is the estimated size of the key-value
+    // pairs in the cache before it was cleared.
+    void onClear(size_t) {}
+};
+
+/**
  * This class tracks a size of entries in 'LRUKeyValue'.
  * The size can be understood as a number of the entries, an amount of memory they occupied,
  * or any other value defined by the template parameter 'Estimator'.
  * The 'Estimator' must be deterministic and always return the same value for the same entry.
+ * The 'InsertionEvictionListener' will be called on every insertion and eviction as well as when
+ * the cache is cleared.
  */
-template <typename V, typename Estimator>
+template <class K, class V, typename Estimator, typename InsertionEvictionListener>
 class LRUBudgetTracker {
 public:
     LRUBudgetTracker(size_t maxBudget) : _max(maxBudget), _current(0) {}
 
-    void onAdd(const V& v) {
-        _current += _estimator(v);
+    void onAdd(const K& k, const V& v) {
+        size_t budget = _estimator(k, v);
+        _current += budget;
+        _listener.onInsert(k, v, budget);
     }
 
-    void onRemove(const V& v) {
+    void onRemove(const K& k, const V& v) {
         using namespace fmt::literals;
-        size_t budget = _estimator(v);
+        size_t budget = _estimator(k, v);
         tassert(5968300,
                 "LRU budget underflow: current={}, budget={} "_format(_current, budget),
                 _current >= budget);
         _current -= budget;
+        _listener.onEvict(k, v, budget);
     }
 
     void onClear() {
+        _listener.onClear(_current);
         _current = 0;
     }
 
@@ -84,12 +109,16 @@ private:
     size_t _max;
     size_t _current;
     Estimator _estimator;
+    InsertionEvictionListener _listener;
 };
 
 /**
  * A key-value store structure with a least recently used (LRU) replacement
  * policy. The size allowed in the kv-store is controlled by 'LRUBudgetTracker'
  * set in the constructor.
+ *
+ * An 'InsertionEvictionListener' may optionally be specified to track the insertion and eviction of
+ * each key-value pair.
  *
  * Caveat:
  * This kv-store is NOT thread safe! The client to this utility is responsible
@@ -102,7 +131,12 @@ private:
  * TODO: We could move this into the util/ directory and do any cleanup necessary to make it
  * fully general.
  */
-template <class K, class V, class BudgetEstimator, class KeyHasher = std::hash<K>>
+template <class K,
+          class V,
+          class KeyValueBudgetEstimator,
+          class InsertionEvictionListener = NoopInsertionEvictionListener,
+          class KeyHasher = std::hash<K>,
+          class Eq = std::equal_to<K>>
 class LRUKeyValue {
 public:
     LRUKeyValue(size_t maxSize) : _budgetTracker{maxSize} {}
@@ -111,13 +145,13 @@ public:
         clear();
     }
 
-    typedef std::pair<K, V> KVListEntry;
+    typedef std::pair<const K*, V> KVListEntry;
 
     typedef std::list<KVListEntry> KVList;
     typedef typename KVList::iterator KVListIt;
     typedef typename KVList::const_iterator KVListConstIt;
 
-    typedef stdx::unordered_map<K, KVListIt, KeyHasher> KVMap;
+    typedef stdx::unordered_map<K, KVListIt, KeyHasher, Eq> KVMap;
     typedef typename KVMap::const_iterator KVMapConstIt;
 
     // These type declarations are required by the 'Partitioned' utility.
@@ -136,14 +170,15 @@ public:
         KVMapConstIt i = _kvMap.find(key);
         if (i != _kvMap.end()) {
             KVListIt found = i->second;
-            _budgetTracker.onRemove(found->second);
+            _budgetTracker.onRemove(key, found->second);
             _kvMap.erase(i);
             _kvList.erase(found);
         }
 
-        _budgetTracker.onAdd(entry);
-        _kvList.push_front(std::make_pair(key, std::move(entry)));
+        _budgetTracker.onAdd(key, entry);
+        _kvList.push_front(std::make_pair(nullptr, std::move(entry)));
         _kvMap[key] = _kvList.begin();
+        _kvList.begin()->first = &(_kvMap.find(key)->first);
 
         return evict();
     }
@@ -161,10 +196,11 @@ public:
         KVListIt found = i->second;
 
         // Promote the kv-store entry to the front of the list. It is now the most recently used.
-        _kvList.push_front(std::make_pair(key, std::move(found->second)));
+        _kvList.push_front(std::make_pair(nullptr, std::move(found->second)));
         _kvMap.erase(i);
         _kvList.erase(found);
         _kvMap[key] = _kvList.begin();
+        _kvList.begin()->first = &(_kvMap.find(key)->first);
 
         return _kvList.begin();
     }
@@ -179,7 +215,7 @@ public:
             return false;
         }
         KVListIt found = i->second;
-        _budgetTracker.onRemove(found->second);
+        _budgetTracker.onRemove(key, found->second);
         _kvMap.erase(i);
         _kvList.erase(found);
         return true;
@@ -193,9 +229,9 @@ public:
     size_t removeIf(KeyValuePredicate predicate) {
         size_t removed = 0;
         for (auto it = _kvList.begin(); it != _kvList.end();) {
-            if (predicate(it->first, *it->second)) {
-                _budgetTracker.onRemove(it->second);
-                _kvMap.erase(it->first);
+            if (predicate(*it->first, *it->second)) {
+                _budgetTracker.onRemove(*it->first, it->second);
+                _kvMap.erase(*it->first);
                 it = _kvList.erase(it);
                 ++removed;
             } else {
@@ -209,9 +245,9 @@ public:
      * Deletes all entries in the kv-store.
      */
     void clear() {
-        _budgetTracker.onClear();
         _kvList.clear();
         _kvMap.clear();
+        _budgetTracker.onClear();
     }
 
     /**
@@ -258,8 +294,8 @@ private:
         while (_budgetTracker.isOverBudget()) {
             invariant(!_kvList.empty());
 
-            _budgetTracker.onRemove(_kvList.back().second);
-            _kvMap.erase(_kvList.back().first);
+            _budgetTracker.onRemove(*_kvList.back().first, _kvList.back().second);
+            _kvMap.erase(*_kvList.back().first);
             _kvList.pop_back();
 
             ++nEvicted;
@@ -268,13 +304,14 @@ private:
         return nEvicted;
     }
 
-    LRUBudgetTracker<V, BudgetEstimator> _budgetTracker;
+    LRUBudgetTracker<K, V, KeyValueBudgetEstimator, InsertionEvictionListener> _budgetTracker;
 
     // (K, V) pairs are stored in this std::list. They are sorted in order of use, where the front
     // is the most recently used and the back is the least recently used.
     mutable KVList _kvList;
 
     // Maps from a key to the corresponding std::list entry.
+    // TODO: SERVER-73659 LRUKeyValue should track and include the size of _kvMap in overall budget.
     mutable KVMap _kvMap;
 };
 

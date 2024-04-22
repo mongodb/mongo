@@ -88,15 +88,17 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         return incomingCursorResponse.getStatus();
     }
 
-    CurOp::get(opCtx)->debug().nreturned = incomingCursorResponse.getValue().getBatch().size();
-
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    opDebug.additiveMetrics.nBatches = 1;
     // If nShards has already been set, then we are storing the forwarding $mergeCursors cursor from
     // a split aggregation pipeline, and the shards half of that pipeline may have targeted multiple
     // shards. In that case, leave the current value as-is.
-    CurOp::get(opCtx)->debug().nShards = std::max(CurOp::get(opCtx)->debug().nShards, 1);
+    opDebug.nShards = std::max(opDebug.nShards, 1);
+    CurOp::get(opCtx)->setEndOfOpMetrics(incomingCursorResponse.getValue().getBatch().size());
 
     if (incomingCursorResponse.getValue().getCursorId() == CursorId(0)) {
-        CurOp::get(opCtx)->debug().cursorExhausted = true;
+        opDebug.cursorExhausted = true;
+        collectQueryStatsMongos(opCtx, std::move(opDebug.queryStatsInfo.key));
         return cmdResult;
     }
 
@@ -128,7 +130,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     }
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, std::move(executor), std::move(params));
-    ccc->incNBatches();
+    collectQueryStatsMongos(opCtx, ccc);
     // We don't expect to use this cursor until a subsequent getMore, so detach from the current
     // OperationContext until then.
     ccc->detachFromOperationContext();
@@ -144,7 +146,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         return clusterCursorId.getStatus();
     }
 
-    CurOp::get(opCtx)->debug().cursorid = clusterCursorId.getValue();
+    opDebug.cursorid = clusterCursorId.getValue();
 
     CursorResponse outgoingCursorResponse(
         requestedNss,

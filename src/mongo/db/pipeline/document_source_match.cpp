@@ -67,11 +67,10 @@ const char* DocumentSourceMatch::getSourceName() const {
     return kStageName.rawData();
 }
 
-Value DocumentSourceMatch::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
-        BSONObjBuilder builder;
-        _expression->serialize(&builder);
-        return Value(DOC(getSourceName() << Document(builder.obj())));
+Value DocumentSourceMatch::serialize(const SerializationOptions& opts) const {
+    if (opts.verbosity || opts.transformIdentifiers ||
+        opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+        return Value(DOC(getSourceName() << Document(_expression->serialize(opts))));
     }
     return Value(DOC(getSourceName() << Document(getQuery())));
 }
@@ -449,15 +448,11 @@ DocumentSourceMatch::splitSourceByFunc(const OrderedPathSet& fields,
     // the corresponding BSONObj may not exist. Therefore, we take each of these expressions,
     // serialize them, and then re-parse them, constructing new BSON that is owned by the
     // DocumentSourceMatch.
-    BSONObjBuilder firstBob;
-    newExpr.first->serialize(&firstBob);
-    auto firstMatch = DocumentSourceMatch::create(firstBob.obj(), pExpCtx);
+    auto firstMatch = DocumentSourceMatch::create(newExpr.first->serialize(), pExpCtx);
 
     intrusive_ptr<DocumentSourceMatch> secondMatch;
     if (newExpr.second) {
-        BSONObjBuilder secondBob;
-        newExpr.second->serialize(&secondBob);
-        secondMatch = DocumentSourceMatch::create(secondBob.obj(), pExpCtx);
+        secondMatch = DocumentSourceMatch::create(newExpr.second->serialize(), pExpCtx);
     }
 
     return {std::move(firstMatch), std::move(secondMatch)};
@@ -490,9 +485,7 @@ boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPat
         }
     });
 
-    BSONObjBuilder query;
-    matchExpr->serialize(&query);
-    return new DocumentSourceMatch(query.obj(), expCtx);
+    return new DocumentSourceMatch(matchExpr->serialize(), expCtx);
 }
 
 std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>

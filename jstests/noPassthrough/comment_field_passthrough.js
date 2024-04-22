@@ -19,8 +19,13 @@ load("jstests/libs/fail_point_util.js");   // Helper to enable/disable failpoint
 const tests = authCommandsLib.tests;
 
 // The following commands require additional start up configuration and hence need to be skipped.
-const denylistedTests =
-    ["startRecordingTraffic", "stopRecordingTraffic", "addShardToZone", "removeShardFromZone"];
+const denylistedTests = [
+    "startRecordingTraffic",
+    "stopRecordingTraffic",
+    "addShardToZone",
+    "removeShardFromZone",
+    "aggregate_$search"  // TODO SERVER-82767 enable this test.
+];
 
 function runTests(tests, conn, impls) {
     const firstDb = conn.getDB(firstDbName);

@@ -33,6 +33,7 @@
 
 #include "mongo/db/query/plan_executor_impl.h"
 
+#include "mongo/util/duration.h"
 #include <memory>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"

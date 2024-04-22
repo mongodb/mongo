@@ -62,7 +62,7 @@ public:
     const char* getSourceName() const final;
 
     boost::intrusive_ptr<DocumentSource> optimize() final;
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     GetModPathsReturn getModifiedPaths() const final;
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {

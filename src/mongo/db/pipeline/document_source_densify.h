@@ -241,15 +241,16 @@ public:
 
     static RangeStatement parse(RangeSpec spec);
 
-    Value serialize() const {
+    Value serialize(const SerializationOptions& opts) const {
         MutableDocument spec;
-        spec[kArgStep] = _step;
+        spec[kArgStep] = opts.serializeLiteral(_step);
         spec[kArgBounds] = stdx::visit(
             visit_helper::Overloaded{[&](Full) { return Value(kValFull); },
                                      [&](Partition) { return Value(kValPartition); },
                                      [&](ExplicitBounds bounds) {
                                          return Value(std::vector<Value>(
-                                             {bounds.first.toValue(), bounds.second.toValue()}));
+                                             {opts.serializeLiteral(bounds.first.toValue()),
+                                              opts.serializeLiteral(bounds.second.toValue())}));
                                      }},
             _bounds);
         if (_unit)
@@ -380,7 +381,7 @@ public:
         return kStageName.rawData();
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         deps->fields.insert(_field.fullPath());

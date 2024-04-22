@@ -91,8 +91,8 @@ const char* DocumentSourceExchange::getSourceName() const {
     return kStageName.rawData();
 }
 
-Value DocumentSourceExchange::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(getSourceName() << _exchange->getSpec().toBSON()));
+Value DocumentSourceExchange::serialize(const SerializationOptions& opts) const {
+    return Value(DOC(getSourceName() << _exchange->getSpec().toBSON(opts)));
 }
 
 DocumentSourceExchange::DocumentSourceExchange(

@@ -178,9 +178,9 @@ const char* AccumulatorMinMaxN::getOpName() const {
 
 Document AccumulatorMinMaxN::serialize(boost::intrusive_ptr<Expression> initializer,
                                        boost::intrusive_ptr<Expression> argument,
-                                       bool explain) const {
+                                       const SerializationOptions& options) const {
     MutableDocument args;
-    AccumulatorN::serializeHelper(initializer, argument, explain, args);
+    AccumulatorN::serializeHelper(initializer, argument, options, args);
     return DOC(getOpName() << args.freeze());
 }
 
@@ -230,10 +230,10 @@ void AccumulatorN::updateAndCheckMemUsage(size_t memAdded) {
 
 void AccumulatorN::serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
                                    const boost::intrusive_ptr<Expression>& argument,
-                                   bool explain,
+                                   const SerializationOptions& options,
                                    MutableDocument& md) {
-    md.addField(kFieldNameN, Value(initializer->serialize(explain)));
-    md.addField(kFieldNameInput, Value(argument->serialize(explain)));
+    md.addField(kFieldNameN, Value(initializer->serialize(options)));
+    md.addField(kFieldNameInput, Value(argument->serialize(options)));
 }
 
 template <MinMaxSense s>
@@ -385,9 +385,9 @@ const char* AccumulatorFirstLastN::getOpName() const {
 
 Document AccumulatorFirstLastN::serialize(boost::intrusive_ptr<Expression> initializer,
                                           boost::intrusive_ptr<Expression> argument,
-                                          bool explain) const {
+                                          const SerializationOptions& options) const {
     MutableDocument args;
-    AccumulatorN::serializeHelper(initializer, argument, explain, args);
+    AccumulatorN::serializeHelper(initializer, argument, options, args);
     return DOC(getOpName() << args.freeze());
 }
 
@@ -531,32 +531,46 @@ template <TopBottomSense sense, bool single>
 Document AccumulatorTopBottomN<sense, single>::serialize(
     boost::intrusive_ptr<Expression> initializer,
     boost::intrusive_ptr<Expression> argument,
-    bool explain) const {
+    const SerializationOptions& options) const {
     MutableDocument args;
 
     if constexpr (!single) {
-        args.addField(kFieldNameN, Value(initializer->serialize(explain)));
+        args.addField(kFieldNameN, Value(initializer->serialize(options)));
     }
-    auto serializedArg = argument->serialize(explain);
 
-    // If 'argument' contains a field named 'output', this means that we are serializing the
-    // accumulator's original output expression under the field name 'output'. Otherwise, we are
-    // serializing a custom argument under the field name 'output'. For instance, a merging $group
-    // will provide an argument that merges multiple partial groups.
-    if (auto output = serializedArg[kFieldNameOutput]; !output.missing()) {
-        args.addField(kFieldNameOutput, Value(output));
+    // If 'argument' is either an ExpressionObject or an ExpressionConstant of object type, then
+    // we are serializing the original expression under the 'output' field of the object. Otherwise,
+    // we're serializing a custom expression for merging group.
+    if (auto argObj = dynamic_cast<ExpressionObject*>(argument.get())) {
+        bool foundOutputField = false;
+        for (auto& child : argObj->getChildExpressions()) {
+            if (child.first == kFieldNameOutput) {
+                auto output = child.second->serialize(options);
+                args.addField(kFieldNameOutput, output);
+                foundOutputField = true;
+                break;
+            }
+        }
+        tassert(7773700, "'output' field should be present.", foundOutputField);
+    } else if (auto argConst = dynamic_cast<ExpressionConstant*>(argument.get())) {
+        auto output = argConst->getValue().getDocument()[kFieldNameOutput];
+        tassert(7773701, "'output' field should be present.", !output.missing());
+        args.addField(kFieldNameOutput, output);
     } else {
+        auto serializedArg = argument->serialize(options);
         args.addField(kFieldNameOutput, serializedArg);
     }
+
     args.addField(kFieldNameSortBy,
                   Value(_sortPattern.serialize(
-                      SortPattern::SortKeySerialization::kForPipelineSerialization)));
+                      SortPattern::SortKeySerialization::kForPipelineSerialization, options)));
     return DOC(getOpName() << args.freeze());
 }
 
 template <TopBottomSense sense>
 std::pair<SortPattern, BSONArray> parseAccumulatorTopBottomNSortBy(ExpressionContext* const expCtx,
                                                                    BSONObj sortBy) {
+
     SortPattern sortPattern(sortBy, expCtx);
     BSONArrayBuilder sortFieldsExpBab;
     BSONObjIterator sortByBoi(sortBy);
@@ -568,7 +582,7 @@ std::pair<SortPattern, BSONArray> parseAccumulatorTopBottomNSortBy(ExpressionCon
             // since the evaluated argument wouldn't have the same metadata as the original
             // document. Instead we use [{$meta: "textScore"}] as the sortFields expression so the
             // sortFields array contains the data we need for sorting.
-            const auto serialized = part.expression->serialize(false);
+            const auto serialized = part.expression->serialize(SerializationOptions{});
             sortFieldsExpBab.append(serialized.getDocument().toBson());
         } else {
             sortFieldsExpBab.append((StringBuilder() << "$" << fieldName).str());
@@ -581,10 +595,8 @@ template <TopBottomSense sense, bool single>
 AccumulationExpression AccumulatorTopBottomN<sense, single>::parseTopBottomN(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
     auto name = AccumulatorTopBottomN<sense, single>::getName();
-
     const auto [n, output, sortBy] =
         accumulatorNParseArgs<single>(expCtx, elem, name.rawData(), true, vps);
-
     auto [sortPattern, sortFieldsExp] = parseAccumulatorTopBottomNSortBy<sense>(expCtx, *sortBy);
 
     expCtx->sbeGroupCompatible = false;

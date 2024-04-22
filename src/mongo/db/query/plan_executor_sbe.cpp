@@ -41,6 +41,7 @@
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resume_token_gen.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 // This failpoint is defined by the classic executor but is also accessed here.

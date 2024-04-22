@@ -89,10 +89,11 @@ void DocumentSourceSingleDocumentTransformation::doDispose() {
 }
 
 Value DocumentSourceSingleDocumentTransformation::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{getSourceName(),
-                           _parsedTransform ? _parsedTransform->serializeTransformation(explain)
-                                            : _cachedStageOptions}});
+    const SerializationOptions& opts) const {
+    return Value(
+        Document{{getSourceName(),
+                  _parsedTransform ? _parsedTransform->serializeTransformation(opts.verbosity, opts)
+                                   : _cachedStageOptions}});
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(

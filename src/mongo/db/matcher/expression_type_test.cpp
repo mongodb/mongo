@@ -217,6 +217,14 @@ TEST(ExpressionTypeTest, InternalSchemaTypeExprWithMultipleTypesMatchesAllSuchTy
     ASSERT_FALSE(expr.matchesBSON(fromjson("{a: ['str']}")));
 }
 
+TEST(ExpressionTypeTest, RedactsTypesCorrectly) {
+    TypeMatchExpression type(""_sd, String);
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$type":[2]})",
+        type.getSerializedRightHandSide(opts));
+}
+
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataGeneral) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::BinDataGeneral));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::bdtCustom));
@@ -265,6 +273,14 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataColumnType) {
     ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
 }
 
+TEST(ExpressionBinDataSubTypeTest, MatchesBinDataSensitiveType) {
+    BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Sensitive));
+    BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
+    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Sensitive);
+    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
+    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+}
+
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataBdtCustom) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::bdtCustom));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Function));
@@ -298,6 +314,14 @@ TEST(ExpressionBinDataSubTypeTest, Equivalent) {
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));
     ASSERT(!e1.equivalent(&e3));
+}
+
+TEST(ExpressionBinDataSubTypeTest, RedactsCorrectly) {
+    InternalSchemaBinDataSubTypeExpression e("b"_sd, BinDataType::newUUID);
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalSchemaBinDataSubType":"?number"})",
+        e.getSerializedRightHandSide(opts));
 }
 
 TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotTraverseLeafArrays) {

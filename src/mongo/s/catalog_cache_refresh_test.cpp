@@ -33,6 +33,7 @@
 
 #include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"

@@ -30,18 +30,18 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
 #include <memory>
 
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_acquisition_stats.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/attribute_storage.h"
@@ -66,8 +66,10 @@ struct PlanSummaryStats;
 class OpDebug {
 public:
     /**
-     * Holds counters for execution statistics that are meaningful both for multi-statement
-     * transactions and for individual operations outside of a transaction.
+     * Holds counters for execution statistics that can be accumulated by one or more operations.
+     * They're accumulated as we go for a single operation, but are also extracted and stored
+     * externally if they need to be accumulated across multiple operations (which have multiple
+     * CurOps), including for cursors and multi-statement transactions.
      */
     class AdditiveMetrics {
     public:
@@ -120,6 +122,16 @@ public:
         void incrementKeysDeleted(long long n);
 
         /**
+         * Increments nreturned by n.
+         */
+        void incrementNreturned(long long n);
+
+        /**
+         * Increments nBatches by 1.
+         */
+        void incrementNBatches();
+
+        /**
          * Increments ninserted by n.
          */
         void incrementNinserted(long long n);
@@ -133,6 +145,11 @@ public:
          * Increments prepareReadConflicts by n.
          */
         void incrementPrepareReadConflicts(long long n);
+
+        /**
+         * Increments executionTime by n.
+         */
+        void incrementExecutionTime(Microseconds n);
 
         /**
          * Generates a string showing all non-empty fields. For every non-empty field field1,
@@ -149,6 +166,10 @@ public:
 
         // Number of records that match the query.
         boost::optional<long long> nMatched;
+        // Number of records returned so far.
+        boost::optional<long long> nreturned;
+        // Number of batches returned so far.
+        boost::optional<long long> nBatches;
         // Number of records written (no no-ops).
         boost::optional<long long> nModified;
         boost::optional<long long> ninserted;
@@ -169,6 +190,9 @@ public:
         AtomicWord<long long> prepareReadConflicts{0};
         AtomicWord<long long> writeConflicts{0};
         AtomicWord<long long> temporarilyUnavailableErrors{0};
+
+        // Amount of time spent executing a query.
+        boost::optional<Microseconds> executionTime;
     };
 
     OpDebug() = default;
@@ -263,6 +287,48 @@ public:
     // The hash of the query's "stable" key. This represents the query's shape.
     boost::optional<uint32_t> queryHash;
 
+    /* The QueryStatsInfo struct was created to bundle all the queryStats related fields of CurOp &
+     * OpDebug together (SERVER-83280).
+     *
+     * ClusterClientCursorImpl and ClientCursor also contain _queryStatsKey and _queryStatsKeyHash
+     * members but NOT a wasRateLimited member. Variable names & accesses would be more consistent
+     * across the code if ClusterClientCursorImpl and ClientCursor each also had a QueryStatsInfo
+     * struct, but we considered and rejected two different potential implementations of this:
+     *  - Option 1:
+     *    Declare a QueryStatsInfo struct in each .h file. Every struct would have key and keyHash
+     *    fields, and a wasRateLimited field would be added only to CurOp. But, it seemed confusing
+     *    to have slightly different structs with the same name declared three different times.
+     *  - Option 2:
+     *    Create a query_stats_info.h that declares QueryStatsInfo--identical to the version defined
+     *    in this file. CurOp/OpDebug, ClientCursor, and ClusterClientCursorImpl would then all
+     *    have their own QueryStatsInfo instances, potentially as a unique_ptr or boost::optional. A
+     *    benefit to this would be the ability to to just move the entire QueryStatsInfo struct from
+     *    Op to the Cursor, instead of copying it over field by field (the current method). But:
+     *      - The current code moves ownership of the key, but copies the keyHash. So, for workflows
+     *        that require multiple cursors, like sharding, one cursor would own the key, but all
+     *        cursors would have copies of the keyHash. The problem with trying to move around the
+     *        struct in its entirety is that access to the *entire* struct would be lost on the
+     *        move, meaning there's no way to retain the keyHash (that doesn't largely nullify the
+     *        benefits of having the struct).
+     *      - It seemed odd to have ClientCursor and ClusterClientCursorImpl using the struct but
+     *        never needing the wasRateLimited field.
+     */
+
+    // Note that the only case when the three fields of the below struct are null, none, and false
+    // is if the query stats feature flag is turned off.
+    struct QueryStatsInfo {
+        // Uniquely identifies one query stats entry.
+        // nullptr if `wasRateLimited` is true.
+        std::unique_ptr<query_stats::Key> key;
+        // A cached value of `absl::HashOf(key)`.
+        // Always populated if `key` is non-null. boost::none if `wasRateLimited` is true.
+        boost::optional<std::size_t> keyHash;
+        // True if the request was rate limited and stats should not be collected.
+        bool wasRateLimited = false;
+    };
+
+    QueryStatsInfo queryStatsInfo;
+
     // Has a value if this operation is a query. True if the execution tree for the find part of the
     // query was built exclusively using the classic query engine, false if any part was built using
     // SBE.
@@ -278,9 +344,10 @@ public:
     // Details of any error (whether from an exception or a command returning failure).
     Status errInfo = Status::OK();
 
-    // response info
-    Microseconds executionTime{0};
-    long long nreturned{-1};
+    // Amount of time spent planning the query. Begins after parsing and ends
+    // after optimizations.
+    Microseconds planningTime{0};
+
     int responseLength{-1};
 
     // Shard targeting info.
@@ -305,7 +372,9 @@ public:
     // Used to track the amount of time spent waiting for a response from remote operations.
     boost::optional<Microseconds> remoteOpWaitTime;
 
-    // Stores additive metrics.
+    // Stores the current operation's count of these metrics. If they are needed to be accumulated
+    // elsewhere, they should be extracted by another aggregator (like the ClientCursor) to ensure
+    // these only ever reflect just this CurOp's consumption.
     AdditiveMetrics additiveMetrics;
 
     // Stores storage statistics.
@@ -393,6 +462,13 @@ public:
                                     const Command* command,
                                     BSONObj cmdObj,
                                     NetworkOp op);
+
+    /**
+     * Sets metrics collected at the end of an operation onto curOp's OpDebug instance. Note that
+     * this is used in tandem with OpDebug::setPlanSummaryMetrics so should not repeat any metrics
+     * collected there.
+     */
+    void setEndOfOpMetrics(long long nreturned);
 
     /**
      * Marks the operation end time, records the length of the client response if a valid response
@@ -688,6 +764,37 @@ public:
 
         return computeElapsedTimeTotal(start, _end.load()) - _totalPausedDuration;
     }
+    /**
+    * The planningTimeMicros metric, reported in the system profiler and in queryStats, is measured
+    * using the Curop instance's _tickSource. Currently, _tickSource is only paused in places where
+    logical work is being done. If this were to change, and _tickSource
+    were to be paused during query planning for reasons unrelated to the work of
+    planning/optimization, it would break the planning time measurement below.
+    *
+    */
+    void beginQueryPlanningTimer() {
+        // This is an inner executor/cursor, the metrics for which don't get tracked by
+        // OpDebug::planningTime.
+        if (_queryPlanningStart.load() != 0) {
+            return;
+        }
+        _queryPlanningStart = _tickSource->getTicks();
+    }
+
+    void stopQueryPlanningTimer() {
+        // The planningTime metric is defined as being done once PrepareExecutionHelper::prepare()
+        // is hit, which calls this function to stop the timer. As certain queries like $lookup
+        // require inner cursors/executors that will follow this same codepath, it is important to
+        // make sure the metric exclusively captures the time associated with the outermost cursor.
+        // This is done by making sure planningTime has not already been set and that start has been
+        // marked (as inner executors are prepared outside of the codepath that begins the planning
+        // timer).
+        auto start = _queryPlanningStart.load();
+        if (debug().planningTime == Microseconds{0} && start != 0) {
+            _queryPlanningEnd = _tickSource->getTicks();
+            debug().planningTime = computeElapsedTimeTotal(start, _queryPlanningEnd.load());
+        }
+    }
 
     /**
      * Starts the waitForWriteConcern timer.
@@ -839,16 +946,6 @@ public:
         _tickSource = tickSource;
     }
 
-    /**
-     * Merge match counters from the current operation into the global map and stop counting.
-     */
-    void stopMatchExprCounter();
-
-    /**
-     * Increment the counter for the match expression with given name in the current operation.
-     */
-    void incrementMatchExprCounter(StringData name);
-
 private:
     class CurOpStack;
 
@@ -923,6 +1020,10 @@ private:
     // These values are used to calculate the amount of time spent waiting for write concern.
     std::atomic<TickSource::Tick> _waitForWriteConcernStart{0};  // NOLINT
     std::atomic<TickSource::Tick> _waitForWriteConcernEnd{0};    // NOLINT
+
+    // These values are used to calculate the amount of time spent planning a query.
+    std::atomic<TickSource::Tick> _queryPlanningStart{0};  // NOLINT
+    std::atomic<TickSource::Tick> _queryPlanningEnd{0};    // NOLINT
 };
 
 }  // namespace mongo

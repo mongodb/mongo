@@ -1,6 +1,9 @@
 # -*- mode: python -*-
 
-Import("env")
+Import([
+    "env",
+    "get_option",
+])
 
 env = env.Clone()
 
@@ -10,6 +13,8 @@ env.SConscript(
         "collation",
         "datetime",
         'optimizer',
+        'query_stats',
+        'query_shape',
     ],
     exports=[
         'env'
@@ -19,8 +24,11 @@ env.SConscript(
 env.Library(
     target='canonical_query',
     source=[
-        "canonical_query.cpp",
-        "canonical_query_encoder.cpp",
+        'canonical_query.cpp',
+        'canonical_query_encoder.cpp',
+        'parsed_find_command.cpp',
+        'query_shape/find_cmd_shape.cpp',
+        'query_stats/find_key.cpp',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/crypto/encrypted_field_config",
@@ -90,6 +98,17 @@ env.Library(
 )
 
 env.Library(
+    target='memory_util',
+    source=[
+        'util/memory_util.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/processinfo',
+        '$BUILD_DIR/mongo/util/regex_util',
+    ],
+)
+
+env.Library(
     target="query_plan_cache",
     source=[
         "classic_plan_cache.cpp",
@@ -101,6 +120,7 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",
         "canonical_query",
+        "memory_util",
     ]
 )
 
@@ -261,17 +281,18 @@ env.Library(
 env.Library(
     target="query_knobs",
     source=[
-        'plan_cache_size_parameter.cpp',
         'query_feature_flags.idl',
         'query_knobs.idl',
+        'query_stats/query_stats_on_parameter_change.cpp',
         'sbe_plan_cache_on_parameter_change.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context",
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/third_party/shim_pcrecpp',
-    ]
+        'memory_util',
+    ],
 )
 
 env.Library(
@@ -348,7 +369,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/storage/recovery_unit_base',
     ],
- )
+)
 
 env.CppUnitTest(
     target="db_query_test",
@@ -359,6 +380,7 @@ env.CppUnitTest(
         "classic_stage_builder_test.cpp",
         "count_command_test.cpp",
         "cursor_response_test.cpp",
+        "query_shape/find_cmd_shape_test.cpp",
         "find_common_test.cpp",
         "get_executor_test.cpp",
         "getmore_request_test.cpp",
@@ -375,10 +397,8 @@ env.CppUnitTest(
         "interval_test.cpp",
         "killcursors_request_test.cpp",
         "lru_key_value_test.cpp",
-        'map_reduce_output_format_test.cpp',
         "parsed_distinct_test.cpp",
         "plan_cache_indexability_test.cpp",
-        "plan_cache_size_parameter_test.cpp",
         "plan_cache_key_info_test.cpp",
         "plan_cache_test.cpp",
         "plan_ranker_test.cpp",
@@ -392,31 +412,35 @@ env.CppUnitTest(
         "query_planner_collation_test.cpp",
         "query_planner_columnar_test.cpp",
         "query_planner_geo_test.cpp",
-        "query_planner_pipeline_pushdown_test.cpp",
         "query_planner_hashed_index_test.cpp",
-        "query_planner_partialidx_test.cpp",
         "query_planner_index_test.cpp",
         "query_planner_operator_test.cpp",
         "query_planner_options_test.cpp",
-        "query_planner_tree_test.cpp",
+        "query_planner_partialidx_test.cpp",
+        "query_planner_pipeline_pushdown_test.cpp",
         "query_planner_text_test.cpp",
+        "query_planner_tree_test.cpp",
         "query_planner_wildcard_index_test.cpp",
         "query_request_test.cpp",
         "query_settings_test.cpp",
         "query_solution_test.cpp",
         "sbe_and_hash_test.cpp",
         "sbe_and_sorted_test.cpp",
+        "sbe_shard_filter_test.cpp",
         "sbe_stage_builder_accumulator_test.cpp",
         "sbe_stage_builder_lookup_test.cpp",
-        "sbe_stage_builder_test_fixture.cpp",
         "sbe_stage_builder_test.cpp",
-        "sbe_shard_filter_test.cpp",
+        "sbe_stage_builder_test_fixture.cpp",
         "shard_filterer_factory_mock.cpp",
+        "sort_pattern_test.cpp",
+        "util/memory_util_test.cpp",
         "view_response_formatter_test.cpp",
+        'map_reduce_output_format_test.cpp',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util",
         "$BUILD_DIR/mongo/db/exec/sbe/sbe_plan_stage_test",
         "$BUILD_DIR/mongo/db/multitenancy",
         "$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper",
@@ -427,6 +451,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "$BUILD_DIR/mongo/dbtests/mocklib",
+        "$BUILD_DIR/mongo/idl/idl_parser",
         "$BUILD_DIR/mongo/rpc/rpc",
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "collation/collator_factory_mock",
@@ -438,6 +463,7 @@ env.CppUnitTest(
         "query_planner",
         "query_planner_test_fixture",
         "query_request",
+        "query_shape/query_shape",
         "query_test_service_context",
     ],
 )

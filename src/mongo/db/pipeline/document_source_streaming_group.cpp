@@ -153,13 +153,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
 }
 
 void DocumentSourceStreamingGroup::serializeAdditionalFields(
-    MutableDocument& out, boost::optional<ExplainOptions::Verbosity> explain) const {
+    MutableDocument& out, const SerializationOptions& opts) const {
     std::vector<Value> monotonicIdFields;
     if (_idFieldNames.empty()) {
-        monotonicIdFields.emplace_back("_id"_sd);
+        monotonicIdFields.emplace_back(opts.serializeFieldPath("_id"));
     } else {
         for (size_t i : _monotonicExpressionIndexes) {
-            monotonicIdFields.emplace_back(_idFieldNames[i]);
+            monotonicIdFields.emplace_back(opts.serializeFieldPathFromString(_idFieldNames[i]));
         }
     }
     out[kMonotonicIdFieldsSpecField] = Value(std::move(monotonicIdFields));

@@ -6,6 +6,7 @@
 //   uses_map_reduce_with_temp_collections,
 //   # Tenant migrations don't support applyOps.
 //   tenant_migration_incompatible,
+//   references_foreign_collection,
 // ]
 
 /**

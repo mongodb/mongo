@@ -44,6 +44,7 @@
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/balancer/type_migration.h"

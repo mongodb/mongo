@@ -206,16 +206,20 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckResumability::doGet
 }
 
 Value DocumentSourceChangeStreamCheckResumability::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return explain
-        ? Value(DOC(DocumentSourceChangeStream::kStageName
-                    << DOC("stage"
-                           << "internalCheckResumability"_sd
-                           << "resumeToken" << ResumeToken(_tokenFromClient).toDocument())))
-        : Value(Document{
-              {DocumentSourceChangeStreamCheckResumability::kStageName,
-               DocumentSourceChangeStreamCheckResumabilitySpec(ResumeToken(_tokenFromClient))
-                   .toBSON()}});
+    const SerializationOptions& opts) const {
+    BSONObjBuilder builder;
+    if (opts.verbosity) {
+        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
+        sub.append("stage"_sd, kStageName);
+        sub << "resumeToken"_sd << Value(ResumeToken(_tokenFromClient).toDocument(opts));
+        sub.done();
+    } else {
+        builder.append(
+            kStageName,
+            DocumentSourceChangeStreamCheckResumabilitySpec(ResumeToken(_tokenFromClient))
+                .toBSON(opts));
+    }
+    return Value(builder.obj());
 }
 
 }  // namespace mongo

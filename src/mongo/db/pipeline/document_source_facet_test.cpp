@@ -186,9 +186,19 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptLegalSpecification) {
     ASSERT_TRUE(facetStage.get());
 }
 
+/*
+ * Override the stub interface to allow full execution in these tests.
+ */
+class ExecutableStubMongoProcessInterface : public StubMongoProcessInterface {
+    bool isExpectedToExecuteQueries() override {
+        return true;
+    }
+};
+
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithinSinglePipeline) {
     auto ctx = getExpCtx();
     ctx->inMongos = true;
+    ctx->mongoProcessInterface = std::make_unique<ExecutableStubMongoProcessInterface>();
 
     auto spec = fromjson(
         "{$facet: {badPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}, "
@@ -202,6 +212,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithi
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsAcrossPipelines) {
     auto ctx = getExpCtx();
     ctx->inMongos = true;
+    ctx->mongoProcessInterface = std::make_unique<ExecutableStubMongoProcessInterface>();
 
     auto spec = fromjson(
         "{$facet: {shardPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}], mongosPipe: "
@@ -903,6 +914,166 @@ TEST_F(DocumentSourceFacetTest, ShouldSurfaceStrictestRequirementsOfEachConstrai
            StageConstraints::TransactionRequirement::kNotAllowed);
     ASSERT_FALSE(
         facetStage->constraints(Pipeline::SplitState::kUnsplit).isAllowedInLookupPipeline());
+}
+
+TEST_F(DocumentSourceFacetTest, RedactsCorrectly) {
+    auto spec = fromjson(R"({
+        $facet: {
+            a: [
+                { $unwind: "$foo" },
+                { $sortByCount: "$foo" }
+            ],
+            b: [
+                {
+                    $match: {
+                        bar: { $exists: 1 }
+                    }
+                },
+                {
+                    $bucket: {
+                        groupBy: "$bar.foo",
+                        boundaries: [0, 50, 100, 200],
+                        output: {
+                            z: { $sum : 1 }
+                        }
+                    }
+                }
+            ],
+            c: [
+                {
+                    $bucketAuto: {
+                        groupBy: "$bar.baz",
+                        buckets: 4
+                    }
+                }
+            ]
+        }
+    })");
+    auto docSource = DocumentSourceFacet::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$facet": {
+                "HASH<a>": [
+                    {
+                        "$unwind": {
+                            "path": "$HASH<foo>"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$HASH<foo>",
+                            "HASH<count>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$sort": {
+                            "HASH<count>": -1
+                        }
+                    }
+                ],
+                "HASH<b>": [
+                    {
+                        "$match": {
+                            "HASH<bar>": {
+                                "$exists": "?bool"
+                            }
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": {
+                                "$switch": {
+                                    "branches": [
+                                        {
+                                            "case": {
+                                                "$and": [
+                                                    {
+                                                        "$gte": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "$lt": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "then": "?number"
+                                        },
+                                        {
+                                            "case": {
+                                                "$and": [
+                                                    {
+                                                        "$gte": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "$lt": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "then": "?number"
+                                        },
+                                        {
+                                            "case": {
+                                                "$and": [
+                                                    {
+                                                        "$gte": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "$lt": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "then": "?number"
+                                        }
+                                    ]
+                                }
+                            },
+                            "HASH<z>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$sort": {
+                            "HASH<_id>": 1
+                        }
+                    }
+                ],
+                "HASH<c>": [
+                    {
+                        "$bucketAuto": {
+                            "groupBy": "$HASH<bar>.HASH<baz>",
+                            "buckets": "?number",
+                            "output": {
+                                "HASH<count>": {
+                                    "$sum": "?number"
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        })",
+        redact(*docSource));
 }
 }  // namespace
 }  // namespace mongo

@@ -1450,7 +1450,6 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
                                            std::move(pipeline));
         // Impose no cursor privilege requirements, as cursor is drained internally
         uassertStatusOK(runAggregate(opCtx,
-                                     AuthorizationManager::usersCollectionNamespace,
                                      aggRequest,
                                      aggregation_request_helper::serializeToCommandObj(aggRequest),
                                      PrivilegeVector(),

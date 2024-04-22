@@ -182,12 +182,8 @@ public:
 
             // An empty PrivilegeVector is acceptable because these privileges are only checked on
             // getMore and explain will not open a cursor.
-            return runAggregate(opCtx,
-                                viewAggRequest.getNamespace(),
-                                viewAggRequest,
-                                viewAggregation.getValue(),
-                                PrivilegeVector(),
-                                result);
+            return runAggregate(
+                opCtx, viewAggRequest, viewAggregation.getValue(), PrivilegeVector(), result);
         }
 
         const auto& collection = ctx->getCollection();
@@ -236,6 +232,8 @@ public:
             &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, nss);
 
         auto request = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
+        auto curOp = CurOp::get(opCtx);
+        curOp->beginQueryPlanningTimer();
         if (shouldDoFLERewrite(request)) {
             processFLECountD(opCtx, nss, &request);
         }
@@ -285,7 +283,6 @@ public:
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
         // Store the plan summary string in CurOp.
-        auto curOp = CurOp::get(opCtx);
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());

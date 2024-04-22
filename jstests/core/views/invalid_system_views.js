@@ -14,6 +14,7 @@
  *   # The drop of offending views may not happen on the donor after a committed migration.
  *   tenant_migration_incompatible,
  *   uses_compact,
+ *   references_foreign_collection,
  * ]
  */
 

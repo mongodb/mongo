@@ -8,17 +8,17 @@ env.Library(
     target="cluster_query",
     source=[
         "cluster_find.cpp",
-        'cluster_query_knobs.idl',
+        "cluster_query_knobs.idl",
+        "store_possible_cursor.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
         '$BUILD_DIR/mongo/db/query/query_common',
+        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         "cluster_client_cursor",
         "cluster_cursor_cleanup_job",
-        "store_possible_cursor",
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
@@ -37,6 +37,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface',
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
+        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
@@ -93,21 +94,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
+        '$BUILD_DIR/mongo/executor/async_multicaster',
     ]
-)
-
-env.Library(
-    target="store_possible_cursor",
-    source=[
-        "store_possible_cursor.cpp"
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/curop",
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "cluster_client_cursor",
-        "cluster_cursor_manager",
-    ],
 )
 
 env.Library(
@@ -119,12 +107,12 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/generic_cursor',
         '$BUILD_DIR/mongo/db/kill_sessions',
         '$BUILD_DIR/mongo/db/logical_session_cache',
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
     ],
 )
 
@@ -171,7 +159,7 @@ env.CppUnitTest(
         "cluster_aggregate",
         "cluster_client_cursor",
         "cluster_cursor_manager",
+        "cluster_query",
         "router_exec_stage",
-        "store_possible_cursor",
     ],
 )

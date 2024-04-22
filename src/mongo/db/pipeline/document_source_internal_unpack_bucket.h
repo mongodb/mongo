@@ -77,13 +77,14 @@ public:
 
     void serializeToArray(
         std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+        const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     /**
      * Use 'serializeToArray' above.
      */
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        MONGO_UNREACHABLE;
+    Value serialize(
+        const SerializationOptions& opts = SerializationOptions{}) const final override {
+        MONGO_UNREACHABLE_TASSERT(7484305);
     }
 
     bool includeMetaField() const {

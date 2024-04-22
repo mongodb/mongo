@@ -73,7 +73,8 @@ private:
     // e.g.
     // { "$intersect" : { "$geometry" : { "type" : "Point", "coordinates": [ 40, 5 ] } } }
     Status parseQuery(const BSONObj& obj);
-
+    BSONObj redactGeoExpression(const BSONObj& obj,
+                                boost::optional<StringData> literalArgsReplacement);
     // Name of the field in the query.
     std::string field;
     std::shared_ptr<GeometryContainer> geoContainer;
@@ -106,7 +107,9 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -206,7 +209,9 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -246,8 +251,10 @@ public:
     TwoDPtInAnnulusExpression(const R2Annulus& annulus, StringData twoDPath)
         : LeafMatchExpression(INTERNAL_2D_POINT_IN_ANNULUS, twoDPath), _annulus(annulus) {}
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final {
-        out->append("TwoDPtInAnnulusExpression", true);
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const final {
+        out->append("$TwoDPtInAnnulusExpression", true);
     }
 
     bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
@@ -265,7 +272,9 @@ public:
     // These won't be called.
     //
 
-    BSONObj getSerializedRightHandSide() const final {
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final {
         MONGO_UNREACHABLE;
     }
 

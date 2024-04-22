@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/query/cluster_client_cursor_impl.h"
@@ -34,6 +36,8 @@
 #include <memory>
 
 #include "mongo/db/curop.h"
+#include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"
 #include "mongo/s/query/router_stage_remove_metadata_fields.h"
@@ -75,7 +79,9 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _opCtx(opCtx),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
-      _queryHash(CurOp::get(opCtx)->debug().queryHash) {
+      _queryHash(CurOp::get(opCtx)->debug().queryHash),
+      _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -92,7 +98,9 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _opCtx(opCtx),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
-      _queryHash(CurOp::get(opCtx)->debug().queryHash) {
+      _queryHash(CurOp::get(opCtx)->debug().queryHash),
+      _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -100,7 +108,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
 }
 
 ClusterClientCursorImpl::~ClusterClientCursorImpl() {
-    if (_nBatchesReturned > 1)
+    if (_metrics.nBatches && *_metrics.nBatches > 1)
         mongosCursorStatsMoreThanOneBatch.increment();
 }
 
@@ -128,7 +136,25 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
 }
 
 void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
+    if (_hasBeenKilled) {
+        LOGV2_DEBUG(7372700,
+                    3,
+                    "Kill called on cluster client cursor after cursor has already been killed, so "
+                    "ignoring");
+        return;
+    }
+
+    if (_queryStatsKeyHash && opCtx) {
+        query_stats::writeQueryStats(opCtx,
+                                     _queryStatsKeyHash,
+                                     std::move(_queryStatsKey),
+                                     _metrics.executionTime.value_or(Microseconds{0}).count(),
+                                     _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
+                                     _metrics.nreturned.value_or(0));
+    }
+
     _root->kill(opCtx);
+    _hasBeenKilled = true;
 }
 
 void ClusterClientCursorImpl::reattachToOperationContext(OperationContext* opCtx) {
@@ -217,12 +243,8 @@ boost::optional<uint32_t> ClusterClientCursorImpl::getQueryHash() const {
     return _queryHash;
 }
 
-std::uint64_t ClusterClientCursorImpl::getNBatches() const {
-    return _nBatchesReturned;
-}
-
-void ClusterClientCursorImpl::incNBatches() {
-    ++_nBatchesReturned;
+boost::optional<std::size_t> ClusterClientCursorImpl::getQueryStatsKeyHash() const {
+    return _queryStatsKeyHash;
 }
 
 APIParameters ClusterClientCursorImpl::getAPIParameters() const {
@@ -265,4 +287,7 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     return root;
 }
 
+std::unique_ptr<query_stats::Key> ClusterClientCursorImpl::getKey() {
+    return std::move(_queryStatsKey);
+}
 }  // namespace mongo

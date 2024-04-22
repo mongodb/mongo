@@ -48,11 +48,11 @@ void GroupFromFirstDocumentTransformation::optimize() {
 }
 
 Document GroupFromFirstDocumentTransformation::serializeTransformation(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-
+    boost::optional<ExplainOptions::Verbosity> explain, const SerializationOptions& options) const {
     MutableDocument newRoot(_accumulatorExprs.size());
+
     for (auto&& expr : _accumulatorExprs) {
-        newRoot.addField(expr.first, expr.second->serialize(static_cast<bool>(explain)));
+        newRoot.addField(expr.first, expr.second->serialize(options));
     }
 
     return {{"newRoot", newRoot.freezeToValue()}};

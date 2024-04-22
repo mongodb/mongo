@@ -61,12 +61,9 @@ void InternalSchemaObjectMatchExpression::debugString(StringBuilder& debug,
     _sub->debugString(debug, indentationLevel + 1);
 }
 
-BSONObj InternalSchemaObjectMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder objMatchBob;
-    BSONObjBuilder subBob(objMatchBob.subobjStart(kName));
-    _sub->serialize(&subBob, true);
-    subBob.doneFast();
-    return objMatchBob.obj();
+void InternalSchemaObjectMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    bob->append(kName, _sub->serialize(opts, includePath));
 }
 
 bool InternalSchemaObjectMatchExpression::equivalent(const MatchExpression* other) const {

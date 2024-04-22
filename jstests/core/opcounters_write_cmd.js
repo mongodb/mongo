@@ -2,6 +2,7 @@
 // @tags: [
 //   uses_multiple_connections,
 //   assumes_standalone_mongod,
+//   inspects_command_opcounters,
 // ]
 // Legacy write mode test also available at jstests/gle.
 

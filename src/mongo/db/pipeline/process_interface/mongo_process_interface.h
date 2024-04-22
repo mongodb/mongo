@@ -84,7 +84,7 @@ public:
      *   2. write_ops::UpdateModification - either the new document we want to upsert or insert into
      *      the collection (i.e. a 'classic' replacement update), or the pipeline to run to compute
      *      the new document.
-     *   3. boost::optional<BSONObj> - for pipeline-style updated, specifies variables that can be
+     *   3. boost::optional<BSONObj> - for pipeline-style updates, specifies variables that can be
      *      referred to in the pipeline performing the custom update.
      */
     using BatchObject =
@@ -170,6 +170,20 @@ public:
      * on this information.
      */
     virtual bool isSharded(OperationContext* opCtx, const NamespaceString& ns) = 0;
+
+    /**
+     * TODO SERVER-79508 validate callers of this function remain correct.
+     *
+     * Returns false if the current request only handles parsing and validating queries. In other
+     * words, we are not executing queries. Examples include query analysis for queryable
+     * encryption, executing pipeline-style operations in the Update system, and creating a Query
+     * Shape. This function only returns false when the process interface is of type
+     * 'StubMongoProcessInterface'.
+     *
+     */
+    virtual bool isExpectedToExecuteQueries() {
+        return true;
+    }
 
     /**
      * Advances the proxied write time associated with the client in ReplClientInfo to

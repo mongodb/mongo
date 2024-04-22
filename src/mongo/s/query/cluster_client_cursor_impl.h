@@ -32,6 +32,7 @@
 #include <memory>
 #include <queue>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 #include "mongo/s/query/cluster_client_cursor_guard.h"
@@ -116,9 +117,9 @@ public:
 
     boost::optional<uint32_t> getQueryHash() const final;
 
-    std::uint64_t getNBatches() const final;
+    boost::optional<std::size_t> getQueryStatsKeyHash() const final;
 
-    void incNBatches() final;
+    std::unique_ptr<query_stats::Key> getKey() final;
 
 public:
     /**
@@ -175,8 +176,17 @@ private:
     // The hash of the query shape to be used for slow query logging;
     boost::optional<uint32_t> _queryHash;
 
-    // The number of batches returned by this cursor.
-    std::uint64_t _nBatchesReturned = 0;
+    // If boost::none, queryStats should not be collected for this cursor.
+    boost::optional<std::size_t> _queryStatsKeyHash;
+
+    // The Key used by query stats to generate the query stats store key.
+    std::unique_ptr<query_stats::Key> _queryStatsKey;
+
+    // Tracks if kill() has been called on the cursor. Multiple calls to kill() are treated as a
+    // noop.
+    // TODO SERVER-74482 investigate where kill() is called multiple times and remove unnecessary
+    // calls
+    bool _hasBeenKilled = false;
 };
 
 }  // namespace mongo

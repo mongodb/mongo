@@ -95,7 +95,9 @@ public:
         return false;
     }
 
-    void serialize(BSONObjBuilder* builder, bool includePath) const final;
+    void serialize(BSONObjBuilder* builder,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const final;
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 

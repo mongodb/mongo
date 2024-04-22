@@ -29,10 +29,13 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+#include "mongo/db/curop.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/get_executor.h"
 
+#include "mongo/util/duration.h"
+#include "mongo/util/tick_source.h"
 #include <boost/optional.hpp>
 #include <limits>
 #include <memory>
@@ -107,6 +110,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/str.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(includeFakeColumnarIndex);
@@ -603,6 +607,8 @@ public:
 
     StatusWith<std::unique_ptr<ResultType>> prepare() {
         const auto& mainColl = getMainCollection();
+
+        ON_BLOCK_EXIT([&] { CurOp::get(_opCtx)->stopQueryPlanningTimer(); });
         if (!mainColl) {
             LOGV2_DEBUG(20921,
                         2,
@@ -702,10 +708,8 @@ public:
                         "Only one plan is available",
                         "query"_attr = redact(_cq->toStringShort()),
                         "planSummary"_attr = result->getPlanSummary());
-
             return std::move(result);
         }
-
         return buildMultiPlan(std::move(solutions));
     }
 
@@ -1317,16 +1321,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     auto&& [roots, solutions] = planningResult->extractResultData();
     // In some circumstances (e.g. when have multiple candidate plans or using a cached one), we
     // might need to execute the plan(s) to pick the best one or to confirm the choice.
-    if (auto planner = makeRuntimePlannerIfNeeded(opCtx,
-                                                  collections,
-                                                  cq.get(),
-                                                  solutions.size(),
-                                                  planningResult->decisionWorks(),
-                                                  planningResult->needsSubplanning(),
-                                                  yieldPolicy.get(),
-                                                  plannerParams.options)) {
+    if (auto runTimePlanner = makeRuntimePlannerIfNeeded(opCtx,
+                                                         collections,
+                                                         cq.get(),
+                                                         solutions.size(),
+                                                         planningResult->decisionWorks(),
+                                                         planningResult->needsSubplanning(),
+                                                         yieldPolicy.get(),
+                                                         plannerParams.options)) {
         // Do the runtime planning and pick the best candidate plan.
-        auto candidates = planner->plan(std::move(solutions), std::move(roots));
+        auto candidates = runTimePlanner->plan(std::move(solutions), std::move(roots));
 
         return plan_executor_factory::make(opCtx,
                                            std::move(cq),
@@ -1409,6 +1413,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
     MultipleCollectionAccessor multi{collection};
+
     return getExecutor(opCtx,
                        multi,
                        std::move(canonicalQuery),
@@ -1450,6 +1455,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     bool permitYield,
     size_t plannerOptions) {
+
     MultipleCollectionAccessor multi{*coll};
     return getExecutorFind(opCtx,
                            multi,
@@ -1665,6 +1671,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     ClassicPrepareExecutionHelper helper{
         opCtx, collection, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
+
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
@@ -1852,6 +1859,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     ClassicPrepareExecutionHelper helper{
         opCtx, collection, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
+
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
@@ -2125,8 +2133,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     OperationContext* opCtx = expCtx->opCtx;
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
+
     findCommand->setFilter(request.getQuery());
     auto collation = request.getCollation().value_or(BSONObj());
     findCommand->setCollation(collation);
@@ -2200,6 +2208,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
+
     auto [root, querySolution] = executionResult.getValue()->extractResultData();
     invariant(root);
 
@@ -2208,6 +2217,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         expCtx.get(), collection, limit, skip, ws.get(), root.release());
     // We must have a tree of stages in order to have a valid plan executor, but the query
     // solution may be NULL. Takes ownership of all args other than 'collection' and 'opCtx'
+
     return plan_executor_factory::make(std::move(cq),
                                        std::move(ws),
                                        std::move(root),

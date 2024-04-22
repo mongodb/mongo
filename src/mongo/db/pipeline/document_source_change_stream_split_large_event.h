@@ -78,10 +78,7 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
-    // This stage does not reference any user or system variables.
-    void addVariableRefs(std::set<Variables::Id>* refs) const {}
-
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 

@@ -67,9 +67,11 @@ assert.commandFailedWithCode(sdb.runCommand({
 }),
                              6273801);
 
-// $out can't passthrough so it's not allowed.
+// $out can't passthrough so it's not allowed. This may be caught in parsing, or when preparing
+// the aggregation.
 assert.commandFailedWithCode(
-    assert.throws(() => pscWatch(sdb, "coll", shardId, {pipeline: [{$out: "h"}]})), 6273802);
+    assert.throws(() => pscWatch(sdb, "coll", shardId, {pipeline: [{$out: "h"}]})),
+                 [6273802, ErrorCodes.IllegalOperation]);
 
 // Shard option should be specified.
 assert.commandFailedWithCode(

@@ -127,18 +127,26 @@ StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
 }
 
 Value DocumentSourceChangeStreamUnwindTransaction::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    tassert(5467604, "expression has not been initialized", _expression);
+    const SerializationOptions& opts) const {
+    tassert(7481400, "expression has not been initialized", _expression);
 
-    if (explain) {
-        return Value(
-            DOC(DocumentSourceChangeStream::kStageName << DOC("stage"
-                                                              << "internalUnwindTransaction"_sd
-                                                              << "filter" << _filter)));
+    if (opts.verbosity) {
+        BSONObjBuilder builder;
+        builder.append("stage"_sd, "internalUnwindTransaction"_sd);
+        builder.append(DocumentSourceChangeStreamUnwindTransactionSpec::kFilterFieldName,
+                       _expression->serialize(opts));
+
+        return Value(DOC(DocumentSourceChangeStream::kStageName << builder.obj()));
     }
 
-    DocumentSourceChangeStreamUnwindTransactionSpec spec(_filter);
-    return Value(Document{{kStageName, Value(spec.toBSON())}});
+    Value spec;
+    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged || opts.transformIdentifiers) {
+        spec = Value(DOC(DocumentSourceChangeStreamUnwindTransactionSpec::kFilterFieldName
+                         << _expression->serialize(opts)));
+    } else {
+        spec = Value(DocumentSourceChangeStreamUnwindTransactionSpec(_filter).toBSON());
+    }
+    return Value(Document{{kStageName, spec}});
 }
 
 DepsTracker::State DocumentSourceChangeStreamUnwindTransaction::getDependencies(

@@ -30,22 +30,10 @@
 
 global:
     cpp_namespace: "mongo"
-    cpp_includes:
-        - "mongo/db/pipeline/resume_token.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
-
-types:
-    # A resume token is an opaque document we return to the user that contains all the information
-    # needed to resume a stream where they left off.  It also provides the ordering of streams
-    # from multiple shards.
-    resumeToken:
-        bson_serialization_type: object
-        description: An object representing a resume token for a change stream
-        cpp_type: ResumeToken
-        serializer: ResumeToken::toBSON
-        deserializer: ResumeToken::parse
+    - "mongo/db/pipeline/resume_token.idl"
 
 enums:
     FullDocumentBeforeChangeMode:
@@ -86,6 +74,7 @@ structs:
         description: A document used to specify the $changeStream stage of an aggregation
                      pipeline. The same spec is also used by the $_internalChangeStreamTransform
                      stage.
+        query_shape_component: true
         fields:
             resumeAfter:
                 cpp_name: resumeAfter
@@ -94,6 +83,7 @@ structs:
                 description: An object representing the point at which we should resume reporting
                              changes from. Only one of resumeAfter, startAfter, and
                              startAtOperationTime should be specified.
+                query_shape: custom
 
             startAfter:
                 cpp_name: startAfter
@@ -103,6 +93,7 @@ structs:
                              changes from. This is allowed to be a token from an invalidating
                              command. Only one of resumeAfter, startAfter, and startAtOperationTime
                              should be specified.
+                query_shape: custom
 
             startAtOperationTime:
                 cpp_name: startAtOperationTime
@@ -111,6 +102,7 @@ structs:
                 description: The operation time after which we should start reporting changes.
                              Only one of resumeAfter, startAfter, and startAtOperationTime should
                              be specified.
+                query_shape: literal
 
             fullDocument:
                 cpp_name: fullDocument
@@ -118,6 +110,7 @@ structs:
                 default: kDefault
                 description: A string '"updateLookup"' or '"default"', indicating whether or not we
                              should return a full document or just changes for an update.
+                query_shape: parameter
 
             fullDocumentBeforeChange:
                 cpp_name: fullDocumentBeforeChange
@@ -132,6 +125,7 @@ structs:
                              set to "required", then the "fullDocumentBeforeChange" field is
                              always populated and an exception is thrown if the pre-image is not
                              available.
+                query_shape: parameter
 
             allChangesForCluster:
                 cpp_name: allChangesForCluster
@@ -139,6 +133,7 @@ structs:
                 description: A flag indicating whether the stream should report all changes that
                              occur on the deployment, aside from those on internal databases or
                              collections.
+                query_shape: literal
 
             showMigrationEvents:
                 cpp_name: showMigrationEvents
@@ -149,12 +144,14 @@ structs:
                              deletes may appear that do not reflect actual deletions or insertions
                              of data. Instead they reflect this data moving from one shard to
                              another.
+                query_shape: literal
 
             showSystemEvents:
                 cpp_name: showSystemEvents
                 type: optionalBool
                 description: A flag indicating whether the stream should report events on system
                              collections.
+                query_shape: literal
 
             allowToRunOnConfigDB:
                 cpp_name: allowToRunOnConfigDB
@@ -163,17 +160,20 @@ structs:
                              'config' database, which is usually banned. This flag is used
                              internally to allow mongoS to open a stream on 'config.shards', in
                              order to monitor for the addition of new shards to the cluster.
+                query_shape: literal
 
             allowToRunOnSystemNS:
                 cpp_name: allowToRunOnSystemNS
                 type: optionalBool
                 description: An internal flag indicating whether the change stream may be opened on
                              a system collection.
+                query_shape: literal
 
             showExpandedEvents:
                 type: optionalBool
                 description: A flag indicating whether the change stream output should include the
                              expanded events and parameters that may not be part of the stable API.
+                query_shape: literal
 
             showRawUpdateDescription:
                 cpp_name: showRawUpdateDescription
@@ -183,6 +183,7 @@ structs:
                              raw update description from the oplog entry for the corresponding
                              update command. When this flag is set to true, the standard
                              "updateDescription" field in update events will be omitted.
+                query_shape: literal
 
     DocumentSourceChangeStreamOplogMatchSpec:
         strict: true
@@ -202,32 +203,51 @@ structs:
         strict: true
         description: A document used to specify the $_internalChangeStreamCheckInvalidate stage of
                      an aggregation pipeline.
+        query_shape_component: true
         fields:
             startAfterInvalidate:
                 type: resumeToken
                 optional: true
-    
+                query_shape: custom
+
     DocumentSourceChangeStreamCheckResumabilitySpec:
         strict: true
         description: A document used to specify the $_internalChangeStreamCheckResumability stage of
                      an aggregation pipeline.
+        query_shape_component: true
         fields:
             resumeToken:
                 type: resumeToken
                 optional: false
+                query_shape: custom
 
     DocumentSourceChangeStreamAddPreImageSpec:
         strict: true
         description: A document used to specify the $_internalChangeStreamAddPreImage stage of
                      an aggregation pipeline.
+        query_shape_component: true
         fields:
             fullDocumentBeforeChange:
                 type: FullDocumentBeforeChangeMode
+                query_shape: parameter
 
     DocumentSourceChangeStreamAddPostImageSpec:
         strict: true
         description: A document used to specify the $_internalChangeStreamAddPostImage stage of
                      an aggregation pipeline.
+        query_shape_component: true
         fields:
             fullDocument:
                 type: FullDocumentMode
+                query_shape: parameter
+
+    DocumentSourceChangeStreamHandleTopologyChangeSpec:
+        strict: true
+        description: A document used to specify the $_internalChangeStreamHandleTopologyChange stage of
+                     an aggregation pipeline.
+        query_shape_component: true
+        fields:
+            originalAggregateCommand:
+                type: object
+                optional: true
+                query_shape: literal

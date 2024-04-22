@@ -90,12 +90,11 @@ StageConstraints DocumentSourceReshardingOwnershipMatch::constraints(
                             ChangeStreamRequirement::kDenylist);
 }
 
-Value DocumentSourceReshardingOwnershipMatch::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceReshardingOwnershipMatch::serialize(const SerializationOptions& opts) const {
     return Value{Document{{kStageName,
                            DocumentSourceReshardingOwnershipMatchSpec(
                                _recipientShardId, _reshardingKey.getKeyPattern())
-                               .toBSON()}}};
+                               .toBSON(opts)}}};
 }
 
 DepsTracker::State DocumentSourceReshardingOwnershipMatch::getDependencies(

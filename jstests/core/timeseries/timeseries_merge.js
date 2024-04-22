@@ -6,6 +6,7 @@
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_timeseries,
+ *   references_foreign_collection,
  * ]
  */
 (function() {

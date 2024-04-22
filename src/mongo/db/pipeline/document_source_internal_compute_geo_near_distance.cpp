@@ -139,15 +139,16 @@ DocumentSource::GetNextResult DocumentSourceInternalGeoNearDistance::doGetNext()
     return next;
 }
 
-Value DocumentSourceInternalGeoNearDistance::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceInternalGeoNearDistance::serialize(const SerializationOptions& opts) const {
     MutableDocument out;
-    out.setField(DocumentSourceInternalGeoNearDistance::kNearFieldName, Value(_coords));
-    out.setField(DocumentSourceInternalGeoNearDistance::kKeyFieldName, Value(_key));
+    out.setField(DocumentSourceInternalGeoNearDistance::kNearFieldName,
+                 opts.serializeLiteral(_coords));
+    out.setField(DocumentSourceInternalGeoNearDistance::kKeyFieldName,
+                 Value(opts.serializeFieldPathFromString(_key)));
     out.setField(DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName,
-                 Value(_distanceField.fullPath()));
+                 Value(opts.serializeFieldPath(_distanceField)));
     out.setField(DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName,
-                 Value(_distanceMultiplier));
+                 opts.serializeLiteral(_distanceMultiplier));
 
     return Value(DOC(getSourceName() << out.freeze()));
 }

@@ -112,13 +112,13 @@ QueryMetadataBitSet SortPattern::metadataDeps(QueryMetadataBitSet unavailableMet
     return depsTracker.metadataDeps();
 }
 
-Document SortPattern::serialize(SortKeySerialization serializationMode) const {
+Document SortPattern::serialize(SortKeySerialization serializationMode,
+                                const SerializationOptions& options) const {
     MutableDocument keyObj;
     const size_t n = _sortPattern.size();
     for (size_t i = 0; i < n; ++i) {
         if (_sortPattern[i].fieldPath) {
-            // Append a named integer based on whether the sort is ascending/descending.
-            keyObj.setField(_sortPattern[i].fieldPath->fullPath(),
+            keyObj.setField(options.serializeFieldPath(*_sortPattern[i].fieldPath),
                             Value(_sortPattern[i].isAscending ? 1 : -1));
         } else {
             // Sorting by an expression, use a made up field name.
@@ -127,7 +127,12 @@ Document SortPattern::serialize(SortKeySerialization serializationMode) const {
                 case SortKeySerialization::kForExplain:
                 case SortKeySerialization::kForPipelineSerialization: {
                     const bool isExplain = (serializationMode == SortKeySerialization::kForExplain);
-                    keyObj[computedFieldName] = _sortPattern[i].expression->serialize(isExplain);
+                    auto opts = SerializationOptions{};
+                    if (isExplain) {
+                        opts.verbosity =
+                            boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner);
+                    }
+                    keyObj[computedFieldName] = _sortPattern[i].expression->serialize(opts);
                     break;
                 }
                 case SortKeySerialization::kForSortKeyMerging: {

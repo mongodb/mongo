@@ -53,6 +53,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -379,6 +380,43 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
     });
 
     future.default_timed_get();
+}
+
+using DocumentSourceMergeCursorsShapeTest = AggregationContextFixture;
+TEST_F(DocumentSourceMergeCursorsShapeTest, QueryShape) {
+    auto expCtx = getExpCtx();
+    AsyncResultsMergerParams armParams;
+    armParams.setNss(kTestNss);
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->ns, 1, {})));
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->ns, 2, {})));
+    armParams.setRemotes(std::move(cursors));
+    auto stage = DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$mergeCursors": {
+                "compareWholeSortKey": "?bool",
+                "remotes": [
+                    {
+                        "shardId": "HASH<FakeShard1>",
+                        "hostAndPort": "HASH<FakeShard1Host:12345>",
+                        "cursorResponse": "?object"
+                    },
+                    {
+                        "shardId": "HASH<FakeShard2>",
+                        "hostAndPort": "HASH<FakeShard2Host:12345>",
+                        "cursorResponse": "?object"
+                    }
+                ],
+                "nss": "HASH<test.mergeCursors>",
+                "allowPartialResults": false,
+                "recordRemoteOpWaitTime": false
+            }
+        })",
+        redact(*stage));
 }
 }  // namespace
 }  // namespace mongo

@@ -161,5 +161,12 @@ TEST_F(DocumentSourceLimitTest, ShouldPropagatePauses) {
     ASSERT_TRUE(limit->getNext().isEOF());
 }
 
+TEST_F(DocumentSourceLimitTest, RedactsCorrectly) {
+    auto limit = DocumentSourceLimit::create(getExpCtx(), 2);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "{ $limit: \"?number\" }",
+        redact(*limit));
+}
+
 }  // namespace
 }  // namespace mongo

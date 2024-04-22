@@ -163,6 +163,13 @@ types:
         cpp_type: "std::vector<std::uint8_t>"
         deserializer: "mongo::BSONElement::_binDataVector"
 
+    bindata_sensitive:
+        bson_serialization_type: bindata
+        bindata_subtype: sensitive
+        description: "A BSON bindata of sensitive sub type"
+        cpp_type: "std::vector<std::uint8_t>"
+        deserializer: "mongo::BSONElement::_binDataVector"
+
     uuid:
         bson_serialization_type: bindata
         bindata_subtype: uuid

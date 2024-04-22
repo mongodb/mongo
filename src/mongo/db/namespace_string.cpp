@@ -35,6 +35,7 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/str.h"
 
@@ -276,6 +277,10 @@ NamespaceString NamespaceString::makeCollectionlessAggregateNSS(StringData dbnam
 std::string NamespaceString::getSisterNS(StringData local) const {
     verify(local.size() && local[0] != '.');
     return db().toString() + "." + local.toString();
+}
+
+std::string NamespaceString::toString(const SerializationOptions& opts) const {
+    return opts.serializeIdentifier(ns());
 }
 
 void NamespaceString::serializeCollectionName(BSONObjBuilder* builder, StringData fieldName) const {

@@ -114,6 +114,16 @@ public:
     };
 
     /**
+     * Constructs an ExpressionContext to be used for find command parsing and evaluation.
+     */
+    ExpressionContext(OperationContext* opCtx,
+                      const FindCommandRequest& findCmd,
+                      std::unique_ptr<CollatorInterface> collator,
+                      bool mayDbProfile,
+                      boost::optional<ExplainOptions::Verbosity> verbosity = boost::none,
+                      bool allowDiskUseByDefault = false);
+
+    /**
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation.
      * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
      */
@@ -278,7 +288,8 @@ public:
      */
     const ResolvedNamespace& getResolvedNamespace(const NamespaceString& nss) const {
         auto it = _resolvedNamespaces.find(nss.coll());
-        invariant(it != _resolvedNamespaces.end());
+        invariant(it != _resolvedNamespaces.end(),
+                  str::stream() << "No resolved namespace provided for " << nss.toString());
         return it->second;
     };
 

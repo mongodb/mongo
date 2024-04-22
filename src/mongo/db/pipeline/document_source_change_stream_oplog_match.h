@@ -74,7 +74,7 @@ public:
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
 protected:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,48 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/plan_cache_size_parameter.h"
+#pragma once
 
-#include <pcrecpp.h>
+#include "mongo/util/assert_util.h"
 
-#include "mongo/db/query/query_knobs_gen.h"
+namespace mongo::query_shape {
 
-namespace mongo::plan_cache_util {
+// This enum is not compatible with the QUERY_UTIL_NAMED_ENUM_DEFINE util since the "virtual" type
+// conflicts with the C++ keyword "virtual". Instead, we manually define the enum and the
+// toStringData function below.
+enum class CollectionType {
+    kUnknown,
+    kCollection,
+    kView,
+    kTimeseries,
+    kChangeStream,
+    kVirtual,
+    kNonExistent,
+};
 
-StatusWith<PlanCacheSizeUnits> parseUnitString(const std::string& strUnit) {
-    if (strUnit.empty()) {
-        return Status(ErrorCodes::Error{6007010}, "Unit value cannot be empty");
+static StringData toStringData(CollectionType type) {
+    switch (type) {
+        case CollectionType::kUnknown:
+            return "unknown"_sd;
+        case CollectionType::kCollection:
+            return "collection"_sd;
+        case CollectionType::kView:
+            return "view"_sd;
+        case CollectionType::kTimeseries:
+            return "timeseries"_sd;
+        case CollectionType::kChangeStream:
+            return "changeStream"_sd;
+        case CollectionType::kVirtual:
+            return "virtual"_sd;
+        case CollectionType::kNonExistent:
+            return "nonExistent"_sd;
+        default:
+            MONGO_UNREACHABLE_TASSERT(7804900);
     }
-
-    if (strUnit[0] == '%') {
-        return PlanCacheSizeUnits::kPercent;
-    } else if (strUnit[0] == 'M' || strUnit[0] == 'm') {
-        return PlanCacheSizeUnits::kMB;
-    } else if (strUnit[0] == 'G' || strUnit[0] == 'g') {
-        return PlanCacheSizeUnits::kGB;
-    }
-
-    return Status(ErrorCodes::Error{6007011}, "Incorrect unit value");
 }
 
-StatusWith<PlanCacheSizeParameter> PlanCacheSizeParameter::parse(const std::string& str) {
-    pcrecpp::RE_Options opt;
-    opt.set_caseless(true);
-    // Looks for a floating point number with followed by a unit suffix (MB, GB, %).
-    pcrecpp::RE re("\\s*(\\d+\\.?\\d*)\\s*(MB|GB|%)\\s*", opt);
-
-    double size{};
-    std::string strUnit{};
-    if (!re.FullMatch(str, &size, &strUnit)) {
-        return {ErrorCodes::Error{6007012}, "Unable to parse plan cache size string"};
-    }
-
-    auto statusWithUnit = parseUnitString(strUnit);
-    if (!statusWithUnit.isOK()) {
-        return statusWithUnit.getStatus();
-    }
-
-    return PlanCacheSizeParameter{size, statusWithUnit.getValue()};
-}
-
-}  // namespace mongo::plan_cache_util
+}  // namespace mongo::query_shape

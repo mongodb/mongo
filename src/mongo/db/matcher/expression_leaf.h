@@ -163,7 +163,9 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    virtual void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                               const SerializationOptions& opts = {},
+                                               bool includePath = true) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -506,7 +508,9 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     void serializeToBSONTypeRegex(BSONObjBuilder* out) const;
 
@@ -586,7 +590,9 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -651,7 +657,9 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -682,7 +690,9 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -749,6 +759,12 @@ public:
 
 private:
     ExpressionOptimizerFunc getOptimizer() const final;
+
+    /**
+     * A helper to serialize to something like {$in: "?array<?number>"} or similar, depending on
+     * 'opts' and whether we have a mixed-type $in or not.
+     */
+    void serializeToShape(BSONObjBuilder* bob, const SerializationOptions& opts) const;
 
     // Whether or not '_equalities' has a jstNULL element in it.
     bool _hasNull = false;
@@ -818,7 +834,9 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
-    BSONObj getSerializedRightHandSide() const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 

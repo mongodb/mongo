@@ -56,15 +56,6 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/tick_source_mock.h"
 
-#define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
-    try {                                                                          \
-        EXPRESSION;                                                                \
-    } catch (const AssertionException& e) {                                        \
-        str::stream err;                                                           \
-        err << "Threw an exception incorrectly: " << e.toString();                 \
-        ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
-    }
-
 namespace mongo {
 namespace {
 

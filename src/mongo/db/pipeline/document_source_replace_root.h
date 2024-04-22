@@ -60,9 +60,9 @@ public:
         _newRoot->optimize();
     }
 
-    Document serializeTransformation(
-        boost::optional<ExplainOptions::Verbosity> explain) const final {
-        return Document{{"newRoot", _newRoot->serialize(static_cast<bool>(explain))}};
+    Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
+                                     const SerializationOptions& options = {}) const final {
+        return Document{{"newRoot", _newRoot->serialize(options)}};
     }
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final {

@@ -76,7 +76,7 @@ public:
     DocumentSourceMock(std::deque<GetNextResult>, const boost::intrusive_ptr<ExpressionContext>&);
 
     Value serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override {
+        const SerializationOptions& opts = SerializationOptions{}) const final override {
         // Unlike the queue, it's okay to serialize this stage for testing purposes.
         return Value(Document{{getSourceName(), Document()}});
     }

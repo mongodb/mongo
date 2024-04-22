@@ -19,6 +19,7 @@
  *   requires_replication,
  *   # This test depends on hardcoded database name equality.
  *   tenant_migration_incompatible,
+ *   references_foreign_collection,
  * ]
  */
 (function() {

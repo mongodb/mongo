@@ -3,7 +3,12 @@
  * should not block on prepare conflicts, but writing out to a collection as a part of an aggregate
  * pipeline should block on prepare conflicts.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * The test runs commands that are not allowed with security token: endSession, prepareTransaction.
+ * @tags: [
+ *   references_foreign_collection,
+ *   uses_transactions,
+ *   uses_prepare_transaction,
+ * ]
  */
 (function() {
 "use strict";

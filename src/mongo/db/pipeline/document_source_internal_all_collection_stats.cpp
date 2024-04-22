@@ -118,17 +118,18 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalAllCollectionStats::do
 }
 
 void DocumentSourceInternalAllCollectionStats::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+    std::vector<Value>& array, const SerializationOptions& opts) const {
+    auto explain = opts.verbosity;
     if (explain) {
         BSONObjBuilder bob;
-        _internalAllCollectionStatsSpec.serialize(&bob);
+        _internalAllCollectionStatsSpec.serialize(&bob, opts);
         if (_absorbedMatch) {
             bob.append("match", _absorbedMatch->getQuery());
         }
         auto doc = Document{{getSourceName(), bob.obj()}};
         array.push_back(Value(doc));
     } else {
-        array.push_back(serialize(explain));
+        array.push_back(serialize(opts));
         if (_absorbedMatch) {
             _absorbedMatch->serializeToArray(array);
         }
@@ -156,8 +157,7 @@ const char* DocumentSourceInternalAllCollectionStats::getSourceName() const {
     return kStageNameInternal.rawData();
 }
 
-Value DocumentSourceInternalAllCollectionStats::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{getSourceName(), _internalAllCollectionStatsSpec.toBSON()}});
+Value DocumentSourceInternalAllCollectionStats::serialize(const SerializationOptions& opts) const {
+    return Value(Document{{getSourceName(), _internalAllCollectionStatsSpec.toBSON(opts)}});
 }
 }  // namespace mongo

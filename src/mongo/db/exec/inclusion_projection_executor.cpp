@@ -67,7 +67,7 @@ void FastPathEligibleInclusionNode::_applyProjections(BSONObj bson, BSONObjBuild
         const auto bsonElement{it.next()};
         const auto fieldName{bsonElement.fieldNameStringData()};
 
-        if (_projectedFields.find(fieldName) != _projectedFields.end()) {
+        if (_projectedFieldsSet.find(fieldName) != _projectedFieldsSet.end()) {
             bob->append(bsonElement);
             --nFieldsNeeded;
         } else if (auto childIt = _children.find(fieldName); childIt != _children.end()) {
@@ -219,11 +219,12 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
         for (const auto& expressionSpec : addFieldsExpressions) {
             auto&& fieldName = std::get<0>(expressionSpec).toString();
             auto oldExpr = std::get<1>(expressionSpec);
-            oldExpr->serialize(false).addToBsonObj(&bb, fieldName);
+            oldExpr->serialize(SerializationOptions{}).addToBsonObj(&bb, fieldName);
 
             if (std::get<2>(expressionSpec)) {
                 // Replace the expression with an inclusion projected field.
-                _projectedFields.insert(fieldName);
+                auto it = _projectedFields.insert(_projectedFields.end(), fieldName);
+                _projectedFieldsSet.insert(StringData(*it));
                 _expressions.erase(fieldName);
                 // Only computed projections at the beginning of the list were marked to become
                 // projected fields. The new projected field is at the beginning of the
@@ -302,7 +303,7 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
         for (const auto& expressionSpec : addFieldsExpressions) {
             auto&& fieldName = expressionSpec.first.toString();
             auto expr = expressionSpec.second;
-            expr->serialize(false).addToBsonObj(&bb, fieldName);
+            expr->serialize(SerializationOptions{}).addToBsonObj(&bb, fieldName);
 
             // Remove the expression from this inclusion node.
             _expressions.erase(fieldName);

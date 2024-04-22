@@ -67,13 +67,25 @@ class ArgumentInfo(object):
     def __init__(self, arg):
         # type: (str) -> None
         """Create a instance of the ArgumentInfo class by parsing the argument string."""
-        parts = arg.split(' ')
-        self.type = ' '.join(parts[0:-1])
-        self.name = parts[-1]
+        self.defaults = None
+        equal_tokens = arg.split('=')
+        if len(equal_tokens) > 1:
+            self.defaults = equal_tokens[-1].strip()
+
+        space_tokens = equal_tokens[0].strip().split(' ')
+        self.type = ' '.join(space_tokens[0:-1])
+        self.name = space_tokens[-1]
 
     def __str__(self):
         # type: () -> str
         """Return a formatted argument string."""
+        return "%s %s" % (self.type, self.name)  # type: ignore
+
+    def get_string(self, get_defaults):
+        # type: (bool) -> str
+        """Return a formatted argument string."""
+        if self.defaults and get_defaults:
+            return "%s %s = %s" % (self.type, self.name, self.defaults)  # type: ignore
         return "%s %s" % (self.type, self.name)  # type: ignore
 
 
@@ -115,7 +127,8 @@ class MethodInfo(object):
         return common.template_args(
             "${pre_modifiers}${return_type}${method_name}(${args})${post_modifiers};",
             pre_modifiers=pre_modifiers, return_type=return_type_str, method_name=self.method_name,
-            args=', '.join([str(arg) for arg in self.args]), post_modifiers=post_modifiers)
+            args=', '.join(
+                [arg.get_string(True) for arg in self.args]), post_modifiers=post_modifiers)
 
     def get_definition(self):
         # type: () -> str
@@ -134,7 +147,7 @@ class MethodInfo(object):
             "${pre_modifiers}${return_type}${class_name}::${method_name}(${args})${post_modifiers}",
             pre_modifiers=pre_modifiers, return_type=return_type_str, class_name=self.class_name,
             method_name=self.method_name, args=', '.join(
-                [str(arg) for arg in self.args]), post_modifiers=post_modifiers)
+                [arg.get_string(False) for arg in self.args]), post_modifiers=post_modifiers)
 
     def get_call(self, obj):
         # type: (Optional[str]) -> str
@@ -268,14 +281,19 @@ class _StructTypeInfo(StructTypeInfoBase):
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
+        args = ['BSONObjBuilder* builder']
+        if self._struct.query_shape_component:
+            args.append("const SerializationOptions& options = {}")
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'serialize', ['BSONObjBuilder* builder'],
-            'void', const=True)
+            common.title_case(self._struct.cpp_name), 'serialize', args, 'void', const=True)
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
+        args = []
+        if self._struct.query_shape_component:
+            args.append("const SerializationOptions& options = {}")
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'toBSON', [], 'BSONObj', const=True)
+            common.title_case(self._struct.cpp_name), 'toBSON', args, 'BSONObj', const=True)
 
     def get_op_msg_request_serializer_method(self):
         # type: () -> Optional[MethodInfo]

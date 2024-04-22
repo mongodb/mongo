@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/collection_type.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/timer.h"
 
@@ -469,6 +470,7 @@ public:
         return getCollection();
     }
     const CollectionPtr& getCollection() const;
+    query_shape::CollectionType getCollectionType() const;
     const ViewDefinition* getView() const;
     const NamespaceString& getNss() const;
     bool isAnySecondaryNamespaceAViewOrSharded() const;

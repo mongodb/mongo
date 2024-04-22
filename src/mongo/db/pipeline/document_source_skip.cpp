@@ -72,8 +72,8 @@ DocumentSource::GetNextResult DocumentSourceSkip::doGetNext() {
     return pSource->getNext();
 }
 
-Value DocumentSourceSkip::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(getSourceName() << _nToSkip));
+Value DocumentSourceSkip::serialize(const SerializationOptions& opts) const {
+    return Value(DOC(getSourceName() << opts.serializeLiteral(_nToSkip)));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::optimize() {

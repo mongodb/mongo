@@ -89,14 +89,6 @@ long long ClusterClientCursorMock::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }
 
-std::uint64_t ClusterClientCursorMock::getNBatches() const {
-    return _nBatchesReturned;
-}
-
-void ClusterClientCursorMock::incNBatches() {
-    ++_nBatchesReturned;
-}
-
 Date_t ClusterClientCursorMock::getCreatedDate() const {
     return _createdDate;
 }
@@ -110,6 +102,10 @@ void ClusterClientCursorMock::setLastUseDate(Date_t now) {
 }
 
 boost::optional<uint32_t> ClusterClientCursorMock::getQueryHash() const {
+    return boost::none;
+}
+
+boost::optional<std::size_t> ClusterClientCursorMock::getQueryStatsKeyHash() const {
     return boost::none;
 }
 
@@ -166,6 +162,10 @@ boost::optional<ReadPreferenceSetting> ClusterClientCursorMock::getReadPreferenc
 
 boost::optional<repl::ReadConcernArgs> ClusterClientCursorMock::getReadConcern() const {
     return boost::none;
+}
+
+std::unique_ptr<query_stats::Key> ClusterClientCursorMock::getKey() {
+    return nullptr;
 }
 
 }  // namespace mongo

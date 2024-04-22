@@ -59,6 +59,13 @@
 #define _ASSERT_DOCVAL_COMPARISON(NAME, a, b) \
     ::mongo::unittest::assertComparison_##NAME(__FILE__, __LINE__, #a, #b, a, b)
 
+// TODO SERVER-87736 make these not say "AUTO".
+// These are backport-special macros, adapted from the "AUTO" version on more recent branches. The
+// automatic functionality doesn't exist on this branch. But the assertions should still pass.
+#define ASSERT_VALUE_EQ_AUTO(expected, val) ASSERT_EQ(expected, val.toString())
+#define ASSERT_DOCUMENT_EQ_AUTO(expected, actual) \
+    ASSERT_BSONOBJ_EQ(fromjson(expected), actual.toBson())
+
 namespace mongo {
 namespace unittest {
 

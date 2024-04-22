@@ -38,6 +38,7 @@ $ coverage run run_tests.py && coverage html
 
 import os
 import unittest
+from textwrap import dedent
 
 # import package so that it works regardless of whether we run as a module or file
 if __package__ is None:
@@ -131,6 +132,79 @@ class TestGenerator(testcase.IDLTestcase):
                 found = True
 
         self.assertTrue(found, "Bad Header: " + header)
+
+    def test_object_with_custom_serializer_and_query_shape(self) -> None:
+        """Serialization with custom query_shape."""
+        _, source = self.assert_generate("""
+        types:
+                object_type_with_custom_serializer:
+                    bson_serialization_type: object
+                    description: ObjWithCustomSerializer
+                    cpp_type: ObjWithCustomSerializer
+                    serializer: ObjWithCustomSerializer::toBSON
+                    deserializer: ObjWithCustomSerializer::parse
+
+        structs:
+                QueryShapeSpec:
+                    description: QueryShape
+                    query_shape_component: true
+                    fields:
+                        internalObject:
+                            type: object_type_with_custom_serializer
+                            optional: false
+                            description: internalObject
+                            query_shape: custom
+        """)
+
+        expected = dedent("""
+        void QueryShapeSpec::serialize(BSONObjBuilder* builder, const SerializationOptions& options) const {
+            invariant(_hasInternalObject);
+
+            {
+                const BSONObj localObject = _internalObject.toBSON(options);
+                builder->append(kInternalObjectFieldName, localObject);
+            }
+
+        }""")
+        self.assertIn(expected, source)
+
+    def test_array_with_custom_serializer_and_query_shape(self) -> None:
+        """Serialization with custom query_shape used, array use case."""
+        _, source = self.assert_generate("""
+        types:
+                object_type_with_custom_serializer:
+                    bson_serialization_type: object
+                    description: ObjWithCustomSerializer
+                    cpp_type: ObjWithCustomSerializer
+                    serializer: ObjWithCustomSerializer::toBSON
+                    deserializer: ObjWithCustomSerializer::parse
+
+        structs:
+                QueryShapeSpec:
+                    description: QueryShape
+                    query_shape_component: true
+                    fields:
+                        internalObjectArray:
+                            type: array<object_type_with_custom_serializer>
+                            optional: false
+                            description: internalObjectArray
+                            query_shape: custom
+        """)
+
+        expected = dedent("""
+        void QueryShapeSpec::serialize(BSONObjBuilder* builder, const SerializationOptions& options) const {
+            invariant(_hasInternalObjectArray);
+
+            {
+                BSONArrayBuilder arrayBuilder(builder->subarrayStart(kInternalObjectArrayFieldName));
+                for (const auto& item : _internalObjectArray) {
+                    const BSONObj localObject = item.toBSON(options);
+                    arrayBuilder.append(localObject);
+                }
+            }
+
+        }""")
+        self.assertIn(expected, source)
 
 
 if __name__ == '__main__':

@@ -39,7 +39,7 @@ void InternalSchemaUniqueItemsMatchExpression::debugString(StringBuilder& debug,
     _debugAddSpace(debug, indentationLevel);
 
     BSONObjBuilder builder;
-    serialize(&builder, true);
+    serialize(&builder, {});
     debug << builder.obj().toString() << "\n";
 
     const auto* tag = getTag();
@@ -59,10 +59,9 @@ bool InternalSchemaUniqueItemsMatchExpression::equivalent(const MatchExpression*
     return path() == other->path();
 }
 
-BSONObj InternalSchemaUniqueItemsMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder bob;
-    bob.append(kName, true);
-    return bob.obj();
+void InternalSchemaUniqueItemsMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    bob->append(kName, true);
 }
 
 std::unique_ptr<MatchExpression> InternalSchemaUniqueItemsMatchExpression::shallowClone() const {

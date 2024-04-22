@@ -77,6 +77,10 @@ struct StageConstraints {
         kAnyShard,
         // Indicates that the stage can only run on mongoS.
         kMongoS,
+        // Indicates that the stage should run on all data-bearing nodes, primary and seconday, for
+        // the participating shards. This is useful for stages like $currentOp which generate
+        // node-specific metadata.
+        kAllShardServers,
     };
 
     /**
@@ -190,7 +194,8 @@ struct StageConstraints {
         // shard, since it needs to be able to run on mongoS in a cluster.
         invariant(!(changeStreamRequirement == ChangeStreamRequirement::kAllowlist &&
                     (hostRequirement == HostTypeRequirement::kAnyShard ||
-                     hostRequirement == HostTypeRequirement::kPrimaryShard)));
+                     hostRequirement == HostTypeRequirement::kPrimaryShard ||
+                     hostRequirement == HostTypeRequirement::kAllShardServers)));
 
         // A stage which is allowlisted for $changeStream cannot have a position requirement.
         invariant(!(changeStreamRequirement == ChangeStreamRequirement::kAllowlist &&
@@ -209,6 +214,13 @@ struct StageConstraints {
         if (diskRequirement == DiskUseRequirement::kWritesPersistentData) {
             invariant(!isAllowedInTransaction());
         }
+
+        tassert(
+            7355706,
+            "Stage can only broadcast to all shard servers if it must be the first stage in the "
+            "pipeline.",
+            hostRequirement != HostTypeRequirement::kAllShardServers ||
+                (requiredPosition == PositionRequirement::kFirst));
     }
 
     /**

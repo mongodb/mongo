@@ -119,12 +119,12 @@ boost::intrusive_ptr<Expression> ExpressionShift::parse(BSONObj obj,
     return shiftExpr;
 }
 
-Value ExpressionShift::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value ExpressionShift::serialize(const SerializationOptions& opts) const {
     MutableDocument args;
-    args.addField(kByArg, Value(_offset));
-    args.addField(kOutputArg, _input->serialize(static_cast<bool>(explain)));
-    args.addField(kDefaultArg, _defaultVal.get_value_or(mongo::Value(BSONNULL)));
-
+    args.addField(kByArg, opts.serializeLiteral(_offset));
+    args.addField(kOutputArg, _input->serialize(opts));
+    args.addField(kDefaultArg,
+                  opts.serializeLiteral(_defaultVal.get_value_or(mongo::Value(BSONNULL))));
     MutableDocument windowFun;
     windowFun.addField(_accumulatorName, args.freezeToValue());
     return windowFun.freezeToValue();

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/json.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/unittest/unittest.h"
@@ -89,6 +90,10 @@ DECLARE_BSON_CMP_FUNC(BSONElement, GT);
 DECLARE_BSON_CMP_FUNC(BSONElement, GTE);
 DECLARE_BSON_CMP_FUNC(BSONElement, NE);
 #undef DECLARE_BSON_CMP_FUNC
+
+// TODO SERVER-87736 this macro is misleading on the v6 .0 branch.We will keep it as "AUTO" for now,
+// but there is no 'auto' support on this branch.
+#define ASSERT_BSONOBJ_EQ_AUTO(expected, actual) ASSERT_BSONOBJ_EQ(fromjson(expected), actual)
 
 }  // namespace unittest
 }  // namespace mongo

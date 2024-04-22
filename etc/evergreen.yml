@@ -1530,6 +1530,10 @@ buildvariants:
   - name: .serverless
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
+  - name: query_stats_aggregation_passthrough
+  - name: query_stats_mongos_aggregation_passthrough
+  - name: query_stats_mongos_passthrough
+  - name: query_stats_passthrough
 # Disabling as the following tests are not aware of feature flags.
 #  - name: server_discovery_and_monitoring_json_test_TG
 #    distros:
@@ -2205,7 +2209,6 @@ buildvariants:
   # rollback_fuzzer_gen
   - name: .updatefuzzer
 
-
 ###########################################
 #     Experimental buildvariants          #
 ###########################################
@@ -2278,6 +2281,10 @@ buildvariants:
   - name: snmp
   - name: .serverless
   - name: .watchdog
+  - name: query_stats_aggregation_passthrough
+  - name: query_stats_mongos_aggregation_passthrough
+  - name: query_stats_mongos_passthrough
+  - name: query_stats_passthrough
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks
 #  - name: unittest_shell_hang_analyzer_gen
@@ -2420,6 +2427,7 @@ buildvariants:
   - name: .serverless
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
+  - name: query_stats_passthrough
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks
 #  - name: server_discovery_and_monitoring_json_test_TG

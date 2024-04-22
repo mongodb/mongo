@@ -117,7 +117,7 @@ public:
 
     void serializeToArray(
         std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
+        const SerializationOptions& opts = SerializationOptions{}) const final override;
 
 private:
     DocumentSourcePlanCacheStats(const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -125,8 +125,8 @@ private:
     GetNextResult doGetNext() final;
 
     Value serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override {
-        MONGO_UNREACHABLE;  // Should call serializeToArray instead.
+        const SerializationOptions& opts = SerializationOptions{}) const final override {
+        MONGO_UNREACHABLE_TASSERT(7484303);  // Should call serializeToArray instead.
     }
 
     // If running through mongos in a sharded cluster, stores the shard name so that it can be

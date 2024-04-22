@@ -84,8 +84,7 @@ public:
     }
 
 private:
-    Value serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     GetNextResult doGetNext() override;
 

@@ -80,12 +80,13 @@ DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
     return next;
 }
 
-Value DocumentSourceQueue::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceQueue::serialize(const SerializationOptions& opts) const {
     ValueArrayStream vals;
     for (auto elem : _queue) {
         vals << elem.getDocument().getOwned();
     }
-    return Value(DOC(kStageName << vals.done()));
+    // We treat the queue's documents as one literal in the context of redaction.
+    return Value(DOC(kStageName << opts.serializeLiteral(vals.done())));
 }
 
 }  // namespace mongo

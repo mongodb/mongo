@@ -82,8 +82,7 @@ DocumentSourceChangeStreamSplitLargeEvent::DocumentSourceChangeStreamSplitLargeE
             !_resumeAfterSplit || _resumeAfterSplit->fragmentNum);
 }
 
-Value DocumentSourceChangeStreamSplitLargeEvent::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceChangeStreamSplitLargeEvent::serialize(const SerializationOptions& opts) const {
     return Value(Document{{DocumentSourceChangeStreamSplitLargeEvent::kStageName, Document{}}});
 }
 

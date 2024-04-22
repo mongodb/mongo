@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 /**

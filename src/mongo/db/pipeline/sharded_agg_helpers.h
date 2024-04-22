@@ -195,7 +195,9 @@ StatusWith<ChunkManager> getExecutionNsRoutingInfo(OperationContext* opCtx,
 /**
  * Returns true if an aggregation over 'nss' must run on all shards.
  */
-bool mustRunOnAllShards(const NamespaceString& nss, bool hasChangeStream, bool startsWithDocuments);
+bool checkIfMustRunOnAllShards(const NamespaceString& nss,
+                               bool hasChangeStream,
+                               bool startsWithDocuments);
 
 /**
  * Retrieves the desired retry policy based on whether the default writeConcern is set on 'opCtx'.

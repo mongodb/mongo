@@ -64,8 +64,8 @@ ServerStatusMetricField<Counter64> displayWriteConflicts("operation.writeConflic
 
 void recordCurOpMetrics(OperationContext* opCtx) {
     const OpDebug& debug = CurOp::get(opCtx)->debug();
-    if (debug.nreturned > 0)
-        returnedCounter.increment(debug.nreturned);
+    if (debug.additiveMetrics.nreturned)
+        returnedCounter.increment(*debug.additiveMetrics.nreturned);
     if (debug.additiveMetrics.ninserted)
         insertedCounter.increment(*debug.additiveMetrics.ninserted);
     if (debug.additiveMetrics.nMatched)

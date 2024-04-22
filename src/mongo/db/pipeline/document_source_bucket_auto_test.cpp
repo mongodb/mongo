@@ -89,8 +89,9 @@ public:
         assertBucketAutoType(bucketAutoStage);
 
         vector<Value> explainedStages;
-        bucketAutoStage->serializeToArray(explainedStages,
-                                          ExplainOptions::Verbosity::kQueryPlanner);
+        bucketAutoStage->serializeToArray(
+            explainedStages,
+            SerializationOptions{boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
         ASSERT_EQUALS(explainedStages.size(), 1UL);
 
         Value expectedExplain = Value(expectedObj);
@@ -868,5 +869,109 @@ TEST_F(BucketAutoTests, ShouldFailOnNegativeNumbersWhenGranularitySpecified) {
         AssertionException,
         40260);
 }
+
+TEST_F(BucketAutoTests, RedactionWithoutOutputField) {
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$_id',
+                buckets: 5,
+                granularity: "R5"
+            }
+        })");
+    auto docSource = DocumentSourceBucketAuto::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$bucketAuto": {
+                "groupBy": "$HASH<_id>",
+                "buckets": "?number",
+                "granularity": "?string",
+                "output": {
+                    "HASH<count>": {
+                        "$sum": "?number"
+                    }
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(BucketAutoTests, RedactionWithOutputField) {
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$year',
+                buckets: 3,
+                output: {
+                    count: { $sum: 1 },
+                    years: { $push: '$year' }
+                }
+            }})");
+    auto docSource = DocumentSourceBucketAuto::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$bucketAuto": {
+                "groupBy": "$HASH<year>",
+                "buckets": "?number",
+                "output": {
+                    "HASH<count>": {
+                        "$sum": "?number"
+                    },
+                    "HASH<years>": {
+                        "$push": "$HASH<year>"
+                    }
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(BucketAutoTests, QueryShapeReParseSerializedStage) {
+    auto expCtx = getExpCtx();
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$year',
+                buckets: 3,
+                granularity: "E192",
+                output: {
+                    count: { $sum: 1 },
+                    years: { $push: '$year' }
+                }
+            }})");
+
+    auto docSource = DocumentSourceBucketAuto::createFromBson(spec.firstElement(), expCtx);
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    std::vector<Value> serialized;
+    docSource->serializeToArray(serialized, opts);
+    auto serializedDocSource = serialized[0].getDocument().toBson();
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$bucketAuto": {
+                "groupBy": "$year",
+                "buckets": 1,
+                "granularity": "R5",
+                "output": {
+                    "count": {
+                        "$sum": {
+                            "$const":1
+                        }
+                    },
+                    "years": {
+                        "$push": "$year"
+                    }
+                }
+            }
+        })",
+        serializedDocSource);
+    auto docSourceFromQueryShape =
+        DocumentSourceBucketAuto::createFromBson(serializedDocSource.firstElement(), expCtx);
+
+    vector<Value> newSerialization;
+    docSourceFromQueryShape->serializeToArray(newSerialization, opts);
+    auto newSerializedDocSource = newSerialization[0].getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(serializedDocSource, newSerializedDocSource);
+}
+
+
 }  // namespace
 }  // namespace mongo

@@ -83,8 +83,8 @@ DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
     return _sortStage->getNext();
 }
 
-Value DocumentSourceSample::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(kStageName << DOC("size" << _size)));
+Value DocumentSourceSample::serialize(const SerializationOptions& opts) const {
+    return Value(DOC(kStageName << DOC("size" << opts.serializeLiteral(_size))));
 }
 
 namespace {

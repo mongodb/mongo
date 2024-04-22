@@ -39,10 +39,12 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_for_window_functions.h"
+#include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
@@ -1869,6 +1871,186 @@ TEST(Accumulators, CovarianceWithRandomVariables) {
     assertCovariance<AccumulatorCovarianceSamp>(&expCtx, randomVariables, boost::none);
 }
 
+Value parseAndSerializeAccumExpr(
+    const BSONObj& obj,
+    std::function<boost::intrusive_ptr<Expression>(
+        ExpressionContext* expCtx, BSONElement, const VariablesParseState&)> func) {
+    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto expr = func(expCtx.get(), obj.firstElement(), expCtx->variablesParseState);
+    return expr->serialize(options);
+}
+
+Document parseAndSerializeAccum(
+    const BSONElement elem,
+    std::function<AccumulationExpression(
+        ExpressionContext* const expCtx, BSONElement, VariablesParseState)> func) {
+    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    VariablesParseState vps = expCtx->variablesParseState;
+
+    auto expr = func(expCtx.get(), elem, vps);
+    auto accum = expr.factory();
+    return accum->serialize(expr.initializer, expr.argument, options);
+}
+
+TEST(Accumulators, SerializeWithRedaction) {
+    auto jsReduce =
+        BSON("$accumulator" << BSON("init"
+                                    << "function() {}"
+                                    << "accumulateArgs"
+                                    << BSON_ARRAY("$a"
+                                                  << "$b")
+                                    << "accumulate"
+                                    << "function(state, str1, str2) {return str1 + str2;}"
+                                    << "merge"
+                                    << "function(s1, s2) {return s1 || s2;}"
+                                    << "lang"
+                                    << "js"));
+    auto actual = parseAndSerializeAccum(jsReduce.firstElement(), &AccumulatorJs::parse);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$accumulator": {
+                "init": "?string",
+                "initArgs": "[]",
+                "accumulate": "?string",
+                "accumulateArgs": [
+                    "$HASH<a>",
+                    "$HASH<b>"
+                ],
+                "merge": "?string",
+                "lang": "js"
+            }
+        })",
+        actual);
+
+    auto topN = BSON("$topN" << BSON("n" << 3 << "output"
+                                         << "$output"
+                                         << "sortBy" << BSON("sortKey" << 1)));
+    actual = parseAndSerializeAccum(
+        topN.firstElement(), &AccumulatorTopBottomN<TopBottomSense::kTop, false>::parseTopBottomN);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$topN": {
+                "n": "?number",
+                "output": "$HASH<output>",
+                "sortBy": {
+                    "HASH<sortKey>": 1
+                }
+            }
+        })",
+        actual);
+
+    auto addToSet = BSON("$addToSet" << BSON("a" << 5));
+    actual = parseAndSerializeAccum(addToSet.firstElement(),
+                                    &genericParseSingleExpressionAccumulator<AccumulatorAddToSet>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$addToSet":"?object"})",
+        actual);
+
+    auto sum = BSON("$sum" << BSON_ARRAY(4 << 6));
+    actual = parseAndSerializeAccum(sum.firstElement(),
+                                    &genericParseSingleExpressionAccumulator<AccumulatorSum>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$sum": "?array<?number>"})",
+        actual);
+
+    sum = BSON("$sum" << BSON_ARRAY("$a" << 5 << 3 << BSON("$sum" << BSON_ARRAY(4 << 6))));
+    actual = parseAndSerializeAccum(sum.firstElement(),
+                                    &genericParseSingleExpressionAccumulator<AccumulatorSum>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$sum":["$HASH<a>","?number","?number",{"$sum":"?array<?number>"}]})",
+        actual);
+
+    auto mergeObjs = BSON("$mergeObjects" << BSON_ARRAY("$a" << BSON("b"
+                                                                     << "null")));
+    actual =
+        parseAndSerializeAccum(mergeObjs.firstElement(),
+                               &genericParseSingleExpressionAccumulator<AccumulatorMergeObjects>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$mergeObjects":["$HASH<a>","?object"]})",
+        actual);
+
+    auto push = BSON("$push" << BSON("$eq" << BSON_ARRAY("$str"
+                                                         << "str2")));
+    actual = parseAndSerializeAccum(push.firstElement(),
+                                    &genericParseSingleExpressionAccumulator<AccumulatorPush>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$push":{"$eq":["$HASH<str>","?string"]}})",
+        actual);
+
+    auto top = BSON("$top" << BSON("output"
+                                   << "$b"
+                                   << "sortBy" << BSON("sales" << 1)));
+    actual = parseAndSerializeAccum(
+        top.firstElement(), &AccumulatorTopBottomN<TopBottomSense::kTop, true>::parseTopBottomN);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$top": {
+                "output": "$HASH<b>",
+                "sortBy": {
+                    "HASH<sales>": 1
+                }
+            }
+        })",
+        actual);
+
+    auto max = BSON("$max" << BSON_ARRAY(
+                        "$a" << 2 << 3 << BSON("$max" << BSON_ARRAY(BSON_ARRAY("$b" << 4 << 5)))));
+    actual = parseAndSerializeAccum(max.firstElement(),
+                                    &genericParseSingleExpressionAccumulator<AccumulatorMax>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$max": [
+                "$HASH<a>",
+                "?number",
+                "?number",
+                {
+                    "$max": [
+                        [
+                            "$HASH<b>",
+                            "?number",
+                            "?number"
+                        ]
+                    ]
+                }
+            ]
+        })",
+        actual);
+
+    auto internalJsReduce = BSON(
+        "$_internalJsReduce" << BSON("data"
+                                     << "$emits"
+                                     << "eval"
+                                     << "function(key, values) {\n return Array.sum(values);\n"));
+    actual = parseAndSerializeAccum(internalJsReduce.firstElement(),
+                                    &AccumulatorInternalJsReduce::parseInternalJsReduce);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$_internalJsReduce":{"data":"$HASH<emits>","eval":"?string"}})",
+        actual);
+}
+
+TEST(AccumulatorsToExpression, SerializeWithRedaction) {
+    auto maxN = BSON("$maxN" << BSON("n" << 3 << "input" << BSON_ARRAY(19 << 7 << 28 << 3 << 5)));
+    using Sense = AccumulatorMinMax::Sense;
+    auto actual =
+        parseAndSerializeAccumExpr(maxN, &AccumulatorMinMaxN::parseExpression<Sense::kMax>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$maxN":{"n":"?number","input":"?array<?number>"}})",
+        actual.getDocument());
+
+    auto firstN = BSON("$firstN" << BSON("input"
+                                         << "$sales"
+                                         << "n"
+                                         << "\'string\'"));
+    using FirstLastSense = AccumulatorFirstLastN::Sense;
+    actual = parseAndSerializeAccumExpr(
+        firstN, &AccumulatorFirstLastN::parseExpression<FirstLastSense::kFirst>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$firstN":{"n":"?string","input":"$HASH<sales>"}})",
+        actual.getDocument());
+}
+
 /* ------------------------- AccumulatorMergeObjects -------------------------- */
 
 TEST(AccumulatorMergeObjects, MergingZeroObjectsShouldReturnEmptyDocument) {
@@ -1919,5 +2101,6 @@ TEST(AccumulatorMergeObjects, MergingWithEmptyDocumentShouldIgnore) {
     auto expected = Value(Document({{"a", 0}, {"b", 1}, {"c", 1}}));
     assertExpectedResults<AccumulatorMergeObjects>(&expCtx, {{{first, second}, expected}});
 }
+
 
 }  // namespace AccumulatorTests

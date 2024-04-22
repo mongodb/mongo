@@ -11,6 +11,8 @@
  *   # currentOp results.
  *   assumes_read_preference_unchanged,
  *   no_selinux,
+ *   # Uses $function operator.
+ *   requires_scripting,
  * ]
  */
 

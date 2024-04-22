@@ -154,15 +154,19 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent
 }
 
 Value DocumentSourceChangeStreamEnsureResumeTokenPresent::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    // We only serialize this stage in the context of explain.
-    if (explain) {
-        return Value(DOC(DocumentSourceChangeStream::kStageName
-                         << DOC("stage"
-                                << "internalEnsureResumeTokenPresent"_sd
-                                << "resumeToken" << ResumeToken(_tokenFromClient).toDocument())));
+    const SerializationOptions& opts) const {
+    BSONObjBuilder builder;
+    if (opts.verbosity) {
+        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
+        sub.append("stage"_sd, kStageName);
+        sub << "resumeToken"_sd << Value(ResumeToken(_tokenFromClient).toDocument(opts));
+        sub.done();
+    } else {
+        BSONObjBuilder sub(builder.subobjStart(kStageName));
+        sub << "resumeToken"_sd << Value(ResumeToken(_tokenFromClient).toDocument(opts));
+        sub.done();
     }
-    MONGO_UNREACHABLE_TASSERT(5467611);
+    return Value(builder.obj());
 }
 
 }  // namespace mongo

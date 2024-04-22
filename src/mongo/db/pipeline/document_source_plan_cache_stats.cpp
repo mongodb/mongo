@@ -57,9 +57,13 @@ DocumentSourcePlanCacheStats::DocumentSourcePlanCacheStats(
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSource(kStageName, expCtx) {}
 
-void DocumentSourcePlanCacheStats::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
+void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
+                                                    const SerializationOptions& opts) const {
+    if (opts.verbosity) {
+        tassert(7513100,
+                "$planCacheStats is not equipped to serialize in explain mode with redaction on",
+                !opts.transformIdentifiers &&
+                    opts.literalPolicy == LiteralSerializationPolicy::kUnchanged);
         array.push_back(Value{
             Document{{kStageName,
                       Document{{"match"_sd,
@@ -67,7 +71,7 @@ void DocumentSourcePlanCacheStats::serializeToArray(
     } else {
         array.push_back(Value{Document{{kStageName, Document{}}}});
         if (_absorbedMatch) {
-            _absorbedMatch->serializeToArray(array);
+            _absorbedMatch->serializeToArray(array, opts);
         }
     }
 }

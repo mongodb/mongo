@@ -69,19 +69,20 @@ using std::pair;
 using std::shared_ptr;
 using std::vector;
 
-Value DocumentSourceGroupBase::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const {
     MutableDocument insides;
 
     // Add the _id.
     if (_idFieldNames.empty()) {
         invariant(_idExpressions.size() == 1);
-        insides["_id"] = _idExpressions[0]->serialize(static_cast<bool>(explain));
+        insides["_id"] = _idExpressions[0]->serialize(opts);
     } else {
         // Decomposed document case.
         invariant(_idExpressions.size() == _idFieldNames.size());
         MutableDocument md;
         for (size_t i = 0; i < _idExpressions.size(); i++) {
-            md[_idFieldNames[i]] = _idExpressions[i]->serialize(static_cast<bool>(explain));
+            md[opts.serializeFieldPathFromString(_idFieldNames[i])] =
+                _idExpressions[i]->serialize(opts);
         }
         insides["_id"] = md.freezeToValue();
     }
@@ -89,34 +90,34 @@ Value DocumentSourceGroupBase::serialize(boost::optional<ExplainOptions::Verbosi
     // Add the remaining fields.
     for (auto&& accumulatedField : _accumulatedFields) {
         intrusive_ptr<AccumulatorState> accum = accumulatedField.makeAccumulator();
-        insides[accumulatedField.fieldName] =
-            Value(accum->serialize(accumulatedField.expr.initializer,
-                                   accumulatedField.expr.argument,
-                                   static_cast<bool>(explain)));
+        insides[opts.serializeFieldPathFromString(accumulatedField.fieldName)] =
+            Value(accum->serialize(
+                accumulatedField.expr.initializer, accumulatedField.expr.argument, opts));
     }
 
     if (_doingMerge) {
-        insides["$doingMerge"] = Value(true);
+        insides["$doingMerge"] = opts.serializeLiteral(true);
     }
 
-    serializeAdditionalFields(insides, explain);
+    serializeAdditionalFields(insides, opts);
 
     MutableDocument out;
     out[getSourceName()] = insides.freezeToValue();
 
-    if (explain && *explain >= ExplainOptions::Verbosity::kExecStats) {
+    if (opts.verbosity && *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
         MutableDocument md;
 
         for (size_t i = 0; i < _accumulatedFields.size(); i++) {
-            md[_accumulatedFields[i].fieldName] = Value(static_cast<long long>(
-                _memoryTracker[_accumulatedFields[i].fieldName].maxMemoryBytes()));
+            md[opts.serializeFieldPathFromString(_accumulatedFields[i].fieldName)] =
+                opts.serializeLiteral(static_cast<long long>(
+                    _memoryTracker[_accumulatedFields[i].fieldName].maxMemoryBytes()));
         }
 
         out["maxAccumulatorMemoryUsageBytes"] = Value(md.freezeToValue());
         out["totalOutputDataSizeBytes"] =
-            Value(static_cast<long long>(_stats.totalOutputDataSizeBytes));
-        out["usedDisk"] = Value(_stats.spills > 0);
-        out["spills"] = Value(static_cast<long long>(_stats.spills));
+            opts.serializeLiteral(static_cast<long long>(_stats.totalOutputDataSizeBytes));
+        out["usedDisk"] = opts.serializeLiteral(_stats.spills > 0);
+        out["spills"] = opts.serializeLiteral(static_cast<long long>(_stats.spills));
     }
 
     return out.freezeToValue();

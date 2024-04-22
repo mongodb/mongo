@@ -142,10 +142,7 @@ public:
      * operation next checks for interruption.
      * Case (2) will only occur if the cursor is pinned.
      *
-     * Returns ErrorCodes::CursorNotFound if the cursor id is not owned by this manager. Returns
-     * ErrorCodes::OperationFailed if attempting to erase a pinned cursor.
-     *
-     * If 'shouldAudit' is true, will perform audit logging.
+     * Returns ErrorCodes::CursorNotFound if the cursor id is not owned by this manager.
      */
     Status killCursor(OperationContext* opCtx, CursorId id);
 
@@ -215,14 +212,17 @@ private:
     static constexpr int kNumPartitions = 16;
     friend class ClientCursorPin;
 
-    ClientCursorPin _registerCursor(
-        OperationContext* opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
-
-    void deregisterCursor(ClientCursor* cursor);
+    // deregisterAndDestroyCursor deregisters the cursor from the manager's cursorMap, then safely
+    // destroys the cursor. The first overload requires having acquired the cursor manager partition
+    // lock already.
     void deregisterAndDestroyCursor(
-        Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>::OnePartition&&,
+        Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>::OnePartition&& lk,
         OperationContext* opCtx,
         std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor);
+    void deregisterAndDestroyCursor(OperationContext* opCtx,
+                                    std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor);
+    void _destroyCursor(OperationContext* opCtx,
+                        std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor);
 
     void unpin(OperationContext* opCtx,
                std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor);

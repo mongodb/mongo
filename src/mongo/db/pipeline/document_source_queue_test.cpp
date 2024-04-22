@@ -73,9 +73,18 @@ TEST_F(QueueStageTest, QueueStageSerialize) {
 
     ASSERT_TRUE(queueStage);
 
-    auto res = queueStage->serialize(boost::none);
+    auto res = queueStage->serialize();
 
     ASSERT_VALUE_EQ(res, Value{DOC("$queue" << DOC_ARRAY(DOC("a1" << 1) << DOC("a2" << 2)))});
+}
+
+TEST_F(QueueStageTest, RedactsCorrectly) {
+    auto queueDoc = BSON("$queue" << BSON_ARRAY(BSON("a" << 1)));
+    auto queueStage = DocumentSourceQueue::createFromBson(queueDoc.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$queue":"?array<?object>"})",
+        redact(*queueStage));
 }
 
 }  // namespace

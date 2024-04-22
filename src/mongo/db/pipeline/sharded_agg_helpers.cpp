@@ -67,6 +67,9 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/visit_helper.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
+
 namespace mongo {
 namespace sharded_agg_helpers {
 namespace {
@@ -193,11 +196,12 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
 std::vector<RemoteCursor> establishShardCursors(OperationContext* opCtx,
                                                 std::shared_ptr<executor::TaskExecutor> executor,
                                                 const NamespaceString& nss,
-                                                bool mustRunOnAll,
+                                                bool mustRunOnAllShards,
                                                 boost::optional<ChunkManager>& cm,
                                                 const std::set<ShardId>& shardIds,
                                                 const BSONObj& cmdObj,
-                                                const ReadPreferenceSetting& readPref) {
+                                                const ReadPreferenceSetting& readPref,
+                                                bool targetEveryShardServer) {
     LOGV2_DEBUG(20904,
                 1,
                 "Dispatching command {cmdObj} to establish cursors on shards",
@@ -206,9 +210,27 @@ std::vector<RemoteCursor> establishShardCursors(OperationContext* opCtx,
     std::vector<std::pair<ShardId, BSONObj>> requests;
 
     // If we don't need to run on all shards, then we should always have a valid routing table.
-    invariant(cm || mustRunOnAll);
+    invariant(cm || mustRunOnAllShards);
 
-    if (mustRunOnAll) {
+    if (targetEveryShardServer) {
+        uassert(7355703,
+                "Cannot target all hosts if the pipeline is not run on all shards.",
+                mustRunOnAllShards);
+        if (MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
+            LOGV2(
+                7355704,
+                "shardedAggregateHangBeforeEstablishingShardCursors fail point enabled.  Blocking "
+                "until fail point is disabled.");
+            while (
+                MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
+                sleepsecs(1);
+            }
+        }
+        return establishCursorsOnAllHosts(
+            opCtx, std::move(executor), nss, shardIds, cmdObj, false, getDesiredRetryPolicy(opCtx));
+    }
+
+    if (mustRunOnAllShards) {
         // The pipeline contains a stage which must be run on all shards. Skip versioning and
         // enqueue the raw command objects.
         for (const auto& shardId : shardIds) {
@@ -1057,15 +1079,17 @@ DispatchShardPipelineResults dispatchShardPipeline(
         : expCtx->getCollatorBSON();
 
     // Determine whether we can run the entire aggregation on a single shard.
-    const bool mustRunOnAll = mustRunOnAllShards(expCtx->ns, hasChangeStream, startsWithDocuments);
+    const bool mustRunOnAllShards =
+        checkIfMustRunOnAllShards(expCtx->ns, hasChangeStream, startsWithDocuments);
     std::set<ShardId> shardIds = getTargetedShards(
-        expCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, shardTargetingCollation);
+        expCtx, mustRunOnAllShards, executionNsRoutingInfo, shardQuery, shardTargetingCollation);
 
+    bool targetEveryShardServer = pipeline->needsAllShardServers();
     // Don't need to split the pipeline if we are only targeting a single shard, unless:
     // - There is a stage that needs to be run on the primary shard and the single target shard
     //   is not the primary.
     // - The pipeline contains one or more stages which must always merge on mongoS.
-    const bool needsSplit = (shardIds.size() > 1u || needsMongosMerge ||
+    const bool needsSplit = (shardIds.size() > 1u || needsMongosMerge || targetEveryShardServer ||
                              (needsPrimaryShardMerge && executionNsRoutingInfo &&
                               *(shardIds.begin()) != executionNsRoutingInfo->dbPrimary()));
 
@@ -1134,8 +1158,11 @@ DispatchShardPipelineResults dispatchShardPipeline(
     if (hasChangeStream) {
         Grid::get(opCtx)->shardRegistry()->reload(opCtx);
         // Rebuild the set of shards as the shard registry might have changed.
-        shardIds = getTargetedShards(
-            expCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, shardTargetingCollation);
+        shardIds = getTargetedShards(expCtx,
+                                     mustRunOnAllShards,
+                                     executionNsRoutingInfo,
+                                     shardQuery,
+                                     shardTargetingCollation);
     }
 
     // If there were no shards when we began execution, we wouldn't have run this aggregation in the
@@ -1147,7 +1174,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
     // Explain does not produce a cursor, so instead we scatter-gather commands to the shards.
     if (explain) {
-        if (mustRunOnAll) {
+        if (mustRunOnAllShards) {
             // Some stages (such as $currentOp) need to be broadcast to all shards, and
             // should not participate in the shard version protocol.
             shardResults =
@@ -1176,11 +1203,12 @@ DispatchShardPipelineResults dispatchShardPipeline(
             cursors = establishShardCursors(opCtx,
                                             expCtx->mongoProcessInterface->taskExecutor,
                                             expCtx->ns,
-                                            mustRunOnAll,
+                                            mustRunOnAllShards,
                                             executionNsRoutingInfo,
                                             shardIds,
                                             targetedCommand,
-                                            ReadPreferenceSetting::get(opCtx));
+                                            ReadPreferenceSetting::get(opCtx),
+                                            targetEveryShardServer);
 
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& e) {
             // Check to see if the command failed because of a stale shard version or something
@@ -1407,9 +1435,11 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         MutableDocument pipelinesDoc;
         // We specify "queryPlanner" verbosity when building the output for "shardsPart" because
         // execution stats are reported by each shard individually.
-        pipelinesDoc.addField("shardsPart",
-                              Value(dispatchResults.splitPipeline->shardsPipeline->writeExplainOps(
-                                  ExplainOptions::Verbosity::kQueryPlanner)));
+        auto opts = SerializationOptions{};
+        opts.verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner);
+        pipelinesDoc.addField(
+            "shardsPart",
+            Value(dispatchResults.splitPipeline->shardsPipeline->writeExplainOps(opts)));
         if (dispatchResults.exchangeSpec) {
             BSONObjBuilder bob;
             dispatchResults.exchangeSpec->exchangeSpec.serialize(&bob);
@@ -1418,7 +1448,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         }
         // We specify "queryPlanner" verbosity because execution stats are not currently
         // supported when building the output for "mergerPart".
-        auto explainOps = mergePipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
+        auto explainOps = mergePipeline->writeExplainOps(opts);
 
         // No cursors to remote shards are established for an explain, and the $mergeCursors
         // aggregation stage which is normally built in addMergeCursorsSource() requires vectors of
@@ -1538,9 +1568,9 @@ Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx) {
     return Shard::RetryPolicy::kIdempotent;
 }
 
-bool mustRunOnAllShards(const NamespaceString& nss,
-                        bool hasChangeStream,
-                        bool startsWithDocuments) {
+bool checkIfMustRunOnAllShards(const NamespaceString& nss,
+                               bool hasChangeStream,
+                               bool startsWithDocuments) {
     // The following aggregations must be routed to all shards:
     // - Any collectionless aggregation, such as non-localOps $currentOp.
     // - Any aggregation which begins with a $changeStream stage.

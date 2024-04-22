@@ -42,6 +42,7 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/summation.h"
 
@@ -134,12 +135,12 @@ public:
      */
     virtual Document serialize(boost::intrusive_ptr<Expression> initializer,
                                boost::intrusive_ptr<Expression> argument,
-                               bool explain) const {
+                               const SerializationOptions& options = {}) const {
         ExpressionConstant const* ec = dynamic_cast<ExpressionConstant const*>(initializer.get());
         invariant(ec);
         invariant(ec->getValue().nullish());
 
-        return DOC(getOpName() << argument->serialize(explain));
+        return DOC(getOpName() << argument->serialize(options));
     }
 
     virtual AccumulatorDocumentsNeeded documentsNeeded() const {

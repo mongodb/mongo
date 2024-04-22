@@ -1,6 +1,7 @@
 // @tags: [
 //   does_not_support_stepdowns,
 //   requires_profiling,
+//   references_foreign_collection,
 // ]
 
 // Confirms that profiled aggregation execution contains all expected metrics with proper values.

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,31 +29,17 @@
 
 #pragma once
 
-#include <string>
+#include "mongo/base/status.h"
+#include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 
-#include "mongo/base/status_with.h"
-
-namespace mongo::plan_cache_util {
+namespace mongo {
+/**
+ * Validate properties of the algorithm field of $queryStats.transformIdentifiers
+ */
+Status validateAlgo(TransformAlgorithmEnum algorithm);
 
 /**
- * Defines units of planCacheSize parameter.
+ * Validate properties of the hmac key field of $queryStats.transformIdentifiers
  */
-enum class PlanCacheSizeUnits {
-    kPercent,
-    kMB,
-    kGB,
-};
-
-StatusWith<PlanCacheSizeUnits> parseUnitString(const std::string& strUnit);
-
-/**
- * Represents parsed planCacheSize parameter.
- */
-struct PlanCacheSizeParameter {
-    static StatusWith<PlanCacheSizeParameter> parse(const std::string& str);
-
-    const double size;
-    const PlanCacheSizeUnits units;
-};
-
-}  // namespace mongo::plan_cache_util
+Status validateHmac(std::vector<uint8_t> hmacKey);
+}  // namespace mongo

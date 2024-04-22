@@ -112,7 +112,7 @@ StageConstraints DocumentSourceReshardingIterateTransaction::constraints(
 }
 
 Value DocumentSourceReshardingIterateTransaction::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+    const SerializationOptions& opts) const {
     return Value(
         Document{{kStageName,
                   Value(Document{{kIncludeCommitTransactionTimestampFieldName,

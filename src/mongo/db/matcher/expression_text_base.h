@@ -60,7 +60,9 @@ public:
      */
     virtual const fts::FTSQuery& getFTSQuery() const = 0;
 
-    BSONObj getSerializedRightHandSide() const final {
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final {
         MONGO_UNREACHABLE;
     }
 
@@ -70,7 +72,9 @@ public:
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final;
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final;
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const final;
 

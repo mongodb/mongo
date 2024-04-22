@@ -29,6 +29,7 @@
 
 #include "mongo/base/dependency_graph.h"
 
+#include "mongo/util/stacktrace.h"
 #include <algorithm>
 #include <fmt/format.h>
 #include <fmt/ranges.h>

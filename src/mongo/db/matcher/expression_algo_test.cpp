@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/parsed_match_expression_for_test.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/platform/decimal128.h"
@@ -44,30 +45,16 @@ namespace mongo {
 
 using std::unique_ptr;
 
-/**
- * A MatchExpression does not hold the memory for BSONElements, so use ParsedMatchExpression to
- * ensure that the BSONObj outlives the MatchExpression.
- */
-class ParsedMatchExpression {
-public:
-    ParsedMatchExpression(const std::string& str, const CollatorInterface* collator = nullptr)
-        : _obj(fromjson(str)) {
-        _expCtx = make_intrusive<ExpressionContextForTest>();
-        _expCtx->setCollator(CollatorInterface::cloneCollator(collator));
-        StatusWithMatchExpression result = MatchExpressionParser::parse(_obj, _expCtx);
-        ASSERT_OK(result.getStatus());
-        _expr = std::move(result.getValue());
-    }
 
-    const MatchExpression* get() const {
-        return _expr.get();
+void assertMatchesEqual(const ParsedMatchExpressionForTest& expected,
+                        const std::unique_ptr<MatchExpression>& actual) {
+    if (expected.get() == nullptr) {
+        ASSERT(actual == nullptr);
+        return;
     }
-
-private:
-    const BSONObj _obj;
-    std::unique_ptr<MatchExpression> _expr;
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
-};
+    ASSERT(actual != nullptr);
+    ASSERT_EQ(expected.get()->toString(), actual.get()->toString());
+}
 
 TEST(ExpressionAlgoIsSubsetOf, NullAndOmittedField) {
     // Verify that the ComparisonMatchExpression constructor prohibits creating a match expression
@@ -77,29 +64,29 @@ TEST(ExpressionAlgoIsSubsetOf, NullAndOmittedField) {
     ASSERT_EQUALS(ErrorCodes::BadValue,
                   MatchExpressionParser::parse(undefined, std::move(expCtx)).getStatus());
 
-    ParsedMatchExpression empty("{}");
-    ParsedMatchExpression null("{a: null}");
+    ParsedMatchExpressionForTest empty("{}");
+    ParsedMatchExpressionForTest null("{a: null}");
 
     ASSERT_TRUE(expression::isSubsetOf(null.get(), empty.get()));
     ASSERT_FALSE(expression::isSubsetOf(empty.get(), null.get()));
 
-    ParsedMatchExpression b1("{b: 1}");
-    ParsedMatchExpression aNullB1("{a: null, b: 1}");
+    ParsedMatchExpressionForTest b1("{b: 1}");
+    ParsedMatchExpressionForTest aNullB1("{a: null, b: 1}");
 
     ASSERT_TRUE(expression::isSubsetOf(aNullB1.get(), b1.get()));
     ASSERT_FALSE(expression::isSubsetOf(b1.get(), aNullB1.get()));
 
-    ParsedMatchExpression a1C3("{a: 1, c: 3}");
-    ParsedMatchExpression a1BNullC3("{a: 1, b: null, c: 3}");
+    ParsedMatchExpressionForTest a1C3("{a: 1, c: 3}");
+    ParsedMatchExpressionForTest a1BNullC3("{a: 1, b: null, c: 3}");
 
     ASSERT_TRUE(expression::isSubsetOf(a1BNullC3.get(), a1C3.get()));
     ASSERT_FALSE(expression::isSubsetOf(a1C3.get(), a1BNullC3.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, NullAndIn) {
-    ParsedMatchExpression eqNull("{x: null}");
-    ParsedMatchExpression inNull("{x: {$in: [null]}}");
-    ParsedMatchExpression inNullOr2("{x: {$in: [null, 2]}}");
+    ParsedMatchExpressionForTest eqNull("{x: null}");
+    ParsedMatchExpressionForTest inNull("{x: {$in: [null]}}");
+    ParsedMatchExpressionForTest inNullOr2("{x: {$in: [null, 2]}}");
 
     ASSERT_TRUE(expression::isSubsetOf(inNull.get(), eqNull.get()));
     ASSERT_FALSE(expression::isSubsetOf(inNullOr2.get(), eqNull.get()));
@@ -109,19 +96,19 @@ TEST(ExpressionAlgoIsSubsetOf, NullAndIn) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, NullAndExists) {
-    ParsedMatchExpression null("{x: null}");
-    ParsedMatchExpression exists("{x: {$exists: true}}");
+    ParsedMatchExpressionForTest null("{x: null}");
+    ParsedMatchExpressionForTest exists("{x: {$exists: true}}");
     ASSERT_FALSE(expression::isSubsetOf(null.get(), exists.get()));
     ASSERT_FALSE(expression::isSubsetOf(exists.get(), null.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_NaN) {
-    ParsedMatchExpression nan("{x: NaN}");
-    ParsedMatchExpression lt("{x: {$lt: 5}}");
-    ParsedMatchExpression lte("{x: {$lte: 5}}");
-    ParsedMatchExpression gte("{x: {$gte: 5}}");
-    ParsedMatchExpression gt("{x: {$gt: 5}}");
-    ParsedMatchExpression in("{x: {$in: [5]}}");
+    ParsedMatchExpressionForTest nan("{x: NaN}");
+    ParsedMatchExpressionForTest lt("{x: {$lt: 5}}");
+    ParsedMatchExpressionForTest lte("{x: {$lte: 5}}");
+    ParsedMatchExpressionForTest gte("{x: {$gte: 5}}");
+    ParsedMatchExpressionForTest gt("{x: {$gt: 5}}");
+    ParsedMatchExpressionForTest in("{x: {$in: [5]}}");
 
     ASSERT_TRUE(expression::isSubsetOf(nan.get(), nan.get()));
     ASSERT_FALSE(expression::isSubsetOf(nan.get(), lt.get()));
@@ -135,7 +122,7 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_NaN) {
     ASSERT_FALSE(expression::isSubsetOf(nan.get(), in.get()));
     ASSERT_FALSE(expression::isSubsetOf(in.get(), nan.get()));
 
-    ParsedMatchExpression decNan("{x : NumberDecimal(\"NaN\") }");
+    ParsedMatchExpressionForTest decNan("{x : NumberDecimal(\"NaN\") }");
     ASSERT_TRUE(expression::isSubsetOf(decNan.get(), decNan.get()));
     ASSERT_TRUE(expression::isSubsetOf(nan.get(), decNan.get()));
     ASSERT_TRUE(expression::isSubsetOf(decNan.get(), nan.get()));
@@ -150,9 +137,9 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_NaN) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_EQ) {
-    ParsedMatchExpression a5("{a: 5}");
-    ParsedMatchExpression a6("{a: 6}");
-    ParsedMatchExpression b5("{b: 5}");
+    ParsedMatchExpressionForTest a5("{a: 5}");
+    ParsedMatchExpressionForTest a6("{a: 6}");
+    ParsedMatchExpressionForTest b5("{b: 5}");
 
     ASSERT_TRUE(expression::isSubsetOf(a5.get(), a5.get()));
     ASSERT_FALSE(expression::isSubsetOf(a5.get(), a6.get()));
@@ -160,10 +147,10 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_EQ) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, CompareAnd_EQ) {
-    ParsedMatchExpression a1B2("{a: 1, b: 2}");
-    ParsedMatchExpression a1B7("{a: 1, b: 7}");
-    ParsedMatchExpression a1("{a: 1}");
-    ParsedMatchExpression b2("{b: 2}");
+    ParsedMatchExpressionForTest a1B2("{a: 1, b: 2}");
+    ParsedMatchExpressionForTest a1B7("{a: 1, b: 7}");
+    ParsedMatchExpressionForTest a1("{a: 1}");
+    ParsedMatchExpressionForTest b2("{b: 2}");
 
     ASSERT_TRUE(expression::isSubsetOf(a1B2.get(), a1B2.get()));
     ASSERT_FALSE(expression::isSubsetOf(a1B2.get(), a1B7.get()));
@@ -174,74 +161,74 @@ TEST(ExpressionAlgoIsSubsetOf, CompareAnd_EQ) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, CompareAnd_GT) {
-    ParsedMatchExpression filter("{a: {$gt: 5}, b: {$gt: 6}}");
-    ParsedMatchExpression query("{a: {$gt: 5}, b: {$gt: 6}, c: {$gt: 7}}");
+    ParsedMatchExpressionForTest filter("{a: {$gt: 5}, b: {$gt: 6}}");
+    ParsedMatchExpressionForTest query("{a: {$gt: 5}, b: {$gt: 6}, c: {$gt: 7}}");
 
     ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
     ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, CompareAnd_SingleField) {
-    ParsedMatchExpression filter("{a: {$gt: 5, $lt: 7}}");
-    ParsedMatchExpression query("{a: {$gt: 5, $lt: 6}}");
+    ParsedMatchExpressionForTest filter("{a: {$gt: 5, $lt: 7}}");
+    ParsedMatchExpressionForTest query("{a: {$gt: 5, $lt: 6}}");
 
     ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
     ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, CompareOr_LT) {
-    ParsedMatchExpression lt5("{a: {$lt: 5}}");
-    ParsedMatchExpression eq2OrEq3("{$or: [{a: 2}, {a: 3}]}");
-    ParsedMatchExpression eq4OrEq5("{$or: [{a: 4}, {a: 5}]}");
-    ParsedMatchExpression eq4OrEq6("{$or: [{a: 4}, {a: 6}]}");
+    ParsedMatchExpressionForTest lt5("{a: {$lt: 5}}");
+    ParsedMatchExpressionForTest eq2OrEq3("{$or: [{a: 2}, {a: 3}]}");
+    ParsedMatchExpressionForTest eq4OrEq5("{$or: [{a: 4}, {a: 5}]}");
+    ParsedMatchExpressionForTest eq4OrEq6("{$or: [{a: 4}, {a: 6}]}");
 
     ASSERT_TRUE(expression::isSubsetOf(eq2OrEq3.get(), lt5.get()));
     ASSERT_FALSE(expression::isSubsetOf(eq4OrEq5.get(), lt5.get()));
     ASSERT_FALSE(expression::isSubsetOf(eq4OrEq6.get(), lt5.get()));
 
-    ParsedMatchExpression lt4OrLt5("{$or: [{a: {$lt: 4}}, {a: {$lt: 5}}]}");
+    ParsedMatchExpressionForTest lt4OrLt5("{$or: [{a: {$lt: 4}}, {a: {$lt: 5}}]}");
 
     ASSERT_TRUE(expression::isSubsetOf(lt4OrLt5.get(), lt5.get()));
     ASSERT_TRUE(expression::isSubsetOf(lt5.get(), lt4OrLt5.get()));
 
-    ParsedMatchExpression lt7OrLt8("{$or: [{a: {$lt: 7}}, {a: {$lt: 8}}]}");
+    ParsedMatchExpressionForTest lt7OrLt8("{$or: [{a: {$lt: 7}}, {a: {$lt: 8}}]}");
 
     ASSERT_FALSE(expression::isSubsetOf(lt7OrLt8.get(), lt5.get()));
     ASSERT_TRUE(expression::isSubsetOf(lt5.get(), lt7OrLt8.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, CompareOr_GTE) {
-    ParsedMatchExpression gte5("{a: {$gte: 5}}");
-    ParsedMatchExpression eq4OrEq6("{$or: [{a: 4}, {a: 6}]}");
-    ParsedMatchExpression eq5OrEq6("{$or: [{a: 5}, {a: 6}]}");
-    ParsedMatchExpression eq7OrEq8("{$or: [{a: 7}, {a: 8}]}");
+    ParsedMatchExpressionForTest gte5("{a: {$gte: 5}}");
+    ParsedMatchExpressionForTest eq4OrEq6("{$or: [{a: 4}, {a: 6}]}");
+    ParsedMatchExpressionForTest eq5OrEq6("{$or: [{a: 5}, {a: 6}]}");
+    ParsedMatchExpressionForTest eq7OrEq8("{$or: [{a: 7}, {a: 8}]}");
 
     ASSERT_FALSE(expression::isSubsetOf(eq4OrEq6.get(), gte5.get()));
     ASSERT_TRUE(expression::isSubsetOf(eq5OrEq6.get(), gte5.get()));
     ASSERT_TRUE(expression::isSubsetOf(eq7OrEq8.get(), gte5.get()));
 
-    ParsedMatchExpression gte5OrGte6("{$or: [{a: {$gte: 5}}, {a: {$gte: 6}}]}");
+    ParsedMatchExpressionForTest gte5OrGte6("{$or: [{a: {$gte: 5}}, {a: {$gte: 6}}]}");
 
     ASSERT_TRUE(expression::isSubsetOf(gte5OrGte6.get(), gte5.get()));
     ASSERT_TRUE(expression::isSubsetOf(gte5.get(), gte5OrGte6.get()));
 
-    ParsedMatchExpression gte3OrGte4("{$or: [{a: {$gte: 3}}, {a: {$gte: 4}}]}");
+    ParsedMatchExpressionForTest gte3OrGte4("{$or: [{a: {$gte: 3}}, {a: {$gte: 4}}]}");
 
     ASSERT_FALSE(expression::isSubsetOf(gte3OrGte4.get(), gte5.get()));
     ASSERT_TRUE(expression::isSubsetOf(gte5.get(), gte3OrGte4.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, DifferentCanonicalTypes) {
-    ParsedMatchExpression number("{x: {$gt: 1}}");
-    ParsedMatchExpression string("{x: {$gt: 'a'}}");
+    ParsedMatchExpressionForTest number("{x: {$gt: 1}}");
+    ParsedMatchExpressionForTest string("{x: {$gt: 'a'}}");
     ASSERT_FALSE(expression::isSubsetOf(number.get(), string.get()));
     ASSERT_FALSE(expression::isSubsetOf(string.get(), number.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, DifferentNumberTypes) {
-    ParsedMatchExpression numberDouble("{x: 5.0}");
-    ParsedMatchExpression numberInt("{x: NumberInt(5)}");
-    ParsedMatchExpression numberLong("{x: NumberLong(5)}");
+    ParsedMatchExpressionForTest numberDouble("{x: 5.0}");
+    ParsedMatchExpressionForTest numberInt("{x: NumberInt(5)}");
+    ParsedMatchExpressionForTest numberLong("{x: NumberLong(5)}");
 
     ASSERT_TRUE(expression::isSubsetOf(numberDouble.get(), numberInt.get()));
     ASSERT_TRUE(expression::isSubsetOf(numberDouble.get(), numberLong.get()));
@@ -252,15 +239,15 @@ TEST(ExpressionAlgoIsSubsetOf, DifferentNumberTypes) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, PointInUnboundedRange) {
-    ParsedMatchExpression a4("{a: 4}");
-    ParsedMatchExpression a5("{a: 5}");
-    ParsedMatchExpression a6("{a: 6}");
-    ParsedMatchExpression b5("{b: 5}");
+    ParsedMatchExpressionForTest a4("{a: 4}");
+    ParsedMatchExpressionForTest a5("{a: 5}");
+    ParsedMatchExpressionForTest a6("{a: 6}");
+    ParsedMatchExpressionForTest b5("{b: 5}");
 
-    ParsedMatchExpression lt5("{a: {$lt: 5}}");
-    ParsedMatchExpression lte5("{a: {$lte: 5}}");
-    ParsedMatchExpression gte5("{a: {$gte: 5}}");
-    ParsedMatchExpression gt5("{a: {$gt: 5}}");
+    ParsedMatchExpressionForTest lt5("{a: {$lt: 5}}");
+    ParsedMatchExpressionForTest lte5("{a: {$lte: 5}}");
+    ParsedMatchExpressionForTest gte5("{a: {$gte: 5}}");
+    ParsedMatchExpressionForTest gt5("{a: {$gt: 5}}");
 
     ASSERT_TRUE(expression::isSubsetOf(a4.get(), lte5.get()));
     ASSERT_TRUE(expression::isSubsetOf(a5.get(), lte5.get()));
@@ -292,26 +279,26 @@ TEST(ExpressionAlgoIsSubsetOf, PointInUnboundedRange) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, PointInBoundedRange) {
-    ParsedMatchExpression filter("{a: {$gt: 5, $lt: 10}}");
-    ParsedMatchExpression query("{a: 6}");
+    ParsedMatchExpressionForTest filter("{a: {$gt: 5, $lt: 10}}");
+    ParsedMatchExpressionForTest query("{a: 6}");
 
     ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
     ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, PointInBoundedRange_FakeAnd) {
-    ParsedMatchExpression filter("{a: {$gt: 5, $lt: 10}}");
-    ParsedMatchExpression query("{$and: [{a: 6}, {a: 6}]}");
+    ParsedMatchExpressionForTest filter("{a: {$gt: 5, $lt: 10}}");
+    ParsedMatchExpressionForTest query("{$and: [{a: 6}, {a: 6}]}");
 
     ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
     ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, MultiplePointsInBoundedRange) {
-    ParsedMatchExpression filter("{a: {$gt: 5, $lt: 10}}");
-    ParsedMatchExpression queryAllInside("{a: {$in: [6, 7, 8]}}");
-    ParsedMatchExpression queryStraddleLower("{a: {$in: [4.9, 5.1]}}");
-    ParsedMatchExpression queryStraddleUpper("{a: {$in: [9.9, 10.1]}}");
+    ParsedMatchExpressionForTest filter("{a: {$gt: 5, $lt: 10}}");
+    ParsedMatchExpressionForTest queryAllInside("{a: {$in: [6, 7, 8]}}");
+    ParsedMatchExpressionForTest queryStraddleLower("{a: {$in: [4.9, 5.1]}}");
+    ParsedMatchExpressionForTest queryStraddleUpper("{a: {$in: [9.9, 10.1]}}");
 
     ASSERT_TRUE(expression::isSubsetOf(queryAllInside.get(), filter.get()));
     ASSERT_FALSE(expression::isSubsetOf(queryStraddleLower.get(), filter.get()));
@@ -319,18 +306,18 @@ TEST(ExpressionAlgoIsSubsetOf, MultiplePointsInBoundedRange) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, PointInCompoundRange) {
-    ParsedMatchExpression filter("{a: {$gt: 5}, b: {$gt: 6}, c: {$gt: 7}}");
-    ParsedMatchExpression query("{a: 10, b: 10, c: 10}");
+    ParsedMatchExpressionForTest filter("{a: {$gt: 5}, b: {$gt: 6}, c: {$gt: 7}}");
+    ParsedMatchExpressionForTest query("{a: 10, b: 10, c: 10}");
 
     ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
     ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_LT_LTE) {
-    ParsedMatchExpression lte4("{x: {$lte: 4}}");
-    ParsedMatchExpression lt5("{x: {$lt: 5}}");
-    ParsedMatchExpression lte5("{x: {$lte: 5}}");
-    ParsedMatchExpression lt6("{x: {$lt: 6}}");
+    ParsedMatchExpressionForTest lte4("{x: {$lte: 4}}");
+    ParsedMatchExpressionForTest lt5("{x: {$lt: 5}}");
+    ParsedMatchExpressionForTest lte5("{x: {$lte: 5}}");
+    ParsedMatchExpressionForTest lt6("{x: {$lt: 6}}");
 
     ASSERT_TRUE(expression::isSubsetOf(lte4.get(), lte5.get()));
     ASSERT_TRUE(expression::isSubsetOf(lt5.get(), lte5.get()));
@@ -344,10 +331,10 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_LT_LTE) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_GT_GTE) {
-    ParsedMatchExpression gte6("{x: {$gte: 6}}");
-    ParsedMatchExpression gt5("{x: {$gt: 5}}");
-    ParsedMatchExpression gte5("{x: {$gte: 5}}");
-    ParsedMatchExpression gt4("{x: {$gt: 4}}");
+    ParsedMatchExpressionForTest gte6("{x: {$gte: 6}}");
+    ParsedMatchExpressionForTest gt5("{x: {$gt: 5}}");
+    ParsedMatchExpressionForTest gte5("{x: {$gte: 5}}");
+    ParsedMatchExpressionForTest gt4("{x: {$gt: 4}}");
 
     ASSERT_TRUE(expression::isSubsetOf(gte6.get(), gte5.get()));
     ASSERT_TRUE(expression::isSubsetOf(gt5.get(), gte5.get()));
@@ -361,18 +348,19 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_GT_GTE) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, BoundedRangeInUnboundedRange) {
-    ParsedMatchExpression filter("{a: {$gt: 1}}");
-    ParsedMatchExpression query("{a: {$gt: 5, $lt: 10}}");
+    ParsedMatchExpressionForTest filter("{a: {$gt: 1}}");
+    ParsedMatchExpressionForTest query("{a: {$gt: 5, $lt: 10}}");
 
     ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
     ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, MultipleRangesInUnboundedRange) {
-    ParsedMatchExpression filter("{a: {$gt: 1}}");
-    ParsedMatchExpression negative("{$or: [{a: {$gt: 5, $lt: 10}}, {a: {$lt: 0}}]}");
-    ParsedMatchExpression unbounded("{$or: [{a: {$gt: 5, $lt: 10}}, {a: {$gt: 15}}]}");
-    ParsedMatchExpression bounded("{$or: [{a: {$gt: 5, $lt: 10}}, {a: {$gt: 20, $lt: 30}}]}");
+    ParsedMatchExpressionForTest filter("{a: {$gt: 1}}");
+    ParsedMatchExpressionForTest negative("{$or: [{a: {$gt: 5, $lt: 10}}, {a: {$lt: 0}}]}");
+    ParsedMatchExpressionForTest unbounded("{$or: [{a: {$gt: 5, $lt: 10}}, {a: {$gt: 15}}]}");
+    ParsedMatchExpressionForTest bounded(
+        "{$or: [{a: {$gt: 5, $lt: 10}}, {a: {$gt: 20, $lt: 30}}]}");
 
     ASSERT_FALSE(expression::isSubsetOf(negative.get(), filter.get()));
     ASSERT_TRUE(expression::isSubsetOf(unbounded.get(), filter.get()));
@@ -380,10 +368,10 @@ TEST(ExpressionAlgoIsSubsetOf, MultipleRangesInUnboundedRange) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, MultipleFields) {
-    ParsedMatchExpression filter("{a: {$gt: 5}, b: {$lt: 10}}");
-    ParsedMatchExpression onlyA("{$or: [{a: 6, b: {$lt: 4}}, {a: {$gt: 11}}]}");
-    ParsedMatchExpression onlyB("{$or: [{b: {$lt: 4}}, {a: {$gt: 11}, b: 9}]}");
-    ParsedMatchExpression both("{$or: [{a: 6, b: {$lt: 4}}, {a: {$gt: 11}, b: 9}]}");
+    ParsedMatchExpressionForTest filter("{a: {$gt: 5}, b: {$lt: 10}}");
+    ParsedMatchExpressionForTest onlyA("{$or: [{a: 6, b: {$lt: 4}}, {a: {$gt: 11}}]}");
+    ParsedMatchExpressionForTest onlyB("{$or: [{b: {$lt: 4}}, {a: {$gt: 11}, b: 9}]}");
+    ParsedMatchExpressionForTest both("{$or: [{a: 6, b: {$lt: 4}}, {a: {$gt: 11}, b: 9}]}");
 
     ASSERT_FALSE(expression::isSubsetOf(onlyA.get(), filter.get()));
     ASSERT_FALSE(expression::isSubsetOf(onlyB.get(), filter.get()));
@@ -391,18 +379,18 @@ TEST(ExpressionAlgoIsSubsetOf, MultipleFields) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_LT_In) {
-    ParsedMatchExpression lt("{a: {$lt: 5}}");
+    ParsedMatchExpressionForTest lt("{a: {$lt: 5}}");
 
-    ParsedMatchExpression inLt("{a: {$in: [4.9]}}");
-    ParsedMatchExpression inEq("{a: {$in: [5]}}");
-    ParsedMatchExpression inGt("{a: {$in: [5.1]}}");
-    ParsedMatchExpression inNull("{a: {$in: [null]}}");
+    ParsedMatchExpressionForTest inLt("{a: {$in: [4.9]}}");
+    ParsedMatchExpressionForTest inEq("{a: {$in: [5]}}");
+    ParsedMatchExpressionForTest inGt("{a: {$in: [5.1]}}");
+    ParsedMatchExpressionForTest inNull("{a: {$in: [null]}}");
 
-    ParsedMatchExpression inAllEq("{a: {$in: [5, 5.0]}}");
-    ParsedMatchExpression inAllLte("{a: {$in: [4.9, 5]}}");
-    ParsedMatchExpression inAllLt("{a: {$in: [2, 3, 4]}}");
-    ParsedMatchExpression inStraddle("{a: {$in: [4, 6]}}");
-    ParsedMatchExpression inLtAndNull("{a: {$in: [1, null]}}");
+    ParsedMatchExpressionForTest inAllEq("{a: {$in: [5, 5.0]}}");
+    ParsedMatchExpressionForTest inAllLte("{a: {$in: [4.9, 5]}}");
+    ParsedMatchExpressionForTest inAllLt("{a: {$in: [2, 3, 4]}}");
+    ParsedMatchExpressionForTest inStraddle("{a: {$in: [4, 6]}}");
+    ParsedMatchExpressionForTest inLtAndNull("{a: {$in: [1, null]}}");
 
     ASSERT_TRUE(expression::isSubsetOf(inLt.get(), lt.get()));
     ASSERT_FALSE(expression::isSubsetOf(inEq.get(), lt.get()));
@@ -419,18 +407,18 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_LT_In) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_LTE_In) {
-    ParsedMatchExpression lte("{a: {$lte: 5}}");
+    ParsedMatchExpressionForTest lte("{a: {$lte: 5}}");
 
-    ParsedMatchExpression inLt("{a: {$in: [4.9]}}");
-    ParsedMatchExpression inEq("{a: {$in: [5]}}");
-    ParsedMatchExpression inGt("{a: {$in: [5.1]}}");
-    ParsedMatchExpression inNull("{a: {$in: [null]}}");
+    ParsedMatchExpressionForTest inLt("{a: {$in: [4.9]}}");
+    ParsedMatchExpressionForTest inEq("{a: {$in: [5]}}");
+    ParsedMatchExpressionForTest inGt("{a: {$in: [5.1]}}");
+    ParsedMatchExpressionForTest inNull("{a: {$in: [null]}}");
 
-    ParsedMatchExpression inAllEq("{a: {$in: [5, 5.0]}}");
-    ParsedMatchExpression inAllLte("{a: {$in: [4.9, 5]}}");
-    ParsedMatchExpression inAllLt("{a: {$in: [2, 3, 4]}}");
-    ParsedMatchExpression inStraddle("{a: {$in: [4, 6]}}");
-    ParsedMatchExpression inLtAndNull("{a: {$in: [1, null]}}");
+    ParsedMatchExpressionForTest inAllEq("{a: {$in: [5, 5.0]}}");
+    ParsedMatchExpressionForTest inAllLte("{a: {$in: [4.9, 5]}}");
+    ParsedMatchExpressionForTest inAllLt("{a: {$in: [2, 3, 4]}}");
+    ParsedMatchExpressionForTest inStraddle("{a: {$in: [4, 6]}}");
+    ParsedMatchExpressionForTest inLtAndNull("{a: {$in: [1, null]}}");
 
     ASSERT_TRUE(expression::isSubsetOf(inLt.get(), lte.get()));
     ASSERT_TRUE(expression::isSubsetOf(inEq.get(), lte.get()));
@@ -447,16 +435,16 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_LTE_In) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_EQ_In) {
-    ParsedMatchExpression eq("{a: 5}");
+    ParsedMatchExpressionForTest eq("{a: 5}");
 
-    ParsedMatchExpression inLt("{a: {$in: [4.9]}}");
-    ParsedMatchExpression inEq("{a: {$in: [5]}}");
-    ParsedMatchExpression inGt("{a: {$in: [5.1]}}");
-    ParsedMatchExpression inNull("{a: {$in: [null]}}");
+    ParsedMatchExpressionForTest inLt("{a: {$in: [4.9]}}");
+    ParsedMatchExpressionForTest inEq("{a: {$in: [5]}}");
+    ParsedMatchExpressionForTest inGt("{a: {$in: [5.1]}}");
+    ParsedMatchExpressionForTest inNull("{a: {$in: [null]}}");
 
-    ParsedMatchExpression inAllEq("{a: {$in: [5, 5.0]}}");
-    ParsedMatchExpression inStraddle("{a: {$in: [4, 6]}}");
-    ParsedMatchExpression inEqAndNull("{a: {$in: [5, null]}}");
+    ParsedMatchExpressionForTest inAllEq("{a: {$in: [5, 5.0]}}");
+    ParsedMatchExpressionForTest inStraddle("{a: {$in: [4, 6]}}");
+    ParsedMatchExpressionForTest inEqAndNull("{a: {$in: [5, null]}}");
 
     ASSERT_FALSE(expression::isSubsetOf(inLt.get(), eq.get()));
     ASSERT_TRUE(expression::isSubsetOf(inEq.get(), eq.get()));
@@ -471,18 +459,18 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_EQ_In) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_GT_In) {
-    ParsedMatchExpression gt("{a: {$gt: 5}}");
+    ParsedMatchExpressionForTest gt("{a: {$gt: 5}}");
 
-    ParsedMatchExpression inLt("{a: {$in: [4.9]}}");
-    ParsedMatchExpression inEq("{a: {$in: [5]}}");
-    ParsedMatchExpression inGt("{a: {$in: [5.1]}}");
-    ParsedMatchExpression inNull("{a: {$in: [null]}}");
+    ParsedMatchExpressionForTest inLt("{a: {$in: [4.9]}}");
+    ParsedMatchExpressionForTest inEq("{a: {$in: [5]}}");
+    ParsedMatchExpressionForTest inGt("{a: {$in: [5.1]}}");
+    ParsedMatchExpressionForTest inNull("{a: {$in: [null]}}");
 
-    ParsedMatchExpression inAllEq("{a: {$in: [5, 5.0]}}");
-    ParsedMatchExpression inAllGte("{a: {$in: [5, 5.1]}}");
-    ParsedMatchExpression inAllGt("{a: {$in: [6, 7, 8]}}");
-    ParsedMatchExpression inStraddle("{a: {$in: [4, 6]}}");
-    ParsedMatchExpression inGtAndNull("{a: {$in: [9, null]}}");
+    ParsedMatchExpressionForTest inAllEq("{a: {$in: [5, 5.0]}}");
+    ParsedMatchExpressionForTest inAllGte("{a: {$in: [5, 5.1]}}");
+    ParsedMatchExpressionForTest inAllGt("{a: {$in: [6, 7, 8]}}");
+    ParsedMatchExpressionForTest inStraddle("{a: {$in: [4, 6]}}");
+    ParsedMatchExpressionForTest inGtAndNull("{a: {$in: [9, null]}}");
 
     ASSERT_FALSE(expression::isSubsetOf(inLt.get(), gt.get()));
     ASSERT_FALSE(expression::isSubsetOf(inEq.get(), gt.get()));
@@ -499,18 +487,18 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_GT_In) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_GTE_In) {
-    ParsedMatchExpression gte("{a: {$gte: 5}}");
+    ParsedMatchExpressionForTest gte("{a: {$gte: 5}}");
 
-    ParsedMatchExpression inLt("{a: {$in: [4.9]}}");
-    ParsedMatchExpression inEq("{a: {$in: [5]}}");
-    ParsedMatchExpression inGt("{a: {$in: [5.1]}}");
-    ParsedMatchExpression inNull("{a: {$in: [null]}}");
+    ParsedMatchExpressionForTest inLt("{a: {$in: [4.9]}}");
+    ParsedMatchExpressionForTest inEq("{a: {$in: [5]}}");
+    ParsedMatchExpressionForTest inGt("{a: {$in: [5.1]}}");
+    ParsedMatchExpressionForTest inNull("{a: {$in: [null]}}");
 
-    ParsedMatchExpression inAllEq("{a: {$in: [5, 5.0]}}");
-    ParsedMatchExpression inAllGte("{a: {$in: [5, 5.1]}}");
-    ParsedMatchExpression inAllGt("{a: {$in: [6, 7, 8]}}");
-    ParsedMatchExpression inStraddle("{a: {$in: [4, 6]}}");
-    ParsedMatchExpression inGtAndNull("{a: {$in: [9, null]}}");
+    ParsedMatchExpressionForTest inAllEq("{a: {$in: [5, 5.0]}}");
+    ParsedMatchExpressionForTest inAllGte("{a: {$in: [5, 5.1]}}");
+    ParsedMatchExpressionForTest inAllGt("{a: {$in: [6, 7, 8]}}");
+    ParsedMatchExpressionForTest inStraddle("{a: {$in: [4, 6]}}");
+    ParsedMatchExpressionForTest inGtAndNull("{a: {$in: [9, null]}}");
 
     ASSERT_FALSE(expression::isSubsetOf(inLt.get(), gte.get()));
     ASSERT_TRUE(expression::isSubsetOf(inEq.get(), gte.get()));
@@ -527,12 +515,12 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_GTE_In) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, RegexAndIn) {
-    ParsedMatchExpression eq1("{x: 1}");
-    ParsedMatchExpression eqA("{x: 'a'}");
-    ParsedMatchExpression inRegexA("{x: {$in: [/a/]}}");
-    ParsedMatchExpression inRegexAbc("{x: {$in: [/abc/]}}");
-    ParsedMatchExpression inRegexAOrEq1("{x: {$in: [/a/, 1]}}");
-    ParsedMatchExpression inRegexAOrNull("{x: {$in: [/a/, null]}}");
+    ParsedMatchExpressionForTest eq1("{x: 1}");
+    ParsedMatchExpressionForTest eqA("{x: 'a'}");
+    ParsedMatchExpressionForTest inRegexA("{x: {$in: [/a/]}}");
+    ParsedMatchExpressionForTest inRegexAbc("{x: {$in: [/abc/]}}");
+    ParsedMatchExpressionForTest inRegexAOrEq1("{x: {$in: [/a/, 1]}}");
+    ParsedMatchExpressionForTest inRegexAOrNull("{x: {$in: [/a/, null]}}");
 
     ASSERT_FALSE(expression::isSubsetOf(inRegexAOrEq1.get(), eq1.get()));
     ASSERT_FALSE(expression::isSubsetOf(inRegexA.get(), eqA.get()));
@@ -544,10 +532,10 @@ TEST(ExpressionAlgoIsSubsetOf, RegexAndIn) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Exists) {
-    ParsedMatchExpression aExists("{a: {$exists: true}}");
-    ParsedMatchExpression bExists("{b: {$exists: true}}");
-    ParsedMatchExpression aExistsBExists("{a: {$exists: true}, b: {$exists: true}}");
-    ParsedMatchExpression aExistsBExistsC5("{a: {$exists: true}, b: {$exists: true}, c: 5}");
+    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest bExists("{b: {$exists: true}}");
+    ParsedMatchExpressionForTest aExistsBExists("{a: {$exists: true}, b: {$exists: true}}");
+    ParsedMatchExpressionForTest aExistsBExistsC5("{a: {$exists: true}, b: {$exists: true}, c: 5}");
 
     ASSERT_TRUE(expression::isSubsetOf(aExists.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(aExists.get(), bExists.get()));
@@ -562,10 +550,10 @@ TEST(ExpressionAlgoIsSubsetOf, Exists) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_Exists) {
-    ParsedMatchExpression exists("{a: {$exists: true}}");
-    ParsedMatchExpression eq("{a: 1}");
-    ParsedMatchExpression gt("{a: {$gt: 4}}");
-    ParsedMatchExpression lte("{a: {$lte: 7}}");
+    ParsedMatchExpressionForTest exists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest eq("{a: 1}");
+    ParsedMatchExpressionForTest gt("{a: {$gt: 4}}");
+    ParsedMatchExpressionForTest lte("{a: {$lte: 7}}");
 
     ASSERT_TRUE(expression::isSubsetOf(eq.get(), exists.get()));
     ASSERT_TRUE(expression::isSubsetOf(gt.get(), exists.get()));
@@ -577,9 +565,9 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_Exists) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Type) {
-    ParsedMatchExpression aType1("{a: {$type: 1}}");
-    ParsedMatchExpression aType2("{a: {$type: 2}}");
-    ParsedMatchExpression bType2("{b: {$type: 2}}");
+    ParsedMatchExpressionForTest aType1("{a: {$type: 1}}");
+    ParsedMatchExpressionForTest aType2("{a: {$type: 2}}");
+    ParsedMatchExpressionForTest bType2("{b: {$type: 2}}");
 
     ASSERT_FALSE(expression::isSubsetOf(aType1.get(), aType2.get()));
     ASSERT_FALSE(expression::isSubsetOf(aType2.get(), aType1.get()));
@@ -589,9 +577,9 @@ TEST(ExpressionAlgoIsSubsetOf, Type) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, TypeAndExists) {
-    ParsedMatchExpression aExists("{a: {$exists: true}}");
-    ParsedMatchExpression aType2("{a: {$type: 2}}");
-    ParsedMatchExpression bType2("{b: {$type: 2}}");
+    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest aType2("{a: {$type: 2}}");
+    ParsedMatchExpressionForTest bType2("{b: {$type: 2}}");
 
     ASSERT_TRUE(expression::isSubsetOf(aType2.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(aExists.get(), aType2.get()));
@@ -599,10 +587,10 @@ TEST(ExpressionAlgoIsSubsetOf, TypeAndExists) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, AllAndExists) {
-    ParsedMatchExpression aExists("{a: {$exists: true}}");
-    ParsedMatchExpression aAll("{a: {$all: ['x', 'y', 'z']}}");
-    ParsedMatchExpression bAll("{b: {$all: ['x', 'y', 'z']}}");
-    ParsedMatchExpression aAllWithNull("{a: {$all: ['x', null, 'z']}}");
+    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest aAll("{a: {$all: ['x', 'y', 'z']}}");
+    ParsedMatchExpressionForTest bAll("{b: {$all: ['x', 'y', 'z']}}");
+    ParsedMatchExpressionForTest aAllWithNull("{a: {$all: ['x', null, 'z']}}");
 
     ASSERT_TRUE(expression::isSubsetOf(aAll.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(bAll.get(), aExists.get()));
@@ -610,10 +598,10 @@ TEST(ExpressionAlgoIsSubsetOf, AllAndExists) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, ElemMatchAndExists_Value) {
-    ParsedMatchExpression aExists("{a: {$exists: true}}");
-    ParsedMatchExpression aElemMatch("{a: {$elemMatch: {$gt: 5, $lte: 10}}}");
-    ParsedMatchExpression bElemMatch("{b: {$elemMatch: {$gt: 5, $lte: 10}}}");
-    ParsedMatchExpression aElemMatchNull("{a: {$elemMatch: {$eq: null}}}");
+    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest aElemMatch("{a: {$elemMatch: {$gt: 5, $lte: 10}}}");
+    ParsedMatchExpressionForTest bElemMatch("{b: {$elemMatch: {$gt: 5, $lte: 10}}}");
+    ParsedMatchExpressionForTest aElemMatchNull("{a: {$elemMatch: {$eq: null}}}");
 
     ASSERT_TRUE(expression::isSubsetOf(aElemMatch.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(aExists.get(), aElemMatch.get()));
@@ -622,10 +610,10 @@ TEST(ExpressionAlgoIsSubsetOf, ElemMatchAndExists_Value) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, ElemMatchAndExists_Object) {
-    ParsedMatchExpression aExists("{a: {$exists: true}}");
-    ParsedMatchExpression aElemMatch("{a: {$elemMatch: {x: {$gt: 5}, y: {$lte: 10}}}}");
-    ParsedMatchExpression bElemMatch("{b: {$elemMatch: {x: {$gt: 5}, y: {$lte: 10}}}}");
-    ParsedMatchExpression aElemMatchNull("{a: {$elemMatch: {x: null, y: null}}}");
+    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest aElemMatch("{a: {$elemMatch: {x: {$gt: 5}, y: {$lte: 10}}}}");
+    ParsedMatchExpressionForTest bElemMatch("{b: {$elemMatch: {x: {$gt: 5}, y: {$lte: 10}}}}");
+    ParsedMatchExpressionForTest aElemMatchNull("{a: {$elemMatch: {x: null, y: null}}}");
 
     ASSERT_TRUE(expression::isSubsetOf(aElemMatch.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(aExists.get(), aElemMatch.get()));
@@ -634,11 +622,11 @@ TEST(ExpressionAlgoIsSubsetOf, ElemMatchAndExists_Object) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, SizeAndExists) {
-    ParsedMatchExpression aExists("{a: {$exists: true}}");
-    ParsedMatchExpression aSize0("{a: {$size: 0}}");
-    ParsedMatchExpression aSize1("{a: {$size: 1}}");
-    ParsedMatchExpression aSize3("{a: {$size: 3}}");
-    ParsedMatchExpression bSize3("{b: {$size: 3}}");
+    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest aSize0("{a: {$size: 0}}");
+    ParsedMatchExpressionForTest aSize1("{a: {$size: 1}}");
+    ParsedMatchExpressionForTest aSize3("{a: {$size: 3}}");
+    ParsedMatchExpressionForTest bSize3("{b: {$size: 3}}");
 
     ASSERT_TRUE(expression::isSubsetOf(aSize0.get(), aExists.get()));
     ASSERT_TRUE(expression::isSubsetOf(aSize1.get(), aExists.get()));
@@ -648,28 +636,28 @@ TEST(ExpressionAlgoIsSubsetOf, SizeAndExists) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, ModAndExists) {
-    ParsedMatchExpression aExists("{a: {$exists: true}}");
-    ParsedMatchExpression aMod5("{a: {$mod: [5, 0]}}");
-    ParsedMatchExpression bMod5("{b: {$mod: [5, 0]}}");
+    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest aMod5("{a: {$mod: [5, 0]}}");
+    ParsedMatchExpressionForTest bMod5("{b: {$mod: [5, 0]}}");
 
     ASSERT_TRUE(expression::isSubsetOf(aMod5.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(bMod5.get(), aExists.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, RegexAndExists) {
-    ParsedMatchExpression aExists("{a: {$exists: true}}");
-    ParsedMatchExpression aRegex("{a: {$regex: 'pattern'}}");
-    ParsedMatchExpression bRegex("{b: {$regex: 'pattern'}}");
+    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest aRegex("{a: {$regex: 'pattern'}}");
+    ParsedMatchExpressionForTest bRegex("{b: {$regex: 'pattern'}}");
 
     ASSERT_TRUE(expression::isSubsetOf(aRegex.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(bRegex.get(), aExists.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, InAndExists) {
-    ParsedMatchExpression aExists("{a: {$exists: true}}");
-    ParsedMatchExpression aIn("{a: {$in: [1, 2, 3]}}");
-    ParsedMatchExpression bIn("{b: {$in: [1, 2, 3]}}");
-    ParsedMatchExpression aInWithNull("{a: {$in: [1, null, 3]}}");
+    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest aIn("{a: {$in: [1, 2, 3]}}");
+    ParsedMatchExpressionForTest bIn("{b: {$in: [1, 2, 3]}}");
+    ParsedMatchExpressionForTest aInWithNull("{a: {$in: [1, null, 3]}}");
 
     ASSERT_TRUE(expression::isSubsetOf(aIn.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(bIn.get(), aExists.get()));
@@ -681,10 +669,10 @@ TEST(ExpressionAlgoIsSubsetOf, InAndExists) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, NinAndExists) {
-    ParsedMatchExpression aExists("{a: {$exists: true}}");
-    ParsedMatchExpression aNin("{a: {$nin: [1, 2, 3]}}");
-    ParsedMatchExpression bNin("{b: {$nin: [1, 2, 3]}}");
-    ParsedMatchExpression aNinWithNull("{a: {$nin: [1, null, 3]}}");
+    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest aNin("{a: {$nin: [1, 2, 3]}}");
+    ParsedMatchExpressionForTest bNin("{b: {$nin: [1, 2, 3]}}");
+    ParsedMatchExpressionForTest aNinWithNull("{a: {$nin: [1, null, 3]}}");
 
     ASSERT_FALSE(expression::isSubsetOf(aNin.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(bNin.get(), aExists.get()));
@@ -692,10 +680,10 @@ TEST(ExpressionAlgoIsSubsetOf, NinAndExists) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE) {
-    ParsedMatchExpression aExists("{a: {$exists: true}}");
-    ParsedMatchExpression aNotEqual1("{a: {$ne: 1}}");
-    ParsedMatchExpression bNotEqual1("{b: {$ne: 1}}");
-    ParsedMatchExpression aNotEqualNull("{a: {$ne: null}}");
+    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
+    ParsedMatchExpressionForTest aNotEqual1("{a: {$ne: 1}}");
+    ParsedMatchExpressionForTest bNotEqual1("{b: {$ne: 1}}");
+    ParsedMatchExpressionForTest aNotEqualNull("{a: {$ne: null}}");
 
     ASSERT_FALSE(expression::isSubsetOf(aNotEqual1.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(bNotEqual1.get(), aExists.get()));
@@ -704,13 +692,13 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE) {
 
 TEST(ExpressionAlgoIsSubsetOf, CollationAwareStringComparison) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    ParsedMatchExpression lhs("{a: {$gt: 'abc'}}", &collator);
-    ParsedMatchExpression rhs("{a: {$gt: 'cba'}}", &collator);
+    ParsedMatchExpressionForTest lhs("{a: {$gt: 'abc'}}", &collator);
+    ParsedMatchExpressionForTest rhs("{a: {$gt: 'cba'}}", &collator);
 
     ASSERT_TRUE(expression::isSubsetOf(lhs.get(), rhs.get()));
 
-    ParsedMatchExpression lhsLT("{a: {$lt: 'abc'}}", &collator);
-    ParsedMatchExpression rhsLT("{a: {$lt: 'cba'}}", &collator);
+    ParsedMatchExpressionForTest lhsLT("{a: {$lt: 'abc'}}", &collator);
+    ParsedMatchExpressionForTest rhsLT("{a: {$lt: 'cba'}}", &collator);
 
     ASSERT_FALSE(expression::isSubsetOf(lhsLT.get(), rhsLT.get()));
 }
@@ -718,27 +706,27 @@ TEST(ExpressionAlgoIsSubsetOf, CollationAwareStringComparison) {
 TEST(ExpressionAlgoIsSubsetOf, NonMatchingCollationsStringComparison) {
     CollatorInterfaceMock collatorAlwaysEqual(CollatorInterfaceMock::MockType::kAlwaysEqual);
     CollatorInterfaceMock collatorReverseString(CollatorInterfaceMock::MockType::kReverseString);
-    ParsedMatchExpression lhs("{a: {$gt: 'abc'}}", &collatorAlwaysEqual);
-    ParsedMatchExpression rhs("{a: {$gt: 'cba'}}", &collatorReverseString);
+    ParsedMatchExpressionForTest lhs("{a: {$gt: 'abc'}}", &collatorAlwaysEqual);
+    ParsedMatchExpressionForTest rhs("{a: {$gt: 'cba'}}", &collatorReverseString);
 
     ASSERT_FALSE(expression::isSubsetOf(lhs.get(), rhs.get()));
 
-    ParsedMatchExpression lhsLT("{a: {$lt: 'abc'}}", &collatorAlwaysEqual);
-    ParsedMatchExpression rhsLT("{a: {$lt: 'cba'}}", &collatorReverseString);
+    ParsedMatchExpressionForTest lhsLT("{a: {$lt: 'abc'}}", &collatorAlwaysEqual);
+    ParsedMatchExpressionForTest rhsLT("{a: {$lt: 'cba'}}", &collatorReverseString);
 
     ASSERT_FALSE(expression::isSubsetOf(lhsLT.get(), rhsLT.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, CollationAwareStringComparisonIn) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    ParsedMatchExpression lhsAllGTcba("{a: {$in: ['abc', 'cbc']}}", &collator);
-    ParsedMatchExpression lhsSomeGTcba("{a: {$in: ['abc', 'aba']}}", &collator);
-    ParsedMatchExpression rhs("{a: {$gt: 'cba'}}", &collator);
+    ParsedMatchExpressionForTest lhsAllGTcba("{a: {$in: ['abc', 'cbc']}}", &collator);
+    ParsedMatchExpressionForTest lhsSomeGTcba("{a: {$in: ['abc', 'aba']}}", &collator);
+    ParsedMatchExpressionForTest rhs("{a: {$gt: 'cba'}}", &collator);
 
     ASSERT_TRUE(expression::isSubsetOf(lhsAllGTcba.get(), rhs.get()));
     ASSERT_FALSE(expression::isSubsetOf(lhsSomeGTcba.get(), rhs.get()));
 
-    ParsedMatchExpression rhsLT("{a: {$lt: 'cba'}}", &collator);
+    ParsedMatchExpressionForTest rhsLT("{a: {$lt: 'cba'}}", &collator);
 
     ASSERT_FALSE(expression::isSubsetOf(lhsAllGTcba.get(), rhsLT.get()));
     ASSERT_FALSE(expression::isSubsetOf(lhsSomeGTcba.get(), rhsLT.get()));
@@ -748,8 +736,8 @@ TEST(ExpressionAlgoIsSubsetOf, CollationAwareStringComparisonIn) {
 TEST(ExpressionAlgoIsSubsetOf, NonMatchingCollationsNoStringComparisonLHS) {
     CollatorInterfaceMock collatorAlwaysEqual(CollatorInterfaceMock::MockType::kAlwaysEqual);
     CollatorInterfaceMock collatorReverseString(CollatorInterfaceMock::MockType::kReverseString);
-    ParsedMatchExpression lhs("{a: {b: 1}}", &collatorAlwaysEqual);
-    ParsedMatchExpression rhs("{a: {$lt: {b: 'abc'}}}", &collatorReverseString);
+    ParsedMatchExpressionForTest lhs("{a: {b: 1}}", &collatorAlwaysEqual);
+    ParsedMatchExpressionForTest rhs("{a: {$lt: {b: 'abc'}}}", &collatorReverseString);
 
     ASSERT_FALSE(expression::isSubsetOf(lhs.get(), rhs.get()));
 }
@@ -757,72 +745,75 @@ TEST(ExpressionAlgoIsSubsetOf, NonMatchingCollationsNoStringComparisonLHS) {
 TEST(ExpressionAlgoIsSubsetOf, NonMatchingCollationsNoStringComparison) {
     CollatorInterfaceMock collatorAlwaysEqual(CollatorInterfaceMock::MockType::kAlwaysEqual);
     CollatorInterfaceMock collatorReverseString(CollatorInterfaceMock::MockType::kReverseString);
-    ParsedMatchExpression lhs("{a: 1}", &collatorAlwaysEqual);
-    ParsedMatchExpression rhs("{a: {$gt: 0}}", &collatorReverseString);
+    ParsedMatchExpressionForTest lhs("{a: 1}", &collatorAlwaysEqual);
+    ParsedMatchExpressionForTest rhs("{a: {$gt: 0}}", &collatorReverseString);
 
     ASSERT_TRUE(expression::isSubsetOf(lhs.get(), rhs.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, InternalExprEqIsSubsetOfNothing) {
-    ParsedMatchExpression exprEq("{a: {$_internalExprEq: 0}}");
-    ParsedMatchExpression regularEq("{a: {$eq: 0}}");
+    ParsedMatchExpressionForTest exprEq("{a: {$_internalExprEq: 0}}");
+    ParsedMatchExpressionForTest regularEq("{a: {$eq: 0}}");
     {
-        ParsedMatchExpression rhs("{a: {$gte: 0}}");
+        ParsedMatchExpressionForTest rhs("{a: {$gte: 0}}");
         ASSERT_FALSE(expression::isSubsetOf(exprEq.get(), rhs.get()));
         ASSERT_TRUE(expression::isSubsetOf(regularEq.get(), rhs.get()));
     }
 
     {
-        ParsedMatchExpression rhs("{a: {$lte: 0}}");
+        ParsedMatchExpressionForTest rhs("{a: {$lte: 0}}");
         ASSERT_FALSE(expression::isSubsetOf(exprEq.get(), rhs.get()));
         ASSERT_TRUE(expression::isSubsetOf(regularEq.get(), rhs.get()));
     }
 }
 
 TEST(ExpressionAlgoIsSubsetOf, IsSubsetOfRHSAndWithinOr) {
-    ParsedMatchExpression rhs("{$or: [{a: 3}, {$and: [{a: 5}, {b: 5}]}]}");
+    ParsedMatchExpressionForTest rhs("{$or: [{a: 3}, {$and: [{a: 5}, {b: 5}]}]}");
     {
-        ParsedMatchExpression lhs("{a:5, b:5}");
+        ParsedMatchExpressionForTest lhs("{a:5, b:5}");
         ASSERT_TRUE(expression::isSubsetOf(lhs.get(), rhs.get()));
     }
 }
 
 TEST(ExpressionAlgoIsSubsetOf, IsSubsetOfComplexRHSExpression) {
-    ParsedMatchExpression complex("{$or: [{z: 1}, {$and: [{x: 1}, {$or: [{y: 1}, {y: 2}]}]}]}");
+    ParsedMatchExpressionForTest complex(
+        "{$or: [{z: 1}, {$and: [{x: 1}, {$or: [{y: 1}, {y: 2}]}]}]}");
     {
-        ParsedMatchExpression lhs("{z: 1}");
+        ParsedMatchExpressionForTest lhs("{z: 1}");
         ASSERT_TRUE(expression::isSubsetOf(lhs.get(), complex.get()));
     }
 
     {
-        ParsedMatchExpression lhs("{z: 1, x: 1, y:2}");
+        ParsedMatchExpressionForTest lhs("{z: 1, x: 1, y:2}");
         ASSERT_TRUE(expression::isSubsetOf(lhs.get(), complex.get()));
     }
 
     {
-        ParsedMatchExpression lhs("{$or: [{z: 1}, {$and: [{x: 1}, {$or: [{y: 1}, {y: 2}]}]}]}");
+        ParsedMatchExpressionForTest lhs(
+            "{$or: [{z: 1}, {$and: [{x: 1}, {$or: [{y: 1}, {y: 2}]}]}]}");
         ASSERT_TRUE(expression::isSubsetOf(lhs.get(), complex.get()));
     }
 
 
     {
-        ParsedMatchExpression lhs("{$or: [{z: 2}, {$and: [{x: 2}, {$or: [{y: 3}, {y: 4}]}]}]}");
+        ParsedMatchExpressionForTest lhs(
+            "{$or: [{z: 2}, {$and: [{x: 2}, {$or: [{y: 3}, {y: 4}]}]}]}");
         ASSERT_FALSE(expression::isSubsetOf(lhs.get(), complex.get()));
     }
 
 
     {
-        ParsedMatchExpression lhs("{z: 1, y:2}");
+        ParsedMatchExpressionForTest lhs("{z: 1, y:2}");
         ASSERT_TRUE(expression::isSubsetOf(lhs.get(), complex.get()));
     }
 
     {
-        ParsedMatchExpression lhs("{z: 2, y: 1}");
+        ParsedMatchExpressionForTest lhs("{z: 2, y: 1}");
         ASSERT_FALSE(expression::isSubsetOf(lhs.get(), complex.get()));
     }
 
     {
-        ParsedMatchExpression lhs("{x: 1, y: 3}");
+        ParsedMatchExpressionForTest lhs("{x: 1, y: 3}");
         ASSERT_FALSE(expression::isSubsetOf(lhs.get(), complex.get()));
     }
 }
@@ -959,15 +950,11 @@ TEST(SplitMatchExpression, AndWithSplittableChildrenIsSplittable) {
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"b"}, {});
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
 
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{a: {$eq: 1}}"));
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{b: {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{a: {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{b: {$eq: 1}}"));
 }
 
 TEST(SplitMatchExpression, NorWithIndependentChildrenIsSplittable) {
@@ -981,15 +968,11 @@ TEST(SplitMatchExpression, NorWithIndependentChildrenIsSplittable) {
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"b"}, {});
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
 
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$nor: [{a: {$eq: 1}}]}"));
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{$nor: [{b: {$eq: 1}}]}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{$nor: [{a: {$eq: 1}}]}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{$nor: [{b: {$eq: 1}}]}"));
 }
 
 TEST(SplitMatchExpression, NotWithIndependentChildIsSplittable) {
@@ -1003,10 +986,8 @@ TEST(SplitMatchExpression, NotWithIndependentChildIsSplittable) {
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"y"}, {});
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
 
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{x: {$not: {$gt: 4}}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{x: {$not: {$gt: 4}}}"));
     ASSERT_FALSE(splitExpr.second);
 }
 
@@ -1021,11 +1002,10 @@ TEST(SplitMatchExpression, OrWithOnlyIndependentChildrenIsNotSplittable) {
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"b"}, {});
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder bob;
-    splitExpr.second->serialize(&bob, true);
 
     ASSERT_FALSE(splitExpr.first);
-    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$or: [{a: {$eq: 1}}, {b: {$eq: 1}}]}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(),
+                      fromjson("{$or: [{a: {$eq: 1}}, {b: {$eq: 1}}]}"));
 }
 
 TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
@@ -1042,15 +1022,12 @@ TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"x"}, {});
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
 
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$or: [{'a.b': {$eq: 3}}, {'a.b.c': {$eq: 4}}]}"));
-    ASSERT_BSONOBJ_EQ(secondBob.obj(),
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(),
+                      fromjson("{$or: [{'a.b': {$eq: 3}}, {'a.b.c': {$eq: 4}}]}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(),
                       fromjson("{$and: [{x: {$not: {$size: 2}}}, {$nor: [{x: {$gt: 4}}, {$and: "
                                "[{x: {$not: {$eq: 1}}}, {y: {$eq: 3}}]}]}]}"));
 }
@@ -1067,15 +1044,12 @@ TEST(SplitMatchExpression, ShouldNotExtractPrefixOfDottedPathAsIndependent) {
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"a.b"}, {});
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
 
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{'a.c': {$eq: 1}}"));
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{$and: [{a: {$eq: 1}}, {'a.b': {$eq: 1}}]}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{'a.c': {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(),
+                      fromjson("{$and: [{a: {$eq: 1}}, {'a.b': {$eq: 1}}]}"));
 }
 
 TEST(SplitMatchExpression, ShouldMoveIndependentLeafPredicateAcrossRename) {
@@ -1089,9 +1063,7 @@ TEST(SplitMatchExpression, ShouldMoveIndependentLeafPredicateAcrossRename) {
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{b: {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{b: {$eq: 1}}"));
 
     ASSERT_FALSE(splitExpr.second.get());
 }
@@ -1107,9 +1079,8 @@ TEST(SplitMatchExpression, ShouldMoveIndependentAndPredicateAcrossRename) {
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$and: [{c: {$eq: 1}}, {b: {$eq: 2}}]}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(),
+                      fromjson("{$and: [{c: {$eq: 1}}, {b: {$eq: 2}}]}"));
 
     ASSERT_FALSE(splitExpr.second.get());
 }
@@ -1125,14 +1096,10 @@ TEST(SplitMatchExpression, ShouldSplitPartiallyDependentAndPredicateAcrossRename
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {"b"}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{c: {$eq: 1}}"));
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{b: {$eq: 2}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{b: {$eq: 2}}"));
 }
 
 TEST(SplitMatchExpression, ShouldSplitPartiallyDependentComplexPredicateMultipleRenames) {
@@ -1146,14 +1113,11 @@ TEST(SplitMatchExpression, ShouldSplitPartiallyDependentComplexPredicateMultiple
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {"a"}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$or: [{d: {$eq: 2}}, {e: {$eq: 3}}]}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(),
+                      fromjson("{$or: [{d: {$eq: 2}}, {e: {$eq: 3}}]}"));
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{a: {$eq: 1}}"));
 }
 
 TEST(SplitMatchExpression,
@@ -1168,14 +1132,11 @@ TEST(SplitMatchExpression,
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {"a"}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$or: [{x: {$eq: 2}}, {y: {$eq: 3}}]}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(),
+                      fromjson("{$or: [{x: {$eq: 2}}, {y: {$eq: 3}}]}"));
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{a: {$eq: 1}}"));
 }
 
 TEST(SplitMatchExpression, ShouldNotMoveElemMatchObjectAcrossRename) {
@@ -1191,9 +1152,7 @@ TEST(SplitMatchExpression, ShouldNotMoveElemMatchObjectAcrossRename) {
     ASSERT_FALSE(splitExpr.first.get());
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$elemMatch: {b: {$eq: 3}}}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{a: {$elemMatch: {b: {$eq: 3}}}}"));
 }
 
 TEST(SplitMatchExpression, ShouldNotMoveElemMatchValueAcrossRename) {
@@ -1209,9 +1168,7 @@ TEST(SplitMatchExpression, ShouldNotMoveElemMatchValueAcrossRename) {
     ASSERT_FALSE(splitExpr.first.get());
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$elemMatch: {$eq: 3}}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{a: {$elemMatch: {$eq: 3}}}"));
 }
 
 TEST(SplitMatchExpression, ShouldMoveTypeAcrossRename) {
@@ -1224,10 +1181,7 @@ TEST(SplitMatchExpression, ShouldMoveTypeAcrossRename) {
     std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
-    ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$type: [16]}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{c: {$type: [16]}}"));
 
     ASSERT_FALSE(splitExpr.second.get());
 }
@@ -1245,9 +1199,7 @@ TEST(SplitMatchExpression, ShouldNotMoveSizeAcrossRename) {
     ASSERT_FALSE(splitExpr.first.get());
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$size: 3}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{a: {$size: 3}}"));
 }
 
 TEST(SplitMatchExpression, ShouldNotMoveMinItemsAcrossRename) {
@@ -1263,9 +1215,8 @@ TEST(SplitMatchExpression, ShouldNotMoveMinItemsAcrossRename) {
     ASSERT_FALSE(splitExpr.first.get());
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$_internalSchemaMinItems: 3}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(),
+                      fromjson("{a: {$_internalSchemaMinItems: 3}}"));
 }
 
 TEST(SplitMatchExpression, ShouldNotMoveMaxItemsAcrossRename) {
@@ -1281,9 +1232,8 @@ TEST(SplitMatchExpression, ShouldNotMoveMaxItemsAcrossRename) {
     ASSERT_FALSE(splitExpr.first.get());
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$_internalSchemaMaxItems: 3}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(),
+                      fromjson("{a: {$_internalSchemaMaxItems: 3}}"));
 }
 
 TEST(SplitMatchExpression, ShouldNotMoveMaxItemsInLogicalExpressionAcrossRename) {
@@ -1301,9 +1251,7 @@ TEST(SplitMatchExpression, ShouldNotMoveMaxItemsInLogicalExpressionAcrossRename)
     ASSERT_FALSE(splitExpr.first.get());
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
-    ASSERT_BSONOBJ_EQ(secondBob.obj(),
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(),
                       fromjson("{$or: [{a: {$_internalSchemaMaxItems: 3}},"
                                "       {a: {$_internalSchemaMaxItems: 4}}]}"));
 }
@@ -1323,9 +1271,7 @@ TEST(SplitMatchExpression, ShouldNotMoveInternalSchemaObjectMatchInLogicalExpres
     ASSERT_FALSE(splitExpr.first.get());
 
     ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob, true);
-    ASSERT_BSONOBJ_EQ(secondBob.obj(),
+    ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(),
                       fromjson("{$or: [{a: {$_internalSchemaObjectMatch: {b: {$eq: 1}}}},"
                                "       {a: {$_internalSchemaObjectMatch: {b: {$eq: 1}}}}]}"));
 }
@@ -1341,9 +1287,8 @@ TEST(SplitMatchExpression, ShouldMoveMinLengthAcrossRename) {
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$_internalSchemaMinLength: 3}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(),
+                      fromjson("{c: {$_internalSchemaMinLength: 3}}"));
 
     ASSERT_FALSE(splitExpr.second.get());
 }
@@ -1359,9 +1304,8 @@ TEST(SplitMatchExpression, ShouldMoveMaxLengthAcrossRename) {
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$_internalSchemaMaxLength: 3}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(),
+                      fromjson("{c: {$_internalSchemaMaxLength: 3}}"));
 
     ASSERT_FALSE(splitExpr.second.get());
 }
@@ -1378,9 +1322,7 @@ TEST(SplitMatchExpression, ShouldMoveIndependentPredicateWhenThereAreMultipleRen
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
-    BSONObjBuilder firstBob;
-    splitExpr.first->serialize(&firstBob, true);
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{x: {$eq: 3}}"));
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{x: {$eq: 3}}"));
 
     ASSERT_FALSE(splitExpr.second.get());
 }
@@ -1398,9 +1340,7 @@ TEST(SplitMatchExpression, ShouldNotSplitWhenRand) {
         ASSERT_FALSE(split.get());
         ASSERT_TRUE(residual.get());
 
-        BSONObjBuilder oldBob;
-        residual->serialize(&oldBob, true);
-        ASSERT_BSONOBJ_EQ(oldBob.obj(), fromjson(randExpr));
+        ASSERT_BSONOBJ_EQ(residual->serialize(), fromjson(randExpr));
     };
 
     // We should not push down a $match with a $rand expression.
@@ -1605,7 +1545,7 @@ TEST(HasExistencePredicateOnPath, ReturnsFalseWhenExistsOnSubpath) {
 }
 
 TEST(SplitMatchExpressionForColumns, PreservesEmptyPredicates) {
-    ParsedMatchExpression empty("{}");
+    ParsedMatchExpressionForTest empty("{}");
     auto splitUp = expression::splitMatchExpressionForColumns(empty.get());
     ASSERT(splitUp);
     ASSERT(splitUp->size() == 0);
@@ -1614,21 +1554,21 @@ TEST(SplitMatchExpressionForColumns, PreservesEmptyPredicates) {
 TEST(SplitMatchExpressionForColumns, RejectsUnsupportedPredicates) {
     {
         // Future work.
-        ParsedMatchExpression orClause("{$or: [{a: 1}, {b: 2}]}");
+        ParsedMatchExpressionForTest orClause("{$or: [{a: 1}, {b: 2}]}");
         auto splitUp = expression::splitMatchExpressionForColumns(orClause.get());
         ASSERT(!splitUp);
     }
 
     {
         // Would match missing values, not safe for a columnar index.
-        ParsedMatchExpression alwaysTrue("{$alwaysTrue: 1}");
+        ParsedMatchExpressionForTest alwaysTrue("{$alwaysTrue: 1}");
         auto splitUp = expression::splitMatchExpressionForColumns(alwaysTrue.get());
         ASSERT(!splitUp);
     }
 
     {
         // Future work.
-        ParsedMatchExpression exprClause("{$expr: {$eq: ['$x', 0]}}");
+        ParsedMatchExpressionForTest exprClause("{$expr: {$eq: ['$x', 0]}}");
         auto splitUp = expression::splitMatchExpressionForColumns(exprClause.get());
         ASSERT(!splitUp);
     }
@@ -1638,7 +1578,7 @@ TEST(SplitMatchExpressionForColumns, RejectsUnsupportedPredicates) {
 TEST(SplitMatchExpressionForColumns, SplitsSafeEqualities) {
 
     {
-        ParsedMatchExpression singleEqualsNumber("{albatross: 1}");
+        ParsedMatchExpressionForTest singleEqualsNumber("{albatross: 1}");
         auto splitUp = expression::splitMatchExpressionForColumns(singleEqualsNumber.get());
         ASSERT(splitUp);
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
@@ -1648,7 +1588,7 @@ TEST(SplitMatchExpressionForColumns, SplitsSafeEqualities) {
     }
 
     {
-        ParsedMatchExpression singleEqualsString("{albatross: 'flying'}");
+        ParsedMatchExpressionForTest singleEqualsString("{albatross: 'flying'}");
         auto splitUp = expression::splitMatchExpressionForColumns(singleEqualsString.get());
         ASSERT(splitUp);
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
@@ -1658,7 +1598,7 @@ TEST(SplitMatchExpressionForColumns, SplitsSafeEqualities) {
     }
 
     {
-        ParsedMatchExpression doubleEqualsNumber("{albatross: 1, blackbird: 2}");
+        ParsedMatchExpressionForTest doubleEqualsNumber("{albatross: 1, blackbird: 2}");
         auto splitUp = expression::splitMatchExpressionForColumns(doubleEqualsNumber.get());
         ASSERT(splitUp);
         ASSERT_EQ(splitUp->size(), 2) << splitUp->size();
@@ -1671,7 +1611,7 @@ TEST(SplitMatchExpressionForColumns, SplitsSafeEqualities) {
     }
 
     {
-        ParsedMatchExpression mixedEquals(
+        ParsedMatchExpressionForTest mixedEquals(
             "{albatross: 1,"
             " blackbird: 'flying',"
             " cowbird: {$eq: /oreo/},"
@@ -1699,7 +1639,7 @@ TEST(SplitMatchExpressionForColumns, SplitsSafeEqualities) {
 
 TEST(SplitMatchExpressionForColumns, SupportsEqualityToEmptyObjects) {
     {
-        ParsedMatchExpression equalsEmptyObj("{albatross: {}}");
+        ParsedMatchExpressionForTest equalsEmptyObj("{albatross: {}}");
         auto splitUp = expression::splitMatchExpressionForColumns(equalsEmptyObj.get());
         ASSERT(splitUp);
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
@@ -1711,7 +1651,7 @@ TEST(SplitMatchExpressionForColumns, SupportsEqualityToEmptyObjects) {
 
 TEST(SplitMatchExpressionForColumns, SupportsEqualityToEmptyArray) {
     {
-        ParsedMatchExpression equalsEmptyArray("{albatross: []}");
+        ParsedMatchExpressionForTest equalsEmptyArray("{albatross: []}");
         auto splitUp = expression::splitMatchExpressionForColumns(equalsEmptyArray.get());
         ASSERT(splitUp);
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
@@ -1723,7 +1663,7 @@ TEST(SplitMatchExpressionForColumns, SupportsEqualityToEmptyArray) {
 
 TEST(SplitMatchExpressionForColumns, DoesNotSupportEqualsNull) {
     {
-        ParsedMatchExpression equalsNull("{a: null}");
+        ParsedMatchExpressionForTest equalsNull("{a: null}");
         auto splitUp = expression::splitMatchExpressionForColumns(equalsNull.get());
         ASSERT(!splitUp);
     }
@@ -1731,7 +1671,7 @@ TEST(SplitMatchExpressionForColumns, DoesNotSupportEqualsNull) {
 
 TEST(SplitMatchExpressionForColumns, DoesSupportNotEqualsNull) {
     {
-        ParsedMatchExpression neNull("{a: {$ne: null}}");
+        ParsedMatchExpressionForTest neNull("{a: {$ne: null}}");
         auto splitUp = expression::splitMatchExpressionForColumns(neNull.get());
         ASSERT(splitUp);
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
@@ -1740,7 +1680,7 @@ TEST(SplitMatchExpressionForColumns, DoesSupportNotEqualsNull) {
             << splitUp->at("a")->toString();
     }
     {
-        ParsedMatchExpression notEqualsNull("{a: {$not: {$eq: null}}}");
+        ParsedMatchExpressionForTest notEqualsNull("{a: {$not: {$eq: null}}}");
         auto splitUp = expression::splitMatchExpressionForColumns(notEqualsNull.get());
         ASSERT(splitUp) << notEqualsNull.get()->toString();
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
@@ -1752,28 +1692,28 @@ TEST(SplitMatchExpressionForColumns, DoesSupportNotEqualsNull) {
 
 TEST(SplitMatchExpressionForColumns, DoesNotSupportCompoundEquals) {
     {
-        ParsedMatchExpression implicitEqualsArray("{a: [1, 2]}");
+        ParsedMatchExpressionForTest implicitEqualsArray("{a: [1, 2]}");
         auto splitUp = expression::splitMatchExpressionForColumns(implicitEqualsArray.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression explicitEqualsArray("{a: {$eq: [1, 2]}}");
+        ParsedMatchExpressionForTest explicitEqualsArray("{a: {$eq: [1, 2]}}");
         auto splitUp = expression::splitMatchExpressionForColumns(explicitEqualsArray.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression implicitEqualsObject("{a: {boats: 1, planes: 2}}");
+        ParsedMatchExpressionForTest implicitEqualsObject("{a: {boats: 1, planes: 2}}");
         auto splitUp = expression::splitMatchExpressionForColumns(implicitEqualsObject.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression explicitEqualsObject("{a: {$eq: {boats: 1, planes: 2}}}");
+        ParsedMatchExpressionForTest explicitEqualsObject("{a: {$eq: {boats: 1, planes: 2}}}");
         auto splitUp = expression::splitMatchExpressionForColumns(explicitEqualsObject.get());
         ASSERT(!splitUp);
     }
     // We should be able to do dotted path version though, as a potential workaround.
     {
-        ParsedMatchExpression equalsDotted("{'a.boats': 1, 'a.planes': 2}");
+        ParsedMatchExpressionForTest equalsDotted("{'a.boats': 1, 'a.planes': 2}");
         auto splitUp = expression::splitMatchExpressionForColumns(equalsDotted.get());
         ASSERT(splitUp);
         ASSERT(splitUp->size() == 2);
@@ -1790,7 +1730,7 @@ TEST(SplitMatchExpressionForColumns, DoesNotSupportCompoundEquals) {
 TEST(SplitMatchExpressionForColumns, SupportsComparisonsLikeEqualities) {
 
     {
-        ParsedMatchExpression singleLtNumber("{albatross: {$lt: 1}}");
+        ParsedMatchExpressionForTest singleLtNumber("{albatross: {$lt: 1}}");
         auto splitUp = expression::splitMatchExpressionForColumns(singleLtNumber.get());
         ASSERT(splitUp);
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
@@ -1799,7 +1739,7 @@ TEST(SplitMatchExpressionForColumns, SupportsComparisonsLikeEqualities) {
             << splitUp->at("albatross")->toString();
     }
     {
-        ParsedMatchExpression singleLteNumber("{albatross: {$lte: 1}}");
+        ParsedMatchExpressionForTest singleLteNumber("{albatross: {$lte: 1}}");
         auto splitUp = expression::splitMatchExpressionForColumns(singleLteNumber.get());
         ASSERT(splitUp);
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
@@ -1808,7 +1748,7 @@ TEST(SplitMatchExpressionForColumns, SupportsComparisonsLikeEqualities) {
             << splitUp->at("albatross")->toString();
     }
     {
-        ParsedMatchExpression singleGtNumber("{albatross: {$gt: 1}}");
+        ParsedMatchExpressionForTest singleGtNumber("{albatross: {$gt: 1}}");
         auto splitUp = expression::splitMatchExpressionForColumns(singleGtNumber.get());
         ASSERT(splitUp);
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
@@ -1817,7 +1757,7 @@ TEST(SplitMatchExpressionForColumns, SupportsComparisonsLikeEqualities) {
             << splitUp->at("albatross")->toString();
     }
     {
-        ParsedMatchExpression singleGteNumber("{albatross: {$gte: 1}}");
+        ParsedMatchExpressionForTest singleGteNumber("{albatross: {$gte: 1}}");
         auto splitUp = expression::splitMatchExpressionForColumns(singleGteNumber.get());
         ASSERT(splitUp);
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
@@ -1826,7 +1766,7 @@ TEST(SplitMatchExpressionForColumns, SupportsComparisonsLikeEqualities) {
             << splitUp->at("albatross")->toString();
     }
     {
-        ParsedMatchExpression combinationPredicate(
+        ParsedMatchExpressionForTest combinationPredicate(
             "{"
             " albatross: {$lt: 100},"
             " blackbird: {$gt: 0},"
@@ -1850,42 +1790,42 @@ TEST(SplitMatchExpressionForColumns, SupportsComparisonsLikeEqualities) {
 // While equality to [] or {} is OK, inequality is not so obvious. Left as future work.
 TEST(SplitMatchExpressionForColumns, DoesNotSupportInequalitiesToObjectsOrArrays) {
     {
-        ParsedMatchExpression ltArray("{albatross: {$lt: []}}");
+        ParsedMatchExpressionForTest ltArray("{albatross: {$lt: []}}");
         auto splitUp = expression::splitMatchExpressionForColumns(ltArray.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression ltObject("{albatross: {$lt: {}}}");
+        ParsedMatchExpressionForTest ltObject("{albatross: {$lt: {}}}");
         auto splitUp = expression::splitMatchExpressionForColumns(ltObject.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression lteArray("{albatross: {$lte: []}}");
+        ParsedMatchExpressionForTest lteArray("{albatross: {$lte: []}}");
         auto splitUp = expression::splitMatchExpressionForColumns(lteArray.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression lteObject("{albatross: {$lte: {}}}");
+        ParsedMatchExpressionForTest lteObject("{albatross: {$lte: {}}}");
         auto splitUp = expression::splitMatchExpressionForColumns(lteObject.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression gtArray("{albatross: {$gt: []}}");
+        ParsedMatchExpressionForTest gtArray("{albatross: {$gt: []}}");
         auto splitUp = expression::splitMatchExpressionForColumns(gtArray.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression gtObject("{albatross: {$gt: {}}}");
+        ParsedMatchExpressionForTest gtObject("{albatross: {$gt: {}}}");
         auto splitUp = expression::splitMatchExpressionForColumns(gtObject.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression gteArray("{albatross: {$gte: []}}");
+        ParsedMatchExpressionForTest gteArray("{albatross: {$gte: []}}");
         auto splitUp = expression::splitMatchExpressionForColumns(gteArray.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression gteObject("{albatross: {$gte: {}}}");
+        ParsedMatchExpressionForTest gteObject("{albatross: {$gte: {}}}");
         auto splitUp = expression::splitMatchExpressionForColumns(gteObject.get());
         ASSERT(!splitUp);
     }
@@ -1893,7 +1833,7 @@ TEST(SplitMatchExpressionForColumns, DoesNotSupportInequalitiesToObjectsOrArrays
 
 // Tests that comparisons which only match values of a certain type are allowed.
 TEST(SplitMatchExpressionForColumns, SupportsTypeSpecificPredicates) {
-    ParsedMatchExpression combinationPredicate(
+    ParsedMatchExpressionForTest combinationPredicate(
         "{"
         " albatross: /oreo/,"
         " blackbird: {$mod: [2, 0]},"
@@ -1928,7 +1868,7 @@ TEST(SplitMatchExpressionForColumns, SupportsTypeSpecificPredicates) {
 TEST(SplitMatchExpressionForColumns, SupportsInWithRegexes) {
     {
         // First confirm a $in clause is supported without regexes.
-        ParsedMatchExpression stringInClause("{albatross: {$in: ['big', 'ol', 'bird']}}");
+        ParsedMatchExpressionForTest stringInClause("{albatross: {$in: ['big', 'ol', 'bird']}}");
         auto splitUp = expression::splitMatchExpressionForColumns(stringInClause.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -1938,7 +1878,7 @@ TEST(SplitMatchExpressionForColumns, SupportsInWithRegexes) {
     }
     {
         // Test that $in with regexes is supported also work.
-        ParsedMatchExpression regexInClause("{albatross: {$in: [/big/, /bird/]}}");
+        ParsedMatchExpressionForTest regexInClause("{albatross: {$in: [/big/, /bird/]}}");
         auto splitUp = expression::splitMatchExpressionForColumns(regexInClause.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -1948,7 +1888,7 @@ TEST(SplitMatchExpressionForColumns, SupportsInWithRegexes) {
     }
     {
         // Test that a mix of both is supported
-        ParsedMatchExpression regexInClause("{albatross: {$in: [/big/, 'bird']}}");
+        ParsedMatchExpressionForTest regexInClause("{albatross: {$in: [/big/, 'bird']}}");
         auto splitUp = expression::splitMatchExpressionForColumns(regexInClause.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -1958,14 +1898,14 @@ TEST(SplitMatchExpressionForColumns, SupportsInWithRegexes) {
     }
     {
         // Test that it is still disallowed if there's a disqualifying equality such as a null.
-        ParsedMatchExpression regexInClause("{albatross: {$in: [/big/, null, 'bird']}}");
+        ParsedMatchExpressionForTest regexInClause("{albatross: {$in: [/big/, null, 'bird']}}");
         auto splitUp = expression::splitMatchExpressionForColumns(regexInClause.get());
         ASSERT(!splitUp);
     }
 }
 
 TEST(SplitMatchExpressionForColumns, SupportsExistsTrue) {
-    ParsedMatchExpression existsPredicate("{albatross: {$exists: true}}");
+    ParsedMatchExpressionForTest existsPredicate("{albatross: {$exists: true}}");
     auto splitUp = expression::splitMatchExpressionForColumns(existsPredicate.get());
     ASSERT(splitUp);
     ASSERT(splitUp->contains("albatross"));
@@ -1975,7 +1915,7 @@ TEST(SplitMatchExpressionForColumns, SupportsExistsTrue) {
 }
 
 TEST(SplitMatchExpressionForColumns, DoesNotSupportExistsFalse) {
-    ParsedMatchExpression existsPredicate("{albatross: {$exists: false}}");
+    ParsedMatchExpressionForTest existsPredicate("{albatross: {$exists: false}}");
     auto splitUp = expression::splitMatchExpressionForColumns(existsPredicate.get());
     ASSERT(!splitUp);
 }
@@ -1984,7 +1924,7 @@ TEST(SplitMatchExpressionForColumns, DoesNotSupportExistsFalse) {
 // next test.
 TEST(SplitMatchExpressionForColumns, SupportsInPredicates) {
     {
-        ParsedMatchExpression emptyIn("{albatross: {$in: []}}");
+        ParsedMatchExpressionForTest emptyIn("{albatross: {$in: []}}");
         auto splitUp = expression::splitMatchExpressionForColumns(emptyIn.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -1993,7 +1933,7 @@ TEST(SplitMatchExpressionForColumns, SupportsInPredicates) {
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
     }
     {
-        ParsedMatchExpression singleElementIn("{albatross: {$in: [4]}}");
+        ParsedMatchExpressionForTest singleElementIn("{albatross: {$in: [4]}}");
         auto splitUp = expression::splitMatchExpressionForColumns(singleElementIn.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -2002,7 +1942,7 @@ TEST(SplitMatchExpressionForColumns, SupportsInPredicates) {
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
     }
     {
-        ParsedMatchExpression inWithEmptyArray("{albatross: {$in: [[]]}}");
+        ParsedMatchExpressionForTest inWithEmptyArray("{albatross: {$in: [[]]}}");
         auto splitUp = expression::splitMatchExpressionForColumns(inWithEmptyArray.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -2011,7 +1951,7 @@ TEST(SplitMatchExpressionForColumns, SupportsInPredicates) {
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
     }
     {
-        ParsedMatchExpression inWithEmptyObject("{albatross: {$in: [{}]}}");
+        ParsedMatchExpressionForTest inWithEmptyObject("{albatross: {$in: [{}]}}");
         auto splitUp = expression::splitMatchExpressionForColumns(inWithEmptyObject.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -2020,7 +1960,8 @@ TEST(SplitMatchExpressionForColumns, SupportsInPredicates) {
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
     }
     {
-        ParsedMatchExpression mixedTypeIn("{albatross: {$in: [4, {}, [], 'string', /regex/]}}");
+        ParsedMatchExpressionForTest mixedTypeIn(
+            "{albatross: {$in: [4, {}, [], 'string', /regex/]}}");
         auto splitUp = expression::splitMatchExpressionForColumns(mixedTypeIn.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -2033,22 +1974,22 @@ TEST(SplitMatchExpressionForColumns, SupportsInPredicates) {
 // We can't support compound types, just like for equality.
 TEST(SplitMatchExpressionForColumns, DoesNotSupportCertainInEdgeCases) {
     {
-        ParsedMatchExpression inWithArray("{albatross: {$in: [[2,3]]}}");
+        ParsedMatchExpressionForTest inWithArray("{albatross: {$in: [[2,3]]}}");
         auto splitUp = expression::splitMatchExpressionForColumns(inWithArray.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression inWithObject("{albatross: {$in: [{wings: 2}]}}");
+        ParsedMatchExpressionForTest inWithObject("{albatross: {$in: [{wings: 2}]}}");
         auto splitUp = expression::splitMatchExpressionForColumns(inWithObject.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression inWithNull("{albatross: {$in: [null]}}");
+        ParsedMatchExpressionForTest inWithNull("{albatross: {$in: [null]}}");
         auto splitUp = expression::splitMatchExpressionForColumns(inWithNull.get());
         ASSERT(!splitUp);
     }
     {
-        ParsedMatchExpression unsupporedMixedInWithSupported(
+        ParsedMatchExpressionForTest unsupporedMixedInWithSupported(
             "{albatross: {$in: ['strings', 1, null, {x: 4}, [0, 0], 4]}}");
         auto splitUp =
             expression::splitMatchExpressionForColumns(unsupporedMixedInWithSupported.get());
@@ -2058,7 +1999,7 @@ TEST(SplitMatchExpressionForColumns, DoesNotSupportCertainInEdgeCases) {
 
 TEST(SplitMatchExpressionForColumns, SupportsTypePredicates) {
     {
-        ParsedMatchExpression intFilter("{albatross: {$type: 'int'}}");
+        ParsedMatchExpressionForTest intFilter("{albatross: {$type: 'int'}}");
         auto splitUp = expression::splitMatchExpressionForColumns(intFilter.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -2067,7 +2008,7 @@ TEST(SplitMatchExpressionForColumns, SupportsTypePredicates) {
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
     }
     {
-        ParsedMatchExpression numberFilter("{albatross: {$type: 'number'}}");
+        ParsedMatchExpressionForTest numberFilter("{albatross: {$type: 'number'}}");
         auto splitUp = expression::splitMatchExpressionForColumns(numberFilter.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -2076,7 +2017,7 @@ TEST(SplitMatchExpressionForColumns, SupportsTypePredicates) {
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
     }
     {
-        ParsedMatchExpression stringFilter("{albatross: {$type: 'string'}}");
+        ParsedMatchExpressionForTest stringFilter("{albatross: {$type: 'string'}}");
         auto splitUp = expression::splitMatchExpressionForColumns(stringFilter.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -2085,7 +2026,7 @@ TEST(SplitMatchExpressionForColumns, SupportsTypePredicates) {
         ASSERT_EQ(splitUp->size(), 1) << splitUp->size();
     }
     {
-        ParsedMatchExpression nullFilter("{albatross: {$type: 'null'}}");
+        ParsedMatchExpressionForTest nullFilter("{albatross: {$type: 'null'}}");
         auto splitUp = expression::splitMatchExpressionForColumns(nullFilter.get());
         ASSERT(splitUp);
         ASSERT(splitUp->contains("albatross"));
@@ -2096,20 +2037,20 @@ TEST(SplitMatchExpressionForColumns, SupportsTypePredicates) {
 }
 
 TEST(SplitMatchExpressionForColumns, DoesNotSupportQueriesForTypeObject) {
-    ParsedMatchExpression objectFilter("{albatross: {$type: 'object'}}");
+    ParsedMatchExpressionForTest objectFilter("{albatross: {$type: 'object'}}");
     auto splitUp = expression::splitMatchExpressionForColumns(objectFilter.get());
     ASSERT(!splitUp);
 }
 
 // This may be workable. But until we can prove it we'll disallow {$type: "array"}.
 TEST(SplitMatchExpressionForColumns, DoesNotSupportQueriesForTypeArray) {
-    ParsedMatchExpression objectFilter("{albatross: {$type: 'array'}}");
+    ParsedMatchExpressionForTest objectFilter("{albatross: {$type: 'array'}}");
     auto splitUp = expression::splitMatchExpressionForColumns(objectFilter.get());
     ASSERT(!splitUp);
 }
 
 TEST(SplitMatchExpressionForColumns, CanCombinePredicates) {
-    ParsedMatchExpression compoundFilter(
+    ParsedMatchExpressionForTest compoundFilter(
         "{"
         " albatross: {$gte: 100},"
         " albatross: {$mod: [2, 0]}"
@@ -2134,7 +2075,7 @@ TEST(SplitMatchExpressionForColumns, CanCombinePredicates) {
 }
 
 TEST(SplitMatchExpressionForColumns, SupportsDottedPaths) {
-    ParsedMatchExpression compoundFilter(
+    ParsedMatchExpressionForTest compoundFilter(
         "{"
         " albatross: /oreo/,"
         " \"blackbird.feet\": {$mod: [2, 0]},"
@@ -2177,7 +2118,7 @@ TEST(SplitMatchExpressionForColumns, SupportsDottedPaths) {
 }
 
 TEST(SplitMatchExpressionForColumns, LeavesOriginalMatchExpressionFunctional) {
-    ParsedMatchExpression combinationPredicate(
+    ParsedMatchExpressionForTest combinationPredicate(
         "{"
         " albatross: {$lt: 100},"
         " blackbird: {$gt: 0},"

@@ -56,10 +56,9 @@ void InternalSchemaNumArrayItemsMatchExpression::debugString(StringBuilder& debu
     debug << "\n";
 }
 
-BSONObj InternalSchemaNumArrayItemsMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder objBuilder;
-    objBuilder.append(_name, _numItems);
-    return objBuilder.obj();
+void InternalSchemaNumArrayItemsMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    opts.appendLiteral(bob, _name, _numItems);
 }
 
 bool InternalSchemaNumArrayItemsMatchExpression::equivalent(const MatchExpression* other) const {

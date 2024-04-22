@@ -31,8 +31,10 @@
 
 #include <boost/intrusive_ptr.hpp>
 #include <memory>
+#include <vector>
 
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/temp_dir.h"
@@ -69,6 +71,42 @@ public:
 
     auto getOpCtx() {
         return _opCtx.get();
+    }
+
+    /*
+     * Serialize and redact a document source.
+     */
+    BSONObj redact(const DocumentSource& docSource,
+                   bool performRedaction = true,
+                   boost::optional<ExplainOptions::Verbosity> verbosity = boost::none) {
+        SerializationOptions options;
+        options.verbosity = verbosity;
+        if (performRedaction) {
+            options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+            options.transformIdentifiersCallback = [](StringData s) -> std::string {
+                return str::stream() << "HASH<" << s << ">";
+            };
+            options.transformIdentifiers = true;
+        }
+        std::vector<Value> serialized;
+        docSource.serializeToArray(serialized, options);
+        ASSERT_EQ(1, serialized.size());
+        return serialized[0].getDocument().toBson().getOwned();
+    }
+
+    std::vector<Value> redactToArray(const DocumentSource& docSource,
+                                     bool performRedaction = true) {
+        SerializationOptions options;
+        if (performRedaction) {
+            options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+            options.transformIdentifiersCallback = [](StringData s) -> std::string {
+                return str::stream() << "HASH<" << s << ">";
+            };
+            options.transformIdentifiers = true;
+        }
+        std::vector<Value> serialized;
+        docSource.serializeToArray(serialized, options);
+        return serialized;
     }
 
 private:

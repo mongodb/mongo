@@ -188,6 +188,17 @@ TEST_F(SampleBasics, ShouldPropagatePauses) {
     assertEOF();
 }
 
+TEST_F(SampleBasics, RedactsCorrectly) {
+    createSample(10);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$sample": {
+                "size": "?number"
+            }
+        })",
+        redact(*sample()));
+}
+
 /**
  * Fixture to test error cases of the $sample stage.
  */
@@ -400,6 +411,13 @@ DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
     // Should see the first result, then see a pause and fail.
     ASSERT_TRUE(sample()->getNext().isAdvanced());
     sample()->getNext();
+}
+
+TEST_F(SampleFromRandomCursorBasics, RedactsCorrectly) {
+    createSample(2);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "{ $sampleFromRandomCursor: { size: \"?number\" } }",
+        redact(*sample()));
 }
 
 }  // namespace

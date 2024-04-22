@@ -931,5 +931,18 @@ TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFieldOverri
     unpackBucket->serializeToArray(array);
     ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), bson);
 }
+
+TEST_F(InternalUnpackBucketExecTest, RedactsCorrectly) {
+    auto bson = fromjson(
+        "{$_internalUnpackBucket: {include: ['a', 'b', 'c'], timeField: 'time', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['a', 'b', 'c']}}");
+    auto docSource = DocumentSourceInternalUnpackBucket::createFromBsonInternal(bson.firstElement(),
+                                                                                getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        "{$_internalUnpackBucket: {include: [\"HASH<a>\", \"HASH<b>\", \"HASH<c>\"], timeField: "
+        "\"HASH<time>\", metaField: \"HASH<meta>\", bucketMaxSpanSeconds: \"?number\", "
+        "computedMetaProjFields: [\"HASH<a>\", \"HASH<b>\", \"HASH<c>\"]}}",
+        redact(*docSource));
+}
 }  // namespace
 }  // namespace mongo

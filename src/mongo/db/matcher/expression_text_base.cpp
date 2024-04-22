@@ -56,12 +56,16 @@ void TextMatchExpressionBase::debugString(StringBuilder& debug, int indentationL
     debug << "\n";
 }
 
-void TextMatchExpressionBase::serialize(BSONObjBuilder* out, bool includePath) const {
+void TextMatchExpressionBase::serialize(BSONObjBuilder* out,
+                                        const SerializationOptions& opts,
+                                        bool includePath) const {
     const fts::FTSQuery& ftsQuery = getFTSQuery();
     out->append("$text",
-                BSON("$search" << ftsQuery.getQuery() << "$language" << ftsQuery.getLanguage()
-                               << "$caseSensitive" << ftsQuery.getCaseSensitive()
-                               << "$diacriticSensitive" << ftsQuery.getDiacriticSensitive()));
+                BSON("$search" << opts.serializeLiteral(ftsQuery.getQuery()) << "$language"
+                               << opts.serializeLiteral(ftsQuery.getLanguage()) << "$caseSensitive"
+                               << opts.serializeLiteral(ftsQuery.getCaseSensitive())
+                               << "$diacriticSensitive"
+                               << opts.serializeLiteral(ftsQuery.getDiacriticSensitive())));
 }
 
 bool TextMatchExpressionBase::equivalent(const MatchExpression* other) const {

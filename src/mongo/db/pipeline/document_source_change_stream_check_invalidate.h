@@ -64,7 +64,7 @@ public:
         return boost::none;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckInvalidate> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx);

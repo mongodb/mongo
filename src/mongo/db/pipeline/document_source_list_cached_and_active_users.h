@@ -87,7 +87,8 @@ public:
         return kStageName.rawData();
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
+    Value serialize(
+        const SerializationOptions& opts = SerializationOptions{}) const final override {
         return Value(Document{{getSourceName(), Document{}}});
     }
 

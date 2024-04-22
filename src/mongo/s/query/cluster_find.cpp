@@ -33,6 +33,7 @@
 
 #include "mongo/s/query/cluster_find.h"
 
+#include "mongo/db/query/query_stats/query_stats.h"
 #include <fmt/format.h>
 
 #include <memory>
@@ -54,6 +55,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
@@ -373,23 +375,26 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         cursorState = ClusterCursorManager::CursorState::Exhausted;
     }
 
+    auto&& opDebug = CurOp::get(opCtx)->debug();
     // Fill out query exec properties.
-    CurOp::get(opCtx)->debug().nShards = ccc->getNumRemotes();
-    CurOp::get(opCtx)->debug().nreturned = results->size();
+    opDebug.nShards = ccc->getNumRemotes();
+    opDebug.additiveMetrics.nBatches = 1;
 
     // If the caller wants to know whether the cursor returned partial results, set it here.
     if (partialResultsReturned) {
         *partialResultsReturned = ccc->partialResultsReturned();
     }
 
+    CurOp::get(opCtx)->setEndOfOpMetrics(results->size());
     // If the cursor is exhausted, then there are no more results to return and we don't need to
     // allocate a cursor id.
     if (cursorState == ClusterCursorManager::CursorState::Exhausted) {
-        CurOp::get(opCtx)->debug().cursorExhausted = true;
+        opDebug.cursorExhausted = true;
 
         if (shardIds.size() > 0) {
             updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
         }
+        collectQueryStatsMongos(opCtx, ccc->getKey());
         return CursorId(0);
     }
 
@@ -400,13 +405,13 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         ? ClusterCursorManager::CursorLifetime::Immortal
         : ClusterCursorManager::CursorLifetime::Mortal;
     auto authUsers = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames();
-    ccc->incNBatches();
+    collectQueryStatsMongos(opCtx, ccc);
 
     auto cursorId = uassertStatusOK(cursorManager->registerCursor(
         opCtx, ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime, authUsers));
 
     // Record the cursorID in CurOp.
-    CurOp::get(opCtx)->debug().cursorid = cursorId;
+    opDebug.cursorid = cursorId;
 
     if (shardIds.size() > 0) {
         updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
@@ -466,6 +471,19 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
     return Status::OK();
 }
 
+CursorId earlyExitWithNoResults(OperationContext* opCtx,
+                                const CanonicalQuery& query,
+                                const FindCommandRequest& findCommand) {
+    uassert(CollectionUUIDMismatchInfo(query.nss().db().toString(),
+                                       *findCommand.getCollectionUUID(),
+                                       query.nss().coll().toString(),
+                                       boost::none),
+            "Database does not exist",
+            !findCommand.getCollectionUUID());
+    collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+
+    return CursorId(0);
+}
 }  // namespace
 
 const size_t ClusterFind::kMaxRetries = 10;
@@ -506,16 +524,9 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     for (size_t retries = 1; retries <= kMaxRetries; ++retries) {
         auto swCM = getCollectionRoutingInfoForTxnCmd(opCtx, query.nss());
         if (swCM == ErrorCodes::NamespaceNotFound) {
-            uassert(CollectionUUIDMismatchInfo(query.nss().db().toString(),
-                                               *findCommand.getCollectionUUID(),
-                                               query.nss().coll().toString(),
-                                               boost::none),
-                    "Database does not exist",
-                    !findCommand.getCollectionUUID());
-
             // If the database doesn't exist, we successfully return an empty result set without
             // creating a cursor.
-            return CursorId(0);
+            return earlyExitWithNoResults(opCtx, query, findCommand);
         }
 
         const auto cm = uassertStatusOK(std::move(swCM));
@@ -842,16 +853,19 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         postBatchResumeToken = pinnedCursor.getValue()->getPostBatchResumeToken();
     }
 
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    // Set nReturned and whether the cursor has been exhausted.
+    opDebug.cursorExhausted = (idToReturn == 0);
+    opDebug.additiveMetrics.nBatches = 1;
+    CurOp::get(opCtx)->setEndOfOpMetrics(batch.size());
+
     const bool partialResultsReturned = pinnedCursor.getValue()->partialResultsReturned();
     pinnedCursor.getValue()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
-    pinnedCursor.getValue()->incNBatches();
+    collectQueryStatsMongos(opCtx, pinnedCursor.getValue());
+
     // Upon successful completion, transfer ownership of the cursor back to the cursor manager. If
     // the cursor has been exhausted, the cursor manager will clean it up for us.
     pinnedCursor.getValue().returnCursor(cursorState);
-
-    // Set nReturned and whether the cursor has been exhausted.
-    CurOp::get(opCtx)->debug().cursorExhausted = (idToReturn == 0);
-    CurOp::get(opCtx)->debug().nreturned = batch.size();
 
     if (MONGO_unlikely(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch.shouldFail())) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(

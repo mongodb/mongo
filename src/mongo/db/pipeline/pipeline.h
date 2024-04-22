@@ -45,7 +45,6 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
 
@@ -259,6 +258,11 @@ public:
     bool needsShard() const;
 
     /**
+     * Returns 'true' if any stage in the pipeline requires being run on all shards.
+     */
+    bool needsAllShardServers() const;
+
+    /**
      * Returns true if the pipeline can run on mongoS, but is not obliged to; that is, it can run
      * either on mongoS or on a shard.
      */
@@ -297,11 +301,12 @@ public:
      * Helpers to serialize a pipeline.
      */
     std::vector<Value> serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
+        boost::optional<const SerializationOptions&> opts = boost::none) const;
     std::vector<BSONObj> serializeToBson(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
+        boost::optional<const SerializationOptions&> opts = boost::none) const;
     static std::vector<Value> serializeContainer(
-        const SourceContainer& container, boost::optional<ExplainOptions::Verbosity> = boost::none);
+        const SourceContainer& container,
+        boost::optional<const SerializationOptions&> opts = boost::none);
 
     /**
      * Serializes the pipeline into BSON for explain/debug logging purposes.
@@ -322,7 +327,8 @@ public:
      * Write the pipeline's operators to a std::vector<Value>, providing the level of detail
      * specified by 'verbosity'.
      */
-    std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const;
+    std::vector<Value> writeExplainOps(
+        const SerializationOptions& opts = SerializationOptions{}) const;
 
     /**
      * Returns the dependencies needed by this pipeline. 'unavailableMetadata' should reflect what
@@ -392,6 +398,12 @@ public:
      */
     boost::intrusive_ptr<DocumentSource> popFrontWithNameAndCriteria(
         StringData targetStageName, std::function<bool(const DocumentSource* const)> predicate);
+
+    /**
+     * Appends another pipeline to the existing pipeline.
+     * NOTE: The other pipeline will be destroyed.
+     */
+    void appendPipeline(std::unique_ptr<Pipeline, PipelineDeleter> otherPipeline);
 
     /**
      * Performs common validation for top-level or facet pipelines. Throws if the pipeline is

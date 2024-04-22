@@ -33,7 +33,7 @@ def fmtBuildInfo(data):
                                            fmtStr(env.subst(obj['value'])),
                                            fmtBool(obj['inBuildInfo']),
                                            fmtBool(obj['inVersion']))
-    return ',\n'.join([fmtObj(obj) for _,obj in data.items()])
+    return ',\n'.join([fmtObj(obj) for _, obj in data.items()])
 
 buildInfoInitializer = fmtBuildInfo(env['MONGO_BUILDINFO_ENVIRONMENT_DATA'])
 
@@ -564,6 +564,14 @@ env.Benchmark(
     ],
 )
 
+env.Benchmark(
+    target='tick_source_bm',
+    source=[
+        'tick_source_bm.cpp',
+    ],
+    LIBDEPS=[],
+)
+
 env.Library(
     target='future_util',
     source=[
@@ -771,6 +779,7 @@ icuEnv.CppUnitTest(
         'processinfo',
         'procparser' if env.TargetOSIs('linux') else [],
         'progress_meter',
+        'regex_util',
         'safe_num',
         'secure_zero_memory',
         'summation',
@@ -872,4 +881,3 @@ env.Benchmark(
         'processinfo',
     ],
 )
-

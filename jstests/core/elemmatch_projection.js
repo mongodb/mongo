@@ -1,6 +1,10 @@
 // Tests for $elemMatch projection operator.
 // @tags: [
 //   requires_getmore,
+//   # On the v6.0 branch the python driver version used does not support reading the output of
+//   # $queryStats for DBRefs, which are technically invalid DBRefs like
+//   # { $ref: { $eq: "?object" } }, { $id: { $eq: "?object" } }.
+//   skip_for_query_stats,
 // ]
 (function() {
 "use strict";
