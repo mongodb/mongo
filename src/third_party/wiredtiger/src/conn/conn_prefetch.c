@@ -74,7 +74,7 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     WT_PREFETCH_QUEUE_ENTRY *pe;
 
     WT_UNUSED(thread);
-    WT_ASSERT(session, session->id != 0);
+    WT_ASSERT(session, !WT_SESSION_IS_DEFAULT(session));
     conn = S2C(session);
 
     WT_RET(__wt_scr_alloc(session, 0, &tmp));

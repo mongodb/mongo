@@ -20,7 +20,9 @@ dl=$(ls -1 ../src/include/*.h ../src/include/*.in | grep -F -v queue.h)
 [[ -z "$(echo "$l" | filter_if_fast ../)" && -z "$(echo "$dl" | filter_if_fast ../)" ]] && exit 0
 
 {
-# Copy out the list of #defines we don't use, but it's OK.
+# Copy out the list of #defines we don't use in source files. Most of these are used exclusively
+# in header files - we should probably update this checker to be more sophisticated and reduce
+# the size of the exceptions list.
 sed -e '/^$/d' -e '/^#/d' < s_define.list
 
 # Search the list of include files for #defines
