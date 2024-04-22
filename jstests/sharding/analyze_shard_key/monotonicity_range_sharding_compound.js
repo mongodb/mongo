@@ -68,8 +68,8 @@ for (let orderType0 of kOrderTypes) {
 // This test requires the collection to contain at least a few thousands of documents to smooth out
 // the insertion order noise caused by parallel oplog application on secondaries.
 const numDocsRange = {
-    min: 7500,
-    max: 10000
+    min: 15000,
+    max: 20000
 };
 
 {
