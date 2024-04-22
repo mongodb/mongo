@@ -2540,8 +2540,6 @@ static WT_INLINE uint64_t __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publi
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE uint64_t __wt_txn_oldest_id(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static WT_INLINE void __wt_api_track_cursor_begin(WT_SESSION_IMPL *session);
-static WT_INLINE void __wt_api_track_cursor_end(WT_SESSION_IMPL *session);
 static WT_INLINE void __wt_btree_disable_bulk(WT_SESSION_IMPL *session);
 static WT_INLINE void __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf);
 static WT_INLINE void __wt_cache_decr_check_size(
