@@ -14,6 +14,9 @@
 import {Thread} from "jstests/libs/parallelTester.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
+// TODO: SERVER-89292 Re-enable test.
+quit();
+
 if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test.
     quit();
 }
