@@ -1575,7 +1575,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             runWithoutSession(outerOpCtx, [&] {
                 auto awaitReplicationResult =
                     repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
-                        opCtx, lastOpApplied, _writeConcern);
+                        opCtx, lastOpApplied, WriteConcerns::kMajorityWriteConcernShardingTimeout);
                 uassertStatusOKWithContext(awaitReplicationResult.status,
                                            awaitReplicationResult.status.codeString());
             });
