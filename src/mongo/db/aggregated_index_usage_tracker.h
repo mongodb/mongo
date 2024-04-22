@@ -58,7 +58,6 @@ struct IndexFeatures {
     bool id = false;
     bool internal = false;
     bool partial = false;
-    bool regular = false;
     bool sparse = false;
     bool ttl = false;
     bool unique = false;
@@ -75,12 +74,29 @@ struct IndexFeatureStats {
     mutable AtomicWord<long long> accesses{0};
 };
 
+enum class FeatureStatType {
+    kCollation,
+    kCompound,
+    kId,
+    kInternal,
+    kPartial,
+    kSingle,
+    kSparse,
+    kTTL,
+    kUnique,
+    kCount,
+};
+
 /**
  * AggregatedIndexUsageTracker aggregates usage metrics about features used by indexes. Ignores
  * indexes on internal databases.
  */
 class AggregatedIndexUsageTracker {
 public:
+    using IndexStatsType = std::array<IndexFeatureStats, INDEX_TYPE_COUNT>;
+    using FeatureStatsType =
+        std::array<IndexFeatureStats, static_cast<size_t>(FeatureStatType::kCount)>;
+
     static AggregatedIndexUsageTracker* get(ServiceContext* svcCtx);
 
     AggregatedIndexUsageTracker();
@@ -114,19 +130,8 @@ public:
     long long getCount() const;
 
 private:
-    /**
-     * Internal helper to update the global stats for each index feature in 'features'. Call back
-     * into UpdateFn which is responsible for update the relevant statistic for each of the features
-     * in use.
-     */
-    using UpdateFn = std::function<void(const IndexFeatureStats* stats)>;
-    void _updateStatsForEachFeature(const IndexFeatures& features, UpdateFn&& onFeature) const;
-
-    // This maps index feature description strings (e.g. 'compound', 'unique') to the actual global
-    // metrics counters for those features. It is intentionally ordered to have consistent
-    // alphabetical ordering when displayed. This map is const because we know all of its entries
-    // ahead of time and we can avoid the extra cost of additional concurrency control.
-    const std::map<std::string, IndexFeatureStats> _indexFeatureToStats;
+    mutable IndexStatsType _indexTypeStats;
+    mutable FeatureStatsType _featureStats;
 
     // Total number of indexes being tracked.
     mutable AtomicWord<long long> _count;
