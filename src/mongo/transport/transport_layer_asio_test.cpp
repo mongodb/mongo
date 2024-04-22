@@ -376,24 +376,16 @@ TEST(TransportLayerASIO, ThrowOnNetworkErrorInEnsureSync) {
     Notification<SessionThread*> mockSessionCreated;
     tf.sep().setOnStartSession([&](SessionThread& st) { mockSessionCreated.set(&st); });
 
-    ConnectionThread connectThread(tf.tla().listenerPort(), [&](ConnectionThread& conn) {
-        // Linger timeout = 0 causes a RST packet on close.
-        struct linger sl = {1, 0};
-        if (setsockopt(conn.socket().rawFD(),
-                       SOL_SOCKET,
-                       SO_LINGER,
-                       reinterpret_cast<SetsockoptPtr>(&sl),
-                       sizeof(sl)) != 0) {
-            auto err = make_error_code(std::errc{errno});
-            LOGV2_ERROR(6060300, "setsockopt", "error"_attr = err.message());
-        }
-    });
-
-    auto& st = *mockSessionCreated.get();
-    connectThread.close();
+    ConnectionThread connectThread(tf.tla().listenerPort(), &setNoLinger);
 
     // We set the timeout to ensure that the setsockopt calls are actually made in ensureSync()
+    auto& st = *mockSessionCreated.get();
     st.session().setTimeout(Milliseconds{500});
+
+    // Synchronize with the connection thread to ensure the connection is closed only after the
+    // connection thread returns from calling `setsockopt`.
+    connectThread.wait();
+    connectThread.close();
 
     // On Mac, setsockopt will immediately throw a SocketException since the socket is closed.
     // On Linux, we will throw HostUnreachable once we try to actually read the socket.
