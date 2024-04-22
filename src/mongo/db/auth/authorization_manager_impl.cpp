@@ -675,35 +675,35 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
 void AuthorizationManagerImpl::invalidateUserByName(OperationContext* opCtx,
                                                     const UserName& userName) {
     LOGV2_DEBUG(20235, 2, "Invalidating user", "user"_attr = userName);
-    _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     // Invalidate the named User, assuming no externally provided roles. When roles are defined
     // externally, there exists no user document which may become invalid.
     _userCache.invalidateKey(UserRequest(userName, boost::none));
+    _updateCacheGeneration();
 }
 
 void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) {
     LOGV2_DEBUG(20236, 2, "Invalidating all users from database", "database"_attr = dbname);
-    _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     _userCache.invalidateKeyIf(
         [&](const UserRequest& userRequest) { return userRequest.name.getDB() == dbname; });
+    _updateCacheGeneration();
 }
 
 void AuthorizationManagerImpl::invalidateUsersByTenant(OperationContext* opCtx,
                                                        const TenantId& tenant) {
     LOGV2_DEBUG(6323600, 2, "Invalidating tenant users", "tenant"_attr = tenant);
-    _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     _userCache.invalidateKeyIf(
         [&](const UserRequest& userRequest) { return userRequest.name.getTenant() == tenant; });
+    _updateCacheGeneration();
 }
 
 void AuthorizationManagerImpl::invalidateUserCache(OperationContext* opCtx) {
     LOGV2_DEBUG(20237, 2, "Invalidating user cache");
-    _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     _userCache.invalidateAll();
+    _updateCacheGeneration();
 }
 
 Status AuthorizationManagerImpl::refreshExternalUsers(OperationContext* opCtx) {
