@@ -826,6 +826,11 @@ add_option(
     help='Configures the path to the evergreen configured tmp directory.',
     default=None,
 )
+'''
+--build-mongot is a compile flag used by the evergreen build variants that run end-to-end search
+suites, as it downloads the necessary mongot binary.
+'''
+add_option('build-mongot', action='store_true')
 
 try:
     with open("version.json", "r") as version_fp:
@@ -6684,6 +6689,51 @@ if has_option("cache"):
         addNoCacheEmitter(env['BUILDERS']['SharedLibrary'])
         addNoCacheEmitter(env['BUILDERS']['SharedArchive'])
         addNoCacheEmitter(env['BUILDERS']['LoadableModule'])
+"""
+mongot is a MongoDB-specific process written as a wrapper around Lucene. Using Lucene, mongot
+indexes MongoDB databases to provide our customers with full text search capabilities.
+
+--build-mongot is utilized as a compile flag by the evergreen build variants that run end-to-end
+search suites. It downloads & bundles mongot with the other mongo binaries. These binaries become
+available to the build variants in question when the binaries are extracted via archive_dist_test
+during compilation.
+"""
+
+if env.GetOption('build-mongot'):
+    platform_str = ''
+    if mongo_platform.is_running_os('linux'):
+        platform_str = 'linux'
+    elif mongo_platform.is_running_os('darwin'):
+        platform_str = 'macos'
+    else:
+        print("mongot is only supported on macOS and linux")
+        Exit(1)
+
+    arch_str = 'x86_64'
+    # macos arm64 is not supported by mongot, but macos x86_64 runs on it successfully
+    if mongo_platform.is_arm_processor() and platform_str != 'macos':
+        arch_str = 'aarch64'
+
+    db_contrib_tool = env.Command(
+        target=["$BUILD_ROOT/db_contrib_tool_venv/bin/db-contrib-tool"], source=[], action=[
+            f'rm -rf $BUILD_ROOT/db_contrib_tool_venv',
+            f'{sys.executable} -m virtualenv -p {sys.executable} $BUILD_ROOT/db_contrib_tool_venv',
+            f'$BUILD_ROOT/db_contrib_tool_venv/bin/python3 -m pip install db-contrib-tool',
+        ], BUILD_ROOT=env.Dir("$BUILD_ROOT").path)
+
+    env.Command(
+        target=["mongot-localdev"], source=db_contrib_tool, action=[
+            f"$SOURCE setup-mongot-repro-env --platform={platform_str} --architecture={arch_str}",
+            f"mv build/mongot-localdev mongot-localdev"
+        ], ENV=os.environ)
+
+    env.AutoInstall(
+        target="$PREFIX_BINDIR",
+        source=["mongot-localdev"],
+        AIB_COMPONENT="mongot",
+        AIB_ROLE="runtime",
+        AIB_COMPONENTS_EXTRA=["dist-test"],
+    )
 
 # load the tool late to make sure we can copy over any new
 # emitters/scanners we may have created in the SConstruct when
