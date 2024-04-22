@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
 #include <list>
 #include <map>
 #include <memory>
@@ -116,8 +117,8 @@ private:
     struct TransportSession {
         int fd;
         short events;  // Events to consider while polling for this session (e.g., `POLLIN`).
-        Promise<void> promise;
         bool canceled = false;
+        Promise<void> promise;
     };
 
     bool _cancelTimer(size_t timerId) noexcept;
@@ -235,8 +236,8 @@ private:
      * been added to `_sessions` yet. The baton only starts polling on a session once it gets
      * added to `_sessions`.
      */
-    stdx::unordered_map<SessionId, TransportSession> _sessions;
-    stdx::unordered_map<SessionId, TransportSession> _pendingSessions;
+    absl::flat_hash_map<SessionId, TransportSession> _sessions;
+    absl::flat_hash_map<SessionId, TransportSession> _pendingSessions;
 
     /**
      * We use three structures to maintain timers:
