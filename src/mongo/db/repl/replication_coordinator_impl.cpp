@@ -201,8 +201,6 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeNewConfigValidationChecks);
 MONGO_FAIL_POINT_DEFINE(setCustomErrorInHelloResponseMongoD);
 // Throws right before the call into recoverTenantMigrationAccessBlockers.
 MONGO_FAIL_POINT_DEFINE(throwBeforeRecoveringTenantMigrationAccessBlockers);
-// Hang before allowing the transition from RECOVERING to SECONDARY.
-MONGO_FAIL_POINT_DEFINE(hangBeforeFinishRecovery);
 
 Atomic64Metric& replicationWaiterListMetric =
     *MetricBuilder<Atomic64Metric>("repl.waiters.replication");
@@ -871,7 +869,6 @@ void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
     invariant(setFollowerMode(MemberState::RS_RECOVERING));
     auto opCtxHolder = cc().makeOperationContext();
     _externalState->startSteadyStateReplication(opCtxHolder.get(), this);
-    finishRecoveryIfEligible(opCtxHolder.get());
     // This log is used in tests to ensure we made it to this point.
     LOGV2_DEBUG(4853000, 1, "initial sync complete.");
 }
@@ -879,7 +876,6 @@ void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
 void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) {
     if (_startedSteadyStateReplication.swap(true)) {
         // This is not the first call.
-        finishRecoveryIfEligible(opCtx);
         return;
     }
 
@@ -906,7 +902,6 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) 
         // an initial sync.
         _replicationProcess->getConsistencyMarkers()->setInitialSyncIdIfNotSet(opCtx);
         _externalState->startSteadyStateReplication(opCtx, this);
-        finishRecoveryIfEligible(opCtx);
         return;
     }
 
@@ -4156,7 +4151,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     // do a quick and cheap pass first to see if host and port exist in the new config. This is safe
     // as we are not allowed to have the same HostAndPort in the config twice. Matching HostandPort
     // implies matching isSelf, and it is actually preferrable to avoid checking the latter as it is
-    // susceptible to transient DNS errors.
+    // succeptible to transient DNS errors.
     auto quickIndex =
         _selfIndex >= 0 ? findOwnHostInConfigQuick(newConfig, getMyHostAndPort()) : -1;
     if (quickIndex >= 0) {
@@ -5799,10 +5794,6 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
 }
 
 void ReplicationCoordinatorImpl::finishRecoveryIfEligible(OperationContext* opCtx) {
-    if (MONGO_unlikely(hangBeforeFinishRecovery.shouldFail())) {
-        hangBeforeFinishRecovery.pauseWhileSet(opCtx);
-    }
-
     // Check to see if we can immediately return without taking any locks.
     if (isInPrimaryOrSecondaryState_UNSAFE()) {
         return;
