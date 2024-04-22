@@ -9,6 +9,7 @@
 executor:
   archive:
     hooks:
+    - LagOplogApplicationInBackground
     - CheckReplDBHash
     - CheckReplOplogs
     - ValidateCollections
@@ -57,6 +58,7 @@ executor:
       settings:
         catchUpTimeoutMillis: 0
   hooks:
+  - class: LagOplogApplicationInBackground
   - class: ContinuousStepdown
     kill: true
   - class: CheckReplOplogs

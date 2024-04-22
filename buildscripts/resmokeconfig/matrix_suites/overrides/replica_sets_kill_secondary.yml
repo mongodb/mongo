@@ -41,6 +41,18 @@
       hooks:
         - class: PeriodicKillSecondaries
 
+- name: hooks_with_oplog_application_lag
+  value:
+    executor:
+      archive:
+        tests: true
+        hooks:
+          - LagOplogApplicationInBackground
+          - PeriodicKillSecondaries
+      hooks:
+        - class: LagOplogApplicationInBackground
+        - class: PeriodicKillSecondaries
+
 - name: exclusions
   value:
     exclude_files:
