@@ -29,8 +29,8 @@
 
 #include "mongo/db/aggregated_index_usage_tracker.h"
 
+#include "mongo/db/index_names.h"
 #include <utility>
-
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,6 +49,7 @@ static const std::string k2d = "2d";
 static const std::string k2dSphere = "2dsphere";
 static const std::string k2dSphereBucket = "2dsphere_bucket";
 static const std::string kCollation = "collation";
+static const std::string kColumn = "columnstore";
 static const std::string kCompound = "compound";
 static const std::string kHashed = "hashed";
 static const std::string kId = "id";
@@ -60,33 +61,52 @@ static const std::string kText = "text";
 static const std::string kTTL = "ttl";
 static const std::string kUnique = "unique";
 static const std::string kWildcard = "wildcard";
-static const std::string kColumn = "columnstore";
-
-std::map<std::string, IndexFeatureStats> makeFeatureMap() {
-    std::map<std::string, IndexFeatureStats> map;
-    map[k2d];
-    map[k2dSphere];
-    map[k2dSphereBucket];
-    map[kCollation];
-    map[kCompound];
-    map[kHashed];
-    map[kId];
-    map[kNormal];
-    map[kPartial];
-    map[kSingle];
-    map[kSparse];
-    map[kText];
-    map[kTTL];
-    map[kUnique];
-    map[kWildcard];
-    map[kColumn];
-    return map;
-};
 
 const auto getAggregatedIndexUsageTracker =
     ServiceContext::declareDecoration<AggregatedIndexUsageTracker>();
-}  // namespace
 
+
+template <class FuncPred>
+void _updateStatsForEachFeature(const IndexFeatures& features,
+                                AggregatedIndexUsageTracker::IndexStatsType& indexStats,
+                                AggregatedIndexUsageTracker::FeatureStatsType& featureStats,
+                                FuncPred update) {
+    // Aggregate _id indexes separately so they do not get included with the other features.
+    if (features.id) {
+        update(featureStats[static_cast<size_t>(FeatureStatType::kId)]);
+        return;
+    }
+
+    update(indexStats[features.type]);
+
+    if (features.collation) {
+        update(featureStats[static_cast<size_t>(FeatureStatType::kCollation)]);
+    }
+
+    if (features.compound) {
+        update(featureStats[static_cast<size_t>(FeatureStatType::kCompound)]);
+    } else {
+        update(featureStats[static_cast<size_t>(FeatureStatType::kSingle)]);
+    }
+
+    if (features.partial) {
+        update(featureStats[static_cast<size_t>(FeatureStatType::kPartial)]);
+    }
+
+    if (features.sparse) {
+        update(featureStats[static_cast<size_t>(FeatureStatType::kSparse)]);
+    }
+
+    if (features.ttl) {
+        update(featureStats[static_cast<size_t>(FeatureStatType::kTTL)]);
+    }
+
+    if (features.unique) {
+        update(featureStats[static_cast<size_t>(FeatureStatType::kUnique)]);
+    }
+}
+
+}  // namespace
 
 IndexFeatures IndexFeatures::make(const IndexDescriptor* desc, bool internal) {
     IndexFeatures features;
@@ -111,8 +131,7 @@ IndexFeatures IndexFeatures::make(const IndexDescriptor* desc, bool internal) {
     return features;
 }
 
-AggregatedIndexUsageTracker::AggregatedIndexUsageTracker()
-    : _indexFeatureToStats(makeFeatureMap()) {}
+AggregatedIndexUsageTracker::AggregatedIndexUsageTracker() {}
 
 AggregatedIndexUsageTracker* AggregatedIndexUsageTracker::get(ServiceContext* svcCtx) {
     return &getAggregatedIndexUsageTracker(svcCtx);
@@ -120,91 +139,47 @@ AggregatedIndexUsageTracker* AggregatedIndexUsageTracker::get(ServiceContext* sv
 
 void AggregatedIndexUsageTracker::onAccess(const IndexFeatures& features) const {
     if (!features.internal) {
-        _updateStatsForEachFeature(features, [](auto stats) { stats->accesses.fetchAndAdd(1); });
+        _updateStatsForEachFeature(features, _indexTypeStats, _featureStats, [](auto& stats) {
+            stats.accesses.fetchAndAdd(1);
+        });
     }
 }
 
 void AggregatedIndexUsageTracker::onRegister(const IndexFeatures& features) const {
     if (!features.internal) {
-        _updateStatsForEachFeature(features, [](auto stats) { stats->count.fetchAndAdd(1); });
+        _updateStatsForEachFeature(features, _indexTypeStats, _featureStats, [](auto& stats) {
+            stats.count.fetchAndAdd(1);
+        });
         _count.fetchAndAdd(1);
     }
 }
 
 void AggregatedIndexUsageTracker::onUnregister(const IndexFeatures& features) const {
     if (!features.internal) {
-        _updateStatsForEachFeature(features, [](auto stats) { stats->count.fetchAndAdd(-1); });
+        _updateStatsForEachFeature(features, _indexTypeStats, _featureStats, [](auto& stats) {
+            stats.count.fetchAndAdd(-1);
+        });
         _count.fetchAndAdd(-1);
     }
 }
 
-void AggregatedIndexUsageTracker::_updateStatsForEachFeature(const IndexFeatures& features,
-                                                             UpdateFn&& update) const {
-    // Aggregate _id indexes separately so they do not get included with the other features.
-    if (features.id) {
-        update(&_indexFeatureToStats.at(kId));
-        return;
-    }
-
-    switch (features.type) {
-        case INDEX_BTREE:
-            update(&_indexFeatureToStats.at(kNormal));
-            break;
-        case INDEX_2D:
-            update(&_indexFeatureToStats.at(k2d));
-            break;
-        case INDEX_HAYSTACK:
-            // MongoDB does not support haystack indexes. This enum only exists to reject creating
-            // them.
-            break;
-        case INDEX_2DSPHERE:
-            update(&_indexFeatureToStats.at(k2dSphere));
-            break;
-        case INDEX_2DSPHERE_BUCKET:
-            update(&_indexFeatureToStats.at(k2dSphereBucket));
-            break;
-        case INDEX_TEXT:
-            update(&_indexFeatureToStats.at(kText));
-            break;
-        case INDEX_HASHED:
-            update(&_indexFeatureToStats.at(kHashed));
-            break;
-        case INDEX_WILDCARD:
-            update(&_indexFeatureToStats.at(kWildcard));
-            break;
-        case INDEX_COLUMN:
-            update(&_indexFeatureToStats.at(kColumn));
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
-
-    if (features.collation) {
-        update(&_indexFeatureToStats.at(kCollation));
-    }
-    if (features.compound) {
-        update(&_indexFeatureToStats.at(kCompound));
-    } else {
-        update(&_indexFeatureToStats.at(kSingle));
-    }
-    if (features.partial) {
-        update(&_indexFeatureToStats.at(kPartial));
-    }
-    if (features.sparse) {
-        update(&_indexFeatureToStats.at(kSparse));
-    }
-    if (features.ttl) {
-        update(&_indexFeatureToStats.at(kTTL));
-    }
-    if (features.unique) {
-        update(&_indexFeatureToStats.at(kUnique));
-    }
-}
-
 void AggregatedIndexUsageTracker::forEachFeature(OnFeatureFn&& onFeature) const {
-    for (auto& [key, value] : _indexFeatureToStats) {
-        onFeature(key, value);
-    }
+    onFeature(k2d, _indexTypeStats[INDEX_2D]);
+    onFeature(k2dSphere, _indexTypeStats[INDEX_2DSPHERE]);
+    onFeature(k2dSphereBucket, _indexTypeStats[INDEX_2DSPHERE_BUCKET]);
+    onFeature(kCollation, _featureStats[static_cast<size_t>(FeatureStatType::kCollation)]);
+    onFeature(kColumn, _indexTypeStats[INDEX_COLUMN]);
+    onFeature(kCompound, _featureStats[static_cast<size_t>(FeatureStatType::kCompound)]);
+    onFeature(kHashed, _indexTypeStats[INDEX_HASHED]);
+    onFeature(kId, _featureStats[static_cast<size_t>(FeatureStatType::kId)]);
+    onFeature(kNormal, _indexTypeStats[INDEX_BTREE]);
+    onFeature(kPartial, _featureStats[static_cast<size_t>(FeatureStatType::kPartial)]);
+    onFeature(kSingle, _featureStats[static_cast<size_t>(FeatureStatType::kSingle)]);
+    onFeature(kSparse, _featureStats[static_cast<size_t>(FeatureStatType::kSparse)]);
+    onFeature(kText, _indexTypeStats[INDEX_TEXT]);
+    onFeature(kTTL, _featureStats[static_cast<size_t>(FeatureStatType::kTTL)]);
+    onFeature(kUnique, _featureStats[static_cast<size_t>(FeatureStatType::kUnique)]);
+    onFeature(kWildcard, _indexTypeStats[INDEX_WILDCARD]);
 }
 
 long long AggregatedIndexUsageTracker::getCount() const {
@@ -240,5 +215,6 @@ public:
         return builder.obj();
     }
 };
+
 auto indexStatsSSS = *ServerStatusSectionBuilder<IndexStatsSSS>("indexStats").forShard();
 }  // namespace mongo

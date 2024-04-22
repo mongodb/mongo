@@ -51,6 +51,7 @@ enum IndexType {
     INDEX_TEXT,
     INDEX_HASHED,
     INDEX_WILDCARD,
+    INDEX_TYPE_COUNT,  // Count of IndexType, not a index
 };
 
 /**
