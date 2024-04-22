@@ -9,6 +9,14 @@
 #pragma once
 
 /*
+ * Define functions that increment histogram statistics for cursor read and write operations
+ * latency. These are defined here as two .c files depend on them but there isn't a perfect header
+ * file to put them in.
+ */
+WT_STAT_USECS_HIST_INCR_FUNC(opread, perf_hist_opread_latency)
+WT_STAT_USECS_HIST_INCR_FUNC(opwrite, perf_hist_opwrite_latency)
+
+/*
  * __wt_curhs_get_btree --
  *     Convert a history store cursor to the underlying btree.
  */
