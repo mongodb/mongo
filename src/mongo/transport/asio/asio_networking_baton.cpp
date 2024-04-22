@@ -588,6 +588,7 @@ Future<void> AsioNetworkingBaton::_addSession(Session& session, short events) tr
     auto pf = makePromiseFuture<void>();
     TransportSession ts{checked_cast<AsioSession&>(session).getSocket().native_handle(),
                         events,
+                        false,
                         std::move(pf.promise)};
     SessionId id = session.id();
 
