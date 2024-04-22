@@ -292,52 +292,6 @@ buildvariants:
     tasks:
       - name: locust_bulk_insert
 
-  - <<: *amazon_linux2_arm64_compile_variant_dependency
-    name: perf-standalone-all-feature-flags.arm.aws.2023-11
-    display_name: all feature flags Standalone ARM AWS 2023-11
-    cron: &linux-standalone-cron "0 0 * * 2,4,6" # Tuesday, Thursday and Saturday at 00:00
-    modules: *perf_modules
-    expansions:
-      mongodb_setup_release: 2022-11
-      mongodb_setup: standalone-all-feature-flags
-      infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: single
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *perf_project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: amazon2-arm64-compile
-    run_on:
-      - "rhel70-perf-single"
-    tasks:
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
-      - name: ycsb.2023-09
-      - name: ycsb_60GB.2023-09
-      - name: ycsb_60GB.long.2023-09
-      - name: crud_workloads_majority
-      - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_wordcount
-      - name: bestbuy_4_analytics
-      - name: bestbuy_4_analytics_columnstore
-      - name: bestbuy_4_inserts
-      - name: bestbuy_query
-      - name: cursor_manager
-      - name: map_reduce_workloads
-      - name: tpcc
-      - name: tpcc_majority
-      - name: tpch_1_normalized
-      - name: tpch_1_denormalized
-      - name: tpch_10_normalized
-      - name: tpch_10_denormalized
-      - name: column_store_index_charts_events_1G
-      - name: column_store_tpch_10_denormalized
-      - name: column_store_tpch_10_denormalized_unindexed
-      - name: ssb_column_store_comparison
-
   - <<: *amazon_linux2_x86_streams_compile_variant_dependency
     name: perf-streams-single.intel.aws.2023-10
     display_name: Streams-Single Intel AWS 2023-10
@@ -895,82 +849,16 @@ buildvariants:
       - name: ycsb.2023-09
       - name: ycsb_w1.2023-09
 
-  - <<: *amazon_linux2_arm64_compile_variant_dependency
-    name: perf-shard-lite-audit.arm.aws.2023-11
-    display_name: Shard Lite Cluster Audit ARM AWS 2023-11
-    cron: *cron_sunday_thursday
-    modules: *perf_modules
-    expansions:
-      mongodb_setup_release: 2022-11
-      mongodb_setup: shard-lite-audit
-      infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: shard-lite-audit
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *perf_project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: amazon2-arm64-compile
-    run_on:
-      - "rhel70-perf-shard-lite"
-    tasks:
-      - name: ycsb.2023-09
-
-  - &shard-lite-baseline
-    <<: *amazon_linux2_arm64_compile_variant_dependency
-    name: perf-shard-lite.arm.aws.2023-11
-    display_name: Shard Lite Cluster ARM AWS 2023-11
-    cron: *cron_sunday_thursday
-    modules: *perf_modules
-    expansions: &shard-lite-baseline-expansions
-      mongodb_setup_release: 2022-11
-      mongodb_setup: shard-lite
-      infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: shard-lite
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *perf_project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: amazon2-arm64-compile
-    run_on:
-      - "rhel70-perf-shard-lite"
-    tasks:
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
-      - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_target_hashed
-      - name: bestbuy_agg_merge_wordcount
-      - name: bestbuy_query
-      - name: change_streams_latency
-      - name: change_streams_preimage_latency
-      - name: change_streams_preimage_throughput
-      - name: change_streams_listen_throughput
-      - name: ycsb.2023-09
-      - name: linkbench
-      - name: mongos_workloads
-      - name: mongos_large_catalog_workloads
-      - name: move_chunk_large_chunk_map_workloads
-      - name: move_chunk_workloads
-      - name: move_chunk_waiting_workloads
-      - name: smoke_test
-      - name: tsbs_query_sharded
-      - name: tsbs_query_finance_sharded
-      - name: tsbs_query_sharded_balancer
-      - name: tsbs_query_finance_sharded_balancer
-
   - <<: *amazon2_x86_compile_variant_dependency
-    name: perf-shard-lite-intel.intel.aws.2023-11
-    display_name: Shard Lite Cluster Intel AWS 2023-11
+    name: perf-3-shard.intel.aws.2023-11
+    display_name: 3-Shard Cluster Intel AWS 2023-11
     cron: *cron_sunday_thursday
     modules: *perf_modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: shard-lite
+      mongodb_setup: shard
       infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: shard-lite-intel.2023-11
+      infrastructure_provisioning: shard-intel
       workload_setup: 2022-11
       platform: linux
       project_dir: *perf_project_dir
@@ -978,7 +866,7 @@ buildvariants:
       storageEngine: wiredTiger
       compile_variant: amazon2-x86-compile
     run_on:
-      - "rhel70-perf-shard-lite"
+      - "rhel70-perf-shard"
     tasks:
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
@@ -986,18 +874,17 @@ buildvariants:
       - name: mongos_workloads
       - name: move_chunk_workloads
       - name: move_chunk_waiting_workloads
-      - name: smoke_test
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
-    name: perf-shard-lite-all-feature-flags.arm.aws.2023-11
-    display_name: all feature flags Shard Lite ARM AWS 2023-11
+    name: perf-shard-all-feature-flags.arm.aws.2023-11
+    display_name: all feature flags 3-Shard Cluster ARM AWS 2023-11
     cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *perf_modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: shard-lite-all-feature-flags
+      mongodb_setup: shard-all-feature-flags
       infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: shard-lite
+      infrastructure_provisioning: shard
       workload_setup: 2022-11
       platform: linux
       project_dir: *perf_project_dir
