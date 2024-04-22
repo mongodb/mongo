@@ -1348,6 +1348,9 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
              * don't exclude it.
              */
             queue->evict_candidates = 1 + candidates + ((entries - candidates) - 1) / 3;
+            if (queue->evict_candidates > entries / 2)
+                queue->evict_candidates = entries / 2;
+
             cache->read_gen_oldest = read_gen_oldest;
         }
     }
