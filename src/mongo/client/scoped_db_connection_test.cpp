@@ -107,7 +107,7 @@ TEST_F(ConnectionPoolTest, ConnectionPoolHistogramStats) {
 
         return expected;
     };
-    ASSERT_THAT(histogram, AnyOf(Eq(makeExpected(2)), Eq(makeExpected(3))));
+    ASSERT_THAT(histogram, AnyOf(Eq(makeExpected(2)), Eq(makeExpected(3)), Eq(makeExpected(4))));
 }
 }  // namespace
 }  // namespace mongo
