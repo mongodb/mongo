@@ -228,7 +228,11 @@ private:
  *
  * This common logic can be used by various consumers which need to fetch data using an SBE
  * PlanStage tree, such as PlanExecutor or RuntimePlanner.
+ *
+ * BSONTraits template parameter can be set to BSONObj::LargeSizeTrait if we want to allow resulting
+ * BSONObj to be larged than 16 MB.
  */
+template <typename BSONTraits = BSONObj::DefaultSizeTrait>
 sbe::PlanState fetchNext(sbe::PlanStage* root,
                          sbe::value::SlotAccessor* resultSlot,
                          sbe::value::SlotAccessor* recordIdSlot,

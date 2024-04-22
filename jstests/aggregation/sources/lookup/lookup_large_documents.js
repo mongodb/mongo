@@ -1,6 +1,10 @@
 /**
  * Test that $lookup can generate documents larger than maximum BSON size, as long as only part of
  * such document is returned to the client.
+ * @tags: [
+ *   # TODO SERVER-79448: Investigate why the test timeouts on TSAN variant.
+ *   tsan_incompatible,
+ * ]
  */
 (function() {
 "use strict";
