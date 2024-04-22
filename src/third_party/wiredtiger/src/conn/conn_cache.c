@@ -126,6 +126,10 @@ __cache_config_local(WT_SESSION_IMPL *session, bool shared, const char *cfg[])
     if (cache->eviction_updates_target < DBL_EPSILON)
         cache->eviction_updates_target = cache->eviction_dirty_target / 2;
 
+    /* Don't allow the updates target to be larger than the eviction target. */
+    if (cache->eviction_updates_target > cache->eviction_target)
+        cache->eviction_updates_target = cache->eviction_target;
+
     WT_RET(__wt_config_gets(session, cfg, "eviction_updates_trigger", &cval));
     cache->eviction_updates_trigger = (double)cval.val;
     WT_RET(__cache_config_abs_to_pct(
