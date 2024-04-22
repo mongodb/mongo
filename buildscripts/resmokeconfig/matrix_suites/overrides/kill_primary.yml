@@ -161,6 +161,30 @@
         - class: CleanEveryN
           n: 20
 
+- name: replica_sets_oplog_application_lag_hooks
+  value:
+    executor:
+      hooks:
+        - class: LagOplogApplicationInBackground
+        # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
+        # so we need to allow time for at most 10 operations to be re-run and then re-committed. If
+        # too many network errors occur when re-running a transaction we will run out of retries.
+        - class: ContinuousStepdown
+          kill: true
+
+        # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+        # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+        # validating the entire contents of the collection.
+        - class: CheckReplOplogs
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+          shell_options:
+            global_vars:
+              TestData:
+                skipEnforceFastCountOnValidate: true
+        - class: CleanEveryN
+          n: 20
+
 ###
 # Archival options.
 ###
@@ -170,6 +194,17 @@
       archive:
         tests: true
         hooks:
+          - CheckReplDBHash
+          - CheckReplOplogs
+          - ValidateCollections
+
+- name: replica_sets_oplog_application_lag_archive
+  value:
+    executor:
+      archive:
+        tests: true
+        hooks:
+          - LagOplogApplicationInBackground
           - CheckReplDBHash
           - CheckReplOplogs
           - ValidateCollections
