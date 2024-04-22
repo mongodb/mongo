@@ -751,7 +751,7 @@ __wt_cursor_cache(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     WT_ASSERT(session, !WT_CURSOR_BOUNDS_SET(cursor)); /* __wt_cursor_bound_reset() */
     WT_ASSERT(session, F_AREALLSET(cursor, WT_CURSTD_CACHEABLE | WT_CURSTD_CACHED));
 
-    API_RET_STAT(session, ret, cursor_cache);
+    return (ret);
 }
 
 /*
