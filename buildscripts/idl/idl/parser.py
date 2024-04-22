@@ -1118,10 +1118,7 @@ def parse_file(stream, error_file_name, parse_non_forward_compatible_section=Tru
             _parse_mapping(ctxt, spec, second_node, 'generic_reply_field_lists',
                            _parse_generic_reply_field_list)
         elif first_name == "server_parameters":
-            # TODO (SERVER-86977): Remove bypass after 8.0 branches
-            if parse_non_forward_compatible_section:
-                _parse_mapping(ctxt, spec, second_node, "server_parameters",
-                               _parse_server_parameter)
+            _parse_mapping(ctxt, spec, second_node, "server_parameters", _parse_server_parameter)
         elif first_name == "configs":
             _parse_mapping(ctxt, spec, second_node, "configs", _parse_config_option)
         elif first_name == "feature_flags":
