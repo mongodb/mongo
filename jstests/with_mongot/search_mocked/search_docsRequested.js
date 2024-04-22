@@ -1,5 +1,10 @@
 /**
- * Tests that if the user defines a limit, we send a search command to mongot with that information.
+ * Tests that if a query has an extractable limit, we send a search command to mongot with that
+ * information in the docsRequested field.
+ * All tests are skipped if featureFlagSearchBatchSizeTuning is enabled, since this file only tests
+ * the docsRequested options, whereas that flag enables the batchSize option.
+ * TODO SERVER-81646 Remove this test when featureFlagSearchBatchSizeTuning is enabled since the
+ * test will no longer run.
  * @tags: [requires_fcv_71]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -14,7 +19,7 @@ import {
 } from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
-const collName = "search_batchsize";
+const collName = "search_docsrequested";
 const chunkBoundary = 8;
 
 const docs = [
@@ -1033,13 +1038,16 @@ function setupAndRunTestStandalone() {
     const mongotConn = mongotmock.getConnection();
     const conn = MongoRunner.runMongod({setParameter: {mongotHost: mongotConn.host}});
     let db = conn.getDB(dbName);
-    let coll = db.getCollection(collName);
+    if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchBatchSizeTuning')) {
+        jsTestLog("Skipping the test because it only applies when batchSize isn't enabled.");
+    } else {
+        let coll = db.getCollection(collName);
+        // Insert documents.
+        assert.commandWorked(coll.insertMany(docs));
 
-    // Insert documents.
-    assert.commandWorked(coll.insertMany(docs));
-
-    let collUUID = getUUIDFromListCollections(db, collName);
-    runTest(db, collUUID, mongotConn, null /* stConn */);
+        let collUUID = getUUIDFromListCollections(db, collName);
+        runTest(db, collUUID, mongotConn, null /* stConn */);
+    }
 
     MongoRunner.stopMongod(conn);
     mongotmock.stop();
@@ -1047,7 +1055,7 @@ function setupAndRunTestStandalone() {
 
 function setupAndRunTestShardedEnv() {
     const stWithMock = new ShardingTestWithMongotMock({
-        name: "search_batchsize",
+        name: "search_docsrequested",
         shards: {
             rs0: {nodes: 2},
             rs1: {nodes: 2},
@@ -1061,19 +1069,24 @@ function setupAndRunTestShardedEnv() {
     let st = stWithMock.st;
     let mongos = st.s;
     let db = mongos.getDB(dbName);
-    assert.commandWorked(
-        mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchBatchSizeTuning')) {
+        jsTestLog("Skipping the test because it only applies when batchSize isn't enabled.");
+    } else {
+        assert.commandWorked(mongos.getDB("admin").runCommand(
+            {enableSharding: dbName, primaryShard: st.shard0.name}));
 
-    let coll = db.getCollection(collName);
+        let coll = db.getCollection(collName);
 
-    // Insert documents.
-    assert.commandWorked(coll.insertMany(docs));
+        // Insert documents.
+        assert.commandWorked(coll.insertMany(docs));
 
-    // Shard the collection, split it at {_id: chunkBoundary}, and move the higher chunk to shard1.
-    st.shardColl(coll, {_id: 1}, {_id: chunkBoundary}, {_id: chunkBoundary + 1});
+        // Shard the collection, split it at {_id: chunkBoundary}, and move the higher chunk to
+        // shard1.
+        st.shardColl(coll, {_id: 1}, {_id: chunkBoundary}, {_id: chunkBoundary + 1});
 
-    let collUUID = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), collName);
-    runTest(db, collUUID, null /* standaloneConn */, stWithMock);
+        let collUUID = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), collName);
+        runTest(db, collUUID, null /* standaloneConn */, stWithMock);
+    }
 
     stWithMock.stop();
 }

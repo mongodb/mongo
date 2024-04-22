@@ -320,11 +320,11 @@ void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegacyExecutor(
-    OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
-    const AggregateCommandRequest& request,
     Pipeline* origPipeline,
-    boost::optional<UUID> uuid) {
+    DocsNeededBounds minBounds,
+    DocsNeededBounds maxBounds,
+    boost::optional<int64_t> userBatchSize) {
     // First, desuguar $search, and inject shard filterer.
     prepareSearchPipelineLegacyExecutor(origPipeline, true);
 
@@ -338,6 +338,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
     auto origSearchStage =
         dynamic_cast<DocumentSourceInternalSearchMongotRemote*>(origPipeline->peekFront());
     tassert(6253727, "Expected search stage", origSearchStage);
+    origSearchStage->setDocsNeededBounds(minBounds, maxBounds);
 
     // We expect to receive unmerged metadata documents from mongot if we are not in mongos and have
     // a metadata merge protocol version. However, we can ignore the meta cursor if the pipeline
@@ -346,9 +347,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
         !expCtx->inMongos && origSearchStage->getIntermediateResultsProtocolVersion();
     auto shouldBuildMetadataPipeline =
         expectsMetaCursorFromMongot && origSearchStage->queryReferencesSearchMeta();
-
-    uassert(
-        6253506, "Cannot have exchange specified in a $search pipeline", !request.getExchange());
 
     // Some tests build $search pipelines without actually setting up a mongot. In this case either
     // return a dummy stage or nothing depending on the environment. Note that in this case we don't
@@ -370,6 +368,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
         origSearchStage->getSearchQuery(),
         origSearchStage->getTaskExecutor(),
         origSearchStage->getMongotDocsRequested(),
+        minBounds,
+        maxBounds,
+        userBatchSize,
         [origSearchStage] { return origSearchStage->calcDocsNeeded(); },
         origSearchStage->getIntermediateResultsProtocolVersion(),
         origSearchStage->getPaginationFlag());
@@ -452,6 +453,9 @@ void establishSearchCursorsSBE(boost::intrusive_ptr<ExpressionContext> expCtx,
         searchStage->getSearchQuery(),
         executor,
         searchStage->getLimit(),
+        boost::none,
+        boost::none,
+        boost::none,
         nullptr,
         searchStage->getIntermediateResultsProtocolVersion(),
         searchStage->getSearchPaginationFlag(),

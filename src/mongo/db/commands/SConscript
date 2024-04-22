@@ -533,6 +533,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper',
+        '$BUILD_DIR/mongo/db/pipeline/docs_needed_bounds',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongod_process_interfaces',
         '$BUILD_DIR/mongo/db/query/command_request_response',

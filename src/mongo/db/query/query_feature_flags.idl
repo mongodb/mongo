@@ -137,6 +137,6 @@ feature_flags:
 
     featureFlagSearchBatchSizeTuning:
       description: "Feature flag to enable batchSize tuning for search queries."
-      cpp_varname: gFeatureFlagSearchBatcSizeTuning
+      cpp_varname: gFeatureFlagSearchBatchSizeTuning
       default: false
       shouldBeFCVGated: true

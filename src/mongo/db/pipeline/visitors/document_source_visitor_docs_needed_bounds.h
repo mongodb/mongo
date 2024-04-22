@@ -28,24 +28,10 @@
  */
 
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 
 namespace mongo {
-namespace docs_needed_bounds {
-struct NeedAll {
-    // Nothing
-};
-
-struct Unknown {
-    // Nothing
-};
-}  // namespace docs_needed_bounds
-
-using NeedAll = docs_needed_bounds::NeedAll;
-using Unknown = docs_needed_bounds::Unknown;
-
-using DocsNeededBounds = std::variant<long long, NeedAll, Unknown>;
-
 /**
  * The visitor context used to compute the number of documents needed for a pipeline, assuming
  * the pipeline will be traversed in reverse order. Tracks the minimum and maximum constraints
@@ -62,8 +48,8 @@ struct DocsNeededBoundsContext : public DocumentSourceVisitorContextBase {
     void applyBlockingStage();
     void applyUnknownStage();
 
-    DocsNeededBounds minBounds = Unknown();
-    DocsNeededBounds maxBounds = Unknown();
+    DocsNeededBounds minBounds = docs_needed_bounds::Unknown();
+    DocsNeededBounds maxBounds = docs_needed_bounds::Unknown();
 };
 
 /**

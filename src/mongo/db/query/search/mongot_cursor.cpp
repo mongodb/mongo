@@ -47,6 +47,7 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
     const BSONObj& query,
     const boost::optional<int> protocolVersion = boost::none,
     const boost::optional<long long> docsRequested = boost::none,
+    const boost::optional<long long> batchSize = boost::none,
     const bool requiresSearchSequenceToken = false) {
     BSONObjBuilder cmdBob;
     cmdBob.append(kSearchField, nss.coll());
@@ -64,12 +65,22 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
     if (protocolVersion) {
         cmdBob.append(kIntermediateField, *protocolVersion);
     }
+
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const auto needsSetBatchSize =
+        feature_flags::gFeatureFlagSearchBatchSizeTuning.isEnabled(fcvSnapshot) &&
+        batchSize.has_value();
     // (Ignore FCV check): This feature is enabled on an earlier FCV.
-    const auto needsSetDocsRequested =
+    // We should only set docsRequested if we're not setting batchSize.
+    // TODO SERVER-74941 Remove docsRequested alongside featureFlagSearchBatchSizeLimit.
+    const auto needsSetDocsRequested = !needsSetBatchSize &&
         feature_flags::gFeatureFlagSearchBatchSizeLimit.isEnabledAndIgnoreFCVUnsafe() &&
         docsRequested.has_value();
-    if (needsSetDocsRequested || requiresSearchSequenceToken) {
+    if (needsSetBatchSize || needsSetDocsRequested || requiresSearchSequenceToken) {
         BSONObjBuilder cursorOptionsBob(cmdBob.subobjStart(kCursorOptionsField));
+        if (needsSetBatchSize) {
+            cursorOptionsBob.append(kBatchSizeField, batchSize.get());
+        }
         if (needsSetDocsRequested) {
             cursorOptionsBob.append(kDocsRequestedField, docsRequested.get());
         }
@@ -94,6 +105,26 @@ void doThrowIfNotRunningWithMongotHostConfigured() {
             << "For more information on how to connect, see "
             << "https://dochub.mongodb.org/core/atlas-cli-deploy-local-reqs.",
         globalMongotParams.enabled);
+}
+
+boost::optional<long long> computeInitialBatchSize(const DocsNeededBounds minBounds,
+                                                   const DocsNeededBounds maxBounds,
+                                                   const boost::optional<int64_t> userBatchSize) {
+    // TODO SERVER-63765 Allow cursor establishment for sharded clusters when userBatchSize is 0.
+    // TODO SERVER-89494 Enable non-extractable limit queries.
+    // TODO SERVER-88888 Add oversubscription logic.
+    return visit(
+        OverloadedVisitor{
+            [](long long minVal, long long maxVal) -> boost::optional<long long> {
+                if (minVal == maxVal) {
+                    return std::max(minVal, kMinimumMongotBatchSize);
+                }
+                return boost::none;
+            },
+            [](auto& minVal, auto& maxVal) -> boost::optional<long long> { return boost::none; },
+        },
+        minBounds,
+        maxBounds);
 }
 }  // namespace
 
@@ -142,6 +173,9 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     const BSONObj& query,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     boost::optional<long long> docsRequested,
+    boost::optional<DocsNeededBounds> minDocsNeededBounds,
+    boost::optional<DocsNeededBounds> maxDocsNeededBounds,
+    boost::optional<int64_t> userBatchSize,
     std::function<boost::optional<long long>()> calcDocsNeededFn,
     const boost::optional<int>& protocolVersion,
     bool requiresSearchSequenceToken,
@@ -150,6 +184,12 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     // collection has not been created yet.
     if (!expCtx->uuid) {
         return {};
+    }
+
+    boost::optional<long long> batchSize = boost::none;
+    if (minDocsNeededBounds.has_value() & maxDocsNeededBounds.has_value()) {
+        batchSize =
+            computeInitialBatchSize(*minDocsNeededBounds, *maxDocsNeededBounds, userBatchSize);
     }
 
     // If we are sending docsRequested to mongot, then we should avoid prefetching the next
@@ -167,6 +207,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
                                                                   query,
                                                                   protocolVersion,
                                                                   docsRequested,
+                                                                  batchSize,
                                                                   requiresSearchSequenceToken),
                             taskExecutor,
                             prefetchNextBatch,

@@ -46,6 +46,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+using NeedAll = docs_needed_bounds::NeedAll;
+using Unknown = docs_needed_bounds::Unknown;
+
 void DocsNeededBoundsContext::applyPossibleDecreaseStage() {
     // If we have existing discrete maxBounds, this stage may reduce the number of documents in the
     // result stream before applying that limit, so we may need to scan more documents than the

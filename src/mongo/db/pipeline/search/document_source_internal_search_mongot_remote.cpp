@@ -284,6 +284,9 @@ DocumentSourceInternalSearchMongotRemote::establishCursor() {
                                                                  _searchQuery,
                                                                  _taskExecutor,
                                                                  _mongotDocsRequested,
+                                                                 _minDocsNeededBounds,
+                                                                 _maxDocsNeededBounds,
+                                                                 boost::none,
                                                                  nullptr,
                                                                  _metadataMergeProtocolVersion,
                                                                  _requiresSearchSequenceToken);

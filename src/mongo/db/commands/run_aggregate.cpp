@@ -96,6 +96,7 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -829,14 +830,24 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
         std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
         // Any pipeline that relies on calls to mongot requires additional setup.
         if (search_helpers::isMongotPipeline(pipeline.get())) {
+            uassert(6253506,
+                    "Cannot have exchange specified in a search pipeline",
+                    !request.getExchange());
+
             // Release locks early, before we generate the search pipeline, so that we don't hold
             // them during network calls to mongot. This is fine for search pipelines since they are
             // not reading any local (lock-protected) data in the main pipeline.
             resetContextFn();
             pipelines.push_back(std::move(pipeline));
 
-            if (auto metadataPipe = search_helpers::prepareSearchForTopLevelPipelineLegacyExecutor(
-                    expCtx->opCtx, expCtx, request, pipelines.back().get(), expCtx->uuid)) {
+            auto [minBounds, maxBounds] = extractDocsNeededBounds(*pipelines.back().get());
+            auto metadataPipe = search_helpers::prepareSearchForTopLevelPipelineLegacyExecutor(
+                expCtx,
+                pipelines.back().get(),
+                minBounds,
+                maxBounds,
+                request.getCursor().getBatchSize());
+            if (metadataPipe) {
                 pipelines.push_back(std::move(metadataPipe));
             }
         } else {

@@ -3,6 +3,7 @@
  * from mongot.
  * @tags: [requires_fcv_71]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestricted} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
@@ -32,10 +33,17 @@ const st = stWithMock.st;
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 
-// Skip the test if running in 'trySbeRestricted' mode. In this mode, $search will be pushed down to
-// SBE, but $limit will not.
-if (checkSbeRestricted(testDB)) {
-    jsTest.log("Skipping test because trySbeRestricted is enabled.");
+// Skip the test if running in 'trySbeRestricted' mode with 'SearchInSbe' enabled. In this mode,
+// $search will be pushed down to SBE, but $limit will not.
+if (checkSbeRestricted(testDB) &&
+    FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchInSbe')) {
+    jsTestLog("Skipping the test because it only applies to $search in classic engine.");
+    stWithMock.stop();
+    quit();
+}
+
+if (FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchBatchSizeTuning')) {
+    jsTestLog("Skipping the test because it only applies when batchSize isn't enabled.");
     stWithMock.stop();
     quit();
 }

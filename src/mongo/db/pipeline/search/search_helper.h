@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
+#include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/service_context.h"
@@ -134,11 +135,11 @@ void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline
  * Returns the additional pipline used for metadata, or nullptr if no pipeline is necessary.
  */
 std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegacyExecutor(
-    OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
-    const AggregateCommandRequest& request,
     Pipeline* origPipeline,
-    boost::optional<UUID> uuid);
+    DocsNeededBounds minBounds,
+    DocsNeededBounds maxBounds,
+    boost::optional<int64_t> userBatchSize);
 
 /**
  * This method works on preparation for $search in nested pipeline, e.g. sub-pipeline of

@@ -73,11 +73,11 @@ protected:
     }
 
     void assertUnknown(DocsNeededBounds bounds) {
-        ASSERT_TRUE(std::holds_alternative<Unknown>(bounds));
+        ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds));
     }
 
     void assertNeedAll(DocsNeededBounds bounds) {
-        ASSERT_TRUE(std::holds_alternative<NeedAll>(bounds));
+        ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::NeedAll>(bounds));
     }
 
     // Helper functions for creating document source stages for more consise pipeline building
