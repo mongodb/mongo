@@ -311,7 +311,7 @@ __wt_configure_method(WT_SESSION_IMPL *session, const char *method, const char *
         WT_RET_MSG(session, EINVAL, "no configuration type specified");
 
     /* Determine the compiled type. */
-    compiled_type = 0;
+    WT_NOT_READ(compiled_type, 0);
     if (strcmp(type, "boolean") == 0)
         compiled_type = WT_CONFIG_COMPILED_TYPE_BOOLEAN;
     else if (strcmp(type, "int") == 0)

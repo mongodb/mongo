@@ -1280,7 +1280,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
 #define RESOLVE_PREPARE_ON_DISK 1
 #define RESOLVE_PREPARE_EVICTION_FAILURE 2
 #define RESOLVE_IN_MEMORY 3
-    resolve_case = RESOLVE_UPDATE_CHAIN;
+    WT_NOT_READ(resolve_case, RESOLVE_UPDATE_CHAIN);
 
     WT_RET(__txn_search_prepared_op(session, op, cursorp, &upd));
 

@@ -113,6 +113,7 @@ __gen_drain_callback(
     uint64_t time_diff_ms, v;
 #ifdef HAVE_DIAGNOSTIC
     WT_VERBOSE_LEVEL verbose_orig_level[WT_VERB_NUM_CATEGORIES];
+    WT_CLEAR(verbose_orig_level);
 #endif
 
     cookie = (WT_GENERATION_DRAIN_COOKIE *)cookiep;

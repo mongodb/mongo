@@ -775,9 +775,9 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
     bool key_out_of_bounds, newpage, need_walk, repositioned, restart;
 #ifdef HAVE_DIAGNOSTIC
     bool inclusive_set;
-
-    inclusive_set = false;
+    WT_NOT_READ(inclusive_set, false);
 #endif
+
     cursor = &cbt->iface;
     key_out_of_bounds = need_walk = newpage = repositioned = false;
     session = CUR2S(cbt);
