@@ -8,7 +8,7 @@ const dbName = "db";
 const collName = "movies";
 const targetCollName = "movies2";
 
-function testFn(db) {
+function testFn(db, awaitReplication) {
     const coll = db[collName];
     coll.drop();
     db[targetCollName].drop();
@@ -40,6 +40,7 @@ function testFn(db) {
         for (const readPref of ["primary", "secondary"]) {
             jsTestLog("Testing " + tojson(aggWriteStageSpec) + " with read preference " + readPref);
             setUpFn(db);
+            awaitReplication();
 
             // If the caller provided some error codes, assert that the command failed with one
             // of these codes.
@@ -54,6 +55,7 @@ function testFn(db) {
                 assert.doesNotThrow(fn, [] /* params */, errMsg);
             }
             cleanUpFn(db);
+            awaitReplication();
         }
     }
 
@@ -97,13 +99,13 @@ function testFn(db) {
 }
 
 jsTestLog("Testing against a replica set");
-const rst = new ReplSetTest({nodes: 2, causallyConsistent: true});
+const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
-testFn(new Mongo(rst.getURL()).getDB(dbName));
+testFn(new Mongo(rst.getURL()).getDB(dbName), () => rst.awaitReplication());
 rst.stopSet();
 
 jsTestLog("Testing against a sharded cluster");
-const st = new ShardingTest({shards: 1, rs: {nodes: 2}, causallyConsistent: true});
-testFn(st.s.getDB(dbName));
+const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
+testFn(st.s.getDB(dbName), () => st.awaitReplicationOnShards());
 st.stop();
