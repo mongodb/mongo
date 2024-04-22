@@ -290,7 +290,7 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session, const char *uri, const char *ch
  *     Sync and close the underlying btree handle.
  */
 int
-__wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead)
+__wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bool check_visibility)
 {
     WT_BM *bm;
     WT_BTREE *btree;
@@ -313,6 +313,18 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead)
     btree = is_btree ? dhandle->handle : NULL;
 
     if (is_btree) {
+        /*
+         * Check if we have exclusive access here, else a transaction can start on this btree after
+         * this check.
+         *
+         * Abort if there are uncommitted update(s) on the btree. We check global visibility instead
+         * of snapshot visibility because we might not have a snapshot.
+         */
+        WT_ASSERT_ALWAYS(session, btree->max_upd_txn != WT_TXN_ABORTED,
+          "Assert failure: session: %s: btree->max_upd_txn == WT_TXN_ABORTED", session->name);
+        if (check_visibility && !__wt_txn_visible_all(session, btree->max_upd_txn, WT_TS_NONE))
+            return (EBUSY);
+
         /* Turn off eviction. */
         WT_RET(__wt_evict_file_exclusive_on(session));
 
@@ -525,7 +537,7 @@ __wt_conn_dhandle_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t fla
      * operation is closed, there won't be updates in the tree that can block the close.
      */
     if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-        WT_ERR(__wt_conn_dhandle_close(session, false, false));
+        WT_ERR(__wt_conn_dhandle_close(session, false, false, false));
 
     /* Discard any previous configuration, set up the new configuration. */
     __conn_dhandle_config_clear(session);
@@ -750,8 +762,8 @@ err:
  *     Lock and, if necessary, close a data handle.
  */
 static int
-__conn_dhandle_close_one(
-  WT_SESSION_IMPL *session, const char *uri, const char *checkpoint, bool removed, bool mark_dead)
+__conn_dhandle_close_one(WT_SESSION_IMPL *session, const char *uri, const char *checkpoint,
+  bool removed, bool mark_dead, bool check_visibility)
 {
     WT_DECL_RET;
 
@@ -770,7 +782,7 @@ __conn_dhandle_close_one(
      */
     if (F_ISSET(session->dhandle, WT_DHANDLE_OPEN)) {
         __wt_meta_track_sub_on(session);
-        ret = __wt_conn_dhandle_close(session, false, mark_dead);
+        ret = __wt_conn_dhandle_close(session, false, mark_dead, check_visibility);
 
         /*
          * If the close succeeded, drop any locks it acquired. If there was a failure, this function
@@ -793,7 +805,8 @@ __conn_dhandle_close_one(
  *     Close all data handles with matching name (including all checkpoint handles).
  */
 int
-__wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *uri, bool removed, bool mark_dead)
+__wt_conn_dhandle_close_all(
+  WT_SESSION_IMPL *session, const char *uri, bool removed, bool mark_dead, bool check_visibility)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle;
@@ -809,7 +822,7 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *uri, bool remo
      * Lock the live handle first. This ordering is important: we rely on locking the live handle to
      * fail fast if the tree is busy (e.g., with cursors open or in a checkpoint).
      */
-    WT_ERR(__conn_dhandle_close_one(session, uri, NULL, removed, mark_dead));
+    WT_ERR(__conn_dhandle_close_one(session, uri, NULL, removed, mark_dead, check_visibility));
 
     bucket = __wt_hash_city64(uri, strlen(uri)) & (conn->dh_hash_size - 1);
     TAILQ_FOREACH (dhandle, &conn->dhhash[bucket], hashq) {
@@ -818,7 +831,7 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *uri, bool remo
             continue;
 
         WT_ERR(__conn_dhandle_close_one(
-          session, dhandle->name, dhandle->checkpoint, removed, mark_dead));
+          session, dhandle->name, dhandle->checkpoint, removed, mark_dead, false));
     }
 
 err:
@@ -867,7 +880,7 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, bool final, bool mark
     dhandle = session->dhandle;
 
     if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-        tret = __wt_conn_dhandle_close(session, final, mark_dead);
+        tret = __wt_conn_dhandle_close(session, final, mark_dead, false);
         if (final && tret != 0) {
             __wt_err(session, tret, "Final close of %s failed", dhandle->name);
             WT_TRET(tret);

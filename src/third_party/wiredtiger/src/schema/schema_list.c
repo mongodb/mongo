@@ -113,11 +113,11 @@ err:
 }
 
 /*
- * __wt_schema_release_table --
+ * __wt_schema_release_table_gen --
  *     Release a table handle.
  */
 int
-__wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE **tablep)
+__wt_schema_release_table_gen(WT_SESSION_IMPL *session, WT_TABLE **tablep, bool check_visibility)
 {
     WT_DECL_RET;
     WT_TABLE *table;
@@ -126,9 +126,20 @@ __wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE **tablep)
         return (0);
     *tablep = NULL;
 
-    WT_WITH_DHANDLE(session, &table->iface, ret = __wt_session_release_dhandle(session));
+    WT_WITH_DHANDLE(
+      session, &table->iface, ret = __wt_session_release_dhandle_v2(session, check_visibility));
 
     return (ret);
+}
+
+/*
+ * __wt_schema_release_table --
+ *     Release a table handle.
+ */
+int
+__wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE **tablep)
+{
+    return (__wt_schema_release_table_gen(session, tablep, false));
 }
 
 /*

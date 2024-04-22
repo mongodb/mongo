@@ -263,13 +263,14 @@ cursor_test(std::string const &config, bool close, int expected_open_cursor_resu
         SECTION(
           "Drop then checkpoint in one thread: config = " + config + ", close = " + close_as_string)
         {
-            check_txn_updates("before close", session_impl, diagnostics);
             if (close) {
+                check_txn_updates("before close", session_impl, diagnostics);
                 REQUIRE(cursor->close(cursor) == 0);
                 check_txn_updates("before drop", session_impl, diagnostics);
                 __wt_sleep(1, 0);
                 REQUIRE(session->drop(session, uri.c_str(), "force=true") == 0);
             } else {
+                check_txn_updates("before drop", session_impl, diagnostics);
                 int result = session->drop(session, uri.c_str(), "force=true");
                 REQUIRE(result == EBUSY);
             }

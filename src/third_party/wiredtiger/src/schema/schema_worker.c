@@ -24,7 +24,7 @@ __wt_execute_handle_operation(WT_SESSION_IMPL *session, const char *uri,
      */
     if (FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE)) {
         WT_WITH_HANDLE_LIST_WRITE_LOCK(
-          session, ret = __wt_conn_dhandle_close_all(session, uri, false, false));
+          session, ret = __wt_conn_dhandle_close_all(session, uri, false, false, false));
         WT_RET(ret);
     }
 

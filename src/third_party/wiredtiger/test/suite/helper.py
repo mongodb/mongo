@@ -96,6 +96,17 @@ def confirm_empty(testcase, uri):
         testcase.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
     cursor.close()
 
+# Confirm a URI exists and is not empty.
+def confirm_nonempty(testcase, uri):
+    testcase.pr('confirm_nonempty: ' + uri)
+    cursor = testcase.session.open_cursor(uri, None)
+    if cursor.value_format == '8t':
+        for key,val in cursor:
+            testcase.assertNotEqual(val, 0)
+    else:
+        testcase.assertNotEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+    cursor.close()
+
 # Copy a WT home directory.
 def copy_wiredtiger_home(testcase, olddir, newdir, aligned=True):
     # Unaligned copy requires 'dd', which may not be available on Windows.

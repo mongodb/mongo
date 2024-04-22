@@ -219,7 +219,7 @@ __alter_tiered(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[], 
      */
     if (FLD_ISSET(flags, WT_DHANDLE_EXCLUSIVE)) {
         WT_WITH_HANDLE_LIST_WRITE_LOCK(
-          session, ret = __wt_conn_dhandle_close_all(session, uri, false, false));
+          session, ret = __wt_conn_dhandle_close_all(session, uri, false, false, false));
         WT_RET(ret);
     }
 

@@ -567,12 +567,13 @@ err:
     if (ret != 0 && created_chunk) {
         /* Drop the newly-created files on error. */
         if (chunk->uri != NULL) {
-            WT_WITH_SCHEMA_LOCK(session, tret = __wt_schema_drop(session, chunk->uri, drop_cfg));
+            WT_WITH_SCHEMA_LOCK(
+              session, tret = __wt_schema_drop(session, chunk->uri, drop_cfg, false));
             WT_TRET(tret);
         }
         if (create_bloom && chunk->bloom_uri != NULL) {
             WT_WITH_SCHEMA_LOCK(
-              session, tret = __wt_schema_drop(session, chunk->bloom_uri, drop_cfg));
+              session, tret = __wt_schema_drop(session, chunk->bloom_uri, drop_cfg, false));
             WT_TRET(tret);
         }
         __wt_free(session, chunk->bloom_uri);
