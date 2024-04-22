@@ -1359,6 +1359,84 @@ tasks:
              threads: "1 2 4 8",
              read_cmd: 'true'}
 
+  # HVW tasks added for query stats backport.
+  - name: mixed_workloads_genny_rate_limited_high_value
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/MixedWorkloadsGennyRateLimited.yml
+
+  - name: majority_reads10_k_threads_high_value
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/MajorityReads10KThreads.yml
+
+  - name: large_indexed_ins_high_value
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/LargeIndexedIns.yml
+
+  - name: expressive_queries_high_value
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/ExpressiveQueries.yml
+
+  - name: time_series_sort_high_value
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TimeSeriesSort.yml
+
+# Additional workloads added for the query stats backport.
+  - name: tie-breaking-heuristics
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: tie-breaking,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+
+
+  - name: tsbs_query_sharded
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_sharded"
+
+  - name: tsbs_query_finance_sharded
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_finance_sharded"
+
+  - name: tsbs_query_sharded_balancer
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_sharded_balancer"
+
+  - name: tsbs_query_finance_sharded_balancer
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_finance_sharded_balancer"
+
 buildvariants:
   - name: task_generation
     display_name: Task Generation
@@ -1474,6 +1552,7 @@ buildvariants:
 
   - name: perf-3-shard.arm.aws.2023-11
     display_name: PERF 3-Shard Cluster ARM AWS 2023-11
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -1503,9 +1582,15 @@ buildvariants:
       - name: mongos_large_catalog_workloads
       - name: change_streams_latency
       - name: change_streams_multi_mongos
+      # Tasks added for QueryStats comparison.
+      - name: tsbs_query_sharded
+      - name: tsbs_query_finance_sharded
+      - name: tsbs_query_sharded_balancer
+      - name: tsbs_query_finance_sharded_balancer
 
   - name: perf-3-node-replSet.arm.aws.2023-11
     display_name: PERF 3-Node ReplSet ARM AWS 2023-11
+    cron: "0 0 * * 1,2,3,4,5,6"  # Everyday except Sunday at 00:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -1549,9 +1634,19 @@ buildvariants:
       - name: tpcc
       - name: linkbench
       - name: linkbench2
+      # Tasks added for QueryStats comparison.
+      - name: tpcc_majority
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: mixed_workloads_genny_rate_limited_high_value
+      - name: majority_reads10_k_threads_high_value
+      - name: large_indexed_ins_high_value
+      - name: expressive_queries_high_value
+      - name: time_series_sort_high_value
 
   - name: perf-3-node-replSet-intel.intel.aws.2023-11
     display_name: PERF 3-Node ReplSet Intel AWS 2023-11
+    cron: "0 0 * * 1,2,3,4,5,6"  # Everyday except Sunday at 00:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -1577,6 +1672,16 @@ buildvariants:
       - name: smoke_test
       - name: linkbench
       - name: linkbench2
+      # Tasks added for QueryStats comparison
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: mixed_workloads_genny_rate_limited_high_value
+      - name: tpcc_majority
+      - name: tsbs_load
+      - name: tsbs_query
 
 
   - name: perf-2-node-replSet-initialsync.arm.aws.2023-11
@@ -1604,7 +1709,7 @@ buildvariants:
   - &linux-microbenchmarks-standalone-arm
     name: perf-mongo-perf-standalone.arm.aws.2023-11
     display_name: PERF Monogo-Perf Standalone inMemory ARM AWS 2023-11
-    cron: "0 0 * * 0"   # Weekly, Sundays at 12 AM
+    cron: "0 0 * * 0,4"   # Weekly, Sundays and Thursdays at 12 AM
     modules: *modules
     expansions: &standalone-arm-expansions
       mongodb_setup_release: 2022-11
@@ -1639,6 +1744,10 @@ buildvariants:
     - name: singleThreaded_read_commands
     - name: pipeline-updates
     - name: javascript
+    # Tasks added for QueryStats comparison.
+    - name: big_collection
+    - name: aggregation_read_commands_large_dataset
+    - name: tie-breaking-heuristics
 
   - &linux-microbenchmarks-standalone-intel
     <<: *linux-microbenchmarks-standalone-arm
@@ -1655,3 +1764,231 @@ buildvariants:
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
+
+  # Added as a baseline comparison for QueryStats.
+  - name: perf-standalone.arm.aws.2023-11
+    display_name: PERF Standalone ARM AWS 2023-11
+    cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    depends_on: *_compile_amazon_linux2_arm64
+    run_on:
+      - "rhel70-perf-single"
+    tasks: &standalonetasks
+      - schedule_patch_auto_tasks
+      - schedule_variant_auto_tasks
+      # Tasks added for QueryStats comparison
+      - name: ycsb.2023-09
+      - name: ycsb_60GB.2023-09
+      - name: ycsb_60GB.long.2023-09
+      - name: crud_workloads_majority
+      - name: tpcc
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
+
+  ######################## QueryStats variants ########################
+  - name: perf-3-shard-query-stats.arm.aws.2023-11
+    display_name: PERF 3-Shard Cluster (QueryStats, Rate Limited with 100) ARM AWS 2023-11
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-query-stats
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: shard
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - schedule_patch_auto_tasks
+      - schedule_variant_auto_tasks
+      - name: ycsb.2023-09
+      - name: mongos_workloads
+      - name: tsbs_query_sharded
+      - name: tsbs_query_finance_sharded
+      - name: tsbs_query_sharded_balancer
+      - name: tsbs_query_finance_sharded_balancer
+
+  - name: perf-3-node-replSet-intel-query-stats.intel.aws.2023-11
+    display_name: PERF 3-Node ReplSet (QueryStats, Rate Limited with 100) Intel AWS 2023-11
+    cron: "0 0 * * 1,2,3,4,5,6"  # Everyday except Sunday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-query-stats-rate-limit
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: replica-intel.2023-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      # Note: not specifying the rate limit here means that it will pick up the DSI default rate limit value (100).
+      config_params_json: '{"v": 0, "featureFlagQueryStats": true}'
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon2
+    tasks: &3node-query-stats-tasks
+      - schedule_patch_auto_tasks
+      - schedule_variant_auto_tasks
+      - name: ycsb.2023-09
+      - name: ycsb_60GB.2023-09
+      - name: ycsb_60GB.long.2023-09
+      - name: crud_workloads_majority
+      - name: smoke_test
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: tpcc_majority
+      - name: linkbench
+      - name: linkbench2
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: mixed_workloads_genny_rate_limited_high_value
+      - name: majority_reads10_k_threads_high_value
+      - name: large_indexed_ins_high_value
+      - name: expressive_queries_high_value
+      - name: time_series_sort_high_value
+
+  - &3node-query-stats-rate-limit
+    name: perf-3-node-replSet-query-stats.arm.aws.2023-11
+    display_name: PERF 3-Node ReplSet (QueryStats, Rate Limited with 100) ARM AWS 2023-11
+    cron: "0 0 * * 1,2,3,4,5,6"  # Everyday except Sunday at 00:00
+    modules: *modules
+    expansions: &3node-query-stats-rate-limit-expansions
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-query-stats-rate-limit
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      config_params_json: '{"v": 0, "featureFlagQueryStats": true}'
+    depends_on: *_compile_amazon_linux2_arm64
+    run_on:
+      - "rhel70-perf-replset"
+    tasks: *3node-query-stats-tasks
+
+  - <<: *3node-query-stats-rate-limit
+    name: perf-3-node-replSet-limited-10-query-stats.arm.aws.2023-11
+    display_name: PERF 3-Node ReplSet (QueryStats, Rate Limited with 10) ARM AWS 2023-11
+    expansions:
+      <<: *3node-query-stats-rate-limit-expansions
+      config_params_json: '{"v": 0, "featureFlagQueryStats": true, "internalQueryStatsRateLimit": 10}'
+    tasks: &3node-query-stats-rate-limit-tasks
+      - schedule_patch_auto_tasks
+      - schedule_variant_auto_tasks
+      - name: ycsb.2023-09
+      - name: ycsb_60GB.2023-09
+      - name: ycsb_60GB.long.2023-09
+      - name: bestbuy_agg
+      - name: tpcc_majority
+      - name: linkbench2
+      - name: tsbs_query
+      - name: mixed_workloads_genny_rate_limited_high_value
+      - name: majority_reads10_k_threads_high_value
+      - name: large_indexed_ins_high_value
+      - name: expressive_queries_high_value
+      - name: time_series_sort_high_value
+
+  - <<: *3node-query-stats-rate-limit
+    name: perf-3-node-replSet-limited-20-query-stats.arm.aws.2023-11
+    display_name: PERF 3-Node ReplSet (QueryStats, Rate Limited with 20) ARM AWS 2023-11
+    expansions:
+      <<: *3node-query-stats-rate-limit-expansions
+      config_params_json: '{"v": 0, "featureFlagQueryStats": true, "internalQueryStatsRateLimit": 20}'
+    tasks: *3node-query-stats-rate-limit-tasks
+
+  - <<: *3node-query-stats-rate-limit
+    name: perf-3-node-replSet-limited-50-query-stats.arm.aws.2023-11
+    display_name: PERF 3-Node ReplSet (QueryStats, Rate Limited with 50) ARM AWS 2023-11
+    expansions:
+      <<: *3node-query-stats-rate-limit-expansions
+      config_params_json: '{"v": 0, "featureFlagQueryStats": true, "internalQueryStatsRateLimit": 50}'
+    tasks: *3node-query-stats-rate-limit-tasks
+
+  - name: perf-standalone-query-stats.arm.aws.2023-11
+    display_name: PERF Standalone (QueryStats, Rate Limited with 100) ARM AWS 2023-11
+    cron: *linux-standalone-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-query-stats
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      config_params_json: '{"v": 0, "featureFlagQueryStats": true}'
+    depends_on: *_compile_amazon_linux2_arm64
+    run_on:
+      - "rhel70-perf-single"
+    tasks: *standalonetasks
+
+  - name: perf-mongo-perf-standalone-query-stats.arm.aws.2023-11
+    display_name: PERF Mongo-Perf Standalone inMemory (QueryStats, Rate Limited with 100) ARM AWS 2023-11
+    cron: "0 0 * * 0,4"   # Weekly, Sundays and Thursdays at 12 AM
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: mongo-perf-standalone-query-stats
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: workload_client_mongod_combined.2023-01
+      workload_setup: 2022-11
+      use_scons_cache: true
+      platform: linux
+      canaries: none
+      storageEngine: inMemory
+      project_dir: *project_dir
+      compile_variant: "-arm64"
+    depends_on: *_compile_amazon_linux2_arm64
+    run_on:
+    - "rhel70-perf-microbenchmarks"
+    tasks:
+      - name: big_collection
+      - name: genny_scale_InsertRemove
+      - name: genny_execution_UserAcquisition
+      - name: aggregation_read_commands
+      - name: aggregation_read_commands_large_dataset
+      - name: agg-query-comparison_read_commands
+      - name: query_read_commands
+      - name: query_read_commands_large_dataset
+      - name: views-aggregation
+      - name: views-query
+      - name: where_read_commands
+      - name: update_read_commands
+      - name: insert_read_commands
+      - name: wildcard-index-read_read_commands
+      - name: wildcard-index-write_read_commands
+      - name: geo_read_commands
+      - name: misc_read_commands
+      - name: singleThreaded_read_commands
+      - name: pipeline-updates
+      - name: javascript
+      - name: tie-breaking-heuristics
