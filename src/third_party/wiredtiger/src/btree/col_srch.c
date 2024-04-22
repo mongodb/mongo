@@ -73,10 +73,13 @@ __wt_col_search(
     uint64_t recno;
     uint32_t base, indx, limit, read_flags;
     int depth;
+    /* Whenever there is a greater record in the tree, FLCS should return the requested record. */
+    bool greater_recno_exists_flcs;
 
     session = CUR2S(cbt);
     btree = S2BT(session);
     current = NULL;
+    greater_recno_exists_flcs = false;
 
     /*
      * Assert the session and cursor have the right relationship (not search specific, but search is
@@ -133,6 +136,11 @@ restart:
         WT_INTL_INDEX_GET(session, page, pindex);
         base = pindex->entries;
         descent = pindex->index[base - 1];
+
+        /* For FLCS, save if we have encountered a record number greater than the requested one. */
+        if (btree->type == BTREE_COL_FIX && !greater_recno_exists_flcs &&
+          descent->ref_recno > recno)
+            greater_recno_exists_flcs = true;
 
         /* Fast path appends. */
         if (recno >= descent->ref_recno) {
@@ -327,6 +335,12 @@ past_end:
         if (recno == cbt->recno)
             cbt->compare = 0;
         else if (recno < cbt->recno)
+            cbt->compare = 1;
+        /*
+         * Special case for FLCS: the requested record number is greater than the record the cursor
+         * is positioned on but a greater record number exists.
+         */
+        else if (greater_recno_exists_flcs)
             cbt->compare = 1;
         else
             cbt->compare = -1;
