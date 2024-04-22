@@ -613,6 +613,7 @@ struct __wt_connection_stats {
     int64_t capacity_time_log;
     int64_t capacity_time_read;
     int64_t capacity_time_chunkcache;
+    int64_t checkpoint_cleanup_success;
     int64_t checkpoint_snapshot_acquired;
     int64_t checkpoint_skipped;
     int64_t checkpoint_fsync_post;

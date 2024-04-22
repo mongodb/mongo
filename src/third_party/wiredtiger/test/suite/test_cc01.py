@@ -27,16 +27,16 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # [TEST_TAGS]
-# checkpoint:garbage_collection
+# checkpoint:checkpoint_cleanup
 # [END_TAGS]
 
-import wiredtiger, wttest
+import time, wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wiredtiger import stat
 
-# test_gc01.py
-# Shared base class used by gc tests.
-class test_gc_base(wttest.WiredTigerTestCase):
+# test_cc01.py
+# Shared base class used by cc tests.
+class test_cc_base(wttest.WiredTigerTestCase):
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records.
@@ -71,23 +71,34 @@ class test_gc_base(wttest.WiredTigerTestCase):
         session.rollback_transaction()
         self.assertEqual(count, nrows)
 
-    def check_gc_stats(self):
+    def wait_for_cc_to_run(self):
+        c = self.session.open_cursor( 'statistics:')
+        cc_success = prev_cc_success = c[stat.conn.checkpoint_cleanup_success][2]
+        c.close()
+        while cc_success - prev_cc_success == 0:
+            time.sleep(0.1)
+            c = self.session.open_cursor( 'statistics:')
+            cc_success = c[stat.conn.checkpoint_cleanup_success][2]
+            c.close()
+
+    def check_cc_stats(self):
+        self.wait_for_cc_to_run()
         c = self.session.open_cursor( 'statistics:')
         self.assertGreaterEqual(c[stat.conn.checkpoint_cleanup_pages_visited][2], 0)
         self.assertGreaterEqual(c[stat.conn.checkpoint_cleanup_pages_removed][2], 0)
         c.close()
 
 # Test that checkpoint cleans the obsolete history store pages.
-class test_gc01(test_gc_base):
+class test_cc01(test_cc_base):
     # Force a small cache.
     conn_config = ('cache_size=50MB,eviction_updates_trigger=95,eviction_updates_target=80,'
                    'statistics=(all)')
 
-    def test_gc(self):
+    def test_cc(self):
         nrows = 10000
 
         # Create a table without logging.
-        uri = "table:gc01"
+        uri = "table:cc01"
         ds = SimpleDataSet(self, uri, 0, key_format="i", value_format="S")
         ds.populate()
 
@@ -115,8 +126,8 @@ class test_gc01(test_gc_base):
             ',stable_timestamp=' + self.timestamp_str(100))
 
         # Checkpoint to ensure that the history store is cleaned.
-        self.session.checkpoint()
-        self.check_gc_stats()
+        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        self.check_cc_stats()
 
         # Check that the new updates are only seen after the update timestamp.
         self.check(bigvalue2, uri, nrows, 100)
@@ -148,8 +159,8 @@ class test_gc01(test_gc_base):
             ',stable_timestamp=' + self.timestamp_str(200))
 
         # Checkpoint to ensure that the history store is cleaned.
-        self.session.checkpoint()
-        self.check_gc_stats()
+        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        self.check_cc_stats()
 
         # Check that the new updates are only seen after the update timestamp.
         self.check(bigvalue, uri, nrows, 200)
@@ -181,8 +192,8 @@ class test_gc01(test_gc_base):
             ',stable_timestamp=' + self.timestamp_str(300))
 
         # Checkpoint to ensure that the history store is cleaned.
-        self.session.checkpoint()
-        self.check_gc_stats()
+        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        self.check_cc_stats()
 
         # Check that the new updates are only seen after the update timestamp.
         self.check(bigvalue2, uri, nrows, 300)

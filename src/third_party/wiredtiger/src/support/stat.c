@@ -1618,6 +1618,7 @@ static const char *const __stats_connection_desc[] = {
   "capacity: time waiting during logging (usecs)",
   "capacity: time waiting during read (usecs)",
   "capacity: time waiting for chunk cache IO bandwidth (usecs)",
+  "checkpoint: checkpoint cleanup successful calls",
   "checkpoint: checkpoint has acquired a snapshot for its transaction",
   "checkpoint: checkpoints skipped because database was clean",
   "checkpoint: fsync calls after allocating the transaction ID",
@@ -2354,6 +2355,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->capacity_time_log = 0;
     stats->capacity_time_read = 0;
     stats->capacity_time_chunkcache = 0;
+    stats->checkpoint_cleanup_success = 0;
     stats->checkpoint_snapshot_acquired = 0;
     stats->checkpoint_skipped = 0;
     stats->checkpoint_fsync_post = 0;
@@ -3109,6 +3111,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->capacity_time_log += WT_STAT_READ(from, capacity_time_log);
     to->capacity_time_read += WT_STAT_READ(from, capacity_time_read);
     to->capacity_time_chunkcache += WT_STAT_READ(from, capacity_time_chunkcache);
+    to->checkpoint_cleanup_success += WT_STAT_READ(from, checkpoint_cleanup_success);
     to->checkpoint_snapshot_acquired += WT_STAT_READ(from, checkpoint_snapshot_acquired);
     to->checkpoint_skipped += WT_STAT_READ(from, checkpoint_skipped);
     to->checkpoint_fsync_post += WT_STAT_READ(from, checkpoint_fsync_post);

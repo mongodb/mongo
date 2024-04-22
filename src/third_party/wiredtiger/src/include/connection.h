@@ -423,8 +423,9 @@ struct __wt_connection_impl {
     TAILQ_HEAD(__wt_blockhash, __wt_block) * blockhash;
     TAILQ_HEAD(__wt_block_qh, __wt_block) blockqh;
 
-    WT_BLKCACHE blkcache;     /* Block cache */
-    WT_CHUNKCACHE chunkcache; /* Chunk cache */
+    WT_BLKCACHE blkcache;             /* Block cache */
+    WT_CHECKPOINT_CLEANUP cc_cleanup; /* Checkpoint cleanup */
+    WT_CHUNKCACHE chunkcache;         /* Chunk cache */
 
     /* Locked: handles in each bucket */
     uint64_t *dh_bucket_count;
@@ -820,13 +821,14 @@ struct __wt_connection_impl {
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CONN_SERVER_CAPACITY 0x001u
 #define WT_CONN_SERVER_CHECKPOINT 0x002u
-#define WT_CONN_SERVER_CHUNKCACHE_METADATA 0x004u
-#define WT_CONN_SERVER_COMPACT 0x008u
-#define WT_CONN_SERVER_LOG 0x010u
-#define WT_CONN_SERVER_LSM 0x020u
-#define WT_CONN_SERVER_STATISTICS 0x040u
-#define WT_CONN_SERVER_SWEEP 0x080u
-#define WT_CONN_SERVER_TIERED 0x100u
+#define WT_CONN_SERVER_CHECKPOINT_CLEANUP 0x004u
+#define WT_CONN_SERVER_CHUNKCACHE_METADATA 0x008u
+#define WT_CONN_SERVER_COMPACT 0x010u
+#define WT_CONN_SERVER_LOG 0x020u
+#define WT_CONN_SERVER_LSM 0x040u
+#define WT_CONN_SERVER_STATISTICS 0x080u
+#define WT_CONN_SERVER_SWEEP 0x100u
+#define WT_CONN_SERVER_TIERED 0x200u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t server_flags;
 
