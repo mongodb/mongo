@@ -15,16 +15,13 @@ function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
                                     .getCollection("magic_restore_checkpointTimestamp")
                                     .findOne()
                                     .ts;
-    const objs = [{
-        "nodeType": "replicaSet",
-        "replicaSetConfig": expectedConfig,
-        "maxCheckpointTs": checkpointTimestamp,
-    }];
-    jsTestLog("Restore configuration: " + tojson(objs[0]));
 
+    let consistencyTs = checkpointTimestamp;
     let oplog = sourceConn.getDB("local").getCollection('oplog.rs');
     const entriesAfterBackup =
-        oplog.find({ts: {$gt: checkpointTimestamp}, ns: {$ne: "magic_restore_metadata"}})
+        oplog
+            .find(
+                {ts: {$gt: checkpointTimestamp}, ns: {$not: {$regex: "magic_restore_metadata.*"}}})
             .sort({ts: 1})
             .toArray();
 
@@ -45,6 +42,8 @@ function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
             // Restore to the timestamp of the last oplog entry on the source cluster.
             "pointInTimeTimestamp": entriesAfterBackup[entriesAfterBackup.length - 1].ts
         };
+        jsTestLog("Restore configuration: " + tojson(metadataDocument));
+        consistencyTs = entriesAfterBackup[entriesAfterBackup.length - 1].ts;
 
         currentBatch.push(metadataDocument);
         currentBatchSize += Object.bsonsize(metadataDocument);
@@ -86,34 +85,58 @@ function performRestore(sourceConn, expectedConfig, dbpath, name, options) {
             "replicaSetConfig": expectedConfig,
             "maxCheckpointTs": checkpointTimestamp,
         }];
+        jsTestLog("Restore configuration: " + tojson(objs[0]));
         MagicRestoreUtils.writeObjsToMagicRestorePipe(MongoRunner.dataDir + "/" + name, objs);
     }
 
     MagicRestoreUtils.runMagicRestoreNode(MongoRunner.dataDir + "/" + name, dbpath, options);
+    return consistencyTs;
+}
+
+// Helper function to retrieve the databases and collections on a node. The result is a map of
+// database names to lists of collections in that database.
+function getDatabasesAndCollectionsSnapshot(node, consistencyTs) {
+    return node.getDB("admin")
+        .aggregate([{$listCatalog: {}}],
+                   {readConcern: {level: 'snapshot', atClusterTime: consistencyTs}})
+        .toArray()
+        .reduce((acc, {db, name, md}) => {
+            // Need to filter out the metadata database from the source.
+            if (db === "magic_restore_metadata") {
+                return acc;
+            }
+            // Skip the collection if it is temporary since it will not have been migrated in
+            // restore.
+            if (md && md.options.temp == true) {
+                jsTestLog("Magic Restore: Skipping consistency check for temporary namespace " +
+                          db + "." + name + ".");
+                return acc;
+            }
+            if (!acc[db]) {
+                acc[db] = [];
+            }
+            acc[db].push(name);
+            return acc;
+        }, {});
 }
 
 // Performs a data consistency check between two nodes. The `local` database is ignored due to
 // containing different contents on the source and restore node. The collection
 // `test.magic_restore_checkpointTimestamp` is ignored on the source node for comparisons.
-function dataConsistencyCheck(sourceNode, restoreNode) {
-    // Grab the list of databases from both nodes.
-    // Need to filter out the metadata database from the source.
-    const sourceDatabases = sourceNode.adminCommand(
-        {listDatabases: 1, nameOnly: true, filter: {name: {$ne: "magic_restore_metadata"}}});
-    const restoreDatabases = restoreNode.adminCommand({listDatabases: 1, nameOnly: true});
-
-    const srcDbs = sourceDatabases.databases;
-    const restoreDbs = restoreDatabases.databases;
+function dataConsistencyCheck(sourceNode, restoreNode, consistencyTs) {
+    // Grab the database and collection names from both nodes.
+    const sourceDatabases = getDatabasesAndCollectionsSnapshot(sourceNode, consistencyTs);
+    const restoreDatabases = getDatabasesAndCollectionsSnapshot(restoreNode, consistencyTs);
 
     // Make sure the lists contain the same elements.
-    if (srcDbs.length === restoreDbs.length &&
-        srcDbs.every((element, index) => element === restoreDbs[index])) {
-        throw new Error("Source and restore databases do not match");
+    if (Object.keys(sourceDatabases).length !== Object.keys(restoreDatabases).length ||
+        Object.keys(sourceDatabases).every((dbName) => !restoreDatabases.hasOwnProperty(dbName))) {
+        throw new Error("Source and restore databases do not match. source database names: " +
+                        tojson(Object.keys(sourceDatabases)) +
+                        ". restore database names: " + tojson(Object.keys(restoreDatabases)));
     }
 
-    srcDbs.forEach((element) => {
-        const dbName = element["name"];
-
+    Object.keys(sourceDatabases).forEach((dbName) => {
         // Ignore the `local` db.
         if (dbName === "local") {
             return;
@@ -122,55 +145,29 @@ function dataConsistencyCheck(sourceNode, restoreNode) {
         let sourceDb = sourceNode.getDB(dbName);
         let restoreDb = restoreNode.getDB(dbName);
 
-        let sourceCollectionInfos =
-            new DBCommandCursor(sourceDb, assert.commandWorked(sourceDb.runCommand({
-                listCollections: 1
-            }))).toArray();
-        sourceCollectionInfos.sort((a, b) => a.name.localeCompare(b.name));
-
-        let restoreCollectionInfos =
-            new DBCommandCursor(
-                restoreDb,
-                assert.commandWorked(restoreDb.runCommand({listCollections: 1, nameOnly: true})))
-                .toArray();
-        restoreCollectionInfos.sort((a, b) => a.name.localeCompare(b.name));
+        let sourceCollections = sourceDatabases[dbName].sort((a, b) => a.localeCompare(b));
+        let restoreCollections = restoreDatabases[dbName].sort((a, b) => a.localeCompare(b));
 
         let idx = 0;
-
-        sourceCollectionInfos.forEach((sourceColl) => {
-            const sourceCollName = sourceColl.name;
-
-            // Skip the collection if it is temporary since it will not have been migrated in
-            // restore.
-            if (sourceColl.options.temp == true) {
-                jsTestLog("Magic Restore: Skipping consistency check for temporary namespace " +
-                          dbName + "." + sourceCollName + ".");
-                return;
-            }
-
-            // When we restore a sharded cluster we are running the individual shards individually
-            // as replica sets. This causes the system.keys collection to be populated differently
-            // than it is in a complete sharded cluster with configsvr. The `config.mongos`
-            // collection is expected to be different here since shard names and last known ping
-            // times will be different from the source node.
-            if (sourceCollName === "system.keys" || sourceCollName === "mongos") {
-                return;
-            }
-
-            // If we have finished iterating restoreCollectionInfos then we are missing a
+        sourceCollections.forEach((sourceCollName) => {
+            // If we have finished iterating restoreCollections then we are missing a
             // collection.
-            assert(idx < restoreCollectionInfos.length,
+            assert(idx < restoreCollections.length,
                    "restore node is missing the " + dbName + "." + sourceCollName + " namespace.");
 
-            let restoreCollName = restoreCollectionInfos[idx++].name;
+            let restoreCollName = restoreCollections[idx++];
 
             // When we restore a sharded cluster we are running the individual shards individually
             // as replica sets. This causes the system.keys collection to be populated differently
             // than it is in a complete sharded cluster with configsvr. The `config.mongos`
             // collection is expected to be different here since shard names and last known ping
-            // times will be different from the source node.
-            if (restoreCollName === "system.keys" || restoreCollName === "mongos") {
-                restoreCollName = restoreCollectionInfos[idx++].name;
+            // times will be different from the source node. The preimages and change_collections
+            // collections use independent untimestamped truncates to delete old data, and therefore
+            // they be inconsistent between source and destination.
+            if (sourceCollName === "system.keys" || sourceCollName === "mongos" ||
+                sourceCollName === "system.preimages" ||
+                sourceCollName === "system.change_collection") {
+                return;
             }
 
             // Make sure we compare the same collections (if they don't match one is missing from
@@ -178,8 +175,20 @@ function dataConsistencyCheck(sourceNode, restoreNode) {
             assert(sourceCollName === restoreCollName,
                    "restore node is missing the " + dbName + "." + sourceCollName + " namespace.");
 
-            let sourceCursor = sourceDb.getCollection(sourceCollName).find().sort({_id: 1});
-            let restoreCursor = restoreDb.getCollection(restoreCollName).find().sort({_id: 1});
+            // Reads on config.transactions do not support snapshot read concern, so we should read
+            // with 'majority'.
+            let readConcern =
+                dbName === "config" && sourceCollName === "transactions" ? "majority" : "snapshot";
+            let atClusterTime =
+                dbName === "config" && sourceCollName === "transactions" ? null : consistencyTs;
+            let sourceCursor = sourceDb.getCollection(sourceCollName)
+                                   .find()
+                                   .readConcern(readConcern, atClusterTime)
+                                   .sort({_id: 1});
+            let restoreCursor = restoreDb.getCollection(restoreCollName)
+                                    .find()
+                                    .readConcern(readConcern, atClusterTime)
+                                    .sort({_id: 1});
 
             let diff = DataConsistencyChecker.getDiff(sourceCursor, restoreCursor);
 
@@ -194,7 +203,7 @@ function dataConsistencyCheck(sourceNode, restoreNode) {
                     dbName + "." + sourceCollName}`);
         });
         // Source cursor has been exhausted, the restore node should be too.
-        assert(idx == restoreCollectionInfos.length,
+        assert(idx == restoreCollections.length,
                "restore node contains more collections than its source for the " + dbName +
                    " database.");
         const dbStats = assert.commandWorked(sourceDb.runCommand({dbStats: 1}));
@@ -219,14 +228,16 @@ function performMagicRestore(sourceNode, dbPath, name, options) {
     rst.stopSet(null /*signal*/, true /*forRestart*/);
 
     jsTestLog("Magic Restore: Restarting with magic restore options.");
+    // performRestore returns a read timestamp for snapshot reads in consistency checks.
+    const consistencyTs = performRestore(sourceNode, expectedConfig, dbPath, name, options);
 
-    performRestore(sourceNode, expectedConfig, dbPath, name, options);
-
-    jsTestLog("Magic Restore: Starting restore cluster for data consistency check.");
+    jsTestLog(
+        "Magic Restore: Starting restore cluster for data consistency check at snapshot timestamp " +
+        tojson(consistencyTs) + ".");
 
     rst.startSet({restart: true, dbpath: dbPath});
 
-    dataConsistencyCheck(sourceNode, rst.getPrimary());
+    dataConsistencyCheck(sourceNode, rst.getPrimary(), consistencyTs);
 
     jsTestLog("Magic Restore: Stopping magic restore cluster and cleaning up restore dbpath.");
 

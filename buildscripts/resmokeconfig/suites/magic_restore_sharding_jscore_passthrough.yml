@@ -48,6 +48,9 @@ selector:
     - jstests/core/max_doc_size.js
     - jstests/core/query/find/find_getmore_bsonsize.js
 
+    # TODO SERVER-89465: Re-enable test once failures are investigated, or include comment why test should remain disabled.
+    - jstests/core/query/query_settings/query_settings_size_limits.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
