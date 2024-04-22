@@ -135,6 +135,23 @@ proc unpack_b {} { unpack_int8 }
 proc unpack_S {{size -1}} { unpack_int8 $size }
 proc unpack_U {{size -1}} { unpack_u $size }  ;# U must have size; u unpacks till the end
 
+# Unpack string or int
+proc unpack_key {size} {
+  set startpos [pos]
+  set intval ""
+  if {[catch {
+    set intval [xentry varint unpack_uint]
+  }] || [pos] - $startpos != $size} {
+    goto $startpos
+    return [ascii $size str]
+  }
+  return "varint $intval"
+}
+
+proc unpack_size_key {name} {
+  _struct_U $name { unpack_key $size }
+}
+
 #####################
 # Debug
 
