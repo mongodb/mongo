@@ -95,8 +95,9 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime, const KeyFormat keyFo
 StatusWith<RecordId> extractKeyOptime(const char* data, int len) {
     // Use the latest BSON validation version. Oplog entries are allowed to contain decimal data
     // even if decimal is disabled.
-    if (kDebugBuild)
-        invariant(validateBSON(data, len).isOK());
+    if (kDebugBuild) {
+        invariantStatusOK(validateBSON(data, len));
+    }
 
     const BSONObj obj(data);
     const BSONElement elem = obj["ts"];
