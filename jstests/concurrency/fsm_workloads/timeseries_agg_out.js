@@ -100,8 +100,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
                 ErrorCodes.CommandNotSupportedOnView,
                 ErrorCodes.NamespaceNotFound,
-                ErrorCodes.NamespaceCannotBeSharded,
-                ErrorCodes.IllegalOperation
+                ErrorCodes.NamespaceCannotBeSharded
             ]);
     };
 
