@@ -75,6 +75,7 @@ ServiceContext* setupServiceContext() {
 }
 
 void BM_refreshOplogTruncateAFterPointIfPrimary(benchmark::State& state) {
+    FailPointEnableBlock skipDirectConnectionChecks{"skipDirectConnectionChecks"};
     auto* serviceContext = setupServiceContext();
     StorageInterfaceMockTimestamp storageInterface;
     repl::ReplicationCoordinator::set(
