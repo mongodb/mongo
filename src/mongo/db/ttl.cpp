@@ -629,7 +629,8 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         }
 
         std::shared_ptr<TenantMigrationAccessBlocker> mtab;
-        if (nullptr !=
+        if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless() &&
+            nullptr !=
                 (mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                             .getTenantMigrationAccessBlockerForDbName(coll.nss().dbName(),
                                                                       MtabType::kRecipient)) &&
