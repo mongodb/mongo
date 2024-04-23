@@ -32,28 +32,28 @@ def authenticate_okta(activation_endpoint, username, test_credentials):
     try:
         # User code will be pre-populated, so wait for next button to load and click.
         next_button = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "//input[@class='button button-primary'][@value='Next']"))
+            EC.element_to_be_clickable((By.XPATH, "//input[@class='button button-primary'][@value='Next']"))
         )
         next_button.click()
 
         # Wait for the username prompt and next button to load.
         username_input_box = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "//input[@name='username']"))
+            EC.element_to_be_clickable((By.XPATH, "//input[@name='username']"))
         )
-        next_button = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "//input[@class='button button-primary'][@value='Next']"))
+        next_button_username = WebDriverWait(driver, 30).until(
+            EC.element_to_be_clickable((By.XPATH, "//input[@id='idp-discovery-submit'][@value='Next']"))
         )
         
         # Enter username.
         username_input_box.send_keys(username)
-        next_button.click()
+        next_button_username.click()
 
         # Wait for the password prompt and next button to load.
         password_input_box = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "//input[@name='password']"))
+            EC.element_to_be_clickable((By.XPATH, "//input[@name='password']"))
         )
         verify_button = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "//input[@class='button button-primary'][@value='Sign In']"))
+            EC.element_to_be_clickable((By.XPATH, "//input[@class='button button-primary'][@value='Sign In']"))
         )
 
         # Enter password.
