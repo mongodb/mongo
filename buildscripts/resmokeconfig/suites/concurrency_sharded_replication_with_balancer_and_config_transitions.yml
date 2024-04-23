@@ -104,9 +104,6 @@ selector:
     - config_shard_incompatible
     - assumes_stable_shard_list
 
-    # TODO SERVER-89342: Enable these tests
-    - requires_capped
-
     # This suites execute random moveCollections in the background that cause open cursors on the
     # collection to be killed.
     - requires_getmore

@@ -65,8 +65,6 @@ selector:
     - requires_timeseries
     # MoveCollection changes the collection uuid.
     - assumes_stable_collection_uuid
-    # TODO SERVER-89342: Remove this tag after moveCollection works on capped collections.
-    - requires_capped
 
     # TODO SERVER-90239 Enable time series tests.
     - requires_timeseries

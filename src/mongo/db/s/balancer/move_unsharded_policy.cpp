@@ -269,8 +269,6 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::LockBusy:
                 case ErrorCodes::NamespaceNotFound:
                 case ErrorCodes::NotImplemented:
-                // TODO SERVER-89342 Remove OperationCannotBeBatched from whitelist
-                case ErrorCodes::OperationCannotBeBatched:
                 case ErrorCodes::OplogQueryMinTsMissing:
                 case ErrorCodes::ReshardCollectionAborted:
                 case ErrorCodes::ReshardCollectionInProgress:
