@@ -233,6 +233,16 @@ tasks:
         vars:
           test_control: "ycsb-60GB.long.2023-09"
 
+  - name: ycsb_audit.2023-09
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb.2023-09"
+          additional_mongodb_setup: |
+            {audit: enabled,
+             auditAuthorization: 1}
+
   - name: ycsb_read_concern_available.2023-09
     priority: 5
     commands:

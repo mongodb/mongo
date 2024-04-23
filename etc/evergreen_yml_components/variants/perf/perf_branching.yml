@@ -288,6 +288,7 @@ buildvariants:
       - *schedule_variant_auto_tasks_task
       - name: ycsb.2023-09
         cron: *high-value-workload-cron
+      - name: ycsb_audit.2023-09
       - name: ycsb_single_thread
       - name: ycsb_w1.2023-09
       - name: ycsb_60GB.2023-09
