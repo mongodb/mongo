@@ -41,7 +41,6 @@ selector:
     - jstests/core/json_schema/json_schema.js
     - jstests/core/**/mr_bigobject.js
     - jstests/core/**/not2.js
-    - jstests/core/**/notablescan.js
     - jstests/core/**/null_query_semantics.js
     - jstests/core/**/or1.js
     - jstests/core/**/or2.js

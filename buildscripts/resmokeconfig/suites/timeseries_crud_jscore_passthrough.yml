@@ -215,7 +215,6 @@ selector:
     - jstests/core/query/type/type_array.js
     - jstests/core/write/update/update_numeric_field_name.js
     # Time-series collections have different indexes from regular collections.
-    - jstests/core/notablescan.js
     - jstests/core/query/array/arrayfind4.js
     - jstests/core/query/array/arrayfind9.js
     - jstests/core/query/array/arrayfinda.js
