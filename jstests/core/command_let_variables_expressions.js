@@ -10,7 +10,7 @@
 (function() {
 "use strict";
 
-load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
+load('jstests/aggregation/extras/utils.js');  // For assertArrayEq().
 
 const coll = db.getCollection(jsTestName());
 
@@ -124,7 +124,7 @@ const literalLetParam = {
 
     assert.commandWorked(db.runCommand({
         findAndModify: coll.getName(),
-        query: {$expr: {$eq: ["$a", "$$c"]}},
+        query: {_id: 3, $expr: {$eq: ["$a", "$$c"]}},
         update: [{$set: {c: "updated"}}],
         let : {c: missingLetParam}
     }));
@@ -138,7 +138,7 @@ const literalLetParam = {
 
     assert.commandWorked(db.runCommand({
         findAndModify: coll.getName(),
-        query: {$expr: {$eq: ["$a", "$$c"]}},
+        query: {_id: 4, $expr: {$eq: ["$a", "$$c"]}},
         update: [{$set: {c: "updated"}}],
         let : {c: literalLetParam}
     }));
@@ -160,7 +160,7 @@ const literalLetParam = {
         delete: coll.getName(),
         deletes: [{
             q: {$expr: {$eq: ["$a", "$$c"]}},
-            limit: 1,
+            limit: 0,  // multi
         }],
         let : {c: missingLetParam}
     }));
@@ -176,7 +176,7 @@ const literalLetParam = {
         delete: coll.getName(),
         deletes: [{
             q: {$expr: {$eq: ["$a", "$$c"]}},
-            limit: 1,
+            limit: 0,  // multi
         }],
         let : {c: literalLetParam}
     }));
