@@ -126,7 +126,10 @@ assert.commandWorked(st.s.adminCommand(
     {"setParameter": 1, ShardingTaskExecutorPoolMinSize: 1, ShardingTaskExecutorPoolMaxSize: 1}));
 assert.soon(() => {
     let poolStats = getDiagnosticData();
-    return poolStats["poolInUse"] == 0 && poolStats["poolWasUsedOnce"] == 2;
+    // Other connections (e.g. connection to config primary running {find: "shards"}) may be
+    // dropped as a result of the max connections restriction, so it's possible more than 2
+    // connections are dropped.
+    return poolStats["poolInUse"] == 0 && poolStats["poolWasUsedOnce"] >= 2;
 }, "Dropped connections failed to be marked as wasUsedOnce within time limit", 20 * 1000);
 
 threads.forEach(function(thread) {
