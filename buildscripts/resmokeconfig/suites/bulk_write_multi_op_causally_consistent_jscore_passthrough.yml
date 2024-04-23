@@ -55,6 +55,7 @@ selector:
     - jstests/core/txns/timeseries/timeseries_reads_in_txns.js
     - jstests/core/txns/timeseries_insert_in_txn.js
     - jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
+    - jstests/core/query/empty_ts.js
 
     # Multiple cluster override does not support QE
     - jstests/core/queryable_encryption/*.js
