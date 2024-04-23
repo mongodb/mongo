@@ -95,6 +95,44 @@ if (!session.getClient().isMongos() && !TestData.testingReplicaSetEndpoint) {
 }
 
 //
+// A transaction with snapshot read concern cannot write to a collection that existed at the logical
+// timestamp at which the transaction executes but was dropped at a later timestamp.
+// There's a subtle difference with the test case immediately above: In this case, by the wallclock
+// time the transaction starts, the collection has already been dropped; whereas in the test case
+// above, the collection is dropped at a wallclock time later than the wallclock time the
+// transaction starts.
+//
+// TODO: SERVER-79766 Run also on sharded clusters. Right now it cannot because TransactionRouter
+// ignores the client-privided atClusterTime.
+// Skip on causal-consistency suites because we cannot use 'atClusterTime' there.
+if (!db.getMongo().isCausalConsistency() && !session.getClient().isMongos()) {
+    sessionCollA.drop();
+    sessionCollB.drop();
+
+    // Ensure collection A and collection B exist.
+    assert.commandWorked(sessionCollA.insert({}));
+    assert.commandWorked(sessionCollB.insert({}));
+    const txnReadTimestamp = session.getOperationTime();
+
+    // Drop collection B outside of the transaction. Advance the cluster time of the session
+    // performing the drop to ensure it happens at a later cluster time than the transaction's.
+    assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
+
+    // Start the transaction with a write to collection A. Use an explicit atClusterTime with a
+    // timestamp at which collectionB existed and contained one document.
+    sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
+    session.startTransaction({readConcern: {level: "snapshot", atClusterTime: txnReadTimestamp}});
+
+    // Expect a conflict to be thrown, because the collection was dropped at a logical timestamp
+    // greater than the one the transaction is reading at.
+    assert.commandFailedWithCode(
+        sessionDB2.runCommand({findAndModify: sessionCollB.getName(), update: {a: 1}}),
+        ErrorCodes.WriteConflict);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
+}
+
+//
 // A transaction with snapshot read concern cannot write to a collection that has been created
 // since the transaction started.
 //
