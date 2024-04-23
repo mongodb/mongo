@@ -3236,6 +3236,8 @@ TEST(EdgeCalcTest, TrimFactorConstraints) {
 void doEdgeCalcTestIdentifyLeaf(std::unique_ptr<Edges> edges, StringData expectLeaf) {
     ASSERT_EQ(edges->getLeaf(), expectLeaf);
     auto edgeSet = edges->get();
+    // sanity check edge set size vs edges->size()
+    ASSERT_EQ(edgeSet.size(), edges->size());
     ASSERT_EQ(std::count_if(edgeSet.cbegin(),
                             edgeSet.cend(),
                             [expectLeaf](const auto& leaf) { return leaf == expectLeaf; }),
@@ -5085,6 +5087,8 @@ public:
             }
         }();
         const auto expect = edges->get().size();
+        // The actual size of edges should be equal to edges->size(). This is a sanity check.
+        ASSERT_EQ(expect, edges->size());
         const auto calculated =
             getEdgesLength(makeRangeQueryTypeConfig(lb, ub, precision, sparsity));
         if (expect != calculated) {
