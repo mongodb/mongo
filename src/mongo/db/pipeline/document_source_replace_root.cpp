@@ -92,24 +92,23 @@ boost::optional<std::string> ReplaceRootTransformation::unnestsPath() const {
 
 boost::intrusive_ptr<DocumentSourceMatch> ReplaceRootTransformation::createTypeNEObjectPredicate(
     const std::string& expression, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // This produces {$expr: ... }
-    auto matchExpr = std::make_unique<ExprMatchExpression>(
-        // This produces {$ne: ... }
-        make_intrusive<ExpressionCompare>(
-            expCtx.get(),
-            ExpressionCompare::CmpOp::NE,
-            // This produces [...]
-            makeVector<boost::intrusive_ptr<Expression>>(
-                // This produces {$type: ... }
-                make_intrusive<ExpressionType>(
-                    expCtx.get(),
-                    makeVector<boost::intrusive_ptr<Expression>>(
-                        // This produces "$expression"
-                        ExpressionFieldPath::createPathFromString(
-                            expCtx.get(), expression, expCtx->variablesParseState))),
-                // This produces {$const: "object"}
-                ExpressionConstant::create(expCtx.get(), Value("object"_sd)))),
-        expCtx);
+    auto matchExpr = std::make_unique<OrMatchExpression>();
+    {
+        MatcherTypeSet typeSet;
+        typeSet.bsonTypes.insert(BSONType::Array);
+        auto typeIsArrayExpr =
+            std::make_unique<TypeMatchExpression>(StringData(expression), typeSet);
+        matchExpr->add(std::move(typeIsArrayExpr));
+    }
+    {
+        MatcherTypeSet typeSet;
+        typeSet.bsonTypes.insert(BSONType::Object);
+        auto typeIsObjectExpr =
+            std::make_unique<TypeMatchExpression>(StringData(expression), typeSet);
+        auto typeIsNotObjectExpr =
+            std::make_unique<NotMatchExpression>(std::move(typeIsObjectExpr));
+        matchExpr->add(std::move(typeIsNotObjectExpr));
+    }
 
     BSONObjBuilder bob;
     matchExpr->serialize(&bob);
@@ -139,7 +138,8 @@ bool ReplaceRootTransformation::pushDotRenamedMatchBefore(Pipeline::SourceContai
         MatchExpression* expr = prospectiveMatch->getMatchExpression();
         // A MatchExpression that contains $expr is ineligible for pushdown because the match
         // pushdown turned out to be comparatively slower in our benchmarks when $expr was used on
-        // dotted paths.
+        // dotted paths. Since MatchExpressions operate on BSONObj, while agg expressions operate on
+        // Documents. $expr also goes through an additional step of converting BSONObj to Document.
         if (QueryPlannerCommon::hasNode(expr, MatchExpression::EXPRESSION)) {
             return false;
         }

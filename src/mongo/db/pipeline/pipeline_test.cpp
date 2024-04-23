@@ -3506,10 +3506,16 @@ TEST(PipelineOptimizationTest, MatchPushedBeforeReplaceRoot) {
     std::string outputPipe =
         "["
         " {$match: {$or: [{'subDocument.x': {$eq: 2}},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}},"
+        " {'subDocument': {$not: {$type: [3]}}}, {'subDocument': {$type: [4]}}]}},"
         " {$replaceRoot: {newRoot: '$subDocument'}}"
         "]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    std::string serializedPipe =
+        "["
+        " {$match: {$or: [{'subDocument.x': {$eq: 2}},"
+        " {'subDocument': {$type: [4]}}, {'subDocument': {$not: {$type: [3]}}}]}},"
+        " {$replaceRoot: {newRoot: '$subDocument'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchPushedBeforeReplaceWith) {
@@ -3521,10 +3527,16 @@ TEST(PipelineOptimizationTest, MatchPushedBeforeReplaceWith) {
     std::string outputPipe =
         "["
         " {$match: {$or: [{'subDocument.x': {$eq: 6.98}},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}},"
+        " {'subDocument': {$not: {$type: [3]}}}, {'subDocument': {$type: [4]}}]}},"
         " {$replaceRoot: {newRoot: '$subDocument'}}"
         "]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    std::string serializedPipe =
+        "["
+        " {$match: {$or: [{'subDocument.x': {$eq: 6.98}},"
+        " {'subDocument': {$type: [4]}}, {'subDocument': {$not: {$type: [3]}}}]}},"
+        " {$replaceRoot: {newRoot: '$subDocument'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchPushedBeforeReplaceWithComplex) {
@@ -3537,10 +3549,17 @@ TEST(PipelineOptimizationTest, MatchPushedBeforeReplaceWithComplex) {
         "["
         " {$match: {$or: [{'subDocument.x': {$eq: 'big'}},"
         " {'subDocument.y': {$eq: 'small'}},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}},"
+        " {'subDocument': {$not: {$type: [3]}}}, {'subDocument': {$type: [4]}}]}},"
         " {$replaceRoot: {newRoot: '$subDocument'}}"
         "]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    std::string serializedPipe =
+        "["
+        " {$match: {$or: [{'subDocument.x': {$eq: 'big'}},"
+        " {'subDocument.y': {$eq: 'small'}},"
+        " {'subDocument': {$type: [4]}}, {'subDocument': {$not: {$type: [3]}}}]}},"
+        " {$replaceRoot: {newRoot: '$subDocument'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchPushedBeforeReplaceWithNestedAnd) {
@@ -3555,7 +3574,7 @@ TEST(PipelineOptimizationTest, MatchPushedBeforeReplaceWithNestedAnd) {
         " {'subDocument.b': {$eq: 'small'}},"
         " {'subDocument.x': {$eq: 'big'}},"
         " {'subDocument.y': {$eq: 'small'}}]},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}},"
+        " {'subDocument': {$not: {$type: [3]}}}, {'subDocument': {$type: [4]}}]}},"
         " {$replaceRoot: {newRoot: '$subDocument'}}"
         "]";
     std::string serializedPipe =
@@ -3564,7 +3583,7 @@ TEST(PipelineOptimizationTest, MatchPushedBeforeReplaceWithNestedAnd) {
         " {'subDocument.y': {$eq: 'small'}}]},"
         " {$and: [{$and: [{'subDocument.a': {$eq: 'big'}},"
         " {'subDocument.b': {$eq: 'small'}}]}]}]},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}},"
+        " {'subDocument': {$type: [4]}}, {'subDocument': {$not: {$type: [3]}}}]}},"
         " {$replaceRoot: {newRoot: '$subDocument'}}"
         "]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
@@ -3582,7 +3601,7 @@ TEST(PipelineOptimizationTest, MatchPushedBeforeReplaceWithAndOr) {
         " {'subDocument.lord': {$eq: 'cat'}}]},"
         " {'subDocument.a': {$eq: 'big'}},"
         " {'subDocument.b': {$eq: 'small'}}]},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}},"
+        " {'subDocument': {$not: {$type: [3]}}}, {'subDocument': {$type: [4]}}]}},"
         " {$replaceRoot: {newRoot: '$subDocument'}}"
         "]";
     std::string serializedPipe =
@@ -3591,7 +3610,7 @@ TEST(PipelineOptimizationTest, MatchPushedBeforeReplaceWithAndOr) {
         " {'subDocument.b': {$eq: 'small'}}]},"
         " {$or: [{'subDocument.lord': {$eq: 'cat'}},"
         " {'subDocument.friend': {$eq: 'dog'}}]}]},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}},"
+        " {'subDocument': {$type: [4]}}, {'subDocument': {$not: {$type: [3]}}}]}},"
         " {$replaceRoot: {newRoot: '$subDocument'}}"
         "]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
@@ -3608,21 +3627,21 @@ TEST(PipelineOptimizationTest, MultipleMatchesPushedBeforeReplaceWith) {
         "["
         " {$match: {$or: [{$and: [{'subDocument.x': {$eq: 'small'}},"
         " {'subDocument.y': {$eq: 1}}]},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}},"
+        " {'subDocument': {$not: {$type: [3]}}}, {'subDocument': {$type: [4]}}]}},"
         " {$replaceRoot: {newRoot: '$subDocument'}}"
         "]";
     std::string serializedPipe =
         "["
         " {$match: {$and: [{$or: [{'subDocument.x': {$eq: 'small'}},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]},"
+        " {'subDocument': {$type: [4]}}, {'subDocument': {$not: {$type: [3]}}}]},"
         " {$or: [{'subDocument.y': {$eq: 1}},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}]}},"
+        " {'subDocument': {$type: [4]}}, {'subDocument': {$not: {$type: [3]}}}]}]}},"
         " {$replaceRoot: {newRoot: '$subDocument'}}"
         "]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
-TEST(PipelineOptimizationTest, MatchOnlyPushedBeforeOneReplaceWith) {
+TEST(PipelineOptimizationTest, MatchPushedBeforeMultipleReplaceWiths) {
     std::string inputPipe =
         "["
         " {$replaceWith: '$subDocumentA'},"
@@ -3631,12 +3650,23 @@ TEST(PipelineOptimizationTest, MatchOnlyPushedBeforeOneReplaceWith) {
         "]";
     std::string outputPipe =
         "["
+        " {$match: {$or: [{'subDocumentA.subDocumentB.x.a': {$eq: 2}},"
+        " {'subDocumentA': {$not: {$type: [3]}}},"
+        " {'subDocumentA.subDocumentB': {$not: {$type: [3]}}},"
+        " {'subDocumentA': {$type: [4]}}, {'subDocumentA.subDocumentB': {$type: [4]}}]}},"
         " {$replaceRoot: {newRoot: '$subDocumentA'}},"
-        " {$match: {$or: [{'subDocumentB.x.a': {$eq: 2}},"
-        " {$expr: {$ne: [{$type: ['$subDocumentB']}, {$const: 'object'}]}}]}},"
         " {$replaceRoot: {newRoot: '$subDocumentB'}}"
         "]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    std::string serializedPipe =
+        "["
+        " {$match: {$or: [{'subDocumentA.subDocumentB.x.a': {$eq: 2}},"
+        " {'subDocumentA.subDocumentB': {$type: [4]}},"
+        " {'subDocumentA.subDocumentB': {$not: {$type: [3]}}},"
+        " {'subDocumentA': {$type: [4]}}, {'subDocumentA': {$not: {$type: [3]}}}]}},"
+        " {$replaceRoot: {newRoot: '$subDocumentA'}},"
+        " {$replaceRoot: {newRoot: '$subDocumentB'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, NoReplaceWithMatchOptForExprMatch) {
@@ -3693,10 +3723,17 @@ TEST(PipelineOptimizationTest, MatchNotPushedBeforeMultipleReplaceWithsSamePredN
         "["
         " {$replaceRoot: {newRoot: '$subDocument'}},"
         " {$match: {$or: [{'subDocument.x.a': {$eq: 2}},"
-        " {$expr: {$ne: [{$type: ['$subDocument']}, {$const: 'object'}]}}]}},"
+        " {'subDocument': {$not: {$type: [3]}}}, {'subDocument': {$type: [4]}}]}},"
         " {$replaceRoot: {newRoot: '$subDocument'}}"
         "]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    std::string serializedPipe =
+        "["
+        " {$replaceRoot: {newRoot: '$subDocument'}},"
+        " {$match: {$or: [{'subDocument.x.a': {$eq: 2}},"
+        " {'subDocument': {$type: [4]}}, {'subDocument': {$not: {$type: [3]}}}]}},"
+        " {$replaceRoot: {newRoot: '$subDocument'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 // TODO SERVER-88464: Optimize out $replaceRoot stage if newRoot is $$ROOT

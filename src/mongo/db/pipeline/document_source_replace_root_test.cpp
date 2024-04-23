@@ -326,8 +326,8 @@ TEST_F(ReplaceRootBasics, ReplaceRootSwapsWithMatchStage) {
     auto firstMatch = dynamic_cast<DocumentSourceMatch*>(container.begin()->get());
     ASSERT(firstMatch);
     ASSERT_BSONOBJ_EQ(firstMatch->getQuery(),
-                      fromjson("{$or: [{'subDocument.x': {$eq: 2}}, {$expr: {$ne: [{$type: "
-                               "['$subDocument']}, {$const: 'object'}]}}]}"));
+                      fromjson("{$or: [{'subDocument.x': {$eq: 2}}, {'subDocument': {$type: [4]}}, "
+                               "{'subDocument': {$not: {$type: [3]}}}]}"));
 
     ASSERT(dynamic_cast<DocumentSourceSingleDocumentTransformation*>(
         std::next(container.begin())->get()));

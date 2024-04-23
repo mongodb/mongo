@@ -122,9 +122,10 @@ public:
 
     /**
      * This whole block adds
-     * {$expr: {$ne: [{$type: "$expression"}, {$const: "object"}]}}
+     * {$or: [{"subDocument": {$type: "array"}}, {"subDocument": {$not: {$type: "object"}}}]}
      * in order to match on documents which, when evaluated at $expression, don't resolve to
-     * objects.
+     * objects. "array" is separately included because for MatchExpressions, arrays are evaluated as
+     * "object" types.
      */
     static boost::intrusive_ptr<DocumentSourceMatch> createTypeNEObjectPredicate(
         const std::string& expression, const boost::intrusive_ptr<ExpressionContext>& expCtx);
