@@ -71,7 +71,8 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
-        return make_intrusive<DocumentSourceVectorSearch>(expCtx, _taskExecutor, BSONObj());
+        return make_intrusive<DocumentSourceVectorSearch>(
+            expCtx, _taskExecutor, _originalSpec.copy());
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
