@@ -2822,9 +2822,9 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     statsBuilder.append("sourceUUID", _coordinatorDoc.getSourceUUID().toBSON());
     statsBuilder.append("newUUID", _coordinatorDoc.getReshardingUUID().toBSON());
     if (_coordinatorDoc.getSourceKey()) {
-        statsBuilder.append("oldShardKey", *_coordinatorDoc.getSourceKey());
+        statsBuilder.append("oldShardKey", _coordinatorDoc.getSourceKey()->toString());
     }
-    statsBuilder.append("newShardKey", _coordinatorDoc.getReshardingKey().toBSON());
+    statsBuilder.append("newShardKey", _coordinatorDoc.getReshardingKey().toString());
     if (_coordinatorDoc.getStartTime()) {
         auto startTime = *_coordinatorDoc.getStartTime();
         statsBuilder.append("startTime", startTime);
