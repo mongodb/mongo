@@ -7329,5 +7329,213 @@ TEST_F(TransactionRouterTest, ParticipantCannotBeAddedOnRetryableStmtInRetryable
                            ErrorCodes::IllegalOperation);
     }
 }
+
+class TransactionRouterSnapshotReadConcern : public TransactionRouterTestWithDefaultSession {
+protected:
+    void runTest(TransactionRouter::TransactionActions startAction,
+                 boost::optional<Timestamp> atClusterTime) {
+        ASSERT(startAction == TransactionRouter::TransactionActions::kStart ||
+               startAction == TransactionRouter::TransactionActions::kStartOrContinue);
+        auto startActionString = startAction == TransactionRouter::TransactionActions::kStart
+            ? OperationSessionInfoFromClient::kStartTransactionFieldName
+            : OperationSessionInfo::kStartOrContinueTransactionFieldName;
+
+        TxnNumber txnNum{3};
+        operationContext()->setTxnNumber(txnNum);
+        auto txnRouter = TransactionRouter::get(operationContext());
+
+        auto initializeReadConcern = [&](BSONObj cmdObj) {
+            repl::ReadConcernArgs readConcernArgs;
+            ASSERT_OK(readConcernArgs.initialize(cmdObj));
+            repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+        };
+
+        // Make the first command in the transaction specify "snapshot" readConcern with an
+        // "atClusterTime" if it is provided, and make it target shard1.
+        BSONObj firstCmdReadConcernObj;
+        BSONObj txnReadConcernObj;
+        if (atClusterTime) {
+            firstCmdReadConcernObj = BSON(
+                repl::ReadConcernArgs::kLevelFieldName
+                << "snapshot" << repl::ReadConcernArgs::kAtClusterTimeFieldName << *atClusterTime);
+            txnReadConcernObj = firstCmdReadConcernObj;
+        } else {
+            firstCmdReadConcernObj = BSON(repl::ReadConcernArgs::kLevelFieldName << "snapshot");
+            txnReadConcernObj =
+                firstCmdReadConcernObj.addFields(BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                                      << kInMemoryLogicalTime.asTimestamp()));
+        }
+        {
+            auto cmdObj = BSON("insert"
+                               << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                               << firstCmdReadConcernObj);
+            initializeReadConcern(cmdObj);
+            if (!atClusterTime &&
+                startAction == TransactionRouter::TransactionActions::kStartOrContinue) {
+                // When the action is startOrContinue, "atClusterTime" must be specified.
+                ASSERT_THROWS_CODE(
+                    txnRouter.beginOrContinueTxn(operationContext(), txnNum, startAction),
+                    DBException,
+                    8676400);
+                return;
+            } else {
+                txnRouter.beginOrContinueTxn(operationContext(), txnNum, startAction);
+            }
+
+            txnRouter.setDefaultAtClusterTime(operationContext());
+            auto actualCmdObj =
+                txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, cmdObj);
+            BSONObj expectedCmdObj = BSON("insert"
+                                          << "test"
+                                          << "readConcern" << txnReadConcernObj << startActionString
+                                          << true);
+            if (startAction != TransactionRouter::TransactionActions::kStartOrContinue) {
+                // When the action is startOrContinue, the "coordinator" field does not get
+                // attached.
+                expectedCmdObj = expectedCmdObj.addFields(BSON("coordinator" << true));
+            }
+            expectedCmdObj =
+                expectedCmdObj.addFields(BSON("autocommit" << false << "txnNumber" << txnNum));
+            ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
+        }
+
+        // Make the second command in the transaction not specify a readConcern and make it target
+        // shard2.
+        {
+            auto cmdObj = BSON("update"
+                               << "test");
+            initializeReadConcern(cmdObj);
+            txnRouter.beginOrContinueTxn(
+                operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
+            txnRouter.setDefaultAtClusterTime(operationContext());
+            auto actualCmdObj =
+                txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, cmdObj);
+            BSONObj expectedCmdObj = BSON("update"
+                                          << "test"
+                                          << "readConcern" << txnReadConcernObj << startActionString
+                                          << true << "autocommit" << false << "txnNumber"
+                                          << txnNum);
+            ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
+        }
+
+        // Make the third command in the transaction specify "local" readConcern. It is expected to
+        // fail with InvalidOptions since only the first command in a transaction can specify a
+        // readConcern.
+        {
+            auto cmdObj = BSON("delete"
+                               << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                               << BSON(repl::ReadConcernArgs::kLevelFieldName << "local"));
+            initializeReadConcern(cmdObj);
+            ASSERT_THROWS_CODE(
+                txnRouter.beginOrContinueTxn(
+                    operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue),
+                DBException,
+                ErrorCodes::InvalidOptions);
+        }
+
+        // Make the fifth command in the transaction specify "snapshot" readConcern with the same
+        // "atClusterTime" as the first command. It is also expected to fail with InvalidOptions
+        // since only the first command in a transaction can specify a readConcern.
+        {
+            auto cmdObj = BSON("delete"
+                               << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                               << txnReadConcernObj);
+            initializeReadConcern(cmdObj);
+            ASSERT_THROWS_CODE(
+                txnRouter.beginOrContinueTxn(
+                    operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue),
+                DBException,
+                ErrorCodes::InvalidOptions);
+        }
+
+        // Make the sixth command in the transaction not specify a readConcern and make it target
+        // shard3.
+        {
+            auto cmdObj = BSON("delete"
+                               << "test");
+            initializeReadConcern(cmdObj);
+            txnRouter.beginOrContinueTxn(
+                operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
+            txnRouter.setDefaultAtClusterTime(operationContext());
+            auto actualCmdObj =
+                txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, cmdObj);
+            BSONObj expectedCmdObj = BSON("delete"
+                                          << "test"
+                                          << "readConcern" << txnReadConcernObj << startActionString
+                                          << true << "autocommit" << false << "txnNumber"
+                                          << txnNum);
+            ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
+        }
+
+        // Make the seventh command in the transaction not specify a readConcern and make it target
+        // shard1. It should not have "readConcern" or "startTransaction" or
+        // "startOrContinueTransaction" attached.
+        {
+            auto cmdObj = BSON("delete"
+                               << "test");
+            initializeReadConcern(cmdObj);
+            txnRouter.beginOrContinueTxn(
+                operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
+            txnRouter.setDefaultAtClusterTime(operationContext());
+            auto actualCmdObj =
+                txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, cmdObj);
+            BSONObj expectedCmdObj = BSON("delete"
+                                          << "test"
+                                          << "autocommit" << false << "txnNumber" << txnNum);
+            ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
+        }
+    }
+};
+
+TEST_F(TransactionRouterSnapshotReadConcern,
+       SnapshotReadConcernWithAtClusterTimeGreaterThanVectorClockTime_Start) {
+    auto atClusterTime = Timestamp(4, 1);
+    ASSERT_GREATER_THAN(atClusterTime, kInMemoryLogicalTime.asTimestamp());
+    runTest(TransactionRouter::TransactionActions::kStart, atClusterTime);
+}
+
+TEST_F(TransactionRouterSnapshotReadConcern,
+       SnapshotReadConcernWithAtClusterTimeGreaterThanVectorClockTime_StartOrContinue) {
+    auto atClusterTime = Timestamp(4, 1);
+    ASSERT_GREATER_THAN(atClusterTime, kInMemoryLogicalTime.asTimestamp());
+    runTest(TransactionRouter::TransactionActions::kStartOrContinue, atClusterTime);
+}
+
+TEST_F(TransactionRouterSnapshotReadConcern,
+       SnapshotReadConcernWithAtClusterTimeEqualToVectorClockTime_Start) {
+    auto atClusterTime = kInMemoryLogicalTime.asTimestamp();
+    runTest(TransactionRouter::TransactionActions::kStart, atClusterTime);
+}
+
+TEST_F(TransactionRouterSnapshotReadConcern,
+       SnapshotReadConcernWithAtClusterTimeEqualToVectorClockTime_StartOrContinue) {
+    auto atClusterTime = kInMemoryLogicalTime.asTimestamp();
+    runTest(TransactionRouter::TransactionActions::kStartOrContinue, atClusterTime);
+}
+
+TEST_F(TransactionRouterSnapshotReadConcern,
+       SnapshotReadConcernWithAtClusterTimeLessThanVectorClockTime_Start) {
+    auto atClusterTime = Timestamp(2, 1);
+    ASSERT_LESS_THAN(atClusterTime, kInMemoryLogicalTime.asTimestamp());
+    runTest(TransactionRouter::TransactionActions::kStart, atClusterTime);
+}
+
+TEST_F(TransactionRouterSnapshotReadConcern,
+       SnapshotReadConcernWithAtClusterTimeLessThanVectorClockTime_StartOrContinue) {
+    auto atClusterTime = Timestamp(2, 1);
+    ASSERT_LESS_THAN(atClusterTime, kInMemoryLogicalTime.asTimestamp());
+    runTest(TransactionRouter::TransactionActions::kStartOrContinue, atClusterTime);
+}
+
+TEST_F(TransactionRouterSnapshotReadConcern, SnapshotReadConcernWithoutAtClusterTime_Start) {
+    runTest(TransactionRouter::TransactionActions::kStart, boost::none /* atClusterTime */);
+}
+
+TEST_F(TransactionRouterSnapshotReadConcern,
+       SnapshotReadConcernWithoutAtClusterTime_StartOrContinue) {
+    runTest(TransactionRouter::TransactionActions::kStartOrContinue,
+            boost::none /* atClusterTime */);
+}
+
 }  // unnamed namespace
 }  // namespace mongo

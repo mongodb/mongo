@@ -219,18 +219,31 @@ std::string actionTypeToString(TransactionRouter::TransactionActions action) {
 }
 
 /**
- * Sets the given logical time as the atClusterTime for the transaction to be the greater of
- * the given time and the user's afterClusterTime, if one was provided.
+ * - If the 'readConcernArgs' specifies an 'atClusterTime', sets the 'txnAtClusterTime' to
+ *   that 'atClusterTime'.
+ * - If the 'readConcernArgs' specifies an 'afterClusterTime', sets the 'txnAtClusterTime' to
+ *   the greater of that 'afterClusterTime' and the 'candidateTime'.
+ * - If neither is specified, sets the 'txnAtClusterTime' to the 'candidateTime'.
  */
 void setAtClusterTime(const LogicalSessionId& lsid,
                       const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                       StmtId latestStmtId,
-                      TransactionRouter::AtClusterTime* atClusterTime,
-                      const boost::optional<LogicalTime>& afterClusterTime,
+                      TransactionRouter::AtClusterTime* txnAtClusterTime,
+                      const repl::ReadConcernArgs& readConcernArgs,
                       const LogicalTime& candidateTime) {
+    auto requestedAtClusterTime = readConcernArgs.getArgsAtClusterTime();
+    auto requestedAfterClusterTime = readConcernArgs.getArgsAfterClusterTime();
+    tassert(7976601,
+            "Cannot specify both 'atClusterTime' and 'afterClusterTime'",
+            !requestedAtClusterTime || !requestedAfterClusterTime);
+
+    if (requestedAtClusterTime) {
+        txnAtClusterTime->setTime(*requestedAtClusterTime, latestStmtId);
+        return;
+    }
     // If the user passed afterClusterTime, the chosen time must be greater than or equal to it.
-    if (afterClusterTime && *afterClusterTime > candidateTime) {
-        atClusterTime->setTime(*afterClusterTime, latestStmtId);
+    if (requestedAfterClusterTime && *requestedAfterClusterTime > candidateTime) {
+        txnAtClusterTime->setTime(*requestedAfterClusterTime, latestStmtId);
         return;
     }
 
@@ -243,7 +256,7 @@ void setAtClusterTime(const LogicalSessionId& lsid,
                 "globalSnapshotTimestamp"_attr = candidateTime,
                 "latestStmtId"_attr = latestStmtId);
 
-    atClusterTime->setTime(candidateTime, latestStmtId);
+    txnAtClusterTime->setTime(candidateTime, latestStmtId);
 }
 
 struct StrippedFields {
@@ -1163,7 +1176,7 @@ void TransactionRouter::Router::setAtClusterTimeForStartOrContinue(OperationCont
                              o(lk).txnNumberAndRetryCounter,
                              p().latestStmtId,
                              o(lk).atClusterTimeForSnapshotReadConcern.get_ptr(),
-                             repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
+                             repl::ReadConcernArgs::get(opCtx),
                              candidateTime.value());
         }
     } else if (o().placementConflictTimeForNonSnapshotReadConcern) {
@@ -1177,7 +1190,7 @@ void TransactionRouter::Router::setAtClusterTimeForStartOrContinue(OperationCont
                              o(lk).txnNumberAndRetryCounter,
                              p().latestStmtId,
                              o(lk).placementConflictTimeForNonSnapshotReadConcern.get_ptr(),
-                             repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
+                             repl::ReadConcernArgs::get(opCtx),
                              candidateTime.value());
         }
     }
@@ -1193,7 +1206,7 @@ void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx)
                              o(lk).txnNumberAndRetryCounter,
                              p().latestStmtId,
                              o(lk).atClusterTimeForSnapshotReadConcern.get_ptr(),
-                             repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
+                             repl::ReadConcernArgs::get(opCtx),
                              defaultTime.clusterTime());
         }
     } else if (o().placementConflictTimeForNonSnapshotReadConcern) {
@@ -1204,7 +1217,7 @@ void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx)
                              o(lk).txnNumberAndRetryCounter,
                              p().latestStmtId,
                              o(lk).placementConflictTimeForNonSnapshotReadConcern.get_ptr(),
-                             repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
+                             repl::ReadConcernArgs::get(opCtx),
                              defaultTime.clusterTime());
         }
     }
