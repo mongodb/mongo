@@ -1140,28 +1140,6 @@ buildvariants:
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
 
-  - <<: *amazon_linux2_arm64_compile_variant_dependency
-    name: perf-3-node-replSet-250mbwtcache.arm.aws.2023-11
-    display_name: 250 MB WiredTiger Cache 3-Node ReplSet ARM AWS 2023-11
-    cron: &linux-3-node-cron "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
-    modules: *perf_modules
-    expansions:
-      mongodb_setup_release: 2022-11
-      mongodb_setup: replica-250mbwtcache.2023-05
-      infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: replica
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *perf_project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: amazon2-arm64-compile
-    run_on:
-      - "rhel70-perf-replset"
-    tasks:
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
-
   - &linux-mongo-perf-repl-arm
     <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-mongo-perf-repl.arm.aws.2023-11
@@ -1728,7 +1706,7 @@ buildvariants:
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-node-replSet-query-settings.arm.aws.2023-11
     display_name: QuerySettings 3-Node ReplSet ARM AWS 2023-11
-    cron: *linux-3-node-cron
+    cron: &linux-3-node-cron "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
     modules: *perf_modules
     expansions:
       mongodb_setup_release: 2022-11
