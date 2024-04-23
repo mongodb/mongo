@@ -231,7 +231,9 @@ def bazel_build_thread_func(log_dir: str, verbose: bool) -> None:
     """This thread runs the bazel build up front."""
 
     done_with_temp = False
-    os.makedirs(log_dir, exist_ok=True)
+    # removed the log directory creation which was intermittently
+    # erroring on a race-condition
+    # FIX: The fix is in https://github.com/10gen/mongo/pull/21020
 
     if verbose:
         extra_args = []
