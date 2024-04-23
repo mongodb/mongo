@@ -4351,15 +4351,22 @@ std::vector<StringData> Edges::get() {
 }
 
 std::size_t Edges::size() const {
-    // Edges::get() generates "root" plus every {sparsity}'th chunk of leaf,
-    // With the full leaf being a guaranteed capture, regardless of sparsity.
-    std::size_t edges = _leaf.size() / _sparsity;
+    // Edges::get() generates, starting from the highest untrimmed level, every {sparsity}'th chunk
+    // of leaf (counting from the original root), with the full leaf being a guaranteed capture,
+    // regardless of sparsity.
+
+    // When trimFactor == 0 or 1, we trim nothing or just the root; when > 1, we trim (TF - 1)
+    // non-root levels.
+    std::size_t trimmedNonRootLevels = _trimFactor > 1 ? _trimFactor - 1 : 0;
+    // Count total number of edges (not accounting for trimming) which would be included according
+    // to sparsity, then remove trimmed edges which would have been included.
+    std::size_t edges = (_leaf.size() / _sparsity) - (trimmedNonRootLevels / _sparsity);
     if ((_leaf.size() % _sparsity) != 0) {
-        // Capture full leaf in the count anyway.
+        // Always capture full leaf in the count.
         ++edges;
     }
-    // Also capture "root" edge.
-    return 1 + edges;
+    // Add the root edge if it is not trimmed.
+    return (_trimFactor == 0 ? 1 : 0) + edges;
 }
 
 template <typename T>
