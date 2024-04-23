@@ -39,7 +39,7 @@ static constexpr auto kDefaultMaxTimeMSClusterParameterName = "defaultMaxTimeMS"
 
 /**
  * Returns the value of maxTimeMS that should be used for a command or boost::none if none could be
- * used.
+ * used. Also returns if 'defaultMaxTimeMS' was used.
  */
 std::pair<boost::optional<Milliseconds>, bool> getRequestOrDefaultMaxTimeMS(
     OperationContext* opCtx,
