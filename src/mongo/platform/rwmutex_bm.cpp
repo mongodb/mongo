@@ -47,6 +47,9 @@
 #define MONGO_SANITIZER_BENCHMARK_BUILD
 #endif
 
+// Only run `ResourceMutex` benchmarks locally since they cause timeouts and other issues in CI.
+#define REGISTER_RESOURCE_MUTEX_BENCHMARKS false
+
 namespace mongo {
 namespace {
 
@@ -166,7 +169,7 @@ const auto kMaxThreads = ProcessInfo::getNumLogicalCores() * 2;
 BENCHMARK_REGISTER_F(RWMutexBm, WriteRarelyRWMutex)->ThreadRange(1, kMaxThreads);
 BENCHMARK_REGISTER_F(RWMutexBm, SharedMutex)->ThreadRange(1, kMaxThreads);
 BENCHMARK_REGISTER_F(RWMutexBm, Mutex)->ThreadRange(1, kMaxThreads);
-#ifndef MONGO_SANITIZER_BENCHMARK_BUILD
+#if REGISTER_RESOURCE_MUTEX_BENCHMARKS
 BENCHMARK_REGISTER_F(RWMutexBm, ResourceMutex)->ThreadRange(1, kMaxThreads);
 #endif
 
