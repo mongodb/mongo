@@ -109,13 +109,8 @@ To run clang-tidy via Bazel, do the following:
 1. To analyze all code, run `bazel build --config=clang-tidy src/...`
 2. To analyze a single target (e.g.: `fsync_locked`), run the following command (note that `_with_debug` suffix on the target): `bazel build --config=clang-tidy src/mongo/db/commands:fsync_locked_with_debug`
 
-Remaining work to do:
+Testing notes:
 
-- TODO(SERVER-80396): Make it SCons-invokable
-- TODO(SERVER-80396): Link in Mongo's custom clang-tidy rules
-- TODO(SERVER-80396): Make it run in CI
-- TODO(SERVER-80396): Address the concern about [aspect / feature interaction](https://github.com/10gen/mongo/pull/21221#pullrequestreview-2009832686).
-  Testing notes:
 - If you want to test whether clang-tidy is in fact finding bugs, you can inject the following code into a `cpp` file to generate a `bugprone-incorrect-roundings` warning:
 
 ```

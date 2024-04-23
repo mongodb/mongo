@@ -4,6 +4,9 @@
 # Required environment variables:
 # * ${targets} - List of build targets
 # * ${compiler} - One of [clang|gcc]
+#
+# Optional environment variable(s):
+# * ${args} - List of additional Bazel arguments (e.g.: "--config=clang-tidy")
 
 # Needed for evergreen scripts that use evergreen expansions and utility methods.
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
