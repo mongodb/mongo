@@ -142,7 +142,7 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
                 // batched catalog write and continue on a new batch afterwards.
                 catalogWriter.reset();
 
-                repl::establishOplogCollectionForLogging(opCtx, collection);
+                repl::establishOplogRecordStoreForLogging(opCtx, collection->getRecordStore());
                 catalogWriter.emplace(opCtx);
             }
         }

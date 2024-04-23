@@ -867,7 +867,7 @@ void startupRecovery(OperationContext* opCtx,
 // Returns true if the oplog collection exists. Will always return false if the cached pointer to
 // the collection has not yet been initialized.
 bool oplogExists(OperationContext* opCtx) {
-    return static_cast<bool>(LocalOplogInfo::get(opCtx)->getCollection());
+    return static_cast<bool>(LocalOplogInfo::get(opCtx)->getRecordStore());
 }
 }  // namespace
 

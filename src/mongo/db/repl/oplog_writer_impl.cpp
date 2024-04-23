@@ -64,7 +64,7 @@ Status insertDocsToOplogAndChangeCollections(OperationContext* opCtx,
                                              bool writeChangeColl,
                                              OplogWriter::Observer* observer) {
     WriteUnitOfWork wuow(opCtx);
-    boost::optional<AutoGetOplog> autoOplog;
+    boost::optional<AutoGetOplogFastPath> autoOplog;
     boost::optional<ChangeStreamChangeCollectionManager::ChangeCollectionsWriter> ccw;
 
     // Acquire locks. We must acquire the locks for all collections we intend to write to before

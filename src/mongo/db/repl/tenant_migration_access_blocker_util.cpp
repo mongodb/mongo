@@ -702,7 +702,7 @@ Status handleTenantMigrationConflict(OperationContext* opCtx, Status status) {
 void performNoopWrite(OperationContext* opCtx, StringData msg) {
     using namespace fmt::literals;
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+    AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
     uassert(ErrorCodes::NotWritablePrimary,
             "Not primary when performing noop write for {}"_format(msg),
             replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));

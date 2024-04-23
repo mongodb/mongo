@@ -91,13 +91,12 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
         // A Global IX lock should be good enough to protect the oplog truncation from
         // interruptions such as restartCatalog. Database lock or collection lock is not
         // needed. This improves concurrency if oplog truncation takes long time.
-        AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
-        const auto& oplog = oplogWrite.getCollection();
-        if (!oplog) {
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
+        auto rs = LocalOplogInfo::get(opCtx.get())->getRecordStore();
+        if (!rs) {
             LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
             return false;
         }
-        auto rs = oplog->getRecordStore();
         if (!rs->yieldAndAwaitOplogDeletionRequest(opCtx.get())) {
             return false;  // Oplog went away.
         }

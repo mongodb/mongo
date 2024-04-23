@@ -97,14 +97,14 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
                                               .allowedFeatures =
                                                   MatchExpressionParser::kBanAllSpecialFeatures},
     });
-    boost::optional<AutoGetOplog> oplogRead;
+    boost::optional<AutoGetCollectionForReadMaybeLockFree> oplogRead;
     boost::optional<AutoGetChangeCollection> changeCollectionRead;
     const CollectionPtr* collPtr;
     if (tenantId) {
         changeCollectionRead.emplace(opCtx, AutoGetChangeCollection::AccessMode::kRead, *tenantId);
         collPtr = &**changeCollectionRead;
     } else {
-        oplogRead.emplace(opCtx, OplogAccessMode::kRead);
+        oplogRead.emplace(opCtx, NamespaceString::kRsOplogNamespace);
         collPtr = &oplogRead->getCollection();
     }
 
