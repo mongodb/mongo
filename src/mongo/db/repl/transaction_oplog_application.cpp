@@ -48,6 +48,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -728,6 +729,8 @@ void _reconstructPreparedTransaction(OperationContext* opCtx,
                                      const OplogEntry& prepareOp,
                                      repl::OplogApplication::Mode mode) {
     repl::UnreplicatedWritesBlock uwb(opCtx);
+    // The transaction may have been prepared originally with document validation bypassed.
+    DisableDocumentValidation validationDisabler(opCtx);
 
     // The operations here are reconstructed at their prepare time. However, that time
     // will be ignored because there is an outer write unit of work during their

@@ -51,6 +51,8 @@ last-continuous:
       ticket: SERVER-89395
     - test_file: jstests/core/query/explain/explain_skip.js
       ticket: SERVER-88949
+    - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
+      ticket: SERVER-89618
   suites: null
 last-lts:
   all:
@@ -84,4 +86,6 @@ last-lts:
       ticket: SERVER-89395
     - test_file: jstests/core/query/explain/explain_skip.js
       ticket: SERVER-88949
+    - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
+      ticket: SERVER-89618
   suites: null

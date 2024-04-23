@@ -56,6 +56,10 @@ assert.commandWorked(sessionColl1.insert({_id: 1}));
 assert.commandWorked(sessionColl2.insert({_id: 2}));
 assert.commandWorked(sessionColl3.insert({_id: 3}));
 assert.commandWorked(sessionColl3.insert({_id: 4}));
+assert.commandWorked(sessionColl3.insert({_id: 5}));
+
+// Add a validator so we can make sure validation doesn't cause initial sync to fail.
+assert.commandWorked(testDB.runCommand({collMod: collName, validator: {b: {$exists: false}}}));
 
 jsTestLog("Preparing three transactions");
 
@@ -108,7 +112,7 @@ jsTestLog("Running operations while collection cloning is paused");
 
 // Perform writes while collection cloning is paused so that we know they must be applied during
 // the oplog application stage of initial sync.
-assert.commandWorked(testColl.insert({_id: 5}));
+assert.commandWorked(testColl.insert({_id: 999}));
 
 let session4 = primary.startSession();
 let sessionDB4 = session4.getDatabase(dbName);
@@ -121,6 +125,22 @@ jsTestLog("Preparing the fourth transaction");
 session4.startTransaction();
 assert.commandWorked(sessionColl4.update({_id: 4}, {_id: 4, a: 1}));
 const prepareTimestamp4 = PrepareHelpers.prepareTransaction(session4, {w: 1});
+
+let session5 = primary.startSession();
+let sessionDB5 = session5.getDatabase(dbName);
+const sessionColl5 = sessionDB5.getCollection(collName);
+
+jsTestLog("Preparing the fifth transaction");
+
+// Prepare a transaction that would fail validation while collection cloning is paused so that its
+// oplog entry must be applied during the oplog application phase of initial sync.
+session5.startTransaction();
+assert.commandWorked(sessionDB5.runCommand({
+    update: collName,
+    updates: [{q: {_id: 5}, u: {_id: 5, a: 1, b: 2}}],
+    bypassDocumentValidation: true
+}));
+const prepareTimestamp5 = PrepareHelpers.prepareTransaction(session5, {w: 1});
 
 jsTestLog("Resuming initial sync");
 
@@ -142,7 +162,7 @@ const secondaryColl = secondary.getDB(dbName).getCollection(collName);
 // changes to the documents from any of the prepared transactions after initial sync. Also, make
 // sure that the writes that happened when collection cloning was paused happened.
 const res = secondaryColl.find().sort({_id: 1}).toArray();
-assert.eq(res, [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}], res);
+assert.eq(res, [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 999}], res);
 
 jsTestLog("Checking that the first transaction is properly prepared");
 
@@ -170,9 +190,15 @@ jsTestLog("Committing the fourth transaction");
 assert.commandWorked(PrepareHelpers.commitTransaction(session4, prepareTimestamp4));
 replTest.awaitReplication();
 
+jsTestLog("Committing the fifth transaction");
+
+assert.commandWorked(PrepareHelpers.commitTransaction(session5, prepareTimestamp5));
+replTest.awaitReplication();
+
 // Make sure that we can see the data from a committed transaction on the secondary if it was
 // applied during secondary oplog application.
 assert.docEq({_id: 4, a: 1}, secondaryColl.findOne({_id: 4}));
+assert.docEq({_id: 5, a: 1, b: 2}, secondaryColl.findOne({_id: 5}));
 
 jsTestLog("Stepping up the secondary");
 
