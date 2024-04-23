@@ -930,7 +930,7 @@ void BuilderBase<BufferT>::_appendDoubleWithoutTypeBits(const double num,
             _appendPreshiftedIntegerPortion((integerPart << 1) | 1, isNegative, invert);
 
             // Append the bytes of the mantissa that include fractional bits.
-            const size_t fractionalBits = 53 - (64 - countLeadingZeros64(integerPart));
+            const size_t fractionalBits = 53 - (64 - countLeadingZerosNonZero64(integerPart));
             const size_t fractionalBytes = (fractionalBits + 7) / 8;
             dassert(fractionalBytes > 0);
             uint64_t mantissa;
@@ -943,7 +943,7 @@ void BuilderBase<BufferT>::_appendDoubleWithoutTypeBits(const double num,
                 reinterpret_cast<const char*>((&mantissa) + 1) - fractionalBytes;
             _appendBytes(firstUsedByte, fractionalBytes, isNegative ? !invert : invert);
         } else {
-            const size_t fractionalBytes = countLeadingZeros64(integerPart << 1) / 8;
+            const size_t fractionalBytes = countLeadingZerosNonZero64(integerPart << 1) / 8;
             const auto ctype = isNegative ? CType::kNumericNegative8ByteInt + fractionalBytes
                                           : CType::kNumericPositive8ByteInt - fractionalBytes;
             _append(static_cast<uint8_t>(ctype), invert);
@@ -1433,7 +1433,7 @@ void BuilderBase<BufferT>::_appendPreshiftedIntegerPortion(uint64_t value,
     dassert(value != 0ULL);
     dassert(value != 1ULL);
 
-    const size_t bytesNeeded = (64 - countLeadingZeros64(value) + 7) / 8;
+    const size_t bytesNeeded = (64 - countLeadingZerosNonZero64(value) + 7) / 8;
 
     // Append the low bytes of value in big endian order.
     value = endian::nativeToBig(value);
