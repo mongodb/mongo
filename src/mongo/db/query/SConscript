@@ -665,3 +665,15 @@ env.Benchmark(
         'plan_cache_test_util',
     ],
 )
+
+env.Benchmark(
+    target='sbe_stage_builder_bm',
+    source=[
+        'sbe_stage_builder_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/query_exec',
+    ],
+)
