@@ -563,30 +563,6 @@ buildvariants:
     tasks: *classic_engine_1nodereplset_tasks
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
-    name: perf-1-node-replSet-all-feature-flags.arm.aws.2023-11
-    display_name: all feature flags 1-Node ReplSet ARM AWS 2023-11
-    cron: *linux-1-node-repl-cron
-    modules: *perf_modules
-    expansions:
-      mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica-all-feature-flags
-      infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: single
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *perf_project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: amazon2-arm64-compile
-    run_on:
-      - "rhel70-perf-single"
-    tasks:
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
-      - name: linkbench
-      - name: linkbench2
-
-  - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-1-node-replSet-test-commands.arm.aws.2023-11
     display_name: 1-Node ReplSet With Test Commands ARM AWS 2023-11
     cron: *linux-1-node-repl-cron
