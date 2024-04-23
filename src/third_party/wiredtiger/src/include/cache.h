@@ -182,7 +182,7 @@ struct __wt_cache {
      * is struggling to make progress, this score rises (up to a maximum of WT_EVICT_SCORE_MAX), at
      * which point the cache is "stuck" and transactions will be rolled back.
      */
-    uint32_t evict_aggressive_score;
+    wt_shared uint32_t evict_aggressive_score;
 
     /*
      * Score of how often LRU queues are empty on refill. This score varies between 0 (if the queue
