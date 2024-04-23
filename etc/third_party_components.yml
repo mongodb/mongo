@@ -160,6 +160,7 @@ components:
     release_monitoring_id: 4844
     local_directory_path: src/third_party/snappy
     team_owner: "Service Architecture"
+    upgrade_suppression: TODO SERVER-89716
 
   gperftools:
     homepage_url: https://github.com/gperftools/gperftools
