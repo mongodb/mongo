@@ -7,5 +7,5 @@ function setup_db_contrib_tool {
 
   python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
   python -m pip --disable-pip-version-check install "pipx" || exit 1
-  pipx install "db-contrib-tool==0.7.0" || exit 1
+  pipx install "db-contrib-tool==0.7.0" --pip-args="--no-cache-dir" || exit 1
 }
