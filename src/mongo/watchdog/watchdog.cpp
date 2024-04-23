@@ -183,37 +183,42 @@ void WatchdogPeriodicThread::doLoop() {
             stdx::unique_lock<Latch> lock(_mutex);
             MONGO_IDLE_THREAD_BLOCK;
 
+            while ((startTime + _period) > preciseClockSource->now()) {
+                // We are signalled on period changes at which point we may be done waiting or need
+                // to wait longer. If the period changes and we still need to wait longer, it's
+                // important that we call waitForConditionOrInterruptUntil again, as it will
+                // otherwise continue to use a deadline based on the old period.
+                auto oldPeriod = _period;
+                try {
+                    opCtx->waitForConditionOrInterruptUntil(
+                        _condvar, lock, startTime + _period, [&] {
+                            return oldPeriod != _period || _state == State::kShutdownRequested;
+                        });
+                } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>&) {
+                    LOGV2_DEBUG(
+                        6644400, 1, "Watchdog interrupted due to storage change. Retrying.");
+                    continue;
+                } catch (const DBException& e) {
+                    // The only bad status is when we are in shutdown
+                    if (!opCtx->getServiceContext()->getKillAllOperations()) {
+                        LOGV2_FATAL_CONTINUE(
+                            23415,
+                            "Watchdog was interrupted, shutting down, reason: {e_toStatus}",
+                            "e_toStatus"_attr = e.toStatus());
+                        exitCleanly(ExitCode::abrupt);
+                    }
 
-            // Check if the period is different?
-            // We are signalled on period changes at which point we may be done waiting or need to
-            // wait longer.
-            try {
-                opCtx->waitForConditionOrInterruptUntil(_condvar, lock, startTime + _period, [&] {
-                    return (startTime + _period) <= preciseClockSource->now() ||
-                        _state == State::kShutdownRequested;
-                });
-            } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>&) {
-                LOGV2_DEBUG(6644400, 1, "Watchdog interrupted due to storage change. Retrying.");
-                continue;
-            } catch (const DBException& e) {
-                // The only bad status is when we are in shutdown
-                if (!opCtx->getServiceContext()->getKillAllOperations()) {
-                    LOGV2_FATAL_CONTINUE(
-                        23415,
-                        "Watchdog was interrupted, shutting down, reason: {e_toStatus}",
-                        "e_toStatus"_attr = e.toStatus());
-                    exitCleanly(ExitCode::abrupt);
+                    // This interruption ends the WatchdogPeriodicThread. This means it is possible
+                    // to killOp this operation and stop it for the lifetime of the process.
+                    LOGV2_DEBUG(
+                        23406, 1, "WatchdogPeriodicThread interrupted by: {e}", "e"_attr = e);
+                    return;
                 }
 
-                // This interruption ends the WatchdogPeriodicThread. This means it is possible to
-                // killOp this operation and stop it for the lifetime of the process.
-                LOGV2_DEBUG(23406, 1, "WatchdogPeriodicThread interrupted by: {e}", "e"_attr = e);
-                return;
-            }
-
-            // Are we done running?
-            if (_state == State::kShutdownRequested) {
-                return;
+                // Are we done running?
+                if (_state == State::kShutdownRequested) {
+                    return;
+                }
             }
 
             // Check if the watchdog checks have been disabled
