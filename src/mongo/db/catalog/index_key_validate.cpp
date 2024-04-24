@@ -1001,6 +1001,19 @@ TTLCollectionCache::Info::ExpireAfterSecondsType extractExpireAfterSecondsType(
                          : TTLCollectionCache::Info::ExpireAfterSecondsType::kInvalid;
 }
 
+boost::optional<int32_t> normalizeExpireAfterSeconds(BSONElement expireAfterSecondsElem) {
+    auto swType = index_key_validate::validateExpireAfterSeconds(
+        expireAfterSecondsElem,
+        index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
+    if (!swType.isOK()) {
+        return durationCount<Seconds>(index_key_validate::kExpireAfterSecondsForInactiveTTLIndex);
+    } else if (index_key_validate::extractExpireAfterSecondsType(swType) ==
+               TTLCollectionCache::Info::ExpireAfterSecondsType::kNonInt) {
+        return expireAfterSecondsElem.safeNumberInt();
+    }
+    return boost::none;
+}
+
 bool isIndexTTL(const BSONObj& indexSpec) {
     return indexSpec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName);
 }

@@ -766,9 +766,10 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     }
 
     // Throws exception if index contains duplicates.
-    auto violatingRecordsList = scanIndexForDuplicates(opCtx, collection, cmr.indexRequest.idx);
+    auto violatingRecordsList = scanIndexForDuplicates(opCtx, cmr.indexRequest.idx);
     if (!violatingRecordsList.empty()) {
-        uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, collection, violatingRecordsList));
+        uassertStatusOK(
+            buildConvertUniqueErrorStatus(opCtx, collection.get(), violatingRecordsList));
     }
 
     return Status::OK();
@@ -801,7 +802,7 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(
     }
     const auto& cmr = statusW.getValue().first;
     auto idx = cmr.indexRequest.idx;
-    auto violatingRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
+    auto violatingRecordsList = scanIndexForDuplicates(opCtx, idx);
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangAfterCollModIndexUniqueFullIndexScan,
@@ -811,7 +812,8 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(
         nss);
 
     if (!violatingRecordsList.empty()) {
-        uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, collection, violatingRecordsList));
+        uassertStatusOK(
+            buildConvertUniqueErrorStatus(opCtx, collection.get(), violatingRecordsList));
     }
 
     return idx;
@@ -820,6 +822,7 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(
 Status _collModInternal(OperationContext* opCtx,
                         const NamespaceStringOrUUID& nsOrUUID,
                         const CollMod& cmd,
+                        const CollectionAcquisition* acquisition,
                         BSONObjBuilder* result,
                         boost::optional<repl::OplogApplication::Mode> mode) {
     // Get key pattern from the config server if we may need it for parsing checks if on the primary
@@ -854,17 +857,19 @@ Status _collModInternal(OperationContext* opCtx,
             return cmd.getIndex() && cmd.getIndex()->getUnique().value_or(false) && !mode;
         });
 
-    AutoGetCollection coll(
-        opCtx,
-        nsOrUUID,
-        MODE_X,
-        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-    auto nss = coll.getNss();
+    boost::optional<AutoGetCollection> autoget;
+    if (!acquisition) {
+        autoget.emplace(
+            opCtx,
+            nsOrUUID,
+            MODE_X,
+            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+    }
+    auto nss = acquisition ? acquisition->nss() : autoget->getNss();
+    auto& coll = acquisition ? acquisition->getCollectionPtr() : autoget->getCollection();
     auto dbName = nss.dbName();
     Lock::CollectionLock systemViewsLock(
         opCtx, NamespaceString::makeSystemDotViewsNamespace(dbName), MODE_X);
-
-    Database* const db = coll.getDb();
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangAfterDatabaseLock, opCtx, "hangAfterDatabaseLock", []() {}, nss);
@@ -885,8 +890,8 @@ Status _collModInternal(OperationContext* opCtx,
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     }
 
-    // If db/collection/view does not exist, short circuit and return.
-    if (!db || (!coll && !view)) {
+    // If collection/view does not exist, short circuit and return.
+    if (!coll && !view) {
         if (nss.isTimeseriesBucketsCollection()) {
             // If a sharded time-series collection is dropped, it's possible that a stale mongos
             // sends the request on the buckets namespace instead of the view namespace. Ensure that
@@ -911,7 +916,7 @@ Status _collModInternal(OperationContext* opCtx,
                                     << nss.toStringForErrorMsg());
     }
 
-    auto statusW = parseCollModRequest(opCtx, nss, coll.getCollection(), cmd, shardKeyPattern);
+    auto statusW = parseCollModRequest(opCtx, nss, coll, cmd, shardKeyPattern);
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
@@ -969,26 +974,28 @@ Status _collModInternal(OperationContext* opCtx,
 
         const CollectionOptions& oldCollOptions = coll->getCollectionOptions();
 
+        Collection* writableColl = acquisition
+            ? CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForMetadataWrite(opCtx,
+                                                                                    coll->uuid())
+            : autoget->getWritableCollection(opCtx);
+
         if (cmrNew.cappedSize || cmrNew.cappedMax) {
             // If the current capped collection size exceeds the newly set limits, future document
             // inserts will prompt document deletion.
-            uassertStatusOK(coll.getWritableCollection(opCtx)->updateCappedSize(
-                opCtx, cmrNew.cappedSize, cmrNew.cappedMax));
+            uassertStatusOK(
+                writableColl->updateCappedSize(opCtx, cmrNew.cappedSize, cmrNew.cappedMax));
         }
 
         boost::optional<IndexCollModInfo> indexCollModInfo;
 
         // Handle collMod operation type appropriately.
         if (cmd.getExpireAfterSeconds()) {
-            _setClusteredExpireAfterSeconds(opCtx,
-                                            oldCollOptions,
-                                            coll.getWritableCollection(opCtx),
-                                            *cmd.getExpireAfterSeconds());
+            _setClusteredExpireAfterSeconds(
+                opCtx, oldCollOptions, writableColl, *cmd.getExpireAfterSeconds());
         }
 
         if (auto mixedSchema = cmrNew.timeseriesBucketsMayHaveMixedSchemaData) {
-            coll.getWritableCollection(opCtx)->setTimeseriesBucketsMayHaveMixedSchemaData(
-                opCtx, mixedSchema);
+            writableColl->setTimeseriesBucketsMayHaveMixedSchemaData(opCtx, mixedSchema);
         }
 
         if (auto recordIdsReplicated = cmrNew.recordIdsReplicated) {
@@ -1000,30 +1007,30 @@ Status _collModInternal(OperationContext* opCtx,
                     nss.toStringForErrorMsg(),
                     cmd.toBSON({}).toString()));
 
-            coll.getWritableCollection(opCtx)->unsetRecordIdsReplicated(opCtx);
+            writableColl->unsetRecordIdsReplicated(opCtx);
         }
 
         // Handle index modifications.
         processCollModIndexRequest(
-            opCtx, &coll, cmrNew.indexRequest, &indexCollModInfo, result, mode);
+            opCtx, writableColl, cmrNew.indexRequest, &indexCollModInfo, result, mode);
 
         if (cmrNew.collValidator) {
-            coll.getWritableCollection(opCtx)->setValidator(opCtx, *cmrNew.collValidator);
+            writableColl->setValidator(opCtx, *cmrNew.collValidator);
         }
         if (cmrNew.collValidationAction)
-            uassertStatusOKWithContext(coll.getWritableCollection(opCtx)->setValidationAction(
-                                           opCtx, *cmrNew.collValidationAction),
-                                       "Failed to set validationAction");
+            uassertStatusOKWithContext(
+                writableColl->setValidationAction(opCtx, *cmrNew.collValidationAction),
+                "Failed to set validationAction");
         if (cmrNew.collValidationLevel) {
-            uassertStatusOKWithContext(coll.getWritableCollection(opCtx)->setValidationLevel(
-                                           opCtx, *cmrNew.collValidationLevel),
-                                       "Failed to set validationLevel");
+            uassertStatusOKWithContext(
+                writableColl->setValidationLevel(opCtx, *cmrNew.collValidationLevel),
+                "Failed to set validationLevel");
         }
 
         if (cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&
             *cmrNew.changeStreamPreAndPostImagesOptions !=
                 oldCollOptions.changeStreamPreAndPostImagesOptions) {
-            coll.getWritableCollection(opCtx)->setChangeStreamPreAndPostImages(
+            writableColl->setChangeStreamPreAndPostImages(
                 opCtx, *cmrNew.changeStreamPreAndPostImagesOptions);
         }
 
@@ -1033,11 +1040,10 @@ Status _collModInternal(OperationContext* opCtx,
             uassertStatusOK(res);
             auto [newOptions, changed] = res.getValue();
             if (changed) {
-                coll.getWritableCollection(opCtx)->setTimeseriesOptions(opCtx, newOptions);
+                writableColl->setTimeseriesOptions(opCtx, newOptions);
                 if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                    coll.getWritableCollection(opCtx)->setTimeseriesBucketingParametersChanged(
-                        opCtx, true);
+                    writableColl->setTimeseriesBucketingParametersChanged(opCtx, true);
                 };
             }
         }
@@ -1052,8 +1058,7 @@ Status _collModInternal(OperationContext* opCtx,
         if (cmrNew.numModifications == 0 &&
             (version == multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest ||
              version == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest)) {
-            auto writableCollection = coll.getWritableCollection(opCtx);
-            writableCollection->sanitizeCollectionOptions(opCtx);
+            writableColl->sanitizeCollectionOptions(opCtx);
         }
 
         // We involve an empty collMod command during a setFCV downgrade to clean timeseries
@@ -1064,21 +1069,20 @@ Status _collModInternal(OperationContext* opCtx,
         // TODO SERVER-80003 remove special version handling when LTS becomes 8.0.
         if (cmrNew.numModifications == 0 && coll->timeseriesBucketingParametersHaveChanged() &&
             version == multiversion::GenericFCV::kDowngradingFromLatestToLastLTS) {
-            coll.getWritableCollection(opCtx)->setTimeseriesBucketingParametersChanged(opCtx,
-                                                                                       boost::none);
+            writableColl->setTimeseriesBucketingParametersChanged(opCtx, boost::none);
         }
 
         // Fix any invalid index options for indexes belonging to this collection.
         std::vector<std::string> indexesWithInvalidOptions =
-            coll.getWritableCollection(opCtx)->repairInvalidIndexOptions(opCtx);
+            writableColl->repairInvalidIndexOptions(opCtx);
         for (const auto& indexWithInvalidOptions : indexesWithInvalidOptions) {
             const IndexDescriptor* desc =
                 coll->getIndexCatalog()->findIndexByName(opCtx, indexWithInvalidOptions);
             invariant(desc);
 
             // Notify the index catalog that the definition of this index changed.
-            coll.getWritableCollection(opCtx)->getIndexCatalog()->refreshEntry(
-                opCtx, coll.getWritableCollection(opCtx), desc, CreateIndexEntryFlags::kIsReady);
+            writableColl->getIndexCatalog()->refreshEntry(
+                opCtx, writableColl, desc, CreateIndexEntryFlags::kIsReady);
         }
 
         // Only observe non-view collMods, as view operations are observed as operations on the
@@ -1130,8 +1134,9 @@ CollModRequest makeCollModDryRunRequest(const CollModRequest& request) {
 Status processCollModCommand(OperationContext* opCtx,
                              const NamespaceStringOrUUID& nsOrUUID,
                              const CollMod& cmd,
+                             const CollectionAcquisition* acquisition,
                              BSONObjBuilder* result) {
-    return _collModInternal(opCtx, nsOrUUID, cmd, result, boost::none);
+    return _collModInternal(opCtx, nsOrUUID, cmd, acquisition, result, boost::none);
 }
 
 Status processCollModCommandForApplyOps(OperationContext* opCtx,
@@ -1139,7 +1144,7 @@ Status processCollModCommandForApplyOps(OperationContext* opCtx,
                                         const CollMod& cmd,
                                         repl::OplogApplication::Mode mode) {
     BSONObjBuilder resultWeDontCareAbout;
-    return _collModInternal(opCtx, nsOrUUID, cmd, &resultWeDontCareAbout, mode);
+    return _collModInternal(opCtx, nsOrUUID, cmd, nullptr, &resultWeDontCareAbout, mode);
 }
 
 }  // namespace mongo

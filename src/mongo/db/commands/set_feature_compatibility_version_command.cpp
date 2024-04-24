@@ -880,8 +880,8 @@ private:
                                                             NetworkOp::dbMsg);
 
                     BSONObjBuilder unusedBuilder;
-                    uassertStatusOK(
-                        processCollModCommand(opCtx, nsOrUUID, collModCmd, &unusedBuilder));
+                    uassertStatusOK(processCollModCommand(
+                        opCtx, nsOrUUID, collModCmd, nullptr, &unusedBuilder));
 
                     try {
                         // Logs the collMod statistics if it took longer than the server
@@ -1444,6 +1444,7 @@ private:
                                 uassertStatusOK(processCollModCommand(opCtx,
                                                                       collection->ns(),
                                                                       CollMod{collection->ns()},
+                                                                      nullptr,
                                                                       &responseBuilder));
                                 return true;
                             }

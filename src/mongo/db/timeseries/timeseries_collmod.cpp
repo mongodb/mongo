@@ -168,14 +168,14 @@ Status processCollModCommandWithTimeSeriesTranslation(OperationContext* opCtx,
         // end up with incorrect query behavior (namely data missing from some queries).
         auto timeseriesViewCmd = makeTimeseriesViewCollModCommand(opCtx, cmd);
         if (timeseriesViewCmd && performViewChange) {
-            auto status = processCollModCommand(opCtx, nss, *timeseriesViewCmd, result);
+            auto status = processCollModCommand(opCtx, nss, *timeseriesViewCmd, nullptr, result);
             if (!status.isOK()) {
                 return status;
             }
         }
         mainCmd = timeseriesBucketsCmd.get();
     }
-    return processCollModCommand(opCtx, mainCmd->getNamespace(), *mainCmd, result);
+    return processCollModCommand(opCtx, mainCmd->getNamespace(), *mainCmd, nullptr, result);
 }
 
 }  // namespace timeseries
