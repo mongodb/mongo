@@ -22,7 +22,7 @@ assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
 const failOnDirectOps =
     FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "FailOnDirectShardOperations");
 const resetClusterCardinalityOnRemoveShard =
-    FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "RSEndpointClusterCardinalityParameter");
+    FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "ReplicaSetEndpoint");
 
 function getUnauthorizedDirectWritesCount() {
     return assert.commandWorked(shardAdminDB.runCommand({serverStatus: 1}))
@@ -125,9 +125,7 @@ directWriteCount = runTests(true /* shouldBlockDirectConnections */, directWrite
 removeShard(mongosAdminUser, newShard.getURL());
 
 // With one shard again, direct shard operations should still be prevented assuming that
-// featureFlagRSEndpointClusterCardinalityParameter is disabled.
-// TODO (SERVER-67835) update this test to reflect the expected behavior for direct shard op checks
-// when RSEndpoint is enabled.
+// featureFlagReplicaSetEndpoint is disabled.
 jsTest.log("Running tests with one shard again.");
 directWriteCount = runTests(
     !resetClusterCardinalityOnRemoveShard /* shouldBlockDirectConnections */, directWriteCount);
