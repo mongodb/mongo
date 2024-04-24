@@ -67,7 +67,9 @@ runDbCheck(replSet,
            {
                maxDocsPerBatch: 20,
                minKey: {a: "0"},
-               maxKey: {a: "199"}  // , validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1"
+               maxKey: {a: "199"},
+               batchWriteConcern: {w: 1},
+               // , validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1"
            },
            true /*awaitCompletion*/);
 
@@ -86,6 +88,8 @@ secondary = replSet.start(secondary,
                           {noCleanData: true});
 
 primary = replSet.getPrimary();
+
+replSet.awaitReplication();
 
 const primaryHealthLog = primary.getDB("local").system.healthlog;
 const secondaryHealthLog = secondary.getDB("local").system.healthlog;
