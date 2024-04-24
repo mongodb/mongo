@@ -413,6 +413,12 @@ void MigrationSourceManager::startClone() {
         _state = kCloning;
     }
 
+    // Refreshing the collection routing information after starting the clone driver will give us a
+    // stable view on whether the recipient is owning other chunks of the collection (a condition
+    // that will be later evaluated).
+    uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(
+        _opCtx, nss()));
+
     if (replEnabled) {
         auto const readConcernArgs = repl::ReadConcernArgs(
             replCoord->getMyLastAppliedOpTime(), repl::ReadConcernLevel::kLocalReadConcern);
@@ -458,11 +464,12 @@ void MigrationSourceManager::enterCriticalSection() {
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
 
-    const auto& metadata = _getCurrentMetadataAndCheckForConflictingErrors();
+    const auto [cm, _] =
+        uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(_opCtx, nss()));
 
     // Check that there are no chunks on the recepient shard. Write an oplog event for change
     // streams if this is the first migration to the recipient.
-    if (!metadata.getChunkManager()->getVersion(_args.getToShard()).isSet()) {
+    if (!cm.getVersion(_args.getToShard()).isSet()) {
         migrationutil::notifyChangeStreamsOnRecipientFirstChunk(
             _opCtx, nss(), _args.getFromShard(), _args.getToShard(), _collectionUUID);
 
