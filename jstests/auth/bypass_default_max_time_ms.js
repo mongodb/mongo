@@ -145,6 +145,8 @@ const keyFile = "jstests/libs/key1";
         shards: {nodes: 1},
         config: {nodes: 1},
         keyFile: keyFile,
+        mongosOptions:
+            {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}},
     });
 
     const conn = st.s;

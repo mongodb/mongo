@@ -120,6 +120,7 @@ const st = new ShardingTest({
     shards: {nodes: 1},
     config: {nodes: 1},
     keyFile: 'jstests/libs/key1',
+    mongosOptions: {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}},
 });
 runTests(st.s);
 st.stop();
