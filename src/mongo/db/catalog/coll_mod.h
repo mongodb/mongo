@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/shard_role.h"
 
 namespace mongo {
 class BSONObj;
@@ -63,11 +64,15 @@ bool isCollModIndexUniqueConversion(const CollModRequest& request);
 CollModRequest makeCollModDryRunRequest(const CollModRequest& request);
 
 /**
- * Performs the collection modification described in "cmd" on the collection "ns".
+ * Performs the collection modification described in "cmd" on the collection "ns". The 'acquisition'
+ * parameter is intended to be used for internal collMod commands where the collection has already
+ * been acquired with the necessary X lock. If omitted, the collection will be looked up and locked
+ * appropriately.
  */
 Status processCollModCommand(OperationContext* opCtx,
                              const NamespaceStringOrUUID& nsOrUUID,
                              const CollMod& cmd,
+                             const CollectionAcquisition* acquisition,
                              BSONObjBuilder* result);
 
 /**

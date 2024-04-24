@@ -911,7 +911,7 @@ Status ShardingCatalogManager::_initConfigSettings(OperationContext* opCtx) {
     collModCmd.getCollModRequest().setValidationLevel(ValidationLevelEnum::strict);
     BSONObjBuilder builder;
     return processCollModCommand(
-        opCtx, {NamespaceString::kConfigSettingsNamespace}, collModCmd, &builder);
+        opCtx, {NamespaceString::kConfigSettingsNamespace}, collModCmd, nullptr, &builder);
 }
 
 Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationContext* opCtx,

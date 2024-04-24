@@ -419,6 +419,48 @@ TEST(IndexKeyValidateTest, ValidateAfterSecondsAcceptsFloatingPointNumber) {
     ASSERT_EQUALS(spec["expireAfterSeconds"].safeNumberLong(), 123LL);
 }
 
+TEST(IndexKeyValidateTest, NormalizeExpireAfterSecondsDetectsInvalidValues) {
+    auto specs = {
+        fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: NaN}"),
+        fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: 1E300}"),
+        fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: -1E300}"),
+        fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: -3600}"),
+    };
+
+    for (auto&& spec : specs) {
+        auto res = index_key_validate::normalizeExpireAfterSeconds(spec["expireAfterSeconds"]);
+        ASSERT_TRUE(res.has_value());
+        ASSERT_EQUALS(
+            res.value(),
+            durationCount<Seconds>(index_key_validate::kExpireAfterSecondsForInactiveTTLIndex));
+    }
+}
+
+TEST(IndexKeyValidateTest, NormalizeExpireAfterSecondsDetectsValidNonIntegerValues) {
+    auto specs = {
+        fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: 123.456}"),
+    };
+
+    for (auto&& spec : specs) {
+        auto res = index_key_validate::normalizeExpireAfterSeconds(spec["expireAfterSeconds"]);
+        ASSERT_TRUE(res.has_value());
+        ASSERT_EQUALS(res.value(), spec["expireAfterSeconds"].safeNumberInt());
+    }
+}
+
+TEST(IndexKeyValidateTest, NormalizeExpireAfterSecondsHandlesValidIntegerValues) {
+    auto specs = {
+        fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: 2147483646}"),
+        fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: 3600}"),
+        fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: 0}"),
+    };
+
+    for (auto&& spec : specs) {
+        auto res = index_key_validate::normalizeExpireAfterSeconds(spec["expireAfterSeconds"]);
+        ASSERT_FALSE(res.has_value());
+    }
+}
+
 TEST(IndexKeyValidateTest, RepairIndexSpecs) {
     ASSERT(fromjson("{key: {a: 1}, name: 'index'}")
                .binaryEqual(index_key_validate::repairIndexSpec(

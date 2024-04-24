@@ -903,6 +903,10 @@ void shutdownTTLMonitor(ServiceContext* serviceContext) {
 }
 
 void TTLMonitor::onStepUp() {
+    // A prepared transaction, which has a write to a collection "foo",  will reacquire an IX lock
+    // on "foo" prior to running this function. Thus processCollModCommand(), which will acquire
+    // MODE_X access to the collection, can't run synchronously here. Spawn and detach a thread to
+    // run it in background.
     stdx::thread([]() mutable {
         ThreadClient tc("InvalidTTLIndexFixer",
                         getGlobalServiceContext()->getService(ClusterRole::ShardServer));
@@ -933,69 +937,74 @@ void TTLMonitor::onStepUp() {
                         continue;
                     }
 
+                    // If the cached value is fine, we don't need to check any closer.
                     if (!info.isExpireAfterSecondsInvalid() && !info.isExpireAfterSecondsNonInt()) {
                         continue;
                     }
 
-                    // A prepared transaction, which has a write to a collection "foo",  will
-                    // reacquire an IX lock on "foo" prior to running this function. Thus
-                    // processCollModCommand(), which will acquire MODE_X access to the collection,
-                    // can't run synchronously here. Spawn and detach a thread to run it in
-                    // background.
-                    auto indexName = info.getIndexName();
-                    LOGV2(6847700,
-                          "Running collMod to fix TTL index with invalid 'expireAfterSeconds'.",
-                          "ns"_attr = *nss,
-                          "uuid"_attr = uuid,
-                          "name"_attr = indexName,
-                          "expireAfterSecondsNew"_attr =
-                              index_key_validate::kExpireAfterSecondsForInactiveTTLIndex);
+                    // At this point we need to look closer at the current version of the index
+                    // spec, and hold the lock to prevent concurrent collMod.
+                    const auto coll = acquireCollection(
+                        opCtx,
+                        CollectionAcquisitionRequest::fromOpCtx(
+                            opCtx, *nss, AcquisitionPrerequisites::OperationType::kWrite),
+                        MODE_X);
 
-                    // Compose collMod command to amend 'expireAfterSeconds' to same value that
-                    // would be used by listIndexes() to convert a NaN value in the catalog.
-                    CollModIndex collModIndex;
-                    collModIndex.setName(StringData{indexName});
-                    if (info.isExpireAfterSecondsInvalid()) {
-                        collModIndex.setExpireAfterSeconds(mongo::durationCount<Seconds>(
-                            index_key_validate::kExpireAfterSecondsForInactiveTTLIndex));
-                    } else if (info.isExpireAfterSecondsNonInt()) {
-                        const auto coll = acquireCollection(
-                            opCtx,
-                            CollectionAcquisitionRequest::fromOpCtx(
-                                opCtx, *nss, AcquisitionPrerequisites::OperationType::kWrite),
-                            MODE_X);
-
-                        if (!coll.exists() || coll.uuid() != uuid) {
-                            continue;
-                        }
-                        const auto& collectionPtr = coll.getCollectionPtr();
-
-                        if (!collectionPtr->isIndexPresent(indexName)) {
-                            ttlCollectionCache.deregisterTTLIndexByName(uuid, indexName);
-                            continue;
-                        }
-
-                        BSONObj spec = collectionPtr->getIndexSpec(indexName);
-                        auto expireAfterSeconds =
-                            spec[IndexDescriptor::kExpireAfterSecondsFieldName].safeNumberInt();
-
-                        collModIndex.setExpireAfterSeconds(expireAfterSeconds);
+                    if (!coll.exists() || coll.uuid() != uuid) {
+                        continue;
                     }
-                    CollMod collModCmd{*nss};
-                    collModCmd.getCollModRequest().setIndex(collModIndex);
+                    const auto& collectionPtr = coll.getCollectionPtr();
 
-                    // processCollModCommand() will acquire MODE_X access to the collection.
-                    BSONObjBuilder builder;
-                    uassertStatusOK(
-                        processCollModCommand(opCtx, {nss->dbName(), uuid}, collModCmd, &builder));
-                    auto result = builder.obj();
-                    LOGV2(6847701,
-                          "Successfully fixed TTL index with invalid 'expireAfterSeconds' using "
-                          "collMod",
-                          "ns"_attr = *nss,
-                          "uuid"_attr = uuid,
-                          "name"_attr = indexName,
-                          "result"_attr = result);
+                    auto indexName = info.getIndexName();
+                    if (!collectionPtr->isIndexPresent(indexName)) {
+                        // This index must have been dropped, clean up the cache.
+                        ttlCollectionCache.deregisterTTLIndexByName(uuid, indexName);
+                        continue;
+                    }
+
+                    BSONObj spec = collectionPtr->getIndexSpec(indexName);
+                    auto expireAfterSecondsElem =
+                        spec[IndexDescriptor::kExpireAfterSecondsFieldName];
+                    if (!expireAfterSecondsElem) {
+                        // This index must have been modified, clean up the cache.
+                        ttlCollectionCache.deregisterTTLIndexByName(uuid, indexName);
+                        continue;
+                    }
+
+                    if (auto correctedExpireAfterSeconds =
+                            index_key_validate::normalizeExpireAfterSeconds(
+                                expireAfterSecondsElem)) {
+                        LOGV2(6847700,
+                              "Running collMod to fix TTL index with invalid "
+                              "'expireAfterSeconds'.",
+                              "ns"_attr = *nss,
+                              "uuid"_attr = uuid,
+                              "name"_attr = indexName,
+                              "expireAfterSecondsNew"_attr = correctedExpireAfterSeconds.value());
+
+                        // Compose collMod command to amend 'expireAfterSeconds' to same value that
+                        // would be used by listIndexes() to convert an invalid value in the
+                        // catalog.
+                        CollModIndex collModIndex;
+                        collModIndex.setName(StringData{indexName});
+                        collModIndex.setExpireAfterSeconds(correctedExpireAfterSeconds.value());
+
+                        CollMod collModCmd{*nss};
+                        collModCmd.getCollModRequest().setIndex(collModIndex);
+
+                        BSONObjBuilder builder;
+                        uassertStatusOK(processCollModCommand(
+                            opCtx, {nss->dbName(), uuid}, collModCmd, &coll, &builder));
+                        auto result = builder.obj();
+                        LOGV2(
+                            6847701,
+                            "Successfully fixed TTL index with invalid 'expireAfterSeconds' using "
+                            "collMod",
+                            "ns"_attr = *nss,
+                            "uuid"_attr = uuid,
+                            "name"_attr = indexName,
+                            "result"_attr = result);
+                    }
                 }
             } catch (const DBException& ex) {
                 LOGV2_ERROR(6835901,
