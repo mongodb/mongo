@@ -154,7 +154,7 @@ intrusive_ptr<Expression> Expression::parseObject(ExpressionContext* const expCt
                                                   BSONObj obj,
                                                   const VariablesParseState& vps) {
     if (obj.isEmpty()) {
-        return ExpressionObject::create(expCtx, {});
+        return ExpressionConstant::create(expCtx, Value(Document{}));
     }
 
     if (obj.firstElementFieldName()[0] == '$') {

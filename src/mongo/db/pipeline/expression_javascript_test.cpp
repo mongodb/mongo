@@ -164,8 +164,10 @@ TEST_F(MapReduceFixture, ExpressionFunctionFailsIfBodyNotSpecified) {
 }
 
 TEST_F(MapReduceFixture, ExpressionFunctionFailsIfBodyIsNotConstantExpression) {
-    auto bsonExpr = BSON("expr" << BSON("body" << BSONObj() << "args" << BSON_ARRAY(1 << 2)
-                                               << "lang" << ExpressionFunction::kJavaScript));
+    auto bsonExpr = BSON("expr" << BSON("body"
+                                        << "$a"
+                                        << "args" << BSON_ARRAY(1 << 2) << "lang"
+                                        << ExpressionFunction::kJavaScript));
     ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS()),
                        AssertionException,
                        31432);
