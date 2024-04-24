@@ -255,6 +255,8 @@ def scan_for_transitive_install(node, env, _path):
                              if direct_children.get_executor() and grandchild.has_builder())
 
     for child in installed_children:
+        if child.has_builder() and child.get_builder().get_name(env) == "ThinTarget":
+            child = env.File(f"#/{env['SCONS2BAZEL_TARGETS'].bazel_output(child)}")
         auto_installed_files = get_auto_installed_files(env, child)
         if not auto_installed_files:
             continue
@@ -386,7 +388,8 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
             target_for_source = env.Dir(aib_additional_directory, directory=target_for_source)
 
         new_installed_files = env.Install(target=target_for_source, source=s)
-        setattr(s.attributes, INSTALLED_FILES, new_installed_files)
+        installed_files = getattr(s.attributes, INSTALLED_FILES, [])
+        setattr(s.attributes, INSTALLED_FILES, new_installed_files + installed_files)
         setattr(new_installed_files[0].attributes, 'AIB_INSTALL_FROM', s)
         installed_files.extend(new_installed_files)
 

@@ -12,14 +12,20 @@ def _copy(src, dst):
 
 
 def _symlink(src, dst):
-    os.symlink(os.path.relpath(src, os.path.dirname(dst)), dst)
+    if os.path.islink(src):
+        _copy(src, dst)
+    else:
+        os.symlink(os.path.relpath(src, os.path.dirname(dst)), dst)
 
 
 def _hardlink(src, dst):
-    try:
-        os.link(src, dst)
-    except:
+    if os.path.islink(src):
         _copy(src, dst)
+    else:
+        try:
+            os.link(src, dst)
+        except:
+            _copy(src, dst)
 
 
 available_actions = {

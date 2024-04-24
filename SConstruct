@@ -1727,6 +1727,10 @@ env = Environment(variables=env_vars, **envDict)
 del envDict
 env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), 'AddOption')
 
+# Preload to perform early fetch of repositories
+tool = Tool('integrate_bazel')
+tool.exists(env)
+
 # The placement of this is intentional. Here we setup an atexit method to store tooling metrics.
 # We should only register this function after env, env_vars and the parser have been properly initialized.
 SConsToolingMetrics.register_metrics(
@@ -6738,9 +6742,6 @@ if env.GetOption('build-mongot'):
 # load the tool late to make sure we can copy over any new
 # emitters/scanners we may have created in the SConstruct when
 # we go to make stand in bazel builders for the various scons builders
-# TODO SERVER-86052 After thin targets are implemented we should
-# be able to load this tool much earlier (before configure checks!)
-# and start the bazel build thread as early as possible.
 env.Tool('integrate_bazel')
 
 env.SConscript(

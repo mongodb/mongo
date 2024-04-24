@@ -741,6 +741,9 @@ def _libdeps_visit(n, tsorted, marked, walking, debug=False):
         walking.remove(n.target_node)
 
 
+BAZEL_LIBDEPS_AUTOINSTALLED = set()
+
+
 def _get_libdeps(node, debug=False):
     """Given a SCons Node, return its library dependencies, topologically sorted.
 
@@ -767,6 +770,15 @@ def _get_libdeps(node, debug=False):
         if child.dependency_type != deptype.Interface:
             _libdeps_visit(child, tsorted, marked, walking, debug=debug)
     tsorted.reverse()
+
+    # Ensure that every thin target transitively-included library is auto-installed.
+    # Note that BAZEL_LIBDEPS_AUTOINSTALLED ensures we only invoke it once for each such library
+    for libdep in tsorted:
+        if str(libdep) not in BAZEL_LIBDEPS_AUTOINSTALLED:
+            env = libdep.get_build_env()
+            shlib_suffix = env.subst("$SHLIBSUFFIX")
+            env.BazelAutoInstall(libdep, shlib_suffix)
+            BAZEL_LIBDEPS_AUTOINSTALLED.add(str(libdep))
 
     setattr(node.attributes, Constants.LibdepsCached, tsorted)
     return tsorted
