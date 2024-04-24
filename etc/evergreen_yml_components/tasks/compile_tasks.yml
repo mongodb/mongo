@@ -2707,7 +2707,8 @@ task_groups:
     name: compile_upload_benchmarks_TG
     tasks:
       - compile_upload_benchmarks
-      - compile_upload_benchmarks_debug
+      # TODO(SERVER-86426): Figure out a workable long-term solution to benchmark debug symbols
+      # - compile_upload_benchmarks_debug
 
   - <<: *compile_task_group_template
     name: compile_and_archive_dist_test_TG
@@ -2897,7 +2898,8 @@ task_groups:
       - run_dbtest
       - archive_dbtest
       - compile_upload_benchmarks
-      - compile_upload_benchmarks_debug
+      # TODO(SERVER-86426): Figure out a workable long-term solution to benchmark debug symbols
+      # - compile_upload_benchmarks_debug
       - compile_all_but_not_unittests
 
   - <<: *compile_task_group_template
