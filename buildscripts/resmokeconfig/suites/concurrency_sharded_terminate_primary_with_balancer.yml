@@ -134,10 +134,6 @@ selector:
     # Time-series collections are not supported on mongos.
     - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
-    # The test needs to directly control the balancer configuration failpoints, whose values get
-    # modified by the fixture executor every time the CSRS primary is respawned.
-    - jstests/concurrency/fsm_workloads/insert_with_data_size_aware_balancing.js
-
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off
