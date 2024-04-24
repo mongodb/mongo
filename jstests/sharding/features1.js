@@ -1,9 +1,4 @@
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 var s = new ShardingTest({name: "features1", shards: 2, mongos: 1});
-
-const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    s.s0.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 
@@ -87,24 +82,21 @@ assert.writeError(db.foo4.insert({num: 7}));
 assert.eq(3, db.foo4.count(), "uc4");
 
 // --- don't let you convertToCapped ----
-// TODO SERVER-84482 remove isTrackUnshardedUponCreationEnabled check once convertToCapped is
-// compatible with unsplittable collection
-if (!isTrackUnshardedUponCreationEnabled) {
-    assert(!db.foo4.isCapped(), "ca1");
-    assert(!a.foo4.isCapped(), "ca2");
-    assert(!b.foo4.isCapped(), "ca3");
+assert(!db.foo4.isCapped(), "ca1");
+assert(!a.foo4.isCapped(), "ca2");
+assert(!b.foo4.isCapped(), "ca3");
 
-    assert.commandFailed(db.foo4.convertToCapped(30000), "ca30");
-    assert(!db.foo4.isCapped(), "ca4");
-    assert(!a.foo4.isCapped(), "ca5");
-    assert(!b.foo4.isCapped(), "ca6");
+assert.commandFailed(db.foo4.convertToCapped(30000), "ca30");
+assert(!db.foo4.isCapped(), "ca4");
+assert(!a.foo4.isCapped(), "ca5");
+assert(!b.foo4.isCapped(), "ca6");
 
-    //      make sure i didn't break anything
-    db.foo4a.save({a: 1});
-    assert(!db.foo4a.isCapped(), "ca7");
-    db.foo4a.convertToCapped(30000);
-    assert(db.foo4a.isCapped(), "ca8");
-}
+//      make sure i didn't break anything
+db.foo4a.save({a: 1});
+assert(!db.foo4a.isCapped(), "ca7");
+db.foo4a.convertToCapped(30000);
+assert(db.foo4a.isCapped(), "ca8");
+
 // --- don't let you shard a capped collection
 db.createCollection("foo5", {capped: true, size: 30000});
 assert(db.foo5.isCapped(), "cb1");
