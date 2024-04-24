@@ -79,6 +79,7 @@ post:
   - func: "save ec2 task artifacts"
   - func: "attach wiki page"
   - func: "upload docker compose"
+  - func: "attach docker logs"
   - func: "upload jstestfuzz minimized output"
   - func: "upload clang tidy results"
   - func: "kill processes"

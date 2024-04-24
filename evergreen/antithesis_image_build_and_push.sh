@@ -43,7 +43,21 @@ $python buildscripts/resmoke.py run --suite ${suite} ${resmoke_args} --dockerCom
 docker-compose -f docker_compose/${suite}/docker-compose.yml up -d
 echo "ALL RUNNING CONTAINERS: "
 docker ps
+set +o errexit
 docker exec workload buildscripts/resmoke.py run --suite ${suite} ${resmoke_args} --sanityCheck --externalSUT
+RET=$?
+set -o errexit
+
+docker-compose -f docker_compose/${suite}/docker-compose.yml logs > docker_logs.txt
+docker-compose -f docker_compose/${suite}/docker-compose.yml down
+
+# Change the permissions of all of the files in the docker compose directory to the current user.
+# Some of the data files cannot be archived otherwise.
+sudo chown -R $USER docker_compose/${suite}/
+if [ $RET -ne 0 ]; then
+  echo "Resmoke sanity check has failed"
+  exit $RET
+fi
 
 # Push Image
 sudo docker tag "${suite}:$tag" "$antithesis_repo/${task_name}:$tag"

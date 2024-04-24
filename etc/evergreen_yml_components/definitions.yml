@@ -2411,12 +2411,25 @@ functions:
         optional: true
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/docker_compose.tgz
+        local_file: docker_compose.tgz
         remote_file: ${project}/${build_variant}/${revision}/docker-compose-${task_id}-${execution}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/gzip
         display_name: Docker Compose
+
+  "attach docker logs":
+    command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/docker_logs.txt
+      remote_file: ${project}/${build_variant}/${revision}/docker-logs-${task_id}-${execution}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: Docker Logs
 
   "attach task errors":
     command: s3.put
