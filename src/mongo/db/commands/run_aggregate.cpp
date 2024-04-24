@@ -1251,6 +1251,7 @@ Status _runAggregate(OperationContext* opCtx,
                                    cmdObj,
                                    &bodyBuilder);
         }
+        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsInfo.key));
     } else {
         // Cursor must be specified, if explain is not.
         const bool keepCursor = handleCursorCommand(
