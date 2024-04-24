@@ -76,21 +76,6 @@ Counter64 queryStatsStoreWriteErrorsMetric;
 ServerStatusMetricField<Counter64> displayWriteErrorsMetric(
     "queryStats.numQueryStatsStoreWriteErrors", &queryStatsStoreWriteErrorsMetric);
 
-/**
- * Indicates whether or not query stats is enabled via the feature flag.
- */
-bool isQueryStatsFeatureEnabled() {
-    // We need to call isVersionInitialized() first because this could run during startup while the
-    // FCV is still uninitialized.
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        return feature_flags::gFeatureFlagQueryStats.isEnabled(
-            serverGlobalParams.featureCompatibility);
-    }
-    // (Generic FCV reference): This reference is needed to ensure we correctly initialize query
-    // stats during startup.
-    return feature_flags::gFeatureFlagQueryStats.isEnabledOnVersion(
-        multiversion::GenericFCV::kLatest);
-}
 
 /**
  * Cap the queryStats store size.
@@ -124,7 +109,7 @@ void assertConfigurationAllowed() {
             "Cannot configure queryStats store. The feature flag is not enabled. Please restart "
             "and specify the feature flag, or upgrade the feature compatibility version to one "
             "where it is enabled by default.",
-            isQueryStatsFeatureEnabled());
+            feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCV());
 }
 
 class QueryStatsOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
@@ -193,7 +178,8 @@ bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
     // check whether queryStats should be enabled without FCV, so default to not recording
     // those queries.
     // TODO SERVER-75935 Remove FCV Check.
-    return isQueryStatsFeatureEnabled() && queryStatsStoreDecoration(serviceCtx)->getMaxSize() > 0;
+    return feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCV() &&
+        queryStatsStoreDecoration(serviceCtx)->getMaxSize() > 0;
 }
 
 /**
