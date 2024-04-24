@@ -430,7 +430,7 @@ functions:
   "get buildnumber": &get_buildnumber
     command: keyval.inc
     params:
-      key: "${build_variant}_v7.3"
+      key: "${build_variant}_${project}"
       destination: "builder_num"
 
   "run diskstats": &run_diskstats
