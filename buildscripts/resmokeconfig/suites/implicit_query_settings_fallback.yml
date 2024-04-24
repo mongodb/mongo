@@ -22,10 +22,6 @@ selector:
     # queries.
     - jstests/core/find_with_resume_after_param.js
 
-    # TODO SERVER-89299: Ensure the uniqueness of query shapes containing $setWindowFields.
-    - jstests/aggregation/sources/setWindowFields/**/*.js
-    - jstests/aggregation/sources/fill/**/*.js
-
     # Test which overcomes the imposed 16Mb query settings limit making the 'setQuerySettings' command fail.
     - jstests/aggregation/query_limits_test.js
 
