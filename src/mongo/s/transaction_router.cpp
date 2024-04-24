@@ -237,15 +237,17 @@ void setAtClusterTime(const LogicalSessionId& lsid,
             "Cannot specify both 'atClusterTime' and 'afterClusterTime'",
             !requestedAtClusterTime || !requestedAfterClusterTime);
 
-    if (requestedAtClusterTime) {
-        txnAtClusterTime->setTime(*requestedAtClusterTime, latestStmtId);
-        return;
-    }
-    // If the user passed afterClusterTime, the chosen time must be greater than or equal to it.
-    if (requestedAfterClusterTime && *requestedAfterClusterTime > candidateTime) {
-        txnAtClusterTime->setTime(*requestedAfterClusterTime, latestStmtId);
-        return;
-    }
+    auto atClusterTime = [&] {
+        if (requestedAtClusterTime) {
+            return *requestedAtClusterTime;
+        }
+        // If the user passed afterClusterTime, the chosen time must be greater than or equal to it.
+        if (requestedAfterClusterTime && *requestedAfterClusterTime > candidateTime) {
+
+            return *requestedAfterClusterTime;
+        }
+        return candidateTime;
+    }();
 
     LOGV2_DEBUG(22888,
                 2,
@@ -253,10 +255,9 @@ void setAtClusterTime(const LogicalSessionId& lsid,
                 "sessionId"_attr = lsid,
                 "txnNumber"_attr = txnNumberAndRetryCounter.getTxnNumber(),
                 "txnRetryCounter"_attr = txnNumberAndRetryCounter.getTxnRetryCounter(),
-                "globalSnapshotTimestamp"_attr = candidateTime,
+                "globalSnapshotTimestamp"_attr = atClusterTime,
                 "latestStmtId"_attr = latestStmtId);
-
-    txnAtClusterTime->setTime(candidateTime, latestStmtId);
+    txnAtClusterTime->setTime(atClusterTime, latestStmtId);
 }
 
 struct StrippedFields {
