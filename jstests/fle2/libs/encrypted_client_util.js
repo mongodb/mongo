@@ -1,10 +1,115 @@
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+export function isEnterpriseShell() {
+    return buildInfo().modules.includes("enterprise");
+}
+
+function assertEnterpriseShell() {
+    if (!isEnterpriseShell()) {
+        doassert("Test requires the enterprise module");
+    }
+}
+
+/**
+ * Run a lambda on an FLE/QE encryption aware connection
+ * @param {*} edb database associated with connection that was setup by EncryptedClient
+ * @param {*} func lambda to run under an encryption connection
+ * @returns value from lambda
+ */
+export function runWithEncryption(edb, func) {
+    try {
+        assertEnterpriseShell();
+
+        assert(!edb.getMongo().isAutoEncryptionEnabled(),
+               "Cannot switch to encrypted connection on already encrypted connection. Do not " +
+                   "nest calls to runWithEncryption.")
+
+        edb.getMongo().toggleAutoEncryption(true);
+
+        return func();
+    } finally {
+        edb.getMongo().toggleAutoEncryption(false);
+    }
+}
+
+/**
+ * A series of extensions to DBCollection and DB that toggle encryption on and off per operation.
+ */
+DBCollection.prototype.einsert = function(obj, options) {
+    return runWithEncryption(this, () => {
+        return this.insert(obj, options);
+    });
+};
+
+DBCollection.prototype.einsertOne = function(document, options) {
+    return runWithEncryption(this, () => {
+        return this.insertOne(document, options);
+    });
+};
+
+DBCollection.prototype.eupdateOne = function(filter, update, options) {
+    return runWithEncryption(this, () => {
+        return this.updateOne(filter, update, options);
+    });
+};
+
+DBCollection.prototype.eupdate = function(query, updateSpec, upsert, multi) {
+    return runWithEncryption(this, () => {
+        return this.update(query, updateSpec, upsert, multi);
+    });
+};
+
+DBCollection.prototype.edeleteOne = function(filter, options) {
+    return runWithEncryption(this, () => {
+        return this.deleteOne(filter, options);
+    });
+};
+
+DBCollection.prototype.edeleteMany = function(filter, options) {
+    return runWithEncryption(this, () => {
+        return this.deleteMany(filter, options);
+    });
+};
+
+DBCollection.prototype.ereplaceOne = function(filter, replacement, options) {
+    return runWithEncryption(this, () => {
+        return this.replaceOne(filter, replacement, options);
+    });
+};
+
+DB.prototype.erunCommand = function(cmd, params) {
+    return runWithEncryption(this, () => {
+        return this.runCommand(cmd, params);
+    });
+};
+
+DB.prototype.eadminCommand = function(cmd, params) {
+    return runWithEncryption(this, () => {
+        return this.adminCommand(cmd, params);
+    });
+};
+
+DBCollection.prototype.ecount = function(filter) {
+    return runWithEncryption(this, () => {return this.find(filter).toArray().length});
+};
+
+// Note that efind does not exist since find executes
+// lazily, not eagerly
+DBCollection.prototype.efindOne = function(filter, projection, options, readConcern, collation) {
+    return runWithEncryption(this, () => {
+        return this.findOne(filter, projection, options, readConcern, collation);
+    });
+};
+
+DBCollection.prototype.erunCommand = function(cmd, params) {
+    return runWithEncryption(this, () => {
+        return this.runCommand(cmd, params);
+    });
+};
 
 /**
  * Create a FLE client that has an unencrypted and encrypted client to the same database
  */
-
 export var kSafeContentField = "__safeContent__";
 
 export var EncryptedClient = class {
@@ -24,8 +129,7 @@ export var EncryptedClient = class {
 
         if (conn.isAutoEncryptionEnabled()) {
             this._keyVault = conn.getKeyVault();
-            this._edb = conn.getDB(dbName);
-            this._db = undefined;
+            this._db = conn.getDB(dbName);
             this._admindb = conn.getDB("admin");
             return;
         }
@@ -44,45 +148,49 @@ export var EncryptedClient = class {
             schemaMap: {},
         };
 
-        let connectionString = conn.host.toString();
-        var shell = undefined;
-        assert((userName && adminPwd) || (!userName && !adminPwd),
-               `EncryptedClient takes either no credential or both credentials`);
-        if (userName && adminPwd) {
-            // We are using the admin database as a hack for our jstests to avoid having to pass
-            // a tenantId that is required when featureFlagRequireTenantID is set.
-            clientSideFLEOptions.keyVaultNamespace = "admin" +
-                "." + dbName + ".keystore";
-            shell = Mongo(connectionString, clientSideFLEOptions);
-            // auth is needed when using unsigned security token.
-            assert(shell.getDB('admin').auth(userName, adminPwd));
-        } else {
-            shell = Mongo(connectionString, clientSideFLEOptions);
+        var shell = conn;
+
+        // Detatch existing auto encryption options
+        // This forces us to drop the schema cache which is important as some tests repeatedly
+        // create collections with the same name
+        if (conn.getAutoEncryptionOptions() !== undefined) {
+            conn.unsetAutoEncryption();
         }
-        var edb = shell.getDB(dbName);
 
+        assert(shell.setAutoEncryption(clientSideFLEOptions));
+
+        shell.toggleAutoEncryption(true);
         var keyVault = shell.getKeyVault();
+        shell.toggleAutoEncryption(false);
 
-        this._db = conn.getDB(dbName);
         this._admindb = conn.getDB("admin");
-        this._edb = edb;
+        this._db = shell.getDB(dbName);
         this._keyVault = keyVault;
     }
 
     /**
-     * Return an encrypted database
+     * Run a lambda on an FLE/QE encryption aware connection
+     * @param {*} func lambda to run under an encryption connection
+     * @returns value from lambda
+     */
+    runEncryptionOperation(func) {
+        return runWithEncryption(this._db, func);
+    }
+
+    /**
+     * Return a database
      *
      * @returns Database
      */
     getDB() {
-        return this._edb;
+        return this._db;
     }
 
     /**
      * Creates a session on the encryptedClient.
      */
     startSession() {
-        return this._edb.getMongo().startSession();
+        return this._db.getMongo().startSession();
     }
 
     /**
@@ -92,15 +200,6 @@ export var EncryptedClient = class {
      */
     getAdminDB() {
         return this._admindb;
-    }
-
-    /**
-     * Return an unencrypted database
-     *
-     * @returns Database
-     */
-    getRawDB() {
-        return this._db;
     }
 
     /**
@@ -118,7 +217,7 @@ export var EncryptedClient = class {
      *          are the corresponding namespace strings.
      */
     getStateCollectionNamespaces(collName) {
-        const baseCollInfos = this._edb.getCollectionInfos({"name": collName});
+        const baseCollInfos = this._db.getCollectionInfos({"name": collName});
         assert.eq(baseCollInfos.length, 1);
         const baseCollInfo = baseCollInfos[0];
         assert(baseCollInfo.options.encryptedFields !== undefined);
@@ -140,12 +239,14 @@ export var EncryptedClient = class {
         assert(options.hasOwnProperty("encryptedFields"));
         assert(options.encryptedFields.hasOwnProperty("fields"));
 
-        for (let field of options.encryptedFields.fields) {
-            if (!field.hasOwnProperty("keyId")) {
-                let testkeyId = this._keyVault.createKey("local", "ignored");
-                field["keyId"] = testkeyId;
+        this.runEncryptionOperation(() => {
+            for (let field of options.encryptedFields.fields) {
+                if (!field.hasOwnProperty("keyId")) {
+                    let testkeyId = this._keyVault.createKey("local", "ignored");
+                    field["keyId"] = testkeyId;
+                }
             }
-        }
+        });
 
         assert.neq(options,
                    undefined,
@@ -154,9 +255,11 @@ export var EncryptedClient = class {
             options.hasOwnProperty("encryptedFields") && typeof options.encryptedFields == "object",
             `options must contain an encryptedFields document'`);
 
-        const res = assert.commandWorked(this._edb.createCollection(name, options));
+        const res = this.runEncryptionOperation(() => {
+            return assert.commandWorked(this._db.createCollection(name, options));
+        });
         let listCollCmdObj = {listCollections: 1, nameOnly: false, filter: {name: name}};
-        const cis = assert.commandWorked(this._edb.runCommand(listCollCmdObj));
+        const cis = assert.commandWorked(this._db.runCommand(listCollCmdObj));
 
         assert.eq(
             cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
@@ -170,31 +273,31 @@ export var EncryptedClient = class {
 
         // All our tests use "last" as the key to query on so shard on "last" instead of "_id"
         if (this.useImplicitSharding) {
-            let resShard = this._edb.adminCommand({enableSharding: this._edb.getName()});
+            let resShard = this._db.adminCommand({enableSharding: this._db.getName()});
 
             // enableSharding may only be called once for a database.
             if (resShard.code !== ErrorCodes.AlreadyInitialized) {
                 assert.commandWorked(
-                    resShard, "enabling sharding on the '" + this._edb.getName() + "' db failed");
+                    resShard, "enabling sharding on the '" + this._db.getName() + "' db failed");
             }
 
             let shardCollCmd = {
-                shardCollection: this._edb.getName() + "." + name,
+                shardCollection: this._db.getName() + "." + name,
                 key: {last: "hashed"},
                 collation: {locale: "simple"}
             };
 
-            resShard = this._edb.adminCommand(shardCollCmd);
+            resShard = this._db.adminCommand(shardCollCmd);
 
             jsTestLog("Sharding: " + tojson(shardCollCmd));
         }
 
         const indexOptions = [{"key": {__safeContent__: 1}, name: "__safeContent___1"}];
         const createIndexCmdObj = {createIndexes: name, indexes: indexOptions};
-        assert.commandWorked(this._edb.runCommand(createIndexCmdObj));
+        assert.commandWorked(this._db.runCommand(createIndexCmdObj));
         let tenantOption = {clusteredIndex: {key: {_id: 1}, unique: true}};
-        assert.commandWorked(this._edb.createCollection(ef.escCollection, tenantOption));
-        assert.commandWorked(this._edb.createCollection(ef.ecocCollection, tenantOption));
+        assert.commandWorked(this._db.createCollection(ef.escCollection, tenantOption));
+        assert.commandWorked(this._db.createCollection(ef.ecocCollection, tenantOption));
 
         return res;
     }
@@ -211,7 +314,7 @@ export var EncryptedClient = class {
         sessionDB, name, expectedEdc, expectedEsc, expectedEcoc) {
         let listCollCmdObj = {listCollections: 1, nameOnly: false, filter: {name: name}};
 
-        const cis = assert.commandWorked(this._edb.runCommand(listCollCmdObj));
+        const cis = assert.commandWorked(this._db.runCommand(listCollCmdObj));
         assert.eq(
             cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
 
@@ -256,7 +359,7 @@ export var EncryptedClient = class {
      */
     assertEncryptedCollectionCounts(name, expectedEdc, expectedEsc, expectedEcoc) {
         this.assertEncryptedCollectionCountsByObject(
-            this._edb, name, expectedEdc, expectedEsc, expectedEcoc);
+            this._db, name, expectedEdc, expectedEsc, expectedEcoc);
     }
 
     /**
@@ -269,7 +372,7 @@ export var EncryptedClient = class {
     assertESCNonAnchorCount(name, expectedCount) {
         const escName = this.getStateCollectionNamespaces(name).esc;
         const actualCount =
-            this._edb.getCollection(escName).countDocuments({"value": {"$exists": false}});
+            this._db.getCollection(escName).countDocuments({"value": {"$exists": false}});
         assert.eq(
             actualCount,
             expectedCount,
@@ -278,7 +381,7 @@ export var EncryptedClient = class {
 
     /**
      * Get a single document from the collection with the specified query. Ensure it contains the
-     specified fields when decrypted and that does fields are encrypted.
+     specified fields when decrypted and that those fields are encrypted.
 
      * @param {string} coll
      * @param {object} query
@@ -294,7 +397,7 @@ export var EncryptedClient = class {
                   1,
                   `Expected query ${tojson(query)} to only return one document. Found ${
                       encryptedDocs.length}`);
-        const unEncryptedDocs = assert.commandWorked(this._edb.runCommand(cmd)).cursor.firstBatch;
+        const unEncryptedDocs = assert.commandWorked(this._db.erunCommand(cmd)).cursor.firstBatch;
         assert.eq(unEncryptedDocs.length, 1);
 
         const encryptedDoc = encryptedDocs[0];
@@ -317,7 +420,7 @@ export var EncryptedClient = class {
     }
 
     assertWriteCommandReplyFields(response) {
-        if (isMongod(this._edb) && !TestData.testingReplicaSetEndpoint) {
+        if (isMongod(this._db) && !TestData.testingReplicaSetEndpoint) {
             // These fields are replica set specific. The replica set endpoint forces write commands
             // to go through the router which does not return these fields.
             assert(response.hasOwnProperty("electionId"));
@@ -341,7 +444,7 @@ export var EncryptedClient = class {
      * @returns
      */
     assertDocumentChanges(collName, unchangedDocumentIndexArray, changedDocumentIndexArray, func) {
-        let coll = this._edb.getCollection(collName);
+        let coll = this._db.getCollection(collName);
 
         let beforeDocuments = coll.find({}).sort({_id: 1}).toArray();
 
@@ -377,15 +480,17 @@ export var EncryptedClient = class {
      * @returns
      */
     assertEncryptedCollectionDocuments(collName, docs) {
-        let coll = this._edb.getCollection(collName);
+        this.runEncryptionOperation(() => {
+            let coll = this._db.getCollection(collName);
 
-        let onDiskDocs = coll.find({}, {[kSafeContentField]: 0}).sort({_id: 1}).toArray();
+            let onDiskDocs = coll.find({}, {[kSafeContentField]: 0}).sort({_id: 1}).toArray();
 
-        assert.docEq(docs, onDiskDocs);
+            assert.docEq(docs, onDiskDocs);
+        });
     }
 
     assertStateCollectionsAfterCompact(collName, ecocExists, ecocTempExists = false) {
-        const baseCollInfos = this._edb.getCollectionInfos({"name": collName});
+        const baseCollInfos = this._db.getCollectionInfos({"name": collName});
         assert.eq(baseCollInfos.length, 1);
         const baseCollInfo = baseCollInfos[0];
         assert(baseCollInfo.options.encryptedFields !== undefined);
@@ -397,9 +502,9 @@ export var EncryptedClient = class {
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection] = ecocExists;
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection + ".compact"] = ecocTempExists;
 
-        const edb = this._edb;
+        const db = this._db;
         Object.keys(checkMap).forEach(function(coll) {
-            const info = edb.getCollectionInfos({"name": coll});
+            const info = db.getCollectionInfos({"name": coll});
             const msg = coll + (checkMap[coll] ? " does not exist" : " exists") + " after compact";
             assert.eq(info.length, checkMap[coll], msg);
         });
@@ -430,7 +535,9 @@ export function runEncryptedTest(db, dbName, collNames, encryptedFields, runTest
     }
 
     let edb = client.getDB();
-    runTestsCallback(edb, client);
+    client.runEncryptionOperation(() => {
+        runTestsCallback(edb, client);
+    });
 }
 
 /**

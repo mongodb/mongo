@@ -2,9 +2,12 @@
  * Validate csfle1 and qe collections are counted correctly.
  */
 
-import {
-    EncryptedClient,
-} from "jstests/fle2/libs/encrypted_client_util.js";
+import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
+
+if (!isEnterpriseShell()) {
+    jsTestLog("Skipping test as it requires the enterprise module");
+    quit();
+}
 
 let dbName = jsTestName();
 
@@ -38,7 +41,9 @@ function runTest(conn) {
 
     assertCollectionCounts(db, 1, 0);
 
-    const defaultKeyId = client.getKeyVault().createKey("local", "ignored");
+    const defaultKeyId = client.runEncryptionOperation(() => {
+        return client.getKeyVault().createKey("local", "ignored");
+    });
     const schema = {
         encryptMetadata: {
             algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic",

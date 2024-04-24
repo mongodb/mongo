@@ -4,7 +4,12 @@
 //     requires_fcv_80,
 // ]
 
-import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
+import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
+
+if (!isEnterpriseShell()) {
+    jsTestLog("Skipping test as it requires the enterprise module");
+    quit();
+}
 
 const options = {
     mongos: 1,
@@ -46,19 +51,21 @@ assert.commandWorked(
     client.createEncryptionCollection("encrypted", {encryptedFields: encryptedFields}));
 assert.commandWorked(test.createCollection("unencrypted"));
 
-assert.commandFailedWithCode(test.unencrypted.compact(), 6346807);
+client.runEncryptionOperation(() => {
+    assert.commandFailedWithCode(test.unencrypted.compact(), 6346807);
 
-const reply = assert.commandWorked(test.encrypted.compact());
-jsTest.log(reply);
+    const reply = assert.commandWorked(test.encrypted.compact());
+    jsTest.log(reply);
 
-// Validate dummy data we expect the placeholder compaction algorithm to return.
-assert.eq(reply.stats.ecoc.read, 0);
-assert.eq(reply.stats.ecoc.deleted, 0);
+    // Validate dummy data we expect the placeholder compaction algorithm to return.
+    assert.eq(reply.stats.ecoc.read, 0);
+    assert.eq(reply.stats.ecoc.deleted, 0);
 
-assert.eq(reply.stats.esc.read, 0);
-assert.eq(reply.stats.esc.inserted, 0);
-assert.eq(reply.stats.esc.updated, 0);
-assert.eq(reply.stats.esc.deleted, 0);
+    assert.eq(reply.stats.esc.read, 0);
+    assert.eq(reply.stats.esc.inserted, 0);
+    assert.eq(reply.stats.esc.updated, 0);
+    assert.eq(reply.stats.esc.deleted, 0);
+});
 
 if (kHaveAuditing) {
     jsTest.log('Verifying audit contents');
@@ -83,5 +90,3 @@ if (kHaveAuditing) {
 }
 
 st.stop();
-
-jsTest.log(reply);
