@@ -233,7 +233,7 @@ buildvariants:
     exec_timeout_factor: 1.5
     test_flags: >-
       --runAllFeatureFlagTests
-      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
   tasks:
   # TODO: DEVPROD-5173
   # Add !.incompatible_all_feature_flags back when the tag is added to any task or DEVPROD-5173 is completed.

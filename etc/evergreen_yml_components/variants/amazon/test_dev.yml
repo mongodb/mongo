@@ -126,7 +126,7 @@ buildvariants:
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
     test_flags: >-
-      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
   tasks:
   - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
   - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags

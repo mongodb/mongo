@@ -55,7 +55,7 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer,requires_ldap_pool
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -482,7 +482,7 @@ buildvariants:
   - amazon2-test
   expansions:
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer,requires_ldap_pool
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
