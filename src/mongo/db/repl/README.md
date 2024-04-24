@@ -286,13 +286,29 @@ mode and waits for manual intervention (likely a call to `resync`). If no viable
 found, `BackgroundSync` waits 1 second and attempts the entire sync source selection process again.
 Otherwise, the secondary found a sync source! At that point `BackgroundSync` starts an OplogFetcher.
 
+### Oplog Entry Persistence
+
+There is a dedicated thread called [`OplogWriter`](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer.h)
+to write the fetched oplog entries into `rs.oplog` collection and trigger journal flush to persist
+those oplog entries.
+
+The `OplogWriter` runs in an endless loop doing the followings:
+
+1. Get a batch from the writer batcher, which is encapsulated in the [`OplogWriterBatcher`](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_batcher.cpp#L59).
+2. Write the batch of oplog entries into the oplog.
+3. Update [**oplog visibility**](../catalog/README.md#oplog-visibility) by notifying the storage
+   engine of the new oplog entries.
+4. Advance the node's `lastWritten` optime to the last optime in the batch.
+5. Tell the storage engine to flush the journal.
+6. Push the written oplog batches to the OplogApplier's buffer.
+
 ### Oplog Entry Application
 
 A separate thread, `ReplBatcher`, runs the
-[`OplogApplierBatcher`](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/db/repl/oplog_applier_batcher.h)
-and is used for pulling oplog entries off of the oplog buffer and creating the next batch that will
-be applied. These batches are called **oplog applier batches** and are different from **oplog
-fetcher batches**, which are sent by a node's sync source during [oplog fetching](#oplog-fetching).
+[`OplogApplierBatcher`](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_applier_batcher.h)
+and is used for pulling oplog entries off of the oplog applier buffer and creating the next batch
+that will be applied. These batches are called **oplog applier batches** and are different from
+**oplog fetcher batches**, which are sent by a node's sync source during [oplog fetching](#oplog-fetching).
 Oplog applier batches differ from oplog fetcher batches because they have more restrictions than
 just size limits when creating a new batch. Operations in a batch are applied in parallel when
 possible, so there are certain operation types (like commands) which require being in their own
@@ -300,17 +316,12 @@ oplog applier batch. For example, a `dropDatabase` operation shouldn't be applie
 other operations, so it must be in a batch of size one.
 
 The
-[`OplogApplier`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/oplog_applier.h)
+[`OplogApplier`](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_applier.h)
 is in charge of applying each batch of oplog entries received from the batcher. It will run in an
 endless loop doing the following:
 
 1. Get the next oplog applier batch from the batcher.
-2. Set the [`oplogTruncateAfterPoint`](#replication-timestamp-glossary) to the node's last applied
-   optime (before this batch) to aid in [startup recovery](#startup-recovery) if the node shuts down
-   in the middle of writing entries to the oplog.
-3. Write the batch of oplog entries into the oplog.
-4. Clear the `oplogTruncateAfterPoint`.
-5. Use multiple threads to apply the batch in parallel. This means that oplog entries within the
+2. Use multiple threads to apply the batch in parallel. This means that oplog entries within the
    same batch are not necessarily applied in order. The operations in each batch will be divided
    among the writer threads. The only restriction for creating the vector of operations that each
    writer thread will apply serially has to do with the documents that the operation applies to.
@@ -318,12 +329,7 @@ endless loop doing the following:
    serialized. Operations on the same collection can still be parallelized if they are working with
    distinct documents. When applying operations, each writer thread will try to **group** together
    insert operations for improved performance and will apply all other operations individually.
-6. Tell the storage engine to flush the journal.
-7. Update [**oplog visibility**](../catalog/README.md#oplog-visibility) by notifying the storage
-   engine of the new oplog entries. Since entries in an oplog applier batch are applied in
-   parallel, it is only safe to make these entries visible once all the entries in this batch are
-   applied, otherwise an oplog hole could be made visible.
-8. Finalize the batch by advancing the global timestamp (and the node's last applied optime) to the
+3. Finalize the batch by advancing the global timestamp (and the node's lastApplied optime) to the
    last optime in the batch.
 
 #### Code References
@@ -333,8 +339,10 @@ endless loop doing the following:
 - [SyncSourceResolver chooses a sync source to sync from](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/sync_source_resolver.cpp#L545)
 - [OplogBuffer currently uses a BlockingQueue as underlying data structure](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_buffer_blocking_queue.h#L41)
 - [OplogFetcher queries from sync source and put fetched oplogs in OplogApplier::\_oplogBuffer](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_fetcher.cpp#L209)
-- [OplogBatcher polls oplogs from OplogApplier::\_oplogBuffer and creates an OplogBatch to apply](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_batcher.cpp#L282)
-- [OplogApplier gets batches of oplog entries from the OplogBatcher and applies entries in parallel](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_applier_impl.cpp#L297)
+- [OplogWriterBatcher merges oplog entries from the oplog writer buffer to create a batch to write](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_batcher.cpp#L79)
+- [OplogWriter writes down the oplog entries batched by OplogWriterBatcher](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_impl.cpp#L231)
+- [OplogApplierBatcher polls oplogs from OplogApplier::\_oplogBuffer and creates an OplogBatch to apply](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_applier_batcher.cpp#L337)
+- [OplogApplier gets batches of oplog entries from the OplogApplierBatcher and applies entries in parallel](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_applier_impl.cpp#L297)
 - [SyncSourceFeedback keeps checking if there are new oplogs applied on this instance and issues `UpdatePositionCmd` to sync source](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/sync_source_feedback.cpp#L157)
 
 ## Replication and Topology Coordinators
@@ -447,7 +455,7 @@ OpTime and in sharding in some places. Otherwise it is ignored.
 
 1. The upstream node's last committed OpTime. This is the most recent operation that would be
    reflected in the snapshot used for `readConcern: majority` reads.
-2. The upstream node's last applied OpTime.
+2. The upstream node's lastWritten and lastApplied OpTime.
 3. The index (as specified by the `ReplicaSetConfig`) of the node that the upstream node thinks is
    primary.
 4. The index of the upstream node's sync source.
@@ -497,14 +505,15 @@ It then creates a `ReplSetHeartbeatResponse` object. This includes:
 
 1. Replica set name
 2. The receiving node's election time
-3. The receiving node's last applied OpTime
-4. The receiving node's last durable OpTime
-5. The term of the receiving node
-6. The state of the receiving node
-7. The receiving node's sync source
-8. The receiving node's `ReplicaSetConfig` version and term
-9. Whether the receiving node is primary
-10. Whether the receiving node is electable
+3. The receiving node's lastWritten OpTime
+4. The receiving node's lastApplied OpTime
+5. The receiving node's lastDurable OpTime
+6. The term of the receiving node
+7. The state of the receiving node
+8. The receiving node's sync source
+9. The receiving node's `ReplicaSetConfig` version and term
+10. Whether the receiving node is primary
+11. Whether the receiving node is electable
 
 When the sending node receives the response to the heartbeat, it first processes its
 `ReplSetMetadata` like before.
@@ -537,10 +546,10 @@ Note that this connection pool is separate from the dedicated connection used by
 
 The replication majority **commit point** refers to an OpTime such that all oplog entries with an
 OpTime earlier or equal to it have been replicated to a majority of nodes in the replica set. It is
-influenced by the [`lastApplied`](#replication-timestamp-glossary) and the
+influenced by the [`lastWritten`](#replication-timestamp-glossary) and the
 [`lastDurable`](#replication-timestamp-glossary) OpTimes.
 
-On the primary, we advance the commit point by checking what the highest `lastApplied` or
+On the primary, we advance the commit point by checking what the highest `lastWritten` or
 `lastDurable` is on a majority of the nodes. This OpTime must be greater than the current
 `commit point` for the primary to advance it. Any threads blocking on a writeConcern are woken up
 to check if they now fulfill their requested writeConcern.
@@ -548,12 +557,12 @@ to check if they now fulfill their requested writeConcern.
 When `getWriteConcernMajorityShouldJournal` is set to true, the
 [`_lastCommittedOpTime`](#replication-timestamp-glossary) is set to the `lastDurable` OpTime. This
 means that the server acknowledges a write operation after a majority has written to the on-disk
-journal. Otherwise, `_lastCommittedOpTime` is set using the `lastApplied`.
+journal. Otherwise, `_lastCommittedOpTime` is set using the `lastWritten`.
 
 Secondaries advance their commit point via heartbeats by checking if the commit point is in the
-same term as their `lastApplied` OpTime. This ensures that the secondary is on the same branch of
+same term as their `lastWritten` OpTime. This ensures that the secondary is on the same branch of
 history as the commit point. Additionally, they can update their commit point via the spanning tree
-by taking the minimum of the learned commit point and their `lastApplied`.
+by taking the minimum of the learned commit point and their `lastWritten`.
 
 ### Update Position Commands
 
@@ -583,10 +592,11 @@ The `replSetUpdatePosition` command contains the following information:
    filled in by the `TopologyCoordinator` with information from its `MemberData`. Nodes that are
    believed to be down are not included. Each node contains:
 
-   1. last durable OpTime
-   2. last applied OpTime
-   3. memberId
-   4. `ReplicaSetConfig` version
+   1. lastWritten opTime
+   2. lastDurable OpTime
+   3. lastApplied OpTime
+   4. memberId
+   5. `ReplicaSetConfig` version
 
 2. `ReplSetMetadata`. Usually this only comes in responses, but here it comes in the request as
    well.
@@ -806,9 +816,9 @@ actually doing the undo steps, the node "fixes up" the operations by "cancelling
 that negate each other to reduce work. The node then drops and fetches all data it needs and
 replaces the local version with the remote versions.
 
-The node gets the last applied OpTime from the sync source and the Rollback ID to check if a
+The node gets the lastApplied OpTime from the sync source and the Rollback ID to check if a
 rollback has happened during this rollback, in which case it fails rollback and shuts down. The
-last applied OpTime is set as the [`minValid`](#replication-timestamp-glossary) for the node and the
+lastApplied OpTime is set as the [`minValid`](#replication-timestamp-glossary) for the node and the
 node goes into RECOVERING state. The node resumes fetching and applying operations like a normal
 secondary until it hits that `minValid`. Only at that point does the node go into SECONDARY state.
 
@@ -1504,7 +1514,7 @@ if it should grant a vote. The vote is rejected if:
 1. It's from an older term.
 2. The configs do not match (see more detail in [Config Ordering and Elections](#config-ordering-and-elections)).
 3. The replica set name does not match.
-4. The last applied OpTime that comes in the vote request is older than the voter's last applied
+4. The lastWritten OpTime that comes in the vote request is older than the voter's lastWritten
    OpTime.
 5. If it's not a dry-run election and the voter has already voted in this term.
 6. If the voter is an arbiter and it can see a healthy primary of greater or equal priority. This is
@@ -1531,7 +1541,7 @@ yet replicated from any viable sync source. While these are guaranteed to not be
 still good to minimize rollback when possible.
 
 The primary-elect uses the responses from the recent round of heartbeats to see the latest applied
-OpTime of every other node. If the primary-elect’s last applied OpTime is less than the newest last
+OpTime of every other node. If the primary-elect’s lastApplied OpTime is less than the newest last
 applied OpTime it sees, it will set that as its target OpTime to catch up to. At the beginning of
 catchup, the primary-elect will schedule a timer for the catchup-timeout. If that timeout expires or
 if the node reaches the target OpTime, then the node ends the catch-up phase. The node then clears
@@ -1607,7 +1617,7 @@ Finally, we log stepdown metrics and update our member state to `SECONDARY`.
 - [Replication coordinator stepDown method](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2729)
 - [ReplSetStepDown command class](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L527)
 - [The node loops trying to step down](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2836)
-- [A majority of nodes need to have reached the last applied optime](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2733)
+- [A majority of nodes need to have reached the lastApplied optime](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2733)
 - [At least one caught up node needs to be electable](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2738)
 - [Set the LeaderMode to kSteppingDown](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L1721)
 - [Upon a successful stepdown, it yields locks held by prepared transactions](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2899)
@@ -1677,7 +1687,7 @@ recover to a [`stable_timestamp`](#replication-timestamp-glossary), which is the
 at which the storage engine can take a checkpoint. This can be considered a consistent, majority
 committed point in time for replication and storage.
 
-A node goes into rollback when its [last fetched OpTime is greater than its sync source's last applied OpTime, but it is in a lower term](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/oplog_fetcher.cpp#L1019-L1024).
+A node goes into rollback when its [last fetched OpTime is greater than its sync source's lastApplied OpTime, but it is in a lower term](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/oplog_fetcher.cpp#L1019-L1024).
 In this case, the `OplogFetcher` will return an empty batch and fail with an `OplogStartMissing` error,
 which [`BackgroundSync` interprets as needing to rollback](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/bgsync.cpp#L600-L603).
 
@@ -1763,7 +1773,7 @@ The last thing we do before exiting the data modification section is
 in-memory state to what it was prior to the rollback in order to fulfill the durability guarantees
 of prepared transactions.
 
-At this point, the last applied and durable OpTimes still point to the divergent branch of history,
+At this point, the lastApplied and durable OpTimes still point to the divergent branch of history,
 so we must update them to be at the top of the oplog (the latest entry in the oplog), which should
 be the `common point`.
 
@@ -1903,7 +1913,7 @@ observable once the index builds commit quorum has been satisfied.
 ## Oplog application phase
 
 After the cloning phase of initial sync has finished, the oplog application phase begins. The new
-node first asks its sync source for its last applied OpTime and this is saved as the
+node first asks its sync source for its lastApplied OpTime and this is saved as the
 `stopTimestamp`, the oplog entry it must apply before it's consistent and can become a secondary. If
 the `beginFetchingTimestamp` is the same as the `stopTimestamp`, then it indicates that there are no
 oplog entries that need to be written to the oplog and no operations that need to be applied. In
@@ -1912,7 +1922,13 @@ finish initial sync.
 
 Otherwise, the new node iterates through all of the buffered operations, writes them to the oplog,
 and if their timestamp is after the `beginApplyingTimestamp`, applies them to the data on disk.
-Oplog entries continue to be fetched and added to the buffer while this is occurring.
+Oplog entries continue to be fetched and added to the buffer while this is occurring. One thing to
+note is that the oplog writes are not performed by the `OplogWriter` thread like [steady state
+replication](#oplog-entry-persistence) but the initial sync thread pool, so it still needs to set
+the [`oplogTruncateAfterPoint`](#replication-timestamp-glossary) to the node's [last written optime](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_impl.cpp#L274)
+(before this batch) to aid in [startup recovery](#startup-recovery) if the node shuts down in the
+middle of writing entries to the oplog. After writing the batch, it will reset the
+`oplogTruncateAfterPoint` to null.
 
 One notable exception is that the node will not apply `prepareTransaction` oplog entries. Similar
 to how we reconstruct prepared transactions in startup and rollback recovery, we will update the
@@ -1951,7 +1967,7 @@ It will register the node's [`lastApplied`](#replication-timestamp-glossary) OpT
 engine to make sure that all oplog entries prior to that will be visible when querying the oplog.
 After that it will reconstruct all prepared transactions. The node will then clear the initial sync
 flag and tell the storage engine that the [`initialDataTimestamp`](#replication-timestamp-glossary)
-is the node's last applied OpTime. Finally, the `InitialSyncer` shuts down and the
+is the node's lastApplied OpTime. Finally, the `InitialSyncer` shuts down and the
 `ReplicationCoordinator` starts steady state replication.
 
 #### Code References
@@ -2137,7 +2153,7 @@ even after a shutdown.
 
 The `oplogTruncateAfterPoint` can be set in two scenarios. The first is during
 [oplog batch application](#oplog-entry-application). Before writing a batch of oplog entries to the
-oplog, the node will [set the `oplogTruncateAfterPoint` to the `lastApplied` timestamp](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/oplog_applier_impl.cpp#L463-L464).
+oplog, the node will [set the `oplogTruncateAfterPoint` to the `lastWritten` timestamp](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_impl.cpp#L274).
 If the node shuts down before it finishes writing the batch, then during startup recovery the node will truncate
 the oplog back to the point saved before the batch application began. If the node successfully
 finishes writing the batch to the oplog, it will
@@ -2168,8 +2184,8 @@ oplog entries through the top of the oplog, it will
 all transactions still in the prepare state.
 
 Finally, the node will [finish loading](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L547)
-the replica set configuration, [set its `lastApplied` and
-`lastDurable`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L697-L698) timestamps
+the replica set configuration, [set its `lastWritten`, `lastApplied` and
+`lastDurable`](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/replication_coordinator_impl.cpp#L727-L729) timestamps
 to the top of the oplog (the latest entry in the oplog) and start steady state replication.
 
 ## Recover from Unstable Checkpoint
@@ -2271,10 +2287,19 @@ Unstable checkpoints simply open a transaction and read all data that is current
 time the transaction is opened. They read a consistent snapshot of data, but the snapshot they read
 from is not associated with any particular timestamp.
 
+**`lastWritten`**: OpTime of the latest oplog entry that has been written to the `rs.oplog`
+collection, though it is not necessary to be flushed to the journal. On primary, it is equal to the
+`lastApplied` timestamp where they are updated together after a storage transaction commits, so it
+can include an oplog hole. On secondary, `lastWritten` will be updated after the `OplogWriter`
+writes a batch of oplog entries to `rs.oplog`, which happens before journal flushing and oplog
+application. Therefore, `lastWritten` is guaranteed to be greater than or equal to both `lastApplied`
+and `lastDurable`.
+
 **`lastApplied`**: In-memory record of the latest applied oplog entry optime. On primaries, it may
 lag behind the optime of the newest oplog entry that is visible in the storage engine because it is
 updated after a storage transaction commits. On secondaries, lastApplied is only updated at the
-completion of an oplog batch.
+completion of an oplog batch. `lastApplied` can include an oplog hole on primary since transactions
+may not commit in order but won't include oplog holes on secondary.
 
 **`lastCommittedOpTime`**: A node’s local view of the latest majority committed optime. Every time
 we update this optime, we also recalculate the `stable_timestamp`. Note that the
