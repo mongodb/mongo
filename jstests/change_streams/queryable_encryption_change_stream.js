@@ -7,10 +7,10 @@
 // requires_fcv_71
 // ]
 //
-import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
+import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
 import {canonicalizeEventForTesting, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 
-if (!buildInfo().modules.includes("enterprise")) {
+if (!isEnterpriseShell()) {
     jsTestLog("Skipping test as it requires the enterprise module");
     quit();
 }
@@ -121,7 +121,7 @@ assert.eq(0, cursordb.firstBatch.length, "Cursor had changes: " + tojson(cursord
 
 jsTestLog("Testing single insert");
 {
-    assert.commandWorked(ecoll.insert({_id: 0, first: "frodo", last: "baggins"}));
+    assert.commandWorked(ecoll.einsert({_id: 0, first: "frodo", last: "baggins"}));
     expectedChange = expectedEDCInsertChange(0, "baggins", {last: "baggins"});
 
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expectedChange]});
@@ -137,7 +137,7 @@ jsTestLog("Testing second insert");
         cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: testDb[collName]});
     cursordb = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
-    assert.commandWorked(ecoll.insert({_id: 1, first: "merry", last: "brandybuck"}));
+    assert.commandWorked(ecoll.einsert({_id: 1, first: "merry", last: "brandybuck"}));
     expectedChange = expectedEDCInsertChange(1, "brandybuck", {last: "brandybuck"});
 
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expectedChange]});
@@ -154,7 +154,7 @@ jsTestLog("Testing replacement update");
     cursordb = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
     assert.commandWorked(
-        ecoll.update({last: "baggins"}, {first: "pippin", last: "took", location: "shire"}));
+        ecoll.ereplaceOne({last: "baggins"}, {first: "pippin", last: "took", location: "shire"}));
     expectedChange = expectedEDCInsertChange(0, "took", {last: "baggins"});
     expectedChange.operationType = "replace";
     expectedChange.fullDocument.location = "shire";
@@ -170,8 +170,8 @@ jsTestLog("Testing upsert");
         cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: testDb[collName]});
     cursordb = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
-    assert.commandWorked(
-        ecoll.update({last: "gamgee"}, {_id: 2, first: "sam", last: "gamgee"}, {upsert: true}));
+    assert.commandWorked(ecoll.ereplaceOne(
+        {last: "gamgee"}, {_id: 2, first: "sam", last: "gamgee"}, {upsert: true}));
 
     expectedChange = expectedEDCInsertChange(2, "gamgee", {last: "gamgee"});
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expectedChange]});
@@ -186,7 +186,7 @@ jsTestLog("Testing modification update");
     cursor =
         cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: testDb[collName]});
     cursordb = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
-    assert.commandWorked(ecoll.update({last: "gamgee"}, {$set: {first: "rosie"}}));
+    assert.commandWorked(ecoll.eupdateOne({last: "gamgee"}, {$set: {first: "rosie"}}));
     expectedChange = {
         documentKey: {_id: 2},
         ns: {db: dbName, coll: collName},
@@ -227,7 +227,7 @@ jsTestLog("Testing findAndModify");
     cursor =
         cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: testDb[collName]});
     cursordb = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
-    assert.commandWorked(ecoll.runCommand({
+    assert.commandWorked(ecoll.erunCommand({
         findAndModify: ecoll.getName(),
         query: {last: "took"},
         update: {$set: {first: "paladin"}, $unset: {location: ""}},
@@ -272,7 +272,7 @@ jsTestLog("Testing delete");
     cursor =
         cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: testDb[collName]});
     cursordb = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
-    assert.commandWorked(ecoll.remove({last: "gamgee"}));
+    assert.commandWorked(ecoll.edeleteOne({last: "gamgee"}));
     expectedChange = {
         documentKey: {_id: 2},
         ns: {db: dbName, coll: collName},
@@ -314,7 +314,9 @@ jsTestLog("Testing compact");
         cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: testDb[collName]});
     cursordb = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
-    assert.commandWorked(ecoll.compact());
+    encryptedClient.runEncryptionOperation(() => {
+        assert.commandWorked(ecoll.compact());
+    });
     encryptedClient.assertEncryptedCollectionCounts(collName, 2, numUniqueValues, 0);
     const anchorCount = testDb[escName].countDocuments({value: {$exists: true}});
     const nonAnchorCount = testDb[escName].countDocuments({value: {$exists: false}});
@@ -343,7 +345,7 @@ jsTestLog("Testing cleanup");
 {
     // insert new documents for each test value, so the ECOC & ESC have documents to clean up
     for (let val of testValues) {
-        assert.commandWorked(ecoll.insert({first: val[0], last: val[1]}));
+        assert.commandWorked(ecoll.einsert({first: val[0], last: val[1]}));
     }
     // ESC doesn't have null anchors yet, so the total delete count == ESC count before cleanup
     const deleteCount = testDb[escName].countDocuments({});
@@ -360,7 +362,9 @@ jsTestLog("Testing cleanup");
         cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: testDb[collName]});
     cursordb = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
-    assert.commandWorked(ecoll.cleanup());
+    encryptedClient.runEncryptionOperation(() => {
+        assert.commandWorked(ecoll.cleanup());
+    });
     encryptedClient.assertEncryptedCollectionCounts(
         collName, 2 + numUniqueValues, numUniqueValues, 0);
     encryptedClient.assertESCNonAnchorCount(collName, 0);

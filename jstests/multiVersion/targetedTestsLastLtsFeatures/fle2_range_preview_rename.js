@@ -45,7 +45,7 @@ function testBinaryUpgradeWithRangePreviewCollection(upgradeConfig, fcvUpgradeSh
     }));
 
     assert.commandWorked(
-        client.getDB().runCommand({insert: "coll1", documents: [{_id: 0, field1: NumberInt(1)}]}));
+        client.getDB().erunCommand({insert: "coll1", documents: [{_id: 0, field1: NumberInt(1)}]}));
     // The upgradeSet should always succeed and we should be able to start up with the rangePreview
     // collection.
     rst.upgradeSet(upgradeConfig);
@@ -53,7 +53,7 @@ function testBinaryUpgradeWithRangePreviewCollection(upgradeConfig, fcvUpgradeSh
 
     // After upgrading, we can't do any CRUD ops on the collection
     assert.commandFailedWithCode(
-        client.getDB().runCommand({insert: "coll1", documents: [{_id: 1, field1: NumberInt(2)}]}),
+        client.getDB().erunCommand({insert: "coll1", documents: [{_id: 1, field1: NumberInt(2)}]}),
         CRUDOnDeprecatedCollectionCode);
     assert.commandFailedWithCode(client.getDB().runCommand({find: "coll1", filter: {}}),
                                  CRUDOnDeprecatedCollectionCode);
@@ -171,10 +171,12 @@ function testCreateCollection(config) {
     }));
 
     // CRUD operations should work fine on the range collection.
-    assert.commandWorked(client.getDB().runCommand(
+    assert.commandWorked(client.getDB().erunCommand(
         {insert: "coll", documents: [{_id: 0, field1: NumberInt(1), field2: NumberInt(2)}]}));
-    assert.eq(client.getDB().coll.find({}, {__safeContent__: 0}).toArray(),
-              [{_id: 0, field1: NumberInt(1), field2: NumberInt(2)}]);
+    client.runEncryptionOperation(() => {
+        assert.eq(client.getDB().coll.find({}, {__safeContent__: 0}).toArray(),
+                  [{_id: 0, field1: NumberInt(1), field2: NumberInt(2)}]);
+    });
 
     rst.stopSet();
 }

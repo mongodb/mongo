@@ -6,7 +6,12 @@
  * requires_sharding
  * ]
  */
-import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
+import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
+
+if (!isEnterpriseShell()) {
+    jsTestLog("Skipping test as it requires the enterprise module");
+    quit();
+}
 
 function runTest(mongosConn, shardConn) {
     let dbName = 'testdb';
@@ -22,7 +27,9 @@ function runTest(mongosConn, shardConn) {
 
     let clientShard = new EncryptedClient(shardConn, dbName);
 
-    assert.commandFailedWithCode(clientShard.getDB().basic.cleanup(), 7618804);
+    clientShard.runEncryptionOperation(() => {
+        assert.commandFailedWithCode(clientShard.getDB().basic.cleanup(), 7618804);
+    });
 }
 
 jsTestLog("Sharding: Testing fle2 cleanup not allowed against a shard server");

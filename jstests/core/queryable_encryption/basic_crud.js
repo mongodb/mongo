@@ -48,7 +48,6 @@ const clientSideFLEOptions = {
 db.getSiblingDB(dbName).dropDatabase();
 
 assert(initialConn.setAutoEncryption(clientSideFLEOptions));
-initialConn.toggleAutoEncryption(true);
 
 let encryptedClient = new EncryptedClient(initialConn, dbName);
 assert.commandWorked(encryptedClient.createEncryptionCollection(collName, {
@@ -58,6 +57,8 @@ assert.commandWorked(encryptedClient.createEncryptionCollection(collName, {
         ]
     }
 }));
+
+initialConn.toggleAutoEncryption(true);
 
 function runIndexedEqualityEncryptedCRUDTest(client, iterations) {
     let conn = client.getDB().getMongo();
