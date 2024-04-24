@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/executor/task_executor_cursor_options.h"
 
 namespace mongo {
@@ -42,10 +43,17 @@ namespace executor {
  */
 class MongotTaskExecutorCursorGetMoreStrategy final : public TaskExecutorCursorGetMoreStrategy {
 public:
+    // The default number of documents returned in a single batch from mongot.
+    static constexpr int64_t kDefaultMongotBatchSize = 101;
+
+    // Specifies the factor by which the batchSize sent from mongod to mongot increases per batch.
+    // TODO SERVER-88412: Convert this into an atomic, configurable cluster parameter.
+    static constexpr double kInternalSearchBatchSizeGrowthFactor = 2.0;
+
     MongotTaskExecutorCursorGetMoreStrategy(
         bool preFetchNextBatch = true,
-        std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr)
-        : _preFetchNextBatch(preFetchNextBatch), _calcDocsNeededFn(calcDocsNeededFn) {}
+        std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
+        int64_t startingBatchSize = kDefaultMongotBatchSize);
 
     MongotTaskExecutorCursorGetMoreStrategy(MongotTaskExecutorCursorGetMoreStrategy&& other) =
         default;
@@ -58,12 +66,37 @@ public:
         return _preFetchNextBatch;
     }
 
+    int64_t getCurrentBatchSize() const {
+        return _currentBatchSize;
+    }
+
+    std::vector<int64_t> getBatchSizeHistory() const {
+        return _batchSizeHistory;
+    }
+
 private:
+    /**
+     * If batchSize tuning is not enabled, we'll see the initial batchSize for any getMore requests.
+     * Otherwise, we'll apply tuning strategies to optimize batchSize of each batch requested.
+     */
+    int64_t _getNextBatchSize();
+
     bool _preFetchNextBatch;
 
     // TODO SERVER-86736 Remove _calcDocsNeededFn and replace with pointer to SharedSearchState
     // to compute docs needed within the cursor.
     std::function<boost::optional<long long>()> _calcDocsNeededFn;
+
+    // If true, we will use batchSize tuning to adjust the batchSizes sent from mongod to mongot and
+    // stick with this decision for the cursor's lifetime (i.e. the cursor should not flip between
+    // sending un-tuned and tuned batchSizes between its getMore requests).
+    const bool _useBatchSizeTuning;
+
+    int64_t _currentBatchSize;
+
+    // TODO SERVER-86738 Incorporate batchSizeHistory into explain executionStats with $search.
+    // Tracks all batchSizes sent to mongot, to be included in the $search explain execution stats.
+    std::vector<int64_t> _batchSizeHistory;
 };
 }  // namespace executor
 }  // namespace mongo

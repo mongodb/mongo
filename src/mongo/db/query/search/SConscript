@@ -23,9 +23,7 @@ env.Library(
 
 env.CppUnitTest(
     target='mongot_cursor_test',
-    source=[
-        'mongot_cursor_test.cpp',
-    ],
+    source=['mongot_cursor_test.cpp', 'mongot_cursor_helpers_test.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/network_interface_mock',
         '$BUILD_DIR/mongo/executor/network_interface_tl',

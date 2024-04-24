@@ -35,28 +35,55 @@
 
 namespace mongo {
 namespace executor {
+
+MongotTaskExecutorCursorGetMoreStrategy::MongotTaskExecutorCursorGetMoreStrategy(
+    bool preFetchNextBatch,
+    std::function<boost::optional<long long>()> calcDocsNeededFn,
+    int64_t startingBatchSize)
+    : _preFetchNextBatch(preFetchNextBatch),
+      _calcDocsNeededFn(calcDocsNeededFn),
+      _useBatchSizeTuning(feature_flags::gFeatureFlagSearchBatchSizeTuning.isEnabled(
+          serverGlobalParams.featureCompatibility.acquireFCVSnapshot())),
+      _currentBatchSize(startingBatchSize),
+      _batchSizeHistory({_currentBatchSize}) {}
+
 BSONObj MongotTaskExecutorCursorGetMoreStrategy::createGetMoreRequest(const CursorId& cursorId,
                                                                       const NamespaceString& nss) {
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
 
-    if (!_calcDocsNeededFn) {
-        return getMoreRequest.toBSON({});
-    }
-
-    auto docsNeeded = _calcDocsNeededFn();
+    boost::optional<long long> docsNeeded = _calcDocsNeededFn ? _calcDocsNeededFn() : boost::none;
     // (Ignore FCV check): This feature is enabled on an earlier FCV.
-    // TODO SERVER-74941 Remove featureFlagSearchBatchSizeLimit
-    if (feature_flags::gFeatureFlagSearchBatchSizeLimit.isEnabledAndIgnoreFCVUnsafe() &&
-        docsNeeded.has_value()) {
+    // TODO SERVER-74941 Remove featureFlagSearchBatchSizeLimit.
+    // TODO SERVER-89530 Follow the same pattern as the featureFlagSearchBatchSizeTuning.
+    bool needsSetDocsRequested = !_useBatchSizeTuning &&
+        feature_flags::gFeatureFlagSearchBatchSizeLimit.isEnabledAndIgnoreFCVUnsafe() &&
+        docsNeeded.has_value();
+
+    // If the cursor is tuning batchSizes, set the batchSize field. Otherwise, set the docsRequested
+    // field if we are performing limit optimization for this request.
+    // TODO SERVER-74941 Remove docsRequested alongside featureFlagSearchBatchSizeLimit.
+    if (_useBatchSizeTuning || needsSetDocsRequested) {
         BSONObjBuilder getMoreBob;
         getMoreRequest.serialize({}, &getMoreBob);
         BSONObjBuilder cursorOptionsBob(getMoreBob.subobjStart(mongot_cursor::kCursorOptionsField));
-        cursorOptionsBob.append(mongot_cursor::kDocsRequestedField, docsNeeded.get());
+        if (_useBatchSizeTuning) {
+            cursorOptionsBob.append(mongot_cursor::kBatchSizeField, _getNextBatchSize());
+        } else {
+            cursorOptionsBob.append(mongot_cursor::kDocsRequestedField, docsNeeded.get());
+        }
         cursorOptionsBob.doneFast();
         return getMoreBob.obj();
     }
-
     return getMoreRequest.toBSON({});
+}
+
+int64_t MongotTaskExecutorCursorGetMoreStrategy::_getNextBatchSize() {
+    // In case the growth factor is small enough that the next batchSize rounds back to the
+    // previous batchSize, we use std::ceil to make sure it always grows by at least 1,
+    // unless the growth factor is exactly 1.
+    _currentBatchSize = std::ceil(_currentBatchSize * kInternalSearchBatchSizeGrowthFactor);
+    _batchSizeHistory.emplace_back(_currentBatchSize);
+    return _currentBatchSize;
 }
 
 }  // namespace executor
