@@ -71,6 +71,9 @@ auto intVec = MyDecorable::declareDecoration<std::vector<int>>();
 auto str1 = MyDecorable::declareDecoration<std::string>();
 auto str2 = MyDecorable::declareDecoration<std::string>();
 
+constexpr auto testData = mongo::namespace_string_data::makeNsData<9, 4>("constexpr", "name");
+constexpr mongo::NamespaceString kConstNs(testData.data(), testData.size());
+
 MyDecorable d1;
 int clang_optnone main(int argc, char** argv) {
 
@@ -85,11 +88,12 @@ int clang_optnone main(int argc, char** argv) {
     mongo::DatabaseName dbNameWithTenantId =
         mongo::DatabaseName::createDatabaseName_forTest(tenantId, "foo");
     mongo::NamespaceString nss =
-        mongo::NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar");
+        mongo::NamespaceString::createNamespaceString_forTest(boost::none, "foo.ba");
     mongo::NamespaceString nssWithTenantId =
-        mongo::NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
+        mongo::NamespaceString::createNamespaceString_forTest(tenantId, "foo.barbaz");
     mongo::NamespaceString longNss = mongo::NamespaceString::createNamespaceString_forTest(
         boost::none, "longdatabasenamewithoutsmallstring.longcollection");
+    mongo::NamespaceString constCopy = kConstNs;
 
     // Tests for various abseil containers.
     mongo::StringMap<int> emptyMap;
