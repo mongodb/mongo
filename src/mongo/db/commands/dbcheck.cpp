@@ -53,6 +53,8 @@
 #include "mongo/logv2/log.h"
 
 MONGO_FAIL_POINT_DEFINE(sleepAfterExtraIndexKeysHashing);
+MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingDbCheckRun);
+MONGO_FAIL_POINT_DEFINE(hangBeforeAddingDBCheckBatchToOplog);
 
 namespace mongo {
 
@@ -288,6 +290,11 @@ protected:
 
         DbCheckStartAndStopLogger startStop(opCtx);
 
+        if (MONGO_unlikely(hangBeforeProcessingDbCheckRun.shouldFail())) {
+            LOGV2(7949000, "Hanging dbcheck due to failpoint 'hangBeforeProcessingDbCheckRun'");
+            hangBeforeProcessingDbCheckRun.pauseWhileSet();
+        }
+
         for (const auto& coll : *_run) {
             try {
                 _doCollection(opCtx, coll);
@@ -440,11 +447,14 @@ private:
             WriteConcernResult unused;
             auto status = waitForWriteConcern(opCtx, stats.time, info.writeConcern, &unused);
             if (!status.isOK()) {
-                auto entry = dbCheckWarningHealthLogEntry(info.nss,
-                                                          "dbCheck failed waiting for writeConcern",
-                                                          OplogEntriesEnum::Batch,
-                                                          status);
+                // TODO SERVER-89817: Add context with batch ID and lastKey once those are
+                // backported.
+                auto entry = dbCheckErrorHealthLogEntry(info.nss,
+                                                        "dbCheck failed waiting for writeConcern",
+                                                        OplogEntriesEnum::Batch,
+                                                        status);
                 HealthLogInterface::get(opCtx)->log(*entry);
+                return;
             }
 
             start = stats.lastKey;
@@ -574,6 +584,12 @@ private:
                 batch.setMinKey(first);
                 batch.setMaxKey(BSONKey(hasher->lastKey()));
                 batch.setReadTimestamp(readTimestamp);
+
+                if (MONGO_unlikely(hangBeforeAddingDBCheckBatchToOplog.shouldFail())) {
+                    LOGV2(8589000,
+                          "Hanging dbCheck due to failpoint 'hangBeforeAddingDBCheckBatchToOplog'");
+                    hangBeforeAddingDBCheckBatchToOplog.pauseWhileSet();
+                }
 
                 // Send information on this batch over the oplog.
                 result.time = _logOp(opCtx, info.nss, collection->uuid(), batch.toBSON());

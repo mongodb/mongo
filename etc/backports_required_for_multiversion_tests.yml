@@ -29,6 +29,8 @@ last-continuous:
     ticket: SERVER-30832
   - test_file: jstests/replsets/ignore_dbcheck_in_rollback.js
     ticket: SERVER-30832
+  - test_file: jstests/replsets/dbcheck_fails_on_write_concern_error.js
+    ticket: SERVER-88318
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_pauses_watchdog_checks_during_storage_change.js
     ticket: SERVER-83508
   - test_file: jstests/sharding/query/find_and_modify_with_partial_shard_key.js
@@ -360,6 +362,8 @@ last-lts:
     ticket: SERVER-88885
   - test_file: jstests/replsets/ignore_dbcheck_in_initial_sync.js
     ticket: SERVER-80340
+  - test_file: jstests/replsets/dbcheck_fails_on_write_concern_error.js
+    ticket: SERVER-88318
   - test_file: jstests/replsets/ignore_dbcheck_in_startup_recovery.js
     ticket: SERVER-30832
   - test_file: jstests/replsets/ignore_dbcheck_in_rollback.js
