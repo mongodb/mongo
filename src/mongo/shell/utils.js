@@ -85,7 +85,11 @@ function isNetworkError(errorOrResponse) {
         "error doing query",
         "socket exception",
         "SocketException",
-        "HostNotFound"
+        "HostNotFound",
+        "HostUnreachable",
+        "NetworkTimeout",
+        "ConnectionPoolExpired",
+        "ConnectionError"
     ];
 
     // Then check if it's an Error, if so see if any of the known network error strings appear
