@@ -4,6 +4,7 @@
  * @tags: [featureFlagCheckForDirectShardOperations, requires_fcv_70]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // Create a new sharded cluster for testing and enable auth.
 const st = new ShardingTest({name: jsTestName(), keyFile: "jstests/libs/key1", shards: 1});
@@ -20,30 +21,88 @@ assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
 // TODO: (SERVER-87190) Remove once 8.0 becomes last lts.
 const failOnDirectOps =
     FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "FailOnDirectShardOperations");
+const resetClusterCardinalityOnRemoveShard =
+    FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "RSEndpointClusterCardinalityParameter");
 
 function getUnauthorizedDirectWritesCount() {
     return assert.commandWorked(shardAdminDB.runCommand({serverStatus: 1}))
         .shardingStatistics.unauthorizedDirectShardOps;
 }
 
-// With only one shard, direct shard operations should be allowed.
-jsTest.log("Running tests with only one shard.");
-{
-    // Direct writes to collections with root priviledge should be authorized.
-    assert.commandWorked(shardAdminTestDB.getCollection("coll").insert({value: 1}));
-    assert.eq(getUnauthorizedDirectWritesCount(), 0);
+function runTests(shouldBlockDirectConnections, directWriteCount) {
+    // Direct writes with root priviledges should always be authorized.
+    assert.commandWorked(shardAdminTestDB.getCollection("coll").update(
+        {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
+    assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
 
-    // Direct writes to collections with read/write priviledge should be authorized.
+    // Direct writes with only read/write priviledges should depend on the cluster state and the
+    // failOnDirectShardOperations feature flag.
     shardAdminTestDB.createUser({user: "user", pwd: "y", roles: ["readWrite"]});
     assert(userTestDB.auth("user", "y"), "Authentication failed");
-    assert.commandWorked(userTestDB.getCollection("coll").insert({value: 2}));
-    assert.eq(getUnauthorizedDirectWritesCount(), 0);
+    if (!shouldBlockDirectConnections) {
+        // In a single shard cluster, this should be allowed
+        assert.commandWorked(userTestDB.getCollection("coll").update(
+            {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
+        assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
+    } else {
+        // In a 2 shard cluster, this will fail if the ff is enabled and warn otherwise.
+        if (failOnDirectOps) {
+            assert.commandFailedWithCode(userTestDB.getCollection("coll").update(
+                                             {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
+                                         ErrorCodes.Unauthorized);
+        } else {
+            assert.commandWorked(userTestDB.getCollection("coll").update(
+                {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
+        }
+        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+    }
 
-    // Logging out and dropping users should be authorized.
-    userTestDB.logout();
+    // Setting the server parameter should cause warnings to be emitted if the cluster only has one
+    // shard.
+    let res = assert.commandWorkedOrFailedWithCode(
+        shardAdminDB.runCommand({setParameter: 1, directConnectionChecksWithSingleShards: true}),
+        ErrorCodes.InvalidOptions);
+    // Skip this test in multiversion tests where the server parameter does not exist.
+    if (res.ok) {
+        // In a 2 shard cluster, this will fail if the ff is enabled and warn otherwise.
+        if (failOnDirectOps && shouldBlockDirectConnections) {
+            assert.commandFailedWithCode(userTestDB.getCollection("coll").update(
+                                             {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
+                                         ErrorCodes.Unauthorized);
+        } else {
+            assert.commandWorked(userTestDB.getCollection("coll").update(
+                {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
+        }
+        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+        assert.commandWorked(shardAdminDB.runCommand(
+            {setParameter: 1, directConnectionChecksWithSingleShard: false}));
+        userTestDB.logout();
+        assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
+
+        // Direct writes with read/write plus the direct shard operations priviledges should always
+        // be authorized.
+        shardAdminDB.createUser(
+            {user: "user2", pwd: "z", roles: ["readWriteAnyDatabase", "directShardOperations"]});
+        let shardUserWithDirectWritesAdminDB = userConn.getDB("admin");
+        let shardUserWithDirectWritesTestDB = userConn.getDB("test");
+        assert(shardUserWithDirectWritesAdminDB.auth("user2", "z"), "Authentication failed");
+        assert.commandWorked(shardUserWithDirectWritesTestDB.getCollection("coll").update(
+            {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
+        assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
+        shardUserWithDirectWritesAdminDB.logout();
+        assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
+    }
+
+    // Reset users and logout for next set of tests.
     shardAdminTestDB.dropUser("user");
-    assert.eq(getUnauthorizedDirectWritesCount(), 0);
+    shardAdminDB.dropUser("user2");
+    assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
+    return directWriteCount;
 }
+
+// With only one shard, direct shard operations should be allowed.
+jsTest.log("Running tests with only one shard.");
+let directWriteCount = runTests(false /* shouldBlockDirectConnections */, 0);
 
 // Adding the second shard will trigger the check for direct shard ops.
 var newShard = new ReplSetTest({name: "additionalShard", nodes: 1});
@@ -58,44 +117,24 @@ if (!TestData.configShard) {
 }
 assert.commandWorked(mongosAdminUser.runCommand({addShard: newShard.getURL()}));
 
+// With two shards, direct shard operations should be prevented.
 jsTest.log("Running tests with two shards.");
-{
-    // Direct writes to collections with root priviledge (which includes directShardOperations)
-    // should be authorized.
-    assert.commandWorked(shardAdminTestDB.getCollection("coll").insert({value: 3}));
-    assert.eq(getUnauthorizedDirectWritesCount(), 0);
+directWriteCount = runTests(true /* shouldBlockDirectConnections */, directWriteCount);
 
-    // Direct writes to collections with read/write priviledge should not be authorized.
-    shardAdminTestDB.createUser({user: "user", pwd: "y", roles: ["readWrite"]});
-    assert(userTestDB.auth("user", "y"), "Authentication failed");
-    if (failOnDirectOps) {
-        assert.commandFailedWithCode(userTestDB.getCollection("coll").insert({value: 4}),
-                                     ErrorCodes.Unauthorized);
-    } else {
-        assert.commandWorked(userTestDB.getCollection("coll").insert({value: 4}));
-    }
-    assert.eq(getUnauthorizedDirectWritesCount(), 1);
-    userTestDB.logout();
-    assert.eq(getUnauthorizedDirectWritesCount(), 1);
+// Remove the second shard, this shouldn't affect the direct shard op checks.
+removeShard(mongosAdminUser, newShard.getURL());
 
-    // Direct writes with just read/write and direct operations should be authorized.
-    shardAdminDB.createUser(
-        {user: "user2", pwd: "z", roles: ["readWriteAnyDatabase", "directShardOperations"]});
-    let shardUserWithDirectWritesAdminDB = userConn.getDB("admin");
-    let shardUserWithDirectWritesTestDB = userConn.getDB("test");
-    assert(shardUserWithDirectWritesAdminDB.auth("user2", "z"), "Authentication failed");
-    assert.commandWorked(shardUserWithDirectWritesTestDB.getCollection("coll").insert({value: 5}));
-    assert.eq(getUnauthorizedDirectWritesCount(), 1);
+// With one shard again, direct shard operations should still be prevented assuming that
+// featureFlagRSEndpointClusterCardinalityParameter is disabled.
+// TODO (SERVER-67835) update this test to reflect the expected behavior for direct shard op checks
+// when RSEndpoint is enabled.
+jsTest.log("Running tests with one shard again.");
+directWriteCount = runTests(
+    !resetClusterCardinalityOnRemoveShard /* shouldBlockDirectConnections */, directWriteCount);
 
-    // Logout should always be authorized and drop user from admin should be authorized.
-    shardUserWithDirectWritesAdminDB.logout();
-    shardAdminTestDB.dropUser("user");
-    shardAdminTestDB.dropUser("user2");
-    mongosAdminUser.logout();
-    assert.eq(getUnauthorizedDirectWritesCount(), 1);
-    // shardAdminDB is used to check the direct writes count, so log it out last.
-    shardAdminDB.logout();
-}
+// Logout of final users
+mongosAdminUser.logout();
+shardAdminDB.logout();
 
 // Stop the sharding test before the additional shard to ensure the test hooks run successfully.
 st.stop();

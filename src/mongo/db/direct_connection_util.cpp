@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/s/sharding_api_d_params_gen.h"
 #include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/logv2/log.h"
@@ -61,7 +62,7 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const DatabaseNam
                     "shardedClusterCardinalityForDirectConns");
             return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
         }();
-        if (clusterHasTwoOrMoreShards) {
+        if (clusterHasTwoOrMoreShards || directConnectionChecksWithSingleShard.load()) {
             const bool authIsEnabled = AuthorizationManager::get(opCtx->getService()) &&
                 AuthorizationManager::get(opCtx->getService())->isAuthEnabled();
 
@@ -75,14 +76,17 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const DatabaseNam
 
             if (!directShardOperationsAllowed) {
                 ShardingStatistics::get(opCtx).unauthorizedDirectShardOperations.addAndFetch(1);
-                if (feature_flags::gFailOnDirectShardOperations.isEnabled(fcvSnapshot)) {
+                if (feature_flags::gFailOnDirectShardOperations.isEnabled(fcvSnapshot) &&
+                    clusterHasTwoOrMoreShards) {
                     LOGV2_ERROR_OPTIONS(
                         8679600,
                         {logv2::UserAssertAfterLog(ErrorCodes::Unauthorized)},
                         "You are connecting to a sharded cluster improperly by connecting directly "
                         "to a shard. Please connect to the cluster via a router (mongos).",
                         "command"_attr = CurOp::get(opCtx)->getCommand()->getName());
-                } else if (feature_flags::gCheckForDirectShardOperations.isEnabled(fcvSnapshot)) {
+                } else if (feature_flags::gCheckForDirectShardOperations.isEnabled(fcvSnapshot) ||
+                           (!clusterHasTwoOrMoreShards &&
+                            directConnectionChecksWithSingleShard.load())) {
                     LOGV2_DEBUG(
                         7553700,
                         ShardingState::get(opCtx)->directConnectionLogSeverity().toInt(),
