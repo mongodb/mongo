@@ -69,7 +69,7 @@ struct ParsedCollModIndexRequest {
  * Used by collMod implementation only.
  */
 void processCollModIndexRequest(OperationContext* opCtx,
-                                AutoGetCollection* autoColl,
+                                Collection* writableColl,
                                 const ParsedCollModIndexRequest& collModIndexRequest,
                                 boost::optional<IndexCollModInfo>* indexCollModInfo,
                                 BSONObjBuilder* result,
@@ -82,7 +82,6 @@ void processCollModIndexRequest(OperationContext* opCtx,
  */
 std::list<std::set<RecordId>> scanIndexForDuplicates(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
     const IndexDescriptor* idx,
     boost::optional<key_string::Value> firstKeyString = {});
 
@@ -91,7 +90,7 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
  * status for not being able to convert the index to unique.
  */
 Status buildConvertUniqueErrorStatus(OperationContext* opCtx,
-                                     const CollectionPtr& collection,
+                                     const Collection* collection,
                                      const std::list<std::set<RecordId>>& duplicateRecordsList);
 
 }  // namespace mongo

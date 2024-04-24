@@ -173,6 +173,12 @@ TTLCollectionCache::Info::ExpireAfterSecondsType extractExpireAfterSecondsType(
     const StatusWith<TTLCollectionCache::Info::ExpireAfterSecondsType>& swType);
 
 /**
+ * Normalizes an expireAfterSeconds value to an int32_t. Returns boost::none if input is already
+ * appropriately normalized.
+ */
+boost::optional<int32_t> normalizeExpireAfterSeconds(BSONElement expireAfterSecondsElem);
+
+/**
  * Returns true if 'indexSpec' refers to a TTL index.
  */
 bool isIndexTTL(const BSONObj& indexSpec);
