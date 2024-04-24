@@ -1225,5 +1225,54 @@ TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordi
     }
 }
 
+TEST_F(ReshardingRecipientServiceTest, FailoverDuringErrorState) {
+    for (bool isAlsoDonor : {false, true}) {
+        LOGV2(8916100,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "isAlsoDonor"_attr = isAlsoDonor);
+
+        std::string errMsg("Simulating an unrecoverable error for testing");
+        FailPointEnableBlock failpoint("reshardingRecipientFailsAfterTransitionToCloning",
+                                       BSON("errmsg" << errMsg));
+
+        auto doc = makeStateDocument(isAlsoDonor);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+
+        auto localTransitionToErrorFuture = recipient->awaitInStrictConsistencyOrError();
+        ASSERT_OK(localTransitionToErrorFuture.getNoThrow());
+
+        stepDown();
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+        recipient.reset();
+
+        stepUp(opCtx.get());
+
+        auto [maybeRecipient, isPausedOrShutdown] =
+            RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(maybeRecipient);
+        ASSERT_FALSE(isPausedOrShutdown);
+        recipient = *maybeRecipient;
+
+        {
+            auto persistedRecipientDocument =
+                getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
+            auto state = persistedRecipientDocument.getMutableState().getState();
+            ASSERT_EQ(state, RecipientStateEnum::kError);
+            ASSERT(persistedRecipientDocument.getMutableState().getAbortReason());
+        }
+
+        recipient->abort(false);
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+    }
+}
+
 }  // namespace
 }  // namespace mongo
