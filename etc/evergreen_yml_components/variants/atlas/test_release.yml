@@ -19,7 +19,7 @@ buildvariants:
       push_bucket: downloads.10gen.com
       push_name: linux
       push_arch: x86_64-enterprise-rhel79
-      test_flags: --excludeWithAnyTags=requires_latch_analyzer
+      test_flags: --excludeWithAnyTags=requires_latch_analyzer,requires_ldap_pool
       compile_flags: >-
         --ssl MONGO_DISTMOD=rhel79
         -j$(grep -c ^processor /proc/cpuinfo)

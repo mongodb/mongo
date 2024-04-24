@@ -129,6 +129,7 @@ variables:
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
+      test_flags: --excludeWithAnyTags=requires_ldap_pool
       multiversion_platform: rhel79
       multiversion_edition: enterprise
       has_packages: true
