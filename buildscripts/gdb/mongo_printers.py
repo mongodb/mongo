@@ -346,7 +346,7 @@ class DatabaseNamePrinter(object):
         """Display hint."""
         return 'string'
 
-    def _get_storage_pointer(self):
+    def _get_storage_data(self):
         """Return the data pointer from the _data Storage class."""
         data = self.val['_data']
         footer = data['_footer']
@@ -357,20 +357,23 @@ class DatabaseNamePrinter(object):
 
         data_ptr = data['_data']
         if is_small_string(flags):
-            size = small_string_size(flags)
-            # Casting to an array first allows conversion to a pointer
-            data_ptr = data_ptr.cast(gdb.lookup_type('char').array(size))\
-                .cast(gdb.lookup_type('char').pointer())
+            return data_ptr.address, small_string_size(flags)
+        else:
+            return data_ptr, data['_length']
 
-        return data_ptr
+    def _get_string(self, address, size):
+        data = gdb.selected_inferior().read_memory(address, size).tobytes()
+        tenant = data[0] & TENANT_ID_MASK
+
+        if tenant:
+            return f"{extract_tenant_id(data)}_{data[1+OBJECT_ID_WIDTH:].decode()}"
+        else:
+            return data[1:].decode()
 
     def to_string(self):
         """Return string representation of NamespaceString."""
-        data = self._get_storage_pointer()
-
-        if data[0] & TENANT_ID_MASK:
-            return f"{extract_tenant_id(data)}_{(data + OBJECT_ID_WIDTH + 1).string()}"
-        return (data + 1).string()
+        address, size = self._get_storage_data()
+        return self._get_string(address, size)
 
 
 class DecorablePrinter(object):

@@ -37,11 +37,16 @@ def test_dbname_nss():
     dbname_tid_str = gdb.execute('print dbNameWithTenantId', to_string=True)
     search("6491a2112ef5c818703bf2a7_foo", dbname_tid_str)
     nss_str = gdb.execute('print nss', to_string=True)
-    search("foo.bar", nss_str)
+    search("foo.ba", nss_str)
     nss_tid_str = gdb.execute('print nssWithTenantId', to_string=True)
-    search("6491a2112ef5c818703bf2a7_foo.bar", nss_tid_str)
+    search("6491a2112ef5c818703bf2a7_foo.barbaz", nss_tid_str)
     long_nss_str = gdb.execute('print longNss', to_string=True)
     search("longdatabasenamewithoutsmallstring.longcollection", long_nss_str)
+    constexpr_str = gdb.execute('print kConstNs', to_string=True)
+    search("constexpr.name", constexpr_str)
+    constexpr_str = gdb.execute('print constCopy', to_string=True)
+    search("constexpr.name", constexpr_str)
+
 
 def test_string_map():
     search(r'absl::flat_hash_map.*0 elems', gdb.execute('print emptyMap', to_string=True))
