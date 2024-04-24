@@ -358,6 +358,21 @@ TEST_F(DocumentSourceGroupTest, StreamingGroupRedactsCorrectly) {
         redact(*docSource));
 }
 
+TEST_F(DocumentSourceGroupTest, CanHandleEmptyExpressionObject) {
+    // Test the case where the _id expression is an empty object. This is handled as a special case,
+    // but is not directly reachable from the parser, so we will manually instantiate an
+    // ExpressionObject here.
+    auto idExpression = ExpressionObject::create(getExpCtx().get(), {});
+    std::vector<AccumulationStatement> accumulationStatements;
+    auto group = DocumentSourceGroup::create(getExpCtx(), idExpression, accumulationStatements);
+    auto mock = DocumentSourceMock::createForTest({Document{{"_id"_sd, 0}}}, getExpCtx());
+    group->setSource(mock.get());
+    auto next = group->getNext();
+    ASSERT(next.isAdvanced());
+    // The constant _id value from the $group spec is passed through.
+    ASSERT_DOCUMENT_EQ((Document{{"_id", Document{}}}), next.getDocument());
+}
+
 BSONObj toBson(const boost::intrusive_ptr<DocumentSource>& source) {
     std::vector<Value> arr;
     source->serializeToArray(arr);
@@ -522,6 +537,26 @@ class EmptySpec : public ParseErrorBase {
 /** $group _id is an empty object. */
 class IdEmptyObject : public IdConstantBase {
     BSONObj spec() override {
+        return BSON("_id" << BSONObj());
+    }
+};
+
+/** $group _id is an empty object surrounded by a no-op $expr */
+class IdEmptyObjectWithExpr : public IdConstantBase {
+    BSONObj spec() override {
+        return BSON("_id" << BSON("$expr" << BSONObj()));
+    }
+    BSONObj expected() override {
+        return BSON("_id" << BSONObj());
+    }
+};
+
+/** $group _id is an empty object surrounded by multiple no-op $exprs */
+class IdEmptyObjectWithManyExpr : public IdConstantBase {
+    BSONObj spec() override {
+        return BSON("_id" << BSON("$expr" << BSON("$expr" << BSON("$expr" << BSONObj()))));
+    }
+    BSONObj expected() override {
         return BSON("_id" << BSONObj());
     }
 };
@@ -1308,6 +1343,8 @@ public:
         add<NonObject>();
         add<EmptySpec>();
         add<IdEmptyObject>();
+        add<IdEmptyObjectWithExpr>();
+        add<IdEmptyObjectWithManyExpr>();
         add<IdObjectExpression>();
         add<IdInvalidObjectExpression>();
         add<TwoIdSpecs>();

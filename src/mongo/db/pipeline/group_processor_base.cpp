@@ -76,20 +76,28 @@ void GroupProcessorBase::freeMemory() {
 
 void GroupProcessorBase::setIdExpression(const boost::intrusive_ptr<Expression> idExpression) {
     tassert(7801001, "Can't mutate _id fields after initialization", !_executionStarted);
-    if (auto object = dynamic_cast<ExpressionObject*>(idExpression.get())) {
-        auto& childExpressions = object->getChildExpressions();
-        invariant(!childExpressions.empty());  // We expect to have converted an empty object into a
-                                               // constant expression.
 
-        // grouping on an "artificial" object. Rather than create the object for each input
-        // in initialize(), instead group on the output of the raw expressions. The artificial
-        // object will be created at the end in makeDocument() while outputting results.
-        for (auto&& childExpPair : childExpressions) {
-            _idFieldNames.push_back(childExpPair.first);
-            _idExpressions.push_back(childExpPair.second);
-        }
-    } else {
+
+    auto object = dynamic_cast<ExpressionObject*>(idExpression.get());
+    if (!object || object->getChildExpressions().empty()) {
+        // Any single expression (including an empty object) can be directly computed and output
+        // without any custom handling or transformations. Note that we don't expect the parser to
+        // produce an empty object ExpressionObject (it should produce an ExpressionConstant
+        // instead), but we have been mistaken about that before in SERVER-89611, so we will handle
+        // this special case as well.
         _idExpressions.push_back(idExpression);
+        return;
+    }
+
+    // For objects (e.g. from parsing {$group: {_id: {a: "$a",  b: "$b"}}}), we do the following
+    // optimization to perform grouping on an "artificial" object. Rather than create the object for
+    // each input in initialize(), instead group on the output of the raw expressions.  The
+    // artificial object will be created at the end in makeDocument() while outputting results.
+    auto& childExpressions = object->getChildExpressions();
+
+    for (auto&& childExpPair : childExpressions) {
+        _idFieldNames.push_back(childExpPair.first);
+        _idExpressions.push_back(childExpPair.second);
     }
 }
 
