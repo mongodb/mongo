@@ -3164,6 +3164,27 @@ TEST_F(BSONColumnTest, BinDataLargerThan16) {
     verifyDecompression(binData, {elemBinData, elemBinDataLong});
 }
 
+TEST_F(BSONColumnTest, BinDataLargerThan16Interleaved) {
+    // The same test as above, but the data is wrapped in an object to test interleaved mode, and
+    // the fast implementation of the block API.
+    std::vector<uint8_t> input{
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '8'};
+    auto elemBinData = createElementObj(BSON("x" << createElementBinData(BinDataGeneral, input)));
+    cb.append(elemBinData);
+
+    std::vector<uint8_t> inputLong{
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '9'};
+    auto elemBinDataLong =
+        createElementObj(BSON("x" << createElementBinData(BinDataGeneral, inputLong)));
+
+    cb.append(elemBinDataLong);
+    auto binData = cb.finalize();
+
+    verifyDecompression(binData, {elemBinData, elemBinDataLong});
+    TestPath testPathX{{"x"}};
+    verifyDecompressPathFast(binData, {elemBinData, elemBinDataLong}, testPathX);
+}
+
 TEST_F(BSONColumnTest, BinDataEqualTo16) {
     std::vector<uint8_t> input{
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7'};

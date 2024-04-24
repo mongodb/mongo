@@ -158,7 +158,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::loadUncompressed(const BS
             case BinData: {
                 int size;
                 const char* binary = elem.binData(size);
-                d128.lastEncodedValue = Simple8bTypeUtil::encodeBinary(binary, size).value_or(0);
+                d128.lastEncodedValue = Simple8bTypeUtil::encodeBinary(binary, size);
                 break;
             }
             case NumberDecimal:

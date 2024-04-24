@@ -674,10 +674,16 @@ struct BlockBasedInterleavedDecompressor::FastDecodingState {
                     Simple8bTypeUtil::encodeString(_refElem.valueStringData()).value_or(0));
                 break;
             case BinData: {
+                // 'BinData' elements that are too large to be encoded should be treated as
+                // literals.
                 int size;
                 const char* binary = _refElem.binData(size);
-                _lastValue.emplace<int128_t>(
-                    Simple8bTypeUtil::encodeBinary(binary, size).value_or(0));
+                boost::optional<int128_t> binData = Simple8bTypeUtil::encodeBinary(binary, size);
+                if (binData) {
+                    _lastValue.emplace<int128_t>(*binData);
+                } else {
+                    _lastValue.emplace<std::monostate>(std::monostate{});
+                }
             } break;
             case Code:
                 _lastValue.emplace<int128_t>(
@@ -891,27 +897,41 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
             break;
         case BinData:
             for (auto&& buffer : state._buffers) {
-                ptr = BSONColumnBlockDecompressHelpers::
-                    decompressAllDelta<StringData, int128_t, Buffer>(
+                // If the lastValue is not a 'int128_t', then the binData is too large to be
+                // decoded and should be treated as a literal.
+                if (auto lastValue = std::get_if<int128_t>(&state._lastValue)) {
+                    ptr = BSONColumnBlockDecompressHelpers::
+                        decompressAllDelta<BSONBinData, int128_t, Buffer>(
+                            control,
+                            end,
+                            *buffer,
+                            *lastValue,
+                            state._lastNonRLEBlock,
+                            state._refElem,
+                            [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
+                                char data[16];
+                                size_t size = ref.valuestrsize();
+                                Simple8bTypeUtil::decodeBinary(v, data, size);
+                                buffer.append(BSONBinData(data, size, ref.binDataType()));
+                            },
+                            finish128);
+                } else {
+                    ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(
                         control,
                         end,
                         *buffer,
-                        std::get<int128_t>(state._lastValue),
                         state._lastNonRLEBlock,
-                        state._refElem,
-                        [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
-                            char data[16];
-                            size_t size = ref.valuestrsize();
-                            Simple8bTypeUtil::decodeBinary(v, data, size);
-                            buffer.append(BSONBinData(data, size, ref.binDataType()));
-                        },
-                        finish128);
+                        [&state](size_t valueCount, uint64_t lastNonRLEBlock) {
+                            state._valueCount += valueCount;
+                            state._lastNonRLEBlock = lastNonRLEBlock;
+                        });
+                }
             }
             break;
         case Code:
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::
-                    decompressAllDelta<StringData, int128_t, Buffer>(
+                    decompressAllDelta<BSONCode, int128_t, Buffer>(
                         control,
                         end,
                         *buffer,
