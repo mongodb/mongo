@@ -440,7 +440,9 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                              double anchorPaddingFactor,
                              std::size_t uniqueLeaves,
                              std::size_t uniqueTokens,
-                             const AnchorPaddingRootToken& anchorPaddingRootToken) {
+                             const AnchorPaddingRootToken& anchorPaddingRootToken,
+                             ECStats* escStats) {
+    CompactStatsCounter<ECStats> stats(escStats);
     // Compact 4.e, Calculate pathLength := #Edges_SPH(lb, lb, uh, prc, theta)
     const auto pathLength = getEdgesLength(queryTypeConfig);
     // Compact 4.f, Calculate numPads := ceil( gamma * (pathLength * uniqueLeaves - len(C_f)) )
@@ -466,23 +468,26 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                                         FLEQueryInterface::TagQueryType::kPadding,
                                         "padding"_sd);
     auto& emuBinaryResult = countInfo.searchedCounts.value();
+
+    stats.add(countInfo.stats.get());
+
     auto optA = emuBinaryResult.apos;
+    // If the apos returned is null, read the null anchor document for correct apos.
+    auto apos = optA ? *optA : countInfo.nullAnchorCounts.value().apos;
 
-    // TODO SERVER-85749 handle boost::none case
-    if (optA) {
-        // Compact 4.i, for all i in numPads: esc.insert(anchorPaddingDocument)
-        // {_id   : F(AnchorPaddingKeyToken, null || a + i),
-        //  value : Enc(AnchorPaddingValueToken, 0 || 0 )}
-        std::vector<BSONObj> batchWrite;
-        for (std::size_t i = 1; i <= numPads; ++i) {
-            batchWrite.push_back(ESCCollectionAnchorPadding::generatePaddingDocument(
-                anchorPaddingKeyToken, anchorPaddingValueToken, *optA + i));
-        }
-
-        StmtId stmtId = kUninitializedStmtId;
-        checkWriteErrors(uassertStatusOK(
-            queryImpl->insertDocuments(escNss, std::move(batchWrite), &stmtId, true)));
+    // Compact 4.i, for all i in numPads: esc.insert(anchorPaddingDocument)
+    // {_id   : F(AnchorPaddingKeyToken, null || a + i),
+    //  value : Enc(AnchorPaddingValueToken, 0 || 0 )}
+    std::vector<BSONObj> batchWrite;
+    for (std::size_t i = 1; i <= numPads; ++i) {
+        batchWrite.push_back(ESCCollectionAnchorPadding::generatePaddingDocument(
+            anchorPaddingKeyToken, anchorPaddingValueToken, apos + i));
     }
+
+    StmtId stmtId = kUninitializedStmtId;
+    checkWriteErrors(
+        uassertStatusOK(queryImpl->insertDocuments(escNss, std::move(batchWrite), &stmtId, true)));
+    stats.addInserts(numPads);
 }
 
 namespace {
@@ -763,8 +768,8 @@ void processFLECompactV2(OperationContext* opCtx,
                 uassertStatusOK(
                     trun->runNoThrow(
                         opCtx,
-                        [service, sharedBlock](const txn_api::TransactionClient& txnClient,
-                                               ExecutorPtr txnExec) {
+                        [service, sharedBlock, innerEscStats](
+                            const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                             FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
                             auto [escNss, anchorPaddingFactor, rangeField] = *sharedBlock.get();
@@ -774,7 +779,8 @@ void processFLECompactV2(OperationContext* opCtx,
                                                     anchorPaddingFactor,
                                                     rangeField.uniqueLeaves,
                                                     rangeField.uniqueTokens,
-                                                    rangeField.anchorPaddingRootToken.get());
+                                                    rangeField.anchorPaddingRootToken.get(),
+                                                    innerEscStats.get());
 
                             return SemiFuture<void>::makeReady();
                         }))

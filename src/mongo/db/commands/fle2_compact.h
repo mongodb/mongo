@@ -122,7 +122,8 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                              double anchorPaddingFactor,
                              std::size_t uniqueLeaves,
                              std::size_t uniqueTokens,
-                             const AnchorPaddingRootToken& anchorPaddingRootToken);
+                             const AnchorPaddingRootToken& anchorPaddingRootToken,
+                             ECStats* escStats);
 
 /**
  * Performs cleanup of the ESC entries for the encrypted field/value pair

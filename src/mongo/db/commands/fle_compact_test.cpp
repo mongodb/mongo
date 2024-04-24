@@ -583,6 +583,9 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
     uint64_t edcCount = 0;
     uint64_t escCount = 0;
     uint64_t ecocCount = 0;
+    // Counts the number of ESC inserts that are not tracked in escStats. I.e.,
+    // escStats.getInserted() + statsMissedInserts should be equal to escCount.
+    uint64_t statsMissedInserts = 0;
 
     // Insert 15 of the same value; assert non-anchors 1 thru 15
     values[value].toInsertCount = 15;
@@ -590,6 +593,7 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
     edcCount += 15;
     escCount += 15;
     ecocCount += 15;
+    statsMissedInserts += 15;
     assertDocumentCounts(edcCount, escCount, ecocCount);
     for (uint64_t i = 1; i <= 15; i++) {
         assertESCNonAnchorDocument(testPair, true, i);
@@ -613,7 +617,8 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
                                 0.42,
                                 1,
                                 1,
-                                *ecocDoc.anchorPaddingRootToken);
+                                *ecocDoc.anchorPaddingRootToken,
+                                &escStats);
         escCount += 3;
     }
     assertDocumentCounts(edcCount, escCount, ecocCount);
@@ -624,6 +629,7 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
     edcCount += 15;
     escCount += 15;
     ecocCount += 15;
+    statsMissedInserts += 15;
     assertDocumentCounts(edcCount, escCount, ecocCount);
     for (uint64_t i = 16; i <= 30; i++) {
         assertESCNonAnchorDocument(testPair, true, i);
@@ -640,11 +646,13 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
                                 0.42,
                                 1,
                                 1,
-                                *ecocDoc.anchorPaddingRootToken);
+                                *ecocDoc.anchorPaddingRootToken,
+                                &escStats);
         escCount += 3;
     }
     assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCAnchorDocument(testPair, true, 2, 30);
+    ASSERT_EQ(escStats.getInserted(), escCount - statsMissedInserts);
 }
 
 TEST_F(FleCompactTest, CompactValueV2_NoNullAnchors) {
@@ -1037,6 +1045,7 @@ TEST_F(FleCompactTest, InjectSomeAnchorPadding) {
     const BSONObj dataDoc = BSON("a.b.c" << 42);
     const auto tokens = getTestESCTokens(dataDoc);
     auto queryTypeConfig = generateQueryTypeConfigForTest(0, 100);
+    ECStats escStats;
 
     // Expect numPads := gamma * (pathLength * uniqueLeaves - uniqueTokens)
     // numPads := 0.42 * (8 * 1 - 5) => 0.42 * 3 => 1.26 => 2 pads {1, 2}
@@ -1046,20 +1055,30 @@ TEST_F(FleCompactTest, InjectSomeAnchorPadding) {
                             0.42,
                             1,
                             5,
-                            tokens.anchorPaddingRoot);
+                            tokens.anchorPaddingRoot,
+                            &escStats);
     ASSERT_EQ(_queryImpl->countDocuments(_namespaces.escNss), 2);
+    ASSERT_EQ(escStats.getInserted(), 2);
 }
 
 TEST_F(FleCompactTest, InjectManyAnchorPadding) {
     const BSONObj dataDoc = BSON("a.b.c" << 42);
     const auto tokens = getTestESCTokens(dataDoc);
     auto queryTypeConfig = generateQueryTypeConfigForTest(0LL, 100LL);
+    ECStats escStats;
 
     // Expect numPads := gamma * (pathLength * uniqueLeaves - uniqueTokens)
     // numPads := 1.0 * (8 * 5 - 25) => 40 - 25 => 15.0 => 15 pads {1..15}
-    compactOneRangeFieldPad(
-        _queryImpl.get(), _namespaces.escNss, queryTypeConfig, 1, 5, 25, tokens.anchorPaddingRoot);
+    compactOneRangeFieldPad(_queryImpl.get(),
+                            _namespaces.escNss,
+                            queryTypeConfig,
+                            1,
+                            5,
+                            25,
+                            tokens.anchorPaddingRoot,
+                            &escStats);
     ASSERT_EQ(_queryImpl->countDocuments(_namespaces.escNss), 15);
+    ASSERT_EQ(escStats.getInserted(), 15);
 }
 
 }  // namespace
