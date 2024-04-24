@@ -28,6 +28,7 @@ let st = new ShardingTest({
     shards: {nodes: 1},
     config: {nodes: 1},
     other: {keyFile: 'jstests/libs/key1'},
+    mongosOptions: {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}},
 });
 
 let adminDB = st.s.getDB('admin');

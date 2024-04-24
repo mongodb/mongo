@@ -113,6 +113,7 @@ const st = new ShardingTest({
     shards: {nodes: 1},
     config: {nodes: 1},
     keyFile: 'jstests/libs/key1',
+    mongosOptions: {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}},
 });
 // Ensures the command times out on the shard but not the router.
 const mongosFP = configureFailPoint(st.s.getDB("admin"), "maxTimeNeverTimeOut");

@@ -79,8 +79,6 @@ selector:
     - jstests/core/**/failcommand_failpoint.js
     # Unacknowledged writes prohibited in an explicit session.
     - jstests/core/**/batch_write_command_w0.js
-    # setClusterParameter cannot be directly run on a config server replica set.
-    - jstests/core/cluster_parameter_default_max_time_ms.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

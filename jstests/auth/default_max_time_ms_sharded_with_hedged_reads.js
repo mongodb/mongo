@@ -47,6 +47,7 @@ let st = new ShardingTest({
             logComponentVerbosity: tojson({network: {verbosity: 2}}),
             // Force the mongos's replica set monitors to always include all the eligible nodes.
             "failpoint.sdamServerSelectorIgnoreLatencyWindow": tojson({mode: "alwaysOn"}),
+            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}",
             maxTimeMSForHedgedReads: maxTimeMSForHedgedReads
         }
     }],

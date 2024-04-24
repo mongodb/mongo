@@ -40,6 +40,14 @@ export const kNonTestOnlyClusterParameters = {
         serverless: true,
         standaloneIncompatible: false,
     },
+    defaultMaxTimeMS: {
+        default: {readOperations: 0},
+        testValues: [{readOperations: 42}, {readOperations: 60000}],
+        featureFlag: 'DefaultReadMaxTimeMS',
+        setParameters: {'multitenancySupport': true},
+        serverless: true,
+        standaloneIncompatible: false,
+    }
 };
 
 export const kTestOnlyClusterParameters = {
