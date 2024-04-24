@@ -405,9 +405,12 @@ __checkpoint_cleanup_walk_btree(WT_SESSION_IMPL *session, WT_ITEM *uri)
 
     /* Open a handle for processing. */
     ret = __wt_session_get_dhandle(session, uri->data, NULL, NULL, 0);
-    if (ret != 0)
-        WT_RET_MSG(session, ret, "%s: unable to open handle%s", (char *)uri->data,
+    if (ret != 0) {
+        __wt_verbose_debug1(session, WT_VERB_CHECKPOINT_CLEANUP, "%s: unable to open handle%s",
+          (char *)uri->data,
           ret == EBUSY ? ", error indicates handle is unavailable due to concurrent use" : "");
+        return (ret);
+    }
 
     btree = S2BT(session);
     /* There is nothing to do on an empty tree. */
