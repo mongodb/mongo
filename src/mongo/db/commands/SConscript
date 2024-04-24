@@ -564,6 +564,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_write_util',
         '$BUILD_DIR/mongo/db/transaction/transaction',
+        '$BUILD_DIR/mongo/db/transaction/transaction_operations',
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         '$BUILD_DIR/mongo/executor/async_request_executor',
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
