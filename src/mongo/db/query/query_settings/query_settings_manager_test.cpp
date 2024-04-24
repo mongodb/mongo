@@ -197,9 +197,11 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsSetAndReset) {
     manager().setQueryShapeConfigurations(opCtx(), {firstConfig}, firstWriteTime, tenantId);
     manager().setQueryShapeConfigurations(opCtx(), {firstConfig}, firstWriteTime, otherTenantId);
     assertQueryShapeConfigurationsEquals(
-        {firstConfig}, manager().getAllQueryShapeConfigurations(opCtx(), tenantId));
+        {firstConfig},
+        manager().getAllQueryShapeConfigurations(opCtx(), tenantId).queryShapeConfigurations);
     assertQueryShapeConfigurationsEquals(
-        {firstConfig}, manager().getAllQueryShapeConfigurations(opCtx(), otherTenantId));
+        {firstConfig},
+        manager().getAllQueryShapeConfigurations(opCtx(), otherTenantId).queryShapeConfigurations);
     ASSERT_EQ(manager().getClusterParameterTime(opCtx(), tenantId), firstWriteTime);
     ASSERT_EQ(manager().getClusterParameterTime(opCtx(), otherTenantId), firstWriteTime);
 
@@ -207,9 +209,11 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsSetAndReset) {
     // parameter cluster time are updated accordingly.
     manager().setQueryShapeConfigurations(opCtx(), {secondConfig}, secondWriteTime, tenantId);
     assertQueryShapeConfigurationsEquals(
-        {secondConfig}, manager().getAllQueryShapeConfigurations(opCtx(), tenantId));
+        {secondConfig},
+        manager().getAllQueryShapeConfigurations(opCtx(), tenantId).queryShapeConfigurations);
     assertQueryShapeConfigurationsEquals(
-        {firstConfig}, manager().getAllQueryShapeConfigurations(opCtx(), otherTenantId));
+        {firstConfig},
+        manager().getAllQueryShapeConfigurations(opCtx(), otherTenantId).queryShapeConfigurations);
     ASSERT_EQ(manager().getClusterParameterTime(opCtx(), tenantId), secondWriteTime);
     ASSERT_EQ(manager().getClusterParameterTime(opCtx(), otherTenantId), firstWriteTime);
 
@@ -217,9 +221,10 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsSetAndReset) {
     // 'tenantId'. QueryShapeConfigurations for tenant with 'otherTenantId' must not be affected..
     manager().removeAllQueryShapeConfigurations(opCtx(), tenantId);
     assertQueryShapeConfigurationsEquals(
-        {}, manager().getAllQueryShapeConfigurations(opCtx(), tenantId));
+        {}, manager().getAllQueryShapeConfigurations(opCtx(), tenantId).queryShapeConfigurations);
     assertQueryShapeConfigurationsEquals(
-        {firstConfig}, manager().getAllQueryShapeConfigurations(opCtx(), otherTenantId));
+        {firstConfig},
+        manager().getAllQueryShapeConfigurations(opCtx(), otherTenantId).queryShapeConfigurations);
     ASSERT_EQ(manager().getClusterParameterTime(opCtx(), tenantId), LogicalTime::kUninitialized);
     ASSERT_EQ(manager().getClusterParameterTime(opCtx(), otherTenantId), firstWriteTime);
 }

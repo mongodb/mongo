@@ -18,6 +18,7 @@ const ns = {
     coll: coll.getName()
 };
 const qsutils = new QuerySettingsUtils(db, coll.getName());
+qsutils.removeAllQuerySettings();
 
 /**
  * Tests query settings setQuerySettings and removeQuerySettings commands as well as $querySettings
@@ -76,7 +77,7 @@ function testQuerySettingsUsing(params) {
             {setQuerySettings: params.queryBPrime, settings: params.querySettingsA}));
         qsutils.assertQueryShapeConfiguration([
             qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA),
-            qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryB)
+            qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryBPrime)
         ]);
     }
 

@@ -13,6 +13,7 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 // command is issued on the nonexistent database and collection.
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());
+qsutils.removeAllQuerySettings();
 
 // Create the index, such that we can ensure that index hints can be combined with query settings,
 // when query settings specify only query engine version.

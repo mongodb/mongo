@@ -34,6 +34,7 @@ const ns = {
 };
 const qsutils = new QuerySettingsUtils(db, collName);
 const queryA = qsutils.makeFindQueryInstance({filter: {a: 1}});
+const queryAInstance2 = qsutils.makeFindQueryInstance({filter: {a: 2}});
 const queryB = qsutils.makeFindQueryInstance({filter: {b: "string"}});
 const queryC = qsutils.makeFindQueryInstance({filter: {c: 1}});
 const querySettingsA = {
@@ -46,72 +47,173 @@ const querySettingsC = {
     indexHints: {ns, allowedIndexes: ["c_1"]}
 };
 
-function runSetQuerySettingsConcurrently(
-    {initialConfiguration, settingToFail, settingToPass, finalConfiguration}) {
-    qsutils.assertQueryShapeConfiguration(initialConfiguration);
+/**
+ * Tests interleaved execution of two query settings modification commands - 'commandToFail' and
+ * 'commandToPass'. 'commandToFail' gets blocked after the query settings cluster-wide configuration
+ * option is read for modification.
+ *
+ * @param initialConfiguration query settings to set before performing the test. An array
+ *     of {settings, representativeQuery}.
+ * @param commandToFail either "setQuerySettings" or "removeQuerySettings" command which is expected
+ *     to fail with 'ConflictingOperationInProgress' error.
+ * @param commandToPass either "setQuerySettings" or "removeQuerySettings" command which is runs.
+ * @param finalConfiguration expected query settings after the test.
+ */
+function runQuerySettingsCommandsConcurrently(
+    {initialConfiguration = [], commandToFail, commandToPass, finalConfiguration}) {
+    qsutils.removeAllQuerySettings();
 
-    const hangSetParamFailPoint = configureFailPoint(testConn, "hangInSetClusterParameter", {
-        "querySettings.settingsArray.representativeQuery": settingToFail.representativeQuery
-    });
+    // Set the query settings state to one defined by 'initialConfiguration'.
+    for (const {settings, representativeQuery} of initialConfiguration) {
+        assert.commandWorked(
+            db.adminCommand({setQuerySettings: representativeQuery, settings: settings}));
+    }
 
-    // Set 'settingToFail' in a parallel shell. This command will hang because of the active
-    // failpoint.
-    const waitForSettingToFail = startParallelShell(
-        funWithArgs((query, settings) => {
-            return assert.commandFailedWithCode(
-                db.adminCommand({setQuerySettings: query, settings: settings}),
-                ErrorCodes.ConflictingOperationInProgress);
-        }, settingToFail.representativeQuery, settingToFail.settings), testConn.port);
+    // Extracts the representative query from either "setQuerySettings" or "removeQuerySettings"
+    // command.
+    function getRepresentativeQuery(command) {
+        if (command.hasOwnProperty("setQuerySettings")) {
+            return command.setQuerySettings;
+        }
+        if (command.hasOwnProperty("removeQuerySettings")) {
+            return command.removeQuerySettings;
+        }
+        assert("Unsupported command " + tojson(command));
+    }
 
-    // Wait until the failpoint is hit.
-    hangSetParamFailPoint.wait();
+    // Program a fail-point to block the query settings modification command 'commandToFail'
+    // processing after it reads query settings cluster-wide parameter for update.
+    const hangPauseAfterReadingQuerySettingsConfigurationParameterFailPoint =
+        configureFailPoint(testConn,
+                           "pauseAfterReadingQuerySettingsConfigurationParameter",
+                           {representativeQueryToBlock: getRepresentativeQuery(commandToFail)});
 
-    // Set 'settingToPass' in a parrallel shell. This command will succeed, because of the
-    // failpoint's configuration.
-    const waitForSettingToPass = startParallelShell(
-        funWithArgs((query, settings) => {
-            return assert.commandWorked(
-                db.adminCommand({setQuerySettings: query, settings: settings}));
-        }, settingToPass.representativeQuery, settingToPass.settings), testConn.port);
+    // Run 'commandToFail' command in a parallel shell. This command will hang because of the active
+    // fail-point.
+    const waitForCommandToFail = startParallelShell(
+        funWithArgs((command) => {
+            return assert.commandFailedWithCode(db.adminCommand(command),
+                                                ErrorCodes.ConflictingOperationInProgress);
+        }, commandToFail), testConn.port);
 
-    waitForSettingToPass();
+    // Wait until the fail-point is hit.
+    hangPauseAfterReadingQuerySettingsConfigurationParameterFailPoint.wait();
 
-    // Unblock the 'settingToFail' thread.
-    hangSetParamFailPoint.off();
+    // Run 'commandToPass' command in a parallel shell. This command will succeed, because of the
+    // fail-point's configuration.
+    const waitForCommandToPass =
+        startParallelShell(funWithArgs((command) => {
+                               return assert.commandWorked(db.adminCommand(command));
+                           }, commandToPass), testConn.port);
+    waitForCommandToPass();
 
-    waitForSettingToFail();
+    // Unblock 'commandToFail' command.
+    hangPauseAfterReadingQuerySettingsConfigurationParameterFailPoint.off();
+    waitForCommandToFail();
 
+    // Verify that query settings state matches 'finalConfiguration'.
     qsutils.assertQueryShapeConfiguration(finalConfiguration);
 }
 
-{
-    // Ensure a concurrent insert fails when setting 'querySettings' cluster parameter value for the
-    // first time.
-    runSetQuerySettingsConcurrently({
-        initialConfiguration: [],
-        settingToFail: qsutils.makeQueryShapeConfiguration(querySettingsA, queryA),
-        settingToPass: qsutils.makeQueryShapeConfiguration(querySettingsB, queryB),
-        finalConfiguration: [
-            qsutils.makeQueryShapeConfiguration(querySettingsB, queryB),
-        ]
-    });
-}
+// The following test steps verify that optimistic-lock-based concurrency control is correct when
+// the query settings cluster-wide configuration option is updated.
 
-{
-    // Ensure a concurrent update fails when updating existing 'querySetings' cluster parameter
-    // value.
-    runSetQuerySettingsConcurrently({
-        initialConfiguration: [
-            qsutils.makeQueryShapeConfiguration(querySettingsB, queryB),
-        ],
-        settingToFail: qsutils.makeQueryShapeConfiguration(querySettingsA, queryA),
-        settingToPass: qsutils.makeQueryShapeConfiguration(querySettingsC, queryC),
-        finalConfiguration: [
-            qsutils.makeQueryShapeConfiguration(querySettingsC, queryC),
-            qsutils.makeQueryShapeConfiguration(querySettingsB, queryB),
-        ]
-    });
-}
+// Verify that query settings insert fails when another query settings entry for the same query
+// shape has been inserted concurrently.
+runQuerySettingsCommandsConcurrently({
+    initialConfiguration: [],
+    commandToFail: qsutils.makeSetQuerySettingsCommand(
+        qsutils.makeQueryShapeConfiguration(querySettingsA, queryA)),
+    commandToPass: qsutils.makeSetQuerySettingsCommand(
+        qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2)),
+    finalConfiguration: [
+        qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2),
+    ]
+});
 
-// Ensure that query settings cluster parameter is empty at the end of the test.
-qsutils.removeAllQuerySettings();
+// Verify that query settings update fails when the query settings entry for the same query shape
+// has been updated concurrently.
+runQuerySettingsCommandsConcurrently({
+    initialConfiguration: [qsutils.makeQueryShapeConfiguration(querySettingsB, queryA)],
+    commandToFail: qsutils.makeSetQuerySettingsCommand(
+        qsutils.makeQueryShapeConfiguration(querySettingsA, queryA)),
+    commandToPass: qsutils.makeSetQuerySettingsCommand(
+        qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2)),
+    finalConfiguration: [
+        qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2),
+    ]
+});
+
+// Verify that query settings update fails when the query settings entry for the same query shape
+// has been deleted concurrently.
+runQuerySettingsCommandsConcurrently({
+    initialConfiguration: [qsutils.makeQueryShapeConfiguration(querySettingsB, queryA)],
+    commandToFail: qsutils.makeSetQuerySettingsCommand(
+        qsutils.makeQueryShapeConfiguration(querySettingsA, queryA)),
+    commandToPass: qsutils.makeRemoveQuerySettingsCommand(queryAInstance2),
+    finalConfiguration: []
+});
+
+// Verify that query settings removal fails when the query settings entry for the same query shape
+// has been deleted concurrently.
+runQuerySettingsCommandsConcurrently({
+    initialConfiguration: [qsutils.makeQueryShapeConfiguration(querySettingsB, queryA)],
+    commandToFail: qsutils.makeRemoveQuerySettingsCommand(queryA),
+    commandToPass: qsutils.makeRemoveQuerySettingsCommand(queryAInstance2),
+    finalConfiguration: []
+});
+
+// Verify that query settings insert fails when another query settings entry for a different query
+// shape has been inserted concurrently.
+runQuerySettingsCommandsConcurrently({
+    initialConfiguration: [],
+    commandToFail: qsutils.makeSetQuerySettingsCommand(
+        qsutils.makeQueryShapeConfiguration(querySettingsA, queryB)),
+    commandToPass: qsutils.makeSetQuerySettingsCommand(
+        qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2)),
+    finalConfiguration: [
+        qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2),
+    ]
+});
+
+// Verify that query settings update fails when the query settings entry for a different query shape
+// has been updated concurrently.
+runQuerySettingsCommandsConcurrently({
+    initialConfiguration: [
+        qsutils.makeQueryShapeConfiguration(querySettingsB, queryA),
+        qsutils.makeQueryShapeConfiguration(querySettingsB, queryB)
+    ],
+    commandToFail: qsutils.makeSetQuerySettingsCommand(
+        qsutils.makeQueryShapeConfiguration(querySettingsA, queryB)),
+    commandToPass: qsutils.makeSetQuerySettingsCommand(
+        qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2)),
+    finalConfiguration: [
+        qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2),
+        qsutils.makeQueryShapeConfiguration(querySettingsB, queryB),
+    ]
+});
+
+// Verify that query settings update fails when the query settings entry for a different query shape
+// has been deleted concurrently.
+runQuerySettingsCommandsConcurrently({
+    initialConfiguration: [
+        qsutils.makeQueryShapeConfiguration(querySettingsB, queryA),
+        qsutils.makeQueryShapeConfiguration(querySettingsB, queryB)
+    ],
+    commandToFail: qsutils.makeSetQuerySettingsCommand(
+        qsutils.makeQueryShapeConfiguration(querySettingsA, queryB)),
+    commandToPass: qsutils.makeRemoveQuerySettingsCommand(queryAInstance2),
+    finalConfiguration: [qsutils.makeQueryShapeConfiguration(querySettingsB, queryB)]
+});
+
+// Verify that query settings removal fails when the query settings entry for a different query
+// shape has been deleted concurrently.
+runQuerySettingsCommandsConcurrently({
+    initialConfiguration: [
+        qsutils.makeQueryShapeConfiguration(querySettingsB, queryA),
+        qsutils.makeQueryShapeConfiguration(querySettingsB, queryB)
+    ],
+    commandToFail: qsutils.makeRemoveQuerySettingsCommand(queryB),
+    commandToPass: qsutils.makeRemoveQuerySettingsCommand(queryAInstance2),
+    finalConfiguration: [qsutils.makeQueryShapeConfiguration(querySettingsB, queryB)]
+});

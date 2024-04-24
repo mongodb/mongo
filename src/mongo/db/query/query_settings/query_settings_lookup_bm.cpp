@@ -315,8 +315,10 @@ public:
                 // Update the query shape configurations by adding a new one, which will be used for
                 // the lookup.
                 auto& manager = QuerySettingsManager::get(opCtx.get());
-                auto queryShapeConfigurations =
+                auto queryShapeConfigurationsWithTimestamp =
                     manager.getAllQueryShapeConfigurations(opCtx.get(), tid);
+                auto& queryShapeConfigurations =
+                    queryShapeConfigurationsWithTimestamp.queryShapeConfigurations;
                 queryShapeConfigurations.push_back(hitQueryShapeConfiguration);
                 manager.setQueryShapeConfigurations(opCtx.get(),
                                                     std::move(queryShapeConfigurations),

@@ -12,7 +12,8 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 const collName = jsTestName();
 assertDropAndRecreateCollection(db, collName);
 
-const qsutils = new QuerySettingsUtils(db, collName)
+const qsutils = new QuerySettingsUtils(db, collName);
+qsutils.removeAllQuerySettings();
 
 const querySettingsA = {
     indexHints: {ns: {db: db.getName(), coll: collName}, allowedIndexes: ["a_1", {$natural: 1}]}
@@ -113,7 +114,7 @@ const nonExistentQueryShapeHash = "0".repeat(64);
 {
     // Ensure that inserting empty settings fails.
     const query = qsutils.makeFindQueryInstance({filter: {a: 15}});
-    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 7746604);
+    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 8727502);
 
     // Insert some settings.
     assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: {reject: true}}));
@@ -124,7 +125,7 @@ const nonExistentQueryShapeHash = "0".repeat(64);
     const queryShapeHash = qsutils.getQueryHashFromQuerySettings(query);
     assert.commandFailedWithCode(db.adminCommand({setQuerySettings: queryShapeHash, settings: {}}),
                                  8727502);
-    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 8727503);
+    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 8727502);
     qsutils.assertQueryShapeConfiguration(
         [qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
 

@@ -14,6 +14,7 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 // Creating the collection.
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());
+qsutils.removeAllQuerySettings();
 
 /**
  * Tests that setting `reject` fails the expected query `query`, and a query with the same shape,

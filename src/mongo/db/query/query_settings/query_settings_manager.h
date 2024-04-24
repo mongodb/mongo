@@ -101,6 +101,18 @@ struct VersionedQueryShapeConfigurations {
 };
 
 /**
+ * All query shape configurations and an associated timestamp.
+ */
+struct QueryShapeConfigurationsWithTimestamp {
+    std::vector<QueryShapeConfiguration> queryShapeConfigurations;
+
+    /**
+     * Cluster time of the current version of the QuerySettingsClusterParameter.
+     */
+    LogicalTime clusterParameterTime;
+};
+
+/**
  * Class responsible for managing in-memory storage and fetching of query settings. The in-memory
  * storage is eventually consistent with the query settings on other cluster nodes and is updated
  * based on OpObserver call performed when executing setClusterParameter command.
@@ -138,9 +150,10 @@ public:
                                       const boost::optional<TenantId>& tenantId) const;
 
     /**
-     * Returns all QueryShapeConfigurations stored for the given tenant.
+     * Returns all query shape configurations and an associated timestamp for the given tenant
+     * 'tenantId'.
      */
-    std::vector<QueryShapeConfiguration> getAllQueryShapeConfigurations(
+    QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
         OperationContext* opCtx, const boost::optional<TenantId>& tenantId) const;
 
     /**
