@@ -20,6 +20,7 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());
+qsutils.removeAllQuerySettings();
 
 // Insert data into the collection.
 assert.commandWorked(coll.insertMany([

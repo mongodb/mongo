@@ -53,6 +53,8 @@ assert.commandWorked(secondaryColl.insertMany([
     {a: 3, b: 1},
 ]));
 
+new QuerySettingsUtils(db, coll.getName()).removeAllQuerySettings();
+
 function setIndexes(coll, indexList) {
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(coll.createIndexes(indexList));

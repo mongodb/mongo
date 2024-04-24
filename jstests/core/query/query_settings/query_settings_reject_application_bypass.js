@@ -51,8 +51,8 @@ const queries =
                    new QuerySettingsUtils(db, collection)
                        .makeAggregateQueryInstance({pipeline: [{[stage]: {}}], cursor: {}}));
 
-// Confirm there's no pre-existing settings.
-qsutils.assertQueryShapeConfiguration([]);
+// Reset query settings.
+qsutils.removeAllQuerySettings();
 
 for (const query of queries) {
     const dbName = query["$db"];

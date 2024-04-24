@@ -35,16 +35,17 @@
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/query_settings_cmds_gen.h"
 #include "mongo/db/commands/set_cluster_parameter_command_impl.h"
-#include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
-#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/sbe_plan_cache.h"
-#include "mongo/platform/basic.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
@@ -52,6 +53,7 @@ namespace {
 using namespace query_settings;
 
 MONGO_FAIL_POINT_DEFINE(querySettingsPlanCacheInvalidation);
+MONGO_FAIL_POINT_DEFINE(pauseAfterReadingQuerySettingsConfigurationParameter);
 
 static constexpr auto kQuerySettingsClusterParameterName = "querySettings"_sd;
 
@@ -88,6 +90,21 @@ void setClusterParameter(OperationContext* opCtx,
 }
 
 /**
+ * Returns an iterator pointing to QueryShapeConfiguration in 'queryShapeConfigurations' that has
+ * query shape hash value 'queryShapeHash'. Returns 'queryShapeConfigurations.end()' if there is no
+ * match.
+ */
+auto findQueryShapeConfigurationByQueryShapeHash(
+    std::vector<QueryShapeConfiguration>& queryShapeConfigurations,
+    const query_shape::QueryShapeHash& queryShapeHash) {
+    return std::find_if(queryShapeConfigurations.begin(),
+                        queryShapeConfigurations.end(),
+                        [&](const QueryShapeConfiguration& configuration) {
+                            return configuration.getQueryShapeHash() == queryShapeHash;
+                        });
+}
+
+/**
  * Merges the query settings 'lhs' with query settings 'rhs', by replacing all attributes in 'lhs'
  * with the existing attributes in 'rhs'.
  */
@@ -111,35 +128,64 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
 }
 
 /**
- * Reads (from the in-memory 'storage' = cache), modifies, and updates the 'querySettings' cluster
- * parameter.
+ * Reads, modifies, and updates the 'querySettings' cluster-wide configuration option. Follows the
+ * Optimistic Offline Lock pattern when updating the option value. 'representativeQuery' indicates
+ * the representative query for which an operation is performed and is used only for fail-point
+ * programming.
  */
-void readModifyWrite(OperationContext* opCtx,
-                     const mongo::DatabaseName& dbName,
-                     std::function<void(std::vector<QueryShapeConfiguration>&)> modify) {
+void readModifyWriteQuerySettingsConfigOption(
+    OperationContext* opCtx,
+    const mongo::DatabaseName& dbName,
+    const boost::optional<QueryInstance>& representativeQuery,
+    std::function<void(std::vector<QueryShapeConfiguration>&)> modify) {
     auto& querySettingsManager = QuerySettingsManager::get(opCtx);
 
-    // Read the query settings array from the cache. The cache might not have the latest cluster
-    // parameter values on mongos, therefore we trigger the cache update before reading from it.
+    // The local copy of the query settings cluster-wide configuration option might not have the
+    // latest value on mongos, therefore we trigger the update of the local copy before reading from
+    // it in order to reduce the probability of update conflicts.
     querySettingsManager.refreshQueryShapeConfigurations(opCtx);
-    auto settingsArray =
+
+    // Read the query shape configurations for the tenant from the local copy of the query settings
+    // cluster-wide configuration option.
+    auto queryShapeConfigurations =
         querySettingsManager.getAllQueryShapeConfigurations(opCtx, dbName.tenantId());
 
-    // Modify the query settings array (append, replace, or remove).
-    modify(settingsArray);
+    // Block if the operation is on the 'representativeQuery' that matches the
+    // "representativeQueryToBlock" field of the fail-point configuration.
+    if (MONGO_unlikely(pauseAfterReadingQuerySettingsConfigurationParameter.shouldFail(
+            [&](const BSONObj& failPointConfiguration) {
+                if (failPointConfiguration.isEmpty() || !representativeQuery.has_value()) {
+                    return false;
+                }
+                BSONElement representativeQueryToBlock =
+                    failPointConfiguration.getField("representativeQueryToBlock");
+                return representativeQueryToBlock.isABSONObj() &&
+                    representativeQueryToBlock.Obj().woCompare(*representativeQuery) == 0;
+            }))) {
+        tassert(8911800, "unexpected empty 'representativeQuery'", representativeQuery);
+        LOGV2(8911801,
+              "Hit pauseAfterReadingQuerySettingsConfigurationParameter fail-point",
+              "representativeQuery"_attr = representativeQuery->toString());
+        pauseAfterReadingQuerySettingsConfigurationParameter.pauseWhileSet(opCtx);
+    }
 
-    // Run SetClusterParameter command with the new value of the 'querySettings' cluster
+    // Modify the query settings array (append, replace, or remove).
+    modify(queryShapeConfigurations.queryShapeConfigurations);
+
+    // Run "setClusterParameter" command with the new value of the 'querySettings' cluster-wide
     // parameter.
-    setClusterParameter(opCtx,
-                        makeSetClusterParameterRequest(settingsArray, dbName),
-                        boost::none,
-                        querySettingsManager.getClusterParameterTime(opCtx, dbName.tenantId()));
+    setClusterParameter(
+        opCtx,
+        makeSetClusterParameterRequest(queryShapeConfigurations.queryShapeConfigurations, dbName),
+        boost::none,
+        queryShapeConfigurations.clusterParameterTime);
+
+    // Refresh the local copy of the query settings cluster-wide configuration option so the results
+    // of the update step above are visible.
     querySettingsManager.refreshQueryShapeConfigurations(opCtx);
 
-    /**
-     * Clears the SBE plan cache if 'querySettingsPlanCacheInvalidation' failpoint is set.
-     * Used in tests when setting index filters via query settings interface.
-     */
+    // Clears the SBE plan cache if 'querySettingsPlanCacheInvalidation' fail-point is set. Used in
+    // tests when setting index filters via query settings interface.
     if (MONGO_unlikely(querySettingsPlanCacheInvalidation.shouldFail())) {
         sbe::getPlanCache(opCtx).clear();
     }
@@ -152,6 +198,31 @@ void assertNoStandalone(OperationContext* opCtx, const std::string& cmdName) {
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << cmdName << " can only run on replica sets or sharded clusters",
             !isStandalone);
+}
+
+/**
+ * Validates and simplifies query settings 'querySettings' for a representative query described by
+ * 'representativeQueryInfo'. An empty 'representativeQueryInfo' indicates that the representative
+ * query was not provided. 'previousRepresentativeQuery' is the previous version of representative
+ * query of the query settings entry being updated, if available.
+ */
+void validateAndSimplifyQuerySettings(
+    OperationContext* opCtx,
+    const boost::optional<TenantId>& tenantId,
+    const boost::optional<const RepresentativeQueryInfo&>& representativeQueryInfo,
+    const boost::optional<QueryInstance>& previousRepresentativeQuery,
+    QuerySettings& querySettings) {
+    // In case the representative query was not provided but the previous representative query is
+    // available, assert that query settings will be set on a valid query.
+    if (!representativeQueryInfo && previousRepresentativeQuery) {
+        utils::validateRepresentativeQuery(
+            createRepresentativeInfo(opCtx, *previousRepresentativeQuery, tenantId));
+    }
+    if (representativeQueryInfo) {
+        utils::verifyQueryCompatibleWithSettings(*representativeQueryInfo, querySettings);
+    }
+    utils::simplifyQuerySettings(querySettings);
+    utils::validateQuerySettings(querySettings);
 }
 
 class SetQuerySettingsCommand final : public TypedCommand<SetQuerySettingsCommand> {
@@ -178,141 +249,30 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        SetQuerySettingsCommandReply insertQuerySettings(
-            OperationContext* opCtx, QueryShapeConfiguration newQueryShapeConfiguration) {
-            utils::simplifyQuerySettings(newQueryShapeConfiguration.getSettings());
-            utils::validateQuerySettings(newQueryShapeConfiguration.getSettings());
-
-            // Append 'newQueryShapeConfiguration' to the list of all 'QueryShapeConfigurations' for
-            // the given database / tenant.
-            readModifyWrite(opCtx, request().getDbName(), [&](auto& settingsArray) {
-                settingsArray.push_back(newQueryShapeConfiguration);
-            });
-
-            SetQuerySettingsCommandReply reply;
-            reply.setQueryShapeConfiguration(std::move(newQueryShapeConfiguration));
-            return reply;
-        }
-
-        SetQuerySettingsCommandReply updateQuerySettings(
-            OperationContext* opCtx, QueryShapeConfiguration newQueryShapeConfiguration) {
-            // Simplify query settings and ensure that they are valid.
-            utils::simplifyQuerySettings(newQueryShapeConfiguration.getSettings());
-            utils::validateQuerySettings(newQueryShapeConfiguration.getSettings());
-
-            // Build the new 'settingsArray' by updating the existing QueryShapeConfiguration with
-            // the new query settings.
-            readModifyWrite(opCtx, request().getDbName(), [&](auto& settingsArray) {
-                auto matchingQueryShapeConfigurationIt =
-                    std::find_if(settingsArray.begin(),
-                                 settingsArray.end(),
-                                 [&](const QueryShapeConfiguration& configuration) {
-                                     return configuration.getQueryShapeHash() ==
-                                         newQueryShapeConfiguration.getQueryShapeHash();
-                                 });
-
-                // Ensure the 'queryShapeHash' is present in the 'settingsArray'.
-                tassert(8758500,
-                        "no matching query settings entries",
-                        matchingQueryShapeConfigurationIt != settingsArray.end());
-                matchingQueryShapeConfigurationIt->setSettings(
-                    newQueryShapeConfiguration.getSettings());
-
-                // Update representative query, as it may be populated during update.
-                matchingQueryShapeConfigurationIt->setRepresentativeQuery(
-                    newQueryShapeConfiguration.getRepresentativeQuery());
-            });
-
-            SetQuerySettingsCommandReply reply;
-            reply.setQueryShapeConfiguration(std::move(newQueryShapeConfiguration));
-            return reply;
-        }
-
-        SetQuerySettingsCommandReply setQuerySettingsByQueryShapeHash(
-            OperationContext* opCtx, const query_shape::QueryShapeHash& queryShapeHash) {
-            auto& querySettingsManager = QuerySettingsManager::get(opCtx);
-            auto tenantId = request().getDbName().tenantId();
-
-            if (auto lookupResult = querySettingsManager.getQuerySettingsForQueryShapeHash(
-                    opCtx, queryShapeHash, tenantId)) {
-                uassert(8727502,
-                        "settings field in setQuerySettings command cannot be empty",
-                        !request().getSettings().toBSON().isEmpty());
-                auto mergedQuerySettings =
-                    mergeQuerySettings(lookupResult->first, request().getSettings());
-                QueryShapeConfiguration newQueryShapeConfiguration(std::move(queryShapeHash),
-                                                                   std::move(mergedQuerySettings));
-                newQueryShapeConfiguration.setRepresentativeQuery(std::move(lookupResult->second));
-                if (const auto& queryInstance =
-                        newQueryShapeConfiguration.getRepresentativeQuery()) {
-                    auto representativeQueryInfo =
-                        createRepresentativeInfo(opCtx, *queryInstance, tenantId);
-
-                    // Assert that query settings will be set on a valid query.
-                    utils::validateRepresentativeQuery(representativeQueryInfo);
-                }
-                return updateQuerySettings(opCtx, std::move(newQueryShapeConfiguration));
-            } else {
-                return insertQuerySettings(
-                    opCtx,
-                    QueryShapeConfiguration(queryShapeHash, std::move(request().getSettings())));
-            }
-        }
-
-        SetQuerySettingsCommandReply setQuerySettingsByQueryInstance(
-            OperationContext* opCtx, const QueryInstance& queryInstance) {
-            auto& querySettingsManager = QuerySettingsManager::get(opCtx);
-            auto tenantId = request().getDbName().tenantId();
-            auto representativeQueryInfo = createRepresentativeInfo(opCtx, queryInstance, tenantId);
-            auto& queryShapeHash = representativeQueryInfo.queryShapeHash;
-
-            // If there is already an entry for a given QueryShapeHash, then perform
-            // an update, otherwise insert.
-            if (auto lookupResult = querySettingsManager.getQuerySettingsForQueryShapeHash(
-                    opCtx, queryShapeHash, tenantId)) {
-                uassert(8727503,
-                        "settings field in setQuerySettings command cannot be empty",
-                        !request().getSettings().toBSON().isEmpty());
-
-                auto mergedQuerySettings =
-                    mergeQuerySettings(lookupResult->first, request().getSettings());
-                utils::verifyQueryCompatibleWithSettings(representativeQueryInfo,
-                                                         mergedQuerySettings);
-                QueryShapeConfiguration newQueryShapeConfiguration(std::move(queryShapeHash),
-                                                                   std::move(mergedQuerySettings));
-
-                // Set 'queryInstance' provided in the request as the new 'representativeQuery', if
-                // it was not previously set in the QueryShapeConfiguration.
-                newQueryShapeConfiguration.setRepresentativeQuery(
-                    lookupResult->second.get_value_or(queryInstance));
-
-                return updateQuerySettings(opCtx, std::move(newQueryShapeConfiguration));
-            } else {
-                QueryShapeConfiguration newQueryShapeConfiguration(
-                    std::move(queryShapeHash), std::move(request().getSettings()));
-                newQueryShapeConfiguration.setRepresentativeQuery(queryInstance);
-
-                // Assert that query settings will be set on a valid query.
-                utils::validateRepresentativeQuery(representativeQueryInfo);
-                utils::verifyQueryCompatibleWithSettings(representativeQueryInfo,
-                                                         newQueryShapeConfiguration.getSettings());
-                return insertQuerySettings(opCtx, std::move(newQueryShapeConfiguration));
-            }
-        }
-
         SetQuerySettingsCommandReply typedRun(OperationContext* opCtx) {
             uassert(7746400,
                     "setQuerySettings command is unknown",
                     feature_flags::gFeatureFlagQuerySettings.isEnabled(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             assertNoStandalone(opCtx, definition()->getName());
+            uassert(8727502,
+                    "settings field in setQuerySettings command cannot be empty",
+                    !request().getSettings().toBSON().isEmpty());
             auto response =
                 visit(OverloadedVisitor{
                           [&](const query_shape::QueryShapeHash& queryShapeHash) {
-                              return setQuerySettingsByQueryShapeHash(opCtx, queryShapeHash);
+                              return setQuerySettings(opCtx,
+                                                      boost::none /*representativeQuery*/,
+                                                      boost::none /*representativeQueryInfo*/,
+                                                      queryShapeHash);
                           },
-                          [&](const QueryInstance& queryInstance) {
-                              return setQuerySettingsByQueryInstance(opCtx, queryInstance);
+                          [&](const QueryInstance& representativeQuery) {
+                              const auto representativeQueryInfo = createRepresentativeInfo(
+                                  opCtx, representativeQuery, request().getDbName().tenantId());
+                              return setQuerySettings(opCtx,
+                                                      representativeQuery,
+                                                      representativeQueryInfo,
+                                                      representativeQueryInfo.queryShapeHash);
                           },
                       },
                       request().getCommandParameter());
@@ -335,6 +295,85 @@ public:
                         ->isAuthorizedForPrivilege(Privilege{
                             ResourcePattern::forClusterResource(request().getDbName().tenantId()),
                             ActionType::querySettings}));
+        }
+
+        // Inserts or updates a query settings entry for a query identified by query shape hash
+        // 'queryShapeHash'. If 'representativeQuery' is set, then it is the representative query to
+        // use and 'representativeQueryInfo' for the query must be set too.
+        SetQuerySettingsCommandReply setQuerySettings(
+            OperationContext* opCtx,
+            const boost::optional<QueryInstance> representativeQuery,
+            const boost::optional<const RepresentativeQueryInfo&> representativeQueryInfo,
+            const query_shape::QueryShapeHash& queryShapeHash) {
+            // Validate that both 'representativeQuery' and 'representativeQueryInfo' are either
+            // empty or not empty.
+            dassert(!(representativeQuery.has_value() ^ representativeQueryInfo.has_value()));
+
+            // Assert that query settings will be set on a valid query.
+            if (representativeQuery) {
+                utils::validateRepresentativeQuery(*representativeQueryInfo);
+            }
+
+            // Make a query shape configuration to insert.
+            QueryShapeConfiguration newQueryShapeConfiguration(queryShapeHash,
+                                                               request().getSettings());
+            newQueryShapeConfiguration.setRepresentativeQuery(representativeQuery);
+            auto&& tenantId = request().getDbName().tenantId();
+
+            readModifyWriteQuerySettingsConfigOption(
+                opCtx,
+                request().getDbName(),
+                representativeQuery,
+                [&](auto& queryShapeConfigurations) {
+                    // Lookup a query shape configuration by query shape hash.
+                    auto matchingQueryShapeConfigurationIt =
+                        findQueryShapeConfigurationByQueryShapeHash(queryShapeConfigurations,
+                                                                    queryShapeHash);
+                    if (matchingQueryShapeConfigurationIt == queryShapeConfigurations.end()) {
+                        // Add a new query settings entry.
+                        validateAndSimplifyQuerySettings(
+                            opCtx,
+                            tenantId,
+                            representativeQueryInfo,
+                            boost::none /*previousRepresentativeQuery*/,
+                            newQueryShapeConfiguration.getSettings());
+                        LOGV2_DEBUG(8911805,
+                                    1,
+                                    "Inserting query settings entry",
+                                    "representativeQuery"_attr = representativeQuery,
+                                    "settings"_attr =
+                                        newQueryShapeConfiguration.getSettings().toBSON());
+                        queryShapeConfigurations.push_back(newQueryShapeConfiguration);
+                    } else {
+                        // Update an existing query settings entry by updating the existing
+                        // QueryShapeConfiguration with the new query settings.
+                        auto&& queryShapeConfigurationToUpdate = *matchingQueryShapeConfigurationIt;
+                        auto mergedQuerySettings = mergeQuerySettings(
+                            queryShapeConfigurationToUpdate.getSettings(), request().getSettings());
+                        validateAndSimplifyQuerySettings(
+                            opCtx,
+                            tenantId,
+                            representativeQueryInfo,
+                            queryShapeConfigurationToUpdate.getRepresentativeQuery(),
+                            mergedQuerySettings);
+                        LOGV2_DEBUG(8911806,
+                                    1,
+                                    "Updating query settings entry",
+                                    "representativeQuery"_attr = representativeQuery,
+                                    "settings"_attr = mergedQuerySettings.toBSON());
+                        queryShapeConfigurationToUpdate.setSettings(mergedQuerySettings);
+
+                        // Update the representative query if provided.
+                        if (representativeQuery) {
+                            queryShapeConfigurationToUpdate.setRepresentativeQuery(
+                                representativeQuery);
+                        }
+                    }
+                });
+
+            SetQuerySettingsCommandReply reply;
+            reply.setQueryShapeConfiguration(std::move(newQueryShapeConfiguration));
+            return reply;
         }
     };
 };
@@ -371,37 +410,45 @@ public:
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             assertNoStandalone(opCtx, definition()->getName());
             auto tenantId = request().getDbName().tenantId();
-            auto queryShapeHash =
+            auto queryShapeHashAndRepresentativeQuery =
                 visit(OverloadedVisitor{
                           [&](const query_shape::QueryShapeHash& queryShapeHash) {
-                              return queryShapeHash;
+                              return std::pair{queryShapeHash, boost::optional<QueryInstance>{}};
                           },
-                          [&](const QueryInstance& queryInstance) {
-                              // Converts 'queryInstance' into QueryShapeHash, for convenient
-                              // comparison during search for the matching
-                              // QueryShapeConfiguration.
+                          [&](const QueryInstance& representativeQuery) {
+                              // Converts 'representativeQuery' into QueryShapeHash, for convenient
+                              // comparison during search for the matching QueryShapeConfiguration.
                               auto representativeQueryInfo =
-                                  createRepresentativeInfo(opCtx, queryInstance, tenantId);
+                                  createRepresentativeInfo(opCtx, representativeQuery, tenantId);
 
-                              return representativeQueryInfo.queryShapeHash;
+                              return std::pair{representativeQueryInfo.queryShapeHash,
+                                               boost::optional<QueryInstance>{representativeQuery}};
                           },
                       },
                       request().getCommandParameter());
 
-            // Build the new 'settingsArray' by removing the first QueryShapeConfiguration matching
-            // the 'queryShapeHash'. There can be only one match, since 'settingsArray' is
-            // constructed from a map where QueryShapeHash is the key.
-            readModifyWrite(opCtx, request().getDbName(), [&](auto& settingsArray) {
-                auto matchingQueryShapeConfigurationIt =
-                    std::find_if(settingsArray.begin(),
-                                 settingsArray.end(),
-                                 [&](const QueryShapeConfiguration& configuration) {
-                                     return configuration.getQueryShapeHash() == queryShapeHash;
-                                 });
-                if (matchingQueryShapeConfigurationIt != settingsArray.end()) {
-                    settingsArray.erase(matchingQueryShapeConfigurationIt);
-                }
-            });
+            const auto& queryShapeHash = queryShapeHashAndRepresentativeQuery.first;
+            readModifyWriteQuerySettingsConfigOption(
+                opCtx,
+                request().getDbName(),
+                queryShapeHashAndRepresentativeQuery.second,
+                [&](auto& queryShapeConfigurations) {
+                    // Build the new 'queryShapeConfigurations' by removing the first
+                    // QueryShapeConfiguration matching the 'queryShapeHash'. There can be only one
+                    // match, since 'queryShapeConfigurations' is constructed from a map where
+                    // QueryShapeHash is the key.
+                    auto matchingQueryShapeConfigurationIt =
+                        findQueryShapeConfigurationByQueryShapeHash(queryShapeConfigurations,
+                                                                    queryShapeHash);
+                    if (matchingQueryShapeConfigurationIt != queryShapeConfigurations.end()) {
+                        LOGV2_DEBUG(8911807,
+                                    1,
+                                    "Removing query settings entry",
+                                    "representativeQuery"_attr =
+                                        queryShapeHashAndRepresentativeQuery.second);
+                        queryShapeConfigurations.erase(matchingQueryShapeConfigurationIt);
+                    }
+                });
         }
 
     private:

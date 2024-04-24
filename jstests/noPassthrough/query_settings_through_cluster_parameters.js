@@ -36,8 +36,8 @@ let test =
             }
         };
 
-        // Ensure that query settings cluster parameter is empty.
-        qsutils.assertQueryShapeConfiguration([]);
+        // Reset query settings.
+        qsutils.removeAllQuerySettings();
 
         // Ensure 'setClusterParameter' doesn't accept query settings parameter directly.
         assert.commandFailedWithCode(db.adminCommand({

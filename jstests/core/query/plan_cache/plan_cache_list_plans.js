@@ -231,6 +231,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings") && !FixtureHelpers.
     assert.commandWorked(coll.createIndex({b: 1, a: 1}));
     const filter = {a: 1, b: 1};
     const query = qsutils.makeFindQueryInstance({filter});
+    qsutils.removeAllQuerySettings();
     assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: settings}));
     qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(settings, query)]);
 

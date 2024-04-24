@@ -22,6 +22,7 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());
+qsutils.removeAllQuerySettings();
 const queryFilter = {
     x: 1,
     y: 1

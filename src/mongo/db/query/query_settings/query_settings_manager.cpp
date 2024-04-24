@@ -165,10 +165,11 @@ void QuerySettingsManager::setQueryShapeConfigurations(
                                           parameterClusterTime});
 }
 
-std::vector<QueryShapeConfiguration> QuerySettingsManager::getAllQueryShapeConfigurations(
+QueryShapeConfigurationsWithTimestamp QuerySettingsManager::getAllQueryShapeConfigurations(
     OperationContext* opCtx, const boost::optional<TenantId>& tenantId) const {
     Lock::SharedLock readLock(opCtx, _mutex);
-    return getAllQueryShapeConfigurations_inlock(opCtx, tenantId);
+    return {getAllQueryShapeConfigurations_inlock(opCtx, tenantId),
+            getClusterParameterTime_inlock(opCtx, tenantId)};
 }
 
 std::vector<QueryShapeConfiguration> QuerySettingsManager::getAllQueryShapeConfigurations_inlock(

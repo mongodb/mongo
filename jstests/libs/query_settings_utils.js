@@ -77,6 +77,14 @@ export class QuerySettingsUtils {
         return {settings, representativeQuery};
     }
 
+    makeSetQuerySettingsCommand({settings, representativeQuery}) {
+        return {setQuerySettings: representativeQuery, settings};
+    }
+
+    makeRemoveQuerySettingsCommand(representativeQuery) {
+        return {removeQuerySettings: representativeQuery};
+    }
+
     /**
      * Return query settings for the current tenant without query hashes.
      */
