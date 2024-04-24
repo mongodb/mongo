@@ -194,11 +194,20 @@ public:
         return _created.load();
     }
 
+    void incrementRejected() {
+        _rejected.fetchAndAdd(1);
+    }
+
+    std::size_t rejected() const {
+        return _rejected.load();
+    }
+
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ServiceEntryPointImpl::Sessions::_mutex");
-    stdx::condition_variable _cv;         ///< notified on `_byClient` changes.
-    AtomicWord<std::size_t> _size{0};     ///< Kept in sync with `_byClient.size()`
-    AtomicWord<std::size_t> _created{0};  ///< Increases with each `insert` call.
-    ByClientMap _byClient;                ///< guarded by `_mutex`
+    stdx::condition_variable _cv;      ///< notified on `_byClient` changes.
+    Atomic<std::size_t> _size{0};      ///< Kept in sync with `_byClient.size()`
+    Atomic<std::size_t> _created{0};   ///< Increases with each `insert` call.
+    Atomic<std::size_t> _rejected{0};  ///< Used to record when a session is rejected.
+    ByClientMap _byClient;             ///< guarded by `_mutex`
 };
 
 SessionManagerCommon::SessionManagerCommon(ServiceContext* svcCtx)
@@ -246,9 +255,7 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     {
         auto sync = _sessions->sync();
         if (sync.size() >= _maxOpenSessions && !isPrivilegedSession) {
-            // Since startSession() is guaranteed to be accessed only by a single listener thread,
-            // an atomic increment is not necessary here.
-            _rejectedSessions++;
+            _sessions->incrementRejected();
             if (verbose) {
                 LOGV2(22942,
                       "Connection refused because there are too many open connections",
@@ -347,6 +354,10 @@ std::size_t SessionManagerCommon::numOpenSessions() const {
 
 std::size_t SessionManagerCommon::numCreatedSessions() const {
     return _sessions->created();
+}
+
+std::size_t SessionManagerCommon::numRejectedSessions() const {
+    return _sessions->rejected();
 }
 
 void SessionManagerCommon::endSessionByClient(Client* client) {
