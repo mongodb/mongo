@@ -310,7 +310,6 @@ selector:
     - jstests/core/**/not1.js
     - jstests/core/**/not2.js
     - jstests/core/**/not3.js
-    - jstests/core/**/notablescan.js
     - jstests/core/**/null_query_semantics.js
     - jstests/core/**/null_query_semantics.js
     - jstests/core/**/objectfind.js
