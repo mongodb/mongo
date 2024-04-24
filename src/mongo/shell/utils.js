@@ -103,7 +103,14 @@ function retryOnNetworkError(func, numRetries, sleepMs) {
 
 const shellGeneratedNetworkErrs = ["network error", "error doing query", "socket exception"];
 
-const networkErrs = ["SocketException", "HostNotFound"];
+const networkErrs = [
+    "SocketException",
+    "HostNotFound",
+    "HostUnreachable",
+    "NetworkTimeout",
+    "ConnectionPoolExpired",
+    "ConnectionError",
+];
 const networkErrsPlusShellGeneratedNetworkErrs = [...networkErrs, ...shellGeneratedNetworkErrs];
 /**
  * Determine if a provided object represents a network error
