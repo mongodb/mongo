@@ -180,6 +180,17 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp, Status error) 
     }
 }
 
+/**
+ * Returns whether it is possible for the donor to be in 'state' when resharding will indefinitely
+ * abort.
+ */
+bool inPotentialAbortScenario(const DonorStateEnum& state) {
+    // Regardless of whether resharding will abort or commit, the donor will eventually reach state
+    // kDone. Additionally, if the donor is in state kError, it is guaranteed that the coordinator
+    // will eventually begin the abort process.
+    return state == DonorStateEnum::kError || state == DonorStateEnum::kDone;
+}
+
 class ExternalStateImpl : public ReshardingDonorService::DonorStateMachineExternalState {
 public:
     ShardId myShardId(ServiceContext* serviceContext) const override {
@@ -591,14 +602,15 @@ SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitCriticalS
 
 void ReshardingDonorService::DonorStateMachine::
     _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData() {
-    if (_donorCtx.getState() > DonorStateEnum::kPreparingToDonate &&
-        _donorCtx.getState() != DonorStateEnum::kError) {
-        // The invariants won't hold if an unrecoverable error is encountered before the donor
-        // makes enough progress to transition to kDonatingInitialData and then a failover
-        // occurs.
-        invariant(_donorCtx.getMinFetchTimestamp());
-        invariant(_donorCtx.getBytesToClone());
-        invariant(_donorCtx.getDocumentsToClone());
+    if (_donorCtx.getState() > DonorStateEnum::kPreparingToDonate) {
+        if (!inPotentialAbortScenario(_donorCtx.getState())) {
+            // The invariants won't hold if an unrecoverable error is encountered before the donor
+            // makes enough progress to transition to kDonatingInitialData and then a failover
+            // occurs.
+            invariant(_donorCtx.getMinFetchTimestamp());
+            invariant(_donorCtx.getBytesToClone());
+            invariant(_donorCtx.getDocumentsToClone());
+        }
         return;
     }
 
@@ -891,7 +903,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
 
 void ReshardingDonorService::DonorStateMachine::_transitionState(DonorStateEnum newState) {
     invariant(newState != DonorStateEnum::kDonatingInitialData &&
-              newState != DonorStateEnum::kError);
+              newState != DonorStateEnum::kError && newState != DonorStateEnum::kDone);
 
     auto newDonorCtx = _donorCtx;
     newDonorCtx.setState(newState);
@@ -902,6 +914,10 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(DonorShardConte
     // For logging purposes.
     auto oldState = _donorCtx.getState();
     auto newState = newDonorCtx.getState();
+
+    // The donor state machine enters the kError state on unrecoverable errors and so we don't
+    // expect it to ever transition from kError except to kDone.
+    invariant(oldState != DonorStateEnum::kError || newState == DonorStateEnum::kDone);
 
     _updateDonorDocument(std::move(newDonorCtx));
 

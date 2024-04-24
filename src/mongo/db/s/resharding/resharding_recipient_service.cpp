@@ -163,6 +163,17 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<T>& sp, T value) {
     }
 }
 
+/**
+ * Returns whether it is possible for the recipient to be in 'state' when resharding will
+ * indefinitely abort.
+ */
+bool inPotentialAbortScenario(const RecipientStateEnum& state) {
+    // Regardless of whether resharding will abort or commit, the recipient will eventually reach
+    // state kDone. Additionally, if the recipient is in state kError, it is guaranteed that the
+    // coordinator will eventually begin the abort process.
+    return state == RecipientStateEnum::kError || state == RecipientStateEnum::kDone;
+}
+
 using resharding_metrics::getIntervalEndFieldName;
 using resharding_metrics::getIntervalStartFieldName;
 using DocT = ReshardingRecipientDocument;
@@ -671,11 +682,13 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken,
         const CancelableOperationContextFactory& factory) {
-    if (_recipientCtx.getState() > RecipientStateEnum::kAwaitingFetchTimestamp &&
-        _recipientCtx.getState() != RecipientStateEnum::kError) {
-        // This invariant won't hold if an unrecoverable error is encountered before the recipient
-        // makes enough progress to record _cloneTimestamp and then a failover occurs.
-        invariant(_cloneTimestamp);
+    if (_recipientCtx.getState() > RecipientStateEnum::kAwaitingFetchTimestamp) {
+        if (!inPotentialAbortScenario(_recipientCtx.getState())) {
+            // This invariant won't hold if an unrecoverable error is encountered before the
+            // recipient makes enough progress to transition to kAwaitingFetchTimestamp and then
+            // a failover occurs.
+            invariant(_cloneTimestamp);
+        }
         return ExecutorFuture(**executor);
     }
 
@@ -781,7 +794,7 @@ void ReshardingRecipientService::RecipientStateMachine::
                                              CommitPhase::kSuccessful);
     }
 
-    _transitionToCloning(factory);
+    _transitionState(RecipientStateEnum::kCloning, factory);
 }
 
 std::unique_ptr<ReshardingDataReplicationInterface>
@@ -886,9 +899,9 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildin
         .then([this, &factory] {
             if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                _transitionToBuildingIndex(factory);
+                _transitionState(RecipientStateEnum::kBuildingIndex, factory);
             } else {
-                _transitionToApplying(factory);
+                _transitionState(RecipientStateEnum::kApplying, factory);
             }
         });
 }
@@ -978,7 +991,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                abortToken)
         .thenRunOn(**executor)
         .then([this, &factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
-            _transitionToApplying(factory);
+            _transitionState(RecipientStateEnum::kApplying, factory);
         });
 }
 
@@ -1029,7 +1042,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                         ShardingCatalogClient::kLocalWriteConcern);
             }
 
-            _transitionToStrictConsistency(factory);
+            _transitionState(RecipientStateEnum::kStrictConsistency, factory);
             _writeStrictConsistencyOplog(factory);
         });
 }
@@ -1139,6 +1152,16 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionState(
+    RecipientStateEnum newState, const CancelableOperationContextFactory& factory) {
+    invariant(newState != RecipientStateEnum::kCreatingCollection &&
+              newState != RecipientStateEnum::kError && newState != RecipientStateEnum::kDone);
+
+    auto newRecipientCtx = _recipientCtx;
+    newRecipientCtx.setState(newState);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     RecipientShardContext&& newRecipientCtx,
     boost::optional<ReshardingRecipientService::RecipientStateMachine::CloneDetails>&& cloneDetails,
     boost::optional<mongo::Date_t> configStartTime,
@@ -1148,6 +1171,10 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     // For logging purposes.
     auto oldState = _recipientCtx.getState();
     auto newState = newRecipientCtx.getState();
+
+    // The recipient state machine enters the kError state on unrecoverable errors and so we don't
+    // expect it to ever transition from kError except to kDone.
+    invariant(oldState != RecipientStateEnum::kError || newState == RecipientStateEnum::kDone);
 
     _updateRecipientDocument(
         std::move(newRecipientCtx), std::move(cloneDetails), std::move(configStartTime), factory);
@@ -1171,34 +1198,6 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToCreatingCol
     newRecipientCtx.setState(RecipientStateEnum::kCreatingCollection);
     _transitionState(
         std::move(newRecipientCtx), std::move(cloneDetails), startConfigTxnCloneTime, factory);
-}
-
-void ReshardingRecipientService::RecipientStateMachine::_transitionToCloning(
-    const CancelableOperationContextFactory& factory) {
-    auto newRecipientCtx = _recipientCtx;
-    newRecipientCtx.setState(RecipientStateEnum::kCloning);
-    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
-}
-
-void ReshardingRecipientService::RecipientStateMachine::_transitionToBuildingIndex(
-    const CancelableOperationContextFactory& factory) {
-    auto newRecipientCtx = _recipientCtx;
-    newRecipientCtx.setState(RecipientStateEnum::kBuildingIndex);
-    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
-}
-
-void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
-    const CancelableOperationContextFactory& factory) {
-    auto newRecipientCtx = _recipientCtx;
-    newRecipientCtx.setState(RecipientStateEnum::kApplying);
-    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
-}
-
-void ReshardingRecipientService::RecipientStateMachine::_transitionToStrictConsistency(
-    const CancelableOperationContextFactory& factory) {
-    auto newRecipientCtx = _recipientCtx;
-    newRecipientCtx.setState(RecipientStateEnum::kStrictConsistency);
-    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToError(
