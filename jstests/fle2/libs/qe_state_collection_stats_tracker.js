@@ -237,3 +237,26 @@ export class QEStateCollectionStatsTracker {
         return estimate;
     }
 }
+
+// Extends the stat tracker for a basic int32 range field. Assumes that we only insert non-negative
+// values, contention factor == 0, trim factor == 0, sparsity == 1.
+export class QEUint32RangeCollectionStatsTracker extends QEStateCollectionStatsTracker {
+    generateRangeValues(value) {
+        // Find the 32-bit binary representation of value, and generate the path in the hypergraph
+        // from root to value.
+        assert(value >= 0);
+        let binRep = value.toString(2);
+        assert(binRep.length <= 32);
+        binRep = binRep.padStart(32, "0");
+        let values = [];
+        for (let i = 0; i <= 32; i++) {
+            values.push(binRep.substring(0, i));
+        }
+        return values;
+    }
+
+    // Overloads to insert the correct values for a given uint32 value given the hypergraph.
+    updateStatsPostInsert(key, value) {
+        this.generateRangeValues(value).forEach((v) => super.updateStatsPostInsert(key, v));
+    }
+}
