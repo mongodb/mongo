@@ -44,6 +44,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/db/write_concern_options.h"

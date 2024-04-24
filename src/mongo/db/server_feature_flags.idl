@@ -35,14 +35,6 @@ feature_flags:
         cpp_varname: gFeatureFlagSecurityToken
         default: false
         shouldBeFCVGated: true
-    featureFlagRequireTenantID:
-        # Only available with the server parameter "multitenancySupport".
-        description: >-
-            When enabled in conjunction with the server parameter "multitenancySupport",
-            require tenantID to be a part of NamespaceString and TenantDatabase.
-        cpp_varname: gFeatureFlagRequireTenantID
-        default: false
-        shouldBeFCVGated: true
     featureFlagGlobalIndexes:
         description: "Enable support for global indexes"
         cpp_varname: gFeatureFlagGlobalIndexes

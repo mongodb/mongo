@@ -2633,8 +2633,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if isinstance(struct, ast.Command):
             known_name = "_knownOP_MSGFields" if is_op_msg_request else "_knownBSONFields"
             self._writer.write_line(
-                "IDLParserContext::appendGenericCommandArguments(commandPassthroughFields, %s, builder);"
-                % (known_name))
+                "::mongo::appendGenericCommandArguments(commandPassthroughFields, %s, builder);" %
+                (known_name))
             self._writer.write_empty_line()
 
     def gen_bson_serializer_method(self, struct):

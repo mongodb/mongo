@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -31,24 +31,26 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <string>
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/db/auth/validated_tenancy_scope_gen.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
+#include "mongo/db/operation_context.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo::auth {
+namespace {
 
-const ValidatedTenancyScope ValidatedTenancyScope::kNotRequired{};
+const auto validatedTenancyScopeDecoration =
+    OperationContext::declareDecoration<boost::optional<ValidatedTenancyScope>>();
 
-bool ValidatedTenancyScope::hasAuthenticatedUser() const {
-    return holds_alternative<UserName>(_tenantOrUser);
+}  // namespace
+
+const boost::optional<ValidatedTenancyScope>& ValidatedTenancyScope::get(OperationContext* opCtx) {
+    return validatedTenancyScopeDecoration(opCtx);
 }
 
-const UserName& ValidatedTenancyScope::authenticatedUser() const {
-    invariant(hasAuthenticatedUser());
-    return std::get<UserName>(_tenantOrUser);
+void ValidatedTenancyScope::set(OperationContext* opCtx,
+                                boost::optional<ValidatedTenancyScope> token) {
+    validatedTenancyScopeDecoration(opCtx) = std::move(token);
 }
 
 }  // namespace mongo::auth
