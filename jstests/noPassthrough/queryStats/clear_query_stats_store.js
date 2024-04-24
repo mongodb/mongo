@@ -40,6 +40,7 @@ assert.eq(testDB.serverStatus().metrics.queryStats.numEvicted, 11);
 assert.eq(testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes, 0);
 
 // Calling $queryStats should fail when the query stats store size is 0 bytes.
-assert.throwsWithCode(() => testDB.getSiblingDB("admin").aggregate([{$queryStats: {}}]), 6579000);
+assert.throwsWithCode(() => testDB.getSiblingDB("admin").aggregate([{$queryStats: {}}]),
+                      ErrorCodes.QueryFeatureNotAllowed);
 MongoRunner.stopMongod(conn);
 }());

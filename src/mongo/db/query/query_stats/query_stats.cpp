@@ -76,6 +76,21 @@ Counter64 queryStatsStoreWriteErrorsMetric;
 ServerStatusMetricField<Counter64> displayWriteErrorsMetric(
     "queryStats.numQueryStatsStoreWriteErrors", &queryStatsStoreWriteErrorsMetric);
 
+/**
+ * Indicates whether or not query stats is enabled via the feature flag.
+ */
+bool isQueryStatsFeatureEnabled() {
+    // We need to call isVersionInitialized() first because this could run during startup while the
+    // FCV is still uninitialized.
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        return feature_flags::gFeatureFlagQueryStats.isEnabled(
+            serverGlobalParams.featureCompatibility);
+    }
+    // (Generic FCV reference): This reference is needed to ensure we correctly initialize query
+    // stats during startup.
+    return feature_flags::gFeatureFlagQueryStats.isEnabledOnVersion(
+        multiversion::GenericFCV::kLatest);
+}
 
 /**
  * Cap the queryStats store size.
@@ -105,11 +120,11 @@ size_t getQueryStatsStoreSize() {
 }
 
 void assertConfigurationAllowed() {
-    uassert(7373500,
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
             "Cannot configure queryStats store. The feature flag is not enabled. Please restart "
             "and specify the feature flag, or upgrade the feature compatibility version to one "
             "where it is enabled by default.",
-            feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCV());
+            isQueryStatsFeatureEnabled());
 }
 
 class QueryStatsOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
@@ -178,8 +193,7 @@ bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
     // check whether queryStats should be enabled without FCV, so default to not recording
     // those queries.
     // TODO SERVER-75935 Remove FCV Check.
-    return feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCV() &&
-        queryStatsStoreDecoration(serviceCtx)->getMaxSize() > 0;
+    return isQueryStatsFeatureEnabled() && queryStatsStoreDecoration(serviceCtx)->getMaxSize() > 0;
 }
 
 /**
@@ -278,7 +292,7 @@ void registerRequest(OperationContext* opCtx,
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
-    uassert(6579000,
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
             "Query stats is not enabled without the feature flag on and a cache size greater than "
             "0 bytes",
             isQueryStatsEnabled(opCtx->getServiceContext()));

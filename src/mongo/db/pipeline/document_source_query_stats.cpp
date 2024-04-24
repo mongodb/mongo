@@ -43,14 +43,10 @@ ServerStatusMetricField<Counter64> displayWriteErrorsMetric("queryStats.numHmacA
                                                             &queryStatsHmacApplicationErrors);
 }  // namespace
 
-REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
-    queryStats,
-    DocumentSourceQueryStats::LiteParsed::parse,
-    DocumentSourceQueryStats::createFromBson,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
-    boost::none,
-    feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCV());
+REGISTER_DOCUMENT_SOURCE(queryStats,
+                         DocumentSourceQueryStats::LiteParsed::parse,
+                         DocumentSourceQueryStats::createFromBson,
+                         AllowedWithApiStrict::kNeverInVersion1);
 
 namespace {
 

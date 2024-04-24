@@ -26,8 +26,10 @@ if (FeatureFlagUtil.isEnabled(db, "QueryStats")) {
 } else {
     // The feature flag is disabled - make sure the query stats store *cannot* be configured.
     assert.commandFailedWithCode(
-        db.adminCommand({setParameter: 1, internalQueryStatsCacheSize: '2MB'}), 7373500);
+        db.adminCommand({setParameter: 1, internalQueryStatsCacheSize: '2MB'}),
+        ErrorCodes.QueryFeatureNotAllowed);
     assert.commandFailedWithCode(
-        db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 2147483647}), 7373500);
+        db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 2147483647}),
+        ErrorCodes.QueryFeatureNotAllowed);
 }
 }());
