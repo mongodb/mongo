@@ -48,9 +48,8 @@
 namespace mongo {
 
 namespace {
-const int kMaxBuckets = operation_latency_histogram_details::kMaxBuckets;
-const std::array<uint64_t, kMaxBuckets>& kLowerBounds =
-    operation_latency_histogram_details::getLowerBounds();
+const int kMaxBuckets = OperationLatencyHistogram::kMaxBuckets;
+const std::array<uint64_t, kMaxBuckets>& kLowerBounds = OperationLatencyHistogram::kLowerBounds;
 }  // namespace
 
 TEST(OperationLatencyHistogram, EnsureIncrementsStored) {

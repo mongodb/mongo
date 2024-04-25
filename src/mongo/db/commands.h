@@ -624,10 +624,8 @@ public:
      *
      * Commands which implement database read or write logic should override this to return kRead
      * or kWrite as appropriate.
-     *
-     * `kLast` is only a marker to specify the number of entries in the list.
      */
-    enum class ReadWriteType { kCommand, kRead, kWrite, kTransaction, kLast };
+    enum class ReadWriteType { kCommand, kRead, kWrite, kTransaction };
     virtual ReadWriteType getReadWriteType() const {
         return ReadWriteType::kCommand;
     }
