@@ -165,7 +165,8 @@ feature_flags:
         description: "Feature flag to allow setting a server-wide default maxTimeMS used for all
         read operations"
         cpp_varname: gFeatureFlagDefaultReadMaxTimeMS
-        default: false
+        default: true
+        version: 8.0
         shouldBeFCVGated: true
     featureFlagPeriodicServerParameterSampling:
         description: "Feature flag to enable periodic FTDC sampling of server parameters"
