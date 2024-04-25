@@ -43,7 +43,7 @@ INSTALLING COMPASS
 DRIVERS
 
   Client drivers for most programming languages are available at
-  https://docs.mongodb.com/manual/applications/drivers/.  Use the shell
+  https://docs.mongodb.com/manual/applications/drivers/. Use the shell
   ("mongo") for administrative tasks.
 
 BUG REPORTS

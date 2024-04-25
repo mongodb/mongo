@@ -1,3 +1,9 @@
+# Forced early return indicating success.
+# Note: This is part of the migration to the GitHub queue; we're going to
+# switch from the validate_commit_message approach to using GH native
+# rulesets to validate commit message formatting.
+exit 0
+
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
