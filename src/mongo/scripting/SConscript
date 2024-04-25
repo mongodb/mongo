@@ -146,6 +146,7 @@ if jsEngine:
     scriptingEnv.CppUnitTest(
         target='scripting_mozjs_test',
         source=[
+            'mozjs/asan_handles_test.cpp',
             'mozjs/module_loader_test.cpp',
         ],
         LIBDEPS=[

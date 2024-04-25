@@ -97,7 +97,7 @@
 #include "mongo/scripting/mozjs/wraptype.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/stdx/unordered_set.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/string_map.h"
@@ -390,6 +390,18 @@ public:
         delete (t);
     }
 
+#if __has_feature(address_sanitizer)
+    class ASANHandlesNoLock {
+    public:
+        ~ASANHandlesNoLock() = default;
+        void addPointer(void* ptr);
+        void removePointer(void* ptr);
+
+    protected:
+        stdx::unordered_map<void*, size_t> _handles;
+    };
+#endif
+
     class ASANHandles {
     public:
         ~ASANHandles() = default;
@@ -414,7 +426,7 @@ public:
 #if __has_feature(address_sanitizer)
     private:
         Mutex _mutex = MONGO_MAKE_LATCH("ASANHandles::_mutex");
-        stdx::unordered_set<void*> _handles;
+        ASANHandlesNoLock _handles;
 #endif
     };
 
