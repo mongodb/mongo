@@ -110,7 +110,11 @@ OS_DOCKER_LOOKUP = {
                frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
     'rhel83': ('almalinux:8', "yum",
                frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
+    'rhel88': ('almalinux:8', "yum",
+               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
     'rhel90': ('almalinux:9', "yum",
+               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
+    'rhel93': ('almalinux:9', "yum",
                frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
     'sunos5': None,
     'suse11': None,
@@ -136,6 +140,11 @@ OS_DOCKER_LOOKUP = {
                        "file"
                    ]), "python3"),
     'ubuntu2204': ('ubuntu:22.04', "apt",
+                   frozenset([
+                       "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
+                       "file"
+                   ]), "python3"),
+    'ubuntu2404': ('ubuntu:24.04', "apt",
                    frozenset([
                        "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
                        "file"
