@@ -142,3 +142,74 @@ result = coll.aggregate([
              ])
              .toArray();
 assert.eq(result, [{_id: 17, mergedDocument: {b: 2}}]);
+
+// Test that the behavior in $bucketAuto is the same as $group:
+//   1. When all inputs end up in the same bucket, it's equivalent to {$group: {_id:1 ...}}.
+{
+    coll.drop();
+    assert.commandWorked(coll.insert([
+        {obj: {}},
+        {obj: {a: 1}},
+        {obj: {b: 2}},
+        {obj: {subobj: {x: 1}}},
+        {obj: {subobj: {y: 2}}},
+        {obj: {a: 3}},
+        {obj: {b: 4}},
+    ]));
+    const result = coll.aggregate([
+                           {$sort: {_id: 1}},
+                           {
+                               $bucketAuto: {
+                                   groupBy: "$no_such_field",
+                                   buckets: 1,
+                                   output: {result: {$mergeObjects: "$obj"}},
+                               }
+                           },
+                       ])
+                       .toArray();
+    assert.sameMembers(result, [
+        {
+            _id: {min: null, max: null},
+            // Last one wins, and subobjects are treated whole (not recursed into).
+            result: {a: 3, b: 4, subobj: {y: 2}},
+        },
+    ]);
+}
+//   2. When inputs end up in separate buckets, $mergeObjects picks the "last" according to
+//     the documents' position in the input--not according to the group key.
+{
+    coll.drop();
+    assert.commandWorked(coll.insert([
+        // With 8 docs and 2 buckets, we expect exactly 4 docs in each bucket.
+
+        // In the first bucket, the documents happen to already be sorted by 'key'.
+        // We expect the last value, a:4 to win.
+        {key: 1, obj: {a: 1}},
+        {key: 2, obj: {a: 2}},
+        {key: 3, obj: {a: 3}},
+        {key: 4, obj: {a: 4}},
+
+        // In the second bucket, the documents are not already sorted by 'key'.
+        // We expect the last one a:101 to win, as opposed to the largest/smallest key.
+        {key: 102, obj: {a: 102}},
+        {key: 103, obj: {a: 103}},
+        {key: 100, obj: {a: 100}},
+        {key: 101, obj: {a: 101}},
+    ]));
+    const result = coll.aggregate([
+                           {$sort: {_id: 1}},
+                           {
+                               $bucketAuto: {
+                                   groupBy: "$key",
+                                   buckets: 2,
+                                   output: {result: {$mergeObjects: "$obj"}},
+                               }
+                           },
+                       ])
+                       .toArray();
+    assert.sameMembers(result, [
+        // The upper bounds, '_id.max', are exclusive.
+        {_id: {min: 1, max: 100}, result: {a: 4}},
+        {_id: {min: 100, max: 103}, result: {a: 101}},
+    ]);
+}
