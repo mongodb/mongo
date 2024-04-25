@@ -76,6 +76,10 @@ runTest(m);
 MongoRunner.stopMongod(m);
 
 // Test mongos.
+if (TestData.configShard) {
+    // Config shard requires at least one shard.
+    quit();
+}
 var st = new ShardingTest({
     keyFile: 'jstests/libs/key1',
     shards: 0,
