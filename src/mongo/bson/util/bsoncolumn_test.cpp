@@ -242,8 +242,8 @@ public:
 
     static uint128_t deltaString(BSONElement val, BSONElement prev) {
         return Simple8bTypeUtil::encodeInt128(
-            *Simple8bTypeUtil::encodeString(val.valueStringData()) -
-            *Simple8bTypeUtil::encodeString(prev.valueStringData()));
+            Simple8bTypeUtil::encodeString(val.valueStringData()).value_or(0) -
+            Simple8bTypeUtil::encodeString(prev.valueStringData()).value_or(0));
     }
 
     static uint64_t deltaInt32(BSONElement val, BSONElement prev) {
@@ -3433,8 +3433,10 @@ TEST_F(BSONColumnTest, EmptyStringAfterUnencodableDelta) {
 }
 
 TEST_F(BSONColumnTest, EmptyStringAfterUnencodableLiteralAndDelta) {
-    std::vector<BSONElement> elems = {
-        createElementString("\0"_sd), createElementString("a"_sd), createElementString(""_sd)};
+    std::vector<BSONElement> elems = {createElementString("\0"_sd),
+                                      createElementString("a"_sd),
+                                      createElementString(""_sd),
+                                      createElementString(""_sd)};
 
     for (auto&& elem : elems) {
         cb.append(elem);
@@ -3446,6 +3448,55 @@ TEST_F(BSONColumnTest, EmptyStringAfterUnencodableLiteralAndDelta) {
     // As the literal is unencodable it will be considered to have a 0 encoding. We take this from
     // the last element that is empty string.
     appendSimple8bBlocks128(expected, deltaString(elems.begin() + 1, elems.end(), elems.back()), 1);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+// TODO SERVER-89715 remove test.
+TEST_F(BSONColumnTest, EmptyStringAfterUnencodableLiteralAndDeltaInterleaved) {
+    // The same test as above, but the data is wrapped in an object to test interleaved mode, and
+    // the fast implementation of the block API.
+    std::vector<BSONElement> elems = {createElementObj(BSON("x" << createElementString("\0"_sd))),
+                                      createElementObj(BSON("x" << createElementString("a"_sd))),
+                                      createElementObj(BSON("x" << createElementString(""_sd))),
+                                      createElementObj(BSON("x" << createElementString(""_sd)))};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+    auto binData = cb.finalize();
+
+    verifyDecompression(binData, elems);
+    TestPath testPathX{{"x"}};
+    verifyDecompressPathFast(binData, elems, testPathX);
+}
+
+TEST_F(BSONColumnTest, UnencodableStringBetweenZeroDelta) {
+    std::vector<BSONElement> elems = {
+        createElementString("a"_sd),
+        createElementString("\0"_sd),
+        createElementString("s"_sd),
+        createElementString("s"_sd),
+        createElementString("\0"_sd),
+        createElementString("\0"_sd),
+    };
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems[0]);
+    appendLiteral(expected, elems[1]);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks128(
+        expected, {deltaString(elems[2], elems[1]), deltaString(elems[3], elems[2])}, 1);
+    appendLiteral(expected, elems[4]);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, uint128_t(0));
     appendEOO(expected);
 
     auto binData = cb.finalize();
@@ -3863,6 +3914,7 @@ TEST_F(BSONColumnTest, NonZeroRLETwoControlBlocks) {
     verifyColumnReopenFromBinary(reinterpret_cast<const char*>(binData.data), binData.length);
 }
 
+// TODO SERVER-89715 remove test.
 TEST_F(BSONColumnTest, InterleavedNonZeroRLETwoControlBlocks) {
     // The same test as above, but the data is wrapped in an object to test interleaved mode, and
     // the fast implementation of the block API.

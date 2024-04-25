@@ -152,8 +152,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::loadUncompressed(const BS
         switch (type) {
             case String:
             case Code:
-                d128.lastEncodedValue =
-                    Simple8bTypeUtil::encodeString(elem.valueStringData()).value_or(0);
+                d128.lastEncodedValue = Simple8bTypeUtil::encodeString(elem.valueStringData());
                 break;
             case BinData: {
                 int size;
@@ -340,13 +339,14 @@ BlockBasedInterleavedDecompressor::DecodingState::loadDelta(ElementStorage& allo
         return _lastLiteral;
     }
 
+    // 'String' and 'Code' can have unencodable values that are followed by non-zero deltas.
     uassert(8690000,
             "attempt to expand delta for type that does not have encoded representation",
-            d128.lastEncodedValue);
+            d128.lastEncodedValue || _lastLiteral.type() == String || _lastLiteral.type() == Code);
 
-    // Expand delta as last encoded.
+    // Expand delta as last encoded. If the last value is unencodable it will be set to 0.
     d128.lastEncodedValue =
-        expandDelta(*d128.lastEncodedValue, Simple8bTypeUtil::decodeInt128(*delta));
+        expandDelta(d128.lastEncodedValue.value_or(0), Simple8bTypeUtil::decodeInt128(*delta));
     return std::pair{_lastLiteral.type(), *d128.lastEncodedValue};
 }
 
