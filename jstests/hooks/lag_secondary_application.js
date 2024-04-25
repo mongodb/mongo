@@ -3,7 +3,6 @@
  * secondary node in a replica set.
  */
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const MIN_MS = 400;
 const MAX_MS = 1000;
@@ -22,6 +21,28 @@ function isShutdownError(error) {
         error.message.includes("The server is in quiesce mode and will shut down");
 }
 
+function turnOffFailPointWithRetry(conn) {
+    let retryRemaining = 5;
+    while (retryRemaining > 0) {
+        try {
+            assert.commandWorked(conn.adminCommand({
+                configureFailPoint: 'pauseBatchApplicationAfterWritingOplogEntries',
+                mode: "off"
+            }));
+            jsTestLog("Resuming oplog application on secondary: " + conn);
+            return;
+        } catch (e) {
+            if (isNetworkError(e)) {
+                retryRemaining--;
+                jsTestLog("Retrying turn off fail point on network error: " + tojson(e));
+            } else {
+                throw e;
+            }
+        }
+    }
+    jsTestLog("LagOplogApplication hook turn off failPoint with network retry failed. " +
+              "The node is expected to be shutdown.");
+}
 /**
  * Enables the 'pauseBatchApplicationAfterWritingOplogEntries' failpoint on a secondary
  * node. This failpoint will pause oplog application after writing entries to the oplog
@@ -36,10 +57,8 @@ function lagLastApplied(secondaryConn) {
         {configureFailPoint: 'pauseBatchApplicationAfterWritingOplogEntries', mode: "alwaysOn"}));
     // Induce a random millisecond lag and turn off the failpoint.
     sleep(randMS);
-    assert.commandWorked(secondaryConn.adminCommand(
-        {configureFailPoint: 'pauseBatchApplicationAfterWritingOplogEntries', mode: "off"}));
 
-    jsTestLog("Resuming oplog application on secondary: " + secondaryConn);
+    turnOffFailPointWithRetry(secondaryConn);
     return {ok: 1};
 }
 
@@ -47,7 +66,11 @@ function lagLastApplied(secondaryConn) {
 // up in failover passthroughs.
 let res;
 try {
-    const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
+    // To make this hook work in kill primary passthroughs that can cause the initial connection
+    // failing with network error, we need to use nodb:"" in the config then manually create the
+    // connection so we can handle network errors.
+    const conn = connect(TestData.connectionString);
+    const topology = DiscoverTopology.findConnectedNodes(conn.getMongo());
 
     // Limit this hook to replica sets.
     if (topology.type !== Topology.kReplicaSet) {
@@ -59,9 +82,12 @@ try {
         throw new Error('Must have at least 2 nodes in the replica set: ' + tojson(topology));
     }
 
-    const secondaries = FixtureHelpers.getSecondaries(db);
+    const primary = topology.primary;
+    const secondaries =
+        (primary === undefined) ? topology.nodes : topology.nodes.filter(node => node !== primary);
     const randomSecondary = secondaries[Math.floor(Math.random() * secondaries.length)];
-    res = lagLastApplied(randomSecondary);
+    const randomSecondaryConn = new Mongo(randomSecondary);
+    res = lagLastApplied(randomSecondaryConn);
 } catch (e) {
     // If the ReplicaSetMonitor cannot find a primary because it has stepped down or
     // been killed, it may take longer than 15 seconds for a new primary to step up.

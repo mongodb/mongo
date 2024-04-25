@@ -166,6 +166,8 @@
     executor:
       hooks:
         - class: LagOplogApplicationInBackground
+          shell_options:
+            nodb: ""
         # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
         # so we need to allow time for at most 10 operations to be re-run and then re-committed. If
         # too many network errors occur when re-running a transaction we will run out of retries.

@@ -51,6 +51,8 @@
           - PeriodicKillSecondaries
       hooks:
         - class: LagOplogApplicationInBackground
+          shell_options:
+            nodb: ""
         - class: PeriodicKillSecondaries
 
 - name: exclusions
