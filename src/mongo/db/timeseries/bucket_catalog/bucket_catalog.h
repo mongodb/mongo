@@ -83,6 +83,24 @@ using StripeNumber = std::uint8_t;
 using ShouldClearFn = std::function<bool(const UUID&)>;
 
 /**
+ * Bundle of information that gets passed down into 'insert' and functions below it that may create
+ * a new bucket. It stores information that is used to decide which bucket to insert a measurement
+ * into.
+ */
+struct InsertContext {
+    BucketKey key;
+    StripeNumber stripeNumber;
+    TimeseriesOptions options;
+    ExecutionStatsController stats;
+    ClosedBuckets closedBuckets = ClosedBuckets();
+
+    bool operator==(const InsertContext& other) const {
+        return key == other.key;
+    };
+};
+
+
+/**
  * Whether to allow inserts to be batched together with those from other clients.
  */
 enum class CombineWithInsertsFromOtherClients {
@@ -249,11 +267,11 @@ uint64_t getMemoryUsage(const BucketCatalog& catalog);
 StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                    BucketCatalog& catalog,
                                    const NamespaceString& nss,
-                                   const UUID& collectionUUID,
                                    const StringDataComparator* comparator,
-                                   const TimeseriesOptions& options,
                                    const BSONObj& doc,
-                                   CombineWithInsertsFromOtherClients combine);
+                                   CombineWithInsertsFromOtherClients combine,
+                                   InsertContext& insertContext,
+                                   const Date_t& time);
 
 /**
  * Returns the WriteBatch into which the document was inserted and a list of any buckets that were
@@ -267,12 +285,12 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
 StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
                                                     BucketCatalog& catalog,
                                                     const NamespaceString& nss,
-                                                    const UUID& collectionUUID,
                                                     const StringDataComparator* comparator,
-                                                    const TimeseriesOptions& options,
                                                     const BSONObj& doc,
                                                     CombineWithInsertsFromOtherClients combine,
-                                                    ReopeningContext& reopeningContext);
+                                                    ReopeningContext& reopeningContext,
+                                                    InsertContext& insertContext,
+                                                    const Date_t& time);
 
 /**
  * Returns the WriteBatch into which the document was inserted and a list of any buckets that were
@@ -284,11 +302,11 @@ StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
 StatusWith<InsertResult> insert(OperationContext* opCtx,
                                 BucketCatalog& catalog,
                                 const NamespaceString& nss,
-                                const UUID& collectionUUID,
                                 const StringDataComparator* comparator,
-                                const TimeseriesOptions& options,
                                 const BSONObj& doc,
-                                CombineWithInsertsFromOtherClients combine);
+                                CombineWithInsertsFromOtherClients combine,
+                                InsertContext& insertContext,
+                                const Date_t& time);
 
 /**
  * If a 'tryInsert' call returns a 'InsertWaiter' object, the caller should use this function to
@@ -381,6 +399,17 @@ void appendExecutionStats(const BucketCatalog& catalog,
 void reportMeasurementsGroupCommitted(BucketCatalog& catalog,
                                       const UUID& collectionUUID,
                                       int64_t count);
+
+/**
+ * Returns a tuple of InsertContext 'insertContext', Date_t 'time', where insertContext contains
+ * information needed to insert a measurement into the correct bucket and time refers to the
+ * timeField value of the measurement we are inserting.
+ */
+StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catalog,
+                                                            const UUID& collectionUUID,
+                                                            const StringDataComparator* comparator,
+                                                            const TimeseriesOptions& options,
+                                                            const BSONObj& doc);
 
 
 }  // namespace mongo::timeseries::bucket_catalog

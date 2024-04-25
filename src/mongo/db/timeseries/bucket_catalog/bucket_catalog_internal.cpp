@@ -223,6 +223,7 @@ StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
     return {std::make_pair(std::move(key), time)};
 }
 
+
 const Bucket* findBucket(BucketStateRegistry& registry,
                          const Stripe& stripe,
                          WithLock,
@@ -272,13 +273,14 @@ Bucket* useBucket(OperationContext* opCtx,
                   Stripe& stripe,
                   WithLock stripeLock,
                   const NamespaceString& nss,
-                  const CreationInfo& info,
-                  AllowBucketCreation mode) {
+                  InsertContext& info,
+                  AllowBucketCreation mode,
+                  const Date_t& time) {
     auto it = stripe.openBucketsByKey.find(info.key);
     if (it == stripe.openBucketsByKey.end()) {
         // No open bucket for this metadata.
         return mode == AllowBucketCreation::kYes
-            ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info)
+            ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info, time)
             : nullptr;
     }
 
@@ -292,7 +294,7 @@ Bucket* useBucket(OperationContext* opCtx,
     }
     if (!bucket) {
         return mode == AllowBucketCreation::kYes
-            ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info)
+            ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info, time)
             : nullptr;
     }
 
@@ -310,7 +312,7 @@ Bucket* useBucket(OperationContext* opCtx,
           getTimeseriesBucketClearedError(nss, bucket->bucketId.oid));
 
     return mode == AllowBucketCreation::kYes
-        ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info)
+        ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info, time)
         : nullptr;
 }
 
@@ -318,8 +320,9 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
                            Stripe& stripe,
                            WithLock stripeLock,
                            const NamespaceString& nss,
-                           const CreationInfo& info) {
-    auto it = stripe.openBucketsByKey.find(info.key);
+                           InsertContext& insertContext,
+                           const Date_t& time) {
+    auto it = stripe.openBucketsByKey.find(insertContext.key);
     if (it == stripe.openBucketsByKey.end()) {
         // No open bucket for this metadata.
         return nullptr;
@@ -338,8 +341,8 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
         }
 
         auto bucketTime = potentialBucket->minTime;
-        if (info.time - bucketTime >= Seconds(*info.options.getBucketMaxSpanSeconds()) ||
-            info.time < bucketTime) {
+        if (time - bucketTime >= Seconds(*insertContext.options.getBucketMaxSpanSeconds()) ||
+            time < bucketTime) {
             continue;
         }
 
@@ -624,35 +627,37 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     BucketCatalog& catalog,
     Stripe& stripe,
     WithLock stripeLock,
-    StripeNumber stripeNumber,
     const BSONObj& doc,
     CombineWithInsertsFromOtherClients combine,
     AllowBucketCreation mode,
-    CreationInfo& info,
-    Bucket& existingBucket) {
+    InsertContext& insertContext,
+    Bucket& existingBucket,
+    const Date_t& time) {
     Bucket::NewFieldNames newFieldNamesToBeInserted;
     Sizes sizesToBeAdded;
 
     bool isNewlyOpenedBucket = (existingBucket.size == 0);
     std::reference_wrapper<Bucket> bucketToUse{existingBucket};
+    bool openedDueToMetadata = true;
     if (!isNewlyOpenedBucket) {
         auto [action, reason] = determineRolloverAction(opCtx,
                                                         catalog.trackingContext,
                                                         doc,
-                                                        info,
+                                                        insertContext,
                                                         existingBucket,
                                                         catalog.numberOfActiveBuckets.load(),
                                                         newFieldNamesToBeInserted,
                                                         sizesToBeAdded,
-                                                        mode);
+                                                        mode,
+                                                        time);
         if ((action == RolloverAction::kSoftClose || action == RolloverAction::kArchive) &&
             mode == AllowBucketCreation::kNo) {
             // We don't actually want to roll this bucket over yet, bail out.
             return reason;
         } else if (action != RolloverAction::kNone) {
-            info.openedDuetoMetadata = false;
-            bucketToUse =
-                rollover(opCtx, catalog, stripe, stripeLock, existingBucket, info, action);
+            openedDueToMetadata = false;
+            bucketToUse = rollover(
+                opCtx, catalog, stripe, stripeLock, existingBucket, insertContext, action, time);
             isNewlyOpenedBucket = true;
         }
     }
@@ -662,13 +667,16 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
         calculateBucketFieldsAndSizeChange(catalog.trackingContext,
                                            bucket,
                                            doc,
-                                           info.options.getMetaField(),
+                                           insertContext.options.getMetaField(),
                                            newFieldNamesToBeInserted,
                                            sizesToBeAdded);
     }
 
-    auto batch = activeBatch(
-        catalog.trackingContext, bucket, getOpId(opCtx, combine), stripeNumber, info.stats);
+    auto batch = activeBatch(catalog.trackingContext,
+                             bucket,
+                             getOpId(opCtx, combine),
+                             insertContext.stripeNumber,
+                             insertContext.stats);
     batch->measurements.push_back(doc);
     for (auto&& field : newFieldNamesToBeInserted) {
         batch->newFieldNamesToBeInserted[field] = field.hash();
@@ -681,12 +689,12 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     bucket.size +=
         sizesToBeAdded.uncommittedVerifiedSize + sizesToBeAdded.uncommittedMeasurementEstimate;
     if (isNewlyOpenedBucket) {
-        if (info.openedDuetoMetadata) {
+        if (openedDueToMetadata) {
             batch->openedDueToMetadata = true;
         }
 
         auto updateStatus = bucket.schema.update(
-            doc, info.options.getMetaField(), info.key.metadata.getComparator());
+            doc, insertContext.options.getMetaField(), insertContext.key.metadata.getComparator());
         invariant(updateStatus == Schema::UpdateStatus::Updated);
     }
 
@@ -828,10 +836,8 @@ void archiveBucket(OperationContext* opCtx,
     }
 }
 
-boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
-                                           Stripe& stripe,
-                                           WithLock stripeLock,
-                                           const CreationInfo& info) {
+boost::optional<OID> findArchivedCandidate(
+    BucketCatalog& catalog, Stripe& stripe, WithLock stripeLock, InsertContext& info, Date_t time) {
     auto setIt = stripe.archivedBuckets.find(info.key.hash);
     if (setIt == stripe.archivedBuckets.end()) {
         return boost::none;
@@ -843,16 +849,16 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
     // will return the smallest element not less than the search value, but we are using
     // std::greater instead of std::less for the map's comparisons. This means the order of keys
     // will be reversed, and lower_bound will return what we want.
-    auto it = archivedSet.lower_bound(info.time);
+    auto it = archivedSet.lower_bound(time);
     if (it == archivedSet.end()) {
         return boost::none;
     }
 
     const auto& [candidateTime, candidateBucket] = *it;
-    invariant(candidateTime <= info.time);
+    invariant(candidateTime <= time);
     // We need to make sure our measurement can fit without violating max span. If not, we
     // can't use this bucket.
-    if (info.time - candidateTime < Seconds(*info.options.getBucketMaxSpanSeconds())) {
+    if (time - candidateTime < Seconds(*info.options.getBucketMaxSpanSeconds())) {
         auto bucketState = getBucketState(catalog.bucketStateRegistry, candidateBucket.bucketId);
         if (bucketState && !transientlyConflictsWithReopening(bucketState.value())) {
             return candidateBucket.bucketId.oid;
@@ -892,10 +898,11 @@ InsertResult getReopeningContext(OperationContext* opCtx,
                                  BucketCatalog& catalog,
                                  Stripe& stripe,
                                  WithLock stripeLock,
-                                 const CreationInfo& info,
+                                 InsertContext& info,
                                  uint64_t catalogEra,
-                                 AllowQueryBasedReopening allowQueryBasedReopening) {
-    if (auto archived = findArchivedCandidate(catalog, stripe, stripeLock, info)) {
+                                 AllowQueryBasedReopening allowQueryBasedReopening,
+                                 const Date_t& time) {
+    if (auto archived = findArchivedCandidate(catalog, stripe, stripeLock, info, time)) {
         // Synchronize concurrent disk accesses. An outstanding query-based reopening request for
         // this series or an outstanding archived-based reopening request or prepared batch for this
         // bucket would potentially conflict with our choice to reopen here, so we must wait for any
@@ -942,7 +949,7 @@ InsertResult getReopeningContext(OperationContext* opCtx,
                             info.key.cloneAsUntracked(),
                             catalogEra,
                             generateReopeningPipeline(opCtx,
-                                                      info.time,
+                                                      time,
                                                       metaElement,
                                                       controlMinTimePath,
                                                       maxDataTimeFieldPath,
@@ -1124,8 +1131,9 @@ Bucket& allocateBucket(OperationContext* opCtx,
                        BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
-                       const CreationInfo& info) {
-    expireIdleBuckets(opCtx, catalog, stripe, stripeLock, info.stats, *info.closedBuckets);
+                       InsertContext& info,
+                       const Date_t& time) {
+    expireIdleBuckets(opCtx, catalog, stripe, stripeLock, info.stats, info.closedBuckets);
 
     // In rare cases duplicate bucket _id fields can be generated in the same stripe and fail to be
     // inserted. We will perform a limited number of retries to minimize the probability of
@@ -1136,7 +1144,7 @@ Bucket& allocateBucket(OperationContext* opCtx,
     tracked_unordered_map<BucketId, unique_tracked_ptr<Bucket>, BucketHasher>::iterator it;
     bool inserted = false;
     for (int retryAttempts = 0; !inserted && retryAttempts < maxRetries; ++retryAttempts) {
-        std::tie(oid, roundedTime) = generateBucketOID(info.time, info.options);
+        std::tie(oid, roundedTime) = generateBucketOID(time, info.options);
         auto bucketId = BucketId{info.key.collectionUUID, oid};
         std::tie(it, inserted) = stripe.openBucketsById.try_emplace(
             bucketId,
@@ -1181,16 +1189,17 @@ Bucket& rollover(OperationContext* opCtx,
                  Stripe& stripe,
                  WithLock stripeLock,
                  Bucket& bucket,
-                 const CreationInfo& info,
-                 RolloverAction action) {
+                 InsertContext& info,
+                 RolloverAction action,
+                 const Date_t& time) {
     invariant(action != RolloverAction::kNone);
     if (allCommitted(bucket)) {
         // The bucket does not contain any measurements that are yet to be committed, so we can take
         // action now.
         if (action == RolloverAction::kArchive) {
-            archiveBucket(opCtx, catalog, stripe, stripeLock, bucket, *info.closedBuckets);
+            archiveBucket(opCtx, catalog, stripe, stripeLock, bucket, info.closedBuckets);
         } else {
-            closeOpenBucket(opCtx, catalog, stripe, stripeLock, bucket, *info.closedBuckets);
+            closeOpenBucket(opCtx, catalog, stripe, stripeLock, bucket, info.closedBuckets);
         }
     } else {
         // We must keep the bucket around until all measurements are committed committed, just mark
@@ -1198,19 +1207,20 @@ Bucket& rollover(OperationContext* opCtx,
         bucket.rolloverAction = action;
     }
 
-    return allocateBucket(opCtx, catalog, stripe, stripeLock, info);
+    return allocateBucket(opCtx, catalog, stripe, stripeLock, info, time);
 }
 
 std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     OperationContext* opCtx,
     TrackingContext& trackingContext,
     const BSONObj& doc,
-    CreationInfo& info,
+    InsertContext& info,
     Bucket& bucket,
     uint32_t numberOfActiveBuckets,
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
     Sizes& sizesToBeAdded,
-    AllowBucketCreation mode) {
+    AllowBucketCreation mode,
+    const Date_t& time) {
     // If the mode is enabled to create new buckets, then we should update stats for soft closures
     // accordingly. If we specify the mode to not allow bucket creation, it means we are not sure if
     // we want to soft close the bucket yet and should wait to update closure stats.
@@ -1227,13 +1237,13 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     }
 
     auto bucketTime = bucket.minTime;
-    if (info.time - bucketTime >= Seconds(*info.options.getBucketMaxSpanSeconds())) {
+    if (time - bucketTime >= Seconds(*info.options.getBucketMaxSpanSeconds())) {
         if (shouldUpdateStats) {
             info.stats.incNumBucketsClosedDueToTimeForward();
         }
         return {RolloverAction::kSoftClose, RolloverReason::kTimeForward};
     }
-    if (info.time < bucketTime) {
+    if (time < bucketTime) {
         if (shouldUpdateStats) {
             info.stats.incNumBucketsArchivedDueToTimeBackward();
         }

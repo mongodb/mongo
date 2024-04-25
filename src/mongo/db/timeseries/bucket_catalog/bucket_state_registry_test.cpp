@@ -91,9 +91,9 @@ public:
                      *state);
     }
 
-    Bucket& createBucket(const internal::CreationInfo& info) {
+    Bucket& createBucket(InsertContext& info, Date_t time) {
         auto ptr = &internal::allocateBucket(
-            operationContext(), *this, *stripes[info.stripe], withLock, info);
+            operationContext(), *this, *stripes[info.stripeNumber], withLock, info, time);
         ASSERT_FALSE(hasBeenCleared(*ptr));
         return *ptr;
     }
@@ -167,31 +167,24 @@ public:
     Date_t date = Date_t::now();
     TimeseriesOptions options;
     ExecutionStatsController stats = internal::getOrInitializeExecutionStats(*this, uuid1);
-    ClosedBuckets closedBuckets;
-    internal::CreationInfo info1{bucketKey1,
-                                 internal::getStripeNumber(bucketKey1, numberOfStripes),
-                                 date,
-                                 options,
-                                 stats,
-                                 &closedBuckets};
-    internal::CreationInfo info2{bucketKey2,
-                                 internal::getStripeNumber(bucketKey2, numberOfStripes),
-                                 date,
-                                 options,
-                                 stats,
-                                 &closedBuckets};
-    internal::CreationInfo info3{bucketKey3,
-                                 internal::getStripeNumber(bucketKey3, numberOfStripes),
-                                 date,
-                                 options,
-                                 stats,
-                                 &closedBuckets};
+    InsertContext info1{std::move(bucketKey1),
+                        internal::getStripeNumber(bucketKey1, numberOfStripes),
+                        options,
+                        stats};
+    InsertContext info2{std::move(bucketKey2),
+                        internal::getStripeNumber(bucketKey2, numberOfStripes),
+                        options,
+                        stats};
+    InsertContext info3{std::move(bucketKey3),
+                        internal::getStripeNumber(bucketKey3, numberOfStripes),
+                        options,
+                        stats};
 };
 
 
 TEST_F(BucketStateRegistryTest, TransitionsFromUntrackedState) {
     // Start with an untracked bucket in the registry.
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
@@ -224,7 +217,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromUntrackedState) {
 
 DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnUntrackedBucket, "invariant") {
     // Start with an untracked bucket in the registry.
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
@@ -235,7 +228,7 @@ DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnUntrackedBucket, "invariant
 
 TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
     // Start with a 'kNormal' bucket in the registry.
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
     // We expect transition to 'kNormal' to succeed.
@@ -279,7 +272,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
 
 TEST_F(BucketStateRegistryTest, TransitionsFromClearedState) {
     // Start with a 'kCleared' bucket in the registry.
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     clearBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
@@ -322,7 +315,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromClearedState) {
 
 TEST_F(BucketStateRegistryTest, TransitionsFromFrozenState) {
     // Start with a 'kFrozen' bucket in the registry.
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     freezeBucket(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 
@@ -352,7 +345,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromFrozenState) {
 
 TEST_F(BucketStateRegistryTest, TransitionsFromPreparedState) {
     // Start with a 'kPrepared' bucket in the registry.
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
@@ -391,7 +384,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedState) {
 
 DEATH_TEST_F(BucketStateRegistryTest, CannotInitializeAPreparedBucket, "invariant") {
     // Start with a 'kPrepared' bucket in the registry.
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
@@ -402,7 +395,7 @@ DEATH_TEST_F(BucketStateRegistryTest, CannotInitializeAPreparedBucket, "invarian
 
 DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnAlreadyPreparedBucket, "invariant") {
     // Start with a 'kPrepared' bucket in the registry.
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
@@ -412,7 +405,7 @@ DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnAlreadyPreparedBucket, "inv
 
 TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndClearedState) {
     // Start with a 'kPreparedAndCleared' bucket in the registry.
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
     clearBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
@@ -459,11 +452,11 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndClearedState) {
 
 TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndFrozenState) {
     // Start with a 'kPreparedAndFrozen' bucket in the registry.
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
     freezeBucket(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
-    auto& bucket2 = createBucket(info2);
+    auto& bucket2 = createBucket(info2, date);
     (void)prepareBucketState(bucketStateRegistry, bucket2.bucketId);
     freezeBucket(bucketStateRegistry, bucket2.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket2.bucketId, BucketState::kPreparedAndFrozen));
@@ -492,7 +485,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndFrozenState) {
 
 TEST_F(BucketStateRegistryTest, TransitionsFromDirectWriteState) {
     // Start with a bucket with a direct write in the registry.
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     auto bucketState = addDirectWrite(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
@@ -528,7 +521,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromDirectWriteState) {
 TEST_F(BucketStateRegistryTest, EraAdvancesAsExpected) {
     // When allocating new buckets, we expect their era value to match the BucketCatalog's era.
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 0);
-    auto& bucket1 = createBucket(info1);
+    auto& bucket1 = createBucket(info1, date);
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 0);
     ASSERT_EQ(bucket1.lastChecked, 0);
 
@@ -540,8 +533,8 @@ TEST_F(BucketStateRegistryTest, EraAdvancesAsExpected) {
 
     // When clearing buckets of one namespace, we expect the era of buckets of any other namespace
     // to not change.
-    auto& bucket2 = createBucket(info1);
-    auto& bucket3 = createBucket(info2);
+    auto& bucket2 = createBucket(info1, date);
+    auto& bucket3 = createBucket(info2, date);
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 1);
     ASSERT_EQ(bucket2.lastChecked, 1);
     ASSERT_EQ(bucket3.lastChecked, 1);
@@ -558,7 +551,7 @@ TEST_F(BucketStateRegistryTest, EraAdvancesAsExpected) {
 
 TEST_F(BucketStateRegistryTest, EraCountMapUpdatedCorrectly) {
     // Creating a bucket in a new era should add a counter for that era to the map.
-    auto& bucket1 = createBucket(info1);
+    auto& bucket1 = createBucket(info1, date);
     ASSERT_EQ(bucket1.lastChecked, 0);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 1);
     clear(*this, uuid1);
@@ -569,8 +562,8 @@ TEST_F(BucketStateRegistryTest, EraCountMapUpdatedCorrectly) {
 
     // If there are still buckets in the era, however, the counter should still exist in the
     // map.
-    auto& bucket2 = createBucket(info1);
-    auto& bucket3 = createBucket(info2);
+    auto& bucket2 = createBucket(info1, date);
+    auto& bucket3 = createBucket(info2, date);
     ASSERT_EQ(bucket2.lastChecked, 1);
     ASSERT_EQ(bucket3.lastChecked, 1);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 2);
@@ -580,7 +573,7 @@ TEST_F(BucketStateRegistryTest, EraCountMapUpdatedCorrectly) {
 
     // A bucket in one era being destroyed and the counter decrementing should not affect a
     // different era's counter.
-    auto& bucket4 = createBucket(info2);
+    auto& bucket4 = createBucket(info2, date);
     ASSERT_EQ(bucket4.lastChecked, 2);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 2), 1);
     clear(*this, uuid2);
@@ -590,8 +583,8 @@ TEST_F(BucketStateRegistryTest, EraCountMapUpdatedCorrectly) {
 }
 
 TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
-    auto& bucket1 = createBucket(info1);
-    auto& bucket2 = createBucket(info2);
+    auto& bucket1 = createBucket(info1, date);
+    auto& bucket2 = createBucket(info2, date);
     ASSERT_EQ(bucket1.lastChecked, 0);
     ASSERT_EQ(bucket2.lastChecked, 0);
 
@@ -607,14 +600,14 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
     ASSERT(cannotAccessBucket(bucket2));
 
     // Sanity check that all this still works with multiple buckets in a namespace being cleared.
-    auto& bucket3 = createBucket(info2);
-    auto& bucket4 = createBucket(info2);
+    auto& bucket3 = createBucket(info2, date);
+    auto& bucket4 = createBucket(info2, date);
     ASSERT_EQ(bucket3.lastChecked, 1);
     ASSERT_EQ(bucket4.lastChecked, 1);
     clear(*this, uuid2);
     ASSERT(cannotAccessBucket(bucket3));
     ASSERT(cannotAccessBucket(bucket4));
-    auto& bucket5 = createBucket(info2);
+    auto& bucket5 = createBucket(info2, date);
     ASSERT_EQ(bucket5.lastChecked, 2);
     clear(*this, uuid2);
     ASSERT(cannotAccessBucket(bucket5));
@@ -629,7 +622,7 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
 
     // _isMemberOfClearedSet works even if the bucket wasn't cleared in the most recent clear.
     clear(*this, uuid1);
-    auto& bucket6 = createBucket(info2);
+    auto& bucket6 = createBucket(info2, date);
     ASSERT_EQ(bucket6.lastChecked, 4);
     clear(*this, uuid2);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 3), 1);
@@ -641,8 +634,8 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
 }
 
 TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
-    auto& bucket1 = createBucket(info1);
-    auto& bucket2 = createBucket(info2);
+    auto& bucket1 = createBucket(info1, date);
+    auto& bucket2 = createBucket(info2, date);
     ASSERT_EQ(bucket1.lastChecked, 0);
     ASSERT_EQ(bucket2.lastChecked, 0);
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 0);
@@ -656,16 +649,16 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
     // cleaned.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 0);
 
-    auto& bucket3 = createBucket(info1);
-    auto& bucket4 = createBucket(info2);
+    auto& bucket3 = createBucket(info1, date);
+    auto& bucket4 = createBucket(info2, date);
     ASSERT_EQ(bucket3.lastChecked, 2);
     ASSERT_EQ(bucket4.lastChecked, 2);
     clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket3);
     // Era 2 still has bucket4 in it, so its count remains non-zero.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
-    auto& bucket5 = createBucket(info1);
-    auto& bucket6 = createBucket(info2);
+    auto& bucket5 = createBucket(info1, date);
+    auto& bucket6 = createBucket(info2, date);
     ASSERT_EQ(bucket5.lastChecked, 3);
     ASSERT_EQ(bucket6.lastChecked, 3);
     clear(*this, uuid1);
@@ -680,22 +673,22 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
     // registry is emptied.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 0);
 
-    auto& bucket7 = createBucket(info1);
-    auto& bucket8 = createBucket(info3);
+    auto& bucket7 = createBucket(info1, date);
+    auto& bucket8 = createBucket(info3, date);
     ASSERT_EQ(bucket7.lastChecked, 5);
     ASSERT_EQ(bucket8.lastChecked, 5);
     clear(*this, uuid3);
     checkAndRemoveClearedBucket(bucket8);
     // Era 5 still has bucket7 in it so its count remains non-zero.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
-    auto& bucket9 = createBucket(info2);
+    auto& bucket9 = createBucket(info2, date);
     ASSERT_EQ(bucket9.lastChecked, 6);
     clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket9);
     // Era 6's count becomes 0. Since era 5 is the smallest era with non-zero count, no clear ops
     // are removed.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 2);
-    auto& bucket10 = createBucket(info3);
+    auto& bucket10 = createBucket(info3, date);
     ASSERT_EQ(bucket10.lastChecked, 7);
     clear(*this, uuid3);
     checkAndRemoveClearedBucket(bucket10);
@@ -709,7 +702,7 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
 }
 
 TEST_F(BucketStateRegistryTest, HasBeenClearedToleratesGapsInRegistry) {
-    auto& bucket1 = createBucket(info1);
+    auto& bucket1 = createBucket(info1, date);
     ASSERT_EQ(bucket1.lastChecked, 0);
     clearById(uuid1, OID());
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 2);
@@ -717,7 +710,7 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedToleratesGapsInRegistry) {
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 3);
     ASSERT_TRUE(hasBeenCleared(bucket1));
 
-    auto& bucket2 = createBucket(info2);
+    auto& bucket2 = createBucket(info2, date);
     ASSERT_EQ(bucket2.lastChecked, 3);
     clearById(uuid1, OID());
     clearById(uuid1, OID());
@@ -732,13 +725,13 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedToleratesGapsInRegistry) {
 }
 
 TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     auto bucketId = bucket.bucketId;
 
     ClosedBuckets closedBuckets;
     internal::archiveBucket(operationContext(),
                             *this,
-                            *stripes[info1.stripe],
+                            *stripes[info1.stripeNumber],
                             WithLock::withoutLock(),
                             bucket,
                             closedBuckets);
@@ -747,20 +740,21 @@ TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
 }
 
 TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     auto bucketId = bucket.bucketId;
 
     auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.collectionUUID);
     TrackingContext trackingContext;
     auto batch =
         std::make_shared<WriteBatch>(trackingContext,
-                                     BucketHandle{bucketId, info1.stripe},
+                                     BucketHandle{bucketId, info1.stripeNumber},
                                      info1.key.cloneAsUntracked(),
                                      0,
                                      stats,
                                      StringData{bucket.timeField.data(), bucket.timeField.size()});
 
-    internal::abort(*this, *stripes[info1.stripe], WithLock::withoutLock(), batch, Status::OK());
+    internal::abort(
+        *this, *stripes[info1.stripeNumber], WithLock::withoutLock(), batch, Status::OK());
     ASSERT(getBucketState(bucketStateRegistry, bucketId) == boost::none);
 }
 
@@ -770,7 +764,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
         "featureFlagTimeseriesAlwaysUseCompressedBuckets", false};
 
     NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.foo");
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     auto bucketId = bucket.bucketId;
 
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kNormal));
@@ -779,7 +773,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
     TrackingContext trackingContext;
     auto batch =
         std::make_shared<WriteBatch>(trackingContext,
-                                     BucketHandle{bucketId, info1.stripe},
+                                     BucketHandle{bucketId, info1.stripeNumber},
                                      info1.key.cloneAsUntracked(),
                                      0,
                                      stats,
@@ -822,7 +816,7 @@ TEST_F(BucketStateRegistryTest, DirectWriteFinishRemovesBucketState) {
 }
 
 TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
-    auto& bucket = createBucket(info1);
+    auto& bucket = createBucket(info1, date);
     auto bucketId = bucket.bucketId;
 
     // Under the hood, the BucketState will contain a counter on the number of ongoing DirectWrites.
