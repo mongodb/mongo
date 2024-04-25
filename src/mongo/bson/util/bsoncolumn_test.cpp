@@ -8557,6 +8557,9 @@ TEST_F(BSONColumnTest, BlockFuzzerDiscoveredEdgeCases) {
         "BQAwAAAAAAcAAAAAAAEAAAAAAABAAAAAAAA7Ozs7Ozs7Ozs6Ozs7Ozs7Ozs7Ozs7Ozs7OwD+/4A7OzsA/v+A/wA="_sd,
         // Block-based API didn't allow non-zero/missing deltas after EOO (SERVER-89150).
         "8h4AAAD/p/+zSENBMoAB/0hDQzKAAP9IOjCAAP8AAACCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCggA="_sd,
+        // Blockbased API didn't update last to EOO when Iterative API did for interleaved data
+        // (SERVER-89612).
+        "8hQAAAAF+P//////FCgAAAAAAAAABgAIAACBKg7/+///////MP8V/3EAAACBeHFYDAAA/3RhZ3P//wEAAAA="_sd,
     };
 
     for (auto&& binaryBase64 : binariesBase64) {
@@ -8569,8 +8572,8 @@ TEST_F(BSONColumnTest, BlockFuzzerDiscoveredEdgeCases) {
         bool iteratorError = false;
 
         // Attempt to decompress using the block-based API.
+        bsoncolumn::BSONColumnBlockBased block(binary.data(), binary.size());
         try {
-            bsoncolumn::BSONColumnBlockBased block(binary.data(), binary.size());
             block.decompress<bsoncolumn::BSONElementMaterializer, std::vector<BSONElement>>(
                 blockBasedElems, allocator);
         } catch (...) {
@@ -8578,8 +8581,8 @@ TEST_F(BSONColumnTest, BlockFuzzerDiscoveredEdgeCases) {
         }
 
         // Attempt to decompress using the iterator API.
+        BSONColumn column(binary.data(), binary.size());
         try {
-            BSONColumn column(binary.data(), binary.size());
             for (auto&& elem : column) {
                 iteratorElems.push_back(elem);
             };

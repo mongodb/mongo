@@ -246,6 +246,9 @@ template <typename Buffer>
 void BlockBasedSubObjectFinisher<Buffer>::finishMissing() {
     for (auto&& buffer : _buffers) {
         buffer->appendMissing();
+        // We need to set last here to ensure we correctly process simple8b blocks that may follow
+        // the interleaved mode.
+        buffer->template setLast<BSONElement>(BSONElement());
     }
 }
 

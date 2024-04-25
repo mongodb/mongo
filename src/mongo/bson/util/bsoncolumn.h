@@ -451,7 +451,9 @@ public:
         return CMaterializer::isMissing(_last);
     }
 
-    // Sets the last value without appending anything.
+    // Sets the last value without appending anything. This should be called to update _last to be
+    // the element in the reference object, and for missing top-level objects. Otherwise the append
+    // methods will take care of updating _last as needed.
     template <typename T>
     void setLast(const BSONElement& val) {
         _last = CMaterializer::template materialize<T>(*_allocator, val);
