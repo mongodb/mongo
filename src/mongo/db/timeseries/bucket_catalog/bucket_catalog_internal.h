@@ -62,20 +62,6 @@
 namespace mongo::timeseries::bucket_catalog::internal {
 
 /**
- * Bundle of information that 'insert' needs to pass down to helper methods that may create a
- * new bucket.
- */
-struct CreationInfo {
-    const BucketKey& key;
-    StripeNumber stripe;
-    const Date_t& time;
-    const TimeseriesOptions& options;
-    ExecutionStatsController& stats;
-    ClosedBuckets* closedBuckets;
-    bool openedDuetoMetadata = true;
-};
-
-/**
  * Mode enum to control whether bucket retrieval methods will create new buckets if no suitable
  * bucket exists.
  */
@@ -122,6 +108,7 @@ StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
     const TimeseriesOptions& options,
     const BSONObj& doc);
 
+
 /**
  * Retrieve a bucket for read-only use.
  */
@@ -158,8 +145,9 @@ Bucket* useBucket(OperationContext* opCtx,
                   Stripe& stripe,
                   WithLock stripeLock,
                   const NamespaceString& nss,
-                  const CreationInfo& info,
-                  AllowBucketCreation mode);
+                  InsertContext& info,
+                  AllowBucketCreation mode,
+                  const Date_t& time);
 
 /**
  * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers buckets
@@ -169,7 +157,8 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
                            Stripe& stripe,
                            WithLock stripeLock,
                            const NamespaceString& nss,
-                           const CreationInfo& info);
+                           InsertContext& info,
+                           const Date_t& time);
 
 /**
  * Given a bucket to reopen, performs validation and constructs the in-memory representation of the
@@ -225,12 +214,12 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     BucketCatalog& catalog,
     Stripe& stripe,
     WithLock stripeLock,
-    StripeNumber stripeNumber,
     const BSONObj& doc,
     CombineWithInsertsFromOtherClients combine,
     AllowBucketCreation mode,
-    CreationInfo& info,
-    Bucket& existingBucket);
+    InsertContext& insertContext,
+    Bucket& existingBucket,
+    const Date_t& time);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'
@@ -260,10 +249,8 @@ void archiveBucket(OperationContext* opCtx,
  * Identifies a previously archived bucket that may be able to accommodate the measurement
  * represented by 'info', if one exists.
  */
-boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
-                                           Stripe& stripe,
-                                           WithLock stripeLock,
-                                           const CreationInfo& info);
+boost::optional<OID> findArchivedCandidate(
+    BucketCatalog& catalog, Stripe& stripe, WithLock stripeLock, InsertContext& info, Date_t time);
 
 /**
  * Calculates the bucket max size constrained by the cache size and the cardinality of active
@@ -282,9 +269,10 @@ InsertResult getReopeningContext(OperationContext* opCtx,
                                  BucketCatalog& catalog,
                                  Stripe& stripe,
                                  WithLock stripeLock,
-                                 const CreationInfo& info,
+                                 InsertContext& info,
                                  uint64_t catalogEra,
-                                 AllowQueryBasedReopening allowQueryBasedReopening);
+                                 AllowQueryBasedReopening allowQueryBasedReopening,
+                                 const Date_t& time);
 
 /**
  * Aborts 'batch', and if the corresponding bucket still exists, proceeds to abort any other
@@ -347,7 +335,8 @@ Bucket& allocateBucket(OperationContext* opCtx,
                        BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
-                       const CreationInfo& info);
+                       InsertContext& info,
+                       const Date_t& time);
 
 /**
  * Close the existing, full bucket and open a new one for the same metadata.
@@ -359,8 +348,9 @@ Bucket& rollover(OperationContext* opCtx,
                  Stripe& stripe,
                  WithLock stripeLock,
                  Bucket& bucket,
-                 const CreationInfo& info,
-                 RolloverAction action);
+                 InsertContext& info,
+                 RolloverAction action,
+                 const Date_t& time);
 
 /**
  * Determines if 'bucket' needs to be rolled over to accommodate 'doc'. If so, determines whether
@@ -370,12 +360,13 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     OperationContext* opCtx,
     TrackingContext&,
     const BSONObj& doc,
-    CreationInfo& info,
+    InsertContext& info,
     Bucket& bucket,
     uint32_t numberOfActiveBuckets,
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
     Sizes& sizesToBeAdded,
-    AllowBucketCreation mode);
+    AllowBucketCreation mode,
+    const Date_t& time);
 
 /**
  * Retrieves or initializes the execution stats for the given namespace, for writing.
