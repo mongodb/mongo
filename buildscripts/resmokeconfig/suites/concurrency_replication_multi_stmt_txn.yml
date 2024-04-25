@@ -38,10 +38,6 @@ selector:
     - jstests/concurrency/fsm_workloads/reindex_background.js
     - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
-    # This workload causes transactions to start with or include a getMore command with
-    # readConcernArgs attached, causing addParticipant implementation to fail. TODO: SERVER-87789.
-    - jstests/concurrency/fsm_workloads/exchange_producer.js
-
   exclude_with_any_tags:
     - does_not_support_causal_consistency
     - requires_sharding

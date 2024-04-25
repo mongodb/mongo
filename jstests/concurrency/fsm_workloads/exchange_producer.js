@@ -6,7 +6,10 @@
  *   assumes_against_mongod_not_mongos,
  *   # The config fuzzer runs logical session cache refreshes, which was occasionally killing the
  *   # cursors before the test is over.
- *   does_not_support_config_fuzzer
+ *   does_not_support_config_fuzzer,
+ *   # This will fail if using transactions because the FSM will attempt to call getMore on a cursor
+ *   # that's been created outside of the transaction.
+ *   does_not_support_transactions
  * ]
  */
 
