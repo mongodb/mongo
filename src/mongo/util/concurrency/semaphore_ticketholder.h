@@ -32,20 +32,24 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/random.h"
-#include "mongo/platform/waitable_atomic.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/notifyable.h"
 
 namespace mongo {
 
 class SemaphoreTicketHolder final : public TicketHolder {
 public:
+    enum class ResizePolicy { kGradual = 0, kImmediate };
+
     explicit SemaphoreTicketHolder(ServiceContext* serviceContext,
                                    int numTickets,
-                                   bool trackPeakUsed);
+                                   bool trackPeakUsed,
+                                   ResizePolicy resizePolicy = ResizePolicy::kGradual);
 
     int32_t available() const final;
+
 
     int64_t queued() const final {
         auto removed = _semaphoreStats.totalRemovedQueue.loadRelaxed();
@@ -64,14 +68,22 @@ private:
     boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) final;
     void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept final;
 
+    bool _resizeImpl(WithLock lock,
+                     OperationContext* opCtx,
+                     int32_t newSize,
+                     Date_t deadline) override;
+    void _immediateResize(WithLock, int32_t newSize);
+
     void _appendImplStats(BSONObjBuilder& b) const final;
 
     QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept final {
         return _semaphoreStats;
     }
 
-    BasicWaitableAtomic<uint32_t> _tickets;
+    ResizePolicy _resizePolicy;
     QueueStats _semaphoreStats;
+    Atomic<int64_t> _tickets;
+    NotifyableParkingLot _parkingLot;
 };
 
 }  // namespace mongo

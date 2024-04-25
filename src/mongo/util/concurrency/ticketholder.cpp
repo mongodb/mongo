@@ -29,6 +29,7 @@
 
 #include "mongo/util/concurrency/ticketholder.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source.h"
@@ -60,7 +61,13 @@ TicketHolder::TicketHolder(ServiceContext* svcCtx, int32_t numTickets, bool trac
 
 bool TicketHolder::resize(OperationContext* opCtx, int32_t newSize, Date_t deadline) {
     stdx::lock_guard<Latch> lk(_resizeMutex);
+    return _resizeImpl(lk, opCtx, newSize, deadline);
+}
 
+bool TicketHolder::_resizeImpl(WithLock,
+                               OperationContext* opCtx,
+                               int32_t newSize,
+                               Date_t deadline) {
     auto difference = newSize - _outof.load();
     MockAdmissionContext admCtx;
     if (difference > 0) {
@@ -71,6 +78,8 @@ bool TicketHolder::resize(OperationContext* opCtx, int32_t newSize, Date_t deadl
             _outof.fetchAndAdd(1);
         }
     } else {
+        // Make sure the operation isn't interrupted before waiting for tickets.
+        opCtx->checkForInterrupt();
         // Take tickets one-by-one without releasing.
         for (auto remaining = -difference; remaining > 0; remaining--) {
             // This call bypasses statistics reporting.
@@ -227,7 +236,7 @@ boost::optional<Ticket> MockTicketHolder::_tryAcquireImpl(AdmissionContext* admC
     if (used() > _peakUsed.load()) {
         _peakUsed.store(used());
     }
-    return Ticket{this, admCtx};
+    return _makeTicket(admCtx);
 }
 
 boost::optional<Ticket> MockTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,

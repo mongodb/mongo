@@ -30,6 +30,8 @@
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 
@@ -47,68 +49,83 @@ void SemaphoreTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
 
 SemaphoreTicketHolder::SemaphoreTicketHolder(ServiceContext* serviceContext,
                                              int numTickets,
-                                             bool trackPeakUsed)
-    : TicketHolder(serviceContext, numTickets, trackPeakUsed), _tickets(numTickets) {}
+                                             bool trackPeakUsed,
+                                             SemaphoreTicketHolder::ResizePolicy resizePolicy)
+    : TicketHolder(serviceContext, numTickets, trackPeakUsed),
+      _resizePolicy(resizePolicy),
+      _tickets(numTickets) {}
 
 boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
-    uint32_t available = _tickets.load();
+    int64_t available = _tickets.load();
     while (true) {
-        if (available == 0) {
+        if (available <= 0) {
             return boost::none;
         }
 
         if (_tickets.compareAndSwap(&available, available - 1)) {
-            return Ticket{this, admCtx};
+            return _makeTicket(admCtx);
         }
     }
 }
 
 boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
                                                                        AdmissionContext* admCtx,
-                                                                       Date_t until,
+                                                                       Date_t deadline,
                                                                        bool interruptible) {
-    auto nextDeadline = [&]() {
-        // Timed waits can be problematic if we have a large number of waiters, since each time we
-        // check for interrupt we risk waking up all waiting threads at the same time. We introduce
-        // some jitter here to try to reduce the impact of a thundering herd of waiters woken at
-        // the same time.
-        static int32_t baseIntervalMs = 500;
-        static double jitterFactor = 0.2;
-        static thread_local XorShift128 urbg(SecureRandom().nextInt64());
-        int32_t offset = std::uniform_int_distribution<int32_t>(
-            -jitterFactor * baseIntervalMs, baseIntervalMs * jitterFactor)(urbg);
-        return std::min(until, Date_t::now() + Milliseconds{baseIntervalMs + offset});
-    };
-
-    Date_t deadline = nextDeadline();
     while (true) {
-        while (!_tickets.waitUntil(0, deadline)) {
-            if (deadline == until) {
-                return boost::none;
-            }
-
-            deadline = nextDeadline();
+        if (boost::optional<Ticket> maybeTicket = _tryAcquireImpl(admCtx)) {
             if (interruptible) {
                 opCtx->checkForInterrupt();
             }
+
+            return std::move(*maybeTicket);
         }
 
-        uint32_t available = _tickets.load();
-        if (available > 0 && _tickets.compareAndSwap(&available, available - 1)) {
-            Ticket ticket{this, admCtx};
+        Waitable::TimeoutState status;
+        _parkingLot.runWithNotifyable(*opCtx->getBaton(), [&]() noexcept {
+            ClockSource* clockSource = opCtx->getServiceContext()->getPreciseClockSource();
+            Baton* baton = opCtx->getBaton().get();
+            status = baton->run_until(clockSource, std::min(deadline, opCtx->getDeadline()));
+        });
 
-            if (interruptible) {
-                opCtx->checkForInterrupt();
-            }
+        if (interruptible) {
+            opCtx->checkForInterrupt();
+        }
 
-            return std::move(ticket);
+        if (MONGO_unlikely(status == Waitable::TimeoutState::Timeout)) {
+            return boost::none;
         }
     }
 }
 
 void SemaphoreTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
-    _tickets.fetchAndAdd(1);
-    _tickets.notifyOne();
+    if (_tickets.fetchAndAdd(1) >= 0) {
+        _parkingLot.notifyOne();
+    }
+}
+
+void SemaphoreTicketHolder::_immediateResize(WithLock, int32_t newSize) {
+    auto oldSize = _outof.swap(newSize);
+    auto delta = newSize - oldSize;
+    auto oldAvailable = _tickets.fetchAndAdd(delta);
+    if ((oldAvailable <= 0) && ((oldAvailable + delta) > 0)) {
+        _parkingLot.notifySome(oldAvailable + delta);
+    }
+}
+
+bool SemaphoreTicketHolder::_resizeImpl(WithLock lock,
+                                        OperationContext* opCtx,
+                                        int32_t newSize,
+                                        Date_t deadline) {
+    switch (_resizePolicy) {
+        case ResizePolicy::kGradual:
+            return TicketHolder::_resizeImpl(lock, opCtx, newSize, deadline);
+        case ResizePolicy::kImmediate:
+            _immediateResize(lock, newSize);
+            return true;
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 int32_t SemaphoreTicketHolder::available() const {
