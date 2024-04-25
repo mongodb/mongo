@@ -50,10 +50,6 @@ The reason they should be pushed as separate commits is in the case of needing t
     This will move some build variants from `etc/evergreen.yml` to continue running on a new branch project.
     More information about build variants after branching is [here](../evergreen-testing/yaml_configuration/buildvariants.md#build-variants-after-branching).
 
-- `etc/evergreen_yml_components/definitions.yml`
-
-  - Update "master" branch suffix in ["get buildnumber" function](https://github.com/10gen/mongo/blob/41ebdd14567ee35bdda0942958a5dc193f97dd5f/etc/evergreen_yml_components/definitions.yml#L349-L354) with a new branch name
-
 - `burn_in_tags` configuration
 
   - Remove build variant names from ["burn_in_tag_include_build_variants" expansion](https://github.com/10gen/mongo/blob/41ebdd14567ee35bdda0942958a5dc193f97dd5f/etc/evergreen_yml_components/variants/misc/misc.yml#L21) that are not included in `etc/evergreen_nightly.yml`
