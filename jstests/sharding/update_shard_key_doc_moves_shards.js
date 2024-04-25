@@ -430,47 +430,42 @@ mongos.getDB(kDbName).foo.drop();
 
 // ----Assert write result reports error when the internal transaction fails to commit----
 
-// Due to SERVER-86120 this test case fails when mongos is version 7.3.
-// TODO SERVER-88769: Remove version check once BACKPORT-18772 is merged.
-const ss = assert.commandWorked(mongos.getDB('admin').runCommand({serverStatus: 1}));
-if (MongoRunner.compareBinVersions(ss.version, "7.3") != 0) {
-    shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
+shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
-    // Set this failpoint on the coordinator shard so that sending prepareTransaction to
-    // participating shards will fail.
-    assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
-        configureFailPoint: "failRemoteTransactionCommand",
-        mode: "alwaysOn",
-        data: {command: "prepareTransaction", code: ErrorCodes.TransactionTooOld}
-    }));
+// Set this failpoint on the coordinator shard so that sending prepareTransaction to
+// participating shards will fail.
+assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
+    configureFailPoint: "failRemoteTransactionCommand",
+    mode: "alwaysOn",
+    data: {command: "prepareTransaction", code: ErrorCodes.TransactionTooOld}
+}));
 
-    res = sessionDB.foo.update({x: 4}, {$set: {x: 1000}});
+res = sessionDB.foo.update({x: 4}, {$set: {x: 1000}});
 
-    // For update, we should have reported the error in the write errors field and the top-level
-    // fields should reflect that no update was performed.
-    assert.writeErrorWithCode(res, ErrorCodes.TransactionTooOld);
-    assert.eq(res.nModified, 0);
-    assert.eq(res.nMatched, 0);
-    assert.eq(res.nUpserted, 0);
+// For update, we should have reported the error in the write errors field and the top-level
+// fields should reflect that no update was performed.
+assert.writeErrorWithCode(res, ErrorCodes.TransactionTooOld);
+assert.eq(res.nModified, 0);
+assert.eq(res.nMatched, 0);
+assert.eq(res.nUpserted, 0);
 
-    res = sessionDB.runCommand({
-        findAndModify: 'foo',
-        query: {x: 78},
-        update: {$set: {x: 250}},
-        lsid: {id: UUID()},
-        txnNumber: NumberLong(1),
-    });
+res = sessionDB.runCommand({
+    findAndModify: 'foo',
+    query: {x: 78},
+    update: {$set: {x: 250}},
+    lsid: {id: UUID()},
+    txnNumber: NumberLong(1),
+});
 
-    // findAndModify reports the failure as a top-level error.
-    assert.commandFailedWithCode(res, ErrorCodes.TransactionTooOld);
+// findAndModify reports the failure as a top-level error.
+assert.commandFailedWithCode(res, ErrorCodes.TransactionTooOld);
 
-    assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
-        configureFailPoint: "failRemoteTransactionCommand",
-        mode: "off",
-    }));
+assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
+    configureFailPoint: "failRemoteTransactionCommand",
+    mode: "off",
+}));
 
-    mongos.getDB(kDbName).foo.drop();
-}
+mongos.getDB(kDbName).foo.drop();
 
 // ----Assert that updating the shard key in a batch with size > 1 fails----
 
