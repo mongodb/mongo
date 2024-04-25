@@ -379,7 +379,8 @@ StatusWithMatchExpression parse(const BSONObj& obj,
                                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                 const ExtensionsCallback* extensionsCallback,
                                 MatchExpressionParser::AllowedFeatureSet allowedFeatures,
-                                DocumentParseLevel currentLevel) {
+                                DocumentParseLevel currentLevel,
+                                bool acceptsDollarPrefixedFieldName = false) {
     auto root = std::make_unique<AndMatchExpression>(createAnnotation(expCtx, "$and", BSONObj()));
 
     const DocumentParseLevel nextLevel = (currentLevel == DocumentParseLevel::kPredicateTopLevel)
@@ -391,7 +392,29 @@ StatusWithMatchExpression parse(const BSONObj& obj,
             auto name = e.fieldNameStringData().substr(1);
             auto parseExpressionMatchFunction = retrievePathlessParser(name);
 
-            if (!parseExpressionMatchFunction) {
+            if (parseExpressionMatchFunction) {
+                auto parsedExpression = parseExpressionMatchFunction(
+                    name, e, expCtx, extensionsCallback, allowedFeatures, currentLevel);
+                if (parsedExpression.isOK()) {
+                    // A nullptr for 'parsedExpression' indicates that the particular operator
+                    // should not be added to 'root', because it is handled outside of the
+                    // MatchExpressionParser library. The following operators currently follow this
+                    // convention:
+                    //    - $comment  has no action associated with the operator.
+                    if (auto&& expr = parsedExpression.getValue())
+                        root->add(std::move(expr));
+
+                    expCtx->incrementMatchExprCounter(e.fieldNameStringData());
+                    continue;
+                } else if (!acceptsDollarPrefixedFieldName) {
+                    return parsedExpression;
+                }
+                // It is legal to have dollar-prefixed field paths that are the same as MQL keywords
+                // ($or, $and, $nor, etc.). If this is the case, we will disregard the corresponding
+                // operator's parser and simply treat the BSONElement as a regular field path.
+            } else if (!acceptsDollarPrefixedFieldName) {
+                // If the field is dollar-prefixed and not an operator, error if the current
+                // expression doesn't support dollar-prefixed field paths.
                 std::string hint = "";
                 if (name == "not") {
                     hint = ". If you are trying to negate an entire expression, use $nor.";
@@ -404,23 +427,6 @@ StatusWithMatchExpression parse(const BSONObj& obj,
                                str::stream() << "unknown top level operator: "
                                              << e.fieldNameStringData() << hint)};
             }
-
-            auto parsedExpression = parseExpressionMatchFunction(
-                name, e, expCtx, extensionsCallback, allowedFeatures, currentLevel);
-
-            if (!parsedExpression.isOK()) {
-                return parsedExpression;
-            }
-
-            // A nullptr for 'parsedExpression' indicates that the particular operator should not
-            // be added to 'root', because it is handled outside of the MatchExpressionParser
-            // library. The following operators currently follow this convention:
-            //    - $comment  has no action associated with the operator.
-            if (auto&& expr = parsedExpression.getValue())
-                root->add(std::move(expr));
-
-            expCtx->incrementMatchExprCounter(e.fieldNameStringData());
-            continue;
         }
 
         // Ensure the path length does not exceed the maximum allowed depth.
@@ -1334,22 +1340,32 @@ StatusWithMatchExpression parseTreeTopLevel(
         return {Status(ErrorCodes::BadValue,
                        str::stream() << T::kName << " argument must be an array")};
     }
-
     auto temp =
         std::make_unique<T>(createAnnotation(expCtx, elem.fieldNameStringData(), BSONObj()));
-
     auto arr = elem.Obj();
     if (arr.isEmpty()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << T::kName << " argument must be a non-empty array");
     }
 
+    // If T is the parsed form of a $jsonSchema MatchExpression, which accepts dollar-prefixed field
+    // paths, set 'acceptsDollarPrefixedFieldName' to true for reparsing so that dollar field paths
+    // do not error.
+    // TODO SERVER-89844: Make $jsonSchema with dollar fields in all keyword fields reparseable.
+    auto acceptsDollarPrefixedFieldName =
+        elem.toString().find("$_internalSchema") != std::string::npos;
+
     for (auto e : arr) {
         if (e.type() != BSONType::Object)
             return Status(ErrorCodes::BadValue,
                           str::stream() << T::kName << " argument's entries must be objects");
 
-        auto sub = parse(e.Obj(), expCtx, extensionsCallback, allowedFeatures, currentLevel);
+        auto sub = parse(e.Obj(),
+                         expCtx,
+                         extensionsCallback,
+                         allowedFeatures,
+                         currentLevel,
+                         acceptsDollarPrefixedFieldName);
         if (!sub.isOK())
             return sub.getStatus();
 
