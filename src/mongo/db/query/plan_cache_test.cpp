@@ -1530,8 +1530,9 @@ TEST_F(CachePlanSelectionTest, ReverseScanForSort) {
 TEST_F(CachePlanSelectionTest, CollscanNoUsefulIndices) {
     addIndex(BSON("a" << 1 << "b" << 1), "a_1_b_1");
     addIndex(BSON("c" << 1), "c_1");
-    runQuery(BSON("b" << 4));
-    assertPlanCacheRecoversSolution(BSON("b" << 4), "{cscan: {filter: {b: 4}, dir: 1}}");
+    BSONObj query = fromjson("{b: 4}");
+    runQuery(query);
+    assertPlanCacheRecoversSolution(query, "{cscan: {filter: {b: 4}, dir: 1}}");
 }
 
 TEST_F(CachePlanSelectionTest, CollscanOrWithoutEnoughIndices) {
@@ -1695,7 +1696,8 @@ TEST_F(CachePlanSelectionTest, MaxNotCached) {
 TEST_F(CachePlanSelectionTest, NaturalHintNotCached) {
     addIndex(BSON("a" << 1), "a_1");
     addIndex(BSON("b" << 1), "b_1");
-    runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("$natural" << 1));
+    BSONObj query = fromjson("{a: 1}");
+    runQuerySortHint(query, BSON("b" << 1), BSON("$natural" << 1));
     assertNotCached(
         "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node: "
         "{cscan: {filter: {a: 1}, dir: 1}}}}");

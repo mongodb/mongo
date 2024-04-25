@@ -78,10 +78,6 @@ inline std::unique_ptr<MatchExpression> parse(BSONObj bsonExpr) {
     return std::move(expr.getValue());
 }
 
-inline std::unique_ptr<MatchExpression> parse(const char* json) {
-    return parse(fromjson(json));
-}
-
 inline void assertSimplification(BSONObj bsonExpr, BSONObj bsonExpected) {
     QueryTestServiceContext serviceContext{};
     auto opCtx = serviceContext.makeOperationContext();
@@ -429,12 +425,13 @@ TEST(ExpressionSimplifierTests, ContainedOrsOnWithoutTop) {
 }
 
 TEST(ExpressionSimplifierTests, StopOnTooManyPredicates) {
-    auto expr =
-        parse(fromjson("{$and: ["
-                       "{$or: [{b: 15}, {c: 15}]},"
-                       "{$or: [{b: 11, c: 11}, {b: 11, c: {$ne: 11}}]},"
-                       "{$or: [{c: 10}, {c: {$ne: 10}}]}"
-                       "]}"));
+    BSONObj query = fromjson(
+        "{$and: ["
+        "{$or: [{b: 15}, {c: 15}]},"
+        "{$or: [{b: 11, c: 11}, {b: 11, c: {$ne: 11}}]},"
+        "{$or: [{c: 10}, {c: {$ne: 10}}]}"
+        "]}");
+    auto expr = parse(query);
 
     ExpressionSimlifierSettings settings{};
 
@@ -448,9 +445,10 @@ TEST(ExpressionSimplifierTests, StopOnTooManyPredicates) {
 }
 
 TEST(ExpressionSimplifierTests, StopOnTooManyTerms) {
-    auto expr =
-        parse(fromjson("{$and: [{$or: [{a: 1}, {b: 1}]}, {$or: [{a: 2}, {b: 2}]}, {$or: [{a: 3}, "
-                       "{b: 3}]}, {$or: [{a: 4}, {b: 4}]}]}"));
+    BSONObj query = fromjson(
+        "{$and: [{$or: [{a: 1}, {b: 1}]}, {$or: [{a: 2}, {b: 2}]}, {$or: [{a: 3}, "
+        "{b: 3}]}, {$or: [{a: 4}, {b: 4}]}]}");
+    auto expr = parse(query);
 
     ExpressionSimlifierSettings settings{};
     settings.doNotOpenContainedOrs = false;
@@ -465,9 +463,10 @@ TEST(ExpressionSimplifierTests, StopOnTooManyTerms) {
 }
 
 TEST(ExpressionSimplifierTests, StopOnTooManyMinTerms) {
-    auto expr = parse(
+    BSONObj query = fromjson(
         "{$and: [{$or: [{a: 1}, {b: 1}]}, {$or: [{a: 2}, {b: 2}]}, {$or: [{a: 3}, "
         "{b: 3}]}, {$or: [{a: 4}, {b: 4}]}]}");
+    auto expr = parse(query);
 
     ExpressionSimlifierSettings settings{};
     settings.doNotOpenContainedOrs = false;
@@ -491,12 +490,18 @@ TEST(ExpressionSimplifierTests, NorAlwaysBoolean) {
     AndMatchExpression alwaysTrue{};
     AlwaysFalseMatchExpression alwaysFalse{};
 
-    assertSimplification(*parse("{$nor: [{$alwaysFalse: 1}]}"), alwaysTrue);
-    assertSimplification(*parse("{$nor: [{$alwaysTrue: 1}]}"), alwaysFalse);
-    assertSimplification(*parse("{$nor: [{a: 1}, {a: {$ne: 1}}]}"), alwaysFalse);
-    assertSimplification(*parse("{$nor: [{$and: [{a: 1}, {a: {$ne: 1}}]}]}"), alwaysTrue);
-    assertSimplification(*parse("{$nor: [{$or: [{a: 1}, {a: {$ne: 1}}]}]}"), alwaysFalse);
-    assertSimplification(*parse("{$nor: [{$alwaysFalse: 1}, {$alwaysTrue: 1}]}"), alwaysFalse);
+    BSONObj query = fromjson("{$nor: [{$alwaysFalse: 1}]}");
+    assertSimplification(*parse(query), alwaysTrue);
+    query = fromjson("{$nor: [{$alwaysTrue: 1}]}");
+    assertSimplification(*parse(query), alwaysFalse);
+    query = fromjson("{$nor: [{a: 1}, {a: {$ne: 1}}]}");
+    assertSimplification(*parse(query), alwaysFalse);
+    query = fromjson("{$nor: [{$and: [{a: 1}, {a: {$ne: 1}}]}]}");
+    assertSimplification(*parse(query), alwaysTrue);
+    query = fromjson("{$nor: [{$or: [{a: 1}, {a: {$ne: 1}}]}]}");
+    assertSimplification(*parse(query), alwaysFalse);
+    query = fromjson("{$nor: [{$alwaysFalse: 1}, {$alwaysTrue: 1}]}");
+    assertSimplification(*parse(query), alwaysFalse);
 }
 
 }  // namespace

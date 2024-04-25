@@ -2874,7 +2874,8 @@ void testRemoveImprecisePredicates(const RemoveImprecisePredicateTestCase& testC
                   ASSERT(newExpr->isTriviallyFalse());
               },
               [&](RemoveImprecisePredicateTestCase::AssertPredicateRewritten a) {
-                  auto expected = ParsedMatchExpressionForTest(a.predicateStr).release();
+                  ParsedMatchExpressionForTest parsedPred(a.predicateStr);
+                  std::unique_ptr<MatchExpression> expected = parsedPred.release();
                   MatchExpression::sortTree(expected.get());
                   ASSERT(expected->equivalent(newExpr.get()));
               },

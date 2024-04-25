@@ -527,6 +527,8 @@ TEST(MatchExpressionParameterizationVisitor, OrMatchExpressionSetsThreeParamWith
 TEST(MatchExpressionParameterizationVisitor,
      MapIsUsedForParamIdLookupsAfterContextSizeExceedsThreshold) {
     MatchExpressionParameterizationVisitorContext context{};
+    // Ensure lifetime of BSONObjs matches that of MatchExpressions.
+    std::vector<BSONObj> expressionBSONs;
     std::vector<std::unique_ptr<MatchExpression>> expressions;
 
     auto expectedSize = context.kUseMapThreshold;
@@ -534,6 +536,7 @@ TEST(MatchExpressionParameterizationVisitor,
     auto addExpressions = [&]() {
         for (size_t i = 0; i < expectedSize; i++) {
             BSONObj gt = BSON("$gt" << static_cast<int>(i));
+            expressionBSONs.push_back(gt);
             expressions.emplace_back(std::make_unique<GTMatchExpression>("a"_sd, gt["$gt"]));
         }
     };
@@ -557,6 +560,8 @@ TEST(MatchExpressionParameterizationVisitor,
 TEST(MatchExpressionParameterizationVisitor,
      MapIsNotUsedForParamIdLookupsUntilContextSizeExceedsThreshold) {
     MatchExpressionParameterizationVisitorContext context{};
+    // Ensure lifetime of BSONObjs matches that of MatchExpressions.
+    std::vector<BSONObj> expressionBSONs;
     std::vector<std::unique_ptr<MatchExpression>> expressions;
 
     auto expectedSize = context.kUseMapThreshold - 1;
@@ -564,6 +569,7 @@ TEST(MatchExpressionParameterizationVisitor,
     auto addExpressions = [&]() {
         for (size_t i = 0; i < expectedSize; i++) {
             BSONObj gt = BSON("$gt" << static_cast<int>(i));
+            expressionBSONs.push_back(gt);
             expressions.emplace_back(std::make_unique<GTMatchExpression>("a"_sd, gt["$gt"]));
         }
     };

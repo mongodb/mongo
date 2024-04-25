@@ -236,8 +236,7 @@ BSONObj generateFFP(StringData path, int lb, int ub, int min, int max) {
 }
 
 template <typename T>
-std::unique_ptr<MatchExpression> generateOpWithFFP(StringData path, int lb, int ub) {
-    auto ffp = generateFFP(path, lb, ub, 0, 255);
+std::unique_ptr<MatchExpression> generateOpWithFFP(StringData path, BSONObj ffp) {
     return std::make_unique<T>(path, ffp.firstElement());
 }
 
@@ -282,7 +281,9 @@ TEST_F(RangePredicateRewriteTest, CollScanRewriteMatch) {
     })");
 #define ASSERT_REWRITE_TO_INTERNAL_BETWEEN(T)                                     \
     {                                                                             \
-        auto input = generateOpWithFFP<T>("age", 23, 35);                         \
+        auto path = "age";                                                        \
+        BSONObj ffp = generateFFP(path, 23, 35, 0, 255);                          \
+        auto input = generateOpWithFFP<T>(path, ffp);                             \
         auto result = _predicate.rewrite(input.get());                            \
         ASSERT(result);                                                           \
         ASSERT_EQ(result->matchType(), MatchExpression::EXPRESSION);              \

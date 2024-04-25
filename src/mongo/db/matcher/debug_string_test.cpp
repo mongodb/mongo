@@ -353,8 +353,9 @@ TEST(DebugStringTest, ExpressionInternalSchemaNumProperties) {
 
 TEST(DebugStringTest, ExpressionInternalSchemaObjectMatch) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);
+    BSONObj query = fromjson("{x: {$_internalSchemaObjectMatch: {y: 1}}}");
     auto expr = uassertStatusOK(
-        MatchExpressionParser::parse(fromjson("{x: {$_internalSchemaObjectMatch: {y: 1}}}"),
+        MatchExpressionParser::parse(query,
                                      new ExpressionContextForTest(),
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures));

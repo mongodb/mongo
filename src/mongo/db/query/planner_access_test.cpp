@@ -125,7 +125,8 @@ void testSimplify(auto input,
                   Bound expectedMax,
                   const CollatorInterface* collator = nullptr) {
     boost::intrusive_ptr<ExpressionContext> expCtx{new ExpressionContextForTest()};
-    auto expr = Matcher(fromjson(input), expCtx).getMatchExpression()->clone();
+    BSONObj query = fromjson(input);
+    auto expr = Matcher(query, expCtx).getMatchExpression()->clone();
 
     RecordIdRange recordRange;
     std::set<const MatchExpression*> redundantExprs;
