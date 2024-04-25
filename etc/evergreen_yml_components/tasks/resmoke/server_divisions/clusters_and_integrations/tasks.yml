@@ -1891,7 +1891,6 @@ tasks:
           sharded_collections_jscore_passthrough_last_lts_new_old_old_new: last_lts
       - func: "generate resmoke tasks"
         vars:
-          suite: sharded_collections_jscore_passthrough
           run_no_feature_flag_tests: "true"
 
   - <<: *gen_task_template
@@ -2128,7 +2127,6 @@ tasks:
           sharding_jscore_passthrough_last_continuous_new_old_old_new: last_continuous
       - func: "generate resmoke tasks"
         vars:
-          suite: sharding_jscore_passthrough
           run_no_feature_flag_tests: "true"
 
   - <<: *gen_task_template
@@ -2226,7 +2224,6 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           use_large_distro: "true"
-          suite: sharding
           run_no_feature_flag_tests: "true"
 
   - <<: *jstestfuzz_template
@@ -2868,7 +2865,6 @@ tasks:
           <<: *jstestfuzz_config_vars
           jstestfuzz_vars: --jsTestsDir ../jstests
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-          suite: jstestfuzz_sharded
           npm_command: jstestfuzz
           run_no_feature_flag_tests: "true"
 
