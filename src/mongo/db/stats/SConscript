@@ -36,6 +36,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/shared_request_handling',
+        '$BUILD_DIR/mongo/db/validate_api_parameters',
         '$BUILD_DIR/mongo/rpc/client_metadata',
     ],
 )

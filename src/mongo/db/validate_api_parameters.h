@@ -34,6 +34,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -48,6 +50,19 @@ class OperationContext;
 void validateAPIParameters(const BSONObj& requestBody,
                            const APIParametersFromClient& apiParamsFromClient,
                            Command* command);
+
+template <typename StringType>
+int getAPIVersion(StringType apiVersion, bool allowTestVersion) {
+    if (MONGO_likely(apiVersion == "1")) {
+        return 1;
+    } else if (apiVersion == "2") {
+        uassert(ErrorCodes::APIVersionError, "Cannot accept API version 2", allowTestVersion);
+        return 2;
+    } else {
+        uasserted(ErrorCodes::APIVersionError, "API version must be \"1\"");
+    }
+}
+
 APIParametersFromClient parseAndValidateAPIParameters(const BSONObj& requestBody, Command* command);
 
 /**
