@@ -31,9 +31,18 @@ function createUsers(conn, grantDirectShardOperationsRole) {
     adminDB.createUser({user: "yuta", pwd: pass, roles: yutaRoles});
 }
 
-// Create the necessary users at both cluster and shard-local level.
+// Create the necessary users at the shard local level.
 createUsers(shardConn, /* grantDirectShardOperationsRole */ true);
-createUsers(mongosConn, /* grantDirectShardOperationsRole */ false);
+
+// Create the necessary users at the cluster level. If the shard is a configShard, then the users
+// will have already been created on the config server from the previous createUsers() call.
+if (!TestData.configShard) {
+    createUsers(mongosConn, /* grantDirectShardOperationsRole */ false);
+} else {
+    // Even though we've skipped creating the users, we still need to log in on the mongos for the
+    // rest of the test.
+    assert(mongosConn.getDB("admin").auth("ted", pass), "Authentication 1 Failed");
+}
 
 // Run the various auth tests on the given shard or mongoS connection.
 function runCursorTests(conn) {
@@ -135,7 +144,7 @@ function runCursorTests(conn) {
         result = adminDB
                      .aggregate([
                          {$currentOp: {localOps: false, allUsers: true, idleCursors: true}},
-                         {$match: {type: "idleCursor", shard: st.rs0.name}}
+                         {$match: {type: "idleCursor", shard: st.shard0.shardName}}
                      ])
                      .toArray();
         assert.eq(result.length, 2, result);
