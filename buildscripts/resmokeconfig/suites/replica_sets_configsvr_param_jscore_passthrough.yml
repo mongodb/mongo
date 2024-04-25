@@ -3,6 +3,8 @@
 # it becomes a config shard. This is important to test because in the rs->sharding procedure, users
 # will briefly be running commands on a replica set started with --configsvr that has not yet become
 # a config shard.
+#
+# TODO: SERVER-89292 Re-enable this suite.
 test_kind: js_test
 
 selector:
