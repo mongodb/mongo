@@ -29,26 +29,26 @@ global:
     cpp_namespace: "mongo"
 
 generic_argument_lists:
-    GenericArgsAPIV1:
+    generic_args_api_v1:
         description: "Validation fails due to a removed argument"
         fields:
             genericArgument:
                 forward_to_shards: false
 
-    GenericArgsAPIV1Unstable:
+    generic_args_unstable_v1:
         description: "IDL checker provides no guarantees about unstable generic arguments"
         fields:
             unstableGenericArgument:
                 forward_to_shards: false
 
 generic_reply_field_lists:
-    GenericReplyFieldsAPIV1:
+    generic_reply_fields_api_v1:
         description: "Validation fails due to a removed reply field"
         fields:
             genericReplyField:
                 forward_from_shards: false
 
-    GenericReplyFieldsAPIV1Unstable:
+    generic_reply_fields_unstable_v1:
         description: "IDL checker provides no guarantees about unstable generic reply fields"
         fields:
             unstableGenericReplyField:

@@ -30,7 +30,7 @@
 #include "mongo/s/routing_table_cache_gossip_metadata_hook.h"
 
 #include "mongo/db/service_context.h"
-#include "mongo/idl/generic_argument_gen.h"
+#include "mongo/idl/generic_args_with_types_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/gossiped_routing_cache_gen.h"
 #include "mongo/s/grid.h"
@@ -53,7 +53,7 @@ Status RoutingTableCacheGossipMetadataHook::readReplyMetadata(OperationContext* 
                                                               const BSONObj& metadataObj) {
     try {
         const auto routerCacheVersionsObj =
-            metadataObj[GenericReplyFieldsAPIV1Unstable::kRoutingCacheGossipFieldName];
+            metadataObj[GenericReplyFieldsWithTypesUnstableV1::kRoutingCacheGossipFieldName];
         if (!routerCacheVersionsObj.eoo()) {
             const auto catalogCache = Grid::get(_serviceContext)->catalogCache();
             for (const auto& elem : routerCacheVersionsObj.Array()) {

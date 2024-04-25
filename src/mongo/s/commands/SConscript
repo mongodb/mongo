@@ -216,7 +216,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/transaction/transaction_api',
         '$BUILD_DIR/mongo/db/validate_api_parameters',
         '$BUILD_DIR/mongo/executor/inline_executor',
-        '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
         '$BUILD_DIR/mongo/s/load_balancer_support',
         '$BUILD_DIR/mongo/s/mongos_topology_coordinator',

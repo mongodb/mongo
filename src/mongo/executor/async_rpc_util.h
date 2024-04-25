@@ -41,7 +41,7 @@
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/generic_argument_gen.h"
+#include "mongo/idl/generic_args_with_types_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_rpc_shard_targeter.h"
@@ -86,19 +86,8 @@ struct AsyncRPCCommandHelpers {
         }
     }
 
-    static LogicalSessionFromClient toLogicalSessionFromClient(const LogicalSessionId& lsid) {
-        LogicalSessionFromClient lsidfc;
-        lsidfc.setId(lsid.getId());
-        lsidfc.setUid(lsid.getUid());
-        lsidfc.setTxnUUID(lsid.getTxnUUID());
-        lsidfc.setTxnNumber(lsid.getTxnNumber());
-        return lsidfc;
-    }
-
     static void appendOSI(GenericArgs& args, const OperationSessionInfo& osi) {
-        if (auto& lsid = osi.getSessionId()) {
-            args.stable.setLsid(toLogicalSessionFromClient(*lsid));
-        }
+        args.stable.setLsid(osi.getSessionId());
         args.stable.setTxnNumber(osi.getTxnNumber());
         args.unstable.setTxnRetryCounter(osi.getTxnRetryCounter());
         args.stable.setAutocommit(osi.getAutocommit());
