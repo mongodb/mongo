@@ -21,7 +21,7 @@ if env.ToolchainIs('clang', 'GCC'):
     env.Append(
         CCFLAGS=['-Wno-sign-compare', '-Wno-unused-function', '-Wno-error=ignored-attributes'])
 
-env.Library(
+env.BazelLibrary(
     target='snappy',
     source=[
         'dist/snappy-c.cc',

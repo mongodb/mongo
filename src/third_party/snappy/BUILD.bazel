@@ -1,0 +1,57 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "snappy",
+    srcs = [
+        "dist/snappy.cc",
+        "dist/snappy-c.cc",
+        "dist/snappy-internal.h",
+        "dist/snappy-sinksource.cc",
+        "dist/snappy-sinksource.h",
+        "dist/snappy-stubs-internal.h",
+    ],
+    hdrs = [
+        "dist/snappy.h",
+        "dist/snappy-c.h",
+        "platform/build_all/snappy-stubs-public.h",
+    ] + select({
+        "//bazel/config:linux_aarch64": ["platform/build_linux_aarch64/config.h"],
+        "//bazel/config:linux_x86_64": ["platform/build_linux_x86_64/config.h"],
+        "//bazel/config:linux_ppc64le": ["platform/build_linux_ppc64le/config.h"],
+        "//bazel/config:linux_s390x": ["platform/build_linux_s390x/config.h"],
+        "//bazel/config:macos_x86_64": ["platform/build_macOS_x86_64/config.h"],
+        "//bazel/config:macos_aarch64": ["platform/build_macOS_aarch64/config.h"],
+        "//bazel/config:windows_x86_64": ["platform/build_windows/config.h"],
+        "//bazel/config:not_windows": ["platform/build_posix/config.h"],
+        "//conditions:default": [],
+    }),
+    copts = select({
+        "@platforms//os:windows": ["/wd4018"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:gcc_or_clang": [
+            "-Wno-sign-compare",
+            "-Wno-unused-function",
+            "-Wno-error=ignored-attributes",
+        ],
+        "//conditions:default": [],
+    }),
+    includes = [
+        "dist",
+        "platform/build_all",
+    ] + select({
+        "//bazel/config:linux_aarch64": ["platform/build_linux_aarch64"],
+        "//bazel/config:linux_x86_64": ["platform/build_linux_x86_64"],
+        "//bazel/config:linux_ppc64le": ["platform/build_linux_ppc64le"],
+        "//bazel/config:linux_s390x": ["platform/build_linux_s390x"],
+        "//bazel/config:macos_x86_64": ["platform/build_macOS_x86_64"],
+        "//bazel/config:macos_aarch64": ["platform/build_macOS_aarch64"],
+        "//bazel/config:windows_x86_64": ["platform/build_windows"],
+        "//bazel/config:not_windows": ["platform/build_posix"],
+        "//conditions:default": [],
+    }),
+    local_defines = ["HAVE_CONFIG_H"],
+    deps = [],
+)
