@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/stats/api_version_metrics.h"
 #include "mongo/unittest/assert.h"
@@ -45,6 +46,8 @@
 #include "mongo/util/duration.h"
 
 namespace mongo {
+
+using VersionMetricsMap = APIVersionMetrics::VersionMetricsMap;
 namespace {
 
 class APIVersionMetricsTest : public ServiceContextTest {
@@ -78,16 +81,16 @@ protected:
         _clkSource->advance(millis);
     }
 
-    void assertShouldExistInMap(APIVersionMetrics::APIVersionMetricsMap metricsMap,
+    void assertShouldExistInMap(const VersionMetricsMap& metricsMap,
                                 std::string appName,
-                                std::string target,
+                                int target,
                                 bool shouldExist = true) {
         auto metricsIter = metricsMap.find(appName);
         ASSERT(metricsIter != metricsMap.end());
 
-        auto versionTimestampMap = metricsIter->second;
-        auto versionTimestampIter = versionTimestampMap.find(target);
-        bool existsInMap = (versionTimestampIter != versionTimestampMap.end());
+        const auto& versionTimestampMap = metricsIter->second;
+        const auto& timestamp = versionTimestampMap.timestamps[target];
+        bool existsInMap = (timestamp.loadRelaxed() != Date_t::min());
         ASSERT_EQ(shouldExist, existsInMap);
     }
 
@@ -102,10 +105,11 @@ TEST_F(APIVersionMetricsTest, StoresDefaultMetrics) {
     ASSERT_FALSE(apiParams.getParamsPassed());
 
     getMetrics().update(appName, apiParams);
-    auto metricsMap = getMetrics().getAPIVersionMetrics_forTest();
+    VersionMetricsMap map;
+    getMetrics().cloneAPIVersionMetrics_forTest(map);
 
     // Verify that the metric was inserted with API version set to 'default'.
-    assertShouldExistInMap(metricsMap, appName, "default");
+    assertShouldExistInMap(map, appName, APIVersionMetrics::kVersionMetricsDefaultVersionPosition);
 }
 
 TEST_F(APIVersionMetricsTest, StoresNonDefaultMetrics) {
@@ -113,10 +117,11 @@ TEST_F(APIVersionMetricsTest, StoresNonDefaultMetrics) {
     ASSERT_TRUE(apiParams.getParamsPassed());
 
     getMetrics().update(appName, apiParams);
-    auto metricsMap = getMetrics().getAPIVersionMetrics_forTest();
+    VersionMetricsMap map;
+    getMetrics().cloneAPIVersionMetrics_forTest(map);
 
     // Verify that the metric was inserted with API version set to '1'.
-    assertShouldExistInMap(metricsMap, appName, "1");
+    assertShouldExistInMap(map, appName, APIVersionMetrics::kVersionMetricsVersionOnePosition);
 }
 
 TEST_F(APIVersionMetricsTest, RemovesStaleMetrics) {
@@ -124,9 +129,13 @@ TEST_F(APIVersionMetricsTest, RemovesStaleMetrics) {
     getMetrics().update(appName, apiParams);
 
     // Verify that the default metric was inserted correctly.
-    auto metricsMap = getMetrics().getAPIVersionMetrics_forTest();
-    assertShouldExistInMap(metricsMap, appName, "default");
-    assertShouldExistInMap(metricsMap, appName, "1", false /* shouldExist */);
+    VersionMetricsMap map;
+    getMetrics().cloneAPIVersionMetrics_forTest(map);
+    assertShouldExistInMap(map, appName, APIVersionMetrics::kVersionMetricsDefaultVersionPosition);
+    assertShouldExistInMap(map,
+                           appName,
+                           APIVersionMetrics::kVersionMetricsVersionOnePosition,
+                           false /* shouldExist */);
 
     // Advance the clock by more than a half day.
     auto timeToAdvance = Milliseconds(1005 * 60 * 60 * 12);
@@ -137,26 +146,27 @@ TEST_F(APIVersionMetricsTest, RemovesStaleMetrics) {
     getMetrics().update(appName, apiParams);
 
     // Verify that both metrics are still within the map.
-    metricsMap = getMetrics().getAPIVersionMetrics_forTest();
-    assertShouldExistInMap(metricsMap, appName, "default");
-    assertShouldExistInMap(metricsMap, appName, "1");
+    getMetrics().cloneAPIVersionMetrics_forTest(map);
+    assertShouldExistInMap(map, appName, APIVersionMetrics::kVersionMetricsDefaultVersionPosition);
+    assertShouldExistInMap(map, appName, APIVersionMetrics::kVersionMetricsVersionOnePosition);
 
     // Advance the clock by more than a half day.
     timeToAdvance = Milliseconds(1005 * 60 * 60 * 12);
     advanceTime(timeToAdvance);
 
-    // Verify that the default metric was removed, but the metric with API version 1 was not.
-    metricsMap = getMetrics().getAPIVersionMetrics_forTest();
-    assertShouldExistInMap(metricsMap, appName, "default", false /* shouldExist */);
-    assertShouldExistInMap(metricsMap, appName, "1");
+    // Both metrics remain in the map since we don't modify until all versions for an appName are
+    // stale.
+    getMetrics().cloneAPIVersionMetrics_forTest(map);
+    assertShouldExistInMap(map, appName, APIVersionMetrics::kVersionMetricsDefaultVersionPosition);
+    assertShouldExistInMap(map, appName, APIVersionMetrics::kVersionMetricsVersionOnePosition);
 
     // Advance the clock by more than a half day.
     timeToAdvance = Milliseconds(1005 * 60 * 60 * 12);
     advanceTime(timeToAdvance);
 
     // Verify that both metrics were correctly removed.
-    metricsMap = getMetrics().getAPIVersionMetrics_forTest();
-    ASSERT(metricsMap.find(appName) == metricsMap.end());
+    getMetrics().cloneAPIVersionMetrics_forTest(map);
+    ASSERT(map.find(appName) == map.end());
 }
 
 TEST_F(APIVersionMetricsTest, TestOutputBSONSizeLimit) {
@@ -166,18 +176,21 @@ TEST_F(APIVersionMetricsTest, TestOutputBSONSizeLimit) {
     ASSERT_FALSE(defaultApiParams.getParamsPassed());
     // Note that an additional entry will be added to the data, but it will not be included in the
     // output that is displayed.
-    for (auto i = -1; i < APIVersionMetrics::KMaxNumOfOutputAppNames; i++) {
+    for (auto i = -1; i < APIVersionMetrics::kMaxNumOfOutputAppNames; i++) {
         auto appNameStr = appName + ((i > -1) ? "_" + std::to_string(i) : "");
         getMetrics().update(appNameStr, defaultApiParams);
         getMetrics().update(appNameStr, apiParams);
     }
 
     // Verify that the metric was inserted correctly.
-    auto metricsMap = getMetrics().getAPIVersionMetrics_forTest();
-    for (auto i = -1; i < APIVersionMetrics::KMaxNumOfOutputAppNames; i++) {
+    VersionMetricsMap map;
+    getMetrics().cloneAPIVersionMetrics_forTest(map);
+    for (auto i = -1; i < APIVersionMetrics::kMaxNumOfOutputAppNames; i++) {
         auto appNameStr = appName + ((i > -1) ? "_" + std::to_string(i) : "");
-        assertShouldExistInMap(metricsMap, appNameStr, "1");
-        assertShouldExistInMap(metricsMap, appNameStr, "default");
+        assertShouldExistInMap(
+            map, appNameStr, APIVersionMetrics::kVersionMetricsVersionOnePosition);
+        assertShouldExistInMap(
+            map, appNameStr, APIVersionMetrics::kVersionMetricsDefaultVersionPosition);
     }
 
     // Verify that output is capped.
@@ -185,7 +198,7 @@ TEST_F(APIVersionMetricsTest, TestOutputBSONSizeLimit) {
     getMetrics().appendAPIVersionMetricsInfo_forTest(&bob);
     auto outputObj = bob.obj();
     int notInOutput = 0;
-    for (auto i = -1; i < APIVersionMetrics::KMaxNumOfOutputAppNames; i++) {
+    for (auto i = -1; i < APIVersionMetrics::kMaxNumOfOutputAppNames; i++) {
         auto appNameStr = appName + ((i > -1) ? "_" + std::to_string(i) : "");
 
         if (!outputObj.hasField(appNameStr)) {
@@ -213,36 +226,40 @@ TEST_F(APIVersionMetricsTest, TestSavedAppNamesLimit) {
     ASSERT_TRUE(apiParams.getParamsPassed());
     APIParameters defaultApiParams;
     ASSERT_FALSE(defaultApiParams.getParamsPassed());
-    for (auto i = 0; i < APIVersionMetrics::KMaxNumOfSavedAppNames; i++) {
+    for (auto i = 0; i < APIVersionMetrics::kMaxNumOfSavedAppNames; i++) {
         auto appNameStr = appName + "_" + std::to_string(i);
         getMetrics().update(appNameStr, defaultApiParams);
     }
 
     // Verify that the metric was inserted correctly.
-    auto metricsMap = getMetrics().getAPIVersionMetrics_forTest();
-    for (auto i = 0; i < APIVersionMetrics::KMaxNumOfSavedAppNames; i++) {
+    VersionMetricsMap map;
+    getMetrics().cloneAPIVersionMetrics_forTest(map);
+    for (auto i = 0; i < APIVersionMetrics::kMaxNumOfSavedAppNames; i++) {
         auto appNameStr = appName + "_" + std::to_string(i);
-        assertShouldExistInMap(metricsMap, appNameStr, "default");
+        assertShouldExistInMap(
+            map, appNameStr, APIVersionMetrics::kVersionMetricsDefaultVersionPosition);
     }
 
     // Attempting to add another entry beyond the limit will not succeed.
     getMetrics().update(appName, defaultApiParams);
-    metricsMap = getMetrics().getAPIVersionMetrics_forTest();
-    auto metricsIter = metricsMap.find(appName);
-    ASSERT(metricsIter == metricsMap.end());
+    getMetrics().cloneAPIVersionMetrics_forTest(map);
+    auto metricsIter = map.find(appName);
+    ASSERT(metricsIter == map.end());
 
     // Modifying existing elements is permitted.
-    for (auto i = 0; i < APIVersionMetrics::KMaxNumOfSavedAppNames; i++) {
+    for (auto i = 0; i < APIVersionMetrics::kMaxNumOfSavedAppNames; i++) {
         auto appNameStr = appName + "_" + std::to_string(i);
         getMetrics().update(appNameStr, apiParams);
     }
 
     // Verify that the metric got updated.
-    metricsMap = getMetrics().getAPIVersionMetrics_forTest();
-    for (auto i = 0; i < APIVersionMetrics::KMaxNumOfSavedAppNames; i++) {
+    getMetrics().cloneAPIVersionMetrics_forTest(map);
+    for (auto i = 0; i < APIVersionMetrics::kMaxNumOfSavedAppNames; i++) {
         auto appNameStr = appName + "_" + std::to_string(i);
-        assertShouldExistInMap(metricsMap, appNameStr, "default");
-        assertShouldExistInMap(metricsMap, appNameStr, "1");
+        assertShouldExistInMap(
+            map, appNameStr, APIVersionMetrics::kVersionMetricsDefaultVersionPosition);
+        assertShouldExistInMap(
+            map, appNameStr, APIVersionMetrics::kVersionMetricsVersionOnePosition);
     }
 }
 

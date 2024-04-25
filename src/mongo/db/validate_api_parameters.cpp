@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "validate_api_parameters.h"
+#include "mongo/db/api_parameters_gen.h"
 #include <memory>
 #include <set>
 #include <string>
@@ -42,7 +44,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/validate_api_parameters.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
@@ -65,15 +66,9 @@ void validateAPIParameters(const BSONObj& requestBody,
                 apiParamsFromClient.getApiVersion());
     }
 
-    if (apiParamsFromClient.getApiVersion()) {
-        auto apiVersionFromClient = *apiParamsFromClient.getApiVersion();
-        if (apiVersionFromClient == "2") {
-            uassert(ErrorCodes::APIVersionError, "Cannot accept API version 2", acceptApiVersion2);
-        } else {
-            uassert(ErrorCodes::APIVersionError,
-                    "API version must be \"1\"",
-                    "1" == apiVersionFromClient);
-        }
+    if (auto apiVersion = apiParamsFromClient.getApiVersion(); apiVersion) {
+        // Validates the API version.
+        getAPIVersion(*apiVersion, acceptApiVersion2);
     }
 
     if (apiParamsFromClient.getApiStrict() && *apiParamsFromClient.getApiStrict()) {
