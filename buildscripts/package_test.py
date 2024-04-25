@@ -159,7 +159,7 @@ OS_DOCKER_LOOKUP = {
 
 # These versions are marked "current" but in fact are EOL
 VERSIONS_TO_SKIP: Set[str] = set(
-    ['3.0.15', '3.2.22', '3.4.24', '3.6.23', '4.0.28', '4.2.24', '6.3.2'])
+    ['3.0.15', '3.2.22', '3.4.24', '3.6.23', '4.0.28', '4.2.24', '4.2.25', '4.4.29', '6.3.2'])
 DISABLED_TESTS: Set[Tuple[str, str]] = set()
 
 
