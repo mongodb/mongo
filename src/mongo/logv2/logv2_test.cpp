@@ -567,7 +567,8 @@ public:
         BSONObj obj(buf);
 
         ASSERT_EQUALS(obj.getField(kTenantFieldName).String(), tenant.toString());
-        return obj.getField(kAttributesFieldName).Obj().getField("name"_sd);
+        container = obj.getField(kAttributesFieldName).Obj();
+        return container.getField("name"_sd);
     }
 
     TenantId tenant = TenantId(OID::gen());
@@ -575,6 +576,12 @@ public:
     std::unique_ptr<LineCapture> json = makeLineCapture(JSONFormatter());
     std::unique_ptr<LineCapture> bson = makeLineCapture(BSONFormatter());
     SharedBuffer buf;
+    // Using BSONElements returned by lastBSONElement() is safe, as they reference data stored in
+    // `buf`. However, this cannot normally be enforced, so getField() is annotated
+    // [[lifetimebound]]. As such, having the nested BSONObj go out of scope before the
+    // BSONElement will lead to a compile time warning "-Wreturn-stack-address". Store the
+    // nested object here to avoid.
+    BSONObj container;
 };
 
 TEST_F(LogV2TypesTest, Numeric) {

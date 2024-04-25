@@ -47,6 +47,15 @@
 // GCC < 7.
 #define MONGO_WARN_UNUSED_RESULT_CLASS [[gnu::warn_unused_result]]
 #define MONGO_WARN_UNUSED_RESULT_FUNCTION [[gnu::warn_unused_result]]
+
+// Annotating methods with [[lifetimebound]] allows the compiler to do some more lifetime checking
+// (e.g., "returned value should not outlive *this") and emit warnings. See
+// https://clang.llvm.org/docs/AttributeReference.html#lifetimebound
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(clang::lifetimebound)
+#define MONGO_COMPILER_LIFETIME_BOUND [[clang::lifetimebound]]
+#else
+#define MONGO_COMPILER_LIFETIME_BOUND
+#endif
 #else
 #define MONGO_COMPILER_COLD_FUNCTION __attribute__((__cold__))
 #define MONGO_COMPILER_NORETURN __attribute__((__noreturn__, __cold__))
@@ -58,6 +67,12 @@
 #else
 #define MONGO_WARN_UNUSED_RESULT_CLASS
 #define MONGO_WARN_UNUSED_RESULT_FUNCTION [[gnu::warn_unused_result]]
+#endif
+
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(lifetimebound)
+#define MONGO_COMPILER_LIFETIME_BOUND [[lifetimebound]]
+#else
+#define MONGO_COMPILER_LIFETIME_BOUND
 #endif
 
 #endif

@@ -151,8 +151,9 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
         if (auto lsidElem =
                 request.cmdObj.getField(OperationSessionInfoFromClient::kSessionIdFieldName)) {
-            if (auto lsidUIDElem =
-                    lsidElem.Obj().getField(LogicalSessionFromClient::kUidFieldName)) {
+            // BSONObj must outlive BSONElement. See BSONElement, BSONObj::getField().
+            auto lsidObj = lsidElem.Obj();
+            if (auto lsidUIDElem = lsidObj.getField(LogicalSessionFromClient::kUidFieldName)) {
                 invariant(SHA256Block::fromBinData(lsidUIDElem._binDataVector()) ==
                           request.opCtx->getLogicalSessionId()->getUid());
                 return newRequest;

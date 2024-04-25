@@ -137,7 +137,9 @@ struct UnstructuredValueExtractor {
         } else if (val.BSONAppend) {
             BSONObjBuilder builder;
             val.BSONAppend(builder, name);
-            BSONElement element = builder.done().getField(name);
+            // BSONObj must outlive BSONElement. See BSONElement, BSONObj::getField().
+            auto obj = builder.done();
+            BSONElement element = obj.getField(name);
             _addString(name, element.toString(false));
         } else if (val.BSONSerialize) {
             BSONObjBuilder builder;

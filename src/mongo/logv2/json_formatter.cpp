@@ -74,7 +74,9 @@ struct JSONValueExtractor {
                 val.BSONAppend(builder, name);
                 // This is a JSON subobject, no quotes needed
                 storeUnquoted(name);
-                BSONElement element = builder.done().getField(name);
+                // BSONObj must outlive BSONElement. See BSONElement, BSONObj::getField().
+                auto obj = builder.done();
+                BSONElement element = obj.getField(name);
                 BSONObj truncated =
                     element.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
                                              false,
