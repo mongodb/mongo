@@ -58,6 +58,14 @@ async function runTransaction() {
 
 let collectionCount = 1;
 const performFsyncLockUnlockWithReadWriteOperations = function() {
+    if (jsTestOptions().embeddedRouter) {
+        // TODO (SERVER-84243): Dedicate a catalog cache and loader to the shard role. If we don't
+        // explicitly create the test collection here, the insert below would trigger a
+        // CatalogCache refresh on this embedded router. Embedded routers currently use the
+        // ShardServerCatalogCacheLoader. So when a refresh occurs, it requires doing a noop
+        // write which would then deadlock since the cluster is fsync locked.
+        assert.commandWorked(st.s.getDB("test").createCollection("collTest"));
+    }
     // lock then unlock
     assert.commandWorked(st.s.adminCommand({fsync: 1, lock: true}));
 
