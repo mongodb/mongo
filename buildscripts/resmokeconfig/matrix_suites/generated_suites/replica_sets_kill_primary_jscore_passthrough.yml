@@ -59,6 +59,8 @@ executor:
         catchUpTimeoutMillis: 0
   hooks:
   - class: LagOplogApplicationInBackground
+    shell_options:
+      nodb: ''
   - class: ContinuousStepdown
     kill: true
   - class: CheckReplOplogs

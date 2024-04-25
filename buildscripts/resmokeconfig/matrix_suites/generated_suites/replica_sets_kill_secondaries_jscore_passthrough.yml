@@ -36,6 +36,8 @@ executor:
     voting_secondaries: false
   hooks:
   - class: LagOplogApplicationInBackground
+    shell_options:
+      nodb: ''
   - class: PeriodicKillSecondaries
 matrix_suite: true
 selector:
