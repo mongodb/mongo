@@ -33,30 +33,45 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/platform/atomic.h"
 
 namespace mongo {
+namespace operation_latency_histogram_details {
+// The number of buckets in the histogram.
+constexpr int kMaxBuckets = 51;
 
-class BSONObjBuilder;
+constexpr int kHistogramsCount = static_cast<int>(Command::ReadWriteType::kLast);
+
+// Retuns the inclusive lower bounds of the histogram buckets.
+std::array<uint64_t, kMaxBuckets> getLowerBounds();
+
+template <typename DataType>
+struct HistogramData {
+    std::array<DataType, kMaxBuckets> buckets{};
+    DataType entryCount{0};
+    DataType sum{0};
+    // Sum of latency time spent doing Queryable Encryption operations.
+    DataType sumQueryableEncryption{0};
+};
+}  // namespace operation_latency_histogram_details
 
 /**
  * Stores statistics for latencies of read, write, command, and multi-document transaction
- * operations.
- *
- * Note: This class is not thread-safe.
+ * operations. There are two flavors to this type:
+ * `OperationLatencyHistogram` is not thread-safe and requires callers to enforce synchronization.
+ * `AtomicOperationLatencyHistogram` is thread-safe but doesn't offer atomic APIs. For example,
+ * partial updates to individual counters and histogram buckets may be observed via calling
+ * `append`. That is considered safe since the data stored by this class is solely used for
+ * diagnostics.
  */
 class OperationLatencyHistogram {
 public:
-    static const int kMaxBuckets = 51;
-
-    // Inclusive lower bounds of the histogram buckets.
-    static const std::array<uint64_t, kMaxBuckets> kLowerBounds;
+    using HistogramType = operation_latency_histogram_details::HistogramData<uint64_t>;
 
     /**
      * Increments the bucket of the histogram based on the operation type.
      */
-    void increment(uint64_t latency,
-                   Command::ReadWriteType type,
-                   bool isQuerableEncryptionOperation);
+    void increment(uint64_t latency, Command::ReadWriteType type, bool isQueryableEncryptionOp);
 
     /**
      * Appends the four histograms with latency totals and operation counts.
@@ -64,29 +79,17 @@ public:
     void append(bool includeHistograms, bool slowMSBucketsOnly, BSONObjBuilder* builder) const;
 
 private:
-    struct HistogramData {
-        std::array<uint64_t, kMaxBuckets> buckets{};
-        uint64_t entryCount = 0;
-        uint64_t sum = 0;
-        // Sum of latency time spent doing Queryable Encryption operations
-        uint64_t sumQueryableEncryption = 0;
-    };
+    std::array<HistogramType, operation_latency_histogram_details::kHistogramsCount> _histograms;
+};
 
-    static int _getBucket(uint64_t latency);
+class AtomicOperationLatencyHistogram {
+public:
+    using HistogramType = operation_latency_histogram_details::HistogramData<Atomic<uint64_t>>;
 
-    static uint64_t _getBucketMicros(int bucket);
+    void increment(uint64_t latency, Command::ReadWriteType type, bool isQueryableEncryptionOp);
+    void append(bool includeHistograms, bool slowMSBucketsOnly, BSONObjBuilder* builder) const;
 
-    void _append(const HistogramData& data,
-                 const char* key,
-                 bool includeHistograms,
-                 bool slowMSBucketsOnly,
-                 BSONObjBuilder* builder) const;
-
-    void _incrementData(uint64_t latency,
-                        int bucket,
-                        bool isQuerableEncryptionOperation,
-                        HistogramData* data);
-
-    HistogramData _reads, _writes, _commands, _transactions;
+private:
+    std::array<HistogramType, operation_latency_histogram_details::kHistogramsCount> _histograms;
 };
 }  // namespace mongo

@@ -57,15 +57,10 @@ class ServiceContext;
  */
 class Top {
 public:
-    static Top& get(ServiceContext* service);
-
-    Top() = default;
-
     struct UsageData {
-        UsageData() : time(0), count(0) {}
-        UsageData(const UsageData& older, const UsageData& newer);
-        long long time;
-        long long count;
+        UsageData() = default;
+        long long time{0};
+        long long count{0};
 
         void inc(long long micros) {
             count++;
@@ -74,11 +69,7 @@ public:
     };
 
     struct CollectionData {
-        /**
-         * constructs a diff
-         */
-        CollectionData() {}
-        CollectionData(const CollectionData& older, const CollectionData& newer);
+        CollectionData() = default;
 
         UsageData total;
 
@@ -91,6 +82,7 @@ public:
         UsageData update;
         UsageData remove;
         UsageData commands;
+
         OperationLatencyHistogram opLatencyHistogram;
 
         bool isStatsRecordingAllowed{true};
@@ -104,7 +96,10 @@ public:
 
     typedef StringMap<CollectionData> UsageMap;
 
-public:
+    Top() = default;
+
+    static Top& get(ServiceContext* service);
+
     void record(OperationContext* opCtx,
                 const NamespaceString& nss,
                 LogicalOp logicalOp,
@@ -125,8 +120,6 @@ public:
                 Command::ReadWriteType readWriteType);
 
     void append(BSONObjBuilder& b);
-
-    void cloneMap(UsageMap& out) const;
 
     void collectionDropped(const NamespaceString& nss);
 
@@ -157,25 +150,7 @@ public:
                                   BSONObjBuilder* builder);
 
 private:
-    void _appendToUsageMap(BSONObjBuilder& b, const UsageMap& map) const;
-
-    void _appendStatsEntry(BSONObjBuilder& b, const char* statsName, const UsageData& map) const;
-
-    void _record(OperationContext* opCtx,
-                 CollectionData& c,
-                 LogicalOp logicalOp,
-                 LockType lockType,
-                 long long micros,
-                 Command::ReadWriteType readWriteType);
-
-    void _incrementHistogram(OperationContext* opCtx,
-                             long long latency,
-                             OperationLatencyHistogram* histogram,
-                             Command::ReadWriteType readWriteType);
-
-    // _lockGlobal should always be acquired before using _globalHistogramStats.
-    Mutex _lockGlobal = MONGO_MAKE_LATCH("Top::_lockGlobal");
-    OperationLatencyHistogram _globalHistogramStats;
+    AtomicOperationLatencyHistogram _globalHistogramStats;
 
     // _lockUsage should always be acquired before using _usage.
     Mutex _lockUsage = MONGO_MAKE_LATCH("Top::_lockUsage");
