@@ -95,7 +95,8 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
             fieldName[0] != '$');
 
     uassert(40238,
-            str::stream() << "The field '" << fieldName << "' must specify one accumulator",
+            str::stream() << "The field '" << fieldName
+                          << "' must specify one accumulator: " << elem,
             elem.Obj().nFields() == 1);
 
     auto specElem = elem.Obj().firstElement();

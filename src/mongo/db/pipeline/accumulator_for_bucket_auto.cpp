@@ -133,9 +133,57 @@ private:
     // firstN/lastN do NOT ignore null values.
     void _processValue(const Value& val) final;
 
-    KeyOutPair _genKeyOutPair(const Value& val);
-
     std::map<long long, SimpleMemoryUsageTokenWith<Value>> _map;
+};
+
+/**
+ * The custom positional accumulator $mergeObjects for $bucketAuto stage. Similar to
+ * AccumulatorFirstLastNForBucketAuto, this custom accumulator consumes the wrapped documents and
+ * determine the accumulated results based on their original positions. To allow a field from the
+ * later document supercedes the preceeding documents, for each field, this accumulator remembers
+ * the position of the last document updates it.
+ */
+class AccumulatorMergeObjectsForBucketAuto : public AccumulatorState {
+public:
+    static constexpr auto kName = "$mergeObjects"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
+    AccumulatorMergeObjectsForBucketAuto(ExpressionContext* expCtx) : AccumulatorState(expCtx) {
+        _memUsageTracker.set(sizeof(*this));
+    }
+
+    void processInternal(const Value& input, bool /*merging*/) final;
+
+    Value getValue(bool toBeMerged) final {
+        return _output.freezeToValue();
+    }
+
+    void reset() final {
+        _memUsageTracker.set(sizeof(*this));
+        _output.reset();
+    }
+
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx) {
+        return new AccumulatorMergeObjectsForBucketAuto(expCtx);
+    }
+
+    Document serialize(boost::intrusive_ptr<Expression> initializer,
+                       boost::intrusive_ptr<Expression> argument,
+                       const SerializationOptions& options) const final {
+        // Similar to 'AccumulatorFirstLastNForBucketAuto::serialize()', this accumulator
+        // serializes itself as a user-facing '$mergeObjects' instead of the internal accumulator
+        // created in 'replaceAccumulationStatementForBucketAuto()'.
+        auto nullInitializer =
+            ExpressionConstant::create(initializer->getExpressionContext(), Value(BSONNULL));
+        return AccumulatorState::serialize(std::move(nullInitializer), argument, options);
+    }
+
+private:
+    MutableDocument _output;
+    StringMap<SimpleMemoryUsageTokenWith<long long>> _fieldPositions;
 };
 
 namespace {
@@ -174,6 +222,12 @@ static FactoryFnMap factoryFnMap{
                                                        false>::create(expCtx);
          };
      }},
+    {"$mergeObjects",
+     [](ExpressionContext* const expCtx) {
+         return [expCtx] {
+             return AccumulatorMergeObjectsForBucketAuto::create(expCtx);
+         };
+     }},
 };
 }  // namespace
 
@@ -184,27 +238,26 @@ AccumulatorFirstLastNForBucketAuto<sense, single>::AccumulatorFirstLastNForBucke
     _memUsageTracker.set(sizeof(*this));
 }
 
-template <FirstLastSense sense, bool single>
-std::pair<long long, Value> AccumulatorFirstLastNForBucketAuto<sense, single>::_genKeyOutPair(
-    const Value& val) {
+
+static std::pair<long long, Value> genKeyOutPair(const Value& val) {
     tassert(8533700,
-            str::stream() << getOpName()
-                          << " tried to get a sort key on something that wasn't a BSON object",
+            str::stream() << "Accumulators in $bucketAuto tried to get a sort key on something "
+                             "that wasn't a BSON object",
             val.isObject());
 
-    Value output = val[kFieldNameOutput];
+    Value output = val[AccumulatorN::kFieldNameOutput];
 
     // Upconvert to 'null' if the output field is missing.
     if (output.missing())
         output = Value(BSONNULL);
 
-    Value sortKey = val[kFieldNameGeneratedSortKey];
+    Value sortKey = val[AccumulatorN::kFieldNameGeneratedSortKey];
     return {std::move(sortKey.coerceToLong()), std::move(output)};
 }
 
 template <FirstLastSense sense, bool single>
 void AccumulatorFirstLastNForBucketAuto<sense, single>::_processValue(const Value& val) {
-    auto keyOutPair = _genKeyOutPair(val);
+    auto keyOutPair = genKeyOutPair(val);
 
     // Only insert in the lastN case if we have 'n' elements.
     if (static_cast<long long>(_map.size()) == *_n) {
@@ -293,6 +346,47 @@ template <FirstLastSense sense, bool single>
 boost::intrusive_ptr<AccumulatorState> AccumulatorFirstLastNForBucketAuto<sense, single>::create(
     ExpressionContext* const expCtx) {
     return make_intrusive<AccumulatorFirstLastNForBucketAuto<sense, single>>(expCtx);
+}
+
+void AccumulatorMergeObjectsForBucketAuto::processInternal(const Value& compoundInput,
+                                                           bool /*merging*/) {
+    // 'compoundInput' is made of two parts:
+    // - 'input' is the value that the user specified in their {$mergeObjects: _}
+    //   accumulator-expression.
+    // - 'inputPosition' is the position in the input where this value occurred. Each toplevel field
+    //   in our output should come from the values of that same field in the input, and it should be
+    //   the one that occurs last in the input (the greatest inputPosition).
+    std::pair<long long, Value> inputPositionAndValue = genKeyOutPair(compoundInput);
+    auto inputPosition = inputPositionAndValue.first;
+    auto input = inputPositionAndValue.second;
+
+    // Type check: ignore null/missing, and error on non-objects.
+    if (input.nullish()) {
+        return;
+    }
+    uassert(8745900,
+            str::stream() << "$mergeObjects requires object inputs, but input " << input.toString()
+                          << " is of type " << typeName(input.getType()),
+            (input.getType() == BSONType::Object));
+
+    FieldIterator iter = input.getDocument().fieldIterator();
+    while (iter.more()) {
+        auto [inputFieldName, inputFieldValue] = iter.next();
+
+        auto largestPositionIter = _fieldPositions.find(inputFieldName);
+        if (largestPositionIter == _fieldPositions.cend() ||
+            largestPositionIter->second.value() < inputPosition) {
+            // Remember this new position, and track memory usage.
+            const auto memUsage = sizeof(inputPosition) + input.getApproximateSize();
+            _fieldPositions.emplace(
+                inputFieldName,
+                SimpleMemoryUsageTokenWith<long long>{
+                    SimpleMemoryUsageToken{memUsage, &_memUsageTracker}, inputPosition});
+
+            // Update the output.
+            _output.setField(inputFieldName, std::move(inputFieldValue));
+        }
+    }
 }
 
 bool isPositionalAccumulator(const char* opName) {
