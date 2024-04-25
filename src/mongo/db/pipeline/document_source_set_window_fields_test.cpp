@@ -261,6 +261,62 @@ TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnShiftOperator) {
         redact(*docSource));
 }
 
+
+TEST_F(DocumentSourceSetWindowFieldsTest, outputFieldsIsDeterministic) {
+    // This test asserts that setWindowFields returns outputFields in the same order for every
+    // document. In this instance, each document should have a obj.str field followed by a obj.date
+    // field followed by a obj.totalB.
+
+    auto spec = fromjson(  // NOLINT
+        R"({
+            $setWindowFields: { 
+                sortBy: { "obj.num": 1 },
+                output: {
+                    "obj.str": {
+                        $max: {$toLower: "$title"}
+                    },
+                    "obj.obj.date": {
+                        $first: { $max: [new Date(00010101), { $dateTrunc: { date: ObjectId('507f191e810c19729de860ea'), unit: "millisecond", timezone: "Australia/Brisbane", startOfWeek: "TUe" }}]}
+                    },
+                    "obj.totalB": {
+                        $sum: "$b"
+                    }
+                }
+            }
+        })");
+    auto parsedStage =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    const auto mock = DocumentSourceMock::createForTest(getExpCtx());
+    auto source = DocumentSourceMock::createForTest(
+        {"{b: 6}", "{b: 5000}", "{b: 50}", "{b: 88}", "{b: 100}"}, getExpCtx());
+    parsedStage->setSource(source.get());
+
+    auto next = parsedStage->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQ(next.getDocument().toString(),
+              "{b: 6, obj: {str: \"\", obj: {date: 2012-10-17T20:46:22.000Z}, totalB: 5244}}");
+
+    next = parsedStage->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQ(next.getDocument().toString(),
+              "{b: 5000, obj: {str: \"\", obj: {date: 2012-10-17T20:46:22.000Z}, totalB: 5244}}");
+
+    next = parsedStage->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQ(next.getDocument().toString(),
+              "{b: 50, obj: {str: \"\", obj: {date: 2012-10-17T20:46:22.000Z}, totalB: 5244}}");
+
+    next = parsedStage->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQ(next.getDocument().toString(),
+              "{b: 88, obj: {str: \"\", obj: {date: 2012-10-17T20:46:22.000Z}, totalB: 5244}}");
+
+    next = parsedStage->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQ(next.getDocument().toString(),
+              "{b: 100, obj: {str: \"\", obj: {date: 2012-10-17T20:46:22.000Z}, totalB: 5244}}");
+}
+
 TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnExpMovingAvgOperator) {
     auto spec = fromjson(
         R"({
