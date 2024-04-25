@@ -86,13 +86,15 @@ protected:
     /** Total number of sessions created. */
     std::size_t numCreatedSessions() const;
 
+    /** Total number of sessions rejected. */
+    std::size_t numRejectedSessions() const;
+
     // We assume that this SessionManager instance will be owned by a ServiceContext
     // permanently until such time as the ServiceContext is destroyed at which point
     // the SessionManager is destroyed as well, so there is no lingering pointer.
     ServiceContext* _svcCtx;
 
     const std::size_t _maxOpenSessions;
-    std::size_t _rejectedSessions{0};
 
     class Sessions;
     std::unique_ptr<Sessions> _sessions;

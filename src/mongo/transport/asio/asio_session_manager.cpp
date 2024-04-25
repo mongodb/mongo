@@ -93,7 +93,7 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
     appendInt("current", sessionCount);
     appendInt("available", maxOpenSessions() - sessionCount);
     appendInt("totalCreated", numCreatedSessions());
-    appendInt("rejected", _rejectedSessions);
+    appendInt("rejected", numRejectedSessions());
 
     appendInt("active", getActiveOperations());
 
