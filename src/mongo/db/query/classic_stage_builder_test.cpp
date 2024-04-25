@@ -135,8 +135,9 @@ private:
 TEST_F(ClassicStageBuilderTest, VirtualScanTranslation) {
     static const std::vector<BSONArray> kFilteredDocs = std::vector<BSONArray>{
         BSON_ARRAY(BSON("a" << 1 << "b" << 2)), BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
+    BSONObj query = fromjson("{a: {$ne: 2}}");
     auto filter = uassertStatusOK(MatchExpressionParser::parse(
-        fromjson("{a: {$ne: 2}}"), make_intrusive<ExpressionContextForTest>(opCtx(), kNss)));
+        query, make_intrusive<ExpressionContextForTest>(opCtx(), kNss)));
 
     std::vector<BSONArray> allDocs = kFilteredDocs;
     allDocs.insert(allDocs.begin() + 1, BSON_ARRAY(BSON("a" << 2 << "b" << 2)));

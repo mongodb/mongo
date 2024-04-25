@@ -235,8 +235,9 @@ TEST_F(SbeStageBuilderTest, VirtualScanWithFilter) {
     auto filteredDocs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
                                                BSON_ARRAY(BSON("a" << 2 << "b" << 2)),
                                                BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
+    BSONObj query = fromjson("{b: 2}");
     auto filter = uassertStatusOK(MatchExpressionParser::parse(
-        fromjson("{b: 2}"), make_intrusive<ExpressionContextForTest>(operationContext(), _nss)));
+        query, make_intrusive<ExpressionContextForTest>(operationContext(), _nss)));
 
     std::vector<BSONArray> allDocs = filteredDocs;
     allDocs.insert(allDocs.begin() + 1, BSON_ARRAY(BSON("a" << 2 << "b" << 1)));

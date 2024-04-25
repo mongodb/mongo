@@ -184,8 +184,7 @@ BSONObj generateFFP(StringData path, int value) {
     return builder.obj();
 }
 
-std::unique_ptr<MatchExpression> generateEqualityWithFFP(StringData path, int value) {
-    auto ffp = generateFFP(path, value);
+std::unique_ptr<MatchExpression> generateEqualityWithFFP(StringData path, BSONObj ffp) {
     return std::make_unique<EqualityMatchExpression>(path, ffp.firstElement());
 }
 
@@ -239,8 +238,10 @@ protected:
 };
 
 TEST_F(EqualityPredicateCollScanRewriteTest, Eq_Match) {
-    auto input = generateEqualityWithFFP("ssn", 1);
-    _predicate.addEncryptedField("ssn");
+    auto path = "ssn";
+    BSONObj ffp = generateFFP(path, 1);
+    auto input = generateEqualityWithFFP(path, ffp);
+    _predicate.addEncryptedField(path);
 
     auto result = _predicate.rewrite(input.get());
 
