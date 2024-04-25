@@ -46,6 +46,7 @@ Every task could be tagged with any number of the following tags:
 - `incompatible_community` - the task should be excluded from the community variants.
 - `incompatible_windows` - the task should be excluded from Windows variants.
 - `incompatible_mac` - the task should be excluded from MacOS variants.
+- `incompatible_debian` - the task should be excluded from Debian variants.
 - `incompatible_ppc` - the task should be excluded from IBM PPC variants.
 - `incompatible_s390x` - the task should be excluded from IBM s390x variants.
 - `incompatible_inmemory` - the task should be excluded from in-memory variants.

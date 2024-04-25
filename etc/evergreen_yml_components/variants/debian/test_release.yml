@@ -65,12 +65,12 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
-      - name: .development_critical !.requires_large_host !.incompatible_community
-      - name: .development_critical .requires_large_host !.incompatible_community
+      - name: .development_critical !.requires_large_host !.incompatible_community !.incompatible_debian
+      - name: .development_critical .requires_large_host !.incompatible_community !.incompatible_debian
         distros:
           - debian12-large
-      - name: .release_critical !.requires_large_host !.incompatible_community
-      - name: .release_critical .requires_large_host !.incompatible_community
+      - name: .release_critical !.requires_large_host !.incompatible_community !.incompatible_debian
+      - name: .release_critical .requires_large_host !.incompatible_community !.incompatible_debian
         distros:
           - debian12-large
 
@@ -115,11 +115,11 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
-      - name: .development_critical !.requires_large_host
-      - name: .development_critical .requires_large_host
+      - name: .development_critical !.requires_large_host !.incompatible_debian
+      - name: .development_critical .requires_large_host !.incompatible_debian
         distros:
           - debian12-large
-      - name: .release_critical !.requires_large_host
-      - name: .release_critical .requires_large_host
+      - name: .release_critical !.requires_large_host !.incompatible_debian
+      - name: .release_critical .requires_large_host !.incompatible_debian
         distros:
           - debian12-large

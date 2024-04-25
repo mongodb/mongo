@@ -1361,10 +1361,11 @@ tasks:
 
   - <<: *task_template
     name: ocsp
-    tags:
-      [
+    tags: [
         "assigned_to_jira_team_server_security",
         "release_critical",
+        # TODO SERVER-89541 Remove incompatible_debian tag once oscrypto gets updated
+        "incompatible_debian",
         "ssl",
         "encrypt",
         "ocsp",
