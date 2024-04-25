@@ -777,7 +777,8 @@ def _get_libdeps(node, debug=False):
         if str(libdep) not in BAZEL_LIBDEPS_AUTOINSTALLED:
             env = libdep.get_build_env()
             shlib_suffix = env.subst("$SHLIBSUFFIX")
-            env.BazelAutoInstall(libdep, shlib_suffix)
+            if env.get('BAZEL_BUILD_ENABLED'):
+                env.BazelAutoInstall(libdep, shlib_suffix)
             BAZEL_LIBDEPS_AUTOINSTALLED.add(str(libdep))
 
     setattr(node.attributes, Constants.LibdepsCached, tsorted)
