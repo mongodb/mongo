@@ -202,7 +202,7 @@ public:
         const auto cycles = _cycles.load();
         state.counters["instructions"] = instructions;
         state.counters["instructions_per_iteration"] =
-            static_cast<double>(instructions) / iterations;
+            static_cast<int>(static_cast<double>(instructions) / iterations);
         state.counters["cycles"] = cycles;
         state.counters["cycles_per_iteration"] = static_cast<double>(cycles) / iterations;
     }
