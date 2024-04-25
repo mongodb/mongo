@@ -48,7 +48,12 @@ selector:
     - jstests/core/max_doc_size.js
     - jstests/core/query/find/find_getmore_bsonsize.js
 
-    # TODO SERVER-89465: Re-enable test once failures are investigated, or include comment why test should remain disabled.
+    # This test does a very large amount of inserts on a single shard which will trigger the balancer.
+    # If we disable the balancer on the source cluster then it will remain enabled on the restore
+    # nodes and still cause a diff. This is because the config shard needs to connect to its replica
+    # set to apply the stashed balancer mode and we are unable to do that since we are running the
+    # config server node on a different port than the configuration we pass in. We will have a
+    # targeted test that handles this case for correctness.
     - jstests/core/query/query_settings/query_settings_size_limits.js
 
   exclude_with_any_tags:
