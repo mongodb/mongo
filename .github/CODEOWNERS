@@ -54,6 +54,9 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
 /buildscripts/resmokelib/**/* @10gen/devprod-correctness
 
+# The following patterns are parsed from ./buildscripts/resmokelib/testing/hooks/OWNERS.yml
+/buildscripts/resmokelib/testing/hooks/**/*
+
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/OWNERS.yml
 /jstests/concurrency/fsm_workloads/**/server_status.js @10gen/server-service-architecture
 /jstests/concurrency/fsm_workloads/**/server_status_with_time_out_cursors.js @10gen/server-service-architecture
