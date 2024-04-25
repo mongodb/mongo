@@ -27,7 +27,7 @@ const runTest = function({docs, pipeline, behaviour, expectedResult}) {
     assert.commandWorked(coll.insertMany(docs));
 
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
-    let unpackStage = {};
+    let unpackStage = null;
     if (getEngine(explain) === "classic") {
         // In the classic engine $_internalUnpackBucket is run as an aggregation stage.
         const unpackStages = getAggPlanStages(explain, '$_internalUnpackBucket');

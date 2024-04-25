@@ -17,7 +17,7 @@ export const kSbeDisabled = "sbeDisabled";
  * returned by the 'checkFunction' callback.
  */
 function discoverNodesAndCheck(theDB, checkFunction) {
-    let result;
+    let result = "";
     assert.soon(() => {
         // Some passthrough tests always operate against the primary node of the database primary
         // shard. In such cases, we want to report the SBE mode which matches what the caller will
@@ -28,6 +28,8 @@ function discoverNodesAndCheck(theDB, checkFunction) {
         } catch (e) {
             // Try non config nodes.
         }
+        // If we don't have a primary node for 'theDB' yet, loop over all non-config nodes and check
+        // for SBE mode. We need to ensure all nodes have the same SBE mode.
         let nodes;
         try {
             nodes = DiscoverTopology.findNonConfigNodes(theDB.getMongo());
@@ -41,8 +43,16 @@ function discoverNodesAndCheck(theDB, checkFunction) {
                 if (FixtureHelpers.isMongos(conn.getDB("admin"))) {
                     continue;
                 }
-                result = checkFunction(conn);
-                return true;
+                let mode = checkFunction(conn);
+                if (result === "") {
+                    result = mode;
+                } else if (result !== mode) {
+                    // SBE mode not consistent in all nodes, test could fail due to unexpected SBE
+                    // mode so quit the test.
+                    jsTestLog(
+                        "Skipping test because SBE configuration is not consistent across hosts!");
+                    quit();
+                }
 
             } catch (e) {
                 // Unable to verify on the current node. Try the next node.
@@ -61,6 +71,8 @@ function discoverNodesAndCheck(theDB, checkFunction) {
  * For tryBonsai*, we return kSbeFullyEnabled when featureFlagSbeFull is on and kSbeRestricted when
  * featureFlagSbeFull is off. This reflects the expected SBE behavior when we cannot use Bonsai and
  * instead fall back to SBE without Bonsai.
+ *
+ * Quits test if there is no primary node and we are running in a mixed configuration.
  */
 export function checkSbeStatus(theDB) {
     return discoverNodesAndCheck(theDB, (conn) => {
@@ -88,6 +100,8 @@ export function checkSbeStatus(theDB) {
 
 /**
  * Check if featureFlagSbeFull is enabled in the cluster.
+ *
+ * Quits test if there is no primary node and we are running in a mixed configuration.
  */
 export function checkSbeFullFeatureFlagEnabled(theDB) {
     return checkSbeStatus(theDB) === kFeatureFlagSbeFullEnabled;
@@ -96,6 +110,8 @@ export function checkSbeFullFeatureFlagEnabled(theDB) {
 /**
  * Check if SBE is fully enabled in the cluster. This implies that either 'featureFlagSbeFull' is
  * enabled, or the internalQueryFrameworkControl knob is set to 'trySbeEngine'.
+ *
+ * Quits test if there is no primary node and we are running in a mixed configuration.
  */
 export function checkSbeFullyEnabled(theDB) {
     const status = checkSbeStatus(theDB);
@@ -105,6 +121,8 @@ export function checkSbeFullyEnabled(theDB) {
 /**
  * Check if SBE is either restricted (only select agg stages: $group, $lookup,
  * $_internalUnpackBucket are allowed to be pushed down to sbe) or fully enabled in the cluster.
+ *
+ * Quits test if there is no primary node and we are running in a mixed configuration.
  */
 export function checkSbeRestrictedOrFullyEnabled(theDB) {
     const status = checkSbeStatus(theDB);
@@ -115,6 +133,8 @@ export function checkSbeRestrictedOrFullyEnabled(theDB) {
 /**
  * Check if SBE is restricted (only select agg stages: $group, $lookup, $_internalUnpackBucket are
  * allowed to be pushed down to sbe).
+ *
+ * Quits test if there is no primary node and we are running in a mixed configuration.
  */
 export function checkSbeRestricted(theDB) {
     return checkSbeStatus(theDB) === kSbeRestricted;
