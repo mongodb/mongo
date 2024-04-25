@@ -82,7 +82,7 @@ boost::optional<Ticket> PriorityTicketHolder::_tryAcquireImpl(AdmissionContext* 
     invariant(admCtx);
 
     if (_pool.tryAcquire()) {
-        return Ticket(this, admCtx);
+        return _makeTicket(admCtx);
     }
 
     return boost::none;
@@ -113,7 +113,7 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationC
 
         if (acquired) {
             rereleaseIfTimedOutOrInterrupted.dismiss();
-            return Ticket(this, admCtx);
+            return _makeTicket(admCtx);
         } else if (maxUntil == until) {
             // We hit the end of our deadline, so return nothing.
             return boost::none;

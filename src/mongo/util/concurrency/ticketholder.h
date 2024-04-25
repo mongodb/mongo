@@ -161,6 +161,12 @@ public:
      */
     void appendStats(BSONObjBuilder& b) const;
 
+protected:
+    virtual bool _resizeImpl(WithLock lock,
+                             OperationContext* opCtx,
+                             int32_t newSize,
+                             Date_t deadline);
+
 private:
     /**
      * Releases a ticket back into the ticketing pool.
@@ -205,6 +211,8 @@ protected:
      * Appends the standard statistics stored in QueueStats to BSONObjBuilder b;
      */
     void _appendCommonQueueImplStats(BSONObjBuilder& b, const QueueStats& stats) const;
+
+    Ticket _makeTicket(AdmissionContext* admCtx);
 
     AtomicWord<int32_t> _outof;
     AtomicWord<int32_t> _peakUsed;
@@ -268,9 +276,6 @@ class Ticket {
     Ticket& operator=(const Ticket&) = delete;
 
     friend class TicketHolder;
-    friend class SemaphoreTicketHolder;
-    friend class PriorityTicketHolder;
-    friend class MockTicketHolder;
 
 public:
     Ticket(Ticket&& t)
@@ -336,4 +341,9 @@ private:
     AdmissionContext::Priority _priority;
     TickSource::Tick _acquisitionTime;
 };
+
+inline Ticket TicketHolder::_makeTicket(AdmissionContext* admCtx) {
+    return Ticket{this, admCtx};
+}
+
 }  // namespace mongo

@@ -54,7 +54,8 @@ void IngressAdmissionController::init() {
     _ticketHolder =
         std::make_unique<SemaphoreTicketHolder>(&getIngressAdmissionController.owner(*this),
                                                 gIngressAdmissionControllerTicketPoolSize.load(),
-                                                false);
+                                                false,
+                                                SemaphoreTicketHolder::ResizePolicy::kImmediate);
 }
 
 IngressAdmissionController& IngressAdmissionController::get(OperationContext* opCtx) {

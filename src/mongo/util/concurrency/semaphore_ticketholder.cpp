@@ -30,6 +30,8 @@
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 
@@ -47,18 +49,21 @@ void SemaphoreTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
 
 SemaphoreTicketHolder::SemaphoreTicketHolder(ServiceContext* serviceContext,
                                              int numTickets,
-                                             bool trackPeakUsed)
-    : TicketHolder(serviceContext, numTickets, trackPeakUsed), _tickets(numTickets) {}
+                                             bool trackPeakUsed,
+                                             SemaphoreTicketHolder::ResizePolicy resizePolicy)
+    : TicketHolder(serviceContext, numTickets, trackPeakUsed),
+      _resizePolicy(resizePolicy),
+      _tickets(numTickets) {}
 
 boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
-    uint32_t available = _tickets.load();
+    int32_t available = _tickets.load();
     while (true) {
-        if (available == 0) {
+        if (available <= 0) {
             return boost::none;
         }
 
         if (_tickets.compareAndSwap(&available, available - 1)) {
-            return Ticket{this, admCtx};
+            return _makeTicket(admCtx);
         }
     }
 }
@@ -67,6 +72,10 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
                                                                        AdmissionContext* admCtx,
                                                                        Date_t until,
                                                                        bool interruptible) {
+    if (interruptible) {
+        opCtx->checkForInterrupt();
+    }
+
     auto nextDeadline = [&]() {
         // Timed waits can be problematic if we have a large number of waiters, since each time we
         // check for interrupt we risk waking up all waiting threads at the same time. We introduce
@@ -80,35 +89,61 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
         return std::min(until, Date_t::now() + Milliseconds{baseIntervalMs + offset});
     };
 
-    Date_t deadline = nextDeadline();
     while (true) {
-        while (!_tickets.waitUntil(0, deadline)) {
-            if (deadline == until) {
-                return boost::none;
-            }
+        auto oldAvailable = _tickets.load();
 
-            deadline = nextDeadline();
-            if (interruptible) {
-                opCtx->checkForInterrupt();
-            }
+        if (boost::optional<Ticket> maybeTicket = _tryAcquireImpl(admCtx); maybeTicket) {
+            return std::move(*maybeTicket);
         }
 
-        uint32_t available = _tickets.load();
-        if (available > 0 && _tickets.compareAndSwap(&available, available - 1)) {
-            Ticket ticket{this, admCtx};
+        if (oldAvailable != _tickets.loadRelaxed()) {
+            continue;
+        }
 
-            if (interruptible) {
-                opCtx->checkForInterrupt();
+        Date_t deadline = nextDeadline();
+        auto canAcquire = _tickets.waitUntil(oldAvailable, deadline);
+        if (interruptible) {
+            opCtx->checkForInterrupt();
+        }
+
+        if (canAcquire) {
+            if (boost::optional<Ticket> maybeTicket = _tryAcquireImpl(admCtx)) {
+                return std::move(*maybeTicket);
             }
-
-            return std::move(ticket);
+        } else if (deadline == until) {
+            // We hit the end of our deadline, so return nothing.
+            return boost::none;
         }
     }
 }
 
 void SemaphoreTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
-    _tickets.fetchAndAdd(1);
-    _tickets.notifyOne();
+    if (_tickets.fetchAndAdd(1) == 0) {
+        _tickets.notifyOne();
+    }
+}
+
+void SemaphoreTicketHolder::_immediateResize(WithLock, int32_t newSize) {
+    auto oldSize = _outof.swap(newSize);
+    auto delta = newSize - oldSize;
+    auto oldAvailable = _tickets.fetchAndAdd(delta);
+    if ((oldAvailable <= 0) && ((oldAvailable + delta) > 0)) {
+        _tickets.notifyMany(oldAvailable + delta);
+    }
+}
+
+bool SemaphoreTicketHolder::_resizeImpl(WithLock lock,
+                                        OperationContext* opCtx,
+                                        int32_t newSize,
+                                        Date_t deadline) {
+    switch (_resizePolicy) {
+        case ResizePolicy::kGradual:
+            return TicketHolder::_resizeImpl(lock, opCtx, newSize, deadline);
+        case ResizePolicy::kImmediate:
+            _immediateResize(lock, newSize);
+            return true;
+    }
+    MONGO_UNREACHABLE;
 }
 
 int32_t SemaphoreTicketHolder::available() const {

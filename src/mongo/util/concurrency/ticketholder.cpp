@@ -60,7 +60,13 @@ TicketHolder::TicketHolder(ServiceContext* svcCtx, int32_t numTickets, bool trac
 
 bool TicketHolder::resize(OperationContext* opCtx, int32_t newSize, Date_t deadline) {
     stdx::lock_guard<Latch> lk(_resizeMutex);
+    return _resizeImpl(lk, opCtx, newSize, deadline);
+}
 
+bool TicketHolder::_resizeImpl(WithLock,
+                               OperationContext* opCtx,
+                               int32_t newSize,
+                               Date_t deadline) {
     auto difference = newSize - _outof.load();
     MockAdmissionContext admCtx;
     if (difference > 0) {
@@ -227,7 +233,7 @@ boost::optional<Ticket> MockTicketHolder::_tryAcquireImpl(AdmissionContext* admC
     if (used() > _peakUsed.load()) {
         _peakUsed.store(used());
     }
-    return Ticket{this, admCtx};
+    return _makeTicket(admCtx);
 }
 
 boost::optional<Ticket> MockTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
