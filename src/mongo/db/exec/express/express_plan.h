@@ -166,12 +166,12 @@ private:
 
     BSONObj _queryFilter;  // Unowned BSON.
 
-    const CollectionPtr* _collection;             // Unowned.
-    const IndexCatalogEntry* _indexCatalogEntry;  // Unowned.
+    const CollectionPtr* _collection{nullptr};             // Unowned.
+    const IndexCatalogEntry* _indexCatalogEntry{nullptr};  // Unowned.
 
     bool _exhausted{false};
 
-    IteratorStats* _stats;
+    IteratorStats* _stats{nullptr};
 };
 
 /**
@@ -233,11 +233,11 @@ public:
 private:
     BSONObj _queryFilter;  // Unowned BSON.
 
-    const CollectionPtr* _collection;
+    const CollectionPtr* _collection{nullptr};
 
     bool _exhausted{false};
 
-    IteratorStats* _stats;
+    IteratorStats* _stats{nullptr};
 };
 
 class LookupViaUserIndex {
@@ -356,14 +356,14 @@ private:
     const std::string _indexIdent;
     const std::string _indexName;
 
-    const CollectionPtr* _collection;             // Unowned.
-    const IndexCatalogEntry* _indexCatalogEntry;  // Unowned.
+    const CollectionPtr* _collection{nullptr};             // Unowned.
+    const IndexCatalogEntry* _indexCatalogEntry{nullptr};  // Unowned.
 
     const CollatorInterface* _collator;  // Owned by the query's ExpressionContext.
 
     bool _exhausted{false};
 
-    IteratorStats* _stats;
+    IteratorStats* _stats{nullptr};
 };
 
 class NoShardFilter {};
@@ -487,7 +487,7 @@ private:
     ShardFilterChoice _shardFilter;
     ProjectionChoice _projection;
 
-    PlanStats* _planStats;
+    PlanStats* _planStats{nullptr};
 };
 }  // namespace express
 }  // namespace mongo
