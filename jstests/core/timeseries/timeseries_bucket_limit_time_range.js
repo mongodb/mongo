@@ -10,6 +10,9 @@
  *   # We assume that all nodes in a mixed-mode replica set are using compressed inserts to a
  *   # time-series collection.
  *   requires_fcv_71,
+ *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
+ *   # collection to insert more documents then expected by the test.
+ *   assumes_balancer_off,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

@@ -31,7 +31,10 @@
  *   does_not_support_stepdowns,
  *   # "Explain of a resolved view must be executed by mongos"
  *   directly_against_shardsvrs_incompatible,
- *   tenant_migration_incompatible
+ *   tenant_migration_incompatible,
+ *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
+ *   # collection to insert more documents then expected by the test.
+ *   assumes_balancer_off,
  * ]
  *
  */

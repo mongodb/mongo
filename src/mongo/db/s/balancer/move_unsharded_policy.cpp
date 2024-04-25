@@ -84,11 +84,6 @@ std::map<NamespaceString, ListCollectionsReplyItem> getCollectionsFromShard(
             // This collection can never be tracked so we skip it
             continue;
         }
-        if (nss.isTimeseriesBucketsCollection()) {
-            // TODO SERVER-83878: re-enable random migrations for unsharded timeseries collections
-            // once we are able to track them in the global catalog.
-            continue;
-        }
 
         localColls.emplace(std::move(nss), std::move(replyItem));
     }

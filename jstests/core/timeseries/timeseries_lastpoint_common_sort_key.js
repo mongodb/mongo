@@ -14,6 +14,9 @@
  *   tenant_migration_incompatible,
  *   # The top/bottom common sort key optimization is available since FCV 8.0.
  *   requires_fcv_80,
+ *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
+ *   # collection to insert more documents then expected by the test.
+ *   assumes_balancer_off,
  * ]
  */
 

@@ -11,6 +11,9 @@
  *   # This test calls "find" with a filter on "_id" whose value is a namespace string. We cannot
  *   # test it as the override does not inject tenant prefix to this special namespace.
  *   simulate_atlas_proxy_incompatible,
+ *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
+ *   # collection to insert more documents then expected by the test.
+ *   assumes_balancer_off,
  * ]
  */
 

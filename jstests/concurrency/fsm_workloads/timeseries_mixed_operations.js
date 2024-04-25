@@ -5,6 +5,8 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   requires_timeseries,
+ *   # TODO SERVER-89708 remove this tag once the related issue is fixed
+ *   assumes_balancer_off,
  * ]
  */
 

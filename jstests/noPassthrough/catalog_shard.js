@@ -223,18 +223,24 @@ const newShardName =
     // Blocked because of the sharded and unsharded databases and the remaining chunk.
     removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert.eq("ongoing", removeRes.state);
-    // TODO SERVER-77915 remove feature flag and set remaining chunks to 2 (before track unsharded,
-    // only sharded collection had associated chunks)
+    // TODO SERVER-77915 remove feature flag and set remaining chunks to 3 (before tracking
+    // unsharded collections, only sharded collection had associated chunks)
     const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
         st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    assert.eq(isTrackUnshardedUponCreationEnabled ? 2 : 1, removeRes.remaining.chunks);
+    assert.eq(isTrackUnshardedUponCreationEnabled ? 3 : 1, removeRes.remaining.chunks);
     assert.eq(3, removeRes.remaining.dbs);
 
     moveDatabaseAndUnshardedColls(st.s.getDB(dbName), newShardName);
     moveDatabaseAndUnshardedColls(st.s.getDB(unshardedDbName), newShardName);
-    // TODO (SERVER-83878 or SERVER-88304) call moveDatabaseAndUnshardedColls instead of
-    // movePrimary.
-    assert.commandWorked(st.s.adminCommand({movePrimary: timeseriesDbName, to: newShardName}));
+
+    // TODO SERVER-84744 remove the feature flag check and leave moveDatabaseAndUnshardedColls
+    const isReshardingForTimeseriesEnabled =
+        FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'), 'ReshardingForTimeseries');
+    if (isReshardingForTimeseriesEnabled) {
+        moveDatabaseAndUnshardedColls(st.s.getDB(timeseriesDbName), newShardName);
+    } else {
+        assert.commandWorked(st.s.adminCommand({movePrimary: timeseriesDbName, to: newShardName}));
+    }
 
     // The draining sharded collections should not have been locally dropped yet.
     assert(configPrimary.getCollection(ns).exists());
