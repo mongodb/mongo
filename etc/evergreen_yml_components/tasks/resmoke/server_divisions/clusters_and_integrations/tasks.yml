@@ -1921,6 +1921,19 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: sharded_collections_jscore_passthrough_with_config_transitions_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "jscore",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
     name: sharded_collections_jscore_passthrough_with_replica_set_endpoint_gen
     tags:
       [
