@@ -173,7 +173,8 @@ feature_flags:
         description: "Feature flag to allow setting a server-wide default maxTimeMS used for all
         read operations"
         cpp_varname: gFeatureFlagDefaultReadMaxTimeMS
-        default: false
+        default: true
+        version: 8.1
         shouldBeFCVGated: true
     featureFlagErrorAndLogValidationAction:
         description: "Feature flag to enable errorAndLog validatio action in collection options"

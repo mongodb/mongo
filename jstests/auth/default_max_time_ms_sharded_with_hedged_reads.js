@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   creates_and_authenticates_user,
- *   featureFlagDefaultReadMaxTimeMS,
+ *   requires_fcv_81,
  *   # Transactions aborted upon fcv upgrade or downgrade; cluster parameters use internal txns.
  *   required_auth,
  *   requires_sharding,

@@ -8,7 +8,7 @@
  *   requires_auth,
  *   # Transactions aborted upon fcv upgrade or downgrade; cluster parameters use internal txns.
  *   uses_transactions,
- *   featureFlagDefaultReadMaxTimeMS,
+ *   requires_fcv_81,
  * ]
  */
 
