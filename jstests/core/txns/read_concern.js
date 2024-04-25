@@ -80,7 +80,7 @@ jsTest.log("Test starting a transaction with an invalid readConcern");
 // Start a new transaction with the given readConcern.
 session.startTransaction();
 assert.commandFailedWithCode(sessionDb.runCommand({find: collName, readConcern: {level: "bad"}}),
-                             [ErrorCodes.BadValue, ErrorCodes.TypeMismatch]);
+                             [ErrorCodes.FailedToParse, ErrorCodes.BadValue]);
 
 // No more operations are allowed in the transaction.
 assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.NoSuchTransaction);
