@@ -13,6 +13,8 @@ import {Thread} from "jstests/libs/parallelTester.js";
 const dbName = "test";
 const collName = "retryable_write_error_labels";
 const ns = dbName + "." + collName;
+const acceptableErrorsDuringShutdown =
+    [ErrorCodes.InterruptedAtShutdown, ErrorCodes.CallbackCanceled, ErrorCodes.ShutdownInProgress];
 
 // Use ShardingTest because we need to test both mongod and mongos behaviors
 let overrideMaxAwaitTimeMS = {'mode': 'alwaysOn', 'data': {maxAwaitTimeMS: 1000}};
@@ -157,9 +159,7 @@ function testMongosError() {
     MongoRunner.stopMongos(st.s);
     try {
         const retryableInsertRes = retryableInsertThread.returnData();
-        checkErrorCode(retryableInsertRes,
-                       [ErrorCodes.InterruptedAtShutdown, ErrorCodes.CallbackCanceled],
-                       false /* isWCError */);
+        checkErrorCode(retryableInsertRes, acceptableErrorsDuringShutdown, false /* isWCError */);
         assertContainRetryableErrorLabel(retryableInsertRes);
     } catch (e) {
         if (!isNetworkError(e)) {
@@ -188,9 +188,8 @@ function testMongosError() {
     MongoRunner.stopMongos(st.s);
     try {
         const nonRetryableInsertRes = nonRetryableInsertThread.returnData();
-        checkErrorCode(nonRetryableInsertRes,
-                       [ErrorCodes.InterruptedAtShutdown, ErrorCodes.CallbackCanceled],
-                       false /* isWCError */);
+        checkErrorCode(
+            nonRetryableInsertRes, acceptableErrorsDuringShutdown, false /* isWCError */);
         assertNotContainErrorLabels(nonRetryableInsertRes);
     } catch (e) {
         if (!isNetworkError(e)) {
@@ -226,9 +225,7 @@ function testMongosError() {
 
     try {
         const commitTxnRes = commitTxnThread.returnData();
-        checkErrorCode(commitTxnRes,
-                       [ErrorCodes.InterruptedAtShutdown, ErrorCodes.CallbackCanceled],
-                       false /* isWCError */);
+        checkErrorCode(commitTxnRes, acceptableErrorsDuringShutdown, false /* isWCError */);
         assertContainRetryableErrorLabel(commitTxnRes);
     } catch (e) {
         if (!isNetworkError(e)) {
@@ -263,9 +260,7 @@ function testMongosError() {
 
     try {
         const abortTxnRes = abortTxnThread.returnData();
-        checkErrorCode(abortTxnRes,
-                       [ErrorCodes.InterruptedAtShutdown, ErrorCodes.CallbackCanceled],
-                       false /* isWCError */);
+        checkErrorCode(abortTxnRes, acceptableErrorsDuringShutdown, false /* isWCError */);
         assertContainRetryableErrorLabel(abortTxnRes);
     } catch (e) {
         if (!isNetworkError(e)) {
