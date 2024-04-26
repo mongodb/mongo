@@ -31,144 +31,79 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/operation_latency_histogram.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/bits.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
-
-const std::array<uint64_t, OperationLatencyHistogram::kMaxBuckets>
-    OperationLatencyHistogram::kLowerBounds = {0,
-                                               2,
-                                               4,
-                                               8,
-                                               16,
-                                               32,
-                                               64,
-                                               128,
-                                               256,
-                                               512,
-                                               1024,
-                                               2048,
-                                               3072,
-                                               4096,
-                                               6144,
-                                               8192,
-                                               12288,
-                                               16384,
-                                               24576,
-                                               32768,
-                                               49152,
-                                               65536,
-                                               98304,
-                                               131072,
-                                               196608,
-                                               262144,
-                                               393216,
-                                               524288,
-                                               786432,
-                                               1048576,
-                                               1572864,
-                                               2097152,
-                                               4194304,
-                                               8388608,
-                                               16777216,
-                                               33554432,
-                                               67108864,
-                                               134217728,
-                                               268435456,
-                                               536870912,
-                                               1073741824,
-                                               2147483648,
-                                               4294967296,
-                                               8589934592,
-                                               17179869184,
-                                               34359738368,
-                                               68719476736,
-                                               137438953472,
-                                               274877906944,
-                                               549755813888,
-                                               1099511627776};
-
-void OperationLatencyHistogram::_append(const HistogramData& data,
-                                        const char* key,
-                                        bool includeHistograms,
-                                        bool slowMSBucketsOnly,
-                                        BSONObjBuilder* builder) const {
-
-    uint64_t filteredCount = 0;
-    bool filterBuckets = slowMSBucketsOnly && serverGlobalParams.slowMS.load() >= 0;
-    size_t lowestFilteredBound = 0;
-
-    BSONObjBuilder histogramBuilder(builder->subobjStart(key));
-    if (includeHistograms) {
-        BSONArrayBuilder arrayBuilder(histogramBuilder.subarrayStart("histogram"));
-        for (size_t i = 0; i < kMaxBuckets; i++) {
-            if (data.buckets[i] == 0) {
-                continue;
-            }
-
-            if (filterBuckets &&
-                (kLowerBounds[i] / 1000) >=
-                    static_cast<unsigned int>(serverGlobalParams.slowMS.load())) {
-                if (lowestFilteredBound == 0) {
-                    lowestFilteredBound = kLowerBounds[i];
-                }
-
-                filteredCount += data.buckets[i];
-                continue;
-            }
-
-            BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
-            entryBuilder.append("micros", static_cast<long long>(kLowerBounds[i]));
-            entryBuilder.append("count", static_cast<long long>(data.buckets[i]));
-            entryBuilder.doneFast();
-        }
-
-        // Append final bucket only if it contains values to minimize data in FTDC
-        // Final bucket is aggregate of all buckets >= slowMS with bucket labeled as minimum latency
-        // of bucket
-        if (filterBuckets && filteredCount > 0) {
-            BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
-            entryBuilder.append("micros", static_cast<long long>(lowestFilteredBound + 1));
-            entryBuilder.append("count", static_cast<long long>(filteredCount));
-            entryBuilder.doneFast();
-        }
-
-        arrayBuilder.doneFast();
-    }
-
-    histogramBuilder.append("latency", static_cast<long long>(data.sum));
-    histogramBuilder.append("ops", static_cast<long long>(data.entryCount));
-    histogramBuilder.append("queryableEncryptionLatencyMicros",
-                            static_cast<long long>(data.sumQueryableEncryption));
-    histogramBuilder.doneFast();
-}
-
-void OperationLatencyHistogram::append(bool includeHistograms,
-                                       bool slowMSBucketsOnly,
-                                       BSONObjBuilder* builder) const {
-    _append(_reads, "reads", includeHistograms, slowMSBucketsOnly, builder);
-    _append(_writes, "writes", includeHistograms, slowMSBucketsOnly, builder);
-    _append(_commands, "commands", includeHistograms, slowMSBucketsOnly, builder);
-    _append(_transactions, "transactions", includeHistograms, slowMSBucketsOnly, builder);
-}
+namespace {
+const std::array<uint64_t, operation_latency_histogram_details::kMaxBuckets> kLowerBounds = {
+    0,             // 0x00000000000
+    2,             // 0x00000000002
+    4,             // 0x00000000004
+    8,             // 0x00000000008
+    16,            // 0x00000000010
+    32,            // 0x00000000020
+    64,            // 0x00000000040
+    128,           // 0x00000000080
+    256,           // 0x00000000100
+    512,           // 0x00000000200
+    1024,          // 0x00000000400
+    2048,          // 0x00000000800 = 2^11
+    3072,          // 0x00000000C00
+    4096,          // 0x00000001000
+    6144,          // 0x00000001800
+    8192,          // 0x00000002000
+    12288,         // 0x00000003000
+    16384,         // 0x00000004000
+    24576,         // 0x00000006000
+    32768,         // 0x00000008000
+    49152,         // 0x0000000C000
+    65536,         // 0x00000010000
+    98304,         // 0x00000018000
+    131072,        // 0x00000020000
+    196608,        // 0x00000030000
+    262144,        // 0x00000040000
+    393216,        // 0x00000060000
+    524288,        // 0x00000080000
+    786432,        // 0x000000C0000
+    1048576,       // 0x00000100000
+    1572864,       // 0x00000180000
+    2097152,       // 0x00000200000 = 2^21
+    4194304,       // 0x00000400000
+    8388608,       // 0x00000800000
+    16777216,      // 0x00001000000
+    33554432,      // 0x00002000000
+    67108864,      // 0x00004000000
+    134217728,     // 0x00008000000
+    268435456,     // 0x00010000000
+    536870912,     // 0x00020000000
+    1073741824,    // 0x00040000000
+    2147483648,    // 0x00080000000
+    4294967296,    // 0x00100000000
+    8589934592,    // 0x00200000000
+    17179869184,   // 0x00400000000
+    34359738368,   // 0x00800000000
+    68719476736,   // 0x01000000000
+    137438953472,  // 0x02000000000
+    274877906944,  // 0x04000000000
+    549755813888,  // 0x08000000000
+    1099511627776  // 0x10000000000
+};
 
 // Computes the log base 2 of value, and checks for cases of split buckets.
-int OperationLatencyHistogram::_getBucket(uint64_t value) {
-    // Zero is a special case since log(0) is undefined.
+size_t getBucket(uint64_t value) {
     if (value == 0) {
+        // Zero is a special case since log(0) is undefined.
         return 0;
     }
 
     int log2 = 63 - countLeadingZeros64(value);
-    // Half splits occur in range [2^11, 2^21) giving 10 extra buckets.
     if (log2 < 11) {
         return log2;
     } else if (log2 < 21) {
+        // Half splits occur in range [2^11, 2^21) giving 10 extra buckets.
         int extra = log2 - 11;
         // Split value boundary is at (2^n + 2^(n+1))/2 = 2^n + 2^(n-1).
         // Which corresponds to (1ULL << log2) | (1ULL << (log2 - 1))
@@ -180,43 +115,172 @@ int OperationLatencyHistogram::_getBucket(uint64_t value) {
         return log2 + extra;
     } else {
         // Add all of the extra 10 buckets.
-        return std::min(log2 + 10, kMaxBuckets - 1);
+        return std::min(log2 + 10, operation_latency_histogram_details::kMaxBuckets - 1);
     }
 }
 
-void OperationLatencyHistogram::_incrementData(uint64_t latency,
-                                               int bucket,
-                                               bool isQuerableEncryptionOperation,
-                                               HistogramData* data) {
-    data->buckets[bucket]++;
-    data->entryCount++;
-    data->sum += latency;
+template <typename DataType>
+void updateHistogram(operation_latency_histogram_details::HistogramData<DataType>& histogram,
+                     size_t bucket,
+                     uint64_t latency,
+                     bool isQueryableEncryptionOperation) {
+    histogram.buckets[bucket]++;
+    histogram.entryCount++;
+    histogram.sum += latency;
 
-    if (isQuerableEncryptionOperation) {
-        data->sumQueryableEncryption += latency;
+    if (isQueryableEncryptionOperation) {
+        histogram.sumQueryableEncryption += latency;
     }
 }
+
+template <>
+void updateHistogram(AtomicOperationLatencyHistogram::HistogramType& histogram,
+                     size_t bucket,
+                     uint64_t latency,
+                     bool isQueryableEncryptionOperation) {
+    histogram.buckets[bucket].fetchAndAddRelaxed(1);
+    histogram.entryCount.fetchAndAddRelaxed(1);
+    histogram.sum.fetchAndAddRelaxed(latency);
+
+    if (isQueryableEncryptionOperation) {
+        histogram.sumQueryableEncryption.fetchAndAddRelaxed(latency);
+    }
+}
+
+template <typename HistogramsType>
+void increment(HistogramsType& histograms,
+               uint64_t latency,
+               Command::ReadWriteType type,
+               bool isQueryableEncryptionOperation) {
+    const auto index = static_cast<int>(type);
+    invariant(index < operation_latency_histogram_details::kHistogramsCount);
+    const auto bucket = getBucket(latency);
+    updateHistogram(histograms[index], bucket, latency, isQueryableEncryptionOperation);
+}
+
+template <typename HistogramDataType, typename StringType>
+void appendHistogram(const HistogramDataType& data,
+                     StringType key,
+                     bool includeHistograms,
+                     bool slowMSBucketsOnly,
+                     BSONObjBuilder& builder) {
+    BSONObjBuilder histogramBuilder(builder.subobjStart(key));
+    const uint64_t slowMicros = static_cast<uint64_t>(serverGlobalParams.slowMS.load()) * 1000;
+    const bool filterBuckets = slowMSBucketsOnly && slowMicros >= 0;
+
+    uint64_t filteredCount = 0;
+    uint64_t lowestFilteredBound = 0;
+
+    if (includeHistograms) {
+        BSONArrayBuilder arrayBuilder(histogramBuilder.subarrayStart("histogram"));
+        for (size_t i = 0; i < operation_latency_histogram_details::kMaxBuckets; i++) {
+            const auto bucketValue = [&] {
+                if constexpr (std::is_same_v<HistogramDataType,
+                                             AtomicOperationLatencyHistogram::HistogramType>) {
+                    return data.buckets[i].loadRelaxed();
+                } else {
+                    return data.buckets[i];
+                }
+            }();
+
+            if (bucketValue == 0) {
+                continue;
+            }
+
+            if (filterBuckets && kLowerBounds[i] >= slowMicros) {
+                if (lowestFilteredBound == 0) {
+                    lowestFilteredBound = kLowerBounds[i];
+                }
+
+                filteredCount += bucketValue;
+                continue;
+            }
+
+            BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
+            entryBuilder.append("micros", static_cast<long long>(kLowerBounds[i]));
+            entryBuilder.append("count", static_cast<long long>(bucketValue));
+            entryBuilder.doneFast();
+        }
+
+        // Append final bucket only if it contains values to minimize data in FTDC. Final bucket
+        // is aggregate of all buckets >= slowMS with bucket labeled as minimum latency of
+        // bucket.
+        if (filterBuckets && filteredCount > 0) {
+            BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
+            entryBuilder.append("micros", static_cast<long long>(lowestFilteredBound + 1));
+            entryBuilder.append("count", static_cast<long long>(filteredCount));
+            entryBuilder.doneFast();
+        }
+
+        arrayBuilder.doneFast();
+    }
+
+    uint64_t latency, ops, queryableEncryptionLatencyMicros;
+    if constexpr (std::is_same_v<HistogramDataType,
+                                 AtomicOperationLatencyHistogram::HistogramType>) {
+        latency = data.sum.loadRelaxed();
+        ops = data.entryCount.loadRelaxed();
+        queryableEncryptionLatencyMicros = data.sumQueryableEncryption.loadRelaxed();
+    } else {
+        latency = data.sum;
+        ops = data.entryCount;
+        queryableEncryptionLatencyMicros = data.sumQueryableEncryption;
+    }
+
+    histogramBuilder.append("latency", static_cast<long long>(latency));
+    histogramBuilder.append("ops", static_cast<long long>(ops));
+    histogramBuilder.append("queryableEncryptionLatencyMicros",
+                            static_cast<long long>(queryableEncryptionLatencyMicros));
+    histogramBuilder.doneFast();
+}
+
+// Note that histograms are expected to appear in the order specified by `kHistogramNames`.
+template <typename HistogramsType>
+void appendHistograms(HistogramsType& histograms,
+                      bool includeHistograms,
+                      bool slowMSBucketsOnly,
+                      BSONObjBuilder& builder) {
+    static_assert(static_cast<int>(Command::ReadWriteType::kCommand) == 0);
+    static_assert(static_cast<int>(Command::ReadWriteType::kRead) == 1);
+    static_assert(static_cast<int>(Command::ReadWriteType::kWrite) == 2);
+    static_assert(static_cast<int>(Command::ReadWriteType::kTransaction) == 3);
+    static constexpr std::array<StringData, operation_latency_histogram_details::kHistogramsCount>
+        kNames = {"commands"_sd, "reads"_sd, "writes"_sd, "transactions"_sd};
+
+    for (size_t i = 0; i < kNames.size(); ++i) {
+        appendHistogram(histograms[i], kNames[i], includeHistograms, slowMSBucketsOnly, builder);
+    }
+}
+}  // namespace
+
+namespace operation_latency_histogram_details {
+std::array<uint64_t, operation_latency_histogram_details::kMaxBuckets> getLowerBounds() {
+    return kLowerBounds;
+}
+}  // namespace operation_latency_histogram_details
 
 void OperationLatencyHistogram::increment(uint64_t latency,
                                           Command::ReadWriteType type,
-                                          bool isQuerableEncryptionOperation) {
-    int bucket = _getBucket(latency);
-    switch (type) {
-        case Command::ReadWriteType::kRead:
-            _incrementData(latency, bucket, isQuerableEncryptionOperation, &_reads);
-            break;
-        case Command::ReadWriteType::kWrite:
-            _incrementData(latency, bucket, isQuerableEncryptionOperation, &_writes);
-            break;
-        case Command::ReadWriteType::kCommand:
-            _incrementData(latency, bucket, isQuerableEncryptionOperation, &_commands);
-            break;
-        case Command::ReadWriteType::kTransaction:
-            _incrementData(latency, bucket, isQuerableEncryptionOperation, &_transactions);
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
+                                          bool isQueryableEncryptionOperation) {
+    ::mongo::increment(_histograms, latency, type, isQueryableEncryptionOperation);
+}
+
+void OperationLatencyHistogram::append(bool includeHistograms,
+                                       bool slowMSBucketsOnly,
+                                       BSONObjBuilder* builder) const {
+    appendHistograms(_histograms, includeHistograms, slowMSBucketsOnly, *builder);
+}
+
+void AtomicOperationLatencyHistogram::increment(uint64_t latency,
+                                                Command::ReadWriteType type,
+                                                bool isQueryableEncryptionOperation) {
+    ::mongo::increment(_histograms, latency, type, isQueryableEncryptionOperation);
+}
+
+void AtomicOperationLatencyHistogram::append(bool includeHistograms,
+                                             bool slowMSBucketsOnly,
+                                             BSONObjBuilder* builder) const {
+    appendHistograms(_histograms, includeHistograms, slowMSBucketsOnly, *builder);
 }
 
 }  // namespace mongo
