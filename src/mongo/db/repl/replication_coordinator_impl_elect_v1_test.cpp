@@ -1108,11 +1108,13 @@ TEST_F(ReplCoordTest, StartElectionOnSingleNodeInitiate) {
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime({Timestamp(100, 1), 0});
 
     BSONObjBuilder result;
+    // processReplSetInitiate will (through a series of steps) transition the
+    // state to secondary, which triggers election on single node. It's possible
+    // that after reaching secondary, we quickly move to primary, so we check
+    // that we are in either state below.
     ASSERT_OK(getReplCoord()->processReplSetInitiate(opCtx.get(), configObj, &result));
-    ASSERT_EQUALS(MemberState::RS_RECOVERING, getReplCoord()->getMemberState().s);
-    // Oplog applier attempts to transition the state to Secondary, which triggers
-    // election on single node.
-    getReplCoord()->finishRecoveryIfEligible(opCtx.get());
+    auto memberState = getReplCoord()->getMemberState().s;
+    ASSERT_TRUE(MemberState::RS_SECONDARY == memberState || MemberState::RS_PRIMARY == memberState);
     // Run pending election operations on executor.
     getNet()->enterNetwork();
     getNet()->runReadyNetworkOperations();

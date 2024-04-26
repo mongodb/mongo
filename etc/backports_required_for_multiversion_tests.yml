@@ -53,6 +53,8 @@ last-continuous:
       ticket: SERVER-88949
     - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
       ticket: SERVER-89618
+    - test_file: jstests/replsets/initial_sync_survives_restart.js
+      ticket: SERVER-88447
   suites: null
 last-lts:
   all:
@@ -88,4 +90,6 @@ last-lts:
       ticket: SERVER-88949
     - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
       ticket: SERVER-89618
+    - test_file: jstests/replsets/initial_sync_survives_restart.js
+      ticket: SERVER-88447
   suites: null
