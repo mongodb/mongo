@@ -103,9 +103,16 @@ public:
 
 
 void registerMongoDCollectors(FTDCController* controller) {
+
+    auto rc = repl::ReplicationCoordinator::get(getGlobalServiceContext());
+    bool isRepl =
+        repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
+        repl::ReplicationCoordinator::modeNone;
+    // Don't collect collection stats on an arbiter, which doesn't store data.
+    bool isArbiter = isRepl && rc->getMemberState().arbiter();
+
     // These metrics are only collected if replication is enabled
-    if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
-        repl::ReplicationCoordinator::modeNone) {
+    if (isRepl) {
         // CmdReplSetGetStatus
         controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
             "replSetGetStatus",
@@ -114,16 +121,20 @@ void registerMongoDCollectors(FTDCController* controller) {
             BSON("replSetGetStatus" << 1 << "initialSync" << 0)));
 
         // CollectionStats
-        controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-            "aggregate",
-            "local.oplog.rs.stats",
-            "local",
-            BSON("aggregate"
-                 << "oplog.rs"
-                 << "cursor" << BSONObj{} << "pipeline"
-                 << BSON_ARRAY(BSON("$collStats" << BSON(
-                                        "storageStats" << BSON(
-                                            "waitForLock" << false << "numericOnly" << true)))))));
+        if (!isArbiter) {
+            controller->addPeriodicCollector(
+                std::make_unique<FTDCSimpleInternalCommandCollector>(
+                    "aggregate",
+                    "local.oplog.rs.stats",
+                    "local",
+                    BSON("aggregate"
+                         << "oplog.rs"
+                         << "cursor" << BSONObj{} << "pipeline"
+                         << BSON_ARRAY(BSON("$collStats"
+                                            << BSON("storageStats"
+                                                    << BSON("waitForLock" << false << "numericOnly"
+                                                                          << true)))))));
+        }
         if (!serverGlobalParams.clusterRole.exclusivelyHasShardRole()) {
             // GetDefaultRWConcern
             controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
@@ -136,7 +147,10 @@ void registerMongoDCollectors(FTDCController* controller) {
 
     controller->addPeriodicCollector(std::make_unique<FTDCCollectionStatsCollector>());
 
-    controller->addPeriodicCollector(std::make_unique<transport::TransportLayerFTDCCollector>());
+    if (!isArbiter) {
+        controller->addPeriodicCollector(
+            std::make_unique<transport::TransportLayerFTDCCollector>());
+    }
 }
 
 }  // namespace
