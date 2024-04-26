@@ -30,7 +30,6 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/db/auth/user_name.h"
-    - "mongo/db/auth/privilege.h"
     - "mongo/db/auth/role_name.h"
     - "mongo/db/auth/role_name_or_string.h"
 

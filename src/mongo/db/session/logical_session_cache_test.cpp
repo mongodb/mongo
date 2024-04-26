@@ -64,7 +64,8 @@
 namespace mongo {
 namespace {
 
-const Milliseconds kSessionTimeout = duration_cast<Milliseconds>(kLogicalSessionDefaultTimeout);
+const Milliseconds kSessionTimeout =
+    duration_cast<Milliseconds>(Minutes(kLocalLogicalSessionTimeoutMinutesDefault));
 const Milliseconds kForceRefresh{kLogicalSessionRefreshMillisDefault};
 
 using SessionList = std::list<LogicalSessionId>;

@@ -39,7 +39,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/str.h"
 
@@ -183,6 +182,10 @@ void IDLParserContext::throwMissingField(StringData fieldName) const {
               str::stream() << "BSON field '" << path << "' is missing but a required field");
 }
 
+bool isMongocryptdArgument(StringData arg) {
+    return arg == "jsonSchema"_sd;
+}
+
 void IDLParserContext::throwUnknownField(StringData fieldName) const {
     std::string path = getElementPath(fieldName);
     if (isMongocryptdArgument(fieldName)) {
@@ -268,21 +271,6 @@ std::variant<UUID, StringData> IDLParserContext::checkAndAssertCollectionNameOrU
     } else {
         // Ensure collection identifier is not a Command
         return checkAndAssertCollectionName(element, false);
-    }
-}
-
-void IDLParserContext::appendGenericCommandArguments(const BSONObj& commandPassthroughFields,
-                                                     const std::vector<StringData>& knownFields,
-                                                     BSONObjBuilder* builder) {
-
-    for (const auto& element : commandPassthroughFields) {
-
-        StringData name = element.fieldNameStringData();
-        // Include a passthrough field as long the IDL class has not defined it.
-        if (mongo::isGenericArgument(name) &&
-            std::find(knownFields.begin(), knownFields.end(), name) == knownFields.end()) {
-            builder->append(element);
-        }
     }
 }
 

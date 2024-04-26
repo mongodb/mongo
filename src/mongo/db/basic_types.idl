@@ -40,6 +40,7 @@ global:
         - "mongo/bson/bson_duration.h"
         - "mongo/bson/bson_time_support.h"
         - "mongo/util/uuid.h"
+        - "mongo/idl/command_generic_argument.h"
 
 types:
     string:

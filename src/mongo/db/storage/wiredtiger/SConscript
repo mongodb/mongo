@@ -82,6 +82,7 @@ wtEnv.Library(
         '$BUILD_DIR/mongo/db/mongod_options',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/snapshot_window_options',
         '$BUILD_DIR/mongo/db/stats/resource_consumption_metrics',

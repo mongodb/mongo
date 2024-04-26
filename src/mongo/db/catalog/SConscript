@@ -89,8 +89,8 @@ env.Library(
         'health_log_interface.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -103,7 +103,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/deferred_writer',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'collection_options',
         'health_log_interface',
     ],
@@ -297,7 +296,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/durable_catalog',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/views/views',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'collection_crud',
     ],
 )
@@ -605,7 +603,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -642,7 +639,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 

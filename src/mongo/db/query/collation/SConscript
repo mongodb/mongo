@@ -92,6 +92,7 @@ icuEnv.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/bson/util/bson_extract",
+        "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/util/icu_init",
         "$BUILD_DIR/third_party/shim_icu",
         "collator_factory_interface",

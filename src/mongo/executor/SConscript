@@ -311,7 +311,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/kill_common',
-        '$BUILD_DIR/mongo/idl/generic_args_with_types_idl',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/rpc/command_status',
         'async_rpc_error_info',
         'hedge_options_util',
