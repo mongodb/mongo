@@ -92,17 +92,9 @@ async function runWorkloads(workloads,
             cluster.awaitReplication();
         }
 
-        // Transactions run at snapshot read concern unless defaultTransactionReadConcernLevel
-        // is set to another level.
-        const transactionsWouldUseSnapshotReadConcern =
-            !TestData.hasOwnProperty("defaultTransactionReadConcernLevel") ||
-            TestData.defaultTransactionReadConcernLevel === "snapshot";
-
-        // Synchronize the cluster times across all routers if the tests will be overriden to
-        // use transactions, so the earliest global snapshots chosen by each router will include
-        // the effects of each setup function. This is only required for snapshot read concern.
-        if (cluster.isSharded() && TestData.runInsideTransaction &&
-            transactionsWouldUseSnapshotReadConcern) {
+        // Synchronize the cluster times across all routers, so the earliest global snapshots chosen
+        // by each router will include the effects of each setup function.
+        if (cluster.isSharded()) {
             cluster.synchronizeMongosClusterTimes();
         }
 
