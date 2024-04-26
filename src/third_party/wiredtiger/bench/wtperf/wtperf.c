@@ -1329,6 +1329,7 @@ backup_worker(void *arg)
         lprintf(wtperf, ret, 0, "open_session failed in backup thread.");
         goto err;
     }
+    thread->backup.ops = wtperf->backup_ops;
 
     while (!wtperf->stop) {
         /* Break the sleep up, so we notice interrupts faster. */
@@ -2776,6 +2777,12 @@ main(int argc, char *argv[])
             testutil_recreate_dir(wtperf->home);
         }
         testutil_check(create_tiered_bucket(wtperf));
+    } else if (opts->backup_interval != 0 && opts->backup_complete != 0) {
+        if (chdir(wtperf->home) != 0)
+            testutil_die(errno, "backup chdir: %s", wtperf->home);
+        testutil_last_backup_id((int *)&wtperf->backup_ops);
+        /* Increment the id for the next backup number. */
+        ++wtperf->backup_ops;
     }
 
     /* Write a copy of the config. */

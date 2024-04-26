@@ -275,6 +275,41 @@ __int_comparator(const void *a, const void *b)
 }
 
 /*
+ * testutil_last_backup_id --
+ *     Find the last valid backup id number. Can be used after a restart to determine backups based
+ *     on directory naming.
+ */
+void
+testutil_last_backup_id(int *last_id)
+{
+#ifdef _WIN32
+    WT_UNUSED(last_id);
+    testutil_assert(0);
+#else
+    struct dirent *dir;
+    DIR *d;
+    size_t len;
+    int i;
+
+    testutil_assert(last_id != NULL);
+    *last_id = 0;
+    len = strlen(BACKUP_BASE);
+    testutil_assert_errno((d = opendir(".")) != NULL);
+    while ((dir = readdir(d)) != NULL) {
+        if (strncmp(dir->d_name, BACKUP_BASE, len) == 0) {
+
+            /* If the backup failed to finish, don't process it. */
+            if (!testutil_exists(dir->d_name, "done"))
+                continue;
+            i = atoi(dir->d_name + len);
+            *last_id = WT_MAX(*last_id, i);
+        }
+    }
+    testutil_check(closedir(d));
+#endif
+}
+
+/*
  * testutil_delete_old_backups --
  *     Delete old backups, keeping just a few recent ones, so that we don't take too much space for
  *     no good reason.
