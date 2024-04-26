@@ -14,6 +14,9 @@
  *   requires_timeseries,
  *   # This test depends on stats read from the primary node in replica sets.
  *   assumes_read_preference_unchanged,
+ *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
+ *   # collection to insert more documents then expected by the test.
+ *   assumes_balancer_off,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

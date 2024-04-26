@@ -13,6 +13,9 @@
  *   # thus different buckets.
  *   does_not_support_stepdowns,
  *   tenant_migration_incompatible,
+ *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
+ *   # collection to insert more documents then expected by the test.
+ *   assumes_balancer_off,
  * ]
  */
 

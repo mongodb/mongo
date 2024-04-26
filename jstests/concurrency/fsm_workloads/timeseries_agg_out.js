@@ -18,6 +18,7 @@
  *   command_not_supported_in_serverless,
  * ]
  */
+import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from 'jstests/concurrency/fsm_workloads/agg_out.js';
@@ -50,7 +51,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             cursor: {}
         });
 
-        const allowedErrorCodes = [
+        let allowedErrorCodes = [
             // indexes of target collection changed during processing.
             ErrorCodes.CommandFailed,
             // $out is not supported to an existing *sharded* output collection
@@ -67,6 +68,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // TODO SERVER-87422 potentially remove this error since there are no concurrent drops
             ErrorCodes.NamespaceNotFound,
         ];
+
+        // TODO (SERVER-88275) a moveCollection can cause the original collection to be dropped and
+        // re-created with a different uuid, causing the aggregation to fail with QueryPlannedKilled
+        // when the mongos is fetching data from the shard using getMore(). Remove
+        // theinterruptedQueryErrors from allowedErrorCodes once this bug is being addressed
+        if (TestData.runningWithBalancer) {
+            allowedErrorCodes = allowedErrorCodes.concat(interruptedQueryErrors)
+        }
+
         assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
         if (res.ok) {
             const cursor = new DBCommandCursor(db, res);
@@ -101,12 +111,30 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
 
         jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
+        // IllegalOperation can happen when trying to convert to capped a timeseries, which is not
+        // allowed.
         assert.commandFailedWithCode(
             db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
                 ErrorCodes.CommandNotSupportedOnView,
                 ErrorCodes.NamespaceNotFound,
-                ErrorCodes.NamespaceCannotBeSharded
+                ErrorCodes.NamespaceCannotBeSharded,
+                ErrorCodes.IllegalOperation
             ]);
+    };
+
+    /**
+     * Same implementation as parent shardCollection, but allow ConflictingOperationInProgress error
+     * which might happen as a concurrent $out creating the timeseries view.
+     */
+    $config.states.shardCollection = function shardCollection(db, unusedCollName) {
+        if (isMongos(db) && this.tid === 0) {
+            jsTestLog(`Running shardCollection: coll=${this.outputCollName} key=${this.shardKey}`);
+
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand(
+                    {shardCollection: db[this.outputCollName].getFullName(), key: this.shardKey}),
+                [ErrorCodes.ConflictingOperationInProgress]);
+        }
     };
 
     $config.teardown = function teardown(db) {

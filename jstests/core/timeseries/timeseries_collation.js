@@ -8,6 +8,9 @@
  *   tenant_migration_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
+ *   # collection to insert more # documents then expected by the test.
+ *   assumes_balancer_off,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

@@ -15,6 +15,25 @@
  * ]
  */
 
+// TODO (SERVER-88275) a moveCollection can cause the original collection to be dropped and
+// re-created with a different uuid, causing the aggregation to fail with QueryPlannedKilled
+// when the mongos is fetching data from the shard using getMore(). Remove the helper and
+// allowedErrorCodes from the entire test once this issue is fixed
+function retryUntilWorked(query) {
+    var attempts = 0;
+    while (attempts < 3) {
+        try {
+            return query();
+        } catch (e) {
+            if (e.code == ErrorCodes.QueryPlanKilled && TestData.runningWithBalancer) {
+                attempts++
+            } else {
+                throw e;
+            }
+        }
+    }
+}
+
 export const $config = (function() {
     const data = {
         logColl: "deletes_and_inserts_log",
@@ -115,10 +134,13 @@ export const $config = (function() {
         // Now validate the state of each reading. We will check all of the seed data and each
         // reading that we may have inserted.
         for (let readingNo = 0; readingNo < data.nTotalReadings; ++readingNo) {
-            const wasDeleted = logColl.count({readingNo: readingNo, deleted: true}) > 0;
-            const wasInserted = logColl.count({readingNo: readingNo, inserted: true}) > 0;
+            const wasDeleted = retryUntilWorked(
+                () => {return logColl.count({readingNo: readingNo, deleted: true}) > 0});
+            const wasInserted = retryUntilWorked(
+                () => {return logColl.count({readingNo: readingNo, inserted: true}) > 0});
 
-            const nReadings = db[collName].count({readingNo: readingNo});
+            const nReadings =
+                retryUntilWorked(() => {return db[collName].count({readingNo: readingNo})});
 
             if (wasDeleted && !wasInserted) {
                 // Easy case: this reading was deleted and never inserted - we expect 0 records.
@@ -153,12 +175,14 @@ export const $config = (function() {
 
         // Now make sure that any full-bucket deletions at least deleted all original records.
         for (const deletedSensor of deletedSensors) {
-            const minReading = db[collName]
-                                   .aggregate([
-                                       {$match: {sensorId: deletedSensor}},
-                                       {$group: {_id: null, min: {$min: "$readingNo"}}}
-                                   ])
-                                   .toArray();
+            const minReading = retryUntilWorked(() => {
+                return db[collName]
+                    .aggregate([
+                        {$match: {sensorId: deletedSensor}},
+                        {$group: {_id: null, min: {$min: "$readingNo"}}}
+                    ])
+                    .toArray();
+            });
 
             assert(minReading.length == 0 || minReading[0].min >= data.nReadingsPerSensor,
                    `Expected all of the original readings to be deleted: sensorId: ${

@@ -16,6 +16,9 @@
  *   requires_timeseries,
  *   # The expected doc examined is incorrect in multiversion tests with mongod below 8.0.
  *   requires_fcv_80,
+ *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
+ *   # collection to insert more documents then expected by the test.
+ *   assumes_balancer_off,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

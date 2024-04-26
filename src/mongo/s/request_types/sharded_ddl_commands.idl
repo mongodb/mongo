@@ -299,8 +299,7 @@ structs:
                     doesn't already exist. Only allowed if `unsplittable` is true.
                 type: shard_id
                 optional: true
-            # TODO SERVER-83878 Remove this parameter when unsplittable timeseries collections request coming 
-            # from the {create...} cmd start getting tracked in the catalog 
+            # TODO SERVER-85395 Remove this parameter once the test command is removed.
             isFromCreateUnsplittableCollectionTestCommand:
                 description: "Temporary field to differentiate calls originating from the createUnsplittableCollection test command."
                 type: optionalBool

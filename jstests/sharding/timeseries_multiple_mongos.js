@@ -8,6 +8,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 Random.setRandomSeed();
@@ -35,11 +36,28 @@ function generateId() {
     return currentId++;
 }
 
+// TODO SERVER-87797 remove completely the unsharded field. The test starts by creating an
+// unsharded collection with mongo1 and sharding it with mongo0. The command specified in the test
+// case is then run with mongos1 (stale). The sharded collection is then dropped and re-created as
+// unsharded from mongos0 and re-attempted the command from mongos1. The test searches in
+// system.profile that the command run 2 times (1 per shard) for the sharded case and 1 time for the
+// unsharded case. The test is testing specifically the interaction within the sharding protocol
+// which is way beyond the scope of the test. Rewrite this test to check the command simply works on
+// the stale mongos
+const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+                                    st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation") ||
+    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'),
+                                        "TrackUnshardedCollectionsUponMoveCollection");
+
 /**
  * The test runs drop, create and shardCollection commands using mongos0, then validates the given
  * command by running against mongos1 with stale config.
  */
 function runTest({shardKey, cmdObj, numProfilerEntries}) {
+    if (isTrackUnshardedEnabled) {
+        return;
+    }
+
     const isInsert = cmdObj["insert"] !== undefined;
     const isDelete = cmdObj["delete"] !== undefined;
     const isUpdate = cmdObj["update"] !== undefined;
