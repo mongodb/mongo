@@ -107,11 +107,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
         jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
+        // The command might return IllegalOperation when running on a timeseries, which is not
+        // allowed. TODO SERVER-89880 remove ErrorCodes.IllegalOperation.
         assert.commandFailedWithCode(
             db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
                 ErrorCodes.CommandNotSupportedOnView,
                 ErrorCodes.NamespaceNotFound,
-                ErrorCodes.NamespaceCannotBeSharded
+                ErrorCodes.NamespaceCannotBeSharded,
+                ErrorCodes.IllegalOperation
             ]);
     };
 
