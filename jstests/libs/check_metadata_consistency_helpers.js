@@ -67,6 +67,11 @@ export var MetadataConsistencyChecker = (function() {
                 if (slowBuild) {
                     jsTest.log(
                         `Ignoring LockBusy error on checkMetadataConsistency because we are running with very slow build (e.g. ASAN enabled)`);
+                } else if (TestData.transitioningConfigShard) {
+                    // TODO SERVER-89841: The config shard transition suite puts pressure on DDL
+                    // locks and can lead the checker to fail with LockBusy.
+                    jsTest.log(
+                        `Temporarily ignoring LockBusy error on checkMetadataConsistency because we are running with config transitions`);
                 } else {
                     throw e;
                 }

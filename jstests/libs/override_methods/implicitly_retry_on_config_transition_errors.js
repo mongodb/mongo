@@ -19,7 +19,12 @@ const kRetryableErrors = [ErrorCodes.MovePrimaryInProgress];
 // Empty for now.
 const kDisallowedCommands = [];
 
-function shouldRetry(res) {
+function shouldRetry(cmdObj, res) {
+    if (cmdObj.hasOwnProperty("autocommit")) {
+        // Retries in a transaction must come from whatever is running the transaction.
+        return false;
+    }
+
     if (res.hasOwnProperty("code") && kRetryableErrors.includes(res.code)) {
         return true;
     }
@@ -50,7 +55,7 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
 
             res = func.apply(conn, makeFuncArgs(cmdObj));
 
-            if (shouldRetry(res)) {
+            if (shouldRetry(cmdObj, res)) {
                 print("Retrying on error from " + cmdName +
                       " with transitioning config shard. Attempt: " + attempt +
                       ", res: " + tojson(res));
