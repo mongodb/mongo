@@ -240,6 +240,74 @@ tasks:
           resmoke_args: >-
             --runAllFeatureFlagTests
 
+  - <<: *antithesis_task_template
+    name: antithesis_replica_sets_lag_oplog_application_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_lag_oplog_application_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_replica_sets_kill_primary_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_kill_primary_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_replica_sets_kill_secondaries_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_kill_secondaries_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_replica_sets_initsync_lagged_sync_source_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_initsync_lagged_sync_source_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
   - name: build_metrics_tasks_gen
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
