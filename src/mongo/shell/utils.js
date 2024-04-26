@@ -75,7 +75,11 @@ function isNetworkError(error) {
         "error doing query",
         "socket exception",
         "SocketException",
-        "HostNotFound"
+        "HostNotFound",
+        "HostUnreachable",
+        "NetworkTimeout",
+        "ConnectionPoolExpired",
+        "ConnectionError",
     ];
     // See if any of the known network error strings appear in the given message.
     return networkErrs.some(err => error.message.includes(err));
