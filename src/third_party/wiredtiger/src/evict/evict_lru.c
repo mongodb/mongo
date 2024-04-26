@@ -1933,6 +1933,11 @@ rand_next:
                 WT_STAT_DATA_INCR(session, cache_eviction_walk_restart);
             }
             WT_RET_NOTFOUND_OK(ret);
+
+            if (btree->evict_ref == NULL) {
+                WT_STAT_CONN_INCR(session, cache_eviction_walk_random_returns_null_position);
+                WT_STAT_DATA_INCR(session, cache_eviction_walk_random_returns_null_position);
+            }
         }
         break;
     }
