@@ -2,6 +2,8 @@
  * Perform CRUD operations, some of which may implicitly create collections, in parallel with
  * collection-dropping operations.
  */
+import {includesErrorCode} from "jstests/libs/error_code_utils.js";
+
 export const $config = (function() {
     const data = {numIds: 10, docValue: "mydoc"};
 
@@ -86,6 +88,13 @@ export const $config = (function() {
                             e["errorLabels"] = ["TransientTransactionError"];
                             throw e;
                         }
+                    } else if (TestData.runInsideTransaction &&
+                               includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
+                        // Rethrow so the auto transaction retry logic will retry.
+                        //
+                        // TODO SERVER-89555: Remove when operations on tracked unsharded
+                        // collections don't hit MovePrimaryInProgress errors.
+                        throw e;
                     } else {
                         assert.contains(
                             e.code,
@@ -148,6 +157,13 @@ export const $config = (function() {
                         e["errorLabels"] = ["TransientTransactionError"];
                         throw e;
                     }
+                } else if (TestData.runInsideTransaction &&
+                           includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
+                    // Rethrow so the auto transaction retry logic will retry.
+                    //
+                    // TODO SERVER-89555: Remove when operations on tracked unsharded collections
+                    // don't hit MovePrimaryInProgress errors.
+                    throw e;
                 } else {
                     // dropIndex can cause queries to throw if these queries yield.
                     assert.contains(e.code,
