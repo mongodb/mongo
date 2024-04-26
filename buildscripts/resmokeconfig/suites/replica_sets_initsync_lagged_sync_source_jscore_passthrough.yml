@@ -1,0 +1,75 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # Tests that query the system.profile collection cannot run in this suite since an initial sync
+    # may insert unexpected operations into the profile collection.
+    - jstests/core/**/profile_list_collections.js
+    - jstests/core/**/profile_list_indexes.js
+    - jstests/core/**/recursion.js
+    - jstests/core/**/system_profile.js
+    # The following tests examine the SBE plan cache, which initial sync may change the contents of.
+    - jstests/core/query/plan_cache/plan_cache_sbe.js
+    - jstests/core/query/plan_cache/query_solution_hash.js
+    - jstests/core/query/sbe_plan_cache_autoparameterize_ixscan.js
+    - jstests/core/timeseries/bucket_unpacking_with_sort_plan_cache.js
+    # operation_latency_histogram.js and geo_s2cursorlimitskip.js do not expect concurrent reads
+    # against their test collections.
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/geo_s2cursorlimitskip.js
+    # Having duplicate namespaces is not supported and will cause initial sync to fail.
+    - jstests/core/views/duplicate_ns.js
+    # These tests run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
+    - jstests/core/**/profile_agg.js
+    - jstests/core/**/profile_count.js
+    - jstests/core/**/profile_delete.js
+    - jstests/core/**/profile_distinct.js
+    - jstests/core/**/profile_find.js
+    - jstests/core/**/profile_findandmodify.js
+    - jstests/core/**/profile_getmore.js
+    - jstests/core/**/profile_insert.js
+    - jstests/core/**/profile_mapreduce.js
+    - jstests/core/**/profile_sampling.js
+    - jstests/core/**/profile_update.js
+    - jstests/core/txns/transactions_profiling.js
+    - jstests/core/write/bulk/bulk_write_profile.js
+    # The downstream syncing node affects the top output.
+    - jstests/core/**/top.js
+    # Change stream pre-images are not cloned during initial sync.
+    - jstests/core/**/write_change_stream_pit_preimage.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+
+run_hook_interval: &run_hook_interval 20
+executor:
+  archive:
+    hooks:
+      - LagOplogApplicationInBackground
+      - BackgroundInitialSync
+  config:
+    shell_options:
+      eval: "globalThis.testingReplication = true;"
+  hooks:
+    - class: LagOplogApplicationInBackground
+      shell_options:
+        nodb: ""
+    - class: BackgroundInitialSync
+      n: *run_hook_interval
+    - class: CleanEveryN
+      n: *run_hook_interval
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableAutoCompaction: 1
+        enableTestCommands: 1
+        collectionClonerBatchSize: 10
+        initialSyncOplogFetcherBatchSize: 10
+        initialSyncSourceReadPreference: "secondaryPreferred"
+    num_nodes: 3
+    start_initial_sync_node: True

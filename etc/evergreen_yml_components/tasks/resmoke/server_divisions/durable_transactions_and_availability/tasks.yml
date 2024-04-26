@@ -1200,6 +1200,21 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
 
+  - <<: *gen_task_template
+    name: replica_sets_initsync_lagged_sync_source_jscore_passthrough_gen
+    # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "incompatible_debug_mode",
+        "replica_sets",
+        "san",
+        "large",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
   - <<: *task_template
     name: replica_sets_initsync_static_jscore_passthrough
     # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
