@@ -102,10 +102,8 @@ if (!session.getClient().isMongos() && !TestData.testingReplicaSetEndpoint) {
 // above, the collection is dropped at a wallclock time later than the wallclock time the
 // transaction starts.
 //
-// TODO: SERVER-79766 Run also on sharded clusters. Right now it cannot because TransactionRouter
-// ignores the client-privided atClusterTime.
 // Skip on causal-consistency suites because we cannot use 'atClusterTime' there.
-if (!db.getMongo().isCausalConsistency() && !session.getClient().isMongos()) {
+if (!db.getMongo().isCausalConsistency()) {
     sessionCollA.drop();
     sessionCollB.drop();
 
