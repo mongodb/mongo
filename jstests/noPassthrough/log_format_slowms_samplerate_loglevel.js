@@ -53,8 +53,12 @@ function dropAndRecreateTestCollection() {
 // corresponding output. Returns a pair of arrays [testsRun, logLines]; the former is the set of
 // test cases that were run, while the latter contains the logline for each test, or null if no
 // such logline was found.
-function runLoggingTests({db, slowMs, logLevel, sampleRate}) {
+function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = false}) {
     dropAndRecreateTestCollection();
+
+    // We either enable query stats on every query (rate limit -1) or no queries (rate limit 0).
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: enableQueryStats ? -1 : 0}));
 
     const coll = db.test;
 
@@ -84,11 +88,24 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate}) {
     // Certain fields in the log lines on mongoD are not applicable in their counterparts on
     // mongoS, and vice-versa. Ignore these fields when examining the logs of an instance on
     // which we do not expect them to appear.
-    const ignoreFields =
-            (isMongos
-                 ? ["docsExamined", "keysExamined", "keysInserted", "keysDeleted", "planSummary",
-					"usedDisk", "hasSortStage"]
-                 : ["nShards"]);
+    const ignoreFields = (() => {
+        if (!isMongos) {
+            return ["nShards"];
+        } else if (!enableQueryStats) {
+            return [
+                "docsExamined",
+                "keysExamined",
+                "keysInserted",
+                "keysDeleted",
+                "planSummary",
+                "usedDisk",
+                "hasSortStage"
+            ];
+
+        } else {
+            return ["keysInserted", "keysDeleted", "planSummary"];
+        }
+    })();
 
     function confirmLogContents(db, {test, logFields}, testIndex) {
         // Clear the log before running the test, to guarantee that we do not match against any
@@ -194,15 +211,16 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate}) {
                           {_id: 1, a: 1, loc: {type: "Point", coordinates: [1, 1]}});
             },
             // TODO SERVER-34208: display FAM update metrics in mongoS logs.
-            logFields: Object.assign((isMongos ? {} : {nMatched: 1, nModified: 1}), {
-                command: "findAndModify",
-                findandmodify: coll.getName(),
-                planSummary: "IXSCAN { _id: 1 }",
-                keysExamined: 1,
-                docsExamined: 1,
-                $comment: logFormatTestComment,
-                collation: {locale: "fr"}
-            })
+            // For mongos with query stats enabled, findAndModify doesn't roll up data-bearing node
+            // metrics (keysExamined, docsExamined).
+            logFields: Object.assign(
+                (isMongos ? {} : {nMatched: 1, nModified: 1, keysExamined: 1, docsExamined: 1}), {
+                    command: "findAndModify",
+                    findandmodify: coll.getName(),
+                    planSummary: "IXSCAN { _id: 1 }",
+                    $comment: logFormatTestComment,
+                    collation: {locale: "fr"}
+                })
         },
         {
             test: function(db) {
@@ -211,15 +229,15 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate}) {
                     out: {inline: 1},
                 }));
             },
-            logFields: {
+            // For mongos with query stats enabled, mapReduce doesn't roll up data-bearing node
+            // metrics (keysExamined, docsExamined).
+            logFields: Object.assign(isMongos ? {} : {keysExamined: 0, docsExamined: 10}, {
                 command: "mapReduce",
                 mapreduce: coll.getName(),
                 planSummary: "COLLSCAN",
-                keysExamined: 0,
-                docsExamined: 10,
                 $comment: logFormatTestComment,
                 out: {inline: 1}
-            }
+            })
         },
         {
             test: function(db) {
@@ -321,8 +339,10 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate}) {
                         originalSortBytes.internalQueryMaxBlockingSortMemoryUsageBytes
                 }));
             },
+            // This query won't necessarily use disk in a sharded context.
             logFields:
-                {command: "aggregate", aggregate: coll.getName(), hasSortStage: 1, usedDisk: 1}
+                Object.assign(isMongos ? {} : {usedDisk: 1},
+                              {command: "aggregate", aggregate: coll.getName(), hasSortStage: 1})
         },
         {
             test: function(db) {
@@ -425,7 +445,7 @@ for (let testDB of [shardDB, mongosDB]) {
     let [testsRun, logLines] =
         runLoggingTests({db: testDB, slowMs: -1, logLevel: 0, sampleRate: 1.0});
     let unlogged = getUnloggedTests(testsRun, logLines);
-    assert.eq(unlogged.length, 0, () => tojson(unlogged));
+    assert.eq(unlogged.length, 0, unlogged);
 
     // Test that only some operations are logged when sampleRate is < 1 at the default
     // logLevel, even when slowMs is < 0. The actual sample rate is probabilistic, and may
@@ -448,7 +468,7 @@ for (let testDB of [shardDB, mongosDB]) {
     [testsRun, logLines] =
         runLoggingTests({db: testDB, slowMs: 1000000, logLevel: 0, sampleRate: 1.0});
     unlogged = getUnloggedTests(testsRun, logLines);
-    assert.eq(unlogged.length, Math.floor(testsRun.length / 2), () => tojson(unlogged));
+    assert.eq(unlogged.length, Math.floor(testsRun.length / 2), unlogged);
 
     // Test that all operations are logged when logLevel is 1, regardless of sampleRate and
     // slowMs. We pass 'null' for slowMs to signify that a high threshold should be set
@@ -458,6 +478,13 @@ for (let testDB of [shardDB, mongosDB]) {
     [testsRun, logLines] =
         runLoggingTests({db: testDB, slowMs: null, logLevel: 1, sampleRate: 0.5});
     unlogged = getUnloggedTests(testsRun, logLines);
-    assert.eq(unlogged.length, 0, () => tojson(unlogged));
+    assert.eq(unlogged.length, 0, unlogged);
+
+    // Test with query stats enabled. This should only affect the log format in the mongos case,
+    // but we'll run against both the mongos and the shard to make sure.
+    [testsRun, logLines] = runLoggingTests(
+        {db: testDB, slowMs: -1, logLevel: 0, sampleRate: 1.0, enableQueryStats: true});
+    unlogged = getUnloggedTests(testsRun, logLines);
+    assert.eq(unlogged.length, 0, unlogged);
 }
 st.stop();
