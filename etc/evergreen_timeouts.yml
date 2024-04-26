@@ -103,6 +103,20 @@ overrides:
   rhel80-debug-aubsan-all-feature-flags:
     - task: update_timeseries_fuzzer
       exec_timeout: 180 # 3 hours
+    - task: change_stream_serverless_no_optimization_fuzzer
+      exec_timeout: 300 # 5 hours
+    - task: change_stream_serverless_fuzzer
+      exec_timeout: 300 # 5 hours
+    - task: change_stream_optimization_fuzzer
+      exec_timeout: 300 # 5 hours
+
+  rhel80-debug-aubsan:
+    - task: change_stream_serverless_no_optimization_fuzzer
+      exec_timeout: 300 # 5 hours
+    - task: change_stream_serverless_fuzzer
+      exec_timeout: 300 # 5 hours
+    - task: change_stream_optimization_fuzzer
+      exec_timeout: 300 # 5 hours
 
   rhel80-debug-aubsan-classic-engine:
     - task: update_timeseries_fuzzer
