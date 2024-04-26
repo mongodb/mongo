@@ -497,6 +497,8 @@ last-continuous:
     ticket: SERVER-89618
   - test_file: jstests/core/timeseries/timeseries_computed_field.js
     ticket: SERVER-88072
+  - test_file: jstests/core/timeseries/timeseries_geonear_lookup.js
+    ticket: SERVER-81454
   suites: null
 last-lts:
   all:
@@ -1044,4 +1046,6 @@ last-lts:
     ticket: SERVER-89618
   - test_file: jstests/core/timeseries/timeseries_computed_field.js
     ticket: SERVER-88072
+  - test_file: jstests/core/timeseries/timeseries_geonear_lookup.js
+    ticket: SERVER-81454
   suites: null
