@@ -42,20 +42,23 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     VariantCollectionPtrOrAcquisition coll,
-    boost::optional<ScopedCollectionFilter> collectionFilter);
+    boost::optional<ScopedCollectionFilter> collectionFilter,
+    bool returnOwnedBson);
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByClusteredId(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     VariantCollectionPtrOrAcquisition coll,
-    boost::optional<ScopedCollectionFilter> collectionFilter);
+    boost::optional<ScopedCollectionFilter> collectionFilter,
+    bool returnOwnedBson);
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByUserIndex(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     VariantCollectionPtrOrAcquisition coll,
     const IndexEntry& index,
-    boost::optional<ScopedCollectionFilter> collectionFilter);
+    boost::optional<ScopedCollectionFilter> collectionFilter,
+    bool returnOwnedBson);
 
 /**
  * Tries to find an index suitable for use in the express equality path. Excludes indexes which

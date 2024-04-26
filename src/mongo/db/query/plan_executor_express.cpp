@@ -70,7 +70,8 @@ public:
     PlanExecutorExpress(OperationContext* opCtx,
                         std::unique_ptr<CanonicalQuery> cq,
                         VariantCollectionPtrOrAcquisition coll,
-                        Plan plan);
+                        Plan plan,
+                        bool returnOwnedBson);
 
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();
@@ -205,7 +206,7 @@ public:
     }
 
     void setReturnOwnedData(bool returnOwnedData) override {
-        // TODO (SERVER-89054): It may be necessary to honor this flag in some cases.
+        _mustReturnOwnedBson = returnOwnedData;
     }
 
     bool usesCollectionAcquisitions() const override {
@@ -235,6 +236,7 @@ private:
     std::vector<NamespaceStringOrUUID> _secondaryNss;
 
     Plan _plan;
+    bool _mustReturnOwnedBson;
 
     /**
      * Some commands return multiple cursors to the client, which are distinguished by their "cursor
@@ -248,14 +250,16 @@ template <class Plan>
 PlanExecutorExpress<Plan>::PlanExecutorExpress(OperationContext* opCtx,
                                                std::unique_ptr<CanonicalQuery> cq,
                                                VariantCollectionPtrOrAcquisition coll,
-                                               Plan plan)
+                                               Plan plan,
+                                               bool returnOwnedBson)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _nss(_cq->nss()),
       _coll(coll),
       _commonStats("EXPRESS"),
       _planExplainer(&_commonStats, &_planStats, &_iteratorStats),
-      _plan(std::move(plan)) {
+      _plan(std::move(plan)),
+      _mustReturnOwnedBson(returnOwnedBson) {
     _plan.open(_opCtx, &coll.getCollectionPtr(), &_planStats, &_iteratorStats);
 }
 
@@ -275,6 +279,9 @@ PlanExecutor::ExecState PlanExecutorExpress<Plan>::getNext(BSONObj* out, RecordI
             *out = std::move(obj);
             if (dlOut) {
                 *dlOut = std::move(rid);
+            }
+            if (_mustReturnOwnedBson) {
+                out->makeOwned();
             }
             haveOutput = true;
             return express::Ready();
@@ -303,7 +310,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
     IteratorChoice iterator,
     std::unique_ptr<CanonicalQuery> cq,
     VariantCollectionPtrOrAcquisition coll,
-    boost::optional<ScopedCollectionFilter> collectionFilter) {
+    boost::optional<ScopedCollectionFilter> collectionFilter,
+    bool returnOwnedBson) {
     using ShardFilterForRead = std::variant<express::NoShardFilter, ScopedCollectionFilter>;
 
     ShardFilterForRead shardFilter = express::NoShardFilter();
@@ -325,7 +333,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
             auto plan = express::ExpressPlan(
                 std::move(iterator), std::move(chosenShardFilter), std::move(chosenProjection));
 
-            return {new PlanExecutorExpress(opCtx, std::move(cq), coll, std::move(plan)),
+            return {new PlanExecutorExpress(
+                        opCtx, std::move(cq), coll, std::move(plan), returnOwnedBson),
                     PlanExecutor::Deleter(opCtx)};
         },
         shardFilter,
@@ -337,26 +346,30 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     VariantCollectionPtrOrAcquisition coll,
-    boost::optional<ScopedCollectionFilter> collectionFilter) {
+    boost::optional<ScopedCollectionFilter> collectionFilter,
+    bool returnOwnedBson) {
     const BSONObj& queryFilter = cq->getQueryObj();
     return makeExpressExecutor(opCtx,
                                express::IdLookupViaIndex(queryFilter),
                                std::move(cq),
                                coll,
-                               std::move(collectionFilter));
+                               std::move(collectionFilter),
+                               returnOwnedBson);
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByClusteredId(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     VariantCollectionPtrOrAcquisition coll,
-    boost::optional<ScopedCollectionFilter> collectionFilter) {
+    boost::optional<ScopedCollectionFilter> collectionFilter,
+    bool returnOwnedBson) {
     const BSONObj& queryFilter = cq->getQueryObj();
     return makeExpressExecutor(opCtx,
                                express::IdLookupOnClusteredCollection(queryFilter),
                                std::move(cq),
                                coll,
-                               std::move(collectionFilter));
+                               std::move(collectionFilter),
+                               returnOwnedBson);
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByUserIndex(
@@ -364,7 +377,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
     std::unique_ptr<CanonicalQuery> cq,
     VariantCollectionPtrOrAcquisition coll,
     const IndexEntry& index,
-    boost::optional<ScopedCollectionFilter> collectionFilter) {
+    boost::optional<ScopedCollectionFilter> collectionFilter,
+    bool returnOwnedBson) {
     auto indexDescriptor = coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
         opCtx, index.identifier.catalogName);
     tassert(8884404,
@@ -385,7 +399,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
                                                            collator),
                                std::move(cq),
                                coll,
-                               std::move(collectionFilter));
+                               std::move(collectionFilter),
+                               returnOwnedBson);
 }
 
 boost::optional<IndexEntry> getIndexForExpressEquality(const CanonicalQuery& cq,
