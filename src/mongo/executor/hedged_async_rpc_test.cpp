@@ -307,12 +307,12 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRemoteErrorWithGenericReplyFields) {
     auto now = network->now();
     network->enterNetwork();
 
-    GenericReplyFieldsAPIV1 stableFields;
+    GenericReplyFieldsWithTypesV1 stableFields;
     auto clusterTime = ClusterTime();
     clusterTime.setClusterTime(Timestamp(2, 3));
     clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
     stableFields.setDollarClusterTime(clusterTime);
-    GenericReplyFieldsAPIV1Unstable unstableFields;
+    GenericReplyFieldsWithTypesUnstableV1 unstableFields;
     unstableFields.setDollarConfigTime(Timestamp(1, 1));
     unstableFields.setOk(false);
 

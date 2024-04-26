@@ -12,6 +12,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/keys_collection_document',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/write_concern_options',
     ],
 )
 

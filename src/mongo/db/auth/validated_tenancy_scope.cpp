@@ -35,10 +35,19 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/auth/validated_tenancy_scope_gen.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
 namespace mongo::auth {
+namespace {
+using namespace fmt::literals;
+
+const auto validatedTenancyScopeDecoration =
+    OperationContext::declareDecoration<boost::optional<ValidatedTenancyScope>>();
+
+}  // namespace
 
 const ValidatedTenancyScope ValidatedTenancyScope::kNotRequired{};
 
@@ -49,6 +58,15 @@ bool ValidatedTenancyScope::hasAuthenticatedUser() const {
 const UserName& ValidatedTenancyScope::authenticatedUser() const {
     invariant(hasAuthenticatedUser());
     return std::get<UserName>(_tenantOrUser);
+}
+
+const boost::optional<ValidatedTenancyScope>& ValidatedTenancyScope::get(OperationContext* opCtx) {
+    return validatedTenancyScopeDecoration(opCtx);
+}
+
+void ValidatedTenancyScope::set(OperationContext* opCtx,
+                                boost::optional<ValidatedTenancyScope> token) {
+    validatedTenancyScopeDecoration(opCtx) = std::move(token);
 }
 
 }  // namespace mongo::auth

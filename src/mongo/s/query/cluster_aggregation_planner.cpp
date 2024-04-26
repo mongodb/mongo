@@ -324,7 +324,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
         }
 
         if (arrayBuilder.arrSize() > 0) {
-            mergeCmd[GenericArgsAPIV1Unstable::kRequestGossipRoutingCacheFieldName] =
+            mergeCmd[Generic_args_unstable_v1::kRequestGossipRoutingCacheFieldName] =
                 Value(arrayBuilder.arr());
         }
     }

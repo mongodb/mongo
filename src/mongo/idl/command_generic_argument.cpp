@@ -27,45 +27,32 @@
  *    it in the license file.
  */
 
-#include "command_generic_argument.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/idl/generic_argument_gen.h"
-#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 
 bool isGenericArgument(StringData arg) {
-    return GenericArgsAPIV1::hasField(arg) || GenericArgsAPIV1Unstable::hasField(arg);
+    return Generic_args_api_v1::hasField(arg) || Generic_args_unstable_v1::hasField(arg);
 }
 
 bool isGenericReply(StringData arg) {
-    return GenericReplyFieldsAPIV1::hasField(arg) || GenericReplyFieldsAPIV1Unstable::hasField(arg);
+    return Generic_reply_fields_api_v1::hasField(arg) ||
+        Generic_reply_fields_unstable_v1::hasField(arg);
 }
 
 bool shouldForwardToShards(StringData arg) {
-    return GenericArgsAPIV1::shouldForwardToShards(arg) &&
-        GenericArgsAPIV1Unstable::shouldForwardToShards(arg);
+    return Generic_args_api_v1::shouldForwardToShards(arg) &&
+        Generic_args_unstable_v1::shouldForwardToShards(arg);
 }
 
 bool shouldForwardFromShards(StringData replyField) {
-    return GenericReplyFieldsAPIV1::shouldForwardFromShards(replyField) &&
-        GenericReplyFieldsAPIV1Unstable::shouldForwardFromShards(replyField);
+    return Generic_reply_fields_api_v1::shouldForwardFromShards(replyField) &&
+        Generic_reply_fields_unstable_v1::shouldForwardFromShards(replyField);
 }
 
-void appendGenericCommandArguments(const BSONObj& commandPassthroughFields,
-                                   const std::vector<StringData>& knownFields,
-                                   BSONObjBuilder* builder) {
-
-    for (const auto& element : commandPassthroughFields) {
-
-        StringData name = element.fieldNameStringData();
-        // Include a passthrough field as long the IDL class has not defined it.
-        if (isGenericArgument(name) &&
-            std::find(knownFields.begin(), knownFields.end(), name) == knownFields.end()) {
-            builder->append(element);
-        }
-    }
+bool isMongocryptdArgument(StringData arg) {
+    return arg == "jsonSchema"_sd;
 }
 
 }  // namespace mongo
