@@ -691,6 +691,7 @@ PipelinePtr DocumentSourceLookUp::buildPipeline(
     // for the streams engine.
     if (isStreamsEngine || !_cache || _cache->isAbandoned()) {
         MakePipelineOptions pipelineOpts;
+        pipelineOpts.alreadyOptimized = false;
         pipelineOpts.optimize = true;
         // The streams engine attaches its own remote cursor source, so we don't need to do it here.
         pipelineOpts.attachCursorSource = !isStreamsEngine;
@@ -727,6 +728,7 @@ PipelinePtr DocumentSourceLookUp::buildPipeline(
     // Construct the basic pipeline without a cache stage. Avoid optimizing here since we need to
     // add the cache first, as detailed below.
     MakePipelineOptions pipelineOpts;
+    pipelineOpts.alreadyOptimized = false;
     pipelineOpts.optimize = false;
     pipelineOpts.attachCursorSource = false;
     pipelineOpts.validator = lookupPipeValidator;
