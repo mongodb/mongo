@@ -280,6 +280,12 @@ Status MigrationSourceManager::startClone() {
         _state = kCloning;
     }
 
+    // Refreshing the collection routing information after starting the clone driver will give us a
+    // stable view on whether the recipient is owning other chunks of the collection (a condition
+    // that will be later evaluated).
+    uassertStatusOK(
+        Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(_opCtx, getNss()));
+
     if (replEnabled) {
         auto const readConcernArgs = repl::ReadConcernArgs(
             replCoord->getMyLastAppliedOpTime(), repl::ReadConcernLevel::kLocalReadConcern);
@@ -333,7 +339,10 @@ Status MigrationSourceManager::enterCriticalSection() {
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
 
-    _notifyChangeStreamsOnRecipientFirstChunk(_getCurrentMetadataAndCheckEpoch());
+    const auto cm = uassertStatusOK(
+        Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(_opCtx, getNss()));
+
+    _notifyChangeStreamsOnRecipientFirstChunk(cm);
 
     // Mark the shard as running critical operation, which requires recovery on crash.
     //
@@ -632,10 +641,9 @@ CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
     return metadata;
 }
 
-void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
-    const CollectionMetadata& metadata) {
+void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(const ChunkManager& cm) {
     // If this is not the first donation, there is nothing to be done
-    if (metadata.getChunkManager()->getVersion(_args.getToShardId()).isSet())
+    if (cm.getVersion(_args.getToShardId()).isSet())
         return;
 
     const std::string dbgMessage = str::stream()

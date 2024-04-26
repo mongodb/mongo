@@ -219,7 +219,7 @@ private:
      * chunks), this function writes a no-op message to the oplog, so that change stream will notice
      * that and close the cursor in order to notify mongos to target the new shard as well.
      */
-    void _notifyChangeStreamsOnRecipientFirstChunk(const CollectionMetadata& metadata);
+    void _notifyChangeStreamsOnRecipientFirstChunk(const ChunkManager& cm);
 
     /**
      * Called when any of the states fails. May only be called once and will put the migration
