@@ -58,7 +58,8 @@ private:
     PlanYieldPolicyRemoteCursor(OperationContext* opCtx,
                                 PlanYieldPolicy::YieldPolicy policy,
                                 std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
-                                std::unique_ptr<YieldPolicyCallbacks> callbacks);
+                                std::unique_ptr<YieldPolicyCallbacks> callbacks,
+                                PlanExecutor* exec = nullptr);
 
     void saveState(OperationContext* opCtx) override;
 
