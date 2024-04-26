@@ -11,18 +11,19 @@ function makeDocument(val) {
 function insertDocuments(conn, dbName, collName, {useBatch} = {
     useBatch: true
 }) {
+    const shouldEncrypt = conn.getAutoEncryptionOptions() !== undefined;
     const coll = conn.getDB(dbName).getCollection(collName);
     const docs = [];
     for (let i = 0; i < maxCount; i++) {
         const doc = makeDocument(i);
         if (!useBatch) {
-            assert.commandWorked(coll.insert(doc));
+            assert.commandWorked(shouldEncrypt ? coll.einsert(doc) : coll.insert(doc));
         } else {
             docs.push(doc);
         }
     }
     if (useBatch) {
-        assert.commandWorked(coll.insert(docs));
+        assert.commandWorked(shouldEncrypt ? coll.einsert(docs) : coll.insert(docs));
     }
 }
 
