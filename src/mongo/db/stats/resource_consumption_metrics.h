@@ -83,58 +83,74 @@ public:
             return _units;
         }
 
-        /**
-         * Call once per input datum with its size in bytes.
-         *
-         * This function calculates the number of units observed based on the implentation-specific
-         * unitSize(). The function uses the following formula to calculate the number of units per
-         * datum:
-         *
-         * units = ceil (datum bytes / unit size in bytes)
-         *
-         * This achieves the goal of counting small datums as at least one unit while ensuring
-         * larger units are accounted proportionately. This can result in overstating smaller datums
-         * when the unit size is large. This is desired behavior, and the extent to which small
-         * datums are overstated is tunable by the unit size of the implementor.
-         */
-        MONGO_COMPILER_ALWAYS_INLINE void observeOne(int64_t datumBytes) {
-            _units += std::ceil(datumBytes / static_cast<float>(unitSize()));
-            _bytes += datumBytes;
-        }
-
     protected:
         /**
-         * Returns the implementation-specific unit size.
+         * Total bytes read or written.
          */
-        virtual int unitSize() const = 0;
-
         long long _bytes = 0;
+
+        /**
+         * Total units read or written.
+         */
         long long _units = 0;
     };
 
     /** DocumentUnitCounter records the number of document units observed. */
     class DocumentUnitCounter : public UnitCounter {
-    private:
-        int unitSize() const final;
+    public:
+        /**
+         * The size of a document unit in bytes for resource consumption metrics collection.
+         */
+        static constexpr int kDocumentUnitSizeBytes = 128;
+
+        /**
+         * Call once per input datum with its size in bytes.
+         *
+         * This function calculates the number of units observed based on the implentation-specific
+         * unit size. This uses integer division, as it is faster than floating point division and,
+         * for denominators that are powers of 2 as these are, will be optimized to right shifts,
+         * which are the fastest of all. This preserves the historical results from floating point
+         * division that used std::ceil() by using integer division with (<unit size> - 1) first
+         * added to the numerator. The effect is to round any fraction of a unit up to the next
+         * whole number of units.
+         */
+        MONGO_COMPILER_ALWAYS_INLINE void observeOneDoc(int64_t datumBytes) {
+            _bytes += datumBytes;
+            _units += (datumBytes + (kDocumentUnitSizeBytes - 1)) / kDocumentUnitSizeBytes;
+        }
     };
 
     /** IdxEntryUnitCounter records the number of index entry units observed. */
     class IdxEntryUnitCounter : public UnitCounter {
-    private:
-        int unitSize() const final;
+    public:
+        /**
+         * The size of an index entry unit in bytes for resource consumption metrics collection.
+         */
+        static constexpr int kIndexEntryUnitSizeBytes = 16;
+
+        MONGO_COMPILER_ALWAYS_INLINE void observeOneIdxEntry(int64_t datumBytes) {
+            _bytes += datumBytes;
+            _units += (datumBytes + (kIndexEntryUnitSizeBytes - 1)) / kIndexEntryUnitSizeBytes;
+        }
     };
 
     /** TotalUnitWriteCounter records the number of units of document plus associated indexes
      * observed. */
     class TotalUnitWriteCounter {
     public:
-        void observeOneDocument(int64_t datumBytes);
-        void observeOneIndexEntry(int64_t datumBytes);
+        /**
+         * The size of a (doc + index) unit in written bytes for resource consumption metrics
+         * collection.
+         */
+        static constexpr int kTotalUnitWriteSizeBytes = 128;
+
+        void observeOneDocForTotalWrites(int64_t datumBytes);
+        void observeOneIdxEntryForTotalWrites(int64_t datumBytes);
 
         TotalUnitWriteCounter& operator+=(TotalUnitWriteCounter other) {
             // Flush the accumulators, in case there is anything still pending.
-            other.observeOneDocument(0);
-            observeOneDocument(0);
+            other.observeOneDocForTotalWrites(0);
+            observeOneDocForTotalWrites(0);
             _units += other._units;
             return *this;
         }
@@ -142,12 +158,11 @@ public:
         long long units() const {
             // Flush the accumulators, in case there is anything still pending.
             TotalUnitWriteCounter copy(*this);
-            copy.observeOneDocument(0);
+            copy.observeOneDocForTotalWrites(0);
             return copy._units;
         }
 
     private:
-        int unitSize() const;
         long long _accumulatedDocumentBytes = 0;
         long long _accumulatedIndexBytes = 0;
         long long _units = 0;
