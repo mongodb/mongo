@@ -4,6 +4,7 @@
  * (Data amount & distribution, as well as per-collection maxChunkSize, are randomly chosen).
  *
  *  @tags: [
+ *      requires_fcv_60,
  *      does_not_support_stepdowns, # TODO SERVER-89797 remove this tag.
  *  ]
  * */
