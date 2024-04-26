@@ -282,7 +282,6 @@ void Builder::addEval(const MatchExpression& expr, const OrderedIntervalList& oi
             case MatchExpression::REGEX: {
                 const auto* regexExpr = checked_cast<const RegexMatchExpression*>(&expr);
                 const auto inputParamId = regexExpr->getSourceRegexInputParamId();
-                tassert(6334805, "RegexMatchExpression must be parameterized", inputParamId);
                 return inputParamId;
             }
             default:
