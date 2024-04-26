@@ -26,7 +26,7 @@ buildvariants:
         --ssl
         -j$(sysctl -n hw.logicalcpu)
         --libc++
-        --variables-files=etc/scons/xcode_macosx_arm.vars
+        --variables-files=etc/scons/xcode_macosx.vars
         --modules=
       resmoke_jobs_max: 6
       compile_variant: *macos-amd64-bazel-compile
