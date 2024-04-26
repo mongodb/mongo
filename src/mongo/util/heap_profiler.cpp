@@ -140,7 +140,9 @@ private:
 //   * the number of active bytes charged to the allocating stack trace is decreased
 //   * the object is removed from the object hash table
 //
-// Enable at startup time (only) with
+// If running mongod with tcmalloc-google allocator, enable at startup or runtime with
+//     {setParameter: 1, heapProfilingSampleIntervalBytes: >0}
+// If running mongod with tcmalloc-gperf allocator, enable at startup time (only) with
 //     mongod --setParameter heapProfilingEnabled=true
 //
 // If enabled, adds a heapProfile section to serverStatus as follows:
@@ -716,11 +718,6 @@ public:
     static const int kMaxStackInfos = 20000;
     static inline HeapProfiler* heapProfiler;
 
-    HeapProfiler() {
-        sampleIntervalBytes = HeapProfilingSampleIntervalBytes;
-        tcmalloc::MallocExtension::SetProfileSamplingRate(sampleIntervalBytes);
-    }
-
     static void generateServerStatusSection(BSONObjBuilder& builder) {
         if (heapProfiler)
             heapProfiler->_generateServerStatusSection(builder);
@@ -773,14 +770,14 @@ private:
 
     void _generateServerStatusSection(BSONObjBuilder& builder) {
         // Compute and log some informational stats first time through
-        if (logGeneralStats) {
+        bool expected = true;
+        if (_logGeneralStats.compareAndSwap(&expected, false)) {
             LOGV2(8592504,
                   "Generating heap profiler serverStatus",
                   "heapProfilingSampleIntervalBytes"_attr = HeapProfilingSampleIntervalBytes);
-            LOGV2(8592503, "Following stack trace is for heap profiler informational purposes");
-            printStackTrace();
-            logGeneralStats = false;
         }
+
+        stdx::lock_guard lk(heapProfiler->_mutex);
 
         // Get a live snapshot profile of the current heap usage
         int64_t totalActiveBytes = 0;
@@ -789,29 +786,27 @@ private:
         tcmalloc::MallocExtension::SnapshotCurrent(tcmalloc::ProfileType::kHeap)
             .Iterate([&](const auto& sample) {
                 totalActiveBytes += sample.sum;
-                sampleBytesAllocated += sample.allocated_size;
+                _sampleBytesAllocated += sample.allocated_size;
                 // Compute backtrace hash of sample stack
                 uint32_t stackHash = StackHash(sample);
-                StackInfo* stackInfo = stackInfoMap[stackHash];
-                // If this is a new stack, store in our stack map
+                auto& stackInfo = _stackInfoMap[stackHash];
                 if (!stackInfo) {
-                    stackInfo = new StackInfo(sample, stackInfoMap.size());
-                    stackInfoMap[stackHash] = stackInfo;
+                    stackInfo = std::make_unique<StackInfo>(sample, _stackInfoMap.size());
                 }
-                auto activeStackSearch = activeStacks.find(stackInfo);
+                auto activeStackSearch = activeStacks.find(stackInfo.get());
                 if (activeStackSearch != activeStacks.end()) {
                     stackInfo->activeBytes += sample.sum;
                 } else {
-                    activeStacks.insert(stackInfo);
-                    stackInfos.push_back(stackInfo);
+                    activeStacks.insert(stackInfo.get());
+                    stackInfos.push_back(stackInfo.get());
                     stackInfo->activeBytes = sample.sum;
                 }
             });
 
         BSONObjBuilder(builder.subobjStart("stats"))
             .appendNumber("totalActiveBytes", static_cast<long long>(totalActiveBytes))
-            .appendNumber("bytesAllocated", static_cast<long long>(sampleBytesAllocated))
-            .appendNumber("numStacks", static_cast<long long>(stackInfoMap.size()));
+            .appendNumber("bytesAllocated", static_cast<long long>(_sampleBytesAllocated))
+            .appendNumber("numStacks", static_cast<long long>(_stackInfoMap.size()));
 
         // Sort the stacks and find enough stacks to account for at least 99% of the active bytes
         // deem any stack that has ever met this criterion as "important".
@@ -821,7 +816,7 @@ private:
         size_t threshold = totalActiveBytes * 0.99;
         size_t cumulative = 0;
         for (auto&& stackInfo : stackInfos) {
-            importantStacks.insert(stackInfo);
+            _importantStacks.insert(stackInfo);
             cumulative += stackInfo->activeBytes;
             if (cumulative > threshold)
                 break;
@@ -831,49 +826,69 @@ private:
         // total heap usage.
         {
             BSONObjBuilder stacks(builder.subobjStart("stacks"));
-            for (auto&& stackInfo : importantStacks)
+            for (auto&& stackInfo : _importantStacks)
                 BSONObjBuilder{stacks.subobjStart(fmt::format("stack{}", stackInfo->stackNum))}
                     .appendNumber("activeBytes", static_cast<long long>(stackInfo->activeBytes));
         }
 
         // importantStacks grows monotonically, so it can accumulate unneeded stacks,
         // so we clear it periodically.
-        if (++numImportantSamples >= kMaxImportantSamples) {
-            LOGV2(8592502, "Clearing importantStacks");
-            importantStacks.clear();
-            numImportantSamples = 0;
+        if (++_numImportantSamples >= kMaxImportantSamples) {
+            LOGV2_DEBUG(8592502, 1, "Clearing importantStacks");
+            _importantStacks.clear();
+            _numImportantSamples = 0;
         }
 
         // We also will clear the stack infos if it gets too large, as opposed to taking up more
         // memory or disabling the heap profiler entirely.
-        if (stackInfoMap.size() >= kMaxStackInfos) {
-            LOGV2(8592505, "Clearing stackInfoMap");
-            stackInfoMap.clear();
+        if (_stackInfoMap.size() >= kMaxStackInfos) {
+            LOGV2_DEBUG(8592505, 1, "Clearing _stackInfoMap");
+            _stackInfoMap.clear();
         }
     }
 
-    std::atomic_size_t sampleIntervalBytes;
-    std::atomic_size_t sampleBytesAllocated{0};
-
-    bool logGeneralStats = true;  // first time only
-    stdx::unordered_map<uint32_t, StackInfo*> stackInfoMap;
+    mutable stdx::mutex _mutex;  // NOLINT
+    size_t _sampleBytesAllocated = 0;
+    stdx::unordered_map<uint32_t, std::unique_ptr<StackInfo>> _stackInfoMap;
+    Atomic<bool> _logGeneralStats = true;
 
     // In order to reduce load on ftdc we track the stacks we deem important enough to emit
     // once a stack is deemed "important" it remains important from that point on.
     // "Important" is a sticky quality to improve the stability of the set of stacks we emit,
     // and we always emit them in stackNum order, greatly improving ftdc compression efficiency.
-    std::set<StackInfo*, ByStackNum> importantStacks;
+    std::set<StackInfo*, ByStackNum> _importantStacks;
 
-    int numImportantSamples = 0;  // samples currently included in importantStacks
+    int _numImportantSamples = 0;  // samples currently included in importantStacks
 };
 #endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 }  // namespace heap_profiler_detail_tcmalloc
 
 #if defined(MONGO_CONFIG_TCMALLOC_GOOGLE)
 using heap_profiler_detail_tcmalloc::HeapProfiler;
+
+class HeapProfilerServerStatusSection final : public ServerStatusSection {
+public:
+    using ServerStatusSection::ServerStatusSection;
+
+    bool includeByDefault() const override {
+        return HeapProfilingSampleIntervalBytes > 0;
+    }
+
+    BSONObj generateSection(OperationContext*, const BSONElement&) const override {
+        BSONObjBuilder builder;
+        if (HeapProfilingSampleIntervalBytes > 0) {
+            HeapProfiler::generateServerStatusSection(builder);
+        }
+        return builder.obj();
+    }
+};
+
+MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("default"))
+(InitializerContext*) {
+    HeapProfiler::start();
+}
 #elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 using heap_profiler_detail_gperf_tcmalloc::HeapProfiler;
-#endif
 
 class HeapProfilerServerStatusSection final : public ServerStatusSection {
 public:
@@ -890,14 +905,15 @@ public:
     }
 };
 
-auto& heapProfilerServerStatusSection =
-    *ServerStatusSectionBuilder<HeapProfilerServerStatusSection>("heapProfile");
-
 MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext*) {
     if (HeapProfilingEnabled)
         HeapProfiler::start();
 }
+#endif  // MONGO_CONFIG_TCMALLOC_GPERF
+
+auto& heapProfilerServerStatusSection =
+    *ServerStatusSectionBuilder<HeapProfilerServerStatusSection>("heapProfile");
 
 }  // namespace
 }  // namespace mongo
