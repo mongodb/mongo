@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/plan_insert_listener.h"
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <deque>
@@ -205,11 +206,34 @@ public:
 
     bool usesCollectionAcquisitions() const final;
 
-    // Helper class used to implement getNextBatched().
-    class GetNextWorker;
-
 private:
     ExecState _getNextImpl(Snapshotted<Document>* objOut, RecordId* dlOut);
+
+    // Helper for handling the NEED_YIELD stage state.
+    void _handleNeedYield(size_t& writeConflictsInARow, size_t& tempUnavailErrorsInARow);
+
+    // Helper for handling the EOF stage state. Returns whether or not to stop doing work().
+    bool _handleEOFAndExit(PlanStage::StageState code,
+                           std::unique_ptr<insert_listener::Notifier>& notifier);
+
+    MONGO_COMPILER_ALWAYS_INLINE void _checkIfMustYield(std::function<void()> whileYieldingFn) {
+        // These are the conditions which can cause us to yield:
+        //   1) The yield policy's timer elapsed, or
+        //   2) some stage requested a yield, or
+        //   3) we need to yield and retry due to a WriteConflictException.
+        // In all cases, the actual yielding happens here.
+        if (_yieldPolicy->shouldYieldOrInterrupt(_opCtx)) {
+            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(_opCtx, whileYieldingFn));
+        }
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE void _checkIfKilled() {
+        if (MONGO_unlikely(isMarkedAsKilled())) {
+            uassertStatusOK(_killStatus);
+        }
+    }
+
+    std::unique_ptr<insert_listener::Notifier> makeNotifier();
 
     // The OperationContext that we're executing within. This can be updated if necessary by using
     // detachFromOperationContext() and reattachToOperationContext().
