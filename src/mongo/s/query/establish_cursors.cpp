@@ -284,10 +284,12 @@ void CursorEstablisher::checkForFailedRequests() {
         return;
     }
 
-    LOGV2(4625501,
-          "Unable to establish remote cursors",
-          "error"_attr = *_maybeFailure,
-          "nRemotes"_attr = _remotesToClean.size());
+    if (!(_maybeFailure->code() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod)) {
+        LOGV2(4625501,
+              "Unable to establish remote cursors",
+              "error"_attr = *_maybeFailure,
+              "nRemotes"_attr = _remotesToClean.size());
+    }
 
     if (_remotesToClean.empty()) {
         // If we don't have any remotes to clean, throw early.
