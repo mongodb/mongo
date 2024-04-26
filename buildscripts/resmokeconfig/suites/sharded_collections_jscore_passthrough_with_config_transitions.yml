@@ -65,6 +65,9 @@ selector:
     - jstests/core/**/optimized_match_explain.js
     - jstests/core/**/sort_array.js
 
+    # These tests drop and create indexes throughout their execution. Index creation might fail when
+    # movePrimary is in progress.
+    - jstests/core/query/agg_hint.js
     # The following tests are excluded specifically for this passthrough suite.
     # TransitionTo/FromDedicated runs remove/addShard which implicitly will set a cluster parameter, which
     # will conflict with tests that explicitly set cluster parameters.
