@@ -301,7 +301,7 @@ DEATH_TEST_REGEX(ErrorExtraInfo, InvariantAllRegistered, "Invariant failure.*par
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
 DEATH_TEST_REGEX(ErrorExtraInfo, DassertShouldHaveExtraInfo, "Fatal assertion.*40680") {
-    Status(ErrorCodes::ForTestingErrorExtraInfo, "");
+    (void)Status(ErrorCodes::ForTestingErrorExtraInfo, "");
 }
 #else
 TEST(ErrorExtraInfo, ConvertCodeOnMissingExtraInfo) {

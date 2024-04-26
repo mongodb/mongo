@@ -37,17 +37,6 @@
 
 
 #ifdef __clang__
-// Our minimum clang version (3.4) doesn't support the "cold" attribute. We could try to use it with
-// clang versions that support the attribute, but since Apple uses weird version numbers on clang
-// and the main goal with the attribute is to improve our production builds with gcc, it didn't seem
-// worth it.
-#define MONGO_COMPILER_COLD_FUNCTION
-#define MONGO_COMPILER_NORETURN __attribute__((__noreturn__))
-// MONGO_WARN_UNUSED_RESULT is only supported in the semantics we want for classes in Clang, not in
-// GCC < 7.
-#define MONGO_WARN_UNUSED_RESULT_CLASS [[gnu::warn_unused_result]]
-#define MONGO_WARN_UNUSED_RESULT_FUNCTION [[gnu::warn_unused_result]]
-
 // Annotating methods with [[lifetimebound]] allows the compiler to do some more lifetime checking
 // (e.g., "returned value should not outlive *this") and emit warnings. See
 // https://clang.llvm.org/docs/AttributeReference.html#lifetimebound
@@ -56,18 +45,8 @@
 #else
 #define MONGO_COMPILER_LIFETIME_BOUND
 #endif
-#else
-#define MONGO_COMPILER_COLD_FUNCTION __attribute__((__cold__))
-#define MONGO_COMPILER_NORETURN __attribute__((__noreturn__, __cold__))
 
-// GCC 7 added support for [[nodiscard]] with the semantics we want.
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
-#define MONGO_WARN_UNUSED_RESULT_CLASS [[nodiscard]]
-#define MONGO_WARN_UNUSED_RESULT_FUNCTION [[nodiscard]]
 #else
-#define MONGO_WARN_UNUSED_RESULT_CLASS
-#define MONGO_WARN_UNUSED_RESULT_FUNCTION [[gnu::warn_unused_result]]
-#endif
 
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(lifetimebound)
 #define MONGO_COMPILER_LIFETIME_BOUND [[lifetimebound]]
@@ -76,6 +55,13 @@
 #endif
 
 #endif
+
+#define MONGO_COMPILER_COLD_FUNCTION __attribute__((__cold__))
+#define MONGO_COMPILER_NORETURN __attribute__((__noreturn__, __cold__))
+
+#define MONGO_WARN_UNUSED_RESULT_CLASS [[nodiscard]]
+#define MONGO_WARN_UNUSED_RESULT_FUNCTION [[nodiscard]]
+
 
 #define MONGO_COMPILER_ALIGN_TYPE(ALIGNMENT) __attribute__((__aligned__(ALIGNMENT)))
 
