@@ -12,7 +12,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/client/read_preference_validators',
         '$BUILD_DIR/mongo/db/server_base',
     ],
 )
@@ -109,7 +108,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/transaction/transaction',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/s/common_s',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'dbcheck',
         'image_collection_entry',
         'oplog_constraint_violation_logger',
@@ -612,7 +610,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/session/kill_sessions_local',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/storage/remove_saver',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'drop_pending_collection_reaper',
         'replica_set_aware_service',
     ],
@@ -635,7 +632,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -746,7 +742,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/storage/storage_control',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'repl_server_parameters',
         'replication_auth',
     ],
@@ -964,30 +959,13 @@ env.Library(
 )
 
 env.Library(
-    target='read_concern_idl',
-    source=[
-        'read_concern.idl',
-        'read_concern_idl.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/read_write_concern_provenance',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        'optime',
-    ],
-)
-
-env.Library(
     'read_concern_args',
     source=[
         'read_concern_args.cpp',
     ],
     LIBDEPS=[
-        'optime',
-        'read_concern_idl',
-    ],
-    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
+        'optime',
     ],
 )
 
@@ -1188,7 +1166,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
         '$BUILD_DIR/mongo/db/index_build_entry_helpers',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         '$BUILD_DIR/mongo/util/progress_meter',
         'repl_server_parameters',
         'replication_auth',
@@ -1348,7 +1325,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'read_concern_args',
     ],
 )
@@ -1422,7 +1398,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/rpc/metadata',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'optime',
     ],
 )

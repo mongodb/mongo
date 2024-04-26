@@ -444,14 +444,6 @@ public:
     static std::variant<UUID, StringData> checkAndAssertCollectionNameOrUUID(
         const BSONElement& element);
 
-    /**
-     * Take all the well known command generic arguments from commandPassthroughFields, but ignore
-     * fields that are already part of the command and append the rest to builder.
-     */
-    static void appendGenericCommandArguments(const BSONObj& commandPassthroughFields,
-                                              const std::vector<StringData>& knownFields,
-                                              BSONObjBuilder* builder);
-
     const boost::optional<TenantId>& getTenantId() const;
 
     const SerializationContext& getSerializationContext() const;

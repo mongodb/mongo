@@ -8,14 +8,19 @@ Import([
 env = env.Clone()
 
 env.Library(
-    target='query_shape', source=['query_shape.cpp', 'shape_helpers.cpp'], LIBDEPS=[
+    target='query_shape',
+    source=[
+        'query_shape.cpp',
+        'shape_helpers.cpp',
+    ],
+    LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/pipeline/field_path',
+        '$BUILD_DIR/mongo/db/server_base',
         'query_shape_common',
-    ], LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
-    ])
+    ],
+)
 
 env.Library(
     target='query_shape_hash',
@@ -28,16 +33,17 @@ env.Library(
 )
 
 env.Library(
-    target='query_shape_common', source=[
+    target='query_shape_common',
+    source=[
         'query_shape.idl',
         'serialization_options.cpp',
-    ], LIBDEPS=[
+    ],
+    LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/pipeline/field_path',
-    ], LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
-    ])
+    ],
+)
 
 env.CppUnitTest(
     target="db_query_query_shape_test",

@@ -44,7 +44,6 @@ protoEnv.Library(
         '$BUILD_DIR/mongo/db/auth/security_token_auth',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         '$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum' if wiredtiger else [],
     ],
 )
@@ -86,6 +85,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/pcre_wrapper',
         'message',
@@ -120,6 +120,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/db/repl/optime',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/signed_logical_time',
         '$BUILD_DIR/mongo/db/write_block_bypass',
         'client_metadata',
@@ -128,7 +129,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/multitenancy',
-        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/fail_point',
@@ -141,10 +141,10 @@ env.Library(
     ],
     source=[
         'metadata/impersonated_user_metadata.cpp',
-        'metadata/impersonated_user_metadata.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
     ],
     LIBDEPS_PRIVATE=[
@@ -168,6 +168,7 @@ env.Library(
         "$BUILD_DIR/mongo/util/processinfo",
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )

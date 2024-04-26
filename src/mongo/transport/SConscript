@@ -95,6 +95,7 @@ tlEnv.Library(
         'transport_layer',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/third_party/shim_asio',
         'service_executor',
         'session_manager',
@@ -186,7 +187,6 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         '$BUILD_DIR/mongo/util/processinfo',
         'ingress_handshake_metrics',

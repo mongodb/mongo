@@ -6,8 +6,6 @@ env = env.Clone()
 env.Library(
     target='idl_parser',
     source=[
-        'command_generic_argument.cpp',
-        'generic_argument.idl',
         'idl_parser.cpp',
     ],
     LIBDEPS=[
@@ -143,24 +141,6 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
-    target='generic_args_with_types_idl',
-    source=[
-        'generic_args_with_types.idl',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/db/repl/read_concern_args',
-        '$BUILD_DIR/mongo/db/s/forwardable_operation_metadata',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/session/logical_session_id',
-        '$BUILD_DIR/mongo/db/vector_clock',
-        '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
-        '$BUILD_DIR/mongo/s/common_s',
-    ],
-)
-
 env.CppUnitTest(
     target='idl_test',
     source=[
@@ -188,7 +168,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'cluster_server_parameter',
     ],

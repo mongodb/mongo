@@ -70,7 +70,7 @@
 #include "mongo/executor/async_transaction_rpc.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/generic_args_with_types_gen.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/transaction_router.h"
@@ -205,8 +205,8 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
 
     // Populate structs for generic reply fields that are expected to be parsed from the
     // response object.
-    GenericReplyFieldsWithTypesV1 genericReplyApiV1;
-    GenericReplyFieldsWithTypesUnstableV1 genericReplyUnstable;
+    GenericReplyFieldsAPIV1 genericReplyApiV1;
+    GenericReplyFieldsAPIV1Unstable genericReplyUnstable;
     genericReplyUnstable.setOk(1);
     genericReplyUnstable.setDollarConfigTime(Timestamp(1, 1));
     auto clusterTime = ClusterTime();
@@ -450,12 +450,12 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorWithGenericReplyFields) {
         getExecutorPtr(), _cancellationToken, helloCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
-    GenericReplyFieldsWithTypesV1 stableFields;
+    GenericReplyFieldsAPIV1 stableFields;
     auto clusterTime = ClusterTime();
     clusterTime.setClusterTime(Timestamp(2, 3));
     clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
     stableFields.setDollarClusterTime(clusterTime);
-    GenericReplyFieldsWithTypesUnstableV1 unstableFields;
+    GenericReplyFieldsAPIV1Unstable unstableFields;
     unstableFields.setDollarConfigTime(Timestamp(1, 1));
     unstableFields.setOk(false);
 

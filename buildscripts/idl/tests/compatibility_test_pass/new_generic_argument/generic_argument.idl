@@ -29,7 +29,7 @@ global:
     cpp_namespace: "mongo"
 
 generic_argument_lists:
-    generic_args_api_v1:
+    GenericArgsAPIV1:
         description: "Add a new generic argument and should still pass"
         fields:
             genericArgument:
@@ -37,7 +37,7 @@ generic_argument_lists:
             addedGenericArgument:
                 forward_to_shards: false
 
-    generic_args_unstable_v1:
+    GenericArgsAPIV1Unstable:
         description: "IDL checker provides no guarantees about unstable generic arguments.
                       Removing an unstable argument should still pass"
         fields:
@@ -45,7 +45,7 @@ generic_argument_lists:
                 forward_to_shards: false
 
 generic_reply_field_lists:
-    generic_reply_fields_api_v1:
+    GenericReplyFieldsAPIV1:
         description: "Add a new generic reply field and should still pass"
         fields:
             genericReplyField:
@@ -53,7 +53,7 @@ generic_reply_field_lists:
             addedGenericReplyField:
                 forward_from_shards: false
 
-    generic_reply_fields_unstable_v1:
+    GenericReplyFieldsAPIV1Unstable:
         description: "IDL checker provides no guarantees about unstable generic reply fields.
                       Removing an unstable reply field should still pass"
         fields:
