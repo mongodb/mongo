@@ -111,6 +111,10 @@ public:
                         "Cannot move a collection until a second shard has been successfully added",
                         clusterHasTwoOrMoreShards);
 
+                uassert(ErrorCodes::IllegalOperation,
+                        "Can't move an internal resharding collection",
+                        !ns().isTemporaryReshardingCollection());
+
                 // TODO (SERVER-88623): re-evalutate the need to track the collection before calling
                 // into moveCollection
                 ShardsvrCreateCollectionRequest trackCollectionRequest;
