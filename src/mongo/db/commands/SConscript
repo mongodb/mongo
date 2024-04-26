@@ -145,20 +145,23 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_settings/utils',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/db/repl/repl_settings',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'cluster_server_parameter_cmds_idl',
         'set_cluster_parameter_impl',
     ])
 
 env.Library(
-    target='set_cluster_parameter_impl', source=[
+    target='set_cluster_parameter_impl',
+    source=[
         'set_cluster_parameter_command_impl.cpp',
-    ], LIBDEPS_PRIVATE=[
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/s/grid',
         'cluster_server_parameter_commands_invocation',
         'mongod_fcv',
-    ])
+    ],
+)
 
 # Commands available in all mongodb server processes (mongod, mongos, etc.)
 xray_files = []
@@ -234,7 +237,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -254,7 +256,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         'test_commands_enabled',
     ],
@@ -315,7 +316,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -327,7 +327,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -339,7 +338,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -356,7 +354,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -374,7 +371,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/s/common_s',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -391,7 +387,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/logv2/logv2_options',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'bulk_write_parser',
         'update_metrics',
         'write_commands_common',
@@ -433,7 +428,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/grid',
         '$BUILD_DIR/mongo/s/query_analysis_sampler',
         '$BUILD_DIR/mongo/util/log_and_backoff',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'bulk_write_common',
         'bulk_write_parser',
         'update_metrics',
@@ -448,7 +442,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -460,7 +453,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -619,7 +611,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -642,7 +633,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -653,7 +643,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -664,7 +653,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -679,7 +667,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -814,6 +801,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/s/sharding_api',
         'cluster_server_parameter_cmds_idl',
     ],
@@ -900,7 +888,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/serverless/serverless_types_idl',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 env.Library(
@@ -912,7 +899,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -924,7 +910,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -991,7 +976,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/search/search_task_executors',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 

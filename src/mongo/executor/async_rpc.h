@@ -58,7 +58,7 @@
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/generic_args_with_types_gen.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -89,7 +89,7 @@ using executor::TaskExecutor;
 /**
  * Contains generic argument fields that can be part of any command request, separated based on
  * whether fields are part of the stable API. The generic arguments are generated from
- * '../idl/generic_args_with_types.idl'.
+ * '../idl/generic_argument.idl'.
  */
 struct GenericArgs {
     GenericArgs(GenericArgsAPIV1 stable = GenericArgsAPIV1(),
@@ -295,9 +295,9 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
         .then([](detail::AsyncRPCInternalResponse r) -> ReplyType {
             auto res = CommandType::Reply::parseSharingOwnership(IDLParserContext("AsyncRPCRunner"),
                                                                  r.response);
-            auto stableReplyFields = GenericReplyFieldsWithTypesV1::parseSharingOwnership(
+            auto stableReplyFields = GenericReplyFieldsAPIV1::parseSharingOwnership(
                 IDLParserContext("AsyncRPCRunner"), r.response);
-            auto unstableReplyFields = GenericReplyFieldsWithTypesUnstableV1::parseSharingOwnership(
+            auto unstableReplyFields = GenericReplyFieldsAPIV1Unstable::parseSharingOwnership(
                 IDLParserContext("AsyncRPCRunner"), r.response);
             return {res,
                     r.targetUsed,

@@ -35,7 +35,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'query_settings',
     ],
 )
@@ -60,7 +59,6 @@ env.CppUnitTest(
         'query_framework_serialization_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'query_settings',
     ],
 )

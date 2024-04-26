@@ -52,7 +52,6 @@
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"

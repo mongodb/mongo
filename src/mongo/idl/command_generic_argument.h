@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 
@@ -62,9 +63,11 @@ bool shouldForwardToShards(StringData arg);
 bool shouldForwardFromShards(StringData replyField);
 
 /**
- * Returns true if the provided argument is one that should be handled by a mongocryptd process.
+ * Take all the well known command generic arguments from commandPassthroughFields, but ignore
+ * fields that are already part of the command and append the rest to builder.
  */
-bool isMongocryptdArgument(StringData arg);
-
+void appendGenericCommandArguments(const BSONObj& commandPassthroughFields,
+                                   const std::vector<StringData>& knownFields,
+                                   BSONObjBuilder* builder);
 
 }  // namespace mongo

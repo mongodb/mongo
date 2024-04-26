@@ -280,7 +280,7 @@ public:
 
             if (arrayBuilder.arrSize() > 0) {
                 metadataBob->appendArray(
-                    Generic_reply_fields_unstable_v1::kRoutingCacheGossipFieldName,
+                    GenericReplyFieldsAPIV1Unstable::kRoutingCacheGossipFieldName,
                     arrayBuilder.obj());
             }
         }

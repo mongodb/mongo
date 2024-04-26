@@ -72,8 +72,6 @@ const TxnRetryCounter kUninitializedTxnRetryCounter = -1;
 class BSONObjBuilder;
 class OperationContext;
 
-constexpr Minutes kLogicalSessionDefaultTimeout{Minutes(kLocalLogicalSessionTimeoutMinutesDefault)};
-
 inline bool operator==(const LogicalSessionId& lhs, const LogicalSessionId& rhs) {
     return (lhs.getId() == rhs.getId()) && (lhs.getTxnNumber() == rhs.getTxnNumber()) &&
         (lhs.getTxnUUID() == rhs.getTxnUUID()) && (lhs.getUid() == rhs.getUid());

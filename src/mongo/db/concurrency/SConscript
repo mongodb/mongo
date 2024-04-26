@@ -60,7 +60,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 

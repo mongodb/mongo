@@ -117,6 +117,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
+        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/executor/async_multicaster',
         '$BUILD_DIR/mongo/s/sharding_router_api',
     ],

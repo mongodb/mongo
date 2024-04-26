@@ -42,7 +42,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/idl/generic_args_with_types_gen.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util_core.h"
@@ -57,15 +57,14 @@ enum class CommandErrorProvenance { kLocal, kRemote };
 /**
  * Contains generic reply fields that can be part of any command response, separated based on
  * whether fields are part of the stable API. The generic reply fields are generated from
- * '../idl/generic_args_with_types.idl'.
+ * '../idl/generic_argument.idl'.
  */
 struct GenericReplyFields {
-    GenericReplyFields(
-        GenericReplyFieldsWithTypesV1 stable = GenericReplyFieldsWithTypesV1(),
-        GenericReplyFieldsWithTypesUnstableV1 unstable = GenericReplyFieldsWithTypesUnstableV1())
+    GenericReplyFields(GenericReplyFieldsAPIV1 stable = GenericReplyFieldsAPIV1(),
+                       GenericReplyFieldsAPIV1Unstable unstable = GenericReplyFieldsAPIV1Unstable())
         : stable{stable}, unstable{unstable} {}
-    GenericReplyFieldsWithTypesV1 stable;
-    GenericReplyFieldsWithTypesUnstableV1 unstable;
+    GenericReplyFieldsAPIV1 stable;
+    GenericReplyFieldsAPIV1Unstable unstable;
 };
 
 /**
@@ -94,9 +93,9 @@ public:
             if (BSONElement errLabelsElem = _error["errorLabels"]; !errLabelsElem.eoo()) {
                 _errLabels = errLabelsElem.Array();
             }
-            auto stableReplyFields = GenericReplyFieldsWithTypesV1::parseSharingOwnership(
+            auto stableReplyFields = GenericReplyFieldsAPIV1::parseSharingOwnership(
                 IDLParserContext("AsyncRPCRunner"), _error);
-            auto unstableReplyFields = GenericReplyFieldsWithTypesUnstableV1::parseSharingOwnership(
+            auto unstableReplyFields = GenericReplyFieldsAPIV1Unstable::parseSharingOwnership(
                 IDLParserContext("AsyncRPCRunner"), _error);
             _genericReplyFields = GenericReplyFields(stableReplyFields, unstableReplyFields);
         }

@@ -48,7 +48,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/catalog/type_index_catalog.h"

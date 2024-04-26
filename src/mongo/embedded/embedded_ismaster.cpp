@@ -42,7 +42,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata/client_metadata.h"

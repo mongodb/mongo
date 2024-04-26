@@ -103,6 +103,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_entry_point_common',
+        '$BUILD_DIR/mongo/db/session/logical_session_cache',
         '$BUILD_DIR/mongo/db/session/service_liaison_mongod',
         '$BUILD_DIR/mongo/db/startup_recovery',
         '$BUILD_DIR/mongo/db/storage/storage_control',

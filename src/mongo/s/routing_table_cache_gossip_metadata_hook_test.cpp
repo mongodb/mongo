@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/idl/generic_args_with_types_gen.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/s/gossiped_routing_cache_gen.h"
 #include "mongo/s/routing_table_cache_gossip_metadata_hook.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
@@ -62,8 +62,7 @@ TEST_F(RoutingTableCacheGossipMetadataHookTest, readReplyMetadata) {
     ASSERT_OK(gossipHook->readReplyMetadata(operationContext(), BSON("otherStuff" << 1)));
     ASSERT_OK(gossipHook->readReplyMetadata(
         operationContext(),
-        BSON("otherStuff" << 1
-                          << GenericReplyFieldsWithTypesUnstableV1::kRoutingCacheGossipFieldName
+        BSON("otherStuff" << 1 << GenericReplyFieldsAPIV1Unstable::kRoutingCacheGossipFieldName
                           << BSONArray())));
 
     // Read metadata with gossip info and check that the CatalogCache is notified.
@@ -79,9 +78,9 @@ TEST_F(RoutingTableCacheGossipMetadataHookTest, readReplyMetadata) {
     arrBuilder.append(gossip2.toBSON());
     ASSERT_OK(gossipHook->readReplyMetadata(
         operationContext(),
-        BSON("otherStuff" << 1
-                          << GenericReplyFieldsWithTypesUnstableV1::kRoutingCacheGossipFieldName
+        BSON("otherStuff" << 1 << GenericReplyFieldsAPIV1Unstable::kRoutingCacheGossipFieldName
                           << arrBuilder.arr())));
+
     ASSERT_EQ(gossip1.getCollectionVersion(),
               getCatalogCacheMock()->lastNotifiedTimeInStore[gossip1.getNss()]);
     ASSERT_EQ(gossip2.getCollectionVersion(),
@@ -91,8 +90,7 @@ TEST_F(RoutingTableCacheGossipMetadataHookTest, readReplyMetadata) {
     // Read ill-formed gossip info. Should return error.
     ASSERT_NOT_OK(gossipHook->readReplyMetadata(
         operationContext(),
-        BSON("otherStuff" << 1
-                          << GenericReplyFieldsWithTypesUnstableV1::kRoutingCacheGossipFieldName
+        BSON("otherStuff" << 1 << GenericReplyFieldsAPIV1Unstable::kRoutingCacheGossipFieldName
                           << "unexpected")));
 }
 

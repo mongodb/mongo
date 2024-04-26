@@ -43,6 +43,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/sessions_collection_standalone.h"
 #include "mongo/rpc/get_status_from_command_result.h"

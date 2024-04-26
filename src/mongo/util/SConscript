@@ -227,30 +227,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='namespace_string_database_name_util',
-    source=[
-        'database_name_util.cpp',
-        'namespace_string_util.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/security_token',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/server_feature_flags',
-    ],
-)
-
-env.CppUnitTest(
-    target='namespace_string_database_name_util_test',
-    source=[
-        'database_name_util_test.cpp',
-        'namespace_string_util_test.cpp',
-    ],
-    LIBDEPS=[
-        'namespace_string_database_name_util',
-    ],
-)
-
 env.CppUnitTest(
     target='concurrent_shared_values_map_test',
     source=[
@@ -601,6 +577,9 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/log_process_details',
         '$BUILD_DIR/mongo/db/service_context',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 

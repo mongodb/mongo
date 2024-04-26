@@ -1637,12 +1637,22 @@ def get_generic_arguments(gen_args_file_path: str, includes: str) -> Tuple[Set[s
         if parsed_idl_file.errors:
             parsed_idl_file.errors.dump_errors()
             raise ValueError(f"Cannot parse {gen_args_file_path}")
-        for argument in parsed_idl_file.spec.symbols.get_generic_argument_list(
-                "generic_args_api_v1").fields:
+
+        generic_arguments = parsed_idl_file.spec.symbols.get_generic_argument_list(
+            "GenericArgsAPIV1")
+        if generic_arguments is None:
+            generic_arguments = parsed_idl_file.spec.symbols.get_generic_argument_list(
+                "generic_args_api_v1")
+            generic_reply_fields = parsed_idl_file.spec.symbols.get_generic_reply_field_list(
+                "generic_reply_fields_api_v1")
+        else:
+            generic_reply_fields = parsed_idl_file.spec.symbols.get_generic_reply_field_list(
+                "GenericReplyFieldsAPIV1")
+
+        for argument in generic_arguments.fields:
             arguments.add(argument.name)
 
-        for reply_field in parsed_idl_file.spec.symbols.get_generic_reply_field_list(
-                "generic_reply_fields_api_v1").fields:
+        for reply_field in generic_reply_fields.fields:
             reply_fields.add(reply_field.name)
 
     return arguments, reply_fields
