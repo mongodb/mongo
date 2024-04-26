@@ -685,9 +685,14 @@ WriteResult performInserts(OperationContext* opCtx,
 
     for (auto&& doc : wholeOp.getDocuments()) {
         const bool isLastDoc = (&doc == &wholeOp.getDocuments().back());
+        const bool preserveEmptyTimestamps = source == OperationSource::kFromMigrate;
         bool containsDotsAndDollarsField = false;
-        auto fixedDoc = fixDocumentForInsert(opCtx, doc, &containsDotsAndDollarsField);
+
+        auto fixedDoc =
+            fixDocumentForInsert(opCtx, doc, preserveEmptyTimestamps, &containsDotsAndDollarsField);
+
         const StmtId stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
+
         const bool wasAlreadyExecuted = opCtx->getTxnNumber() &&
             !opCtx->inMultiDocumentTransaction() &&
             txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId);

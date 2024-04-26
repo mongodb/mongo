@@ -209,6 +209,14 @@ public:
         return _fromOplogApplication;
     }
 
+    void setPreserveEmptyTS(OptionalBool preserveEmptyTS) {
+        _preserveEmptyTS = preserveEmptyTS;
+    }
+
+    OptionalBool getPreserveEmptyTS() const {
+        return _preserveEmptyTS;
+    }
+
     void setExplain(boost::optional<ExplainOptions::Verbosity> verbosity) {
         _explain = verbosity;
     }
@@ -313,6 +321,8 @@ private:
 
     // The statement ids of this request.
     std::vector<StmtId> _stmtIds = {kUninitializedStmtId};
+
+    OptionalBool _preserveEmptyTS;
 
     // Flags controlling the update.
 
