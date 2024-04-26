@@ -125,7 +125,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
     auto executor = executor::getMongotTaskExecutor(pExpCtx->opCtx->getServiceContext());
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline;
-    bool storedSource = _searchQuery.getBoolField(kReturnStoredSourceArg);
+    bool storedSource = _searchQuery.getBoolField(mongot_cursor::kReturnStoredSourceArg);
 
     if (_spec) {
         auto spec = InternalSearchMongotRemoteSpec::parseOwned(IDLParserContext(kStageName),

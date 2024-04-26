@@ -51,6 +51,8 @@ static constexpr StringData kCursorOptionsField = "cursorOptions"_sd;
 static constexpr StringData kDocsRequestedField = "docsRequested"_sd;
 static constexpr StringData kBatchSizeField = "batchSize"_sd;
 static constexpr StringData kRequiresSearchSequenceToken = "requiresSearchSequenceToken"_sd;
+static constexpr StringData kReturnStoredSourceArg = "returnStoredSource"_sd;
+static constexpr StringData kSlowQueryLogFieldName = "slowQueryLog"_sd;
 
 static constexpr long long kMinimumMongotBatchSize = 10;
 

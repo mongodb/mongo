@@ -7,19 +7,19 @@ env = env.Clone()
 env.SConscript(dirs=['mongotmock'], exports=['env'])
 
 env.Library(
-    target='mongot_cursor',
-    source=[
+    target='mongot_cursor', source=[
+        'internal_search_cluster_parameters.idl',
         'mongot_cursor.cpp',
         'mongot_cursor_getmore_strategy.cpp',
-    ],
-    LIBDEPS=[
+    ], LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
         '$BUILD_DIR/mongo/db/query/plan_yield_policy',
         '$BUILD_DIR/mongo/executor/task_executor_cursor',
         'mongot_options',
         'search_task_executors',
-    ],
-)
+    ], LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+    ])
 
 env.CppUnitTest(
     target='mongot_cursor_test',

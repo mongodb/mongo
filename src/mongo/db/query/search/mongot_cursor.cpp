@@ -28,9 +28,12 @@
  */
 #include "mongo/db/query/search/mongot_cursor.h"
 
+#include "mongo/db/query/search/internal_search_cluster_parameters_gen.h"
 #include "mongo/db/query/search/mongot_cursor_getmore_strategy.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -107,17 +110,30 @@ void doThrowIfNotRunningWithMongotHostConfigured() {
         globalMongotParams.enabled);
 }
 
-boost::optional<long long> computeInitialBatchSize(const DocsNeededBounds minBounds,
-                                                   const DocsNeededBounds maxBounds,
-                                                   const boost::optional<int64_t> userBatchSize) {
+boost::optional<long long> computeInitialBatchSize(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const DocsNeededBounds minBounds,
+    const DocsNeededBounds maxBounds,
+    const boost::optional<int64_t> userBatchSize,
+    bool isStoredSource) {
     // TODO SERVER-63765 Allow cursor establishment for sharded clusters when userBatchSize is 0.
     // TODO SERVER-89494 Enable non-extractable limit queries.
-    // TODO SERVER-88888 Add oversubscription logic.
+    double oversubscriptionFactor = 1;
+    if (!isStoredSource) {
+        oversubscriptionFactor =
+            ServerParameterSet::getClusterParameterSet()
+                ->get<ClusterParameterWithStorage<InternalSearchOptions>>("internalSearchOptions")
+                ->getValue(expCtx->ns.tenantId())
+                .getOversubscriptionFactor();
+    }
+
     return visit(
         OverloadedVisitor{
-            [](long long minVal, long long maxVal) -> boost::optional<long long> {
+            [oversubscriptionFactor](long long minVal,
+                                     long long maxVal) -> boost::optional<long long> {
                 if (minVal == maxVal) {
-                    return std::max(minVal, kMinimumMongotBatchSize);
+                    long long batchSize = std::ceil(minVal * oversubscriptionFactor);
+                    return std::max(batchSize, kMinimumMongotBatchSize);
                 }
                 return boost::none;
             },
@@ -188,8 +204,12 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
 
     boost::optional<long long> batchSize = boost::none;
     if (minDocsNeededBounds.has_value() & maxDocsNeededBounds.has_value()) {
-        batchSize =
-            computeInitialBatchSize(*minDocsNeededBounds, *maxDocsNeededBounds, userBatchSize);
+        // TODO SERVER-87077 This manual check for storedSource shouldn't be necessary if we pass
+        // all arguments via the mongot remote spec.
+        const auto storedSourceElem = query[kReturnStoredSourceArg];
+        bool isStoredSource = !storedSourceElem.eoo() && storedSourceElem.Bool();
+        batchSize = computeInitialBatchSize(
+            expCtx, *minDocsNeededBounds, *maxDocsNeededBounds, userBatchSize, isStoredSource);
     }
 
     // If we are sending docsRequested to mongot, then we should avoid prefetching the next

@@ -49,8 +49,6 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-static constexpr auto kReturnStoredSourceArg = "returnStoredSource"_sd;
-static constexpr auto kSlowQueryLogFieldName = "slowQueryLog"_sd;
 
 using RemoteCursorMap = absl::flat_hash_map<size_t, std::unique_ptr<executor::TaskExecutorCursor>>;
 using RemoteExplainVector = std::vector<BSONObj>;

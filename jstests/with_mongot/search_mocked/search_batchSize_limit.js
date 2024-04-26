@@ -35,45 +35,52 @@ if (checkSbeRestrictedOrFullyEnabled(db) &&
 }
 
 const docs = [
-    {"_id": 1, "title": "Theme from New York, New York"},
-    {"_id": 2, "title": "VeggieTales Theme Song"},
-    {"_id": 3, "title": "Hedwig's Theme"},
-    {"_id": 4, "title": "Indiana Jones Main Theme"},
-    {"_id": 5, "title": "Star Wars (Main Theme)"},
-    {"_id": 6, "title": "SpongeBob SquarePants Theme Song"},
-    {"_id": 7, "title": "Call Me, Beep Me! (The Kim Possible Theme)"},
-    {"_id": 8, "title": "My Heart Will Go On - Love Theme from \"Titanic\""},
-    {"_id": 9, "title": "Rocky Theme"},
-    {"_id": 10, "title": "Mia and Sebastian's Theme"},
-    {"_id": 11, "title": "Barney's Theme Song"},
-    {"_id": 12, "title": "So Long, London"},
-    {"_id": 13, "title": "The Office Theme (from The Office)"},
-    {"_id": 14, "title": "Theme from Jurassic Park"},
-    {"_id": 15, "title": "Theme from Superman - Concert Version"},
-    {"_id": 16, "title": "Ghostbusters - Instrumental Version"},
-    {"_id": 17, "title": "Full House Theme"},
-    {"_id": 18, "title": "The James Bond Theme"},
-    {"_id": 19, "title": "Twelve Variations on Vous dirai-je, Mama"},
-    {"_id": 20, "title": "Theme (from \"Spider Man\")"},
+    {"_id": 1, "title": "Theme from New York, New York", "artist": "Frank Sinatra"},
+    {"_id": 2, "title": "VeggieTales Theme Song", "artist": "Kidz Bop"},
+    {"_id": 3, "title": "Hedwig's Theme", "artist": "John Williams"},
+    {"_id": 4, "title": "Indiana Jones Main Theme", "artist": "John Williams"},
+    {"_id": 5, "title": "Star Wars (Main Theme)", "artist": "John Williams"},
+    {"_id": 6, "title": "SpongeBob SquarePants Theme Song", "artist": "Squidward"},
+    {"_id": 7, "title": "Call Me, Beep Me! (The Kim Possible Theme)", "artist": "Kim"},
+    {
+        "_id": 8,
+        "title": "My Heart Will Go On - Love Theme from \"Titanic\"",
+        "artist": "Celine Dion"
+    },
+    {"_id": 9, "title": "Rocky Theme", "artist": "Bill Conti"},
+    {"_id": 10, "title": "Mia and Sebastian's Theme", "artist": "Justin Hurwitz"},
+    {"_id": 11, "title": "Barney's Theme Song", "artist": "Barney"},
+    {"_id": 12, "title": "So Long, London", "artist": "Taylor Swift"},
+    {"_id": 13, "title": "The Office Theme (from The Office)", "artist": "Jim and Pam"},
+    {"_id": 14, "title": "Theme from Jurassic Park", "artist": "John Williams"},
+    {"_id": 15, "title": "Theme from Superman - Concert Version", "artist": "John Williams"},
+    {"_id": 16, "title": "Ghostbusters - Instrumental Version", "artist": "Ray Parker Jr."},
+    {"_id": 17, "title": "Full House Theme", "artist": "Jesse Frederick"},
+    {"_id": 18, "title": "The James Bond Theme", "artist": "Monty Normon"},
+    {
+        "_id": 19,
+        "title": "Twelve Variations on Vous dirai-je, Mama",
+        "artist": "Wolfgang Amadeus Mozart"
+    },
+    {"_id": 20, "title": "Theme (from \"Spider Man\")", "artist": "Francis Webster and Bob Harris"},
 ];
 assert.commandWorked(coll.insertMany(docs));
 
 const collUUID = getUUIDFromListCollections(db, coll.getName());
-const mongotQuery = {
-    query: "Theme",
-    path: "title"
-};
+let mongotQuery = {query: "Theme", path: "title"};
 
 // All the documents that would be returned by the search query above.
 let relevantDocs = [];
 let relevantSearchDocs = [];
-let relevantDocsNoId = [];
+let relevantStoredSourceDocs = [];
+let relevantDocsOnlyTitle = [];
 let searchScore = 0.300;
 for (let i = 0; i < docs.length; i++) {
     if (docs[i]["title"].includes(mongotQuery.query)) {
         relevantDocs.push(docs[i]);
         relevantSearchDocs.push({_id: docs[i]._id, $searchScore: searchScore});
-        relevantDocsNoId.push({title: docs[i].title})
+        relevantStoredSourceDocs.push({storedSource: docs[i], $searchScore: searchScore});
+        relevantDocsOnlyTitle.push({title: docs[i].title})
     }
 
     // The documents with lower _id will have a higher search score.
@@ -82,115 +89,155 @@ for (let i = 0; i < docs.length; i++) {
 
 assert.eq(17, relevantDocs.length);
 
-function mockRequest(batchSize) {
-    const cursorId = NumberLong(99);
-    const responseOk = 1;
+function runTest(oversubscriptionFactor, mongotQuery) {
+    // When we have a computed batchSize less than 10, it should be rounded to minimum 10 when
+    // computing initial mongot batchSize.
+    function calcNumDocsMongotShouldReturn(extractedLimit) {
+        return Math.max(Math.ceil(oversubscriptionFactor * extractedLimit), 10);
+    }
 
-    const history = [{
-        expectedCommand: mongotCommandForQuery(mongotQuery,
-                                               collName,
-                                               dbName,
-                                               collUUID,
-                                               /*protocolVersion*/ null,
-                                               /*cursorOptions*/ {batchSize}),
-        response: mongotResponseForBatch(
-            relevantSearchDocs.slice(0, batchSize), NumberLong(0), coll.getFullName(), responseOk),
-    }];
-    mongotMock.setMockResponses(history, cursorId);
+    function mockRequest(extractedLimit) {
+        const cursorId = NumberLong(99);
+        const responseOk = 1;
+        const batchSize = calcNumDocsMongotShouldReturn(extractedLimit);
+
+        const docsToReturn = mongotQuery.returnStoredSource
+            ? relevantStoredSourceDocs.slice(0, batchSize)
+            : relevantSearchDocs.slice(0, batchSize);
+        const history = [{
+            expectedCommand: mongotCommandForQuery(mongotQuery,
+                                                   collName,
+                                                   dbName,
+                                                   collUUID,
+                                                   /*protocolVersion*/ null,
+                                                   /*cursorOptions*/ {batchSize}),
+            response:
+                mongotResponseForBatch(docsToReturn, NumberLong(0), coll.getFullName(), responseOk),
+        }];
+        mongotMock.setMockResponses(history, cursorId);
+    }
+
+    /**
+     * Mocks the mongot request / results for the given pipeline with the given extractedLimit,
+     * then asserts that the results are correct.
+     * This will fail (via the mongotMock internals) if the batchSize sent to mongot is different
+     * than expected.
+     */
+    function runBatchSizeExtractableLimitTest({pipeline, extractedLimit, expectedDocs}) {
+        mockRequest(extractedLimit);
+        let res = coll.aggregate(pipeline).toArray();
+        assert.eq(expectedDocs, res);
+    }
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [{$search: mongotQuery}, {$limit: 13}],
+        extractedLimit: 13,
+        expectedDocs: relevantDocs.slice(0, 13)
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [{$search: mongotQuery}, {$limit: 17}],
+        extractedLimit: 17,
+        expectedDocs: relevantDocs
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [{$search: mongotQuery}, {$limit: 20}],
+        extractedLimit: 20,
+        expectedDocs: relevantDocs
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [{$search: mongotQuery}, {$limit: 500}],
+        extractedLimit: 500,
+        expectedDocs: relevantDocs
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [{$search: mongotQuery}, {$limit: 500}, {$limit: 13}],
+        extractedLimit: 13,
+        expectedDocs: relevantDocs.slice(0, 13)
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [{$search: mongotQuery}, {$project: {_id: 0, artist: 0}}, {$limit: 13}],
+        extractedLimit: 13,
+        expectedDocs: relevantDocsOnlyTitle.slice(0, 13)
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [{$search: mongotQuery}, {$limit: 5}],
+        extractedLimit: 5,
+        expectedDocs: relevantDocs.slice(0, 5)
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [{$search: mongotQuery}, {$limit: 13}, {$limit: 5}],
+        extractedLimit: 5,
+        expectedDocs: relevantDocs.slice(0, 5)
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [
+            {$search: mongotQuery},
+            {$limit: 7},
+            {$limit: 500},
+            {$project: {_id: 0, title: 1}},
+            {$limit: 13}
+        ],
+        extractedLimit: 7,
+        expectedDocs: relevantDocsOnlyTitle.slice(0, 7)
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [{$search: mongotQuery}, {$skip: 5}, {$limit: 10}],
+        extractedLimit: 15,
+        expectedDocs: relevantDocs.slice(5, 15)
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline:
+            [{$search: mongotQuery}, {$skip: 5}, {$limit: 3}, {$project: {_id: 0, artist: 0}}],
+        extractedLimit: 8,
+        expectedDocs: relevantDocsOnlyTitle.slice(5, 8)
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [{$search: mongotQuery}, {$skip: 15}, {$limit: 100}],
+        extractedLimit: 115,
+        expectedDocs: relevantDocs.slice(15)
+    });
+
+    runBatchSizeExtractableLimitTest({
+        pipeline: [{$search: mongotQuery}, {$skip: 5}, {$limit: 10}, {$skip: 5}, {$limit: 3}],
+        extractedLimit: 13,
+        expectedDocs: relevantDocs.slice(10, 13)
+    });
 }
 
-/**
- * Mocks the mongot request / results for the given pipeline with the given expectedBatchSize,
- * then asserts that the results are correct.
- * This will fail (via the mongotMock internals) if the batchSize sent to mongot is different
- * than expected.
- */
-function runBatchSizeExtractableLimitTest({pipeline, expectedBatchSize, expectedDocs}) {
-    mockRequest(expectedBatchSize);
-    let res = coll.aggregate(pipeline).toArray();
-    assert.eq(expectedDocs, res);
-}
+let oversubscriptionFactor = 1.064;
+// Assert the default oversubscriptionFactor is 1.064.
+assert.eq(oversubscriptionFactor,
+          assert.commandWorked(db.adminCommand({getClusterParameter: "internalSearchOptions"}))
+              .clusterParameters[0]
+              .oversubscriptionFactor);
+runTest(oversubscriptionFactor, mongotQuery);
 
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$limit: 13}],
-    expectedBatchSize: 13,
-    expectedDocs: relevantDocs.slice(0, 13)
-});
+oversubscriptionFactor = 1;
+assert.commandWorked(
+    db.adminCommand({setClusterParameter: {internalSearchOptions: {oversubscriptionFactor}}}));
+runTest(oversubscriptionFactor, mongotQuery);
 
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$limit: 17}],
-    expectedBatchSize: 17,
-    expectedDocs: relevantDocs
-});
+oversubscriptionFactor = 1.5;
+assert.commandWorked(
+    db.adminCommand({setClusterParameter: {internalSearchOptions: {oversubscriptionFactor}}}));
+runTest(oversubscriptionFactor, mongotQuery);
 
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$limit: 20}],
-    expectedBatchSize: 20,
-    expectedDocs: relevantDocs
-});
-
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$limit: 500}],
-    expectedBatchSize: 500,
-    expectedDocs: relevantDocs
-});
-
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$limit: 500}, {$limit: 13}],
-    expectedBatchSize: 13,
-    expectedDocs: relevantDocs.slice(0, 13)
-});
-
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$project: {_id: 0}}, {$limit: 13}],
-    expectedBatchSize: 13,
-    expectedDocs: relevantDocsNoId.slice(0, 13)
-});
-
-// When we have an extractable limit less than 10, it should be rounded to minimum 10 when computing
-// initial mongot batchSize.
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$limit: 5}],
-    expectedBatchSize: 10,
-    expectedDocs: relevantDocs.slice(0, 5)
-});
-
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$limit: 13}, {$limit: 5}],
-    expectedBatchSize: 10,
-    expectedDocs: relevantDocs.slice(0, 5)
-});
-
-runBatchSizeExtractableLimitTest({
-    pipeline:
-        [{$search: mongotQuery}, {$limit: 7}, {$limit: 500}, {$project: {_id: 0}}, {$limit: 13}],
-    expectedBatchSize: 10,
-    expectedDocs: relevantDocsNoId.slice(0, 7)
-});
-
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$skip: 5}, {$limit: 10}],
-    expectedBatchSize: 15,
-    expectedDocs: relevantDocs.slice(5, 15)
-});
-
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$skip: 5}, {$limit: 3}, {$project: {_id: 0}}],
-    expectedBatchSize: 10,
-    expectedDocs: relevantDocsNoId.slice(5, 8)
-});
-
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$skip: 15}, {$limit: 100}],
-    expectedBatchSize: 115,
-    expectedDocs: relevantDocs.slice(15)
-});
-
-runBatchSizeExtractableLimitTest({
-    pipeline: [{$search: mongotQuery}, {$skip: 5}, {$limit: 10}, {$skip: 5}, {$limit: 3}],
-    expectedBatchSize: 13,
-    expectedDocs: relevantDocs.slice(10, 13)
-});
+mongotQuery.returnStoredSource = true;
+// Although the actual cluster parameter oversubscriptionFactor is still 1.5, the oversubscription
+// should not be applied for stored source queries.
+oversubscriptionFactor = 1;
+runTest(oversubscriptionFactor, mongotQuery);
 
 MongoRunner.stopMongod(conn);
 mongotMock.stop();

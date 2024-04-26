@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/executor/task_executor_cursor.h"
 
 namespace mongo {
@@ -87,8 +88,8 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
     auto isStoredSource() const {
-        return _searchQuery.hasField(kReturnStoredSourceArg)
-            ? _searchQuery[kReturnStoredSourceArg].Bool()
+        return _searchQuery.hasField(mongot_cursor::kReturnStoredSourceArg)
+            ? _searchQuery[mongot_cursor::kReturnStoredSourceArg].Bool()
             : false;
     }
 

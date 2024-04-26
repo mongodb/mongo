@@ -219,10 +219,11 @@ void DocumentSourceInternalSearchMongotRemote::tryToSetSearchMetaVar() {
                     opDebug.mongotCountVal = metaValDoc.getField("count").wrap("count");
                 }
 
-                if (!metaValDoc.getField(kSlowQueryLogFieldName).missing()) {
+                if (!metaValDoc.getField(mongot_cursor::kSlowQueryLogFieldName).missing()) {
                     auto& opDebug = CurOp::get(pExpCtx->opCtx)->debug();
                     opDebug.mongotSlowQueryLog =
-                        metaValDoc.getField(kSlowQueryLogFieldName).wrap(kSlowQueryLogFieldName);
+                        metaValDoc.getField(mongot_cursor::kSlowQueryLogFieldName)
+                            .wrap(mongot_cursor::kSlowQueryLogFieldName);
                 }
             }
         }

@@ -136,6 +136,7 @@
 #include "mongo/db/query/sbe_stage_builder_projection.h"
 #include "mongo/db/query/sbe_stage_builder_sbexpr_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_window_function.h"
+#include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/stage_types.h"
@@ -219,10 +220,11 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
                     opDebug.mongotCountVal = metaValObj.getField("count").wrap();
                 }
 
-                if (metaValObj.hasField(kSlowQueryLogFieldName)) {
+                if (metaValObj.hasField(mongot_cursor::kSlowQueryLogFieldName)) {
                     auto& opDebug = CurOp::get(cq.getOpCtx())->debug();
                     opDebug.mongotSlowQueryLog =
-                        metaValObj.getField(kSlowQueryLogFieldName).wrap(kSlowQueryLogFieldName);
+                        metaValObj.getField(mongot_cursor::kSlowQueryLogFieldName)
+                            .wrap(mongot_cursor::kSlowQueryLogFieldName);
                 }
             }
         }
@@ -5473,7 +5475,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto sortSpecSlot = _env->registerSlot(
         "searchSortSpec"_sd, sbe::value::TypeTags::Nothing, 0 /* val */, false, &_slotIdGenerator);
 
-    bool isStoredSource = sn->searchQuery.getBoolField(kReturnStoredSourceArg);
+    bool isStoredSource = sn->searchQuery.getBoolField(mongot_cursor::kReturnStoredSourceArg);
 
     auto topLevelFields = getTopLevelFields(reqs.getFields());
     auto topLevelFieldSlots = _slotIdGenerator.generateMultiple(topLevelFields.size());

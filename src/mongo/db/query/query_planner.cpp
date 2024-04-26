@@ -96,6 +96,7 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/set_util.h"
@@ -575,7 +576,7 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
         // Build a SearchNode in order to retrieve the search info.
         auto searchNode = SearchNode::getSearchNode(query.cqPipeline().front().get());
 
-        if (searchNode->searchQuery.getBoolField(kReturnStoredSourceArg) ||
+        if (searchNode->searchQuery.getBoolField(mongot_cursor::kReturnStoredSourceArg) ||
             searchNode->isSearchMeta) {
             auto querySoln = std::make_unique<QuerySolution>();
             querySoln->setRoot(std::move(searchNode));
