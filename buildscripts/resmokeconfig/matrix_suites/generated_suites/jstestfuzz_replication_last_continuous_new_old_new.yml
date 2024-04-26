@@ -36,6 +36,9 @@ executor:
     old_bin_version: last_continuous
   hooks:
   - class: FuzzerRestoreSettings
+  - class: LagOplogApplicationInBackground
+    shell_options:
+      nodb: ''
   - class: CheckReplOplogs
   - class: CheckReplDBHash
     shell_options:
