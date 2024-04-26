@@ -1095,6 +1095,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_debian",
       ]
     commands:
       - func: "f_expansions_write"
