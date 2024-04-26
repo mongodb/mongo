@@ -169,7 +169,7 @@ buildvariants:
     tasks:
       - name: compile_bazel_TG
 
-  # This task is responsible for creating a AL2023 x86 server binary candidate for 10gen/mongot.
+  # This variant is responsible for creating a AL2023 x86 server binary candidate for 10gen/mongot.
   # A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
   # binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests.
   - name: amazon-linux-2023-x86-mongot-integration-cron-only
@@ -179,7 +179,7 @@ buildvariants:
     patchable: false
     run_on:
       - amazon2023.0-small
-    expansions:
+    expansions: &amazon-linux-2023-x86-mongot-integration-expansions
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=amazon2023
@@ -197,10 +197,11 @@ buildvariants:
       repo_edition: enterprise
       scons_cache_scope: shared
       compile_variant: amazon-linux-2023-x86-mongot-integration-cron-only
-    tasks:
+    tasks: &amazon-linux-2023-x86-mongot-distro-tasks
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
           - amazon2023.0-large
+      # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
       - name: search_auth
       - name: search_end_to_end_sharded_cluster
@@ -211,7 +212,20 @@ buildvariants:
       - name: vector_search_auth
       - name: vector_search_ssl
 
-  # This task is responsible for creating a AL2023 arm64 server binary candidate for 10gen/mongot.
+  # This mongot integration variant is identical to the AL2023 x86 above except it is patachable
+  # and is not configured with any downstream project triggers on 10gen/mongot.
+  - name: amazon-linux-2023-x86-mongot-integration-patchable
+    display_name: "AL2023 x86 mongot integration tasks"
+    tags: []
+    patch_only: true
+    run_on:
+      - amazon2023.0-small
+    expansions:
+      <<: *amazon-linux-2023-x86-mongot-integration-expansions
+      compile_variant: amazon-linux-2023-x86-mongot-integration-patchable
+    tasks: *amazon-linux-2023-x86-mongot-distro-tasks
+
+  # This variant is responsible for creating a AL2023 arm64 server binary candidate for 10gen/mongot.
   # A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
   # binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests.
   - name: amazon2023-arm64-mongot-integration-cron-only
@@ -221,7 +235,7 @@ buildvariants:
     patchable: false
     run_on:
       - amazon2023.0-arm64-small
-    expansions:
+    expansions: &amazon2023-arm64-mongot-integration-expansions
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=amazon2023
@@ -243,10 +257,11 @@ buildvariants:
       repo_edition: enterprise
       scons_cache_scope: shared
       compile_variant: amazon2023-arm64-mongot-integration-cron-only
-    tasks:
+    tasks: &amazon2023-arm64-mongot-distro-tasks
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
           - amazon2023.0-arm64-large
+      # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
       - name: search_auth
       - name: search_end_to_end_sharded_cluster
@@ -257,7 +272,20 @@ buildvariants:
       - name: vector_search_auth
       - name: vector_search_ssl
 
-  # This task is responsible for creating a AL2 arm64 server binary candidate for 10gen/mongot.
+  # This mongot integration variant is identical to the AL2023 arm64 above except it is patachable
+  # and is not configured with any downstream project triggers on 10gen/mongot.
+  - name: amazon2023-arm64-mongot-integration-patchable
+    display_name: "AL2023 arm64 mongot integration tasks"
+    tags: []
+    patch_only: true
+    run_on:
+      - amazon2023.0-arm64-small
+    expansions:
+      <<: *amazon2023-arm64-mongot-integration-expansions
+      compile_variant: amazon2023-arm64-mongot-integration-patchable
+    tasks: *amazon2023-arm64-mongot-distro-tasks
+
+  # This variant is responsible for creating a AL2 arm64 server binary candidate for 10gen/mongot.
   # A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
   # binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests.
   - name: amazon-linux2-arm64-mongot-integration-cron-only
@@ -268,7 +296,7 @@ buildvariants:
     run_on:
       - amazon2-arm64-small
     stepback: true
-    expansions:
+    expansions: &amazon-linux2-arm64-mongot-integration-expansions
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=amazon2
@@ -278,17 +306,16 @@ buildvariants:
       scons_cache_scope: shared
       scons_cache_mode: all
       has_packages: false
-      jstestfuzz_num_generated_files: 40
-      jstestfuzz_concurrent_num_files: 10
       target_resmoke_time: 10
       max_sub_suites: 5
       idle_timeout_factor: 1.5
       exec_timeout_factor: 1.5
       compile_variant: amazon-linux2-arm64-mongot-integration-cron-only
-    tasks:
+    tasks: &amazon-linux2-arm64-mongot-distro-tasks
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
           - amazon2-arm64-large
+      # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
       - name: search_auth
       - name: search_end_to_end_sharded_cluster
@@ -299,7 +326,21 @@ buildvariants:
       - name: vector_search_auth
       - name: vector_search_ssl
 
-  # This task is responsible for creating a AL2 x86 server binary candidate for 10gen/mongot.
+  # This mongot integration variant is identical to the AL2 arm64 above except it is patachable
+  # and is not configured with any downstream project triggers on 10gen/mongot.
+  - name: amazon-linux2-arm64-mongot-integration-patchable
+    display_name: "AL2 arm64 mongot integration tasks"
+    tags: []
+    patch_only: true
+    run_on:
+      - amazon2-arm64-small
+    stepback: true
+    expansions:
+      <<: *amazon-linux2-arm64-mongot-integration-expansions
+      compile_variant: amazon-linux2-arm64-mongot-integration-patchable
+    tasks: *amazon-linux2-arm64-mongot-distro-tasks
+
+  # This variant is responsible for creating a AL2 x86 server binary candidate for 10gen/mongot.
   # A project trigger defined on 10gen/mongot runs when this variant succeeds, to check if the resulting
   # binary candidate passes their tests and is therefore safe to use in their pre-commit integration tests
   - name: amazon2-x86-mongot-integration-cron-only
@@ -309,7 +350,7 @@ buildvariants:
     patchable: false
     run_on:
       - amazon2-large
-    expansions:
+    expansions: &amazon2-x86-mongot-integration-expansions
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=amazon2
@@ -327,7 +368,7 @@ buildvariants:
       repo_edition: enterprise
       scons_cache_scope: shared
       compile_variant: amazon2-x86-mongot-integration-cron-only
-    tasks:
+    tasks: &amazon2-x86-mongot-distro-tasks
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
           - amazon2-large
@@ -340,6 +381,19 @@ buildvariants:
       - name: vector_search
       - name: vector_search_auth
       - name: vector_search_ssl
+
+  # This mongot integration variant is identical to the AL2 x86 above except it is patachable
+  # and is not configured with any downstream project triggers on 10gen/mongot
+  - name: amazon2-x86-mongot-integration-patchable
+    display_name: "AL2 x86 mongot integration tasks"
+    tags: []
+    cron: "0 */4 * * *" # Run these tasks every 4 hours
+    run_on:
+      - amazon2-large
+    expansions:
+      <<: *amazon2-x86-mongot-integration-expansions
+      compile_variant: amazon2-x86-mongot-integration-patchable
+    tasks: *amazon2-x86-mongot-distro-tasks
 
   - &enterprise-amazon-linux2-arm64-all-feature-flags-template
     <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
