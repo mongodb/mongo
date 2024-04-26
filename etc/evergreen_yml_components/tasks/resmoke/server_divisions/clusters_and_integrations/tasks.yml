@@ -1311,6 +1311,15 @@ tasks:
           suite: core_ese
 
   - <<: *task_template
+    name: jsCore_heap_profiling
+    tags: ["assigned_to_jira_team_server_servicearch", "default", "jscore"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: core_heap_profiling
+
+  - <<: *task_template
     name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
     tags:
       [
