@@ -15,7 +15,7 @@ def run_prettier(prettier: pathlib.Path, check: bool) -> int:
         subprocess.run(command, check=True)
     except subprocess.CalledProcessError:
         print("Found formatting errors. Run 'bazel run //:format' to fix")
-        print("If bazel is not installed, run the following:\n")
+        print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
         print("python buildscripts/install_bazel.py")
         return 1
 
@@ -29,7 +29,7 @@ def main() -> int:
     default_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
     if not default_dir:
         print("This script must be run though bazel. Please run 'bazel run //:format' instead")
-        print("If bazel is not installed, run the following:\n")
+        print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
         print("python buildscripts/install_bazel.py")
         return 1
 

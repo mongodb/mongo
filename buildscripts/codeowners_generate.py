@@ -208,7 +208,7 @@ def main():
             print(
                 "If you are seeing this message in CI you likely need to run `bazel run //:codeowners`"
             )
-            print("If bazel is not installed, run the following:\n")
+            print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
             print("python buildscripts/install_bazel.py")
             return 1
 
