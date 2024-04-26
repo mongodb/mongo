@@ -536,9 +536,6 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
             rsSyncApplyStop.pauseWhileSet(&opCtx);
         }
 
-        // Transition to SECONDARY state, if possible.
-        _replCoord->finishRecoveryIfEligible(&opCtx);
-
         // Blocks up to a second waiting for a batch to be ready to apply. If one doesn't become
         // ready in time, we'll loop again so we can do the above checks periodically.
         OplogApplierBatch ops = _oplogBatcher->getNextBatch(Seconds(1));
