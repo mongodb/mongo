@@ -49,62 +49,6 @@ variables:
       - flamegraph
 
 buildvariants:
-  - <<: *amazon_linux2_arm64_compile_variant_dependency
-    name: perf-1-node-replSet.arm.aws.2023-11
-    display_name: 1-Node ReplSet ARM AWS 2023-11
-    cron: &linux-1-node-repl-cron "0 0 * * 4" # 00:00 on Thursday
-    modules: *perf_modules
-    expansions:
-      mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica
-      infrastructure_provisioning_release: 2023-09
-      infrastructure_provisioning: single
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: &perf_project_dir dsi
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: amazon2-arm64-compile
-    run_on:
-      - "rhel70-perf-single"
-    tasks: &1nodetasks
-      - *schedule_patch_auto_tasks_task
-      - *schedule_variant_auto_tasks_task
-      - name: ycsb.2023-09
-      - name: ycsb_single_thread
-      - name: ycsb_60GB.2023-09
-      - name: ycsb_60GB.long.2023-09
-      - name: crud_workloads_majority
-      - name: misc_workloads
-      - name: map_reduce_workloads
-      - name: smoke_test
-      - name: canaries_only
-      - name: non_sharded_workloads
-      - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_wordcount
-      - name: bestbuy_query
-      - name: change_streams_latency
-      - name: change_streams_listen_throughput
-      - name: snapshot_reads
-      - name: linkbench
-      - name: linkbench2
-      - name: tsbs_load
-      - name: tsbs_query
-      - name: tsbs_query_finance
-      - name: tsbs_query_manual_bucketing
-      - name: tsbs_query_fixed_bucketing
-      - name: tsbs-query-genny
-      - name: tsbs-query-optimizations
-      - name: tpcc
-      - name: tpcc_majority
-      - name: tpch_1_normalized
-      - name: tpch_1_denormalized
-      - name: tpch_10_normalized
-      - name: tpch_10_denormalized
-      - name: genny_execution_ValidationFull
-
   - <<: *amazon2_x86_compile_variant_dependency
     name: perf-standalone-classic-query-engine.intel.aws.2023-11
     display_name: Classic Query Engine Standalone Intel AWS 2023-11
@@ -117,7 +61,7 @@ buildvariants:
       infrastructure_provisioning: single-intel.2023-11
       workload_setup: 2022-11
       platform: linux
-      project_dir: *perf_project_dir
+      project_dir: &perf_project_dir dsi
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: amazon2-x86-compile
@@ -169,7 +113,7 @@ buildvariants:
   - <<: *amazon2_x86_compile_variant_dependency
     name: perf-1-node-replSet-classic-query-engine.intel.aws.2023-11
     display_name: Classic Query Engine Intel 1-Node ReplSet Intel AWS 2023-11
-    cron: *linux-1-node-repl-cron
+    cron: &linux-1-node-repl-cron "0 0 * * 4" # 00:00 on Thursday
     modules: *perf_modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -1802,8 +1746,43 @@ buildvariants:
       compile_variant: amazon2-arm64-compile
     run_on:
       - "rhel70-perf-single"
-    # Not using 1nodetasks because some need to be temporarily disabled.
-    tasks: *1nodetasks
+    tasks:
+      - *schedule_patch_auto_tasks_task
+      - *schedule_variant_auto_tasks_task
+      - name: ycsb.2023-09
+      - name: ycsb_single_thread
+      - name: ycsb_60GB.2023-09
+      - name: ycsb_60GB.long.2023-09
+      - name: crud_workloads_majority
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: smoke_test
+      - name: canaries_only
+      - name: non_sharded_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: change_streams_latency
+      - name: change_streams_listen_throughput
+      - name: snapshot_reads
+      - name: linkbench
+      - name: linkbench2
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
+      - name: tsbs_query_fixed_bucketing
+      - name: tsbs-query-genny
+      - name: tsbs-query-optimizations
+      - name: tpcc
+      - name: tpcc_majority
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
+      - name: genny_execution_ValidationFull
 
   # Variant which runs a single shard cluster with a config
   # shard and mongos processes processes co-located on the
