@@ -880,11 +880,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     MakePipelineOptions opts) {
     auto pipeline = Pipeline::parse(rawPipeline, expCtx, opts.validator);
 
+    bool alreadyOptimized = opts.alreadyOptimized;
+
     if (opts.optimize) {
         pipeline->optimizePipeline();
+        alreadyOptimized = true;
     }
 
-    constexpr bool alreadyOptimized = true;
     pipeline->validateCommon(alreadyOptimized);
 
     if (opts.attachCursorSource) {
