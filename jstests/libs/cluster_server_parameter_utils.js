@@ -315,6 +315,8 @@ export function runGetClusterParameterSharded(st,
                                               tenantId = undefined,
                                               omitInFTDC = false,
                                               omittedInFTDCClusterParameters = []) {
+    const shards = [st.rs0, st.rs1, st.rs2];
+    shards.forEach((shard) => shard.awaitReplication());
     assert(runGetClusterParameterNode(st.s0,
                                       getClusterParameterArgs,
                                       expectedClusterParameters,
@@ -328,7 +330,6 @@ export function runGetClusterParameterSharded(st,
                                      tenantId,
                                      omitInFTDC,
                                      omittedInFTDCClusterParameters);
-    const shards = [st.rs0, st.rs1, st.rs2];
     shards.forEach(function(shard) {
         runGetClusterParameterReplicaSet(shard,
                                          getClusterParameterArgs,
