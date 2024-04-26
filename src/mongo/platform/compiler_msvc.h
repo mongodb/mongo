@@ -83,4 +83,10 @@
 
 #define MONGO_GSL_POINTER
 
+// Introduced in Visual Studio 2022 17.7
+// See: https://learn.microsoft.com/en-us/cpp/code-quality/c26815?view=msvc-170
+#if _MSC_VER >= 1937
+#define MONGO_COMPILER_LIFETIME_BOUND [[msvc::lifetimebound]]
+#else
 #define MONGO_COMPILER_LIFETIME_BOUND
+#endif
