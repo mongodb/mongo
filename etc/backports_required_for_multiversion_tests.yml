@@ -561,7 +561,7 @@ last-continuous:
     ticket: SERVER-83370
   - test_file: jstests/core/timeseries/timeseries_lookup.js
     ticket: SERVER-79637
-  - test_file: jstests/core/notablescan.js
+  - test_file: jstests/noPassthrough/notablescan.js
     ticket: SERVER-83119
   - test_file: jstests/sharding/clustered_coll_scan.js
     ticket: SERVER-83119
@@ -1210,7 +1210,7 @@ last-lts:
     ticket: SERVER-83370
   - test_file: jstests/core/timeseries/timeseries_lookup.js
     ticket: SERVER-79637
-  - test_file: jstests/core/notablescan.js
+  - test_file: jstests/noPassthrough/notablescan.js
     ticket: SERVER-83119
   - test_file: jstests/sharding/clustered_coll_scan.js
     ticket: SERVER-83119
