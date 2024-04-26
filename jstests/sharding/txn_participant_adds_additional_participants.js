@@ -1,6 +1,9 @@
 /**
  * Tests that additional participants can be added to an existing transaction.
- * @tags: [featureFlagAllowAdditionalParticipants]
+ * @tags: [
+ *   featureFlagAllowAdditionalParticipants,
+ *   temp_disabled_embedded_router_metrics,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
