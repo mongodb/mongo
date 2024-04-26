@@ -66,6 +66,20 @@
 
 namespace mongo {
 
+namespace fallback_op_observer_util {
+
+bool inRecoveryMode(OperationContext* opCtx) {
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->getSettings().isReplSet()) {
+        return false;
+    }
+
+    const auto memberState = replCoord->getMemberState();
+    return memberState.startup2() || memberState.rollback();
+}
+
+}  // namespace fallback_op_observer_util
+
 void FallbackOpObserver::onInserts(OperationContext* opCtx,
                                    const CollectionPtr& coll,
                                    std::vector<InsertStatement>::const_iterator first,
@@ -86,6 +100,10 @@ void FallbackOpObserver::onInserts(OperationContext* opCtx,
     if (nss.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (nss.isSystemDotViews()) {
+        if (fallback_op_observer_util::inRecoveryMode(opCtx)) {
+            return;
+        }
+
         try {
             for (auto it = first; it != last; it++) {
                 view_util::validateViewDefinitionBSON(opCtx, it->doc, nss.dbName());
@@ -150,6 +168,10 @@ void FallbackOpObserver::onUpdate(OperationContext* opCtx,
     if (nss.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (nss.isSystemDotViews()) {
+        if (fallback_op_observer_util::inRecoveryMode(opCtx)) {
+            return;
+        }
+
         CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opAccumulator->opTime.writeOpTime.isNull()) {
@@ -212,6 +234,10 @@ void FallbackOpObserver::onDelete(OperationContext* opCtx,
     if (nss.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (nss.isSystemDotViews()) {
+        if (fallback_op_observer_util::inRecoveryMode(opCtx)) {
+            return;
+        }
+
         onDeleteView(opCtx, nss, doc);
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
                (inBatchedWrite || !opAccumulator->opTime.writeOpTime.isNull())) {
@@ -239,6 +265,10 @@ repl::OpTime FallbackOpObserver::onDropCollection(OperationContext* opCtx,
     if (collectionName.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (collectionName.isSystemDotViews()) {
+        if (fallback_op_observer_util::inRecoveryMode(opCtx)) {
+            return {};
+        }
+
         CollectionCatalog::get(opCtx)->clearViews(opCtx, collectionName.dbName());
     } else if (collectionName == NamespaceString::kSessionTransactionsTableNamespace) {
         // Disallow this drop if there are currently prepared transactions.
@@ -264,6 +294,24 @@ repl::OpTime FallbackOpObserver::onDropCollection(OperationContext* opCtx,
     }
 
     return {};
+}
+
+// TODO: this might not be needed after SERVER-89706
+void FallbackOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                               const RollbackObserverInfo& rbInfo) {
+    stdx::unordered_set<DatabaseName> deduplicatedDbNames{};
+    for (const auto& ns : rbInfo.rollbackNamespaces) {
+        deduplicatedDbNames.insert(ns.dbName());
+    }
+
+    for (const auto& dbName : deduplicatedDbNames) {
+        Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+        Lock::CollectionLock sysCollLock(
+            opCtx, NamespaceString::makeSystemDotViewsNamespace(dbName), MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+        CollectionCatalog::get(opCtx)->reloadViews(opCtx, dbName);
+        wuow.commit();
+    }
 }
 
 }  // namespace mongo

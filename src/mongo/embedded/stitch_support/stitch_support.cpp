@@ -159,10 +159,10 @@ struct ServiceContextDestructor {
      * stitch_support_v1_fini() or when the process exits.
      */
     void operator()(mongo::ServiceContext* const serviceContext) const noexcept {
+        setGlobalServiceContext(nullptr);
+
         Status status = mongo::runGlobalDeinitializers();
         uassertStatusOKWithContext(status, "Global deinitilization failed");
-
-        setGlobalServiceContext(nullptr);
     }
 };
 
