@@ -266,5 +266,5 @@ buildvariants:
       # 4) serverless: Retryable writes on the serverless cause problems with recordIdsReplicated:true
       test_flags: >-
         --runAllFeatureFlagTests
-        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,exclude_when_record_ids_replicated,disables_test_commands,requires_capped
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,exclude_when_record_ids_replicated,disables_test_commands,requires_capped,incompatible_with_atlas_environment,requires_ldap_pool
         --mongodSetParameters="{'failpoint.overrideRecordIdsReplicatedDefault': {mode: 'alwaysOn'}, 'failpoint.automaticallyCollmodToRecordIdsReplicatedFalse': {mode: 'alwaysOn'}}"
