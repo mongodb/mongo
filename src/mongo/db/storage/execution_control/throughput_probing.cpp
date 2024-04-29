@@ -302,8 +302,8 @@ void ThroughputProbing::_resize(TicketHolder* ticketholder, int newTickets) {
             dumpLockManager();
 
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
-            // Dump the stack of each thread, non-blocking.
-            printAllThreadStacks();
+            // Dump the stack of each thread.
+            printAllThreadStacksBlocking();
 #endif
         }
     }
