@@ -137,42 +137,43 @@ Status validateBaseOptions(const moe::Environment& params) {
         }
     }
 
+    std::map<std::string, std::string> parameters;
     if (params.count("setParameter")) {
-        const auto parameters = params["setParameter"].as<std::map<std::string, std::string>>();
+        parameters = params["setParameter"].as<std::map<std::string, std::string>>();
+    }
 
-        const bool enableTestCommandsValue = ([&parameters] {
-            const auto etc = parameters.find("enableTestCommands");
-            if (etc == parameters.end()) {
-                return false;
-            }
-            const auto& val = etc->second;
-            return (0 == val.compare("1")) || (0 == val.compare("true"));
-        })();
+    const bool enableTestCommandsValue = ([&parameters] {
+        const auto etc = parameters.find("enableTestCommands");
+        if (etc == parameters.end()) {
+            return false;
+        }
+        const auto& val = etc->second;
+        return (0 == val.compare("1")) || (0 == val.compare("true"));
+    })();
 
-        if (enableTestCommandsValue) {
-            // Only register failpoint server parameters if enableTestCommands=1.
-            globalFailPointRegistry().registerAllFailPointsAsServerParameters();
-        } else {
-            // Deregister test-only parameters.
-            ServerParameterSet::getNodeParameterSet()->disableTestParameters();
-            ServerParameterSet::getClusterParameterSet()->disableTestParameters();
+    if (enableTestCommandsValue) {
+        // Only register failpoint server parameters if enableTestCommands=1.
+        globalFailPointRegistry().registerAllFailPointsAsServerParameters();
+    } else {
+        // Deregister test-only parameters.
+        ServerParameterSet::getNodeParameterSet()->disableTestParameters();
+        ServerParameterSet::getClusterParameterSet()->disableTestParameters();
+    }
+
+    // Must come after registerAllFailPointsAsServerParameters() above.
+    auto* paramSet = ServerParameterSet::getNodeParameterSet();
+    for (const auto& setParam : parameters) {
+        auto* param = paramSet->getIfExists(setParam.first);
+
+        if (!param) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Unknown --setParameter '" << setParam.first << "'"};
         }
 
-        // Must come after registerAllFailPointsAsServerParameters() above.
-        auto* paramSet = ServerParameterSet::getNodeParameterSet();
-        for (const auto& setParam : parameters) {
-            auto* param = paramSet->getIfExists(setParam.first);
-
-            if (!param) {
-                return {ErrorCodes::BadValue,
-                        str::stream() << "Unknown --setParameter '" << setParam.first << "'"};
-            }
-
-            if (!param->isEnabled()) {
-                return {ErrorCodes::BadValue,
-                        str::stream() << "--setParameter '" << setParam.first
-                                      << "' only available when used with 'enableTestCommands'"};
-            }
+        if (!param->isEnabled()) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "--setParameter '" << setParam.first
+                                  << "' only available when used with 'enableTestCommands'"};
         }
     }
 
