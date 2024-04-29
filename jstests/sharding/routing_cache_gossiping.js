@@ -48,9 +48,6 @@ function getGossipedVersion(gossipResponseArray, nss) {
 
 function getExpectedCollectionVersion(nss) {
     let shardMetadata;
-    // TODO (SERVER-88696): Evaluate if the test can be restored if synchronization is implemented.
-    // Since shardCollection asynchronously updates the states queried by this test, we might need
-    // to wait until everything is updated.
     assert.soon(() => {
         shardMetadata = ShardVersioningUtil.getMetadataOnShard(st.shard0, nss);
         return bsonWoCompare(shardMetadata, {});
