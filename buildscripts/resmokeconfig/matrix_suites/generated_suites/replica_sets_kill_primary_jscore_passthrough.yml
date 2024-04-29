@@ -42,7 +42,6 @@ executor:
     mongod_options:
       enableMajorityReadConcern: ''
       set_parameters:
-        enableAutoCompaction: 1
         enableElectionHandoff: 0
         enableTestCommands: 1
         logComponentVerbosity:

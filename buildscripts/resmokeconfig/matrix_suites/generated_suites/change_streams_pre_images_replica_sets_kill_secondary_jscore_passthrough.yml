@@ -18,7 +18,6 @@ executor:
     class: ReplicaSetFixture
     mongod_options:
       set_parameters:
-        enableAutoCompaction: 1
         enableTestCommands: 1
         expiredChangeStreamPreImageRemovalJobSleepSecs: 1
         failpoint.preImagesEnabledOnAllCollectionsByDefault: '{mode: ''alwaysOn''}'
