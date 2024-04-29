@@ -25,17 +25,6 @@ var _parsePath = function() {
     return dbpath;
 };
 
-var _parsePort = function() {
-    var port = "";
-    for (var i = 0; i < arguments.length; ++i)
-        if (arguments[i] == "--port")
-            port = arguments[i + 1];
-
-    if (port == "")
-        throw Error("No port specified");
-    return port;
-};
-
 var createMongoArgs = function(binaryName, args) {
     if (!Array.isArray(args)) {
         throw new Error("The second argument to createMongoArgs must be an array");
@@ -81,6 +70,17 @@ MongoRunner.mongodPath = "mongod";
 MongoRunner.mongosPath = "mongos";
 MongoRunner.mongoqPath = "mongoqd";
 MongoRunner.mongoShellPath = "mongo";
+
+MongoRunner.parsePort = function() {
+    var port = "";
+    for (var i = 0; i < arguments.length; ++i)
+        if (arguments[i] == "--port")
+            port = arguments[i + 1];
+
+    if (port == "")
+        throw Error("No port specified");
+    return port;
+};
 
 MongoRunner.VersionSub = function(pattern, version) {
     this.pattern = pattern;
@@ -1640,7 +1640,7 @@ MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
     // TODO: Make there only be one codepath for starting mongo processes
 
     argArray = appendSetParameterArgs(argArray);
-    var port = _parsePort.apply(null, argArray);
+    var port = MongoRunner.parsePort.apply(null, argArray);
     var pid = -1;
     if (env === undefined) {
         pid = _startMongoProgram.apply(null, argArray);
@@ -1675,7 +1675,7 @@ MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
  * command line arguments to the program.
  */
 startMongoProgram = function() {
-    var port = _parsePort.apply(null, arguments);
+    var port = MongoRunner.parsePort.apply(null, arguments);
 
     // Enable test commands.
     // TODO: Make this work better with multi-version testing so that we can support
