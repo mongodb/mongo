@@ -29,9 +29,7 @@
   </Type>
 
   <Type Name="mongo::StringData">
-    <DisplayString Condition="_size == 0">empty</DisplayString>
-    <DisplayString>{_data,[_size]s8}</DisplayString>
-    <StringView>_data,[_size]s8</StringView>
+    <DisplayString>{_sv,s8}</DisplayString>
   </Type>
 
   <Type Name="mongo::BSONElementBinaryType">
@@ -401,4 +399,47 @@
     </Expand>
   </Type>
 
+  <Type Name="mongo::ShardId">
+    <DisplayString>{_shardId}</DisplayString>
+  </Type>
+
+  <Type Name="mongo::OID">
+    <DisplayString>ObjectId({_data[0],nvoxb}{_data[1],nvoxb}{_data[2],nvoxb}{_data[3],nvoxb}{_data[4],nvoxb}{_data[5],nvoxb}{_data[6],nvoxb}{_data[7],nvoxb}{_data[8],nvoxb}{_data[9],nvoxb}{_data[10],nvoxb}{_data[11],nvoxb})</DisplayString>
+  </Type>
+
+  <Type Name="mongo::UUID">
+    <DisplayString>{_uuid[0],nvoxb}{_uuid[1],nvoxb}{_uuid[2],nvoxb}{_uuid[3],nvoxb}-{_uuid[4],nvoxb}{_uuid[5],nvoxb}-{_uuid[6],nvoxb}{_uuid[7],nvoxb}-{_uuid[8],nvoxb}{_uuid[9],nvoxb}-{_uuid[10],nvoxb}{_uuid[11],nvoxb}{_uuid[12],nvoxb}{_uuid[13],nvoxb}{_uuid[14],nvoxb}{_uuid[15],nvoxb}</DisplayString>
+  </Type>
+
+  <Type Name="mongo::ChunkVersion">
+    <DisplayString>{{e = {_epoch} t = Timestamp({_timestamp.secs}, {_timestamp.i}) v = Timestamp({_combined &gt;&gt; 32}, {_combined &amp; 0xFFFFFFFF})}}</DisplayString>
+    <Expand>
+      <Item Name="Epoch">_epoch</Item>
+      <Item Name="Timestamp">_timestamp</Item>
+      <Item Name="Version">_combined</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="mongo::ShardVersion">
+    <DisplayString>{{chunkVersion = {_chunkVersion} indexVersion = {_indexVersion}}}</DisplayString>
+    <Expand>
+        <Item Name="ChunkVersion">_chunkVersion</Item>
+        <Item Name="IndexVersion">_indexVersion</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="mongo::DatabaseName">
+    <!-- (((const char *)&_footer)[sizeof(size_t) - 1]) & 2 -->
+    <DisplayString Condition="(((const char*)&amp; _data._footer)[sizeof(size_t) - 1]) &amp; 2">{ ((const char *)&amp;(_data._data)),[(((const char*)&amp; _data._footer)[sizeof(size_t) - 1]) &gt;&gt; 2]s8 }</DisplayString>
+    <DisplayString>{_data._data,[_data._length]s8}</DisplayString>
+  </Type>
+
+  <Type Name="mongo::DatabaseVersionBase">
+    <DisplayString>{{uuid = UUID({_uuid}) timestamp = Timestamp({_timestamp.secs}, {_timestamp.i}) lastMod = {_lastMod}}}</DisplayString>
+      <Expand>
+          <Item Name="UUID">_uuid</Item>
+          <Item Name="Timestamp">_timestamp</Item>
+          <Item Name="LastMod">_lastMod</Item>
+      </Expand>
+  </Type>
 </AutoVisualizer>
