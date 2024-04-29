@@ -68,10 +68,6 @@ RecoveryUnit::RecoveryUnit() : _snapshot(getNextSnapshotId()) {}
 
 RecoveryUnit::~RecoveryUnit() = default;
 
-RecoveryUnit::Snapshot& RecoveryUnit::getSnapshot() {
-    return _snapshot.get();
-}
-
 void RecoveryUnit::assignNextSnapshot() {
     // The current snapshot's destructor will be called first, followed by the constructors for the
     // next snapshot.

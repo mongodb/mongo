@@ -2174,11 +2174,10 @@ TEST_F(ShardRoleTest,
         boost::optional<CollectionAcquisition> acquisition1;
         boost::optional<CollectionAcquisition> acquisition2;
         {
-            CollectionAcquisitionMap acquisitions = makeAcquisitionMap(
-                withLocks ? acquireCollections(
-                                opCtx(), {acquisitionRequest1, acquisitionRequest2}, MODE_IS)
-                          : acquireCollectionsMaybeLockFree(
-                                opCtx(), {acquisitionRequest1, acquisitionRequest2}));
+            CollectionAcquisitionRequests requests{acquisitionRequest1, acquisitionRequest2};
+            CollectionAcquisitionMap acquisitions =
+                makeAcquisitionMap(withLocks ? acquireCollections(opCtx(), requests, MODE_IS)
+                                             : acquireCollectionsMaybeLockFree(opCtx(), requests));
             acquisition1 = acquisitions.at(acquisitionRequest1.nssOrUUID.nss());
             acquisition2 = acquisitions.at(acquisitionRequest2.nssOrUUID.nss());
         }

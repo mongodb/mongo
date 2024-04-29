@@ -65,16 +65,18 @@ bool canReadAtLastApplied(OperationContext* opCtx) {
          readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern);
 }
 
+constexpr StringData kReasonUnreplicatedCollection = "unreplicated collection"_sd;
+constexpr StringData kReasonPrimary = "primary"_sd;
+constexpr StringData kReasonNotPrimaryOrSecondary = "not primary or secondary"_sd;
+
 bool shouldReadAtLastApplied(OperationContext* opCtx,
                              boost::optional<const NamespaceString&> nss,
-                             std::string* reason) {
+                             StringData* reason) {
     // Non-replicated collections do not need to read at lastApplied, as those collections are not
     // written by the replication system. However, the oplog is special, as it *is* written by the
     // replication system.
     if (nss && !nss->isReplicated() && !nss->isOplog()) {
-        if (reason) {
-            *reason = "unreplicated collection";
-        }
+        *reason = kReasonUnreplicatedCollection;
         return false;
     }
 
@@ -84,9 +86,7 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
     // lastApplied.
     if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
             opCtx, DatabaseName::kAdmin)) {
-        if (reason) {
-            *reason = "primary";
-        }
+        *reason = kReasonPrimary;
         return false;
     }
 
@@ -95,9 +95,7 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
     // be internal. We give these operations the benefit of the doubt rather than attempting to read
     // at a lastApplied timestamp that is not valid.
     if (!repl::ReplicationCoordinator::get(opCtx)->isInPrimaryOrSecondaryState(opCtx)) {
-        if (reason) {
-            *reason = "not primary or secondary";
-        }
+        *reason = kReasonNotPrimaryOrSecondary;
         return false;
     }
 
@@ -125,22 +123,17 @@ namespace SnapshotHelper {
 
 bool changeReadSourceIfNeeded(OperationContext* opCtx,
                               boost::optional<const NamespaceString&> nss) {
-    std::string reason;
-    // Write to the reason string if debug logging is enabled. This avoids writing this string every
-    // time we check if we should read at last applied. This string itself is only used in logging
-    // with the same debug level as this check.
-    std::string* reasonWriter =
-        logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(2)) ? &reason
-                                                                                      : nullptr;
-    bool readAtLastApplied = shouldReadAtLastApplied(opCtx, nss, reasonWriter);
+
+    StringData reason;
+    bool readAtLastApplied = shouldReadAtLastApplied(opCtx, nss, &reason);
 
     if (!canReadAtLastApplied(opCtx)) {
         return readAtLastApplied;
     }
 
-    const auto originalReadSource =
-        shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
-    if (shard_role_details::getRecoveryUnit(opCtx)->isReadSourcePinned()) {
+    auto ru = shard_role_details::getRecoveryUnit(opCtx);
+    const auto originalReadSource = ru->getTimestampReadSource();
+    if (ru->isReadSourcePinned()) {
         LOGV2_DEBUG(5863601,
                     2,
                     "Not changing readSource as it is pinned",
@@ -161,7 +154,7 @@ bool changeReadSourceIfNeeded(OperationContext* opCtx,
     // Helper to set read source to the recovery unit and remember our current setting
     auto currentReadSource = originalReadSource;
     auto setReadSource = [&](RecoveryUnit::ReadSource readSource) {
-        shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(readSource);
+        ru->setTimestampReadSource(readSource);
         currentReadSource = readSource;
     };
 
@@ -199,8 +192,7 @@ bool changeReadSourceIfNeeded(OperationContext* opCtx,
         //
         // The above mainly applies for Lock-free reads that is not holding the RSTL which protects
         // against state changes.
-        reason.clear();
-        if (!shouldReadAtLastApplied(opCtx, nss, reasonWriter)) {
+        if (!shouldReadAtLastApplied(opCtx, nss, &reason)) {
             // State changed concurrently with setting the read source and we should no longer read
             // at lastApplied.
             setReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
@@ -211,22 +203,18 @@ bool changeReadSourceIfNeeded(OperationContext* opCtx,
     // All done, log if we made a change to the read source
     if (originalReadSource == RecoveryUnit::ReadSource::kNoTimestamp &&
         currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
-        LOGV2_DEBUG(
-            4452901,
-            2,
-            "Changed ReadSource to kLastApplied",
-            "namespace"_attr = nss,
-            "ts"_attr =
-                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx));
+        LOGV2_DEBUG(4452901,
+                    2,
+                    "Changed ReadSource to kLastApplied",
+                    "namespace"_attr = nss,
+                    "ts"_attr = ru->getPointInTimeReadTimestamp(opCtx));
     } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
                currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
-        LOGV2_DEBUG(
-            6730500,
-            2,
-            "ReadSource kLastApplied updated timestamp",
-            "namespace"_attr = nss,
-            "ts"_attr =
-                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx));
+        LOGV2_DEBUG(6730500,
+                    2,
+                    "ReadSource kLastApplied updated timestamp",
+                    "namespace"_attr = nss,
+                    "ts"_attr = ru->getPointInTimeReadTimestamp(opCtx));
     } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
                currentReadSource == RecoveryUnit::ReadSource::kNoTimestamp) {
         LOGV2_DEBUG(4452902,
