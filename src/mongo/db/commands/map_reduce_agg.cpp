@@ -190,7 +190,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
         PlanSummaryStats planSummaryStats;
         explainer.getSummaryStats(&planSummaryStats);
-        CurOp::get(opCtx)->debug().setPlanSummaryMetrics(planSummaryStats);
+        CurOp::get(opCtx)->debug().setPlanSummaryMetrics(std::move(planSummaryStats));
 
         if (!expCtx->explain) {
             if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {

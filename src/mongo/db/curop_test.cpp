@@ -242,11 +242,15 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.keysExamined = 1;
     additiveMetrics.docsExamined = 2;
     additiveMetrics.clusterWorkingTime = Milliseconds(3);
+    additiveMetrics.readingTime = Microseconds(4);
+    additiveMetrics.bytesRead = 5;
     additiveMetrics.hasSortStage = false;
     additiveMetrics.usedDisk = false;
 
     CursorMetrics cursorMetrics(3 /* keysExamined */,
                                 4 /* docsExamined */,
+                                10 /* bytesRead */,
+                                11 /* readingTimeMicros */,
                                 5 /* workingTimeMillis */,
                                 true /* hasSortStage */,
                                 false /* usedDisk */,
@@ -258,6 +262,8 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(*additiveMetrics.keysExamined, 4);
     ASSERT_EQ(*additiveMetrics.docsExamined, 6);
     ASSERT_EQ(additiveMetrics.clusterWorkingTime, Milliseconds(8));
+    ASSERT_EQ(additiveMetrics.readingTime, Microseconds(15));
+    ASSERT_EQ(*additiveMetrics.bytesRead, 15);
     ASSERT_EQ(additiveMetrics.hasSortStage, true);
     ASSERT_EQ(additiveMetrics.usedDisk, false);
 }
@@ -267,10 +273,13 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
 
     additiveMetrics.keysExamined = boost::none;
     additiveMetrics.docsExamined = boost::none;
+    additiveMetrics.bytesRead = boost::none;
 
     CursorMetrics cursorMetrics(1 /* keysExamined */,
                                 2 /* docsExamined */,
-                                3 /* workingTimeMillis */,
+                                3 /* bytesRead */,
+                                10 /* workingTimeMillis */,
+                                11 /* readingTimeMicros */,
                                 true /* hasSortStage */,
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
@@ -280,6 +289,7 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
 
     ASSERT_EQ(*additiveMetrics.keysExamined, 1);
     ASSERT_EQ(*additiveMetrics.docsExamined, 2);
+    ASSERT_EQ(*additiveMetrics.bytesRead, 3);
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
@@ -321,6 +331,47 @@ TEST(CurOpTest, AdditiveMetricsAggregateDataBearingNodeMetricsTreatsNoneAsZero) 
 
     ASSERT_EQ(*additiveMetrics.keysExamined, 1);
     ASSERT_EQ(*additiveMetrics.docsExamined, 2);
+}
+
+TEST(CurOpTest, AdditiveMetricsShouldAggregateStorageStats) {
+    class StorageStatsForTest final : public StorageStats {
+        uint64_t _bytesRead;
+        Microseconds _readingTime;
+
+    public:
+        StorageStatsForTest(uint64_t bytesRead, Microseconds readingTime)
+            : _bytesRead(bytesRead), _readingTime(readingTime) {}
+        BSONObj toBSON() const final {
+            return {};
+        }
+        uint64_t bytesRead() const final {
+            return _bytesRead;
+        }
+        Microseconds readingTime() const final {
+            return _readingTime;
+        }
+        std::unique_ptr<StorageStats> clone() const final {
+            return nullptr;
+        }
+        StorageStats& operator+=(const StorageStats&) final {
+            return *this;
+        }
+        StorageStats& operator-=(const StorageStats&) final {
+            return *this;
+        }
+    };
+
+    OpDebug::AdditiveMetrics additiveMetrics;
+
+    additiveMetrics.bytesRead = 2;
+    additiveMetrics.readingTime = Microseconds(3);
+
+    StorageStatsForTest storageStats{5 /* bytesRead */, Microseconds(7) /* readingTime */};
+
+    additiveMetrics.aggregateStorageStats(storageStats);
+
+    ASSERT_EQ(*additiveMetrics.bytesRead, 7);
+    ASSERT_EQ(*additiveMetrics.readingTime, Microseconds(10));
 }
 
 TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {

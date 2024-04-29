@@ -672,7 +672,8 @@ export function exhaustCursorAndGetQueryStats(conn, coll, cmd, key, expectedDocs
     assert.eq(allResults.length, expectedDocs);
 
     const execCountPost = getExecCount(testDB, namespace);
-    assert.eq(execCountPost, execCountPre + 1, "Didn't find query stats for namespace" + namespace);
+    assert.eq(
+        execCountPost, execCountPre + 1, "Didn't find query stats for namespace " + namespace);
 
     const queryStats = getSingleQueryStatsEntryForNs(conn, namespace);
     print("Query Stats: " + tojson(queryStats));
@@ -695,10 +696,14 @@ export function exhaustCursorAndGetQueryStats(conn, coll, cmd, key, expectedDocs
  * the test object (ReplSetTest or ShardingTest). For the standalone case, the test is null.
  */
 export function runForEachDeployment(callbackFn) {
-    const options = {setParameter: {internalQueryStatsRateLimit: -1}};
+    // The options passed to runMongod sometimes get modified. Instead of having a single constant
+    // that we pass around (risking modification), we return the defaults from a function.
+    function options() {
+        return {setParameter: {internalQueryStatsRateLimit: -1}};
+    }
 
     {
-        const conn = MongoRunner.runMongod(options);
+        const conn = MongoRunner.runMongod(options());
 
         callbackFn(conn, null);
 
@@ -706,7 +711,7 @@ export function runForEachDeployment(callbackFn) {
     }
 
     {
-        const rst = new ReplSetTest({nodes: 3, nodeOptions: options});
+        const rst = new ReplSetTest({nodes: 3, nodeOptions: options()});
         rst.startSet();
         rst.initiate();
 
@@ -716,7 +721,7 @@ export function runForEachDeployment(callbackFn) {
     }
 
     {
-        const st = new ShardingTest(Object.assign({shards: 2, other: {mongosOptions: options}}));
+        const st = new ShardingTest(Object.assign({shards: 2, other: {mongosOptions: options()}}));
 
         const testDB = st.s.getDB("test");
         // Enable sharding separate from per-test setup to avoid calling enableSharding repeatedly.

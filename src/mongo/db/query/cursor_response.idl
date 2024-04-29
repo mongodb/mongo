@@ -58,6 +58,14 @@ structs:
                 description: "Number of documents examined by the query."
                 type: long
                 stability: unstable
+            bytesRead:
+                description: "Number of bytes of storage read by the query."
+                type: long
+                stability: unstable
+            readingTimeMicros:
+                description: "Amount of time spent reading data from storage."
+                type: long
+                stability: unstable
             workingTimeMillis:
                 description: "Amount of time spent executing the query, not including time spent blocked."
                 type: long

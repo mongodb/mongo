@@ -248,8 +248,8 @@ void collectQueryStats(OperationContext* opCtx,
         : maybeExec->getPlanExplainer();
     PlanSummaryStats stats;
     planExplainer.getSummaryStats(&stats);
-    curOp->debug().setPlanSummaryMetrics(stats);
     curOp->setEndOfOpMetrics(stats.nReturned);
+    curOp->debug().setPlanSummaryMetrics(std::move(stats));
 
     if (maybePinnedCursor) {
         collectQueryStatsMongod(opCtx, *maybePinnedCursor);

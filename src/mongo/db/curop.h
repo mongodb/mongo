@@ -138,6 +138,11 @@ public:
         void aggregateCursorMetrics(const CursorMetrics& metrics);
 
         /**
+         * Aggregates StorageStats from the storage engine into this AdditiveMetrics instance.
+         */
+        void aggregateStorageStats(const StorageStats& stats);
+
+        /**
          * Resets all members to the default state.
          */
         void reset();
@@ -210,6 +215,7 @@ public:
 
         boost::optional<long long> keysExamined;
         boost::optional<long long> docsExamined;
+        boost::optional<long long> bytesRead;
 
         // Number of records that match the query.
         boost::optional<long long> nMatched;
@@ -247,6 +253,9 @@ public:
         // for other nodes to do work on our behalf. In mongos, this tracks the total working time
         // across the cluster.
         boost::optional<Milliseconds> clusterWorkingTime{0};
+
+        // Amount of time spent reading from disk in the storage engine.
+        boost::optional<Microseconds> readingTime{0};
 
         // True if the query plan involves an in-memory sort.
         bool hasSortStage{false};
@@ -288,9 +297,9 @@ public:
     static void appendUserInfo(const CurOp&, BSONObjBuilder&, AuthorizationSession*);
 
     /**
-     * Copies relevant plan summary metrics to this OpDebug instance.
+     * Moves relevant plan summary metrics to this OpDebug instance.
      */
-    void setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats);
+    void setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats);
 
     /**
      * The resulting object has zeros omitted. As is typical in this file.
@@ -1127,6 +1136,12 @@ private:
      * Used for testing purposes instead of the getLog command.
      */
     void _checkForFailpointsAfterCommandLogged();
+
+    /**
+     * Fetches storage stats and stores them in the OpDebug if they're not already present.
+     * Can throw if interrupted while waiting for the global lock.
+     */
+    void _fetchStorageStatsIfNecessary(Date_t deadline, AdmissionContext::Priority priority);
 
     static const OperationContext::Decoration<CurOpStack> _curopStack;
 

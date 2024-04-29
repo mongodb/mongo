@@ -47,6 +47,8 @@ BSONObj QueryStatsEntry::toBSON(bool includeDiskUsageMetrics) const {
     if (includeDiskUsageMetrics) {
         keysExamined.appendTo(builder, "keysExamined");
         docsExamined.appendTo(builder, "docsExamined");
+        bytesRead.appendTo(builder, "bytesRead");
+        readTimeMicros.appendTo(builder, "readTimeMicros");
         workingTimeMillis.appendTo(builder, "workingTimeMillis");
         hasSortStage.appendTo(builder, "hasSortStage");
         usedDisk.appendTo(builder, "usedDisk");
