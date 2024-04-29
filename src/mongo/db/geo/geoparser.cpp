@@ -160,7 +160,7 @@ static Status parseArrayOfCoordinates(const BSONElement& elem, vector<S2Point>* 
                          << typeName(elem.type()));
     }
     BSONObjIterator it(elem.Obj());
-    // Iterate all coordinates in array
+    // Iterate all coordinates in array.
     while (it.more()) {
         S2Point p;
         Status status = parseGeoJSONCoordinate(it.next(), &p);
@@ -172,11 +172,20 @@ static Status parseArrayOfCoordinates(const BSONElement& elem, vector<S2Point>* 
 }
 
 static void eraseDuplicatePoints(vector<S2Point>* vertices) {
-    for (size_t i = 1; i < vertices->size(); ++i) {
-        if ((*vertices)[i - 1] == (*vertices)[i]) {
-            vertices->erase(vertices->begin() + i);
-            // We could have > 2 adjacent identical vertices, and must examine i again.
-            --i;
+    // Duplicates can't exist in a vector of 0 or 1 elements, and we want to be careful about
+    // possible underflow of size - 1 in the next block.
+    if (vertices->size() < 2) {
+        return;
+    }
+
+    size_t i = 0;
+    while (i < vertices->size() - 1) {
+        if ((*vertices)[i] == (*vertices)[i + 1]) {
+            vertices->erase(vertices->begin() + i + 1);
+            // We could have > 2 adjacent identical vertices, and must examine i again, so we don't
+            // increment the iterator.
+        } else {
+            ++i;
         }
     }
 }
