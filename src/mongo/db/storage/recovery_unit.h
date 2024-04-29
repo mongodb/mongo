@@ -145,7 +145,9 @@ public:
      * Note that the RecoveryUnit does not make any guarantees that this reference remains valid
      * except for the lifetime of the Snapshot.
      */
-    Snapshot& getSnapshot();
+    Snapshot& getSnapshot() {
+        return _snapshot.get();
+    }
 
     // Behavior for abandonSnapshot().
     enum class AbandonSnapshotMode {
