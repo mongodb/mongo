@@ -223,9 +223,7 @@ bool LogicalTimeValidator::isAuthorizedToAdvanceClock(OperationContext* opCtx) {
     auto as = AuthorizationSession::get(opCtx->getClient());
     // Note: returns true if auth is off, courtesy of
     // AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks.
-    return as->isAuthorizedForPrivilege(
-        Privilege(ResourcePattern::forClusterResource(as->getUserTenantId()),
-                  ActionType::advanceClusterTime));
+    return as->isAuthorizedForClusterAction(ActionType::advanceClusterTime, as->getUserTenantId());
 }
 
 bool LogicalTimeValidator::shouldGossipLogicalTime() {
