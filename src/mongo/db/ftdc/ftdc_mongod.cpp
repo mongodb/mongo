@@ -122,8 +122,13 @@ public:
 void registerShardCollectors(FTDCController* controller) {
     registerServerCollectorsForRole(controller, ClusterRole::ShardServer);
 
+    auto rc = repl::ReplicationCoordinator::get(getGlobalServiceContext());
+    bool isRepl = rc->getSettings().isReplSet();
+    // Don't collect collection stats on an arbiter, which doesn't store data.
+    bool isArbiter = isRepl && rc->getMemberState().arbiter();
+
     // These metrics are only collected if replication is enabled
-    if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getSettings().isReplSet()) {
+    if (isRepl) {
         // CmdReplSetGetStatus
         controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
                                              "replSetGetStatus",
@@ -133,19 +138,21 @@ void registerShardCollectors(FTDCController* controller) {
                                          ClusterRole::ShardServer);
 
         // CollectionStats
-        controller->addPeriodicCollector(
-            std::make_unique<FTDCSimpleInternalCommandCollector>(
-                "aggregate",
-                "local.oplog.rs.stats",
-                DatabaseName::kLocal,
-                BSON("aggregate"
-                     << "oplog.rs"
-                     << "cursor" << BSONObj{} << "pipeline"
-                     << BSON_ARRAY(BSON(
-                            "$collStats"
-                            << BSON("storageStats"
-                                    << BSON("waitForLock" << false << "numericOnly" << true)))))),
-            ClusterRole::ShardServer);
+        if (!isArbiter) {
+            controller->addPeriodicCollector(
+                std::make_unique<FTDCSimpleInternalCommandCollector>(
+                    "aggregate",
+                    "local.oplog.rs.stats",
+                    DatabaseName::kLocal,
+                    BSON("aggregate"
+                         << "oplog.rs"
+                         << "cursor" << BSONObj{} << "pipeline"
+                         << BSON_ARRAY(BSON("$collStats"
+                                            << BSON("storageStats"
+                                                    << BSON("waitForLock" << false << "numericOnly"
+                                                                          << true)))))),
+                ClusterRole::ShardServer);
+        }
     }
     controller->addPeriodicMetadataCollector(
         std::make_unique<FTDCSimpleInternalCommandCollector>(
@@ -165,9 +172,10 @@ void registerShardCollectors(FTDCController* controller) {
                                                                   << "omitInFTDC" << true)),
         ClusterRole::ShardServer);
 
-
-    controller->addPeriodicCollector(std::make_unique<FTDCCollectionStatsCollector>(),
-                                     ClusterRole::ShardServer);
+    if (!isArbiter) {
+        controller->addPeriodicCollector(std::make_unique<FTDCCollectionStatsCollector>(),
+                                         ClusterRole::ShardServer);
+    }
 }
 
 }  // namespace
