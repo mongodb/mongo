@@ -118,8 +118,6 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
-#include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor_express.h"
@@ -1655,10 +1653,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     // This is the regular path for when we have a CanonicalQuery.
     std::unique_ptr<CanonicalQuery> cq(parsedDelete->releaseParsedQuery());
 
-    uassert(ErrorCodes::InternalErrorNotSupported,
-            "delete command is not eligible for bonsai",
-            !isEligibleForBonsai(opCtx, collectionPtr, *cq));
-
     // Transfer the explain verbosity level into the expression context.
     cq->getExpCtx()->explain = verbosity;
 
@@ -1806,10 +1800,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     // This is the regular path for when we have a CanonicalQuery.
     std::unique_ptr<CanonicalQuery> cq(parsedUpdate->releaseParsedQuery());
-
-    uassert(ErrorCodes::InternalErrorNotSupported,
-            "update command is not eligible for bonsai",
-            !isEligibleForBonsai(opCtx, collectionPtr, *cq));
 
     std::unique_ptr<projection_ast::Projection> projection;
     if (!request->getProj().isEmpty()) {
@@ -2036,10 +2026,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     const auto skip = request.getSkip().value_or(0);
     const auto limit = request.getLimit().value_or(0);
-
-    uassert(ErrorCodes::InternalErrorNotSupported,
-            "count command is not eligible for bonsai",
-            !isEligibleForBonsai(opCtx, collection, *cq));
 
     if (!collection) {
         // Treat collections that do not exist as empty collections. Note that the explain reporting
@@ -2350,10 +2336,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
 
     const auto& canonicalQuery = *canonicalDistinct.getQuery();
     auto* opCtx = canonicalQuery.getExpCtx()->opCtx;
-
-    uassert(ErrorCodes::InternalErrorNotSupported,
-            "distinct command is not eligible for bonsai",
-            !isEligibleForBonsai(opCtx, collectionPtr, canonicalQuery));
 
     auto getQuerySolution = [&](size_t options) -> std::unique_ptr<QuerySolution> {
         auto plannerParams =
