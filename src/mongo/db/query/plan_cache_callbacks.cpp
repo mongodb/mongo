@@ -120,34 +120,24 @@ void logPromoteCacheEntry(std::string&& query,
                 "newWorks"_attr = newWorks);
 }
 
-void logRemoveCacheEntry(const std::string& ns,
-                         const BSONObj& query,
-                         const BSONObj& projection,
-                         const BSONObj& sort,
-                         const BSONObj& collation) {
-    LOGV2_DEBUG(23907,
-                1,
-                "Removed plan cache entry",
-                "namespace"_attr = ns,
-                "query"_attr = redact(query),
-                "sort"_attr = sort,
-                "projection"_attr = projection,
-                "collation"_attr = collation);
-}
-
-void logMissingCacheEntry(const std::string& ns,
-                          const BSONObj& query,
-                          const BSONObj& projection,
-                          const BSONObj& sort,
-                          const BSONObj& collation) {
-    LOGV2_DEBUG(23906,
-                1,
-                "Query shape doesn't exist in PlanCache",
-                "namespace"_attr = ns,
-                "query"_attr = redact(query),
-                "sort"_attr = sort,
-                "projection"_attr = projection,
-                "collation"_attr = collation);
+void logUnexpectedPinnedCacheEntry(std::string&& query,
+                                   std::string&& queryHash,
+                                   std::string&& planCacheKey,
+                                   std::string&& oldEntry,
+                                   std::string&& newEntry,
+                                   std::string&& oldSbePlan,
+                                   std::string&& newSbePlan,
+                                   size_t newWorks) {
+    LOGV2(8983103,
+          "Found unexpected pinned plan cache entry",
+          "query"_attr = redact(query),
+          "queryHash"_attr = queryHash,
+          "planCacheKey"_attr = planCacheKey,
+          "oldEntry"_attr = oldEntry,
+          "newEntry"_attr = newEntry,
+          "oldSbePlan"_attr = oldSbePlan,
+          "newSbePlan"_attr = newSbePlan,
+          "newWorks"_attr = newWorks);
 }
 
 }  // namespace mongo::log_detail
