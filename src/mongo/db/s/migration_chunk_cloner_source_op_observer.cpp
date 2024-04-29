@@ -170,7 +170,7 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
-    if (!metadata || !metadata->isSharded()) {
+    if (!metadata || !metadata->hasRoutingTable()) {
         MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
         return;
     }
@@ -241,7 +241,7 @@ void MigrationChunkClonerSourceOpObserver::onUpdate(OperationContext* opCtx,
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
-    if (!metadata || !metadata->isSharded()) {
+    if (!metadata || !metadata->hasRoutingTable()) {
         MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
         return;
     }
@@ -287,7 +287,7 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
-    if (!metadata || !metadata->isSharded()) {
+    if (!metadata || !metadata->hasRoutingTable()) {
         assertNoMovePrimaryInProgress(opCtx, nss);
         return;
     }
