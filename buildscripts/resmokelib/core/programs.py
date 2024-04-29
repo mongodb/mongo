@@ -6,7 +6,9 @@ Handles all the nitty-gritty parameter conversion.
 import json
 import os
 import os.path
+import re
 import stat
+from packaging import version
 
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import utils
@@ -43,6 +45,31 @@ def get_path_env_var(env_vars):
     return path
 
 
+def get_binary_version(executable):
+    """Return the string for the binary version of the given executable."""
+
+    # pylint: disable=wrong-import-position
+    from buildscripts.resmokelib.multiversionconstants import LATEST_FCV
+
+    split_executable = executable.split("-")
+    version_regex = re.compile(version.VERSION_PATTERN, re.VERBOSE | re.IGNORECASE)
+    if len(split_executable) > 1 and version_regex.match(split_executable[-1]):
+        return split_executable[-1]
+    return LATEST_FCV
+
+
+def remove_set_parameter_if_before_version(set_parameters, parameter_name, bin_version,
+                                           required_bin_version):
+    """
+    Used for removing a server parameter that does not exist prior to a specified version.
+
+    Remove 'parameter_name' from the 'set_parameters' dictionary if 'bin_version' is older than
+    'required_bin_version'.
+    """
+    if version.parse(bin_version) < version.parse(required_bin_version):
+        set_parameters.pop(parameter_name, None)
+
+
 def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     """
     Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
@@ -54,12 +81,17 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     @param mongod_options - A HistoryDict describing the various options to pass to the mongod.
     """
 
+    bin_version = get_binary_version(executable)
     args = [executable]
     mongod_options = mongod_options.copy()
 
     if "port" not in mongod_options:
         mongod_options["port"] = network.PortAllocator.next_fixture_port(job_num)
     suite_set_parameters = mongod_options.get("set_parameters", {})
+    remove_set_parameter_if_before_version(suite_set_parameters, "internalQueryStatsRateLimit",
+                                           bin_version, "6.0.15")
+    remove_set_parameter_if_before_version(
+        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "6.0.15")
     _apply_set_parameters(args, suite_set_parameters)
     mongod_options.pop("set_parameters")
 
@@ -78,6 +110,7 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
 
 def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos_options=None):  # pylint: disable=too-many-arguments
     """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
+    bin_version = get_binary_version(executable)
     args = [executable]
 
     mongos_options = mongos_options.copy()
@@ -85,6 +118,10 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     if "port" not in mongos_options:
         mongos_options["port"] = network.PortAllocator.next_fixture_port(job_num)
     suite_set_parameters = mongos_options.get("set_parameters", {})
+    remove_set_parameter_if_before_version(suite_set_parameters, "internalQueryStatsRateLimit",
+                                           bin_version, "6.0.15")
+    remove_set_parameter_if_before_version(
+        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "6.0.15")
     _apply_set_parameters(args, suite_set_parameters)
     mongos_options.pop("set_parameters")
 

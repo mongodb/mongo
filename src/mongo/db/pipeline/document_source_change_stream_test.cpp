@@ -4664,7 +4664,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamAddPostImag
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamAddPostImage":{"fullDocument":"updateLookup"}})",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamAddPostImage":{"fullDocument":"updateLookup"}})",
         redact(*docSource));
@@ -4680,7 +4680,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamAddPreImage
                 "fullDocumentBeforeChange": "whenAvailable"
             }
         })",
-        docSource.serialize(SerializationOptions{}).getDocument().toBson());
+        docSource.serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamAddPreImage":{"fullDocumentBeforeChange":"whenAvailable"}})",
         redact(docSource));
@@ -4703,7 +4703,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckInvali
                 }
             }
         })",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamCheckInvalidate":{"startAfterInvalidate":{
                     "_data": "?string"
@@ -4736,7 +4736,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckResuma
                 }
             }
         })",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamCheckResumability":{
                 "resumeToken": {
@@ -4763,7 +4763,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckTopolo
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamCheckTopologyChange":{}})",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamCheckTopologyChange":{}})",
         redact(*docSource));
@@ -4784,7 +4784,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamEnsureResum
                 }
             }
         })",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$_internalChangeStreamEnsureResumeTokenPresent": {
@@ -4801,7 +4801,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamHandleTopol
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamHandleTopologyChange":{}})",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamHandleTopologyChange":{}})",
         redact(*docSource));
@@ -4816,7 +4816,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamSplitLargeE
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$changeStreamSplitLargeEvent":{}})",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$changeStreamSplitLargeEvent":{}})",
         redact(*docSource));
@@ -4839,14 +4839,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamTransform) 
                 "fullDocumentBeforeChange": "off"
             }
         })",
-        //  { $_internalChangeStreamTransform: { resumeAfter: { _data:
-        // "8200000000000000002B042C0100296E5A10046948DF8014BD4E0488427668D9C001F5463C6F7065726174696F6E54797065003C696E736572740046646F63756D656E744B657900461E5F..."
-        // },
-        //  },
-        //   fullDocument: "default", fullDocumentBeforeChange: "off" } }
-        //  { $_internalChangeStreamTransform: { resumeAfter: { _data:
-        //   fullDocument: "default", fullDocumentBeforeChange: "off" } }
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$_internalChangeStreamTransform": {

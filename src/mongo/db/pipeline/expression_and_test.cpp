@@ -76,11 +76,8 @@ static BSONObj toBson(const Value& value) {
 }
 
 /** Convert Expression to BSON. */
-static BSONObj expressionToBson(const intrusive_ptr<Expression>& expression) {
-    return BSON("" << expression->serialize(SerializationOptions{}))
-        .firstElement()
-        .embeddedObject()
-        .getOwned();
+static BSONObj expressionToBson(const boost::intrusive_ptr<Expression>& expression) {
+    return BSON("" << expression->serialize()).firstElement().embeddedObject().getOwned();
 }
 
 /** Convert Document to BSON. */

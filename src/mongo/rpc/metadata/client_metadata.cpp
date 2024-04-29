@@ -269,6 +269,7 @@ Status ClientMetadata::validateOperatingSystemDocument(const BSONObj& doc) {
 void ClientMetadata::setMongoSMetadata(StringData hostAndPort,
                                        StringData mongosClient,
                                        StringData version) {
+    _documentWithoutMongosInfo = _document;
     BSONObjBuilder builder;
     builder.appendElements(_document);
 
@@ -381,11 +382,12 @@ const BSONObj& ClientMetadata::getDocument() const {
     return _document;
 }
 
-unsigned long ClientMetadata::getHash() const {
-    if (!_hash) {
-        _hash = simpleHash(_document);
-    }
-    return *_hash;
+unsigned long ClientMetadata::hashWithoutMongosInfo() const {
+    return _hashWithoutMongos.get(documentWithoutMongosInfo());
+}
+
+const BSONObj& ClientMetadata::documentWithoutMongosInfo() const {
+    return _documentWithoutMongosInfo.get(_document);
 }
 
 void ClientMetadata::logClientMetadata(Client* client) const {

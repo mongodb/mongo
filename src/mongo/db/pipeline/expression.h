@@ -224,7 +224,7 @@ public:
      * If 'explain' is false, the returned Value must result in the same Expression when parsed by
      * parseOperand().
      */
-    virtual Value serialize(const SerializationOptions& options = SerializationOptions()) const = 0;
+    virtual Value serialize(const SerializationOptions& options = {}) const = 0;
 
     /**
      * Evaluate the expression with respect to the Document given by 'root' and the Variables given
@@ -400,7 +400,7 @@ public:
 
     boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root, Variables* variables) const final;
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     const char* getOpName() const;
 
@@ -428,7 +428,10 @@ public:
     static bool isConstant(boost::intrusive_ptr<Expression> expression) {
         return dynamic_cast<ExpressionConstant*>(expression.get());
     }
-    static Value serializeConstant(const SerializationOptions& opts, Value val);
+
+    static Value serializeConstant(const SerializationOptions& opts,
+                                   Value val,
+                                   bool wrapRepresentativeValue = false);
 
     bool selfAndChildrenAreConstant() const override final {
         return true;
@@ -487,7 +490,7 @@ private:
 class ExpressionNary : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() override;
-    Value serialize(const SerializationOptions& options) const override;
+    Value serialize(const SerializationOptions& options = {}) const override;
 
     /*
       Add an operand to the n-ary expression.
@@ -553,7 +556,7 @@ public:
     ExpressionVariadic(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
         : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
 
-    Value serialize(const SerializationOptions& options) const {
+    Value serialize(const SerializationOptions& options = {}) const {
         // As a special case, we would like to serialize a variadic number of children as
         // "?array<?subtype>" if they are all constant. Check for that here, otherwise default to
         // the normal one-by-one serialization of the children.
@@ -694,7 +697,7 @@ public:
         return AccumulatorN::kName.rawData();
     }
 
-    Value serialize(const SerializationOptions& options) const {
+    Value serialize(const SerializationOptions& options = {}) const {
         MutableDocument md;
         AccumulatorN::serializeHelper(_n, _output, options, md);
         return Value(DOC(getOpName() << md.freeze()));
@@ -851,7 +854,7 @@ public:
      * Always serializes to the full {date: <date arg>, timezone: <timezone arg>} format, leaving
      * off the timezone if not specified.
      */
-    Value serialize(const SerializationOptions& options) const final {
+    Value serialize(const SerializationOptions& options = {}) const final {
         auto timezone = _timeZone ? _timeZone->serialize(options) : Value();
         return Value(Document{
             {_opName,
@@ -1109,7 +1112,7 @@ public:
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     static boost::intrusive_ptr<ExpressionArray> create(
         ExpressionContext* const expCtx, std::vector<boost::intrusive_ptr<Expression>>&& children) {
@@ -1277,7 +1280,7 @@ class ExpressionCoerceToBool final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root, Variables* variables) const final;
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     static boost::intrusive_ptr<ExpressionCoerceToBool> create(
         ExpressionContext* expCtx, boost::intrusive_ptr<Expression> pExpression);
@@ -1440,8 +1443,8 @@ public:
                              boost::intrusive_ptr<Expression> onNull,
                              boost::intrusive_ptr<Expression> onError);
 
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -1482,8 +1485,8 @@ public:
                             boost::intrusive_ptr<Expression> isoDayOfWeek,
                             boost::intrusive_ptr<Expression> timeZone);
 
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -1562,8 +1565,8 @@ public:
                           boost::intrusive_ptr<Expression> timeZone,
                           boost::intrusive_ptr<Expression> iso8601);
 
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -1596,8 +1599,8 @@ public:
                            boost::intrusive_ptr<Expression> date,
                            boost::intrusive_ptr<Expression> timeZone,
                            boost::intrusive_ptr<Expression> onNull);
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -1708,8 +1711,8 @@ public:
                        boost::intrusive_ptr<Expression> unit,
                        boost::intrusive_ptr<Expression> timezone,
                        boost::intrusive_ptr<Expression> startOfWeek);
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
     Value evaluate(const Document& root, Variables* variables) const final;
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
@@ -1841,7 +1844,7 @@ public:
 
     boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root, Variables* variables) const;
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     /*
       Create a field path expression using old semantics (rooted off of CURRENT).
@@ -1942,8 +1945,8 @@ private:
 
 class ExpressionFilter final : public Expression {
 public:
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -2179,8 +2182,8 @@ public:
 
 class ExpressionLet final : public Expression {
 public:
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -2296,7 +2299,7 @@ public:
                                ConstDataRange serverToken,
                                int64_t contentionFactor,
                                ConstDataRange edcToken);
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const;
@@ -2330,8 +2333,8 @@ public:
         boost::intrusive_ptr<Expression> input,  // yields array to iterate
         boost::intrusive_ptr<Expression> each);  // yields results to be added to output array
 
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -2363,7 +2366,7 @@ class ExpressionMeta final : public Expression {
 public:
     ExpressionMeta(ExpressionContext* expCtx, DocumentMetadataFields::MetaType metaType);
 
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -2557,7 +2560,7 @@ class ExpressionObject final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root, Variables* variables) const final;
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     static boost::intrusive_ptr<ExpressionObject> create(
         ExpressionContext* expCtx,
@@ -2702,7 +2705,7 @@ public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2738,8 +2741,8 @@ public:
 
     virtual const char* getOpName() const = 0;
     Value evaluate(const Document& root, Variables* variables) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
 
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
@@ -3019,7 +3022,7 @@ public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3394,7 +3397,7 @@ public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3509,7 +3512,7 @@ public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3760,7 +3763,7 @@ public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3799,8 +3802,8 @@ public:
                                                   const VariablesParseState& vpsIn);
 
     Value evaluate(const Document& root, Variables* variables) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3905,7 +3908,7 @@ public:
     boost::optional<std::pair<boost::optional<std::string>, std::string>>
     getConstantPatternAndOptions() const;
 
-    Value serialize(const SerializationOptions& options) const;
+    Value serialize(const SerializationOptions& options = {}) const;
 
     const std::string& getOpName() const {
         return _opName;
@@ -4022,7 +4025,7 @@ public:
                                                   BSONElement exprElement,
                                                   const VariablesParseState& vps);
 
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
@@ -4068,7 +4071,7 @@ public:
     }
 
     Value evaluate(const Document& root, Variables* variables) const;
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
@@ -4091,8 +4094,8 @@ public:
           _timeZone(_children[3]),
           _opName(opName) {}
 
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
     Value evaluate(const Document& root, Variables* variables) const final;
 
 protected:
@@ -4219,8 +4222,8 @@ public:
                         boost::intrusive_ptr<Expression> binSize,
                         boost::intrusive_ptr<Expression> timezone,
                         boost::intrusive_ptr<Expression> startOfWeek);
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(const SerializationOptions& options) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
     Value evaluate(const Document& root, Variables* variables) const final;
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -4310,7 +4313,7 @@ public:
         expCtx->sbeCompatible = false;
     }
 
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
@@ -4355,7 +4358,7 @@ public:
         expCtx->sbeCompatible = false;
     }
 
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
@@ -4486,7 +4489,7 @@ public:
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
 
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     Value evaluate(const Document& root, Variables* variables) const final;
 

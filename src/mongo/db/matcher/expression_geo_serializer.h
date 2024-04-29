@@ -36,7 +36,7 @@
 namespace mongo {
 
 /**
- * We rely on this custom serializer for geo expressions to handle serialization with
+ * We rely on these custom serializers for geo expressions to handle serialization with
  * kToRepresentativeParseableValue and kToDebugTypeString policies since the original raw query
  * needs to be re-parsed in order to properly serialize.
  *
@@ -55,8 +55,13 @@ namespace mongo {
  * checks. As a workaround, this custom serializer determines a parseable value for each shape or
  * point type.
  */
-void geoCustomSerialization(BSONObjBuilder* bob,
-                            const BSONObj& obj,
-                            const SerializationOptions& opts = {},
-                            bool includePath = true);
+void geoNearExpressionCustomSerialization(BSONObjBuilder& bob,
+                                          const BSONObj& obj,
+                                          const SerializationOptions& opts = {},
+                                          bool includePath = true);
+
+void geoExpressionCustomSerialization(BSONObjBuilder& bob,
+                                      const BSONObj& obj,
+                                      const SerializationOptions& opts = {},
+                                      bool includePath = true);
 }  // namespace mongo

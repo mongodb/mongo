@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/util/deferred.h"
 #include "mongo/db/read_concern_support_result.h"
 
 namespace mongo {
@@ -66,14 +67,8 @@ public:
     /**
      * Returns all foreign namespaces referenced by stages within this pipeline, if any.
      */
-    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const {
-        stdx::unordered_set<NamespaceString> involvedNamespaces;
-        for (auto&& spec : _stageSpecs) {
-            auto stagesInvolvedNamespaces = spec->getInvolvedNamespaces();
-            involvedNamespaces.insert(stagesInvolvedNamespaces.begin(),
-                                      stagesInvolvedNamespaces.end());
-        }
-        return involvedNamespaces;
+    const stdx::unordered_set<NamespaceString>& getInvolvedNamespaces() const {
+        return _involvedNamespaces.get(_stageSpecs);
     }
 
     /**
@@ -133,9 +128,7 @@ public:
      * Returns true if the pipeline has a $changeStream stage.
      */
     bool hasChangeStream() const {
-        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
-            return spec->isChangeStream();
-        });
+        return _hasChangeStream.get(_stageSpecs);
     }
 
     /**
@@ -226,7 +219,25 @@ public:
     void validate(const OperationContext* opCtx, bool performApiVersionChecks = true) const;
 
 private:
+    // This is logically const - any changes to _stageSpecs will invalidate cached copies of
+    // "_hasChangeStream" and "_involvedNamespaces" below.
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
+    Deferred<bool, const decltype(_stageSpecs)&> _hasChangeStream{[](const auto& stageSpecs) {
+        return std::any_of(stageSpecs.begin(), stageSpecs.end(), [](auto&& spec) {
+            return spec->isChangeStream();
+        });
+    }};
+
+    Deferred<stdx::unordered_set<NamespaceString>, const decltype(_stageSpecs)&>
+        _involvedNamespaces{[](const auto& stageSpecs) -> stdx::unordered_set<NamespaceString> {
+            stdx::unordered_set<NamespaceString> involvedNamespaces;
+            for (const auto& spec : stageSpecs) {
+                auto stagesInvolvedNamespaces = spec->getInvolvedNamespaces();
+                involvedNamespaces.insert(stagesInvolvedNamespaces.begin(),
+                                          stagesInvolvedNamespaces.end());
+            }
+            return involvedNamespaces;
+        }};
 };
 
 }  // namespace mongo

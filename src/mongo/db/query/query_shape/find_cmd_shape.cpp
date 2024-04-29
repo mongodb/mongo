@@ -35,13 +35,13 @@
 namespace mongo::query_shape {
 namespace {
 
-BSONObj projectionShape(boost::optional<projection_ast::Projection> proj,
+BSONObj projectionShape(const boost::optional<projection_ast::Projection>& proj,
                         const SerializationOptions& opts =
                             SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
     return proj ? projection_ast::serialize(*proj->root(), opts) : BSONObj();
 }
 
-BSONObj sortShape(boost::optional<SortPattern> sort,
+BSONObj sortShape(const boost::optional<SortPattern>& sort,
                   const SerializationOptions& opts =
                       SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
     return sort

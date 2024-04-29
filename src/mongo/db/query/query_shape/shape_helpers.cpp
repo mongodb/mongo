@@ -50,7 +50,9 @@ BSONObj shapifyFlatObj(BSONObj obj, const SerializationOptions& opts, bool value
             } else if (elem.type() == BSONType::Object) {
                 opts.appendLiteral(&bob, hintSpecialField, elem.Obj());
             } else {
-                uasserted(ErrorCodes::FailedToParse, "$hint must be a string or an object");
+                // SERVER-85500: $hint syntax will not be validated if the collection does not
+                // exist, so we should accept a value that is neither string nor object here.
+                opts.appendLiteral(&bob, hintSpecialField, elem);
             }
             continue;
         }

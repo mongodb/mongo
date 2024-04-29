@@ -107,8 +107,8 @@ void AggCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions&
     }
 }
 
-int64_t AggCmdComponents::size() const {
-    return sizeof(*this) +
+size_t AggCmdComponents::size() const {
+    return sizeof(AggCmdComponents) +
         std::accumulate(involvedNamespaces.begin(),
                         involvedNamespaces.end(),
                         0,
