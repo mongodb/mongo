@@ -783,7 +783,7 @@ public:
             exec->getPlanExplainer().getSummaryStats(&postExecutionStats);
             postExecutionStats.totalKeysExamined -= preExecutionStats.totalKeysExamined;
             postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
-            curOp->debug().setPlanSummaryMetrics(postExecutionStats);
+            curOp->debug().setPlanSummaryMetrics(std::move(postExecutionStats));
 
             // We do not report 'execStats' for aggregation or other cursors with the
             // 'kLocksInternally' policy, both in the original request and subsequent getMore. It

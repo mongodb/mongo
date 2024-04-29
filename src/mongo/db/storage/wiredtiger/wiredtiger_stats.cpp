@@ -126,6 +126,14 @@ BSONObj WiredTigerStats::toBSON() const {
     return builder.obj();
 }
 
+uint64_t WiredTigerStats::bytesRead() const {
+    return bytes_read;
+}
+
+Microseconds WiredTigerStats::readingTime() const {
+    return Microseconds(read_time);
+}
+
 std::unique_ptr<StorageStats> WiredTigerStats::clone() const {
     return std::make_unique<WiredTigerStats>(*this);
 }

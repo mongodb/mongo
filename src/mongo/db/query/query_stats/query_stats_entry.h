@@ -103,6 +103,16 @@ struct QueryStatsEntry {
     AggregatedMetric<uint64_t> docsExamined;
 
     /**
+     * Aggregates the number of bytes read including getMore requests.
+     */
+    AggregatedMetric<uint64_t> bytesRead;
+
+    /**
+     * Aggregates the amount of time spent reading from storage including getMore requests.
+     */
+    AggregatedMetric<int64_t> readTimeMicros;
+
+    /**
      * Aggregates the executing time (excluding time spent blocked) including getMore requests.
      */
     AggregatedMetric<int64_t> workingTimeMillis;

@@ -34,8 +34,8 @@
 namespace mongo {
 
 /**
- * Manages statistics from the storage engine, allowing addition of statistics and serialization to
- * BSON.
+ * Manages statistics from the storage engine, allowing addition of statistics, serialization to
+ * BSON, and access to certain metrics.
  */
 class StorageStats {
 public:
@@ -51,6 +51,9 @@ public:
     virtual ~StorageStats() = default;
 
     virtual BSONObj toBSON() const = 0;
+
+    virtual uint64_t bytesRead() const = 0;
+    virtual Microseconds readingTime() const = 0;
 
     virtual std::unique_ptr<StorageStats> clone() const = 0;
 

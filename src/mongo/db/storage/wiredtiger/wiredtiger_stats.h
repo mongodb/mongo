@@ -50,6 +50,9 @@ public:
 
     BSONObj toBSON() const final;
 
+    uint64_t bytesRead() const final;
+    Microseconds readingTime() const final;
+
     std::unique_ptr<StorageStats> clone() const final;
 
     WiredTigerStats& operator=(WiredTigerStats&&);

@@ -219,6 +219,8 @@ struct QueryStatsSnapshot {
 
     uint64_t keysExamined;
     uint64_t docsExamined;
+    uint64_t bytesRead;
+    int64_t readTimeMicros;
     int64_t workingTimeMillis;
     bool hasSortStage;
     bool usedDisk;

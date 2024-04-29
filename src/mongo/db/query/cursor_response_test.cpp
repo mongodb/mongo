@@ -54,6 +54,8 @@ namespace {
 static const BSONObj basicMetricsObj = fromjson(R"({
     keysExamined: {"$numberLong": "1"},
     docsExamined: {"$numberLong": "2"},
+    bytesRead: {"$numberLong": "4"},
+    readingTimeMicros: {"$numberLong": "5"},
     workingTimeMillis: {"$numberLong": "3"},
     hasSortStage: true,
     usedDisk: true,
@@ -290,15 +292,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     auto cursor = makeCursorBSON();
 
     BSONObjBuilder cursorBuilder(cursor);
-    cursorBuilder << "metrics" << fromjson(R"({
-        keysExamined: {"$numberLong": "1"},
-        docsExamined: {"$numberLong": "2"},
-        workingTimeMillis: {"$numberLong": "3"},
-        hasSortStage: true,
-        usedDisk: true,
-        fromMultiPlanner: true,
-        fromPlanCache: true
-    })");
+    cursorBuilder << "metrics" << basicMetricsObj;
 
     // Check that it parses correctly.
     StatusWith<CursorResponse> result =
@@ -854,6 +848,8 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
 
     CursorMetrics metrics(2 /* keysExamined */,
                           3 /* docsExamined */,
+                          10 /* bytesRead */,
+                          11 /* readingTimeMicros */,
                           4 /* workingTimeMillis */,
                           false /* hasSortStage */,
                           true /* usedDisk */,
@@ -880,6 +876,8 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_TRUE(parsedMetrics.has_value());
     ASSERT_EQ(parsedMetrics->getKeysExamined(), 2);
     ASSERT_EQ(parsedMetrics->getDocsExamined(), 3);
+    ASSERT_EQ(parsedMetrics->getBytesRead(), 10);
+    ASSERT_EQ(parsedMetrics->getReadingTimeMicros(), 11);
     ASSERT_EQ(parsedMetrics->getWorkingTimeMillis(), 4);
     ASSERT_FALSE(parsedMetrics->getHasSortStage());
     ASSERT_TRUE(parsedMetrics->getUsedDisk());

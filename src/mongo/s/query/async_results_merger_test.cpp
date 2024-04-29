@@ -2407,6 +2407,8 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                      {fromjson("{_id: 1}")},
                      CursorMetrics(2 /* keysExamined */,
                                    5 /* docsExamined */,
+                                   13 /* bytesRead */,
+                                   17 /* readingTimeMicros */,
                                    7 /* workingTimeMillis */,
                                    false /* hasSortStage */,
                                    true /* usedDisk */,
@@ -2424,6 +2426,8 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         auto remoteMetrics = arm->peekMetrics_forTest();
         ASSERT_EQ(remoteMetrics.keysExamined, 2);
         ASSERT_EQ(remoteMetrics.docsExamined, 5);
+        ASSERT_EQ(remoteMetrics.bytesRead, 13);
+        ASSERT_EQ(remoteMetrics.readingTime, Microseconds(17));
         ASSERT_EQ(remoteMetrics.clusterWorkingTime, Milliseconds(7));
         ASSERT_EQ(remoteMetrics.hasSortStage, false);
         ASSERT_EQ(remoteMetrics.usedDisk, true);
@@ -2436,6 +2440,8 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                      {fromjson("{_id: 2}")},
                      CursorMetrics(7 /* keysExamined */,
                                    11 /* docsExamined */,
+                                   17 /* bytesRead */,
+                                   19 /* readingTimeMicros */,
                                    13 /* workingTimeMillis */,
                                    false /* hasSortStage */,
                                    true /* usedDisk */,
@@ -2451,6 +2457,8 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         auto remoteMetrics = arm->takeMetrics();
         ASSERT_EQ(remoteMetrics.keysExamined, 9);
         ASSERT_EQ(remoteMetrics.docsExamined, 16);
+        ASSERT_EQ(remoteMetrics.bytesRead, 30);
+        ASSERT_EQ(remoteMetrics.readingTime, Microseconds(36));
         ASSERT_EQ(remoteMetrics.clusterWorkingTime, Milliseconds(20));
         ASSERT_EQ(remoteMetrics.hasSortStage, false);
         ASSERT_EQ(remoteMetrics.usedDisk, true);

@@ -237,6 +237,8 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
 
     toUpdate.keysExamined.aggregate(snapshot.keysExamined);
     toUpdate.docsExamined.aggregate(snapshot.docsExamined);
+    toUpdate.bytesRead.aggregate(snapshot.bytesRead);
+    toUpdate.readTimeMicros.aggregate(snapshot.readTimeMicros);
     toUpdate.workingTimeMillis.aggregate(snapshot.workingTimeMillis);
     toUpdate.hasSortStage.aggregate(snapshot.hasSortStage);
     toUpdate.usedDisk.aggregate(snapshot.usedDisk);
@@ -371,6 +373,8 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         static_cast<uint64_t>(metrics.nreturned.value_or(0)),
         static_cast<uint64_t>(metrics.keysExamined.value_or(0)),
         static_cast<uint64_t>(metrics.docsExamined.value_or(0)),
+        static_cast<uint64_t>(metrics.bytesRead.value_or(0)),
+        metrics.readingTime.value_or(Microseconds(0)).count(),
         metrics.clusterWorkingTime.value_or(Milliseconds(0)).count(),
         metrics.hasSortStage,
         metrics.usedDisk,

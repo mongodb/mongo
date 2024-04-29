@@ -910,7 +910,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
 
     write_ops_exec::recordUpdateResultInOpDebug(updateResult, &curOp->debug());
 
-    curOp->debug().setPlanSummaryMetrics(summaryStats);
+    curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));
 
     if (updateResult.containsDotsAndDollarsField) {
         // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.
@@ -1016,7 +1016,7 @@ long long performDelete(OperationContext* opCtx,
     if (const auto& coll = collectionPtr) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summaryStats);
     }
-    curOp->debug().setPlanSummaryMetrics(summaryStats);
+    curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));
 
     // Fill out OpDebug with the number of deleted docs.
     auto nDeleted = exec->getDeleteResult();
@@ -1304,7 +1304,7 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
     if (source != OperationSource::kTimeseriesInsert) {
         recordUpdateResultInOpDebug(updateResult, &curOp.debug());
     }
-    curOp.debug().setPlanSummaryMetrics(summary);
+    curOp.debug().setPlanSummaryMetrics(std::move(summary));
 
     const bool didInsert = !updateResult.upsertedId.isEmpty();
     const long long nMatchedOrInserted = didInsert ? 1 : updateResult.numMatched;
@@ -1867,7 +1867,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     if (const auto& coll = collection.getCollectionPtr()) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
     }
-    curOp.debug().setPlanSummaryMetrics(summary);
+    curOp.debug().setPlanSummaryMetrics(std::move(summary));
 
     if (curOp.shouldDBProfile()) {
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);

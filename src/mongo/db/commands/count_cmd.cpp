@@ -409,7 +409,7 @@ public:
         if (collection) {
             CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
         }
-        curOp->debug().setPlanSummaryMetrics(summaryStats);
+        curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));
 
         if (curOp->shouldDBProfile()) {
             auto&& explainer = exec->getPlanExplainer();
