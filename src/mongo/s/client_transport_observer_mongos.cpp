@@ -42,6 +42,8 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/transaction_router.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 namespace mongo {
 
 void killOpenCursors(OperationContext& opCtx) {
@@ -83,7 +85,7 @@ void killInProgressTransactions(OperationContext& opCtx) {
     }
 }
 
-void ClientTransportObserverMongos::onClientDisconnect(Client* client) {
+void ClientTransportObserverMongos::onClientDisconnect(Client* client) try {
     auto session = client->session();
     if (!session || !session->bindsToOperationState())
         return;
@@ -92,6 +94,11 @@ void ClientTransportObserverMongos::onClientDisconnect(Client* client) {
 
     killOpenCursors(*killerOperationContext);
     killInProgressTransactions(*killerOperationContext);
+} catch (const DBException& ex) {
+    LOGV2_DEBUG(8969800,
+                2,
+                "Encountered error while performing client connection cleanup",
+                "error"_attr = ex.toStatus());
 }
 
 }  // namespace mongo
