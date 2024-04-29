@@ -630,10 +630,10 @@ var ReplSetTest = function ReplSetTest(opts) {
      * @param isMixedVersionCluster - Boolean indicating whether this is a mixed version replica
      *     set. Defaults to false.
      * @param skipStepUpOnRestart - Boolean indicating that this method should skip attempting to
-     *     step up a new primary after restarting the set. Defaults to false. This may be useful if
-     *     e.g. the test has no electable node or if it uses the in-memory storage engine and must
-     *     reinitiate the set upon restart. This option has no effect if `restart` is not also
-     *     passed as true.
+     *     step up a new primary after restarting the set. Defaults to false. This must be set to
+     *     true when using the in-memory storage engine, as the replica set must be re-initiated
+     *     by the test on restart before a node can be elected.
+     *     This option has no effect if `restart` is not also passed as true.
      */
     ReplSetTest.prototype.startSet = function(
         options, restart, isMixedVersionCluster, skipStepUpOnRestart) {
@@ -662,18 +662,6 @@ var ReplSetTest = function ReplSetTest(opts) {
         if (!triggerStepUp) {
             print("ReplSetTest startSet skipping stepping a new primary");
             return this.nodes;
-        }
-
-        if (triggerStepUp) {
-            const serverStatus = asCluster(this, this.nodes[0], () => {
-                return assert.commandWorked(this.nodes[0].adminCommand({serverStatus: 1}));
-            });
-            if (!serverStatus.storageEngine.persistent) {
-                throw Error(
-                    "skipStepUpOnRestart must be set to false when using non-persistent storage engine," +
-                    " as the replica set needs to be re-initiated via initiate() after restart before " +
-                    " a node can be elected");
-            }
         }
 
         print("ReplSetTest startSet attempting to step up a new primary");
