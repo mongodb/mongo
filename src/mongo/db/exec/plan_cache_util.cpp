@@ -202,8 +202,11 @@ void updateClassicPlanCacheFromClassicCandidates(
     auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
         return buildDebugInfo(query, std::move(ranking));
     };
+    auto printCachedPlanFn = [](const SolutionCacheData& plan) {
+        return plan.toString();
+    };
     PlanCacheCallbacksImpl<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
-        callbacks{query, buildDebugInfoFn};
+        callbacks{query, buildDebugInfoFn, printCachedPlanFn};
     winningPlan.solution->cacheData->indexFilterApplied = winningPlan.solution->indexFilterApplied;
     winningPlan.solution->cacheData->solutionHash = winningPlan.solution->hash();
     auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
@@ -228,10 +231,14 @@ void updateSbePlanCache(OperationContext* opCtx,
     auto buildDebugInfoFn = [soln]() -> plan_cache_debug_info::DebugInfoSBE {
         return buildDebugInfo(soln);
     };
+    auto printCachedPlanFn = [](const sbe::CachedSbePlan& plan) {
+        sbe::DebugPrinter p;
+        return p.print(*plan.root.get());
+    };
     PlanCacheCallbacksImpl<sbe::PlanCacheKey,
                            sbe::CachedSbePlan,
                            plan_cache_debug_info::DebugInfoSBE>
-        callbacks{query, buildDebugInfoFn};
+        callbacks{query, buildDebugInfoFn, printCachedPlanFn};
 
     auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
     uassertStatusOK(sbe::getPlanCache(opCtx).set(

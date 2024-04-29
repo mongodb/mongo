@@ -230,8 +230,8 @@ public:
     std::string debugString() const {
         StringBuilder builder;
         builder << "(";
-        builder << "queryHash: " << queryHash;
-        builder << "; planCacheKey: " << planCacheKey;
+        builder << "queryHash: " << zeroPaddedHex(queryHash);
+        builder << "; planCacheKey: " << zeroPaddedHex(planCacheKey);
         if (debugInfo) {
             builder << "; " << debugInfo->debugString();
         }
@@ -468,6 +468,7 @@ public:
                     key,
                     // Deference the pointer, then the shared_ptr, and then back to a raw pointer.
                     hasOldEntry ? &**oldEntryWithStatus.getValue() : nullptr,
+                    *cachedPlan.get(),
                     newWorks,
                     worksGrowthCoefficient.get_value_or(internalQueryCacheWorksGrowthCoefficient),
                     callbacks);
@@ -683,6 +684,7 @@ private:
     NewEntryState getNewEntryState(
         const KeyType& key,
         const Entry* oldEntry,
+        const CachedPlanType& newPlan,
         size_t newWorks,
         double growthCoefficient,
         const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks) {
@@ -696,9 +698,13 @@ private:
             return res;
         }
 
-        tassert(6108302,
-                "Works value is not present in the old cache entry (is it a pinned entry?)",
-                oldEntry->works);
+        if (!oldEntry->works) {
+            if (callbacks) {
+                callbacks->onUnexpectedPinnedCacheEntry(key, oldEntry, newPlan, newWorks);
+            }
+            tasserted(6108302,
+                      "Works value is not present in the old cache entry (is it a pinned entry?)");
+        }
         auto oldWorks = oldEntry->works.get();
 
         if (oldEntry->isActive && newWorks <= oldWorks) {
