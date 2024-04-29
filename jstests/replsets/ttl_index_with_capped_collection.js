@@ -115,6 +115,7 @@ assert.eq(primaryColl.find().itcount(), 1, "TTL index on timestmap didn't delete
 
 // Try deleting the last one, and verify the secondary replicated this.
 assert.commandWorked(primaryColl.deleteOne({}));
+rst.awaitReplication();
 assert.eq(primaryColl.find().itcount(), 0, "Drop didn't delete");
 assert.eq(secondaryColl.find().itcount(), 0, "Drop didn't delete on secondary");
 
