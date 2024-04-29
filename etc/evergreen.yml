@@ -653,7 +653,6 @@ buildvariants:
   - name: jsCore_ese
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
-  - name: mqlrun
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: .replica_sets .common !.ignore_non_generated_replica_sets_jscore_passthrough
@@ -727,7 +726,6 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: jsCore_wildcard_indexes
   - name: .jstestfuzz .common
-  - name: mqlrun
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: .replica_sets .common !.ignore_non_generated_replica_sets_jscore_passthrough
@@ -849,7 +847,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
   - name: .jscore .common !.decimal !.sharding
   - name: .logical_session_cache .one_sec
-  - name: mqlrun
   # TODO(SERVER-64009): Re-enable replica_sets_auth_gen.
   # - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
@@ -883,7 +880,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
   - name: .jscore .common !.decimal !.sharding
   - name: .logical_session_cache .one_sec
-  - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
@@ -913,7 +909,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
   - name: .jscore .common !.decimal !.sharding
   - name: .logical_session_cache .one_sec
-  - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -984,7 +979,6 @@ buildvariants:
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
@@ -1099,7 +1093,6 @@ buildvariants:
   # - name: .jstestfuzz !.flow_control
   - name: libunwind_tests
   - name: .multiversion_sanity_check
-  - name: mqlrun
   - name: .multi_shard !.no_debug_mode
   - name: multiversion_gen
   - name: .ocsp
@@ -1231,7 +1224,6 @@ buildvariants:
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
   - name: .multiversion_sanity_check
-  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
@@ -1364,7 +1356,6 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: lint_fuzzer_sanity_patch
-  - name: mqlrun
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: .multiversion_sanity_check
@@ -1814,7 +1805,6 @@ buildvariants:
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
   - name: .multiversion_sanity_check
-  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
@@ -2263,7 +2253,6 @@ buildvariants:
   # - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer. # Not passing
   # - name: libunwind_tests # Cant be used because tsan does not use libunwind
   # - name: .multiversion_sanity_check # Multiversion does not pass yet, also making this work is going to be pretty tricky
-  - name: mqlrun
   # - name: .multi_shard # Not passing
   # - name: multi_stmt_txn_jscore_passthrough_with_migration_gen # Not passing
   # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
