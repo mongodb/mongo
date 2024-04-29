@@ -144,7 +144,6 @@ buildvariants:
   - name: jsCore_ese
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
-  - name: mqlrun
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: .replica_sets .common !.ignore_non_generated_replica_sets_jscore_passthrough
@@ -249,7 +248,6 @@ buildvariants:
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
   - name: .multiversion_sanity_check
-  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
@@ -551,7 +549,6 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: lint_fuzzer_sanity_patch
-  - name: mqlrun
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: .multiversion_sanity_check
@@ -651,7 +648,6 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: lint_fuzzer_sanity_patch
-  - name: mqlrun
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   # This doesn't really make sense since we are explicitly enabling a feature flag which is new in 6.0.
@@ -760,7 +756,6 @@ buildvariants:
   # - name: jsCore_txns_large_txns_format
   # - name: json_schema
   # - name: lint_fuzzer_sanity_patch
-  # - name: mqlrun
   # - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   # - name: multiversion_gen
   # - name: .multiversion_sanity_check
