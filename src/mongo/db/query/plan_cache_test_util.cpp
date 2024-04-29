@@ -51,6 +51,9 @@ createCallback(const CanonicalQuery& cq, const plan_ranker::PlanRankingDecision&
     auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
         return plan_cache_util::buildDebugInfo(cq, decision.clone());
     };
-    return {cq, std::move(buildDebugInfoFn)};
+    auto printCachedPlanFn = [](const SolutionCacheData& plan) {
+        return plan.toString();
+    };
+    return {cq, std::move(buildDebugInfoFn), printCachedPlanFn};
 }
 }  // namespace mongo

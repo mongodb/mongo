@@ -74,6 +74,14 @@ void logPromoteCacheEntry(std::string&& query,
                           std::string&& planCacheKey,
                           size_t works,
                           size_t newWorks);
+void logUnexpectedPinnedCacheEntry(std::string&& query,
+                                   std::string&& queryHash,
+                                   std::string&& planCacheKey,
+                                   std::string&& oldEntry,
+                                   std::string&& newEntry,
+                                   std::string&& oldSbePlan,
+                                   std::string&& newSbePlan,
+                                   size_t newWorks);
 }  // namespace log_detail
 
 template <class CachedPlanType, class DebugInfo>
@@ -109,6 +117,11 @@ public:
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
         size_t newWorks) const = 0;
+    virtual void onUnexpectedPinnedCacheEntry(
+        const KeyType& key,
+        const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
+        const CachedPlanType& newPlan,
+        size_t newWorks) const = 0;
     virtual DebugInfoType buildDebugInfo() const = 0;
     virtual uint32_t getPlanCacheCommandKeyHash() const = 0;
 };
@@ -119,10 +132,15 @@ public:
 template <typename KeyType, typename CachedPlanType, typename DebugInfoType>
 class PlanCacheCallbacksImpl : public PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType> {
 public:
-    PlanCacheCallbacksImpl(const CanonicalQuery& cq) : _cq{cq} {}
-
-    PlanCacheCallbacksImpl(const CanonicalQuery& cq, std::function<DebugInfoType()> buildDebugInfo)
-        : _cq{cq}, _buildDebugInfoCallBack(buildDebugInfo) {}
+    PlanCacheCallbacksImpl(const CanonicalQuery& cq,
+                           std::function<DebugInfoType()> buildDebugInfo,
+                           std::function<std::string(const CachedPlanType&)> printCachedPlan)
+        : _cq{cq},
+          _buildDebugInfoCallback(buildDebugInfo),
+          _printCachedPlanCallback(printCachedPlan) {
+        tassert(6407401, "_buildDebugInfoCallBack should be callable", _buildDebugInfoCallback);
+        tassert(8983105, "_printCachedPlanCallback should be callable", _printCachedPlanCallback);
+    }
 
     void onCreateInactiveCacheEntry(
         const KeyType& key,
@@ -186,9 +204,27 @@ public:
                                          newWorks);
     }
 
+    void onUnexpectedPinnedCacheEntry(
+        const KeyType& key,
+        const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
+        const CachedPlanType& newPlan,
+        size_t newWorks) const final {
+        tassert(8983101, "Expected oldEntry to not be null", oldEntry);
+        tassert(8983102, "Expected oldEntry to be pinned", !oldEntry->works);
+        auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
+        auto newEntryDebugInfo = buildDebugInfo();
+        log_detail::logUnexpectedPinnedCacheEntry(_cq.toStringShort(),
+                                                  std::move(queryHash),
+                                                  std::move(planCacheKey),
+                                                  oldEntry->debugString(),
+                                                  newEntryDebugInfo.debugString(),
+                                                  printCachedPlan(*oldEntry->cachedPlan.get()),
+                                                  printCachedPlan(newPlan),
+                                                  newWorks);
+    }
+
     DebugInfoType buildDebugInfo() const final {
-        tassert(6407401, "_buildDebugInfoCallBack should be callable", _buildDebugInfoCallBack);
-        return _buildDebugInfoCallBack();
+        return _buildDebugInfoCallback();
     }
 
     uint32_t getPlanCacheCommandKeyHash() const final {
@@ -197,6 +233,10 @@ public:
     }
 
 private:
+    std::string printCachedPlan(const CachedPlanType& plan) const {
+        return _printCachedPlanCallback(plan);
+    }
+
     auto hashes(const KeyType& key,
                 const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry) const {
         // Avoid recomputing the hashes if we've got an old entry to grab them from.
@@ -207,6 +247,7 @@ private:
     }
 
     const CanonicalQuery& _cq;
-    std::function<DebugInfoType()> _buildDebugInfoCallBack;
+    std::function<DebugInfoType()> _buildDebugInfoCallback;
+    std::function<std::string(const CachedPlanType&)> _printCachedPlanCallback;
 };
 }  // namespace mongo

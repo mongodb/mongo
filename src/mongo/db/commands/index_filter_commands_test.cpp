@@ -304,8 +304,11 @@ private:
         auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
             return plan_cache_util::buildDebugInfo(*cq, std::move(decision));
         };
+        auto printCachedPlanFn = [](const SolutionCacheData& plan) {
+            return plan.toString();
+        };
         PlanCacheCallbacksImpl<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
-            callbacks{*cq, buildDebugInfoFn};
+            callbacks{*cq, buildDebugInfoFn, printCachedPlanFn};
         ASSERT_OK(_classicPlanCache->set(
             makeClassicKey(*cq),
             std::move(cacheData),
@@ -342,10 +345,14 @@ private:
                                      querySolution.get()]() -> plan_cache_debug_info::DebugInfoSBE {
             return plan_cache_util::buildDebugInfo(soln);
         };
+        auto printCachedPlanFn = [](const sbe::CachedSbePlan& plan) {
+            sbe::DebugPrinter p;
+            return p.print(*plan.root.get());
+        };
         PlanCacheCallbacksImpl<sbe::PlanCacheKey,
                                sbe::CachedSbePlan,
                                plan_cache_debug_info::DebugInfoSBE>
-            callbacks{*cq, buildDebugInfoFn};
+            callbacks{*cq, buildDebugInfoFn, printCachedPlanFn};
 
         ASSERT_OK(_sbePlanCache->set(
             makeSbeKey(*cq),
