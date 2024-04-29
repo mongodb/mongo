@@ -73,6 +73,15 @@ continue to aggregate the operation's metrics. Once the query execution is fully
 the key from the store if it exists and update it, or create a new one and add it to the store. See
 more details in the [comments](query_stats.h#L158-L216).
 
+Some metrics are only known to data-bearing nodes. When a query is selected for query stats
+gathering in a sharded cluster, the router requests that the shards gather those metrics and
+include them in cursor responses by setting the `includeQueryStatsMetrics` field to `true` in
+requests it makes to the shards. The router then aggregates the metrics received from the shards
+into its own query stats store. In executing such a query, the local shard may need to send further
+queries to other (foreign) shards. In such cases, the local shard forwards the
+`includeQueryStatsMetrics` field to the foreign shard(s). The local shard then aggregates the
+metrics it receives into those it includes in its response.
+
 ### Rate Limiting
 
 Whether or not query stats will be recorded for a specific query execution depends on a Rate
@@ -150,11 +159,31 @@ following way:
   first recording of this query stats store entry.
 - `metrics.lastSeenTimestamp`: UTC time taken at query completion (including getMores) for the
   latest recording of this query stats store entry.
-- `metrics.docsReturned`: Various broken down metrics for the number of documents returned by
+- `metrics.docsReturned`: Various broken down statistics for the number of documents returned by
   observation of this query.
 - `metrics.firstResponseExecMicros`: Estimated time spent computing and returning the first batch.
 - `metrics.totalExecMicros`: Estimated time spent computing and returning all batches, which is the
   same as the above for single-batch queries.
+- `metrics.keysExamined`: Various broken down statistics for the number of index keys examined while
+  executing this query, including getMores.
+- `metrics.docsExamined`: Various broken down statistics for the number of documents examined while
+  executing this query, including getMores.
+- `metrics.workingTimeMillis`: Various broken down statistics for the estimated time spent executing
+  this query, excluding time spent blocked.
+- `metrics.hasSortStage`: Aggregate counts of the number of query executions that did and did not
+  include a sort stage, respectively.
+- `metrics.usedDisk`: Aggregate counts of the number of query executions that did and did not use
+  disk, respectively.
+- `metrics.fromMultiPlanner`: Aggregate counts of the number of query executions that did and did
+  not use the multi-planner, respectively. A query is considered to have used the multi-planner
+  if any internal query generated as part of its execution used the multi-planner.
+- `metrics.fromPlanCache`: Aggregate counts of the number of query executions that did and did
+  not use the plan cache, respectively. A query is considered to have not used the plan cache if
+  any internal query generated as part of its execution did not use the plan cache.
+- `metrics.bytesRead`: Various broken down statistics for the number of bytes read from disk while
+  executing this query, including getMores.
+- `metrics.readingTime`: Various broken down statistics for the amount of time spent reading from disk
+  while executing this query, including getMores.
 - `metrics.lastExecutionMicros`: Estimated time spent processing the latest query (akin to
   "totalExecMicros", not "firstResponseExecMicros").
 
