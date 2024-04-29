@@ -164,7 +164,7 @@ class MockTestFileExplorer(object):
     def is_glob_pattern(self, pattern):
         return globstar.is_glob_pattern(pattern)
 
-    def iglob(self, pattern):
+    def glob(self, pattern):
         globbed = []
         for test_file in self.files:
             if fnmatch.fnmatchcase(test_file, pattern):

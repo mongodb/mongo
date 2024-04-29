@@ -3,11 +3,13 @@
 import io
 import re
 import yaml
+import functools
 
 # TODO: use a more robust regular expression for matching tags
 _JSTEST_TAGS_RE = re.compile(r".*@tags\s*:\s*(\[[^\]]*\])", re.DOTALL)
 
 
+@functools.cache
 def get_tags(pathname):
     """Return the list of tags found in the (JS-style) comments of 'pathname'.
 

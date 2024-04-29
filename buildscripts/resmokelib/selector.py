@@ -49,14 +49,16 @@ class TestFileExplorer(object):
         return globstar.is_glob_pattern(path)
 
     @staticmethod
-    def iglob(pattern):  # noqa: D406,D407,D411,D413
+    def glob(pattern):  # noqa: D406,D407,D411,D413
         """Expand the given glob pattern with regard to the current working directory.
 
-        See buildscripts.resmokelib.utils.globstar.iglob().
+        See buildscripts.resmokelib.utils.globstar.glob().
         Returns:
             A list of paths as a list(str).
+
         """
-        return globstar.iglob(pattern)
+        # Use the memoized one.
+        return globstar.glob(pattern)
 
     @staticmethod
     def jstest_tags(file_path):  # noqa: D406,D407,D411,D413
@@ -196,7 +198,7 @@ class _TestList(object):
 
         for path in paths:
             if self._test_file_explorer.is_glob_pattern(path):
-                expanded_paths = self._test_file_explorer.iglob(path)
+                expanded_paths = self._test_file_explorer.glob(path)
                 len_before = len(evaluated)
                 evaluated.extend(expanded_paths)
                 len_after = len(evaluated)

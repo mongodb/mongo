@@ -3,6 +3,7 @@
 import glob as _glob
 import os.path
 import re
+import functools
 
 _CONTAINS_GLOB_PATTERN = re.compile("[*?[]")
 
@@ -14,6 +15,7 @@ def is_glob_pattern(string):
     return _CONTAINS_GLOB_PATTERN.search(string) is not None
 
 
+@functools.cache
 def glob(globbed_pathname):
     """Return a list of pathnames matching the 'globbed_pathname' pattern.
 
