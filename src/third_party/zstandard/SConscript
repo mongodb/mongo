@@ -9,7 +9,7 @@ env.Prepend(CPPPATH=[
     'zstd/lib/common',
 ])
 
-env.Library(
+env.BazelLibrary(
     target="zstd",
     source=[
         'zstd/lib/common/entropy_common.c',

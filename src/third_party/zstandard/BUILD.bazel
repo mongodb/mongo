@@ -1,0 +1,61 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "zstd",
+    srcs = [
+        "zstd/lib/common/entropy_common.c",
+        "zstd/lib/common/error_private.c",
+        "zstd/lib/common/fse_decompress.c",
+        "zstd/lib/common/pool.c",
+        "zstd/lib/common/threading.c",
+        "zstd/lib/common/xxhash.c",
+        "zstd/lib/common/zstd_common.c",
+        "zstd/lib/compress/fse_compress.c",
+        "zstd/lib/compress/hist.c",
+        "zstd/lib/compress/huf_compress.c",
+        "zstd/lib/compress/zstd_compress.c",
+        "zstd/lib/compress/zstd_compress_literals.c",
+        "zstd/lib/compress/zstd_compress_sequences.c",
+        "zstd/lib/compress/zstd_compress_superblock.c",
+        "zstd/lib/compress/zstd_double_fast.c",
+        "zstd/lib/compress/zstd_fast.c",
+        "zstd/lib/compress/zstd_lazy.c",
+        "zstd/lib/compress/zstd_ldm.c",
+        "zstd/lib/compress/zstd_opt.c",
+        "zstd/lib/compress/zstdmt_compress.c",
+        "zstd/lib/decompress/huf_decompress.c",
+        "zstd/lib/decompress/zstd_ddict.c",
+        "zstd/lib/decompress/zstd_decompress.c",
+        "zstd/lib/decompress/zstd_decompress_block.c",
+        "zstd/lib/deprecated/zbuff_common.c",
+        "zstd/lib/deprecated/zbuff_compress.c",
+        "zstd/lib/deprecated/zbuff_decompress.c",
+        "zstd/lib/dictBuilder/cover.c",
+        "zstd/lib/dictBuilder/divsufsort.c",
+        "zstd/lib/dictBuilder/fastcover.c",
+        "zstd/lib/dictBuilder/zdict.c",
+    ] + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": [
+            "zstd/lib/decompress/huf_decompress_amd64.S",
+        ],
+    }) + glob([
+        "zstd/lib/common/*.h",
+        "zstd/lib/compress/*.h",
+        "zstd/lib/decompress/*.h",
+        "zstd/lib/deprecated/*.h",
+        "zstd/lib/dictBuilder/*.h",
+    ]),
+    hdrs = glob([
+        "zstd/lib/*.h",
+    ]),
+    copts = select({
+        "//bazel/config:compiler_type_gcc": ["-Wno-stringop-overflow"],
+        "//conditions:default": [],
+    }),
+    includes = [
+        "zstd/lib",
+    ],
+)
