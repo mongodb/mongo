@@ -52,9 +52,7 @@ public:
 
     void applyActionResult(OperationContext* opCtx,
                            const BalancerStreamAction& action,
-                           const BalancerStreamActionResponse& result) override {
-        // Not yet implemented
-    }
+                           const BalancerStreamActionResponse& response) override;
 
     MigrateInfoVector selectCollectionsToMove(
         OperationContext* opCtx,
