@@ -156,6 +156,9 @@ public:
 
     bool isAuthorizedForAnyActionOnResource(const ResourcePattern& resource) override;
 
+    bool isAuthorizedForClusterActions(const ActionSet& actionSet,
+                                       const boost::optional<TenantId>& tenantId) override;
+
     void setImpersonatedUserData(const UserName& username,
                                  const std::vector<RoleName>& roles) override;
 
@@ -187,8 +190,7 @@ protected:
     friend class AuthorizationSessionImplTestHelper;
 
     // Updates internal cached authorization state, i.e.:
-    // - _mayBypassWriteBlockingMode, reflecting whether the connection is authorized for the
-    // privilege of bypassing write blocking mode on cluster resource.
+    // - _nonTenantClusterActions, see below.
     // - _authenticatedRoleNames, which stores all roles held by users who are authenticated on this
     // connection.
     // - _authenticationMode -- we just update this to None if there are no users on the connection.
@@ -241,9 +243,9 @@ private:
     // set of checks performed is a subset of the checks declared in the contract.
     AuthorizationContract _contract;
 
-    bool _mayBypassWriteBlockingMode = false;
-
-    bool _mayUseTenant = false;
+    // Optimized check for actions which may be performed on the non-tenanted cluster resource.
+    // It is a union of ClusterResource and AnyResource permissions.
+    ActionSet _nonTenantClusterActions;
 
     // The expiration time for this session, expressed as a Unix timestamp. After this time passes,
     // the session will be expired and requests will fail until the expiration time is refreshed.

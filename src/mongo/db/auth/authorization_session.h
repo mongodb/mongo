@@ -281,6 +281,15 @@ public:
     // Returns true if the current session possesses a privilege which applies to the resource.
     virtual bool isAuthorizedForAnyActionOnResource(const ResourcePattern& resource) = 0;
 
+    // Returns true if the current session possesses privileges on the cluster resource for the
+    // action(s) specified.
+    virtual bool isAuthorizedForClusterActions(const ActionSet& actionSet,
+                                               const boost::optional<TenantId>& tenantId) = 0;
+    bool isAuthorizedForClusterAction(ActionType action,
+                                      const boost::optional<TenantId>& tenantId) {
+        return isAuthorizedForClusterActions({action}, tenantId);
+    }
+
     // Replaces the data for the user that a system user is impersonating with new data.
     // The auditing system adds this user and their roles to each audit record in the log.
     virtual void setImpersonatedUserData(const UserName& username,

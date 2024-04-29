@@ -203,6 +203,11 @@ public:
         return true;
     }
 
+    bool isAuthorizedForClusterActions(const ActionSet& actionSet,
+                                       const boost::optional<TenantId>& tenantId) override {
+        return true;
+    }
+
     void setImpersonatedUserData(const UserName&, const std::vector<RoleName>&) override {
         UASSERT_NOT_IMPLEMENTED;
     }
