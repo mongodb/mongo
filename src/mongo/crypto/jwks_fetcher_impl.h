@@ -34,19 +34,28 @@
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/jwks_fetcher.h"
 #include "mongo/crypto/jwt_types_gen.h"
+#include "mongo/util/synchronized_value.h"
+#include "mongo/util/time_support.h"
 
-namespace mongo::crypto {
+namespace mongo {
+class ClockSource;
+
+namespace crypto {
 
 /** JWKSFetcher implementation which acquires keys via HTTP.
  */
 class JWKSFetcherImpl : public JWKSFetcher {
 public:
-    JWKSFetcherImpl(StringData issuer) : _issuer(issuer) {}
+    JWKSFetcherImpl(ClockSource* clock, StringData issuer);
 
-    JWKSet fetch() final;
+    JWKSet fetch() override;
+    bool quiesce() const override;
 
 private:
     std::string _issuer;
+    ClockSource* _clock;
+    synchronized_value<Date_t> _lastSuccessfulFetch;
 };
 
-}  // namespace mongo::crypto
+}  // namespace crypto
+}  // namespace mongo

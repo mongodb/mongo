@@ -49,6 +49,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
+using namespace fmt::literals;
+
 namespace mongo::crypto {
 namespace {
 constexpr auto kMinKeySizeBytes = 2048 >> 3;
@@ -80,7 +82,7 @@ StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
         // updated.
         LOGV2_DEBUG(7938400,
                     3,
-                    "Could not locate key in key cache, refreshing key cache",
+                    "Could not locate key in key cache, attempting key cache refresh",
                     "keyId"_attr = keyId.toString());
         auto loadKeysStatus = loadKeys();
         if (!loadKeysStatus.isOK()) {
@@ -104,6 +106,10 @@ StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
 }
 
 Status JWKManager::loadKeys() try {
+    if (_fetcher->quiesce()) {
+        return {ErrorCodes::OperationFailed, "Skipping refresh due to IdP quiesce"};
+    }
+
     auto newValidators = std::make_shared<SharedValidatorMap>();
     auto newKeyMaterial = std::make_shared<KeyMap>();
 

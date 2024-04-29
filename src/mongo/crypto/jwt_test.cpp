@@ -27,25 +27,13 @@
  *    it in the license file.
  */
 
-#include <map>
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/crypto/jwk_manager.h"
-#include "mongo/crypto/jwks_fetcher.h"
-#include "mongo/crypto/jwks_fetcher_mock.h"
+#include "mongo/crypto/jwk_manager_test_framework.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/net/http_client.h"
 
-namespace mongo::crypto {
+namespace mongo::crypto::test {
 namespace {
 
 BSONObj getTestJWKSet() {
@@ -100,41 +88,66 @@ void assertCorrectKeys(JWKManager* manager, BSONObj data) {
     }
 }
 
-TEST(JWKManager, parseJWKSetBasicFromSource) {
+TEST_F(JWKManagerTest, parseJWKSetBasicFromSource) {
+    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
+
     auto data = getTestJWKSet();
-    auto uniqueFetcher = std::make_unique<MockJWKSFetcher>(data);
-    auto* fetcher = uniqueFetcher.get();
-    JWKManager manager(std::move(uniqueFetcher));
+    jwksFetcher()->setKeys(getTestJWKSet());
 
     // Initially, set the fetcher to fail. This should cause the JWKManager to contain no keys
     // even after loadKeys() is called.
-    fetcher->setShouldFail(true);
-    ASSERT_EQ(manager.size(), 0);
-    ASSERT_NOT_OK(manager.loadKeys());
-    ASSERT_EQ(manager.size(), 0);
+    jwksFetcher()->setShouldFail(true);
+    ASSERT_EQ(jwkManager()->size(), 0);
+    ASSERT_NOT_OK(jwkManager()->loadKeys());
+    ASSERT_EQ(jwkManager()->size(), 0);
 
     // Then, set the fetcher to succeed. The subsequent call to loadKeys() should result in the
     // keys getting updated correctly.
-    fetcher->setShouldFail(false);
-    ASSERT_OK(manager.loadKeys());
-    ASSERT_EQ(manager.size(), 2);
+    jwksFetcher()->setShouldFail(false);
+    ASSERT_OK(jwkManager()->loadKeys());
+    ASSERT_EQ(jwkManager()->size(), 2);
 
     BSONObjBuilder successfulLoadKeysBob;
-    manager.serialize(&successfulLoadKeysBob);
+    jwkManager()->serialize(&successfulLoadKeysBob);
     ASSERT_BSONOBJ_EQ(successfulLoadKeysBob.obj(), data);
-    assertCorrectKeys(&manager, data);
+    assertCorrectKeys(jwkManager(), data);
 
     // Finally, set the fetcher to fail again. The subsequent call to loadKeys() should fail but
     // leave the manager's keys untouched.
-    fetcher->setShouldFail(true);
-    ASSERT_NOT_OK(manager.loadKeys());
-    ASSERT_EQ(manager.size(), 2);
+    jwksFetcher()->setShouldFail(true);
+    ASSERT_NOT_OK(jwkManager()->loadKeys());
+    ASSERT_EQ(jwkManager()->size(), 2);
 
     BSONObjBuilder failedLoadKeysBob;
-    manager.serialize(&failedLoadKeysBob);
+    jwkManager()->serialize(&failedLoadKeysBob);
     ASSERT_BSONOBJ_EQ(failedLoadKeysBob.obj(), data);
-    assertCorrectKeys(&manager, data);
+    assertCorrectKeys(jwkManager(), data);
+}
+
+TEST_F(JWKManagerTest, JWKSFetcherQuiesce) {
+    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 5);
+
+    // Initially the fetcher will return no keys.
+    ASSERT_EQ(jwkManager()->size(), 0);
+    ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-1"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"_sd));
+
+    // Update keys and advance for a period less than the quiesce time.
+    // Fetcher will continue to refuse to update.
+    jwksFetcher()->setKeys(getTestJWKSet());
+    getClock()->advance(Seconds{3});
+    ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-1"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"_sd));
+    ASSERT_EQ(jwkManager()->size(), 0);
+    ASSERT_NOT_OK(jwkManager()->loadKeys());
+    ASSERT_EQ(jwkManager()->size(), 0);
+
+    // Advance clock further, keys will now be JIT loaded.
+    getClock()->advance(Seconds{3});
+    ASSERT_OK(jwkManager()->getValidator("custom-key-1"_sd));
+    ASSERT_OK(jwkManager()->getValidator("custom-key-2"_sd));
+    ASSERT_EQ(jwkManager()->size(), 2);
 }
 
 }  // namespace
-}  // namespace mongo::crypto
+}  // namespace mongo::crypto::test
