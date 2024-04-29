@@ -232,6 +232,47 @@ MoveUnshardedPolicy::MoveUnshardedPolicy()
             fpBalancerShouldReturnRandomMigrations != nullptr);
 }
 
+void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
+                                            const BalancerStreamAction& action,
+                                            const BalancerStreamActionResponse& response) {
+
+    const auto& moveAction = get<MigrateInfo>(action);
+    const auto& moveResponse = get<Status>(response);
+
+    if (!moveResponse.isOK()) {
+        auto isAcceptableError = [](ErrorCodes::Error errorCode) {
+            switch (errorCode) {
+                case ErrorCodes::BackgroundOperationInProgressForNamespace:
+                // TODO SERVER-89892 Investigate CannotCreateIndex error
+                case ErrorCodes::CannotCreateIndex:
+                case ErrorCodes::CommandNotSupported:
+                case ErrorCodes::DuplicateKey:
+                case ErrorCodes::HostUnreachable:
+                // TODO SERVER-89826 Investigate IllegalOperation error
+                case ErrorCodes::IllegalOperation:
+                case ErrorCodes::InterruptedDueToReplStateChange:
+                case ErrorCodes::NamespaceNotFound:
+                case ErrorCodes::NotImplemented:
+                // TODO SERVER-89342 Remove OperationCannotBeBatched from whitelist
+                case ErrorCodes::OperationCannotBeBatched:
+                case ErrorCodes::OplogQueryMinTsMissing:
+                case ErrorCodes::ReshardCollectionInProgress:
+                case ErrorCodes::StaleDbVersion:
+                    return true;
+                default:
+                    return false;
+            }
+        };
+        tassert(8959500,
+                str::stream()
+                    << "An unexpected error occured while moving a random unsharded collection"
+                    << ", from: " << moveAction.from << ", to: " << moveAction.to
+                    << ", nss: " << moveAction.nss.toStringForErrorMsg()
+                    << ", error: " << moveResponse.toString(),
+                isAcceptableError(moveResponse.code()));
+    }
+}
+
 // Returns a MigrateInfo for a moveCollection of an unsharded collection from one of the given
 // donors to one of the given recipients. Returns boost::none if there are no eligible collections
 // to move or no eligibile recipients. Handles overlaps in the given donors and recipients.
