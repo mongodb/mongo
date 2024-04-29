@@ -62,6 +62,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -358,11 +359,11 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
  * - geometry type
  * - CRS (flat or spherical)
  */
-void encodeGeoMatchExpression(const GeoMatchExpression* tree, StringBuilder* keyBuilder) {
-    const GeoExpression& geoQuery = tree->getGeoExpression();
-
+void encodeGeoMatchExpression(const GeometryContainer& geo,
+                              GeoExpression::Predicate pred,
+                              StringBuilder* keyBuilder) {
     // Type of geo query.
-    switch (geoQuery.getPred()) {
+    switch (pred) {
         case GeoExpression::WITHIN:
             *keyBuilder << "wi";
             break;
@@ -376,20 +377,20 @@ void encodeGeoMatchExpression(const GeoMatchExpression* tree, StringBuilder* key
 
     // Geometry type.
     // Only one of the shared_ptrs in GeoContainer may be non-NULL.
-    *keyBuilder << geoQuery.getGeometry().getDebugType();
+    *keyBuilder << geo.getDebugType();
 
     // CRS (flat or spherical)
-    if (FLAT == geoQuery.getGeometry().getNativeCRS()) {
+    if (FLAT == geo.getNativeCRS()) {
         *keyBuilder << "fl";
-    } else if (SPHERE == geoQuery.getGeometry().getNativeCRS()) {
+    } else if (SPHERE == geo.getNativeCRS()) {
         *keyBuilder << "sp";
-    } else if (STRICT_SPHERE == geoQuery.getGeometry().getNativeCRS()) {
+    } else if (STRICT_SPHERE == geo.getNativeCRS()) {
         *keyBuilder << "ss";
     } else {
         LOGV2_ERROR(23849,
                     "Unknown CRS type in geometry",
-                    "crsType"_attr = (int)geoQuery.getGeometry().getNativeCRS(),
-                    "geometryType"_attr = geoQuery.getGeometry().getDebugType());
+                    "crsType"_attr = (int)geo.getNativeCRS(),
+                    "geometryType"_attr = geo.getDebugType());
         MONGO_UNREACHABLE;
     }
 }
@@ -512,23 +513,90 @@ void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) {
 
     encodeUserString(tree->path(), keyBuilder);
 
-    // GEO and GEO_NEAR require additional encoding.
-    if (MatchExpression::GEO == tree->matchType()) {
-        encodeGeoMatchExpression(static_cast<const GeoMatchExpression*>(tree), keyBuilder);
-    } else if (MatchExpression::GEO_NEAR == tree->matchType()) {
-        encodeGeoNearMatchExpression(static_cast<const GeoNearMatchExpression*>(tree), keyBuilder);
-    }
-
-    // We encode regular expression flags such that different options produce different shapes.
-    if (MatchExpression::REGEX == tree->matchType()) {
-        encodeRegexFlagsForMatch({static_cast<const RegexMatchExpression*>(tree)}, keyBuilder);
-    } else if (MatchExpression::MATCH_IN == tree->matchType()) {
-        const auto* inMatch = static_cast<const InMatchExpression*>(tree);
-        if (!inMatch->getRegexes().empty()) {
-            // Append '_re' to distinguish an $in without regexes from an $in with regexes.
-            encodeUserString("_re"_sd, keyBuilder);
-            encodeRegexFlagsForMatch(inMatch->getRegexes(), keyBuilder);
+    switch (tree->matchType()) {
+        // Geo operators require additional encoding.
+        case MatchExpression::GEO: {
+            auto geoTree = static_cast<const GeoMatchExpression*>(tree);
+            encodeGeoMatchExpression(geoTree->getGeoExpression().getGeometry(),
+                                     geoTree->getGeoExpression().getPred(),
+                                     keyBuilder);
+            break;
         }
+        case MatchExpression::GEO_NEAR:
+            encodeGeoNearMatchExpression(static_cast<const GeoNearMatchExpression*>(tree),
+                                         keyBuilder);
+            break;
+        case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN: {
+            auto geoTree = static_cast<const InternalBucketGeoWithinMatchExpression*>(tree);
+            encodeGeoMatchExpression(geoTree->getGeoContainer(), GeoExpression::WITHIN, keyBuilder);
+            break;
+        }
+        case MatchExpression::REGEX:
+            // We encode regular expression flags such that different options produce different
+            // shapes.
+            encodeRegexFlagsForMatch({static_cast<const RegexMatchExpression*>(tree)}, keyBuilder);
+            break;
+        case MatchExpression::MATCH_IN: {
+            const auto* inMatch = static_cast<const InMatchExpression*>(tree);
+            if (!inMatch->getRegexes().empty()) {
+                // Append '_re' to distinguish an $in without regexes from an $in with regexes.
+                encodeUserString("_re"_sd, keyBuilder);
+                encodeRegexFlagsForMatch(inMatch->getRegexes(), keyBuilder);
+            }
+            break;
+        }
+        case MatchExpression::AND:
+        case MatchExpression::OR:
+        case MatchExpression::ELEM_MATCH_OBJECT:
+        case MatchExpression::ELEM_MATCH_VALUE:
+        case MatchExpression::SIZE:
+        case MatchExpression::EQ:
+        case MatchExpression::LTE:
+        case MatchExpression::LT:
+        case MatchExpression::GT:
+        case MatchExpression::GTE:
+        case MatchExpression::MOD:
+        case MatchExpression::EXISTS:
+        case MatchExpression::BITS_ALL_SET:
+        case MatchExpression::BITS_ALL_CLEAR:
+        case MatchExpression::BITS_ANY_SET:
+        case MatchExpression::BITS_ANY_CLEAR:
+        case MatchExpression::NOT:
+        case MatchExpression::NOR:
+        case MatchExpression::TYPE_OPERATOR:
+        case MatchExpression::WHERE:
+        case MatchExpression::EXPRESSION:
+        case MatchExpression::ALWAYS_FALSE:
+        case MatchExpression::ALWAYS_TRUE:
+        case MatchExpression::TEXT:
+        case MatchExpression::INTERNAL_2D_POINT_IN_ANNULUS:
+        case MatchExpression::INTERNAL_EXPR_EQ:
+        case MatchExpression::INTERNAL_EXPR_GT:
+        case MatchExpression::INTERNAL_EXPR_GTE:
+        case MatchExpression::INTERNAL_EXPR_LT:
+        case MatchExpression::INTERNAL_EXPR_LTE:
+        case MatchExpression::INTERNAL_EQ_HASHED_KEY:
+        case MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
+        case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE:
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE:
+        case MatchExpression::INTERNAL_SCHEMA_COND:
+        case MatchExpression::INTERNAL_SCHEMA_EQ:
+        case MatchExpression::INTERNAL_SCHEMA_FMOD:
+        case MatchExpression::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
+        case MatchExpression::INTERNAL_SCHEMA_MAX_ITEMS:
+        case MatchExpression::INTERNAL_SCHEMA_MAX_LENGTH:
+        case MatchExpression::INTERNAL_SCHEMA_MAX_PROPERTIES:
+        case MatchExpression::INTERNAL_SCHEMA_MIN_ITEMS:
+        case MatchExpression::INTERNAL_SCHEMA_MIN_LENGTH:
+        case MatchExpression::INTERNAL_SCHEMA_MIN_PROPERTIES:
+        case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
+        case MatchExpression::INTERNAL_SCHEMA_ROOT_DOC_EQ:
+        case MatchExpression::INTERNAL_SCHEMA_TYPE:
+        case MatchExpression::INTERNAL_SCHEMA_UNIQUE_ITEMS:
+        case MatchExpression::INTERNAL_SCHEMA_XOR:
+            break;
     }
 
     // If the query predicate is minKey or maxKey it can't use the same plan as other GT/LT

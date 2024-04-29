@@ -402,6 +402,23 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyGeoNear) {
                    "{}");
 }
 
+// Cache keys for $_internalBucketGeoWithin with flat and spherical geometry should
+// not be the same.
+TEST_F(CanonicalQueryEncoderTest, ComputeKeyTimeseriesGeoWithin) {
+    // Flat geometry.
+    unique_ptr<CanonicalQuery> cqFlat(
+        canonicalize(opCtx(),
+                     "{ $_internalBucketGeoWithin: { withinRegion: { $center: [ [ 180.0, 0.0 ], "
+                     "1.79 ] }, field: \"loc\" } }"));
+    // Spherical geometry.
+    unique_ptr<CanonicalQuery> cqSpherical(
+        canonicalize(opCtx(),
+                     "{ $_internalBucketGeoWithin: { withinRegion: { $centerSphere: [ [ 180.0, 0.0 "
+                     "], 1.79 ] }, field: \"loc\" } }"));
+    ASSERT_NOT_EQUALS(canonical_query_encoder::encodeClassic(*cqFlat),
+                      canonical_query_encoder::encodeClassic(*cqSpherical));
+}
+
 TEST_F(CanonicalQueryEncoderTest, ComputeKeyRegexDependsOnFlags) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);
     // The computed key depends on which execution engine is enabled. As such, we enable SBE for
