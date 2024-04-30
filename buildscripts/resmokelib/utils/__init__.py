@@ -7,6 +7,7 @@ import sys
 
 import yaml
 
+from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.utils import archival
 
 
@@ -98,7 +99,9 @@ def pick_catalog_shard_node(config_shard, num_shards):
         return None
 
     if config_shard == "any":
-        if num_shards is None or num_shards == 0:
+        # We check _config.NOOP_MONGO_D_S_PROCESSES because when running in antithesis
+        # the resmoke setup needs to be deterministic so the config shard cannot be random.
+        if num_shards is None or num_shards == 0 or _config.NOOP_MONGO_D_S_PROCESSES:
             return 0
         return random.randint(0, num_shards - 1)
 
