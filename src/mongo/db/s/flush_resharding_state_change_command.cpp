@@ -104,7 +104,11 @@ public:
                     "Can't call _flushReshardingStateChange if in read-only mode",
                     !storageGlobalParams.readOnly);
 
-            ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor())
+            // We use the fixed executor here since it may cause the thread to block. This would
+            // cause potential liveness issues since the arbitrary executor is a NetworkInterfaceTL
+            // executor in sharded clusters and that executor is one that executes networking
+            // operations.
+            ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
                 .then([svcCtx = opCtx->getServiceContext(), nss = ns()] {
                     ThreadClient tc("FlushReshardingStateChange", svcCtx);
                     {
