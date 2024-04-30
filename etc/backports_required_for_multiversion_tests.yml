@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/replsets/dbcheck_skip_applying_batch_on_secondary_parameter.js
+    ticket: SERVER-88885
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_pauses_watchdog_checks_during_storage_change.js
     ticket: SERVER-83508
   - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
@@ -630,6 +632,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/replsets/dbcheck_skip_applying_batch_on_secondary_parameter.js
+    ticket: SERVER-88885
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_pauses_watchdog_checks_during_storage_change.js
     ticket: SERVER-83508
   - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
