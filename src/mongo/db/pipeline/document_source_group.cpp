@@ -240,14 +240,6 @@ bool DocumentSourceGroup::tryToAbsorbTopKSort(
         }
     }
 
-    // We don't want to apply this optimization if this group can leverage DISTINCT_SCAN when we
-    // transform it to an internal $groupByDistinctScan.
-    std::string groupId;
-    GroupFromFirstDocumentTransformation::ExpectedInput expectedInput;
-    if (isEligibleForTransformOnFirstDocument(expectedInput, groupId)) {
-        return false;
-    }
-
     // Collects all $first and $last accumulators. Does not support either $firstN or $lastN
     // accumulators yet.
     auto& accumulators = _groupProcessor.getMutableAccumulationStatements();
@@ -325,11 +317,6 @@ using AccIndices = absl::InlinedVector<size_t, 4>;
 // Hash table to group $top(N)/$bottom(N) with the same sort pattern.
 using TopBottomAccKeyToAccIndicesMap =
     absl::flat_hash_map<TopBottomAccKey, AccIndices, Hasher, EqualTo>;
-
-template <TopBottomSense sense, bool single>
-SortPattern getAccSortPattern(AccumulatorN* accN) {
-    return static_cast<AccumulatorTopBottomN<sense, single>*>(accN)->getSortPattern();
-}
 
 TopBottomAccKey getTopBottomAccKey(AccumulatorN* accN) {
     switch (accN->getAccumulatorType()) {

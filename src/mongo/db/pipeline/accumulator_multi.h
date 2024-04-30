@@ -378,6 +378,18 @@ public:
         }
     }
 
+    AccumulatorDocumentsNeeded documentsNeeded() const final {
+        auto accType = getAccumulatorType();
+        // If we have top or bottom accumulators in a group we may only need to see the first or
+        // last documents respectively if the sorter matches an index.
+        if (accType == AccumulatorType::kTop) {
+            return AccumulatorDocumentsNeeded::kFirstOutputDocument;
+        } else if (accType == AccumulatorType::kBottom) {
+            return AccumulatorDocumentsNeeded::kLastOutputDocument;
+        }
+        return AccumulatorDocumentsNeeded::kAllDocuments;
+    }
+
 private:
     // top/bottom/topN/bottomN do NOT ignore null values, but MISSING values will be promoted to
     // null so the users see them.
@@ -408,5 +420,30 @@ using AccumulatorBottom = AccumulatorTopBottomN<TopBottomSense::kBottom, true>;
 
 using AccumulatorTopN = AccumulatorTopBottomN<TopBottomSense::kTop, false>;
 using AccumulatorBottomN = AccumulatorTopBottomN<TopBottomSense::kBottom, false>;
+
+template <TopBottomSense sense, bool single>
+SortPattern getAccSortPattern(AccumulatorN* accN) {
+    return static_cast<AccumulatorTopBottomN<sense, single>*>(accN)->getSortPattern();
+}
+
+inline SortPattern getAccSortPattern(const boost::intrusive_ptr<AccumulatorState>& accState) {
+    using namespace fmt::literals;
+    auto accN = dynamic_cast<AccumulatorN*>(accState.get());
+    tassert(8434700,
+            "Expected AccumulatorN but the accumulator is {}"_format(accState->getOpName()),
+            accN);
+    switch (accN->getAccumulatorType()) {
+        case AccumulatorN::kTop:
+            return getAccSortPattern<TopBottomSense::kTop, true>(accN);
+        case AccumulatorN::kTopN:
+            return getAccSortPattern<TopBottomSense::kTop, false>(accN);
+        case AccumulatorN::kBottom:
+            return getAccSortPattern<TopBottomSense::kBottom, true>(accN);
+        case AccumulatorN::kBottomN:
+            return getAccSortPattern<TopBottomSense::kBottom, false>(accN);
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 
 }  // namespace mongo

@@ -98,9 +98,9 @@ std::unique_ptr<GroupFromFirstDocumentTransformation> GroupFromFirstDocumentTran
     const std::string& groupId,
     StringData originalStageName,
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs,
-    ExpectedInput expectedInput) {
+    AccumulatorDocumentsNeeded docsNeeded) {
     return std::make_unique<GroupFromFirstDocumentTransformation>(
-        groupId, originalStageName, std::move(accumulatorExprs), expectedInput);
+        groupId, originalStageName, std::move(accumulatorExprs), docsNeeded);
 }
 
 }  // namespace mongo

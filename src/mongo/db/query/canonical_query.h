@@ -158,6 +158,11 @@ public:
         return _sortPattern;
     }
 
+    void resetSortPattern() {
+        _findCommand->setSort(BSONObj());
+        _sortPattern = boost::none;
+    }
+
     const CollatorInterface* getCollator() const {
         return _expCtx->getCollator();
     }

@@ -1533,7 +1533,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
     // them and sort their measurements. Hence, this rewrite could give us an incorrect firstpoint.
     auto isSortValidForGroup = [&](AccumulatorDocumentsNeeded targetAccum) {
         bool firstpointTimeIsAscending =
-            (targetAccum == AccumulatorDocumentsNeeded::kFirstDocument);
+            (targetAccum == AccumulatorDocumentsNeeded::kFirstInputDocument);
         for (const auto& entry : sortStage->getSortKeyPattern()) {
             auto isTimeField = entry.fieldPath->fullPath() == timeField;
             if (isTimeField && (entry.isAscending == firstpointTimeIsAscending)) {
@@ -1564,7 +1564,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
             return false;
         }
 
-        bool flipSort = (accum == AccumulatorDocumentsNeeded::kLastDocument);
+        bool flipSort = (accum == AccumulatorDocumentsNeeded::kLastInputDocument);
         auto newSort = createMetadataSortForReorder(*sortStage, timeField, newFieldPath, flipSort);
         auto newGroup = createBucketGroupForReorder(pExpCtx, fieldsToInclude, newFieldPath);
 
@@ -1579,8 +1579,8 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
     };
 
     const bool optimized =
-        tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kFirstDocument) ||
-        tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kLastDocument);
+        tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kFirstInputDocument) ||
+        tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kLastInputDocument);
 
     // If we lower the group at the bucket collection level to SBE we won't be able to unpack in
     // SBE due to the current limitations of 'TsBucketToCellBlockStage', but we don't want to

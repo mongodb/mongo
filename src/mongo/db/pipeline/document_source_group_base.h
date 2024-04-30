@@ -60,9 +60,6 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/sorter/sorter.h"
-#include "mongo/db/sorter/sorter_stats.h"
-#include "mongo/logv2/log_attr.h"
 #include "mongo/util/memory_usage_tracker.h"
 #include "mongo/util/string_map.h"
 
@@ -186,14 +183,21 @@ public:
     /**
      * When possible, creates a document transformer that transforms the first document in a group
      * into one of the output documents of the $group stage. This is possible when we are grouping
-     * on a single field and all accumulators are $first (or there are no accumluators).
+     * on a single field and all accumulators are $first or $top (or there are no accumluators).
      *
      * It is sometimes possible to use a DISTINCT_SCAN to scan the first document of each group,
      * in which case this transformation can replace the actual $group stage in the pipeline
-     * (SERVER-9507).
+     * (SERVER-9507 & SERVER-84347).
+     *
+     * If a $group with $top/$bottom accumulator is transformed, its SortPattern is necessary to
+     * create a DISTINCT_SCAN plan.
+     *
+     * Returns:
+     * - first: the optional SortPattern of $group's $top or $bottom.
+     * - second: The rewritten $group stage.
      */
-    std::unique_ptr<GroupFromFirstDocumentTransformation> rewriteGroupAsTransformOnFirstDocument()
-        const;
+    std::pair<boost::optional<SortPattern>, std::unique_ptr<GroupFromFirstDocumentTransformation>>
+    rewriteGroupAsTransformOnFirstDocument() const;
 
     // True if this $group can be pushed down to SBE.
     SbeCompatibility sbeCompatibility() const {
@@ -219,12 +223,17 @@ protected:
     virtual void serializeAdditionalFields(
         MutableDocument& out, const SerializationOptions& opts = SerializationOptions{}) const {};
 
+    using RewriteGroupRequirements =
+        std::tuple<AccumulatorDocumentsNeeded, std::string, boost::optional<SortPattern>>;
+
     /**
-     * Returns true iff rewriteGroupAsTransformOnFirstDocument() returns a non-null value.
+     * If $group is eligible for rewrite of group to transform on first document, this returns a
+     * tuple of
+     * - The same ExpectedInput across all accumulators.
+     * - the id field for grouping.
+     * - an optional SortPattern when the needed document is either kFirstOutputDocument or
      */
-    bool isEligibleForTransformOnFirstDocument(
-        GroupFromFirstDocumentTransformation::ExpectedInput& expectedInput,
-        std::string& groupId) const;
+    boost::optional<RewriteGroupRequirements> getRewriteGroupRequirements() const;
 
     GroupProcessor _groupProcessor;
 
