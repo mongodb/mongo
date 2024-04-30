@@ -186,7 +186,12 @@ void executeChildBatches(OperationContext* opCtx,
             break;
         }
 
-        TargetedWriteBatch* writeBatch = childBatches.find(response.shardId)->second.get();
+        auto iter = childBatches.find(response.shardId);
+        tassert(8971901,
+                "Unexpectedly could not find batches sent to a shard",
+                iter != childBatches.end());
+
+        TargetedWriteBatch* writeBatch = iter->second.get();
         tassert(8048101, "Unexpectedly could not find write batch for shard", writeBatch);
 
         // When the responseStatus is not OK, this means that mongos was unable to receive a
