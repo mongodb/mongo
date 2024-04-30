@@ -84,7 +84,6 @@ class _TransitionThread(threading.Thread):
         self._client = fixture_interface.build_client(self._fixture, self._auth_options)
         self._current_mode = self._current_fixture_mode()
         self._should_wait_for_balancer_round = False
-        self._initial_balancer_round = None
 
         # Event set when the thread has been stopped using the 'stop()' method.
         self._is_stopped_evt = threading.Event()
@@ -240,6 +239,8 @@ class _TransitionThread(threading.Thread):
         self.logger.info("Starting transition from " + self._current_mode)
         res = None
         start_time = time.time()
+        last_balancer_status = None
+
         while True:
             try:
                 if self._should_wait_for_balancer_round:
@@ -248,15 +249,26 @@ class _TransitionThread(threading.Thread):
                     # Wait for one balancer round after starting to drain if the config server owned no
                     # chunks to avoid a race where the migration of the first chunk to the config server
                     # can leave the collection orphaned on it after it's been removed as a shard.
-                    if self._initial_balancer_round is None:
-                        initial_status = self._client.admin.command({"balancerStatus": 1})
-                        self._initial_balancer_round = initial_status["numBalancerRounds"]
+                    if last_balancer_status is None:
+                        last_balancer_status = self._client.admin.command({"balancerStatus": 1})
 
                     latest_status = self._client.admin.command({"balancerStatus": 1})
-                    if self._initial_balancer_round >= latest_status["numBalancerRounds"]:
+
+                    if last_balancer_status["term"] != latest_status["term"]:
+                        self.logger.info(
+                            "Detected change in repl set term while waiting for a balancer round "
+                            "before transitioning to dedicated CSRS. last term: %d, new term: %d",
+                            last_balancer_status["term"], latest_status["term"])
+                        last_balancer_status = latest_status
+                        time.sleep(1)
+                        continue
+
+                    if last_balancer_status["numBalancerRounds"] >= latest_status[
+                            "numBalancerRounds"]:
                         self.logger.info(
                             "Waiting for a balancer round before transition to dedicated. "
-                            "Initial round: %d, latest round: %d", self._initial_balancer_round,
+                            "Last round: %d, latest round: %d",
+                            last_balancer_status["numBalancerRounds"],
                             latest_status["numBalancerRounds"])
                         time.sleep(1)
                         continue
@@ -264,7 +276,7 @@ class _TransitionThread(threading.Thread):
                     self.logger.info(
                         "Done waiting for a balancer round before transition to dedicated")
                     self._should_wait_for_balancer_round = False
-                    self._initial_balancer_round = None
+                    last_balancer_status = None
 
                 res = self._client.admin.command({"transitionToDedicatedConfigServer": 1})
 
