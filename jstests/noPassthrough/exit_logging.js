@@ -89,7 +89,10 @@ if (_isAddressSanitizerActive()) {
 (function testMongos() {
     print("********************\nTesting exit logging in mongos\n********************");
 
-    var st = new ShardingTest({shards: 1});
+    var st = new ShardingTest({
+        shards: 1,
+        configOptions: {setParameter: {transactionLifetimeLimitSeconds: 10}},
+    });
     var mongosLauncher = {
         start: function(opts) {
             var actualOpts = {configdb: st._configDB};
