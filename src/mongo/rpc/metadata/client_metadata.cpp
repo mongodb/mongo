@@ -407,6 +407,10 @@ void ClientMetadata::logClientMetadata(Client* client) const {
         return;
     }
 
+    if (serverGlobalParams.quiet.load()) {
+        return;
+    }
+
     auto negotiatedCompressors =
         MessageCompressorManager::forSession(client->session()).getNegotiatedCompressors();
     std::vector<StringData> negotiatedCompressorNames(negotiatedCompressors.size());

@@ -154,6 +154,9 @@ inline Status makeShutdownTerminationStatus() {
  * If the document is not valid BSON, log at WARNING level.
  */
 void logClientMetadataDocument(const IngressSession& session) {
+    if (serverGlobalParams.quiet.load()) {
+        return;
+    }
     try {
         if (auto metadata = session.getClientMetadata()) {
             if (session.getRemoteClientId()) {
