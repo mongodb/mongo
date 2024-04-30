@@ -2373,6 +2373,45 @@ committed. However, this is safe because we do not allow rollbacks before the
   transaction. For a prepared transaction, we have the following guarantee: `prepareTimestamp` <=
   `commitTimestamp` <= `commit oplog entry timestamp`
 
+# Replication state transitions
+
+```mermaid
+  graph TD
+  STARTUP --> STARTUP2
+  STARTUP2 --> RECOVERING
+  RECOVERING --> SECONDARY
+  SECONDARY <-- election --> PRIMARY
+  PRIMARY --> REMOVED
+  PRIMARY -- [5] --> RECOVERING
+  SECONDARY <--> ROLLBACK
+  ROLLBACK --[7] --> RECOVERING
+  REMOVED -- [6] --> RECOVERING
+  SECONDARY -- [4] --> MAINTENANCE(MAINTENANCE #91;2#93;)
+  MAINTENANCE -- [3] --> SECONDARY
+  STARTUP --> ARBITER
+  ARBITER --> REMOVED
+  REMOVED <--> SECONDARY
+  ROLLBACK --> REMOVED
+  STARTUP --> REMOVED
+  REMOVED --> STARTUP2
+  UNKNOWN(UNKNOWN #91;1#93;)
+  DOWN(DOWN #91;1#93;)
+
+  %% The following are invisible links and nodes used for formatting:
+  REMOVED ~~~ UNKNOWN
+  REMOVED ~~~ DOWN
+  ROLLBACK ~~~ SPACER(" ") ~~~ REMOVED
+  style SPACER height:0px;
+```
+
+- **`[1]`**: A node can never be in that state. One node can consider another to be in that state.
+- **`[2]`**: Not an actual MemberState, RECOVERING + a [separate flag](https://github.com/10gen/mongo/blob/v8.0/src/mongo/db/repl/topology_coordinator.h#L1206)
+- **`[3]`**: With manual replSetMaintenance or when [switching sync source](https://github.com/10gen/mongo/blob/v8.0/src/mongo/db/repl/bgsync.cpp#L485-L486)
+- **`[4]`**: Too stale or manual replSetMaintenance
+- **`[5]`**: When stepping down with [\_hasOnlyAuthErrorUpHeartbeats(...) returning true](https://github.com/10gen/mongo/blob/v8.0/src/mongo/db/repl/topology_coordinator.cpp#L2737-L2739)
+- **`[6]`**: [Code in ReplicationCoordinatorImpl::\_startDataReplication](https://github.com/10gen/mongo/blob/v8.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L899-L900) allows it
+- **`[7]`**: For Rollback via Refetch (which is not used starting in 5.0), [here](https://github.com/10gen/mongo/blob/v8.0/src/mongo/db/repl/rs_rollback.cpp#L2026)
+
 # Non-replication subsystems dependent on replication state transitions.
 
 The replication machinery provides two different APIs for mongod subsystems to receive notifications
