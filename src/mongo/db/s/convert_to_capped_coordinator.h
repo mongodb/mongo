@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/s/convert_to_capped_coordinator_document_gen.h"
+#include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 
 namespace mongo {
@@ -67,6 +68,9 @@ public:
         cmdInfoBuilder->appendElements(_doc.getShardsvrConvertToCappedRequest().toBSON());
     };
 
+protected:
+    logv2::DynamicAttributes getCoordinatorLogAttrs() const override;
+
 private:
     StringData serializePhase(const Phase& phase) const override {
         return ConvertToCappedCoordinatorPhase_serializer(phase);
@@ -82,6 +86,22 @@ private:
                                   const CancellationToken& token) noexcept override;
 
     void _checkPreconditions(OperationContext* opCtx);
+
+    void _enterCriticalSectionOnDataShard(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token,
+        CriticalSectionBlockTypeEnum blockType);
+
+    void _exitCriticalSectionOnDataShard(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
+
+    void _performNoopRetryableWriteOnParticipantShardsAndConfigsvr(
+        OperationContext* opCtx,
+        const OperationSessionInfo& osi,
+        const std::shared_ptr<executor::TaskExecutor>& executor);
 
     const BSONObj _critSecReason;
 };

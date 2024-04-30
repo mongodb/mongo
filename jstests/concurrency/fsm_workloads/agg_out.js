@@ -169,13 +169,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * subsequent $out's to this collection should fail.
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
-        if (isMongos(db)) {
-            return;  // convertToCapped can't be run against a mongos.
-        }
         jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
         assert.commandWorkedOrFailedWithCode(
-            db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
-            ErrorCodes.MovePrimaryInProgress);
+            db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
+                ErrorCodes.MovePrimaryInProgress,
+                ErrorCodes.NamespaceNotFound,
+                ErrorCodes.NamespaceCannotBeSharded,
+            ]);
     };
 
     /**
@@ -188,8 +188,21 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         if (isMongos(db) && this.tid === 0) {
             jsTestLog(`Running shardCollection: coll=${this.outputCollName} key=${this.shardKey}`);
             assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-            assert.commandWorked(db.adminCommand(
-                {shardCollection: db[this.outputCollName].getFullName(), key: this.shardKey}));
+
+            try {
+                assert.commandWorked(db.adminCommand(
+                    {shardCollection: db[this.outputCollName].getFullName(), key: this.shardKey}));
+            } catch (e) {
+                const exceptionCode = e.code;
+                if (exceptionCode) {
+                    if (exceptionCode == ErrorCodes.InvalidOptions) {
+                        // Expected errors:
+                        // - `ErrorCodes.InvalidOptions`: Can't shard a capped collection.
+                        return;
+                    }
+                }
+                throw e;
+            }
         }
     };
 

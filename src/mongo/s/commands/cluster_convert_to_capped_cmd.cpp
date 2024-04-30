@@ -85,6 +85,10 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         const long long size = cmdObj.getField("size").safeNumberLong();
 
+        uassert(ErrorCodes::InvalidOptions,
+                "Capped collection size must be greater than zero",
+                size > 0);
+
         ShardsvrConvertToCappedRequest req;
         req.setSize(size);
 

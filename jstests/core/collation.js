@@ -1766,6 +1766,7 @@ if (!isMongos) {
 // Test that the collection created with the "cloneCollectionAsCapped" command inherits the
 // default collation of the corresponding collection. We skip running this command in a sharded
 // cluster because it isn't supported by mongos.
+// TODO SERVER-85773: Enale below test for sharded clusters.
 if (!isMongos) {
     const clonedColl = testDb.collation_cloned;
 

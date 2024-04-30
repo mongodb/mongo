@@ -32,17 +32,24 @@
 
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_util.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_state.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(convertToCappedFailBeforeCappingTheCollection);
+MONGO_FAIL_POINT_DEFINE(convertToCappedFailAfterCappingTheCollection);
 
 namespace {
 
@@ -68,38 +75,94 @@ void logConvertToCappedOnChangelog(OperationContext* opCtx,
                                            ShardingCatalogClient::kMajorityWriteConcern);
 }
 
+void convertToCappedOnShard(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            long long size,
+                            const ShardId& shardId,
+                            const UUID& targetUUID,
+                            const OperationSessionInfo& osi,
+                            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                            const CancellationToken& token) {
+    ShardsvrConvertToCappedParticipant request(nss);
+    request.setSize(size);
+    request.setTargetUUID(targetUUID);
+
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
+
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrConvertToCappedParticipant>>(
+        **executor, token, request, args);
+    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {shardId});
+}
 
 bool isCollectionCappedWithRequestedSize(OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         const long long size) {
-    const auto acquisition = acquireCollectionOrViewMaybeLockFree(
-        opCtx,
-        CollectionAcquisitionRequest(nss,
-                                     AcquisitionPrerequisites::kPretendUnsharded,
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kRead));
+                                         long long size,
+                                         const ShardId& shardId,
+                                         const UUID& expectedUUID) {
+    ListCollections listCollections;
+    listCollections.setDbName(nss.dbName());
 
-    // Since `convertToCapped`  internally calls `cloneCollectionAsCapped`, the error message
-    // mentions the latter (to keep the message consistent between RSs and sharded clusters)
-    uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "cloneCollectionAsCapped not supported for views: "
-                          << nss.toStringForErrorMsg(),
-            !acquisition.isView());
+    BSONObjBuilder filterBuilder;
+    expectedUUID.appendToBuilder(&filterBuilder, "info.uuid"_sd);
+    filterBuilder.append("name", nss.coll());
+    filterBuilder.append("options.capped", true);
+    filterBuilder.append("options.size", size);
+    listCollections.setFilter(filterBuilder.obj());
 
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "source collection " << nss.toStringForErrorMsg() << " does not exist",
-            acquisition.collectionExists());
+    const auto destinationShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 
-    const auto& coll = acquisition.getCollectionPtr();
-    return coll->isCapped() && (coll->getCappedMaxDocs() == size);
+    auto collectionResponse =
+        uassertStatusOK(destinationShard->runExhaustiveCursorCommand(
+                            opCtx,
+                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                            nss.dbName(),
+                            listCollections.toBSON({}),
+                            Seconds(30)))
+            .docs;
+
+    return !collectionResponse.empty();
 }
+
 
 }  // namespace
 
 void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
-    uassert(ErrorCodes::RequestAlreadyFulfilled,
-            str::stream() << "Collection " << toStringForLogging(nss()) << " already capped",
-            !isCollectionCappedWithRequestedSize(opCtx, nss(), _doc.getSize()));
+
+    // Preemptively check that the size will be correctly parsed by the subsequent convertToCapped
+    // request.
+    uassertStatusOK(CollectionOptions::checkAndAdjustCappedSize(_doc.getSize()));
+
+    {
+        const auto acquisition = acquireCollectionOrViewMaybeLockFree(
+            opCtx,
+            CollectionAcquisitionRequest(nss(),
+                                         AcquisitionPrerequisites::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead));
+
+        // Since `convertToCapped`  internally calls `cloneCollectionAsCapped`, the error message
+        // mentions the latter (to keep the message consistent between RSs and sharded clusters)
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                str::stream() << "cloneCollectionAsCapped not supported for views: "
+                              << nss().toStringForErrorMsg(),
+                !acquisition.isView());
+
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "source collection " << nss().toStringForErrorMsg()
+                              << " does not exist",
+                acquisition.collectionExists());
+
+        // Check if the collection is already capped. This check can entirely be done in the
+        // DBPrimary even if the collection lives on another shard since a valid collection metadata
+        // must exist always on the DBPrimary.
+        const auto& coll = acquisition.getCollectionPtr();
+        uassert(ErrorCodes::RequestAlreadyFulfilled,
+                str::stream() << "Collection " << toStringForLogging(nss()) << " already capped",
+                !(coll->isCapped() && (coll->getCappedMaxSize() == _doc.getSize())));
+    }
 
     const auto& [chunkManager, _] = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(opCtx,
@@ -112,22 +175,44 @@ void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
     if (chunkManager.hasRoutingTable()) {
         invariant(chunkManager.isUnsplittable());
 
-        uassert(ErrorCodes::IllegalOperation,
+        uassert(ErrorCodes::CommandNotSupportedOnView,
                 "Can't convert a timeseries collection to a capped collection",
                 !chunkManager.getTimeseriesFields());
 
-        const auto& selfShardId = ShardingState::get(opCtx)->shardId();
         std::set<ShardId> shards;
         chunkManager.getAllShardIds(&shards);
-
-        // TODO SERVER-85772: allow convertToCapped to work on unsplittable collections
-        // located outside the dbPrimary
-        uassert(ErrorCodes::IllegalOperation,
-                "Can't convert to capped a collection residing outside the primary shard",
-                *(shards.begin()) == selfShardId);
+        invariant(!shards.empty());
+        _doc.setDataShard(*(shards.begin()));
 
         _doc.setOriginalCollection(sharding_ddl_util::getCollectionFromConfigServer(opCtx, nss()));
+    } else {
+        // The collection is located on the DBPrimary if it's not tracked by the sharding catalog.
+        const auto& selfShardId = ShardingState::get(opCtx)->shardId();
+        _doc.setDataShard(selfShardId);
     }
+
+    // Compute and persist the targetUUID of the newly capped collection before sending
+    // the capped command to the dataShard. Make sure any existing collection has that UUID.
+    auto targetUUID = UUID::gen();
+    while (true) {
+        try {
+            const auto acquisition = acquireCollectionOrViewMaybeLockFree(
+                opCtx,
+                CollectionAcquisitionRequest(NamespaceStringOrUUID{nss().dbName(), targetUUID},
+                                             AcquisitionPrerequisites::kPretendUnsharded,
+                                             repl::ReadConcernArgs::get(opCtx),
+                                             AcquisitionPrerequisites::kRead));
+
+            if (acquisition.collectionExists()) {
+                targetUUID = UUID::gen();
+                continue;
+            }
+        } catch (const DBException&) {
+        }
+        break;
+    }
+
+    _doc.setTargetUUID(targetUUID);
 }
 
 ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
@@ -144,7 +229,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
             }
         })
         .then(_buildPhaseHandler(
-            Phase::kAcquireCriticalSection,
+            Phase::kAcquireCriticalSectionOnCoordinator,
             [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
@@ -164,34 +249,96 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (status == ErrorCodes::RequestAlreadyFulfilled) {
                 // If the collection is already capped, jump directly to the last phase
-                _enterPhase(Phase::kReleaseCriticalSection);
+                _enterPhase(Phase::kReleaseCriticalSectionOnCoordinator);
                 return Status::OK();
             };
 
             return status;
         })
         .then(_buildPhaseHandler(
-            Phase::kConvertCollectionToCapped,
+            Phase::kDropCollectionOnShardsNotOwningData,
+            [this, token, executor = executor, anchor = shared_from_this()] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+
+                if (_doc.getOriginalCollection().has_value()) {
+                    // Drop collection form any shard that is not db primary and does not owning
+                    // data (getting rid of possible stale incarnations due to SERVER-87010).
+                    std::vector<ShardId> participantsNotOwningData;
+
+                    auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+                    const auto& dataShardId = *_doc.getDataShard();
+                    const auto& selfShardId = ShardingState::get(opCtx)->shardId();
+                    for (const auto& shardId : allShards) {
+                        if (shardId != dataShardId && shardId != selfShardId) {
+                            participantsNotOwningData.push_back(shardId);
+                        }
+                    }
+
+                    const auto& session = getNewSession(opCtx);
+                    sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+                        opCtx,
+                        nss(),
+                        participantsNotOwningData,
+                        **executor,
+                        session,
+                        false /* fromMigrate */,
+                        false /* dropSystemCollections */,
+                        _doc.getOriginalCollection()->getUuid());
+                }
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kAcquireCriticalSectionOnDataShard,
+            [this, token, executor = executor, anchor = shared_from_this()] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+
+                if (*_doc.getDataShard() != ShardingState::get(opCtx)->shardId()) {
+                    _enterCriticalSectionOnDataShard(
+                        opCtx, executor, token, CriticalSectionBlockTypeEnum::kReadsAndWrites);
+                }
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kConvertCollectionToCappedOnDataShard,
             [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
                 logConvertToCappedOnChangelog(opCtx, nss(), _doc.getSize(), true /* start */);
 
-                try {
-                    convertToCapped(opCtx, nss(), _doc.getSize());
-                } catch (const DBException& ex) {
-                    if (!isCollectionCappedWithRequestedSize(opCtx, nss(), _doc.getSize())) {
-                        // The conversion to capped failed so there was no catalog change, it is
-                        // then safe to simply return the error to the router that will retry
-                        triggerCleanup(opCtx, ex.toStatus());
-                        MONGO_UNREACHABLE;
-                    }
+                if (MONGO_unlikely(convertToCappedFailBeforeCappingTheCollection.shouldFail())) {
+                    uasserted(ErrorCodes::InternalError,
+                              "Reproducing an error. This is part of a test.");
+                }
+                const auto& session = getNewSession(opCtx);
+                convertToCappedOnShard(opCtx,
+                                       nss(),
+                                       _doc.getSize(),
+                                       *_doc.getDataShard(),
+                                       *_doc.getTargetUUID(),
+                                       session,
+                                       executor,
+                                       token);
 
-                    // If the coordinator succeeded to convert the collection to capped, the
-                    // sharding catalog must be updated. Thus throw the error and rely on
-                    // _mustAlwaysMakeProgress that will always be true reached this phase.
-                    throw;
+                if (MONGO_unlikely(convertToCappedFailAfterCappingTheCollection.shouldFail())) {
+                    convertToCappedFailAfterCappingTheCollection.pauseWhileSet();
+                    uasserted(ErrorCodes::InternalError,
+                              "Reproducing an error. This is part of a test.");
+                }
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kConvertCollectionToCappedOnCoordinator,
+            [this, token, executor = executor, anchor = shared_from_this()] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+
+                // The collection must be updated also on the DBPrimary shard in case the
+                // dataShard is not the DBPrimary shard.
+                if (*_doc.getDataShard() != ShardingState::get(opCtx)->shardId()) {
+                    convertToCapped(opCtx, nss(), _doc.getSize(), *_doc.getTargetUUID());
                 }
             }))
         .then(_buildPhaseHandler(
@@ -200,9 +347,6 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
-
-                _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                    opCtx, getNewSession(opCtx), **executor);
 
                 const auto [localCollUuid, defaultCollator] = [&]() {
                     auto collection = acquireCollectionMaybeLockFree(
@@ -235,11 +379,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
 
                     auto createCollectionOnShardingCatalogOps = sharding_ddl_util::
                         getOperationsToCreateUnsplittableCollectionOnShardingCatalog(
-                            opCtx,
-                            nss(),
-                            localCollUuid,
-                            defaultCollator,
-                            ShardingState::get(opCtx)->shardId());
+                            opCtx, nss(), localCollUuid, defaultCollator, *(_doc.getDataShard()));
                     sharding_ddl_util::runTransactionWithStmtIdsOnShardingCatalog(
                         opCtx,
                         **executor,
@@ -255,8 +395,19 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 logConvertToCappedOnChangelog(
                     opCtx, nss(), _doc.getSize(), false /* end */, localCollUuid);
             }))
+        .then(_buildPhaseHandler(Phase::kReleaseCriticalSectionOnDataShard,
+                                 [this, token, executor = executor, anchor = shared_from_this()] {
+                                     auto opCtxHolder = cc().makeOperationContext();
+                                     auto* opCtx = opCtxHolder.get();
+                                     getForwardableOpMetadata().setOn(opCtx);
+
+                                     if (*_doc.getDataShard() !=
+                                         ShardingState::get(opCtx)->shardId()) {
+                                         _exitCriticalSectionOnDataShard(opCtx, executor, token);
+                                     }
+                                 }))
         .then(_buildPhaseHandler(
-            Phase::kReleaseCriticalSection,
+            Phase::kReleaseCriticalSectionOnCoordinator,
             [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
@@ -282,16 +433,54 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     ShardingCatalogClient::kMajorityWriteConcern,
                     true /* throwIfReasonDiffers */);
             }))
-        .onError([this, anchor = shared_from_this()](const Status& status) {
+        .onError([this, executor = executor, anchor = shared_from_this()](const Status& status) {
+            const auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
+
+            // If the convertToCapped command fails on the dataShard, not retry the operation if
+            // we can ensure the collection hasn't been capped.
+            if (_doc.getPhase() == Phase::kConvertCollectionToCappedOnDataShard) {
+                try {
+                    // Perform a noop write on the participant in order to advance the txnNumber
+                    // for this coordinator's lsid so that requests with older txnNumbers can no
+                    // longer execute.
+                    //
+                    // Additionally we want to wait for the completion of any ongoing command to
+                    // ensure that the subsequent check will see the correct status of the
+                    // collection.
+                    _performNoopRetryableWriteOnParticipantShardsAndConfigsvr(
+                        opCtx, getNewSession(opCtx), **executor);
+
+                    if (!isCollectionCappedWithRequestedSize(opCtx,
+                                                             nss(),
+                                                             _doc.getSize(),
+                                                             *_doc.getDataShard(),
+                                                             *_doc.getTargetUUID())) {
+                        // The conversion to capped failed so there was no catalog change, it is
+                        // then safe to simply return the error to the router that will retry
+                        triggerCleanup(opCtx, status);
+                        MONGO_UNREACHABLE;
+                    }
+                } catch (const DBException& e) {
+                    LOGV2_WARNING(8577202,
+                                  "Failed to check if the collection has been capped.",
+                                  logv2::DynamicAttributes{getCoordinatorLogAttrs(),
+                                                           "error"_attr = redact(e)});
+                }
+            }
+
+            // If the coordinator succeeded to convert the collection to capped and the collection
+            // is tracked, the sharding catalog must be updated. Thus throw the error and retry
+            // relying on _mustAlwaysMakeProgress that will always be true reached this phase.
             if (_mustAlwaysMakeProgress() || _isRetriableErrorForDDLCoordinator(status)) {
+                // Retry the operation.
                 return status;
             }
 
-            if (_doc.getPhase() >= Phase::kAcquireCriticalSection) {
-                const auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
+            if (_doc.getPhase() >= Phase::kAcquireCriticalSectionOnCoordinator) {
                 triggerCleanup(opCtx, status);
+                MONGO_UNREACHABLE;
             }
 
             return status;
@@ -304,7 +493,7 @@ bool ConvertToCappedCoordinator::_mustAlwaysMakeProgress() {
     // sharding catalog.
     const bool isCollectionTrackedOnTheShardingCatalog = _doc.getOriginalCollection().has_value();
     return isCollectionTrackedOnTheShardingCatalog &&
-        _doc.getPhase() >= Phase::kConvertCollectionToCapped;
+        _doc.getPhase() >= Phase::kConvertCollectionToCappedOnDataShard;
 }
 
 ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
@@ -317,7 +506,11 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
 
-            if (_doc.getPhase() >= Phase::kAcquireCriticalSection) {
+            if (_doc.getPhase() >= Phase::kAcquireCriticalSectionOnCoordinator) {
+                if (*_doc.getDataShard() != ShardingState::get(opCtx)->shardId()) {
+                    _exitCriticalSectionOnDataShard(opCtx, executor, token);
+                }
+
                 ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
                     opCtx,
                     nss(),
@@ -327,5 +520,68 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
             }
         });
 }
+
+void ConvertToCappedCoordinator::_enterCriticalSectionOnDataShard(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token,
+    CriticalSectionBlockTypeEnum blockType) {
+    ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
+    blockCRUDOperationsRequest.setBlockType(blockType);
+    blockCRUDOperationsRequest.setReason(_critSecReason);
+
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
+        **executor, token, blockCRUDOperationsRequest, args);
+    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {*_doc.getDataShard()});
+}
+
+void ConvertToCappedCoordinator::_exitCriticalSectionOnDataShard(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
+    unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
+    unblockCRUDOperationsRequest.setReason(_critSecReason);
+    unblockCRUDOperationsRequest.setClearFilteringMetadata(true);
+
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
+        **executor, token, unblockCRUDOperationsRequest, args);
+    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {*_doc.getDataShard()});
+}
+
+logv2::DynamicAttributes ConvertToCappedCoordinator::getCoordinatorLogAttrs() const {
+    return logv2::DynamicAttributes{getBasicCoordinatorAttrs(),
+                                    "size"_attr = _doc.getSize(),
+                                    "targetUUID"_attr = _doc.getTargetUUID()};
+}
+
+void ConvertToCappedCoordinator::_performNoopRetryableWriteOnParticipantShardsAndConfigsvr(
+    OperationContext* opCtx,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::TaskExecutor>& executor) {
+    const ShardId configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
+    const ShardId coordShardId = ShardingState::get(opCtx)->shardId();
+
+    tassert(8577203, "Data shard not found.", _doc.getDataShard());
+    const ShardId dataShard = *_doc.getDataShard();
+
+    std::vector<ShardId> participants;
+    participants.emplace_back(coordShardId);
+
+    if (configShard != coordShardId) {
+        participants.emplace_back(configShard);
+    }
+    if (dataShard != coordShardId && dataShard != configShard) {
+        participants.emplace_back(dataShard);
+    }
+    sharding_ddl_util::performNoopRetryableWriteOnShards(opCtx, participants, osi, executor);
+}
+
 
 }  // namespace mongo

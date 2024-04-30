@@ -133,6 +133,7 @@ const allCommands = {
     _shardsvrCoordinateMultiUpdate: {skip: isAnInternalCommand},
     _shardsvrCollMod: {skip: isPrimaryOnly},
     _shardsvrCollModParticipant: {skip: isAnInternalCommand},
+    _shardsvrConvertToCappedParticipant: {skip: isAnInternalCommand},
     _shardsvrParticipantBlock: {skip: isAnInternalCommand},
     _shardsvrCheckMetadataConsistency: {skip: isAnInternalCommand},
     _shardsvrCheckMetadataConsistencyParticipant: {skip: isAnInternalCommand},

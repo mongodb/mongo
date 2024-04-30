@@ -11,6 +11,7 @@
  *  # capped collections connot be sharded
  *  assumes_unsharded_collection,
  *  # cloneCollectionAsCapped command is not supported on mongos
+ *  # TODO: SERVER-85773 Remove assumes_against_mongod_not_mongos tag
  *  assumes_against_mongod_not_mongos,
  *  # cloneCollectionAsCapped (and capped collections) are not supported on serverless
  *  tenant_migration_incompatible,
@@ -23,24 +24,30 @@ let dest = db.capped_convertToCapped1_clone;
 source.drop();
 dest.drop();
 
-let N = 1000;
-
-for (let i = 0; i < N; ++i) {
+const numInitialDocs = 1000;
+for (let i = 0; i < numInitialDocs; ++i) {
     source.save({i: i});
 }
-assert.eq(N, source.count());
+assert.eq(numInitialDocs, source.count());
+assert(!source.isCapped());
+assert(!dest.isCapped());
 
 // should all fit
-let res = db.runCommand(
-    {cloneCollectionAsCapped: source.getName(), toCollection: dest.getName(), size: 100000});
-assert.commandWorked(res);
-assert.eq(source.count(), dest.count());
-assert.eq(N, source.count());  // didn't delete source
+assert.commandWorked(db.runCommand(
+    {cloneCollectionAsCapped: source.getName(), toCollection: dest.getName(), size: 100000}));
+assert(!source.isCapped());
+assert(dest.isCapped());
+assert.eq(numInitialDocs, dest.count());
+assert.eq(numInitialDocs, source.count());
 
 dest.drop();
+
 // should NOT all fit
+assert(!dest.isCapped());
 assert.commandWorked(db.runCommand(
     {cloneCollectionAsCapped: source.getName(), toCollection: dest.getName(), size: 1000}));
+assert(!source.isCapped());
+assert(dest.isCapped());
 
-assert.eq(N, source.count());  // didn't delete source
-assert.gt(source.count(), dest.count());
+assert.eq(numInitialDocs, source.count());
+assert.gt(numInitialDocs, dest.count());

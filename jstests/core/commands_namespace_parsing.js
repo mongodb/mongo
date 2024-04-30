@@ -264,6 +264,7 @@ assertFailsWithInvalidNamespacesForField(
 assertFailsWithInvalidNamespacesForField(
     "create", {create: ""}, isNotFullyQualified, isNotAdminCommand);
 
+// TODO SERVER-85773: Enale below test for sharded clusters.
 if (!runningOnMongos) {
     // Test cloneCollectionAsCapped fails with an invalid source collection name.
     assertFailsWithInvalidNamespacesForField(
@@ -277,13 +278,11 @@ if (!runningOnMongos) {
         {cloneCollectionAsCapped: "commands_namespace_parsing", toCollection: "", size: 1024},
         isNotFullyQualified,
         isNotAdminCommand);
-
-    // Test convertToCapped fails with an invalid collection name.
-    assertFailsWithInvalidNamespacesForField("convertToCapped",
-                                             {convertToCapped: "", size: 1024},
-                                             isNotFullyQualified,
-                                             isNotAdminCommand);
 }
+
+// Test convertToCapped fails with an invalid collection name.
+assertFailsWithInvalidNamespacesForField(
+    "convertToCapped", {convertToCapped: "", size: 1024}, isNotFullyQualified, isNotAdminCommand);
 
 // Test filemd5 fails with an invalid collection name.
 // Note: for this command, it is OK to pass 'root: ""', so do not use the helper function.
