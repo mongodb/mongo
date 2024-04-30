@@ -33,6 +33,7 @@
 #include <absl/meta/type_traits.h>
 #include <boost/none.hpp>
 #include <mutex>
+#include <shared_mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -72,33 +73,36 @@ public:
     };
 
     CSSAndLock* getOrCreate(const NamespaceString& nss) noexcept {
-        stdx::lock_guard<Latch> lg(_mutex);
-        auto it = _collections.find(nss);
-        if (it == _collections.end()) {
-            auto inserted = _collections.try_emplace(
-                nss, std::make_unique<CSSAndLock>(nss, _factory->make(nss)));
-            invariant(inserted.second);
-            it = std::move(inserted.first);
+        std::shared_lock lk(_mutex);  // NOLINT
+        if (auto it = _collections.find(nss); MONGO_likely(it != _collections.end())) {
+            return it->second.get();
         }
-
+        lk.unlock();
+        stdx::lock_guard writeLock(_mutex);
+        auto [it, _] =
+            _collections.emplace(nss, std::make_unique<CSSAndLock>(nss, _factory->make(nss)));
         return it->second.get();
     }
 
     void appendInfoForShardingStateCommand(BSONObjBuilder* builder) const {
-        BSONObjBuilder versionB(builder->subobjStart("versions"));
-
+        std::vector<CSSAndLock*> cssAndLocks;
         {
-            stdx::lock_guard<Latch> lg(_mutex);
+            std::shared_lock lk(_mutex);  // NOLINT
+            cssAndLocks.reserve(_collections.size());
             for (const auto& [_, cssAndLock] : _collections) {
-                cssAndLock->css->appendShardVersion(builder);
+                cssAndLocks.emplace_back(cssAndLock.get());
             }
         }
 
+        BSONObjBuilder versionB(builder->subobjStart("versions"));
+        for (auto cssAndLock : cssAndLocks) {
+            cssAndLock->css->appendShardVersion(builder);
+        }
         versionB.done();
     }
 
     std::vector<NamespaceString> getCollectionNames() const {
-        stdx::lock_guard lg(_mutex);
+        std::shared_lock lk(_mutex);  // NOLINT
         std::vector<NamespaceString> result;
         result.reserve(_collections.size());
         for (const auto& [nss, _] : _collections) {
@@ -110,7 +114,11 @@ public:
 private:
     std::unique_ptr<CollectionShardingStateFactory> _factory;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("CollectionShardingStateMap::_mutex");
+    // Adding entries to `_collections` is expected to be very infrequent and far apart (collection
+    // creation), so the majority of accesses to this map are read-only and benefit from using a
+    // shared mutex type for synchronization. The selected `std::shared_mutex` primitive prefers
+    // writers over readers so it is the appropriate choice for this use-case.
+    mutable std::shared_mutex _mutex;  // NOLINT
 
     // Entries of the _collections map must never be deleted or replaced. This is to guarantee that
     // a 'nss' is always associated to the same 'ResourceMutex'.
