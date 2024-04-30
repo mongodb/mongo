@@ -55,7 +55,7 @@ function testBinaryUpgradeWithRangePreviewCollection(upgradeConfig, fcvUpgradeSh
     assert.commandFailedWithCode(
         client.getDB().erunCommand({insert: "coll1", documents: [{_id: 1, field1: NumberInt(2)}]}),
         CRUDOnDeprecatedCollectionCode);
-    assert.commandFailedWithCode(client.getDB().runCommand({find: "coll1", filter: {}}),
+    assert.commandFailedWithCode(client.getDB().erunCommand({find: "coll1", filter: {}}),
                                  CRUDOnDeprecatedCollectionCode);
 
     // We should be able to drop the collection
