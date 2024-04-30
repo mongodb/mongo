@@ -237,4 +237,4 @@ globals:
   helloStatePrompt: true
   _validateMemberIndex: true
   help: true
-
+  retryOnRetryableError: true
