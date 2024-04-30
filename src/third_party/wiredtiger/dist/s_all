@@ -173,7 +173,7 @@ run --bg "s_include_guards" &
 # Wait for completion.
 if [[ -n "$ISTTY" ]]; then
     while J="$(echo `jobs -rp` | tr ' ' '|')" && [[ -n "$J" ]]; do
-        status "$(echo -n $'Running:'`ps -o ppid=,command= | egrep "^($J) " | egrep -o " s_\w*| \w*\.py" | sort`)"
+        status "$(echo -n $'Running:'`ps -o ppid=,command= | grep -E "^($J) " | grep -E -o " s_\w*| \w*\.py" | sort`)"
         sleep 0.2
     done
 fi

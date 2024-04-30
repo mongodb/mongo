@@ -14,7 +14,7 @@ l=$(
 
 # List of include files for source #defines.
 # Ignore the queue.h file, we don't use most of it.
-dl=$(ls -1 ../src/include/*.h ../src/include/*.in | fgrep -v queue.h)
+dl=$(ls -1 ../src/include/*.h ../src/include/*.in | grep -F -v queue.h)
 
 # If no source files or include files have changed there's nothing to do. Early exit the script
 [[ -z "$(echo "$l" | filter_if_fast ../)" && -z "$(echo "$dl" | filter_if_fast ../)" ]] && exit 0
@@ -30,7 +30,7 @@ search=`cat $dl |
     sed -e '/API configuration keys: BEGIN/,/API configuration keys: END/d' \
         -e '/configuration section: BEGIN/,/configuration section: END/d' \
         -e '/Statistics section: BEGIN/,/Statistics section: END/d' |
-    egrep '^#define' |
+    grep -E '^#define' |
     sed 's/#define[	 ][	 ]*\([A-Za-z_][A-Za-z0-9_]*\).*/\1/' |
     sort -u`
 

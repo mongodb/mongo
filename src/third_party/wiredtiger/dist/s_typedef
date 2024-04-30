@@ -31,7 +31,7 @@ build() {
 
     l=`ls ../src/include/*.h ../src/include/*.in |
         sed -e '/wiredtiger.*/d' -e '/queue.h/d'` || exit $?
-    egrep -h \
+    grep -E -h \
         '^[[:space:]]*(((struct|union)[[:space:]].*__wt_.*{)|WT_PACKED_STRUCT_BEGIN)' \
         $l |
         sed -e 's/WT_PACKED_STRUCT_BEGIN(\(.*\))/struct \1 {/' \
@@ -73,7 +73,7 @@ check() {
             -e d |
         sort -u`
     echo "$search"
-    fgrep -who "$search" $l
+    grep -F -who "$search" $l
     ) | sort | uniq -u > $t
 
     test -s $t && cat $t

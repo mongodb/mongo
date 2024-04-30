@@ -43,12 +43,12 @@ for f in "$@"; do
       ! expr "$f" : 'src/checksum.*' > /dev/null; then
 
         # Camel case style is not allowed.
-        if egrep -r -n '\b[a-z]+[A-Z]' $f | egrep -v ':[     ]+\*|"|UNCHECKED_STRING'; then
+        if grep -E -r -n '\b[a-z]+[A-Z]' $f | grep -E -v ':[     ]+\*|"|UNCHECKED_STRING'; then
             echo "$f: Styling requires variables that use underscores to separate parts of a name instead of camel casing.";
         fi
 
         # Return values should be wrapped in parentheses.
-        egrep -r -n '^[^*/"]*[[:space:]]*return [^(]' $f > $t;
+        grep -E -r -n '^[^*/"]*[[:space:]]*return [^(]' $f > $t;
         test -s $t && {
             echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
             echo 'Add parentheses to return values indicated below in file '"$f"
@@ -73,11 +73,11 @@ for f in "$@"; do
 
     # Finding paired typos in the comments of different file types and excluding invalid edge cases.
     if [ "${fname##*.}" = "py" ]; then
-        egrep '#.*[[:space:]]\b([a-zA-Z]+)[[:space:]]\b\1[[:space:]\.]' $f > $t
+        grep -E '#.*[[:space:]]\b([a-zA-Z]+)[[:space:]]\b\1[[:space:]\.]' $f > $t
     elif [ "${fname##*.}" = "c" ] || [ "${fname##*.}" = "h" ]; then
-        egrep '/?\*.*[[:space:]]\b([a-zA-Z]+)[[:space:]]\b\1[[:space:]\.]' $f | egrep -v -e "@" -e "long long" > $t
+        grep -E '/?\*.*[[:space:]]\b([a-zA-Z]+)[[:space:]]\b\1[[:space:]\.]' $f | grep -E -v -e "@" -e "long long" > $t
     else
-        egrep '[[:space:]]\b([a-zA-Z]+)[[:space:]]\b\1[[:space:]\.]' $f | egrep -v -e "@" -e "^\(" > $t
+        grep -E '[[:space:]]\b([a-zA-Z]+)[[:space:]]\b\1[[:space:]\.]' $f | grep -E -v -e "@" -e "^\(" > $t
     fi
 
     test -s $t && {
@@ -120,7 +120,7 @@ for f in "$@"; do
     fi
 
     if ! expr "$f" : 'src/include/queue\.h' > /dev/null &&
-        egrep 'STAILQ_|SLIST_|\bLIST_' $f ; then
+        grep -E 'STAILQ_|SLIST_|\bLIST_' $f ; then
         echo "$f: use TAILQ for all lists"
     fi
 
@@ -138,12 +138,12 @@ for f in "$@"; do
 
     if ! expr "$f" : 'examples/c/.*' > /dev/null &&
        ! expr "$f" : 'src/include/os.h' > /dev/null &&
-        egrep "%[0-9]*zu" $f | grep -v 'SIZET_FMT' > $t; then
+        grep -E "%[0-9]*zu" $f | grep -v 'SIZET_FMT' > $t; then
         echo "$f: %zu needs to be fixed for Windows"
         cat $t
     fi
 
-    egrep -w 'off_t' $f > $t
+    grep -E -w 'off_t' $f > $t
     test -s $t && {
         echo "$f: off_t type declaration, use wt_off_t"
         cat $t
@@ -156,7 +156,7 @@ for f in "$@"; do
     fi
 
     if ! expr "$f" : 'src/.*/os_setvbuf.c' > /dev/null &&
-        egrep -w 'setvbuf' $f > $t; then
+        grep -E -w 'setvbuf' $f > $t; then
         echo "$f: setvbuf call, use WiredTiger library replacements"
         cat $t
     fi
@@ -167,7 +167,7 @@ for f in "$@"; do
        ! expr "$f" : '.*cpp' > /dev/null &&
        ! expr "$f" : 'ext/*' > /dev/null &&
        ! expr "$f" : 'src/os_posix/os_snprintf.c' > /dev/null &&
-        egrep '[^a-z_]snprintf\(|[^a-z_]vsnprintf\(' $f > $t; then
+        grep -E '[^a-z_]snprintf\(|[^a-z_]vsnprintf\(' $f > $t; then
         echo "$f: snprintf call, use WiredTiger library replacements"
         cat $t
     fi
@@ -175,7 +175,7 @@ for f in "$@"; do
     # If we don't have matching pack-begin and pack-end calls, we don't get
     # an error, we just get a Windows performance regression. Using awk and
     # not wc to ensure there's no whitespace in the assignment.
-    egrep WT_PACKED_STRUCT $f > $t
+    grep -E WT_PACKED_STRUCT $f > $t
     cnt=`awk 'BEGIN { line = 0 } { ++line } END { print line }' < $t`
     test `expr "$cnt" % 2` -ne 0 && {
         echo "$f: mismatched WT_PACKED_STRUCT_BEGIN/END lines"
@@ -191,20 +191,20 @@ for f in "$@"; do
        ! expr "$f" : 'test/.*' > /dev/null; then
         if ! expr "$f" : '.*/os_alloc.c' > /dev/null &&
            ! expr "$f" : '.*/util_misc.c' > /dev/null &&
-             egrep '[[:space:]]free[(]|[[:space:]]strdup[(]|[[:space:]]strndup[(]|[[:space:]]malloc[(]|[[:space:]]calloc[(]|[[:space:]]realloc[(]|[[:space:]]sprintf[(]' $f > $t; then
+             grep -E '[[:space:]]free[(]|[[:space:]]strdup[(]|[[:space:]]strndup[(]|[[:space:]]malloc[(]|[[:space:]]calloc[(]|[[:space:]]realloc[(]|[[:space:]]sprintf[(]' $f > $t; then
             test -s $t && {
                 echo "$f: call to illegal function"
                 cat $t
             }
         fi
         if ! expr "$f" : '.*/os_strtouq.c' > /dev/null &&
-             egrep '[[:space:]]strtouq[(]' $f > $t; then
+             grep -E '[[:space:]]strtouq[(]' $f > $t; then
             test -s $t && {
                 echo "$f: call to illegal function"
                 cat $t
             }
         fi
-        if egrep '[[:space:]]exit[(]' $f > $t; then
+        if grep -E '[[:space:]]exit[(]' $f > $t; then
             test -s $t && {
                 echo "$f: call to illegal function"
                 cat $t
@@ -219,7 +219,7 @@ for f in "$@"; do
        ! expr "$f" : 'ext/.*' > /dev/null; then
        # This regex can return false positives on functions that take ret as
        # an argument. Filter out matches that contain brackets.
-        egrep -w ret $f | egrep 'int.*[, ]ret[,;]' | egrep -v '[()]' > $t
+        grep -E -w ret $f | grep -E 'int.*[, ]ret[,;]' | grep -E -v '[()]' > $t
         test -s $t && {
             echo "$f: explicit declaration of \"ret\""
             cat $t
@@ -234,7 +234,7 @@ for f in "$@"; do
        ! expr "$f" : '.*py' > /dev/null &&
        ! expr "$f" : '.*cpp' > /dev/null &&
        ! expr "$f" : 'src/include/ctype.i' > /dev/null; then
-        if egrep '(#include.*["</]ctype.h[">]|\b(is(alnum|alpha|cntrl|digit|graph|lower|print|punct|space|upper|xdigit)|to(lower|toupper))\()' $f > $t; then
+        if grep -E '(#include.*["</]ctype.h[">]|\b(is(alnum|alpha|cntrl|digit|graph|lower|print|punct|space|upper|xdigit)|to(lower|toupper))\()' $f > $t; then
             test -s $t && {
                 echo "$f: direct use of ctype.h functions, instead of ctype.i equivalents"
                 cat $t

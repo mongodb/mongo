@@ -57,7 +57,7 @@ The next step is to examine the complete format operation. For example, to find 
 the update at timestamp [1641602399:300014], you can grep for the operation ID. Note that threads
 use the same operation numbers, so you should grep for the session ID followed by the operation ID:
 
-    % egrep '0x7fa221ffb700.*: 224868' LOG
+    % grep -E '0x7fa221ffb700.*: 224868' LOG
     [1641602399:299982][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 begin snapshot read-ts=1797649 (not repeatable)
     [1641602399:300000][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 table:wt: reserve 1063233
     [1641602399:300014][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 table:wt: update 1063233 {0x5e}

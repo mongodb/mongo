@@ -22,7 +22,7 @@ l=$(
     sed -e '/^$/d' -e '/^#/d' < s_funcs.list
 
     # Get the list of functions
-    search=`egrep -h '^[a-zA-Z0-9_][a-zA-Z0-9_]*\(' $l | sed -e 's/(.*//' | sort -u`
+    search=`grep -E -h '^[a-zA-Z0-9_][a-zA-Z0-9_]*\(' $l | sed -e 's/(.*//' | sort -u`
 
     # Print the list of functions, followed by the occurrences: we're looking for
     # functions that only appear once
@@ -35,6 +35,6 @@ l=$(
     wait
     cat $t-par-*.out
 
-} | egrep -v '^__ut_' | sort | uniq -u
+} | grep -E -v '^__ut_' | sort | uniq -u
 
 exit 0

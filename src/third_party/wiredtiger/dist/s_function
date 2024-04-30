@@ -36,7 +36,7 @@ for f in "$@"; do
     # where there's a jump to the error label after the error label.
     {
         echo "$fp" |
-        egrep '(WT_ERR[_A-Z]*)\(.*(WT_RET[_A-Z]*)\(.*err:|[^a-z_]err:.*(WT_ERR)\(' |
+        grep -E '(WT_ERR[_A-Z]*)\(.*(WT_RET[_A-Z]*)\(.*err:|[^a-z_]err:.*(WT_ERR)\(' |
         sed 's/:.*//' > $t-1
 
         test -s $t-1 && {
@@ -51,7 +51,7 @@ for f in "$@"; do
         echo "$fp" |
         sed "s=^=$f:=" |
         python3 dist/s_function_loop.py |
-            egrep '\{@[^@]*(WT_RET[_A-Z]*)\([^@]*(WT_ERR[_A-Z]*)\(.*err:' |
+            grep -E '\{@[^@]*(WT_RET[_A-Z]*)\([^@]*(WT_ERR[_A-Z]*)\(.*err:' |
             sed -e 's/^\([^:]*\): *\([^:]*\):.*/\1:\2: mix of returns and jump to the error label within a loop/'
     }
 
@@ -70,8 +70,8 @@ for f in "$@"; do
     # Return of 0 in functions after a jump to the error label.
     {
         echo "$fp" |
-        egrep -v '[^a-z_]err:.*return \(ret|[^a-z_]err:.*WT_RET' |
-        egrep '[^a-z_]err:.*return \(0\);' |
+        grep -E -v '[^a-z_]err:.*return \(ret|[^a-z_]err:.*WT_RET' |
+        grep -E '[^a-z_]err:.*return \(0\);' |
         sed 's/:.*//' > $t-3
 
         test -s $t-3 && {
@@ -88,14 +88,14 @@ for f in "$@"; do
             -e '/WT_TRACK_OP_INIT/,/WT_TRACK_OP_END/{=;p;}' \
             -e '/va_start/,/va_end/{=;p;}' $f | \
             sed 'N;s/\n/:/' | \
-            egrep -w 'return;|return \(|WT_RET' | \
+            grep -E -w 'return;|return \(|WT_RET' | \
             sed -e "s,^,$f:," -e 's/$/ [return skips matching end call]/'
     }
 
     # API_END with a return
     {
         echo "$fp" |
-        egrep '[^A-Z_]API_END.*return' |
+        grep -E '[^A-Z_]API_END.*return' |
         sed 's/:.*//' > $t-4
         test -s $t-4 && {
             echo "$f: API_END followed by return."
@@ -106,7 +106,7 @@ for f in "$@"; do
     # S2C with a local WT_CONNECTION_IMPL variable.
     {
         echo "$fp" |
-        egrep 'conn = S2C.*S2C' |
+        grep -E 'conn = S2C.*S2C' |
         sed 's/:.*//' > $t-5
         test -s $t-5 && {
             echo "$f: S2C with a local WT_CONNECTION_IMPL variable."
@@ -117,7 +117,7 @@ for f in "$@"; do
     # S2B with a local WT_BTREE variable.
     {
         echo "$fp" |
-        egrep 'btree = S2B.*S2B' |
+        grep -E 'btree = S2B.*S2B' |
         sed 's/:.*//' > $t-6
         test -s $t-6 && {
             echo "$f: S2B with a local WT_BTREE variable."
@@ -137,7 +137,7 @@ for f in "$@"; do
     # WT_STRING_MATCH or WT_CONFIG_MATCH with a literal string.
     {
         echo "$fp" |
-        egrep 'WT_(STRING|CONFIG)_MATCH *\( *"' |
+        grep -E 'WT_(STRING|CONFIG)_MATCH *\( *"' |
         sed 's/:.*//' > $t-8
         test -s $t-8 && {
             echo "$f: WT_{STRING|CONFIG}_MATCH used with a literal string," \
