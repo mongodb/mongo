@@ -38,7 +38,7 @@ var $config = (function() {
             // Can't assert much in particular about the results.
             assert.gte(cursor.itcount(), 0);
         } catch (e) {
-            if (e.code === 6579000) {
+            if (e.code === ErrorCodes.QueryFeatureNotAllowed) {
                 // This means query stats is disabled, which is expected to happen in this workload.
                 return;
             }
