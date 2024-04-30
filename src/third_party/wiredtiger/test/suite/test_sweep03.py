@@ -123,7 +123,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor.close()
 
         # We force the drop in this case to confirm that the handle is closed
-        self.session.drop(drop_uri, "force=true")
+        self.dropUntilSuccess(self.session, drop_uri, "force=true")
 
         sweep_baseline = self.wait_for_sweep(sweep_baseline)
 

@@ -66,7 +66,11 @@ class test_cursor06(wttest.WiredTigerTestCase):
     def test_reconfigure_overwrite(self):
         uri = self.type + self.name
         for open_config in (None, "overwrite=0", "overwrite=1"):
-            self.session.drop(uri, "force")
+            if open_config == None:
+                # The first time it has not been created yet so use force.
+                self.dropUntilSuccess(self.session, uri, "force")
+            else:
+                self.dropUntilSuccess(self.session, uri)
             self.populate(uri)
             cursor = self.ds.open_cursor(uri, None, open_config)
             if open_config != "overwrite=0":
@@ -85,7 +89,11 @@ class test_cursor06(wttest.WiredTigerTestCase):
     def test_reconfigure_readonly(self):
         uri = self.type + self.name
         for open_config in (None, "readonly=0", "readonly=1"):
-            self.session.drop(uri, "force")
+            if open_config == None:
+                # The first time it has not been created yet so use force.
+                self.dropUntilSuccess(self.session, uri, "force")
+            else:
+                self.dropUntilSuccess(self.session, uri)
             self.populate(uri)
             cursor = self.ds.open_cursor(uri, None, open_config)
             msg = '/Unsupported cursor/'

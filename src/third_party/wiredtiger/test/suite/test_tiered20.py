@@ -80,7 +80,7 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
                 self.assertTrue(len(got) != 0)
             self.session.drop(uri, "remove_files=true,remove_shared={}".format(wt_boolean(remove_shared)))
         else:
-            self.session.drop(uri, "force=true")
+            self.dropUntilSuccess(self.session, uri, "force=true")
 
     # Return True iff the binary file contains the given string.
     def file_contains(self, fname, match):
