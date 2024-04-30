@@ -12,11 +12,13 @@ cd src
 set -o verbose
 set -o errexit
 if [ "${is_commit_queue}" = "true" ]; then
-  # Since `commit_message` is an evergreen expansion, we need a way to ensure we
-  # properly deal with any special characters that could cause issues (like "). To
+  # Fetch the gitlog from the last merge commit to HEAD, which is guaranteed
+  # to be the commit message of the PR.
+  gitlog=$(git log --pretty=format:'%s' v5.0-test-merge-queue...HEAD 2>&1)
+  # In case there are any special characters that could cause issues (like "). To
   # do this, we will write it out to a file, then read that file into a variable.
   cat > commit_message.txt << END_OF_COMMIT_MSG
-${commit_message}
+${gitlog}
 END_OF_COMMIT_MSG
 
   commit_message_content=$(cat commit_message.txt)
