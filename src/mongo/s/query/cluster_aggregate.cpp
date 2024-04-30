@@ -312,10 +312,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
 
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
-        query_stats::registerRequest(opCtx, executionNss, [&]() {
-            return std::make_unique<query_stats::AggKey>(
-                request, *pipeline, expCtx, involvedNamespaces, executionNss);
-        });
+        query_stats::registerRequest(
+            opCtx,
+            executionNss,
+            [&]() {
+                return std::make_unique<query_stats::AggKey>(
+                    request, *pipeline, expCtx, involvedNamespaces, executionNss);
+            },
+            hasChangeStream);
     }
     return pipeline;
 }
@@ -595,6 +599,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         if (expCtx->explain) {
             explain_common::appendIfRoom(
                 aggregation_request_helper::serializeToCommandObj(request), "command", result);
+            collectQueryStatsMongos(opCtx,
+                                    std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
         }
     }
     return status;

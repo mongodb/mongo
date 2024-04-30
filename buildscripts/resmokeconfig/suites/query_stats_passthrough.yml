@@ -14,9 +14,6 @@ selector:
   exclude_files:
   # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests.
   - jstests/core/txns/**/*.js
-  - jstests/core/views/invalid_system_views.js # TODO SERVER-78025 reenable coverage on this test
-  # Queryable encryption is not supported on standalone
-  - jstests/core/queryable_encryption/**/*.js
   - jstests/core/timeseries/timeseries_union_with.js
   exclude_with_any_tags:
   # Running $queryStats will increment these counters which can screw up some test assertions.

@@ -107,6 +107,9 @@ public:
     boost::optional<uint32_t> getQueryHash() const final;
 
     boost::optional<std::size_t> getQueryStatsKeyHash() const final;
+
+    bool getQueryStatsWillNeverExhaust() const final;
+
     /**
      * Returns false unless the mock cursor has been fully iterated.
      */
@@ -117,7 +120,7 @@ public:
      */
     void queueError(Status status);
 
-    std::unique_ptr<query_stats::Key> getKey() final;
+    std::unique_ptr<query_stats::Key> takeKey() final;
 
 private:
     bool _killed = false;

@@ -151,6 +151,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
       _queryStatsKeyHash(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.keyHash),
       _queryStatsKey(std::move(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.key)),
+      _queryStatsWillNeverExhaust(
+          CurOp::get(operationUsingCursor)->debug().queryStatsInfo.willNeverExhaust),
       _opKey(operationUsingCursor->getOperationKey()) {
     invariant(_exec);
     invariant(_operationUsingCursor);
@@ -182,14 +184,14 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
         return;
     }
 
-    if (_queryStatsKeyHash && opCtx) {
-        query_stats::writeQueryStats(opCtx,
-                                     _queryStatsKeyHash,
-                                     std::move(_queryStatsKey),
-                                     _metrics.executionTime.value_or(Microseconds{0}).count(),
-                                     _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
-                                     _metrics.nreturned.value_or(0));
-    }
+    query_stats::writeQueryStatsOnCursorDisposeOrKill(
+        opCtx,
+        _queryStatsKeyHash,
+        std::move(_queryStatsKey),
+        _queryStatsWillNeverExhaust,
+        _metrics.executionTime.value_or(Microseconds{0}).count(),
+        _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
+        _metrics.nreturned.value_or(0));
 
     if (now) {
         incrementCursorLifespanMetric(_createdDate, *now);
@@ -404,6 +406,22 @@ void startClientCursorMonitor() {
 
 void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCursor) {
     pinnedCursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
+
+    // For a change stream query, we want to collect and update query stats on the initial query and
+    // for every getMore.
+    // TODO SERVER-89058 Modify comment to include tailable cursors.
+    if (pinnedCursor->getQueryStatsWillNeverExhaust()) {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+
+        int64_t execTime = opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count();
+        query_stats::writeQueryStats(opCtx,
+                                     opDebug.queryStatsInfo.keyHash,
+                                     pinnedCursor->takeKey(),
+                                     execTime,
+                                     execTime,
+                                     opDebug.additiveMetrics.nreturned.value_or(0),
+                                     pinnedCursor->getQueryStatsWillNeverExhaust());
+    }
 }
 
 void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stats::Key> key) {

@@ -37,25 +37,20 @@ AggCmdShapeComponents::AggCmdShapeComponents(
     const AggregateCommandRequest& aggRequest,
     stdx::unordered_set<NamespaceString> involvedNamespaces_,
     std::vector<BSONObj> pipeline)
-    :  // {explain : true} in an aggregate command sets the verbosity of explain to 'kQueryPlanner'.
-       // {explain: false} never sets explain so we can't include this input in the shape.
-      explain(aggRequest.getExplain().has_value() ? OptionalBool(true) : OptionalBool(boost::none)),
-      allowDiskUse(aggRequest.getAllowDiskUse()),
+    : allowDiskUse(aggRequest.getAllowDiskUse()),
       involvedNamespaces(std::move(involvedNamespaces_)),
       representativePipeline(std::move(pipeline)) {}
 
 AggCmdShapeComponents::AggCmdShapeComponents(
-    OptionalBool explain,
     OptionalBool allowDiskUse,
     stdx::unordered_set<NamespaceString> involvedNamespaces_,
     std::vector<BSONObj> pipeline)
-    : explain(explain),
-      allowDiskUse(allowDiskUse),
+    : allowDiskUse(allowDiskUse),
       involvedNamespaces(std::move(involvedNamespaces_)),
       representativePipeline(std::move(pipeline)) {}
 
 void AggCmdShapeComponents::HashValue(absl::HashState state) const {
-    state = absl::HashState::combine(std::move(state), explain, allowDiskUse);
+    state = absl::HashState::combine(std::move(state), allowDiskUse);
     for (auto&& shapifiedStage : representativePipeline) {
         state = absl::HashState::combine(std::move(state), simpleHash(shapifiedStage));
     }
@@ -80,10 +75,8 @@ void AggCmdShape::appendLetCmdSpecificShapeComponents(
         expCtx->addResolvedNamespaces(_components.involvedNamespaces);
         auto reparsed = Pipeline::parse(_components.representativePipeline, expCtx);
         auto serializedPipeline = reparsed->serializeToBson(opts);
-        AggCmdShapeComponents{_components.explain,
-                              _components.allowDiskUse,
-                              _components.involvedNamespaces,
-                              serializedPipeline}
+        AggCmdShapeComponents{
+            _components.allowDiskUse, _components.involvedNamespaces, serializedPipeline}
             .appendTo(bob);
     }
 }
@@ -93,10 +86,6 @@ void AggCmdShapeComponents::appendTo(BSONObjBuilder& bob) const {
 
     // pipeline
     bob.append(AggregateCommandRequest::kPipelineFieldName, representativePipeline);
-
-    // explain
-    if (explain.has_value())
-        bob.append(AggregateCommandRequest::kExplainFieldName, bool(explain));
 
     // allowDiskUse
     if (allowDiskUse.has_value()) {

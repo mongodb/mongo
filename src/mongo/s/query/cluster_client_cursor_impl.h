@@ -119,7 +119,9 @@ public:
 
     boost::optional<std::size_t> getQueryStatsKeyHash() const final;
 
-    std::unique_ptr<query_stats::Key> getKey() final;
+    bool getQueryStatsWillNeverExhaust() const final;
+
+    std::unique_ptr<query_stats::Key> takeKey() final;
 
 public:
     /**
@@ -181,6 +183,8 @@ private:
 
     // The Key used by query stats to generate the query stats store key.
     std::unique_ptr<query_stats::Key> _queryStatsKey;
+
+    bool _queryStatsWillNeverExhaust = false;
 
     // Tracks if kill() has been called on the cursor. Multiple calls to kill() are treated as a
     // noop.

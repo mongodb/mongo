@@ -228,9 +228,20 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWithMultipleBoundaryValues) {
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
 
+/*
+ * Override the stub interface to allow full execution in these tests.
+ */
+class ExecutableStubMongoProcessInterface : public StubMongoProcessInterface {
+    bool isExpectedToExecuteQueries() override {
+        return true;
+    }
+};
+
 class InvalidBucketSpec : public AggregationContextFixture {
 public:
     list<intrusive_ptr<DocumentSource>> createBucket(BSONObj bucketSpec) {
+        getExpCtx()->mongoProcessInterface =
+            std::make_unique<ExecutableStubMongoProcessInterface>();
         auto sources = DocumentSourceBucket::createFromBson(bucketSpec.firstElement(), getExpCtx());
         return sources;
     }

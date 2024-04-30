@@ -81,7 +81,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
-      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)) {
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
+      _queryStatsWillNeverExhaust(CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -100,7 +101,9 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
-      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)) {
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
+      _queryStatsWillNeverExhaust(
+          std::move(CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -144,14 +147,14 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
         return;
     }
 
-    if (_queryStatsKeyHash && opCtx) {
-        query_stats::writeQueryStats(opCtx,
-                                     _queryStatsKeyHash,
-                                     std::move(_queryStatsKey),
-                                     _metrics.executionTime.value_or(Microseconds{0}).count(),
-                                     _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
-                                     _metrics.nreturned.value_or(0));
-    }
+    query_stats::writeQueryStatsOnCursorDisposeOrKill(
+        opCtx,
+        _queryStatsKeyHash,
+        std::move(_queryStatsKey),
+        _queryStatsWillNeverExhaust,
+        _metrics.executionTime.value_or(Microseconds{0}).count(),
+        _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
+        _metrics.nreturned.value_or(0));
 
     _root->kill(opCtx);
     _hasBeenKilled = true;
@@ -247,6 +250,10 @@ boost::optional<std::size_t> ClusterClientCursorImpl::getQueryStatsKeyHash() con
     return _queryStatsKeyHash;
 }
 
+bool ClusterClientCursorImpl::getQueryStatsWillNeverExhaust() const {
+    return _queryStatsWillNeverExhaust;
+}
+
 APIParameters ClusterClientCursorImpl::getAPIParameters() const {
     return _params.apiParameters;
 }
@@ -287,7 +294,7 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     return root;
 }
 
-std::unique_ptr<query_stats::Key> ClusterClientCursorImpl::getKey() {
+std::unique_ptr<query_stats::Key> ClusterClientCursorImpl::takeKey() {
     return std::move(_queryStatsKey);
 }
 }  // namespace mongo

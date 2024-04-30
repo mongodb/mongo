@@ -972,7 +972,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
         shapified);
 
     // Add the fields that shouldn't be abstracted.
-    acr.setExplain(ExplainOptions::Verbosity::kExecStats);
     acr.setAllowDiskUse(false);
     acr.setHint(BSON("z" << 1 << "c" << 1));
     acr.setCollation(BSON("locale"
@@ -1033,7 +1032,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "collectionType": "collection",
@@ -1109,7 +1107,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "collectionType": "collection",
@@ -1188,7 +1185,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "comment": "?string",
@@ -1219,8 +1215,12 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                     "locale": "simple"
                 },
                 "let": {
-                    "HASH<var1>": "?",
-                    "HASH<var2>": "?"
+                    "HASH<var1>": {
+                        "$const": "?"
+                    },
+                    "HASH<var2>": {
+                        "$const": "?"
+                    }
                 },
                 "command": "aggregate",
                 "pipeline": [
@@ -1254,7 +1254,9 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                                 "$first": "$HASH<d>.HASH<e>"
                             },
                             "HASH<f>": {
-                                "$sum": 1
+                                "$sum": {
+                                    "$const": 1
+                                }
                             }
                         }
                     },
@@ -1268,7 +1270,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "comment": "?",

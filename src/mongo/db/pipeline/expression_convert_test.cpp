@@ -156,8 +156,8 @@ TEST_F(ExpressionConvertTest, RoundTripSerialization) {
 
     auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
     auto serialized = convertExp->serialize(opts);
-    ASSERT_VALUE_EQ(Value(BSON("$convert" << BSON("input" << BSON("?"
-                                                                  << "?")
+    ASSERT_VALUE_EQ(Value(BSON("$convert" << BSON("input" << BSON("$const" << BSON("?"
+                                                                                   << "?"))
                                                           << "to"
                                                           << BSON("$const"
                                                                   << "string")))),
