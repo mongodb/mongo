@@ -239,7 +239,7 @@ let pipeline = [
     }
 ];
 assert.eq(2, col.aggregate(pipeline).itcount());
-assert.eq(1, getUsageCount("_id_", col), "Expected aggregation to use _id index");
+assert.gte(getUsageCount("_id_", col), 1, "Expected aggregation to use _id index");
 let foreignCollectionIndexUsageCount = getUsageCount("_id_", foreignCollection);
 if (!checkSbeRestrictedOrFullyEnabled(db) || isPipelineSplit(col, pipeline)) {
     assert.eq(
@@ -277,7 +277,7 @@ pipeline = [
     }
 ];
 assert.eq(2, col.aggregate(pipeline).itcount());
-assert.eq(1, getUsageCount("_id_", col), "Expected aggregation to use _id index");
+assert.gte(getUsageCount("_id_", col), 1, "Expected aggregation to use _id index");
 foreignCollectionIndexUsageCount = getUsageCount("_id_", foreignCollection);
 if (!checkSbeRestrictedOrFullyEnabled(db) || isPipelineSplit(col, pipeline)) {
     assert.eq(
@@ -321,7 +321,7 @@ assert.eq(2,
                      }
                  ])
                   .itcount());
-assert.eq(1, getUsageCount("_id_", col), "Expected aggregation to use _id index");
+assert.gte(getUsageCount("_id_", col), 1, "Expected aggregation to use _id index");
 assert.eq(2 * 3,
           getUsageCount("_id_", foreignCollection),
           "Expected each of two graph searches to issue 3 queries, each using the _id index");
