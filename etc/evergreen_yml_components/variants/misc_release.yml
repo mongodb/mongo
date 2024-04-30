@@ -2308,11 +2308,18 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    # Diagnostic latches are disabled by default, and we match that behavior here. We also need to
+    # exclude tests with 'requires_latch_analyzer'.
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     test_flags: >-
       --mongodSetParameters="{featureFlagSbeFull: true}"
-      --excludeWithAnyTags=resource_intensive,incompatible_with_amazon_linux,sbe_incompatible
+      --excludeWithAnyTags=resource_intensive,incompatible_with_amazon_linux,sbe_incompatible,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2
     multiversion_edition: enterprise
