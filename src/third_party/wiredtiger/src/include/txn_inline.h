@@ -1891,15 +1891,13 @@ __wt_upd_value_assign(WT_UPDATE_VALUE *upd_value, WT_UPDATE *upd)
         upd_value->tw.durable_stop_ts = upd->durable_ts;
         upd_value->tw.stop_ts = upd->start_ts;
         upd_value->tw.stop_txn = upd->txnid;
-        upd_value->tw.prepare =
-          prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED;
     } else {
         upd_value->tw.durable_start_ts = upd->durable_ts;
         upd_value->tw.start_ts = upd->start_ts;
         upd_value->tw.start_txn = upd->txnid;
-        upd_value->tw.prepare =
-          prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED;
     }
+    upd_value->tw.prepare =
+      prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED;
     upd_value->type = upd->type;
 }
 
