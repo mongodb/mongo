@@ -380,7 +380,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
                                 const ExtensionsCallback* extensionsCallback,
                                 MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                                 DocumentParseLevel currentLevel,
-                                bool acceptsDollarPrefixedFieldName = false) {
+                                const BSONObj& parentObj = BSONObj()) {
     auto root = std::make_unique<AndMatchExpression>(createAnnotation(expCtx, "$and", BSONObj()));
 
     const DocumentParseLevel nextLevel = (currentLevel == DocumentParseLevel::kPredicateTopLevel)
@@ -406,13 +406,17 @@ StatusWithMatchExpression parse(const BSONObj& obj,
 
                     expCtx->incrementMatchExprCounter(e.fieldNameStringData());
                     continue;
-                } else if (!acceptsDollarPrefixedFieldName) {
+                } else if (parentObj.toString().find("$_internalSchema") == std::string::npos) {
+                    // Only return error if the input is not the parsed form of a $jsonSchema
+                    // MatchExpression. It is legal to have dollar-prefixed field paths that are the
+                    // same as MQL keywords ($or, $and, $nor, etc.). If this is the case, we will
+                    // disregard the corresponding operator's parser and simply treat the
+                    // BSONElement as a regular field path.
+                    // TODO SERVER-89844: Make $jsonSchema with dollar fields in all keyword fields
+                    // reparseable.
                     return parsedExpression;
                 }
-                // It is legal to have dollar-prefixed field paths that are the same as MQL keywords
-                // ($or, $and, $nor, etc.). If this is the case, we will disregard the corresponding
-                // operator's parser and simply treat the BSONElement as a regular field path.
-            } else if (!acceptsDollarPrefixedFieldName) {
+            } else if (parentObj.toString().find("$_internalSchema") == std::string::npos) {
                 // If the field is dollar-prefixed and not an operator, error if the current
                 // expression doesn't support dollar-prefixed field paths.
                 std::string hint = "";
@@ -1348,24 +1352,12 @@ StatusWithMatchExpression parseTreeTopLevel(
                       str::stream() << T::kName << " argument must be a non-empty array");
     }
 
-    // If T is the parsed form of a $jsonSchema MatchExpression, which accepts dollar-prefixed field
-    // paths, set 'acceptsDollarPrefixedFieldName' to true for reparsing so that dollar field paths
-    // do not error.
-    // TODO SERVER-89844: Make $jsonSchema with dollar fields in all keyword fields reparseable.
-    auto acceptsDollarPrefixedFieldName =
-        elem.toString().find("$_internalSchema") != std::string::npos;
-
     for (auto e : arr) {
         if (e.type() != BSONType::Object)
             return Status(ErrorCodes::BadValue,
                           str::stream() << T::kName << " argument's entries must be objects");
 
-        auto sub = parse(e.Obj(),
-                         expCtx,
-                         extensionsCallback,
-                         allowedFeatures,
-                         currentLevel,
-                         acceptsDollarPrefixedFieldName);
+        auto sub = parse(e.Obj(), expCtx, extensionsCallback, allowedFeatures, currentLevel, arr);
         if (!sub.isOK())
             return sub.getStatus();
 
