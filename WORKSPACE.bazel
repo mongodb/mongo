@@ -20,6 +20,16 @@ load("//bazel/toolchains:python_toolchain.bzl", "setup_mongo_python_toolchains")
 
 [register_toolchains(toolchain) for toolchain in setup_mongo_python_toolchains()]
 
+load("//bazel/coverity:coverity_toolchain.bzl", "coverity_toolchain")
+
+coverity_toolchain(
+    name = "rules_coverity",
+)
+
+load("@rules_coverity//coverity:repositories.bzl", "rules_coverity_toolchains")
+
+rules_coverity_toolchains()
+
 http_archive(
     name = "rules_python",
     sha256 = "8c8fe44ef0a9afc256d1e75ad5f448bb59b81aba149b8958f02f7b3a98f5d9b4",

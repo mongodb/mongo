@@ -394,6 +394,15 @@ add_option(
 )
 
 add_option(
+    'coverity-build',
+    action="store_true",
+    default=False,
+    help=(
+        "Enable coverity build mode, which only means the bazel build will not run. "
+        "The bazel build is expected to be run in a prior separate coverity enabled bazel build."),
+)
+
+add_option(
     'sanitize',
     help='enable selected sanitizers',
     metavar='san1,san2,...sanN',

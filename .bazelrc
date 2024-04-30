@@ -1,5 +1,9 @@
 # Reference docs: https://bazel.build/run/bazelrc
 
+# coverity need to use the local command without remote execution auto
+# enabled.
+info --config=local
+
 # This automatically sets a config based on host platform, ex: --config=macos if the host is macos
 build --enable_platform_specific_config=true
 

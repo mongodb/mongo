@@ -265,7 +265,7 @@ def ninja_bazel_builder(env: SCons.Environment.Environment, _dup_env: SCons.Envi
     }
 
 
-def bazel_build_thread_func(log_dir: str, verbose: bool) -> None:
+def bazel_build_thread_func(env, log_dir: str, verbose: bool) -> None:
     """This thread runs the bazel build up front."""
 
     done_with_temp = False
@@ -277,6 +277,12 @@ def bazel_build_thread_func(log_dir: str, verbose: bool) -> None:
 
     bazel_cmd = Globals.bazel_base_build_command + extra_args + ['//src/...']
     bazel_debug(f"BAZEL_COMMAND: {' '.join(bazel_cmd)}")
+    if env.GetOption("coverity-build"):
+        print(
+            "--coverity-build selected, assuming bazel targets were built in a previous coverity run. Not running bazel build."
+        )
+        return
+
     print("Starting bazel build thread...")
 
     try:
@@ -841,7 +847,8 @@ def generate(env: SCons.Environment.Environment) -> None:
 
             # ninja will handle the build so do not launch the bazel batch thread
             bazel_build_thread = threading.Thread(target=bazel_build_thread_func,
-                                                  args=(log_dir, env["VERBOSE"]))
+                                                  args=(env, log_dir, env["VERBOSE"]))
+
             bazel_build_thread.start()
 
             def wait_for_bazel(env):
