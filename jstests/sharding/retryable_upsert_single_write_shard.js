@@ -42,18 +42,16 @@ assert.commandWorked(db.runCommand(updateCmd));
 assert.commandWorked(coll.insertOne({x: -50}));
 
 // Failover shard0 to cause it to forget the in memory txn state from being a txn participant.
-const secondary = st.rs0.getSecondary();
-ShardingStateTest.failoverToMember(st.rs0, secondary);
-
-// Await until RS connection in shell is updated.
-_awaitRSHostViaRSMonitor(secondary.name, {ok: true, ismaster: true}, st.rs0.name);
+ShardingStateTest.failoverToMember(st.rs0, st.rs0.getSecondary());
 
 // Retry the earlier retryable upsert.
 db = st.s.getDB(jsTestName());
 coll = db.coll;
 
 // Insert a document matching the update query.
-coll.insertOne({x: -50});
+// Add retries on retryable error as the connections in ShardingTest may be stale and can fail with
+// NotWritablePrimary
+retryOnRetryableError(() => coll.insertOne({x: -50}), 10, 30);
 
 // A retry of the update should fail.
 assert.commandFailedWithCode(db.runCommand(updateCmd), ErrorCodes.IncompleteTransactionHistory);
