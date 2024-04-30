@@ -54,6 +54,11 @@ selector:
     - jstests/core/max_doc_size.js
     - jstests/core/query/find/find_getmore_bsonsize.js
 
+    # This test does a large number of write operations and can cause magic restore to take a
+    # long time. If the restore duration exceeds 5 minutes, the restore node will throw away
+    # durable history that is required to do PIT reads for consistency checks.
+    - jstests/core/query/query_settings/query_settings_size_limits.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     # After SERVER-80339, the server runs a "listIndexes" command on the background, which could show
