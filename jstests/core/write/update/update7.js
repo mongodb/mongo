@@ -14,7 +14,7 @@ t.save({_id: 2, x: 5});
 
 assert.eq("1,5", s(), "A");
 
-t.update({}, {$inc: {x: 1}});
+t.update({_id: 1}, {$inc: {x: 1}});
 assert.eq("2,5", s(), "B");
 
 t.update({_id: 1}, {$inc: {x: 1}});
