@@ -1240,9 +1240,10 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
     /*
      * If both queues are full and haven't been empty on recent refills, we're done.
      */
-    if (__evict_queue_full(queue) && cache->evict_empty_score < WT_EVICT_SCORE_CUTOFF)
+    if (__evict_queue_full(queue) && cache->evict_empty_score < WT_EVICT_SCORE_CUTOFF) {
+        WT_STAT_CONN_INCR(session, cache_eviction_queue_not_empty);
         goto err;
-
+    }
     /*
      * If the queue we are filling is empty, pages are being requested faster than they are being
      * queued.
