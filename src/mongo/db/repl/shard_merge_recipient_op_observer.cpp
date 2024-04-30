@@ -227,7 +227,7 @@ void deleteTenantDataWhenMergeAborts(const ShardMergeRecipientDocument& doc) {
 void onShardMergeRecipientsNssInsert(OperationContext* opCtx,
                                      std::vector<InsertStatement>::const_iterator first,
                                      std::vector<InsertStatement>::const_iterator last) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering())
+    if (tenant_migration_access_blocker::inRecoveryMode(opCtx))
         return;
 
     for (auto it = first; it != last; it++) {
@@ -284,7 +284,7 @@ void onShardMergeRecipientsNssInsert(OperationContext* opCtx,
 void onDonatedFilesCollNssInsert(OperationContext* opCtx,
                                  std::vector<InsertStatement>::const_iterator first,
                                  std::vector<InsertStatement>::const_iterator last) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering())
+    if (tenant_migration_access_blocker::inRecoveryMode(opCtx))
         return;
 
     for (auto it = first; it != last; it++) {
@@ -464,7 +464,7 @@ void ShardMergeRecipientOpObserver::onUpdate(OperationContext* opCtx,
 
     auto recipientStateDoc = ShardMergeRecipientDocument::parse(
         IDLParserContext("recipientStateDoc"), args.updateArgs->updatedDoc);
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    if (tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         handleUpdateRecoveryMode(opCtx, recipientStateDoc);
         return;
     }
@@ -502,7 +502,7 @@ void ShardMergeRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
                                                   OplogDeleteEntryArgs* args,
                                                   OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kShardMergeRecipientsNamespace ||
-        repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 
@@ -533,7 +533,7 @@ void ShardMergeRecipientOpObserver::onDelete(OperationContext* opCtx,
                                              const OplogDeleteEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kShardMergeRecipientsNamespace ||
-        repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 
@@ -557,7 +557,7 @@ repl::OpTime ShardMergeRecipientOpObserver::onDropCollection(OperationContext* o
                                                              const CollectionDropType dropType,
                                                              bool markFromMigrate) {
     if (collectionName == NamespaceString::kShardMergeRecipientsNamespace &&
-        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
 
         uassert(
             ErrorCodes::IllegalOperation,

@@ -137,7 +137,7 @@ void TenantMigrationRecipientOpObserver::onInserts(
     bool defaultFromMigrate,
     OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
-        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         for (auto it = first; it != last; it++) {
             auto recipientStateDoc = TenantMigrationRecipientDocument::parse(
                 IDLParserContext("recipientStateDoc"), it->doc);
@@ -161,7 +161,7 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                                                   const OplogUpdateEntryArgs& args,
                                                   OpStateAccumulator* opAccumulator) {
     if (args.coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
-        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto recipientStateDoc = TenantMigrationRecipientDocument::parse(
             IDLParserContext("recipientStateDoc"), args.updateArgs->updatedDoc);
 
@@ -218,7 +218,7 @@ void TenantMigrationRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
                                                        OplogDeleteEntryArgs* args,
                                                        OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
-        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto recipientStateDoc =
             TenantMigrationRecipientDocument::parse(IDLParserContext("recipientStateDoc"), doc);
         uassert(ErrorCodes::IllegalOperation,
@@ -244,7 +244,7 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
                                                   const OplogDeleteEntryArgs& args,
                                                   OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
-        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto tmi = tenantMigrationInfo(opCtx);
         if (!tmi) {
             return;

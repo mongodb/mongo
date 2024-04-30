@@ -162,7 +162,7 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
         }
     }
 
-    if (!repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    if (!topology_time_ticker_utils::inRecoveryMode(opCtx)) {
         boost::optional<Timestamp> maxTopologyTime;
         for (auto it = begin; it != end; it++) {
             Timestamp newTopologyTime = it->doc[ShardType::topologyTime.name()].timestamp();

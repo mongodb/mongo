@@ -256,7 +256,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
         }
 
         if (nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
-            !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+            !sharding_recovery_util::inRecoveryMode(opCtx)) {
             const auto collCSDoc = CollectionCriticalSectionDocument::parse(
                 IDLParserContext("ShardServerOpObserver"), insertedDoc);
             invariant(!collCSDoc.getBlockReads());
@@ -407,7 +407,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
     }
 
     if (args.coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace &&
-        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        !sharding_recovery_util::inRecoveryMode(opCtx)) {
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
         invariant(collCSDoc.getBlockReads());
@@ -482,7 +482,7 @@ void ShardServerOpObserver::onModifyCollectionShardingIndexCatalog(OperationCont
                                                                    BSONObj indexDoc) {
     // If we are in recovery mode (STARTUP or ROLLBACK) let the sharding recovery service to take
     // care of the in-memory state.
-    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    if (sharding_recovery_util::inRecoveryMode(opCtx)) {
         return;
     }
     LOGV2_DEBUG(6712303,
@@ -661,7 +661,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     }
 
     if (nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
-        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        !sharding_recovery_util::inRecoveryMode(opCtx)) {
         const auto& deletedDoc = documentId;
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), deletedDoc);

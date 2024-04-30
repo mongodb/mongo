@@ -41,6 +41,12 @@
 
 namespace mongo {
 
+namespace sharding_recovery_util {
+
+bool inRecoveryMode(OperationContext* opCtx);
+
+}
+
 class ShardingRecoveryService : public ReplicaSetAwareServiceShardSvr<ShardingRecoveryService> {
 
 public:

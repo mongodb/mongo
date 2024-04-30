@@ -109,15 +109,5 @@ bool ReplicationCoordinator::isOplogDisabledForNS(const NamespaceString& nss) {
 
     return false;
 }
-
-bool ReplicationCoordinator::isDataRecovering() const {
-    if (!getSettings().isReplSet()) {
-        return false;
-    }
-
-    const auto memberState = getMemberState();
-    return memberState.startup() || memberState.startup2() || memberState.rollback();
-}
-
 }  // namespace repl
 }  // namespace mongo
