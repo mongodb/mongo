@@ -93,12 +93,13 @@ components:
     team_owner: "Service Architecture"
     upgrade_suppression: TODO SERVER-74870
 
-  croaring:
+  RoaringBitmap/CRoaring:
     homepage_url: https://roaringbitmap.org/
     open_hub_url: N/A
     release_monitoring_id: 370651
     local_directory_path: src/third_party/croaring
     team_owner: "Query Execution"
+    upgrade_suppression: TODO SERVER-89972
 
   "Cyrus SASL":
     homepage_url: https://www.cyrusimap.org/sasl/
