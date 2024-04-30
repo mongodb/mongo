@@ -131,10 +131,10 @@ public:
             // Return the collection's information.
             const auto [cm, sii] =
                 uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
-            uassert(ErrorCodes::NamespaceNotSharded,
+            uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Collection " << nss.toStringForErrorMsg()
-                                  << " is not sharded.",
-                    cm.isSharded());
+                                  << " does not have a routing table.",
+                    cm.hasRoutingTable());
 
             result.appendTimestamp("version", cm.getVersion().toLong());
             result.append("versionEpoch", cm.getVersion().epoch());
