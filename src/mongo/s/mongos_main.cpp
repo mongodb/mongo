@@ -893,19 +893,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ClusterServerParameterRefresher::start(serviceContext, opCtx);
 
     {
-        TimeElapsedBuilderScopedTimer scopedTimer(
-            serviceContext->getFastClockSource(), "Start mongos FTDC", &startupTimeElapsedBuilder);
-        startMongoSFTDC(serviceContext);
-    }
-
-    if (mongosGlobalParams.scriptingEnabled) {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Set up script engine",
-                                                  &startupTimeElapsedBuilder);
-        ScriptEngine::setup(ExecutionEnvironment::Server);
-    }
-
-    {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Build user and roles graph",
                                                   &startupTimeElapsedBuilder);
@@ -916,6 +903,22 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
             LOGV2_ERROR(22858, "Error initializing authorization data", "error"_attr = status);
             return ExitCode::shardingError;
         }
+    }
+
+    // Needs to be initialized before any user of the getClusterParameter command.
+    ClusterServerParameterRefresher::start(serviceContext, opCtx);
+
+    {
+        TimeElapsedBuilderScopedTimer scopedTimer(
+            serviceContext->getFastClockSource(), "Start mongos FTDC", &startupTimeElapsedBuilder);
+        startMongoSFTDC(serviceContext);
+    }
+
+    if (mongosGlobalParams.scriptingEnabled) {
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Set up script engine",
+                                                  &startupTimeElapsedBuilder);
+        ScriptEngine::setup(ExecutionEnvironment::Server);
     }
 
     // Construct the router uptime reporter after the startup parameters have been parsed in order
