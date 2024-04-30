@@ -379,23 +379,19 @@ boost::optional<MigrateInfo> chooseRandomMigration(
         return boost::none;
     }
 
+    // Do not perform random migrations if there is a shard that is draining to avoid starving
+    // them of eligible shards to migrate to.
+    auto drainingShardIter = std::find_if(
+        shardStats.begin(), shardStats.end(), [](const auto& stat) { return stat.isDraining; });
+
+    if (drainingShardIter != shardStats.end()) {
+        return boost::none;
+    }
+
     std::vector<ShardId> shards;
     std::copy(availableShards.begin(), availableShards.end(), std::back_inserter(shards));
     std::default_random_engine rng(time(nullptr));
     std::shuffle(shards.begin(), shards.end(), rng);
-
-    // Filter out draining shards to get more realistic coverage for tests that remove shards.
-    std::erase_if(shards, [&](auto shardId) {
-        for (const auto& stat : shardStats) {
-            if (stat.shardId == shardId && stat.isDraining) {
-                return true;
-            }
-        }
-        return false;
-    });
-    if (shards.size() < 2) {
-        return boost::none;
-    }
 
     // Get a random shard with chunks as the donor shard and another random shard as the recipient
     boost::optional<ShardId> donorShard;
@@ -561,9 +557,9 @@ MigrateInfosWithReason BalancerPolicy::balance(
             tassert(8245224,
                     "Migration's to shard does not exist in available shards",
                     availableShards->erase(migration.get().to));
-        }
 
-        return std::make_pair(std::move(migrations), firstReason);
+            return std::make_pair(std::move(migrations), firstReason);
+        }
     }
 
     // 2) Check for chunks, which are on the wrong shard and must be moved off of it
