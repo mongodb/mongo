@@ -208,6 +208,14 @@ conn_stats = [
     ConnStat('write_io', 'total write I/Os'),
 
     ##########################################
+    # API utilization statistics
+    ##########################################
+    ConnStat('api_call_current', 'threads currently in the library application', 'no_clear,no_scale,size'),
+    ConnStat('api_call_current_int', 'threads currently in the library internal', 'no_clear,no_scale,size'),
+    ConnStat('api_call_current_cursor', 'threads currently in the library doing cursor operations application', 'no_clear,no_scale,size'),
+    ConnStat('api_call_current_cursor_int', 'threads currently in the library doing cursor operations internal', 'no_clear,no_scale,size'),
+
+    ##########################################
     # Background compaction statistics
     ##########################################
     BackgroundCompactStat('background_compact_bytes_recovered', 'background compact recovered bytes', 'no_scale'),

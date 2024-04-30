@@ -303,6 +303,19 @@ __session_close(WT_SESSION *wt_session, const char *config)
     SESSION_API_CALL_PREPARE_ALLOWED(session, close, config, cfg);
     WT_UNUSED(cfg);
 
+    /*
+     * Ideally tracking would be after the close call, but that gets complex. The api tracking
+     * macros don't balance the count since they rely on a valid session handle. Once the session
+     * handle is gone, we can't rely on the connection remaining valid. The internal session close
+     * API is called internally a lot, so it isn't appealing to split that out to improve this
+     * tracking. Let's live with the imprecision.
+     */
+    if (!WT_SESSION_IS_DEFAULT(session) && session->api_call_counter == 1) {
+        if (F_ISSET(session, WT_SESSION_INTERNAL))
+            (void)__wt_atomic_add64(&S2C(session)->api_count_int_out, 1);
+        else
+            (void)__wt_atomic_add64(&S2C(session)->api_count_out, 1);
+    }
     WT_TRET(__wt_session_close_internal(session));
     session = NULL;
 

@@ -69,6 +69,7 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_CONNECTION_STATS **stats;
+    uint64_t api_count;
 
     conn = S2C(session);
     stats = conn->stats;
@@ -81,6 +82,26 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
     WT_STAT_SET(session, stats, dh_conn_handle_count, conn->dhandle_count);
     WT_STAT_SET(session, stats, rec_split_stashed_objects, conn->stashed_objects);
     WT_STAT_SET(session, stats, rec_split_stashed_bytes, conn->stashed_bytes);
+
+    /*
+     * If the atomic operations used to keep these values up to date become a performance problem,
+     * the fields could be moved into session handles, and this code could traverse session handles
+     * accumulating current values. In some way it would be nice to have these be active counts, but
+     * tracking bugs can lead to a negative value when that happens. Note that these counters are
+     * updated independently. Carefully read the out counter before the in counter otherwise the out
+     * counter can include more API calls than the in and make the balance negative.
+     */
+    WT_API_COUNTER_REALIZE(session, api_count, api_count);
+    WT_STAT_CONN_SET(session, api_call_current, api_count);
+
+    WT_API_COUNTER_REALIZE(session, api_count_int, api_count);
+    WT_STAT_CONN_SET(session, api_call_current_int, api_count);
+
+    WT_API_COUNTER_REALIZE(session, api_count_cursor, api_count);
+    WT_STAT_CONN_SET(session, api_call_current_cursor, api_count);
+
+    WT_API_COUNTER_REALIZE(session, api_count_cursor_int, api_count);
+    WT_STAT_CONN_SET(session, api_call_current_cursor_int, api_count);
 }
 
 /*
