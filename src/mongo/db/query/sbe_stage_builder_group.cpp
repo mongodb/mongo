@@ -355,7 +355,9 @@ SbExpr::Vector generateGroupByKeyExprs(StageBuilderState& state,
     return exprs;
 }
 
-std::variant<Expression*, BSONElement> getTopBottomNValueExprHelper(
+using TagAndValue = std::pair<sbe::value::TypeTags, sbe::value::Value>;
+
+std::variant<Expression*, TagAndValue> getTopBottomNValueExprHelper(
     const AccumulationStatement& accStmt) {
     auto accOp = AccumOp{accStmt};
 
@@ -376,9 +378,10 @@ std::variant<Expression*, BSONElement> getTopBottomNValueExprHelper(
     } else {
         auto objConst = expConst->getValue();
         auto objBson = objConst.getDocument().toBson();
+        // `outputField` may reference data in objBson, so must not outlive it.
         auto outputField = objBson.getField(AccumulatorN::kFieldNameOutput);
         if (outputField.ok()) {
-            return outputField;
+            return sbe::bson::convertFrom<false /* not a view */>(outputField);
         }
     }
 
@@ -399,7 +402,7 @@ SbExpr getTopBottomNValueExpr(StageBuilderState& state,
         auto* expr = get<Expression*>(valueExpr);
         return b.makeFillEmptyNull(generateExpression(state, expr, rootSlot, outputs));
     } else {
-        auto [tag, val] = sbe::bson::convertFrom<false /*View*/>(get<BSONElement>(valueExpr));
+        auto [tag, val] = get<TagAndValue>(valueExpr);
         return b.makeConstant(tag, val);
     }
 }
@@ -436,7 +439,7 @@ std::pair<SbExpr::Vector, bool> getBlockTopBottomNValueExpr(StageBuilderState& s
         auto sbExpr = b.makeFillEmptyNull(generateExpression(state, expr, rootSlot, outputs));
         return {SbExpr::makeSeq(std::move(sbExpr)), isArray};
     } else {
-        auto [tag, val] = sbe::bson::convertFrom<false /*View*/>(get<BSONElement>(valueExpr));
+        auto [tag, val] = get<TagAndValue>(valueExpr);
         return {SbExpr::makeSeq(b.makeConstant(tag, val)), isArray};
     }
 }

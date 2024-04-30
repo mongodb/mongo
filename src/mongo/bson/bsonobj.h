@@ -389,8 +389,12 @@ public:
     /**
      * Get the field of the specified name. eoo() is true on the returned
      * element if not found.
+     *
+     * BSONElement will point to data which may only be owned by `this`.
+     * Thus, this BSONObj must outlive the returned BSONElement, hence the lifetime bound
+     * annotation.
      */
-    BSONElement getField(StringData name) const;
+    BSONElement getField(StringData name) const MONGO_COMPILER_LIFETIME_BOUND;
 
     /**
      * Get several fields at once. This is faster than separate getField() calls as the size of

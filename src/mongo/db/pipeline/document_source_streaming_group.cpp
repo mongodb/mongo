@@ -135,7 +135,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
         new DocumentSourceStreamingGroup(expCtx, maxMemoryUsageBytes);
     groupStage->initializeFromBson(elem);
 
-    const auto& monotonicIdFieldsElem = elem.Obj().getField(kMonotonicIdFieldsSpecField);
+    // BSONObj must outlive BSONElement. See BSONElement, BSONObj::getField().
+    auto obj = elem.Obj();
+    const auto& monotonicIdFieldsElem = obj.getField(kMonotonicIdFieldsSpecField);
     uassert(7026702,
             "streaming group must specify an array of monotonic id fields " +
                 kMonotonicIdFieldsSpecField,

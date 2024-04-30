@@ -591,7 +591,9 @@ boost::optional<EncryptedFieldConfig> EncryptedDBClientBase::getEncryptedFieldCo
     if (opts.eoo() || !opts.isABSONObj()) {
         return boost::none;
     }
-    auto efc = opts.Obj().getField("encryptedFields");
+    // BSONObj must outlive BSONElement. See BSONElement, BSONObj::getField().
+    auto optsObj = opts.Obj();
+    auto efc = optsObj.getField("encryptedFields");
     if (efc.eoo() || !efc.isABSONObj()) {
         return boost::none;
     }

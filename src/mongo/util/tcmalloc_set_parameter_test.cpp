@@ -182,7 +182,9 @@ void runNoOpSetTest(T param, StringData name, const F& getTcmallocValue) {
         getTcmallocValue(name), ExceptionFor<ErrorCodes::InternalError>, ErrorCodes::InternalError);
     BSONObjBuilder bob;
     bob.appendNumber("a", 1);
-    BSONElement val = bob.obj().getField("a");
+    // BSONObj must outlive BSONElement. See BSONElement, BSONObj::getField().
+    auto obj = bob.obj();
+    BSONElement val = obj.getField("a");
     ASSERT_OK(param.set(val, boost::none));
 }
 

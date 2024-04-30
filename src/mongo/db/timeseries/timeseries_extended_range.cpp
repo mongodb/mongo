@@ -67,11 +67,15 @@ bool bucketsHaveDateOutsideStandardRange(const TimeseriesOptions& options,
         uassert(6781400,
                 "Time series bucket document is missing 'control' field",
                 controlElem.isABSONObj());
-        auto minElem = controlElem.Obj().getField(timeseries::kBucketControlMinFieldName);
+        // BSONObj must outlive BSONElement. See BSONElement, BSONObj::getField().
+        auto controlObj = controlElem.Obj();
+        auto minElem = controlObj.getField(timeseries::kBucketControlMinFieldName);
         uassert(6781401,
                 "Time series bucket document is missing 'control.min' field",
                 minElem.isABSONObj());
-        auto timeElem = minElem.Obj().getField(options.getTimeField());
+        // As above.
+        auto minObj = minElem.Obj();
+        auto timeElem = minObj.getField(options.getTimeField());
         uassert(6781402,
                 "Time series bucket document does not have a valid min time element",
                 timeElem && BSONType::Date == timeElem.type());
