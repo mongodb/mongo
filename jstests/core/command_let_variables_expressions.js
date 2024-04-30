@@ -12,7 +12,7 @@
 
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq().
 
-const coll = db.getCollection(jsTestName());
+const coll = db.getCollection('command_let_variables_expressions');
 
 function setupColl() {
     coll.drop();
