@@ -52,9 +52,11 @@ waitForCurOpByFailPoint(primaryAdmin, collNss, "waitAfterPinningCursorBeforeGetM
 
 jsTestLog("2. Start blocking find cmd before step down");
 const joinFindThread = startParallelShell(() => {
-    // Enable the fail point for find cmd.
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
+    // Enable the fail point for find cmd. We know this is a replica set, so enable
+    // "shardWaitInFindBeforeMakingBatch" (helper function configureFailPoint() cannot be used
+    // inside a parallel shell).
+    assert.commandWorked(db.adminCommand(
+        {configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "alwaysOn"}));
 
     var findRes = assert.commandWorked(
         db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));

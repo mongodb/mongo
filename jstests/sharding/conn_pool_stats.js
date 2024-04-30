@@ -9,12 +9,8 @@
  *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
-import {
-    assertHasConnPoolStats,
-    configureReplSetFailpoint,
-    launchFinds
-} from "jstests/libs/conn_pool_helpers.js";
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {assertHasConnPoolStats, launchFinds} from "jstests/libs/conn_pool_helpers.js";
+import {configureFailPoint, configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 
 let st = new ShardingTest({shards: 1});
 
@@ -94,7 +90,9 @@ function neverUsedMetricTest(kDbName = 'test') {
 
     // Launch 5 blocked finds and verify that 5 connections are in-use while the remaining 10
     // are available
-    configureReplSetFailpoint(st, kDbName, "waitInFindBeforeMakingBatch", "alwaysOn");
+    const fpRs = configureFailPointForRS(st.rs0.nodes,
+                                         "waitInFindBeforeMakingBatch",
+                                         {shouldCheckForInterrupt: true, nss: kDbName + ".test"});
     launchFinds(mongos, threads, {times: 5, readPref: "primary"}, currentCheckNum);
     currentCheckNum = assertHasConnPoolStats(
         mongos, allHosts, {active: 5, ready: 10, hosts: primaryOnly}, currentCheckNum);
@@ -116,7 +114,7 @@ function neverUsedMetricTest(kDbName = 'test') {
             }
         },
         currentCheckNum);
-    configureReplSetFailpoint(st, kDbName, "waitInFindBeforeMakingBatch", "off");
+    fpRs.off();
     threads.forEach(t => t.join());
 
     // stats = st.s.getDB("admin").runCommand({connPoolStats: 1});

@@ -487,7 +487,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     // Retrieve enough data from the ClusterClientCursor for the first batch of results.
 
-    FindCommon::waitInFindBeforeMakingBatch(opCtx, query);
+    FindCommon::waitInFindBeforeMakingBatch(opCtx, query, &routerWaitInFindBeforeMakingBatch);
 
     if (findCommand.getAllowPartialResults() &&
         opCtx->checkForInterruptNoAssert().code() == ErrorCodes::MaxTimeMSExpired) {

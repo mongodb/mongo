@@ -7,6 +7,8 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+
 const testDBName = 'test';
 const readDBName = 'read';
 const readCollName = 'readColl';
@@ -25,8 +27,7 @@ assert.commandWorked(
         .runCommand({insert: readCollName, documents: [{x: 1}], writeConcern: {w: 2}}));
 
 // The find will hang and holds a global IS lock.
-assert.commandWorked(secondary.getDB("admin").runCommand(
-    {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
+const fp = configureFailPoint(secondary, "waitInFindBeforeMakingBatch");
 
 const findWait = startParallelShell(function() {
     db.getMongo().setSecondaryOk();
@@ -68,8 +69,7 @@ assert.soon(function() {
     assert.commandWorked(testDB.runCommand({drop: renameCollName, writeConcern: {w: 2}}));
 }
 
-assert.commandWorked(secondary.getDB("admin").runCommand(
-    {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "off"}));
+fp.off();
 findWait();
 
 rst.stopSet();

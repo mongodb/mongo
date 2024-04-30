@@ -82,17 +82,11 @@ function runWithCuropFailPointEnabled(client, failPointName) {
     return function(entry) {
         entry[0](client,
                  function(client) {
-                     assert.commandWorked(client.adminCommand({
-                         configureFailPoint: failPointName,
-                         mode: "alwaysOn",
-                         data: {shouldCheckForInterrupt: true},
-                     }));
-
+                     configureFailPoint(client, failPointName, {shouldCheckForInterrupt: true});
                      entry[1](client);
                  },
                  function() {
-                     assert.commandWorked(
-                         client.adminCommand({configureFailPoint: failPointName, mode: "off"}));
+                     configureFailPoint(client, failPointName, {}, "off");
                  });
     };
 }
@@ -103,17 +97,11 @@ function runWithCmdFailPointEnabled(client) {
 
         entry[0](client,
                  function(client) {
-                     assert.commandWorked(client.adminCommand({
-                         configureFailPoint: failPointName,
-                         mode: "alwaysOn",
-                         data: {appName: kTestName + id},
-                     }));
-
+                     configureFailPoint(client, failPointName, {appName: kTestName + id});
                      entry[1](client);
                  },
                  function() {
-                     assert.commandWorked(
-                         client.adminCommand({configureFailPoint: failPointName, mode: "off"}));
+                     configureFailPoint(client, failPointName, {}, "off");
                  });
     };
 }

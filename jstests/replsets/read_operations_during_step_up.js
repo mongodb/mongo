@@ -67,9 +67,10 @@ const joinFindThread = startParallelShell(() => {
     const secondaryDB = db.getSiblingDB(TestData.dbName);
     secondaryDB.getMongo().setSecondaryOk();
 
-    // Enable the fail point for find cmd.
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
+    // Enable the fail point for find cmd. We are in a parallel shell, so we can't use the helper
+    // function. Enable the shard variant of the fail point.
+    assert.commandWorked(db.adminCommand(
+        {configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "alwaysOn"}));
 
     const findRes = assert.commandWorked(secondaryDB.runCommand({"find": TestData.collName}));
     assert.docEq([{_id: 0}], findRes.cursor.firstBatch);

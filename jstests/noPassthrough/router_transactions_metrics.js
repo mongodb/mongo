@@ -5,6 +5,7 @@
 //   uses_transactions,
 // ]
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {
     flushRoutersAndRefreshShardMetadata
@@ -657,8 +658,7 @@ jsTest.log("Abandoned transaction.");
 
 jsTest.log("Active transaction.");
 (() => {
-    assert.commandWorked(st.rs0.getPrimary().adminCommand(
-        {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn", data: {nss: ns}}));
+    const fp = configureFailPoint(st.rs0.getPrimary(), "waitInFindBeforeMakingBatch", {nss: ns});
 
     const txnThread = new Thread(function(host, dbName, collName) {
         const mongosConn = new Mongo(host);
@@ -682,8 +682,7 @@ jsTest.log("Active transaction.");
     expectedStats.totalRequestsTargeted += 2;
     verifyServerStatusValues(st, expectedStats);
 
-    assert.commandWorked(st.rs0.getPrimary().adminCommand(
-        {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "off"}));
+    fp.off();
     txnThread.join();
 
     expectedStats.currentOpen -= 1;

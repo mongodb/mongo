@@ -2,6 +2,8 @@
  * Utilities for turning on/off and waiting for fail points.
  */
 
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+
 export var configureFailPoint;
 
 export var configureFailPointForRS;
@@ -18,9 +20,37 @@ if (configureFailPoint) {
     return;  // Protect against this file being double-loaded.
 }
 
+// This table is the opposite to failPointRenameTable below. It maps from a fail point name to
+// either a router-specific or a shard-specific version, based on the type of connection that is
+// passed to configureFailPoint.
+const failPointRouterShardRenameTable = {
+    "waitInFindBeforeMakingBatch":
+        {router: "routerWaitInFindBeforeMakingBatch", shard: "shardWaitInFindBeforeMakingBatch"},
+};
+
+function getActualFailPointName(conn, failPointName) {
+    const names = failPointRouterShardRenameTable[failPointName];
+    if (!names) {
+        return failPointName;
+    }
+    const isRouter =
+        typeof conn.getMongo == "function" ? isMongos(conn) : isMongos(conn.getDB("admin"));
+    return isRouter ? names.router : names.shard;
+}
+
+function getShardFailPointName(failPointName) {
+    const names = failPointRouterShardRenameTable[failPointName];
+    if (!names) {
+        return failPointName;
+    }
+    return names.shard;
+}
+
 kDefaultWaitForFailPointTimeout = 10 * 60 * 1000;
 
 configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "alwaysOn") {
+    failPointName = getActualFailPointName(conn, failPointName);
+
     const res = sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
         return conn.adminCommand(
             {configureFailPoint: failPointName, mode: failPointMode, data: data});
@@ -66,6 +96,8 @@ configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "a
 };
 
 configureFailPointForRS = function(conns, failPointName, data = {}, failPointMode = "alwaysOn") {
+    failPointName = getShardFailPointName(failPointName);
+
     conns.forEach((conn) => {
         sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
             return conn.adminCommand(

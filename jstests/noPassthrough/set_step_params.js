@@ -2,13 +2,8 @@
  * @tags: [requires_replication, requires_sharding, sets_replica_set_matching_strategy]
  */
 
-import {
-    assertHasConnPoolStats,
-    configureReplSetFailpoint,
-    launchFinds
-} from "jstests/libs/conn_pool_helpers.js";
-
-import {getFailPointName} from "jstests/libs/fail_point_util.js";
+import {assertHasConnPoolStats, launchFinds} from "jstests/libs/conn_pool_helpers.js";
+import {configureFailPointForRS, getFailPointName} from "jstests/libs/fail_point_util.js";
 
 const kDbName = 'test';
 
@@ -92,7 +87,9 @@ runSubTest("MinSize", function() {
 });
 
 runSubTest("MaxSize", function() {
-    configureReplSetFailpoint(st, kDbName, "waitInFindBeforeMakingBatch", "alwaysOn");
+    const fpRs = configureFailPointForRS(st.rs0.nodes,
+                                         "waitInFindBeforeMakingBatch",
+                                         {shouldCheckForInterrupt: true, nss: kDbName + ".test"});
     dropConnections();
 
     // Launch 10 blocked finds
@@ -111,7 +108,7 @@ runSubTest("MaxSize", function() {
     currentCheckNum =
         assertHasConnPoolStats(mongos, allHosts, {active: 15, hosts: primaryOnly}, currentCheckNum);
 
-    configureReplSetFailpoint(st, kDbName, "waitInFindBeforeMakingBatch", "off");
+    fpRs.off();
     currentCheckNum = assertHasConnPoolStats(
         mongos, allHosts, {ready: 15, pending: 0, hosts: primaryOnly}, currentCheckNum);
 });
@@ -127,8 +124,15 @@ runSubTest("MaxConnecting", function() {
         ShardingTaskExecutorPoolMaxConnecting: maxPending1,
     });
 
-    configureReplSetFailpoint(st, kDbName, waitInHelloFpName, "alwaysOn");
-    configureReplSetFailpoint(st, kDbName, "waitInFindBeforeMakingBatch", "alwaysOn");
+    // Important to enable "waitInFindBeforeMakingBatch" first, configureFailPoint will check
+    // whether the connection is a shard and that check will become stuck in Hello if the Hello fail
+    // point is enabled.
+    const fpWaitRs =
+        configureFailPointForRS(st.rs0.nodes,
+                                "waitInFindBeforeMakingBatch",
+                                {shouldCheckForInterrupt: true, nss: kDbName + ".test"});
+    const fpHelloRs =
+        configureFailPointForRS(st.rs0.nodes, waitInHelloFpName, {shouldCheckForInterrupt: true});
     dropConnections();
 
     // Go to the limit of maxConnecting, so we're stuck here
@@ -152,7 +156,7 @@ runSubTest("MaxConnecting", function() {
         assertHasConnPoolStats(mongos, allHosts, {pending: maxPending2}, currentCheckNum);
 
     // Release our pending and walk away
-    configureReplSetFailpoint(st, kDbName, waitInHelloFpName, "off");
+    fpHelloRs.off();
     currentCheckNum =
         assertHasConnPoolStats(mongos,
                                allHosts,
@@ -163,7 +167,7 @@ runSubTest("MaxConnecting", function() {
                                    }
                                },
                                currentCheckNum);
-    configureReplSetFailpoint(st, kDbName, "waitInFindBeforeMakingBatch", "off");
+    fpWaitRs.off();
 });
 
 runSubTest("Timeouts", function() {
@@ -184,16 +188,20 @@ runSubTest("Timeouts", function() {
         ShardingTaskExecutorPoolHostTimeoutMS: idleTimeoutMS1,
     });
 
-    configureReplSetFailpoint(st, kDbName, "waitInFindBeforeMakingBatch", "alwaysOn");
+    const fpWaitRs =
+        configureFailPointForRS(st.rs0.nodes,
+                                "waitInFindBeforeMakingBatch",
+                                {shouldCheckForInterrupt: true, nss: kDbName + ".test"});
     dropConnections();
 
     // Make ready connections
     launchFinds(mongos, threads, {times: conns, readPref: "primary"});
-    configureReplSetFailpoint(st, kDbName, "waitInFindBeforeMakingBatch", "off");
+    fpWaitRs.off();
     currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {ready: conns}, currentCheckNum);
 
     // Block refreshes and wait for the toRefresh timeout
-    configureReplSetFailpoint(st, kDbName, waitInHelloFpName, "alwaysOn");
+    const fpHelloRs =
+        configureFailPointForRS(st.rs0.nodes, waitInHelloFpName, {shouldCheckForInterrupt: true});
     sleep(toRefreshTimeoutMS);
 
     // Confirm that we're in pending for all of our conns
@@ -208,7 +216,7 @@ runSubTest("Timeouts", function() {
     sleep(pendingTimeoutMS);
     currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {}, currentCheckNum);
 
-    configureReplSetFailpoint(st, kDbName, waitInHelloFpName, "off");
+    fpHelloRs.off();
 
     // Reset the min conns to make sure normal refresh doesn't extend the timeout
     updateSetParameters({

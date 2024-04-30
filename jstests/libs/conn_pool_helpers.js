@@ -1,18 +1,5 @@
 import {Thread} from "jstests/libs/parallelTester.js";
 
-export function configureReplSetFailpoint(st, kDbName, failpoint, modeValue) {
-    st.rs0.nodes.forEach(function(node) {
-        assert.commandWorked(node.getDB("admin").runCommand({
-            configureFailPoint: failpoint,
-            mode: modeValue,
-            data: {
-                shouldCheckForInterrupt: true,
-                nss: kDbName + ".test",
-            },
-        }));
-    });
-}
-
 export function launchFinds(mongos, threads, {times, readPref, shouldFail}) {
     jsTestLog("Starting " + times + " connections");
     for (var i = 0; i < times; i++) {

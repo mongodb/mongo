@@ -5,6 +5,7 @@
  * ]
  */
 
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
 const st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 2, protocolVersion: 1}});
@@ -19,19 +20,6 @@ const cfg = primary.getDB('local').system.replset.findOne();
 const allHosts = cfg.members.map(x => x.host);
 const primaryOnly = [primary.name];
 const secondaryOnly = [secondary.name];
-
-function configureReplSetFailpoint(name, modeValue) {
-    st.rs0.nodes.forEach(function(node) {
-        assert.commandWorked(node.getDB("admin").runCommand({
-            configureFailPoint: name,
-            mode: modeValue,
-            data: {
-                shouldCheckForInterrupt: true,
-                nss: kDbName + ".test",
-            },
-        }));
-    });
-}
 
 var threads = [];
 
@@ -119,7 +107,9 @@ function walkThroughBehavior({primaryFollows, secondaryFollows}) {
     checkConnPoolStats();
 
     // Block connections from finishing
-    configureReplSetFailpoint("waitInFindBeforeMakingBatch", "alwaysOn");
+    const fpRs = configureFailPointForRS(st.rs0.nodes,
+                                         "waitInFindBeforeMakingBatch",
+                                         {shouldCheckForInterrupt: true, nss: kDbName + ".test"});
 
     // Launch a bunch of primary finds
     launchFinds({times: 10, readPref: "primary"});
@@ -141,7 +131,7 @@ function walkThroughBehavior({primaryFollows, secondaryFollows}) {
     }
     checkConnPoolStats();
 
-    configureReplSetFailpoint("waitInFindBeforeMakingBatch", "off");
+    fpRs.off();
 
     dropConnections();
 }

@@ -51,17 +51,10 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
 
     jsTestLog("Enable fail point for namespace '" + collNss + "'");
     // Find command.
-    assert.commandWorked(primary.adminCommand({
-        configureFailPoint: readFailPoint,
-        data: {nss: collNss, shouldCheckForInterrupt: true},
-        mode: "alwaysOn"
-    }));
+    configureFailPoint(primary, readFailPoint, {nss: collNss, shouldCheckForInterrupt: true});
     // Insert command.
-    assert.commandWorked(primary.adminCommand({
-        configureFailPoint: writeFailPoint,
-        data: {nss: collNss, shouldCheckForInterrupt: true},
-        mode: "alwaysOn"
-    }));
+    const writeFp =
+        configureFailPoint(primary, writeFailPoint, {nss: collNss, shouldCheckForInterrupt: true});
 
     var startSafeParallelShell = (func, port) => {
         TestData.func = func;
@@ -94,9 +87,10 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
         checkLog.contains(db, "Starting to kill user operations");
 
         jsTestLog("Unblock step down");
-        // Turn off fail point on find cmd to allow step down to continue.
+        // Turn off fail point on find cmd to allow step down to continue. Hardcode the use of the
+        // shard failpoint here since we are in a parallel shell.
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: TestData.readFailPoint, mode: "off"}));
+            db.adminCommand({configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "off"}));
     }, primary.port);
 
     jsTestLog("Wait for find cmd to reach the fail point");
@@ -125,7 +119,7 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
     waitForState(primary,
                  (toRemovedState) ? ReplSetTest.State.REMOVED : ReplSetTest.State.SECONDARY);
 
-    assert.commandWorked(primary.adminCommand({configureFailPoint: writeFailPoint, mode: "off"}));
+    writeFp.off();
 
     // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has been
     // cleared, since the node is no longer primary.

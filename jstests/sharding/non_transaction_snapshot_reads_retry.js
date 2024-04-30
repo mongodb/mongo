@@ -18,6 +18,7 @@
  * - Assert the read succeeded and returned the updated (post-updateTS) document.
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const historyWindowSecs = 10;
@@ -26,7 +27,8 @@ const st = new ShardingTest({
     other: {rsOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: historyWindowSecs}}}
 });
 
-const primaryAdmin = st.rs0.getPrimary().getDB("admin");
+const primary = st.rs0.getPrimary();
+const primaryAdmin = primary.getDB("admin");
 assert.eq(assert
               .commandWorked(
                   primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
@@ -44,11 +46,7 @@ let result =
 const insertTS = assert.commandWorked(result).operationTime;
 jsTestLog(`Inserted document at ${tojson(insertTS)}`);
 
-assert.commandWorked(primaryAdmin.runCommand({
-    configureFailPoint: "waitInFindBeforeMakingBatch",
-    mode: "alwaysOn",
-    data: {nss: "test.test"}
-}));
+const fp = configureFailPoint(primary, "waitInFindBeforeMakingBatch", {nss: "test.test"});
 
 function read(insertTS, enableCausal) {
     const readConcern = {level: "snapshot"};
@@ -76,11 +74,7 @@ const waitForShell = startParallelShell(funWithArgs(read, insertTS, false), st.s
 const waitForShellCausal = startParallelShell(funWithArgs(read, insertTS, true), st.s.port);
 
 jsTestLog("Wait for shells to hit waitInFindBeforeMakingBatch failpoint");
-assert.commandWorked(primaryAdmin.runCommand({
-    waitForFailPoint: "waitInFindBeforeMakingBatch",
-    timesEntered: 2,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+fp.wait(kDefaultWaitForFailPointTimeout, 2);
 
 jsTestLog("Update document");
 result = mongosDB.runCommand({
@@ -101,8 +95,7 @@ assert.commandWorked(
     mongosDB.runCommand({insert: "test", documents: [{_id: 1}], writeConcern: {w: "majority"}}));
 
 jsTestLog("Disable failpoint");
-assert.commandWorked(
-    primaryAdmin.runCommand({configureFailPoint: "waitInFindBeforeMakingBatch", mode: "off"}));
+fp.off();
 
 jsTestLog("Wait for shells to finish");
 waitForShell();
