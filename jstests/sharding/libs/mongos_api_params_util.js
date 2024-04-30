@@ -1450,7 +1450,7 @@ export let MongosAPIParametersUtil = (function() {
         };
     });
 
-    const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 1}});
+    const st = new ShardingTest({mongos: 1, shards: 2, config: 1, rs: {nodes: 1}});
     const listCommandsRes = st.s0.adminCommand({listCommands: 1});
     assert.commandWorked(listCommandsRes);
 
