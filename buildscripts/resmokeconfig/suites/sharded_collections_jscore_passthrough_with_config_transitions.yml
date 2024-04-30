@@ -216,7 +216,7 @@ executor:
   fixture:
     class: ShardedClusterFixture
     config_shard: "any"
-    num_shards: 2
+    num_shards: 3
     mongos_options:
       set_parameters:
         enableTestCommands: 1
