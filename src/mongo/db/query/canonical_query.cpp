@@ -44,6 +44,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/cqf_command_utils.h"
@@ -229,7 +230,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
             _metadataDeps.set(DocumentMetadataFields::kSortKey);
         }
     }
-    _cqPipeline = std::move(cqPipeline);
+    setCqPipeline(std::move(cqPipeline), false /* containsEntirePipeline */);
     _isCountLike = isCountLike;
     _isSearchQuery = isSearchQuery;
 
@@ -419,6 +420,32 @@ CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKeyForPlanCacheCommand() const {
     return canonical_query_encoder::encodeForPlanCacheCommand(*this);
+}
+
+void CanonicalQuery::setCqPipeline(std::vector<boost::intrusive_ptr<DocumentSource>> cqPipeline,
+                                   bool containsEntirePipeline) {
+    _cqPipeline = std::move(cqPipeline);
+    _containsEntirePipeline = containsEntirePipeline;
+
+    // Find $match stages that weren't pushed down to find, but will be pushed to SBE. These
+    // need to be parameterized separately from the find layer filters.
+    for (auto& docSource : _cqPipeline) {
+        auto matchStage = dynamic_cast<DocumentSourceMatch*>(docSource.get());
+        if (matchStage) {
+            MatchExpression* matchExpr = matchStage->getMatchExpression();
+            if (shouldParameterizeSbe(matchExpr)) {
+                bool parameterized;
+                std::vector<const MatchExpression*> newParams = MatchExpression::parameterize(
+                    matchExpr, getMaxMatchExpressionParams(), numParams(), &parameterized);
+                if (parameterized) {
+                    addMatchParams(newParams);
+                } else {
+                    // Avoid plan cache flooding by not fully parameterized plans.
+                    setUncacheableSbe();
+                }
+            }
+        }
+    }
 }
 
 bool CanonicalQuery::shouldParameterizeSbe(MatchExpression* matchExpr) const {

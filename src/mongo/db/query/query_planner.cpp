@@ -1927,24 +1927,6 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
 
         auto matchStage = dynamic_cast<DocumentSourceMatch*>(innerStage);
         if (matchStage) {
-            // Parameterize the pushed-down match expression if there is not already a reason not
-            // to.
-            MatchExpression* matchExpr = matchStage->getMatchExpression();
-            if (query.shouldParameterizeSbe(matchExpr)) {
-                bool parameterized;
-                std::vector<const MatchExpression*> newParams =
-                    MatchExpression::parameterize(matchExpr,
-                                                  query.getMaxMatchExpressionParams(),
-                                                  query.numParams(),
-                                                  &parameterized);
-                if (parameterized) {
-                    query.addMatchParams(newParams);
-                } else {
-                    // Avoid plan cache flooding by not fully parameterized plans.
-                    query.setUncacheableSbe();
-                }
-            }
-
             solnForAgg = std::make_unique<MatchNode>(std::move(solnForAgg),
                                                      matchStage->getMatchExpression()->clone());
             continue;
