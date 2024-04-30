@@ -110,13 +110,6 @@ public:
                             ->isAuthorizedForActionsOnResource(
                                 ResourcePattern::forClusterResource(fromNss.tenantId()),
                                 ActionType::setUserWriteBlockMode));
-
-                uassert(ErrorCodes::IllegalOperation,
-                        str::stream() << "Cannot rename time-series buckets collection {"
-                                      << fromNss.toStringForErrorMsg()
-                                      << "} to a non-time-series buckets namespace {"
-                                      << toNss.toStringForErrorMsg() << "}",
-                        toNss.isTimeseriesBucketsCollection());
             }
 
             RenameCollectionRequest renameCollReq(request().getTo());

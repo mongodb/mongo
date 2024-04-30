@@ -154,6 +154,17 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                                     << " does not exist");
     }
 
+    // TODO SERVER-89089 move this check up in the rename stack execution once we have the guarantee
+    // that all bucket collection have timeseries options.
+    if (source.isTimeseriesBucketsCollection() && sourceColl->getTimeseriesOptions() &&
+        !target.isTimeseriesBucketsCollection()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot rename timeseries buckets collection '"
+                                    << source.toStringForErrorMsg()
+                                    << "' to a namespace that is not timeseries buckets '"
+                                    << target.toStringForErrorMsg() << "'.");
+    }
+
     if (sourceColl->getCollectionOptions().encryptedFieldConfig &&
         !AuthorizationSession::get(opCtx->getClient())
              ->isAuthorizedForActionsOnResource(
@@ -569,6 +580,17 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
     }
 
+    // TODO SERVER-89089 move this check up in the rename stack execution once we have the guarante
+    // that all bucket collection have timeseries options.
+    if (source.isTimeseriesBucketsCollection() && sourceColl->getTimeseriesOptions() &&
+        !target.isTimeseriesBucketsCollection()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot rename timeseries buckets collection '"
+                                    << source.toStringForErrorMsg()
+                                    << "' to a namespace that is not timeseries buckets '"
+                                    << target.toStringForErrorMsg() << "'.");
+    }
+
     if (isReplicatedChanged(opCtx, source, target))
         return {ErrorCodes::IllegalOperation,
                 "Cannot rename collections across a replicated and an unreplicated database"};
@@ -928,13 +950,6 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
                     ->isAuthorizedForActionsOnResource(
                         ResourcePattern::forClusterResource(target.tenantId()),
                         ActionType::setUserWriteBlockMode));
-
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot rename time-series buckets collection {"
-                              << source.toStringForErrorMsg()
-                              << "} to a non-time-series buckets namespace {"
-                              << target.toStringForErrorMsg() << "}",
-                target.isTimeseriesBucketsCollection());
     }
 }
 
