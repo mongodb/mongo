@@ -12,9 +12,9 @@ let orClauses = [];
 for (let idxKey = 'a'; idxKey <= 'aaaaaaaaaa'; idxKey += 'a') {
     let idx = {};
     idx[idxKey] = 1;
-    t.createIndex(idx);
+    assert.commandWorked(t.createIndex(idx));
     for (let i = 0; i < 200; ++i) {
-        t.insert(idx);
+        assert.commandWorked(t.insert(idx));
     }
     orClauses.push(idx);
 }
