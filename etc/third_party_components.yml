@@ -132,13 +132,6 @@ components:
     is_test_only: true
     team_owner: "Wiredtiger"
 
-  double-conversion:
-    homepage_url: https://github.com/google/double-conversion
-    open_hub_url: N/A
-    release_monitoring_id: -1
-    local_directory_path: src/third_party/mozjs/include/double-conversion
-    team_owner: "Query Execution"
-
   fmtlib/fmt:
     homepage_url: https://fmt.dev
     open_hub_url: https://www.openhub.net/p/fmtlib_fmt
