@@ -544,6 +544,7 @@ void testutil_delete_old_backups(int);
 bool testutil_exists(const char *, const char *);
 int testutil_general_event_handler(
   WT_EVENT_HANDLER *, WT_CONNECTION *, WT_SESSION *, WT_EVENT_TYPE, void *);
+void testutil_last_backup_id(int *);
 void testutil_lazyfs_cleanup(WT_LAZY_FS *);
 void testutil_lazyfs_clear_cache(WT_LAZY_FS *);
 void testutil_lazyfs_setup(WT_LAZY_FS *, const char *);
