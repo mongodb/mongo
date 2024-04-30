@@ -213,6 +213,7 @@ let viewsCommandTests = {
     _shardsvrValidateShardKeyCandidate: {skip: isAnInternalCommand},
     _shardsvrCollMod: {skip: isAnInternalCommand},
     _shardsvrCollModParticipant: {skip: isAnInternalCommand},
+    _shardsvrConvertToCappedParticipant: {skip: isAnInternalCommand},
     _shardsvrParticipantBlock: {skip: isAnInternalCommand},
     _shardsvrUnregisterIndex: {skip: isAnInternalCommand},
     streams_startStreamProcessor: {skip: isAnInternalCommand},

@@ -27,26 +27,46 @@
  *    it in the license file.
  */
 
+
+#include <string>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/capped_utils.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/s/convert_to_capped_coordinator.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/s/sharding_state.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace {
 
-class ShardsvrConvertToCappedCommand final : public TypedCommand<ShardsvrConvertToCappedCommand> {
+class ShardSvrConvertToCappedParticipantCommand final
+    : public TypedCommand<ShardSvrConvertToCappedParticipantCommand> {
 public:
-    using Request = ShardsvrConvertToCapped;
+    using Request = ShardsvrConvertToCappedParticipant;
 
     std::string help() const override {
-        return "Internal command, do not invoke directly. Converts a collection to capped.";
+        return "Internal command, which is exported by the shards. Do not call "
+               "directly. Processes convertToCapped.";
     }
 
     bool skipApiVersionCheck() const override {
@@ -58,59 +78,42 @@ public:
         return Command::AllowedOnSecondary::kNever;
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
+
+            const auto txnParticipant = TransactionParticipant::get(opCtx);
+            uassert(8577201,
+                    str::stream() << Request::kCommandName << " must be run as a retryable write",
+                    txnParticipant);
+
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            // Since this operation is not directly writing locally we need to force its db
-            // profile level increase in order to be logged in "<db>.system.profile"
-            CurOp::get(opCtx)->raiseDbProfileLevel(
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().dbName()));
+            const auto size = request().getSize();
+            uassert(ErrorCodes::InvalidOptions,
+                    "Capped collection size must be greater than zero",
+                    size > 0);
 
-            const auto& nss = ns();
+            convertToCapped(opCtx, ns(), size, request().getTargetUUID());
 
-            {
-                // TODO SERVER-87119 remove this scope once v8.0 branches out
-                // Unsafe best effort check needed to prevent calling convertToCapped on sharded
-                // collections when mustUseCoordinator=false
-                const auto cri = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                          nss));
-                uassert(ErrorCodes::NamespaceCannotBeSharded,
-                        "Can't convert a sharded collection to a capped collection",
-                        !cri.cm.isSharded());
-            }
-
-            boost::optional<SharedSemiFuture<void>> coordinatorCompletionFuture;
-            {
-                FixedFCVRegion fixedFcvRegion{opCtx};
-                bool mustUseCoordinator = feature_flags::gConvertToCappedCoordinator.isEnabled(
-                    (*fixedFcvRegion).acquireFCVSnapshot());
-
-                if (!mustUseCoordinator) {
-                    convertToCapped(opCtx, nss, request().getSize());
-                    return;
-                }
-
-                auto coordinatorDoc = ConvertToCappedCoordinatorDocument();
-                coordinatorDoc.setShardsvrConvertToCappedRequest(
-                    request().getShardsvrConvertToCappedRequest());
-                coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                    {{nss, DDLCoordinatorTypeEnum::kConvertToCapped}});
-
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
-                auto coordinator = checked_pointer_cast<ConvertToCappedCoordinator>(
-                    service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
-                coordinatorCompletionFuture.emplace(coordinator->getCompletionFuture());
-            }
-
-            coordinatorCompletionFuture->get(opCtx);
+            // In case no write that generated a retryable write oplog entry with this sessionId
+            // and txnNumber has happened, we need to make a dummy write so that the session gets
+            // durably persisted on the oplog. This must be the last operation done on this
+            // command.
+            DBDirectClient dbClient(opCtx);
+            dbClient.update(NamespaceString::kServerConfigurationNamespace,
+                            BSON("_id" << Request::kCommandName),
+                            BSON("$inc" << BSON("count" << 1)),
+                            true /* upsert */,
+                            false /* multi */);
         }
 
     private:
@@ -132,7 +135,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrConvertToCappedCommand).forShard();
+MONGO_REGISTER_COMMAND(ShardSvrConvertToCappedParticipantCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

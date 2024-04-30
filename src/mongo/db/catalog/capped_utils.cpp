@@ -49,6 +49,7 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog/unique_collection_name.h"
@@ -140,7 +141,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                              const NamespaceString& fromNss,
                              const NamespaceString& toNss,
                              long long size,
-                             bool temp) {
+                             bool temp,
+                             const boost::optional<UUID>& targetUUID) {
     CollectionPtr fromCollection(
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fromNss));
     if (!fromCollection) {
@@ -174,16 +176,13 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         auto options = fromCollection->getCollectionOptions();
         // The capped collection will get its own new unique id, as the conversion isn't reversible,
         // so it can't be rolled back.
-        options.uuid.reset();
+        options.uuid = targetUUID;
         options.capped = true;
         options.cappedSize = size;
         if (temp)
             options.temp = true;
 
-        BSONObjBuilder cmd;
-        cmd.append("create", toNss.coll());
-        cmd.appendElements(options.toBSON());
-        uassertStatusOK(createCollection(opCtx, toNss.dbName(), cmd.done()));
+        uassertStatusOK(createCollection(opCtx, toNss, options, BSONObj()));
     }
 
     CollectionPtr toCollection(
@@ -290,7 +289,10 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long long size) {
+void convertToCapped(OperationContext* opCtx,
+                     const NamespaceString& ns,
+                     long long size,
+                     const boost::optional<UUID>& targetUUID) {
     auto dbname = ns.dbName();
     StringData shortSource = ns.coll();
 
@@ -315,6 +317,39 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     }
 
+    if (targetUUID) {
+        // Return if the collection is already capped with the given UUID.
+        if (coll && (coll->uuid() == *targetUUID) && coll->isCapped()) {
+            invariant(coll->getCappedMaxSize() == size);
+            return;
+        }
+
+        // Check if a previous execution left an existing temporary collection with the given
+        // targetUUID. In that case let's drop the temporary collection to be able to proceed with
+        // the creation of a new one.
+        boost::optional<NamespaceString> oldTempNssToDrop;
+        try {
+            AutoGetCollection tempColl(
+                opCtx, NamespaceStringOrUUID{ns.dbName(), *targetUUID}, MODE_S);
+            invariant(!tempColl || (tempColl && tempColl->isTemporary()));
+
+            if (tempColl && tempColl->isTemporary()) {
+                oldTempNssToDrop = tempColl.getNss();
+            }
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        }
+
+        if (oldTempNssToDrop) {
+            DropReply unused;
+            uassertStatusOK(
+                dropCollection(opCtx,
+                               *oldTempNssToDrop,
+                               &unused,
+                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops,
+                               false));
+        }
+    }
+
     // Generate a temporary collection name that will not collide with any existing collections.
     boost::optional<Lock::CollectionLock> collLock;
     const auto tempNs = [&] {
@@ -336,7 +371,7 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
         }
     }();
 
-    cloneCollectionAsCapped(opCtx, db, ns, tempNs, size, true);
+    cloneCollectionAsCapped(opCtx, db, ns, tempNs, size, true /* temp */, targetUUID);
 
     RenameCollectionOptions options;
     options.dropTarget = true;

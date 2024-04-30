@@ -127,7 +127,9 @@ public:
         auto size = cmdObj.getField("size").safeNumberLong();
         bool temp = cmdObj.getField("temp").trueValue();
 
-        uassert(ErrorCodes::InvalidOptions, "invalid command spec", size != 0);
+        uassert(ErrorCodes::InvalidOptions,
+                "Capped collection size must be greater than zero",
+                size > 0);
 
         NamespaceString fromNs(NamespaceStringUtil::deserialize(dbName, from));
         NamespaceString toNs(NamespaceStringUtil::deserialize(dbName, to));
@@ -194,7 +196,9 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         auto size = cmdObj.getField("size").safeNumberLong();
 
-        uassert(ErrorCodes::InvalidOptions, "invalid command spec", size != 0);
+        uassert(ErrorCodes::InvalidOptions,
+                "Capped collection size must be greater than zero",
+                size > 0);
 
         convertToCapped(opCtx, nss, size);
         return true;

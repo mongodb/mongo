@@ -541,6 +541,7 @@ env.Library(
         'shardsvr_commit_reshard_collection_command.cpp',
         'shardsvr_compact_structured_encryption_data_command.cpp',
         'shardsvr_convert_to_capped_command.cpp',
+        'shardsvr_convert_to_capped_participant_command.cpp',
         'shardsvr_create_collection_command.cpp',
         'shardsvr_create_collection_participant_command.cpp',
         'shardsvr_create_global_index_command.cpp',

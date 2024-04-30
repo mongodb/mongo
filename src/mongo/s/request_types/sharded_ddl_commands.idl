@@ -828,6 +828,21 @@ commands:
         chained_structs:
             ShardsvrConvertToCappedRequest: ShardsvrConvertToCappedRequest
 
+    _shardsvrConvertToCappedParticipant:
+        command_name: _shardsvrConvertToCappedParticipant
+        cpp_name: ShardsvrConvertToCappedParticipant
+        description: "Internal command sent to the data shard to convert a collection to capped"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        chained_structs:
+            ShardsvrConvertToCappedRequest: ShardsvrConvertToCappedRequest
+        fields:
+            targetUUID:
+                type: uuid
+                description: "UUID of the new capped collection"
+        reply_type: OkReply
+
     _shardsvrUntrackUnsplittableCollection:
         command_name: _shardsvrUntrackUnsplittableCollection
         cpp_name: ShardsvrUntrackUnsplittableCollection

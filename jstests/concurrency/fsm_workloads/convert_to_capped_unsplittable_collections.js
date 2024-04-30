@@ -11,8 +11,6 @@
  *   # convertToCapped requires a global lock and any background operations on the database causes
  *   # it to fail due to not finishing quickly enough.
  *   incompatible_with_concurrency_simultaneous,
- *   # SERVER-85772 enable testing with balancer once convertToCapped supported on arbitrary shards
- *   assumes_balancer_off,
  * ]
  */
 

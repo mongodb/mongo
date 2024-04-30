@@ -7,9 +7,6 @@
  *   not_allowed_with_signed_security_token,
  *   requires_non_retryable_commands,
  *   requires_capped,
- *   # TODO SERVER-85772 enable testing with balancer once convertToCapped supported on arbitrary
- *   # shards
- *   assumes_balancer_off,
  *   # TODO SERVER-86309 enable testing with FCV transitions once unsharded collections are
  *   # untracked on downgrade
  *   cannot_run_during_upgrade_downgrade,
@@ -32,7 +29,10 @@ assert.eq([{_id: "FOO"}],
           coll.find({_id: "foo"}).toArray(),
           "query should have performed a case-insensitive match");
 
+assert(!coll.isCapped());
+
 assert.commandWorked(testDb.runCommand({convertToCapped: coll.getName(), size: 4096}));
+assert(coll.isCapped());
 const cappedCollectionInfos = testDb.getCollectionInfos({name: coll.getName()});
 assert.eq(cappedCollectionInfos.length, 1, tojson(cappedCollectionInfos));
 assert.eq(originalCollectionInfos[0].options.collation, cappedCollectionInfos[0].options.collation);

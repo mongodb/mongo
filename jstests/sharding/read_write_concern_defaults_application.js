@@ -203,6 +203,7 @@ let testCases = {
     _shardsvrValidateShardKeyCandidate: {skip: "internal command"},
     _shardsvrCollMod: {skip: "internal command"},
     _shardsvrCollModParticipant: {skip: "internal command"},
+    _shardsvrConvertToCappedParticipant: {skip: "internal command"},
     _shardsvrParticipantBlock: {skip: "internal command"},
     _shardsvrUntrackUnsplittableCollection: {skip: "internal command"},
     streams_startStreamProcessor: {skip: "internal command"},

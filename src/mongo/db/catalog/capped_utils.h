@@ -27,7 +27,10 @@
  *    it in the license file.
  */
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/status.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 class Database;
@@ -41,18 +44,24 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
 
 /**
  * Clones the collection "shortFrom" to the capped collection "shortTo" with a size of "size".
+ * If targetUUID is provided, then the newly capped collection will get that UUID. Otherwise, the
+ * UUID for the newly capped collection will be randomly generated.
  */
 void cloneCollectionAsCapped(OperationContext* opCtx,
                              Database* db,
                              const NamespaceString& fromNss,
                              const NamespaceString& toNss,
                              long long size,
-                             bool temp);
+                             bool temp,
+                             const boost::optional<UUID>& targetUUID = boost::none);
 
 /**
  * Converts the collection "collectionName" to a capped collection with a size of "size".
+ * If targetUUID is provided, then the newly capped collection will get that UUID. Otherwise, the
+ * UUID for the newly capped collection will be randomly generated.
  */
 void convertToCapped(OperationContext* opCtx,
                      const NamespaceString& collectionName,
-                     long long size);
+                     long long size,
+                     const boost::optional<UUID>& targetUUID = boost::none);
 }  // namespace mongo

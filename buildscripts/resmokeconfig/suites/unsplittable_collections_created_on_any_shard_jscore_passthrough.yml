@@ -57,6 +57,9 @@ selector:
     # TODO SERVER-89286 re-enable this test
     - src/mongo/db/modules/enterprise/jstests/fle2/query/update_upsert.js
 
+    # TODO: SERVER-85773 Reenable the following test once `cloneCollectionAsCapped` is supported on any shard
+    - jstests/core/ddl/capped_convertToCapped1.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
@@ -64,9 +67,6 @@ selector:
     - requires_profiling
     # system.js stored functions only work for collections that live on the db-primary shard (SERVER-83269)
     - requires_system_dot_js_stored_functions
-    # TODO SERVER-85772 Revisit this tag once `cloneCollectionAsCapped` is supported on any shard
-    # TODO SERVER-85773 Revisit this tag once `convertToCapped` is supported on any shard
-    - requires_capped
 
 executor:
   archive:

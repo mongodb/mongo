@@ -42,10 +42,14 @@ enums:
         type: string
         values:
             kUnset: "unset"
-            kAcquireCriticalSection: "acquireCriticalSection"
-            kConvertCollectionToCapped: "convertCollectionToCapped"
+            kAcquireCriticalSectionOnCoordinator: "acquireCriticalSectionOnCoordinator"
+            kDropCollectionOnShardsNotOwningData: "dropCollectionOnShardsNotOwningData"
+            kAcquireCriticalSectionOnDataShard: "acquireCriticalSectionOnDataShard"
+            kConvertCollectionToCappedOnDataShard: "convertCollectionToCappedOnDataShard"
+            kConvertCollectionToCappedOnCoordinator: "convertCollectionToCappedOnCoordinator"
             kUpdateShardingCatalog: "updateShardingCatalog"
-            kReleaseCriticalSection: "releaseCriticalSection"
+            kReleaseCriticalSectionOnDataShard: "releaseCriticalSectionOnDataShard"
+            kReleaseCriticalSectionOnCoordinator: "releaseCriticalSectionOnCoordinator"
 
 structs:
     ConvertToCappedCoordinatorDocument:
@@ -62,4 +66,13 @@ structs:
             originalCollection:
                 description: "Collection entry in the sharding catalog before executing `convertToCapped`"
                 type: CollectionType
+                optional: true
+            targetUUID:
+                description: "The UUID of the newly capped collection."
+                type: uuid
+                optional: true
+            dataShard:
+                type: shard_id
+                description: >-
+                    The data shard that the collection lives on.
                 optional: true
