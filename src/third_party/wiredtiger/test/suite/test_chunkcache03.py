@@ -119,11 +119,27 @@ class test_chunkcache03(wttest.WiredTigerTestCase):
         self.assertGreater(total_chunks, 0)
         self.assertGreater(pinned_chunks, 0)
 
-        # Assert that pinned chunks make up 50% of the total chunks.
-        self.assertEqual(total_chunks/pinned_chunks, 2)
+        # Assert that pinning a table also pins its backing chunks.
+        # We can't measure this directly, so exploit the fact that all four tables have been
+        # populated to roughly the same size and will use ~25% of available chunks each.
 
-        # Reconfigure wiredtiger and mark the pinned objects as unpinned and vice-versa.
-        self.conn.reconfigure('chunk_cache=[pinned=("table:chunkcache03", "table:chunkcache04")]')
+        # We start with two tables pinned. This is half the total chunks
+        self.assertEqual(round(total_chunks/pinned_chunks), 2)
 
-        # Assert that pinned chunks make up 50% of the total chunks.
-        self.assertEqual(total_chunks/pinned_chunks, 2)
+        # Now reconfigure to unpin the second table for a quarter of all chunks.
+        self.conn.reconfigure('chunk_cache=[pinned=("table:chunkcache01")]')
+        total_chunks = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_inuse)
+        pinned_chunks = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_pinned)
+        self.assertEqual(round(total_chunks/pinned_chunks), 4)
+
+        # Now pin two different tables again for half the chunks.
+        self.conn.reconfigure('chunk_cache=[pinned=("table:chunkcache02", "table:chunkcache04")]')
+        total_chunks = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_inuse)
+        pinned_chunks = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_pinned)
+        self.assertEqual(round(total_chunks/pinned_chunks), 2)
+
+        # Finally pin all tables to pin all chunks.
+        self.conn.reconfigure('chunk_cache=[pinned=("table:chunkcache01", "table:chunkcache02", "table:chunkcache03", "table:chunkcache04")]')
+        total_chunks = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_inuse)
+        pinned_chunks = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_pinned)
+        self.assertEqual(round(total_chunks/pinned_chunks), 1)
