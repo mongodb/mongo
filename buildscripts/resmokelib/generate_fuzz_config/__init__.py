@@ -36,6 +36,7 @@ class GenerateFuzzConfig(Subcommand):
         set_parameters["mirrorReads"] = json.dumps(set_parameters["mirrorReads"])
         # This is moved from Jepsen mongod.conf to have only one setParameter key value pair.
         set_parameters["enableTestCommands"] = True
+        set_parameters["testingDiagnosticsEnabled"] = True
         conf = {
             "setParameter": set_parameters, "storage": {
                 "wiredTiger": {
