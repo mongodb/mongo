@@ -73,9 +73,13 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const DatabaseNam
 
             if (!directShardOperationsAllowed) {
                 ShardingStatistics::get(opCtx).unauthorizedDirectShardOperations.addAndFetch(1);
+                // Atlas log ingestion requires a strict upper bound on the number of logs per
+                // hour. To abide by this, we log the lower verbosity messages with a different
+                // log ID to prevent log ingestion from picking them up.
+                const auto severity = ShardingState::get(opCtx)->directConnectionLogSeverity();
                 LOGV2_DEBUG(
-                    7553700,
-                    ShardingState::get(opCtx)->directConnectionLogSeverity().toInt(),
+                    severity == logv2::LogSeverity::Warning() ? 7553700 : 8993900,
+                    severity.toInt(),
                     "You are connecting to a sharded cluster improperly by connecting directly "
                     "to a shard. Please connect to the cluster via a router (mongos).",
                     "command"_attr = CurOp::get(opCtx)->getCommand()->getName());
