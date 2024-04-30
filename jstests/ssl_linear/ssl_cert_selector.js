@@ -58,8 +58,6 @@ requireSSLProvider('windows', function() {
         if (_isWindows()) {
             const trusted_ca_thumbprint = cat('jstests/libs/trusted-ca.pem.digest.sha1');
             runProgram("certutil.exe", "-delstore", "-f", "Root", trusted_ca_thumbprint);
-            const ca_thumbprint = cat('jstests/libs/trusted-ca.pem.digest.sha1');
-            runProgram("certutil.exe", "-delstore", "-f", "Root", ca_thumbprint);
         }
     }
 });
