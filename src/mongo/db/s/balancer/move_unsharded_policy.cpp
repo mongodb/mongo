@@ -240,17 +240,33 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
     const auto& moveResponse = get<Status>(response);
 
     if (!moveResponse.isOK()) {
-        auto isAcceptableError = [](ErrorCodes::Error errorCode) {
-            switch (errorCode) {
+        auto isAcceptableError = [](const Status& status) {
+            // Categories covering stepdown, crashes, network issues, slow machines, stale routing
+            // info
+            const bool isErrorInAcceptableCategory = status.isA<ErrorCategory::ShutdownError>() ||
+                status.isA<ErrorCategory::NetworkError>() ||
+                status.isA<ErrorCategory::RetriableError>() ||
+                status.isA<ErrorCategory::Interruption>() ||
+                status.isA<ErrorCategory::ExceededTimeLimitError>() ||
+                status.isA<ErrorCategory::WriteConcernError>() ||
+                status.isA<ErrorCategory::NeedRetargettingError>() ||
+                status.isA<ErrorCategory::NotPrimaryError>();
+            if (isErrorInAcceptableCategory) {
+                return true;
+            }
+
+            switch (status.code()) {
                 case ErrorCodes::BackgroundOperationInProgressForNamespace:
                 // TODO SERVER-89892 Investigate CannotCreateIndex error
                 case ErrorCodes::CannotCreateIndex:
+                // TODO SERVER-90002 Investigate CannotInsertTimeseriesBucketsWithMixedSchema error
+                case ErrorCodes::CannotInsertTimeseriesBucketsWithMixedSchema:
                 case ErrorCodes::CommandNotSupported:
                 case ErrorCodes::DuplicateKey:
-                case ErrorCodes::HostUnreachable:
+                case ErrorCodes::FailedToSatisfyReadPreference:
                 // TODO SERVER-89826 Investigate IllegalOperation error
                 case ErrorCodes::IllegalOperation:
-                case ErrorCodes::InterruptedDueToReplStateChange:
+                case ErrorCodes::LockBusy:
                 case ErrorCodes::NamespaceNotFound:
                 case ErrorCodes::NotImplemented:
                 // TODO SERVER-89342 Remove OperationCannotBeBatched from whitelist
@@ -270,7 +286,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                     << ", from: " << moveAction.from << ", to: " << moveAction.to
                     << ", nss: " << moveAction.nss.toStringForErrorMsg()
                     << ", error: " << moveResponse.toString(),
-                isAcceptableError(moveResponse.code()));
+                isAcceptableError(moveResponse));
     }
 }
 
