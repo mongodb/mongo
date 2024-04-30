@@ -1,7 +1,7 @@
 command_type: system
 stepback: false
-exec_timeout_secs: 21600
-timeout_secs: 7200
+exec_timeout_secs: &exec_timeout_secs 21600
+timeout_secs: &timeout_secs 7200
 
 include:
   - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
@@ -21,6 +21,12 @@ parameters:
   # see https://github.com/10gen/performance-tooling-docs/blob/main/patch_testing.md#skipping-compilation-on-sys-perf-projects
   - key: reuse_compile_from
     description: "Version_id of the commit/patch to reuse the compile artifacts from, e.g., sys_perf_ef8504eefef4c9fe2062b8424e85053b3e1ad8d2"
+  - key: exec_timeout_secs_override
+    value: *exec_timeout_secs
+    description: "Overrides the default exec_timeout_secs defined at the top of this file for the f_dsi_run_workload task"
+  - key: timeout_secs_override
+    value: *timeout_secs
+    description: "Overrides the default timeout_secs defined at the top of this file for the f_dsi_run_workload task"
 
 variables:
   ###
