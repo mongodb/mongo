@@ -881,6 +881,21 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                 "Cannot rename an encrypted collection",
                                 !coll || !coll->getCollectionOptions().encryptedFieldConfig ||
                                     _doc.getAllowEncryptedCollectionRename().value_or(false));
+
+                        // Since SERVER-89992 the rename on the local catalog actually supports
+                        // renaming a bucket collections without timeseries options to a non bucket
+                        // namespace. On the other hand in the rename coordinator we do not have the
+                        // guarantee that all participants are on a version that support this. Thus
+                        // we need to be pessimistic and simply disallow renaming a bucket
+                        // collection to a normal collection even though the source bucket
+                        // collection does not have timeseries options.
+                        uassert(ErrorCodes::IllegalOperation,
+                                str::stream() << "Cannot rename timeseries buckets collection '"
+                                              << fromNss.toStringForErrorMsg()
+                                              << "' to a namespace that is not timeseries buckets '"
+                                              << toNss.toStringForErrorMsg() << "'.",
+                                !fromNss.isTimeseriesBucketsCollection() ||
+                                    toNss.isTimeseriesBucketsCollection());
                     }
 
                     // Make sure the source collection exists
