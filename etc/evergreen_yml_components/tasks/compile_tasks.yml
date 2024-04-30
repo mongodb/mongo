@@ -223,7 +223,6 @@ tasks:
             install-all
             prove-unittests
           task_compile_flags: >-
-            BAZEL_BUILD_ENABLED=1
             ICECC=
             CCACHE=
             --build-profile=opt
@@ -242,7 +241,6 @@ tasks:
             build/opt/mongo/db/commands/libfsync_locked.a
             build/opt/mongo/db/commands/libtest_commands_enabled.a
           task_compile_flags: >-
-            BAZEL_BUILD_ENABLED=1
             ICECC=
             --build-profile=opt
             --ninja=disabled

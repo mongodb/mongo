@@ -139,6 +139,13 @@ if [[ ${compile_flags} == *"--lto"* ]]; then
   mkdir -p tmp && $sudo mount --bind ./tmp /tmp
 fi
 
+if [[ -n "${bazel_scons_diff_targets}" ]]; then
+  diff_extra_args="--extra_args \"${compile_flags} ${task_compile_flags} ${task_compile_flags_extra} $extra_args\""
+  eval ${compile_env} $python ./buildscripts/bazel_scons_diff.py \
+    ${diff_extra_args} \
+    ${bazel_scons_diff_targets}
+fi
+
 eval ${compile_env} $python ./buildscripts/scons.py \
   ${compile_flags} ${task_compile_flags} ${task_compile_flags_extra} \
   ${scons_cache_args} $extra_args \

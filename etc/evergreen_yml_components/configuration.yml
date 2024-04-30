@@ -42,6 +42,8 @@ parameters:
   - key: project_weekly_cron
     value: "0 4 * * 0" # Every week starting 0400 UTC Sunday
     description: "Cron schedule for nightly variants"
+  - key: bazel_scons_diff_targets
+    description: "Targets to run the bazel-scons diff on in this patch"
 
 #######################################
 #               Modules               #

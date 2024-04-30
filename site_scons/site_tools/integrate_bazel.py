@@ -269,9 +269,6 @@ def bazel_build_thread_func(log_dir: str, verbose: bool) -> None:
     """This thread runs the bazel build up front."""
 
     done_with_temp = False
-    # removed the log directory creation which was intermittently
-    # erroring on a race-condition
-    # FIX: The fix is in https://github.com/10gen/mongo/pull/21020
 
     if verbose:
         extra_args = []
@@ -785,6 +782,11 @@ def generate(env: SCons.Environment.Environment) -> None:
             'build',
         ] + bazel_internal_flags + shlex.split(env.get("BAZEL_FLAGS", ""))
 
+        log_dir = env.Dir("$BUILD_ROOT/scons/bazel").path
+        os.makedirs(log_dir, exist_ok=True)
+        with open(os.path.join(log_dir, "bazel_command"), "w") as f:
+            f.write(" ".join(Globals.bazel_base_build_command))
+
         # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
         if normalized_arch == "ppc64le":
             Globals.bazel_env_variables[
@@ -838,9 +840,8 @@ def generate(env: SCons.Environment.Environment) -> None:
         if env.GetOption('ninja') == "disabled":
 
             # ninja will handle the build so do not launch the bazel batch thread
-            bazel_build_thread = threading.Thread(
-                target=bazel_build_thread_func, args=(env.Dir("$BUILD_ROOT/scons/bazel").path,
-                                                      env["VERBOSE"]))
+            bazel_build_thread = threading.Thread(target=bazel_build_thread_func,
+                                                  args=(log_dir, env["VERBOSE"]))
             bazel_build_thread.start()
 
             def wait_for_bazel(env):
