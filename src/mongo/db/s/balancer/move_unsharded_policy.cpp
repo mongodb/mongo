@@ -257,6 +257,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::OperationCannotBeBatched:
                 case ErrorCodes::OplogQueryMinTsMissing:
                 case ErrorCodes::ReshardCollectionInProgress:
+                case ErrorCodes::SnapshotTooOld:
                 case ErrorCodes::StaleDbVersion:
                     return true;
                 default:
