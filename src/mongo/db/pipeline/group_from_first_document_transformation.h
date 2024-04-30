@@ -40,6 +40,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
@@ -60,17 +61,15 @@ namespace mongo {
  */
 class GroupFromFirstDocumentTransformation final : public TransformerInterface {
 public:
-    enum class ExpectedInput { kFirstDocument, kLastDocument };
-
     GroupFromFirstDocumentTransformation(
         const std::string& groupId,
         StringData originalStageName,
         std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs,
-        ExpectedInput expectedInput = ExpectedInput::kFirstDocument)
+        AccumulatorDocumentsNeeded docsNeeded = AccumulatorDocumentsNeeded::kFirstInputDocument)
         : _accumulatorExprs(std::move(accumulatorExprs)),
           _groupId(groupId),
           _originalStageName(originalStageName),
-          _expectedInput(expectedInput) {}
+          _docsNeeded(docsNeeded) {}
 
     TransformerType getType() const final {
         return TransformerType::kGroupFromFirstDocument;
@@ -88,8 +87,8 @@ public:
         return _originalStageName;
     }
 
-    ExpectedInput expectedInput() const {
-        return _expectedInput;
+    AccumulatorDocumentsNeeded docsNeeded() const {
+        return _docsNeeded;
     }
 
     Document applyTransformation(const Document& input) const final;
@@ -113,13 +112,13 @@ public:
         const std::string& groupId,
         StringData originalStageName,
         std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs,
-        ExpectedInput expectedInput);
+        AccumulatorDocumentsNeeded docsNeeded);
 
 private:
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> _accumulatorExprs;
     std::string _groupId;
     StringData _originalStageName;
-    ExpectedInput _expectedInput;
+    AccumulatorDocumentsNeeded _docsNeeded;
 };
 
 }  // namespace mongo

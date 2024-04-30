@@ -153,6 +153,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -736,12 +737,16 @@ void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
 namespace {
 
 /**
- * Check for $group or $sort+$group at the beginning of the pipeline that could qualify for the
+ * Checks if $group or $sort+$group at the beginning of the pipeline that could qualify for the
  * DISTINCT_SCAN plan that visits the first document in each group (SERVER-9507). If found, return
  * the stage that would replace them in the pipeline on top of DISTINCT_SCAN.
+ *
+ * Returns a pair of:
+ * - first: the optional sort pattern of $group's $top and/or $bottom's common sort pattern.
+ * - second: the stage that would replace $group in the pipeline on top of DISTINCT_SCAN.
  */
-std::unique_ptr<GroupFromFirstDocumentTransformation> tryDistinctGroupRewrite(
-    const Pipeline::SourceContainer& sources) {
+std::pair<boost::optional<SortPattern>, std::unique_ptr<GroupFromFirstDocumentTransformation>>
+tryDistinctGroupRewrite(const Pipeline::SourceContainer& sources) {
     auto sourcesIt = sources.begin();
     if (sourcesIt != sources.end()) {
         auto sortStage = dynamic_cast<DocumentSourceSort*>(sourcesIt->get());
@@ -751,17 +756,20 @@ std::unique_ptr<GroupFromFirstDocumentTransformation> tryDistinctGroupRewrite(
             } else {
                 // This $sort stage was previously followed by a $limit stage which disqualifies it
                 // from DISTINCT_SCAN.
-                return nullptr;
+                return {boost::none, nullptr};
             }
         }
     }
 
     if (sourcesIt == sources.end()) {
-        return nullptr;
+        return {boost::none, nullptr};
     }
 
-    auto groupStage = dynamic_cast<DocumentSourceGroupBase*>(sourcesIt->get());
-    return groupStage ? groupStage->rewriteGroupAsTransformOnFirstDocument() : nullptr;
+    if (auto groupStage = dynamic_cast<DocumentSourceGroupBase*>(sourcesIt->get()); groupStage) {
+        return groupStage->rewriteGroupAsTransformOnFirstDocument();
+    } else {
+        return {boost::none, nullptr};
+    }
 }
 
 boost::optional<long long> extractSkipForPushdown(Pipeline* pipeline) {
@@ -875,8 +883,13 @@ auto buildProjectionForPushdown(const DepsTracker& deps,
     return BSONObj();
 }
 
-// Does the last-minute analysis of the pipeline to see if any sort, skip and limit stages could be
-// pushed down into the PlanStage layer and creates a CanonicalQuery that represents the plan.
+/**
+ * Does the last-minute analysis of the pipeline to see if any sort, skip and limit stages could be
+ * pushed down into the PlanStage layer and creates a CanonicalQuery that represents the plan.
+ *
+ * Side effect: this function modifies 'pipeline' for the last-minute optimization but those
+ * modifications are visible only when this function succeeds to generate a canonical query.
+ */
 StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     const intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
@@ -884,6 +897,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     QueryMetadataBitSet unavailableMetadata,
     const BSONObj& queryObj,
     boost::intrusive_ptr<DocumentSourceMatch> leadingMatch,
+    const boost::optional<SortPattern>& sortPattern,
     const AggregateCommandRequest* aggRequest,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     bool timeseriesBoundedSortOptimization,
@@ -917,10 +931,10 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     // hasLimit() set on it).
     auto skipThenLimit = extractSkipAndLimitForPushdown(pipeline);
 
-    // If there is a sort stage eligible for pushdown, serialize its SortPattern to a BSONObj. The
-    // BSONObj format is currently necessary to request that the sort is computed by the query layer
-    // inside the inner PlanExecutor. We also remove the $sort stage from the Pipeline, since it
-    // will be handled instead by PlanStage execution.
+    // If there is a sort stage or a sort pattern eligible for pushdown, serialize its SortPattern
+    // to a BSONObj. The BSONObj format is currently necessary to request that the sort is computed
+    // by the query layer inside the inner PlanExecutor. We also remove the $sort stage from the
+    // Pipeline, since it will be handled instead by PlanStage execution.
     BSONObj sortObj;
     if (sortStage) {
         sortObj = sortStage->getSortKeyPattern()
@@ -936,6 +950,10 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
         // Since the limit from $sort is going before the extracted $skip stages, we construct
         // 'LimitThenSkip' object and then convert it 'SkipThenLimit'.
         skipThenLimit = LimitThenSkip(sortStage->getLimit(), skip).flip();
+    } else if (sortPattern) {
+        sortObj =
+            sortPattern->serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
+                .toBson();
     }
     // =============================================================================================
     // The end of last-minute pipeline optimizations.
@@ -1007,17 +1025,162 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
         }
     }(std::move(leadingMatch), std::move(findCommand));
 
-    StatusWith<std::unique_ptr<CanonicalQuery>> cq = CanonicalQuery::make(
+    StatusWith<std::unique_ptr<CanonicalQuery>> swCq = CanonicalQuery::make(
         {.expCtx = expCtx,
          .parsedFind = std::move(parsedFind),
          .isCountLike = *shouldProduceEmptyDocs,
          .isSearchQuery = PipelineD::isSearchPresentAndEligibleForSbe(pipeline)});
 
-    if (cq.isOK()) {
-        cq.getValue()->requestAdditionalMetadata(deps.metadataDeps());
-        cq.getValue()->setSearchMetadata(deps.searchMetadataDeps());
+    if (!swCq.isOK()) {
+        return swCq.getStatus();
     }
-    return cq;
+
+    swCq.getValue()->requestAdditionalMetadata(deps.metadataDeps());
+    swCq.getValue()->setSearchMetadata(deps.searchMetadataDeps());
+
+    return swCq;
+}
+
+/**
+ * Tries to generate a distinct query executor for $sort+$group with $first/$last or $group with
+ * $top/$bottom if a proper index exists for the $sort or $top/$bottom's sortBy sort pattern. For
+ * example, the following pipeline
+ *
+ * [
+ *   {$sort: {a: 1, b: 1}},
+ *   {$group: {_id: "$a", fc: {$first: "$c"}}}
+ * ]
+ *
+ * can be optimized into
+ *
+ * [
+ *   {$cursor: {DISTINCT_SCAN over a_1_b_1 index}},     --> distinct_scan query executor
+ *   {$groupByDistinct {newRoot: {id: "$a", fc: "$c"}}}
+ * ]
+ *
+ * The same optimization can be applied to $group with $top or $bottom. For example, the following
+ * pipeline
+ *
+ * [{$group: {_id: "$a", tc: {$top: {sortBy: {a: 1, b: 1}, output: "$c"}}}}]
+ *
+ * can be optimized into
+ *
+ * [
+ *   {$cursor: {DISTINCT_SCAN over a_1_b_1 index}},     --> distinct_scan query executor
+ *   {$groupByDistinct {newRoot: {id: "$a", tc: "$c"}}}
+ * ]
+ *
+ * Returns:
+ * 1) Status::OK() and a distinct executor if succeeds to generate a distinct executor.
+ * 2) NoQueryExecutionPlans error code if fails to generate a canonical query. This should be
+ *    considered as a final failure of prepareExecutor().
+ * 3) Status::OK() and an optimized CanonicalQuery if fails to generate a distinct executor in any
+ *    reason other than 2) and need to continue to generate a non-distinct executor.
+ */
+StatusWith<std::variant<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
+                        std::unique_ptr<CanonicalQuery>>>
+tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
+                           const MultipleCollectionAccessor& collections,
+                           const NamespaceString& nss,
+                           Pipeline* pipeline,
+                           QueryMetadataBitSet unavailableMetadata,
+                           const BSONObj& queryObj,
+                           boost::intrusive_ptr<DocumentSourceMatch> leadingMatch,
+                           const AggregateCommandRequest* aggRequest,
+                           const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
+                           bool* shouldProduceEmptyDocs,
+                           bool timeseriesBoundedSortOptimization) {
+    // We want to do this before createCanonicalQuery() which does the last-minute optimization to
+    // 'pipeline' and hence modifies it.
+    auto [sortPattern, rewrittenGroupStage] = tryDistinctGroupRewrite(pipeline->getSources());
+
+    auto swCq =
+        createCanonicalQuery(expCtx,
+                             nss,
+                             pipeline,
+                             unavailableMetadata,
+                             queryObj,
+                             leadingMatch,
+                             rewrittenGroupStage ? sortPattern : boost::optional<SortPattern>(),
+                             aggRequest,
+                             matcherFeatures,
+                             timeseriesBoundedSortOptimization,
+                             shouldProduceEmptyDocs);
+    if (!swCq.isOK()) {
+        // Return an error instead of uasserting, since there are cases where the combination of
+        // sort and projection will result in a bad query, but when we try with a different
+        // combination it will be ok. e.g. a sort by {$meta: 'textScore'}, without any projection
+        // will fail, but will succeed when the corresponding '$meta' projection is passed in
+        // another attempt.
+        return {swCq.getStatus()};
+    }
+
+    // If the pipeline is not eligible for distinct executor, returns the CanonicalQuery so that we
+    // can create a non-distinct executor. We don't want to lose the work done inside
+    // createCanonicalQuery()
+    if (!rewrittenGroupStage) {
+        return StatusWith{std::move(swCq.getValue())};
+    }
+
+    std::size_t plannerOpts = QueryPlannerParams::DEFAULT;
+    if (!*shouldProduceEmptyDocs) {
+        plannerOpts |= QueryPlannerParams::RETURN_OWNED_DATA;
+    }
+
+    CanonicalDistinct canonicalDistinct(std::move(swCq.getValue()), rewrittenGroupStage->groupId());
+
+    // If the GroupFromFirst transformation was generated for the $last or $bottom case, we will
+    // need to flip the direction of any generated DISTINCT_SCAN to preserve the semantics of
+    // the query.
+    const bool flipDistinctScanDirection = [&, groupStage = rewrittenGroupStage.get()] {
+        const auto docsNeeded = groupStage->docsNeeded();
+        return docsNeeded == AccumulatorDocumentsNeeded::kLastInputDocument ||
+            docsNeeded == AccumulatorDocumentsNeeded::kLastOutputDocument;
+    }();
+
+    // We have to request a "strict" distinct plan because:
+    // 1) $group with distinct semantics doesn't de-duplicate the results.
+    // 2) Non-strict parameter would allow use of multikey indexes for DISTINCT_SCAN, which
+    //    means that for {a: [1, 2]} two distinct values would be returned, but for group keys
+    //    arrays shouldn't be traversed.
+    StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> swExecutorGrouped =
+        tryGetExecutorDistinct(collections,
+                               plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
+                               canonicalDistinct,
+                               flipDistinctScanDirection);
+
+    if (swExecutorGrouped.isOK()) {
+        pipeline->popFrontWithName(rewrittenGroupStage->originalStageName());
+
+        boost::intrusive_ptr<DocumentSource> groupTransform(
+            new DocumentSourceSingleDocumentTransformation(expCtx,
+                                                           std::move(rewrittenGroupStage),
+                                                           "$groupByDistinctScan",
+                                                           false /* independentOfAnyCollection */));
+        pipeline->addInitialSource(groupTransform);
+
+        return StatusWith{std::move(swExecutorGrouped.getValue())};
+    }
+
+    if (swExecutorGrouped != ErrorCodes::NoQueryExecutionPlans) {
+        return swExecutorGrouped.getStatus().withContext(
+            "Failed to determine whether query system can provide a DISTINCT_SCAN grouping");
+    }
+
+    // Couldn't find a viable distinct executor for the query. This is not a final failure because
+    // it's possible to generate a non-distinct executor and so, returns Status::OK() with the
+    // CanonicalQuery. We return the CanonicalQuery since we don't want to lose the work done inside
+    // createCanonicalQuery().
+    auto cq = canonicalDistinct.releaseQuery();
+    // Non-empty sortPattern can be returned only from the case of $group with $top or $bottom, when
+    // the 'sortPattern' is artificially added to leverage the DISTINCT_SCAN inside
+    // createCanonicalQuery() though there is no $sort stage. Now given that we can't generate a
+    // distinct executor, we should remove the 'sortPattern' in this case. Otherwise, a SORT stage
+    // is unnecessarily added to the final plan.
+    if (sortPattern) {
+        cq->resetSortPattern();
+    }
+    return StatusWith{std::move(cq)};
 }
 
 /**
@@ -1044,32 +1207,37 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     bool timeseriesBoundedSortOptimization,
     std::size_t plannerOpts = QueryPlannerParams::DEFAULT,
     boost::optional<TraversalPreference> traversalPreference = boost::none) {
+    // See if could use DISTINCT_SCAN with the pipeline (SERVER-9507 & SERVER-84347).
+    auto swExecOrCq = tryPrepareDistinctExecutor(expCtx,
+                                                 collections,
+                                                 nss,
+                                                 pipeline,
+                                                 unavailableMetadata,
+                                                 queryObj,
+                                                 leadingMatch,
+                                                 aggRequest,
+                                                 matcherFeatures,
+                                                 shouldProduceEmptyDocs,
+                                                 timeseriesBoundedSortOptimization);
 
-    // See if could use DISTINCT_SCAN with the pipeline (SERVER-9507). We must do this check before
-    // creating the CQ which might modify the pipeline.
-    std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage =
-        tryDistinctGroupRewrite(pipeline->getSources());
-
-    StatusWith<std::unique_ptr<CanonicalQuery>> cqWithStatus =
-        createCanonicalQuery(expCtx,
-                             nss,
-                             pipeline,
-                             unavailableMetadata,
-                             queryObj,
-                             std::move(leadingMatch),
-                             aggRequest,
-                             matcherFeatures,
-                             timeseriesBoundedSortOptimization,
-                             shouldProduceEmptyDocs);
-    if (!cqWithStatus.isOK()) {
-        // Return an error instead of uasserting, since there are cases where the combination of
-        // sort and projection will result in a bad query, but when we try with a different
-        // combination it will be ok. e.g. a sort by {$meta: 'textScore'}, without any projection
-        // will fail, but will succeed when the corresponding '$meta' projection is passed in
-        // another attempt.
-        return {cqWithStatus.getStatus()};
+    // This signifies that a non-recoverable error has happened and so we pass through the error.
+    if (!swExecOrCq.isOK()) {
+        if (swExecOrCq != ErrorCodes::NoQueryExecutionPlans) {
+            return swExecOrCq.getStatus().withContext(
+                "Failed to determine whether query system can provide a DISTINCT_SCAN grouping");
+        }
+        return swExecOrCq.getStatus();
     }
-    std::unique_ptr<CanonicalQuery> cq = std::move(cqWithStatus.getValue());
+
+    // This signifies that the tryPrepareDistinctExecutor() has succeeded to generate a distinct
+    // executor and so we're done.
+    auto&& execOrCq = swExecOrCq.getValue();
+    if (std::holds_alternative<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(execOrCq)) {
+        return std::move(std::get<0>(execOrCq));
+    }
+
+    // This signifies that we couldn't find a viable distinct executor for the query. It's still
+    // possible to generate a non-distinct executor. Try to generate one.
 
     if (!*shouldProduceEmptyDocs) {
         plannerOpts |= QueryPlannerParams::RETURN_OWNED_DATA;
@@ -1085,55 +1253,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     auto collatorStash =
         isChangeStream ? expCtx->temporarilyChangeCollator(std::move(collatorForCursor)) : nullptr;
 
-    if (rewrittenGroupStage) {
-        CanonicalDistinct canonicalDistinct(std::move(cq), rewrittenGroupStage->groupId());
-
-        // If the GroupFromFirst transformation was generated for the $last case, we will need to
-        // flip the direction of any generated DISTINCT_SCAN to preserve the semantics of the query.
-        const bool flipDistinctScanDirection =
-            (rewrittenGroupStage->expectedInput() ==
-             GroupFromFirstDocumentTransformation::ExpectedInput::kLastDocument);
-
-        // We have to request a "strict" distinct plan because:
-        // 1) $group with distinct semantics doesn't de-duplicate the results.
-        // 2) Non-strict parameter would allow use of multikey indexes for DISTINCT_SCAN, which
-        //    means that for {a: [1, 2]} two distinct values would be returned, but for group keys
-        //    arrays shouldn't be traversed.
-        StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> swExecutorGrouped =
-            tryGetExecutorDistinct(collections,
-                                   plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
-                                   canonicalDistinct,
-                                   flipDistinctScanDirection);
-
-        if (swExecutorGrouped.isOK()) {
-            pipeline->popFrontWithName(rewrittenGroupStage->originalStageName());
-
-            boost::intrusive_ptr<DocumentSource> groupTransform(
-                new DocumentSourceSingleDocumentTransformation(
-                    expCtx,
-                    std::move(rewrittenGroupStage),
-                    "$groupByDistinctScan",
-                    false /* independentOfAnyCollection */));
-            pipeline->addInitialSource(groupTransform);
-
-            return swExecutorGrouped;
-        } else if (swExecutorGrouped != ErrorCodes::NoQueryExecutionPlans) {
-            return swExecutorGrouped.getStatus().withContext(
-                "Failed to determine whether query system can provide a DISTINCT_SCAN grouping");
-        } else {
-            // Couldn't find a viable DISTINCT_SCAN plan for the query. Fallthrough to execute the
-            // original pipeline using whatever executor is appropriate for it.
-            cq = canonicalDistinct.releaseQuery();
-        }
-    }
-
     // For performance, we pass a null callback instead of 'extractAndAttachPipelineStages' when
     // 'pipeline' is empty. The 'extractAndAttachPipelineStages' is a no-op when there are no
     // pipeline stages, so we can save some work by skipping it. The 'getExecutorFind()' function is
     // responsible for checking that the callback is non-null before calling it.
     auto executor = getExecutorFind(expCtx->opCtx,
                                     collections,
-                                    std::move(cq),
+                                    std::move(std::get<1>(execOrCq)),
                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                     plannerOpts,
                                     pipeline,

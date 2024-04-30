@@ -67,11 +67,19 @@ enum class AccumulatorDocumentsNeeded {
 
     // AccumulatorState only needs to see one document in a group, and when there is a sort order,
     // that document must be the first document.
-    kFirstDocument,
+    kFirstInputDocument,
 
     // AccumulatorState only needs to see one document in a group, and when there is a sort order,
     // that document must be the last document.
-    kLastDocument,
+    kLastInputDocument,
+
+    // AccumulatorState may only need to see the first document in a group if there is an index that
+    // matches the sort order.
+    kFirstOutputDocument,
+
+    // AccumulatorState may only need to see the last document in a group if there is an index that
+    // matches the sort order.
+    kLastOutputDocument,
 };
 
 class AccumulatorState : public RefCountable {
@@ -229,7 +237,7 @@ public:
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 
     AccumulatorDocumentsNeeded documentsNeeded() const final {
-        return AccumulatorDocumentsNeeded::kFirstDocument;
+        return AccumulatorDocumentsNeeded::kFirstInputDocument;
     }
 
 private:
@@ -282,7 +290,7 @@ public:
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 
     AccumulatorDocumentsNeeded documentsNeeded() const final {
-        return AccumulatorDocumentsNeeded::kLastDocument;
+        return AccumulatorDocumentsNeeded::kLastInputDocument;
     }
 
 private:
