@@ -764,7 +764,7 @@ functions:
         source venv/bin/activate
         pip3 install lxml==4.8.0 Pygments==2.11.2 Jinja2==3.0.3 gcovr==5.0
         mkdir -p coverage_report
-        GCOV=/opt/mongodbtoolchain/v4/bin/gcov gcovr -f src -j 4 --html-self-contained --html-details coverage_report/2_coverage_report.html --json-summary-pretty --json-summary coverage_report/1_coverage_report_summary.json --json coverage_report/full_coverage_report.json
+        GCOV=/opt/mongodbtoolchain/v4/bin/gcov gcovr -f ${coverage_filter|src} -j 4 --html-self-contained --html-details coverage_report/2_coverage_report.html --json-summary-pretty --json-summary coverage_report/1_coverage_report_summary.json --json coverage_report/full_coverage_report.json
         ${python_binary|python3} test/evergreen/code_coverage_analysis.py -s coverage_report/1_coverage_report_summary.json -t time.txt
 
         # Generate Atlas compatible format report.
@@ -3767,6 +3767,43 @@ tasks:
             # Keep repeating the model test for 30 minutes
             ./model_test -l 2000-3000 -t 1800
 
+  - name: model-test-long-with-coverage
+    tags: ["model_checking"]
+    commands:
+      - func: "get project"
+      - command: expansions.update
+        params:
+          updates:
+          - key: CMAKE_TOOLCHAIN_FILE
+            value: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc.cmake
+      - func: "compile wiredtiger"
+        vars:
+          CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Coverage
+          CODE_COVERAGE_FLAGS: -DCODE_COVERAGE_MEASUREMENT=1 -DINLINE_FUNCTIONS_INSTEAD_OF_MACROS=1
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/model/tools"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+
+            # Record the start time, in seconds (needed by the code coverage analysis step below)
+            date +%s > ../../../../time.txt
+
+            # Keep repeating the model test for 600 seconds
+            ./model_test -l 2000-3000 -t 600
+
+            # Record the end time, in seconds
+            date +%s >> ../../../../time.txt
+      - func: "code coverage analysis"
+        vars:
+          coverage_filter: "src/rollback_to_stable"
+          working_dir: "wiredtiger"
+      - func: "code coverage publish main page"
+      - func: "code coverage publish report"
+
   - name: format-stress-zseries-test
     tags: ["stress-test-zseries-1"]
     # Set 2.5 hours timeout (60 * 60 * 2.5)
@@ -5352,6 +5389,8 @@ buildvariants:
       batchtime: 1440 # 24 hours
     - name: model-test-long
       batchtime: 1440 # once a day
+    - name: model-test-long-with-coverage
+      batchtime: 1440 # once a day
     - name: csuite-long-running
       batchtime: 1440 # once a day
 
@@ -5711,6 +5750,8 @@ buildvariants:
     - name: model-test-failure-workloads
       batchtime: 1440 # 24 hours
     - name: model-test-long
+      batchtime: 1440 # once a day
+    - name: model-test-long-with-coverage
       batchtime: 1440 # once a day
 
 - name: amazon2-arm64
