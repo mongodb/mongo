@@ -96,20 +96,6 @@
 
 namespace mongo {
 
-namespace sharding_recovery_util {
-
-bool inRecoveryMode(OperationContext* opCtx) {
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->getSettings().isReplSet()) {
-        return false;
-    }
-
-    const auto memberState = replCoord->getMemberState();
-    return memberState.startup2() || memberState.rollback();
-}
-
-}  // namespace sharding_recovery_util
-
 namespace {
 const StringData kShardingIndexCatalogEntriesFieldName = "indexes"_sd;
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();

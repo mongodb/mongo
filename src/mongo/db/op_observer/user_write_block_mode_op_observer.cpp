@@ -72,7 +72,7 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
     }
 
     if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace &&
-        !user_writes_recoverable_critical_section_util::inRecoveryMode(opCtx)) {
+        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
         for (auto it = first; it != last; ++it) {
             const auto& insertedDoc = it->doc;
 
@@ -112,7 +112,7 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
     }
 
     if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace &&
-        !user_writes_recoverable_critical_section_util::inRecoveryMode(opCtx)) {
+        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
         const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
             IDLParserContext("UserWriteBlockOpObserver"), args.updateArgs->updatedDoc);
 
@@ -156,7 +156,7 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
     }
 
     if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace &&
-        !user_writes_recoverable_critical_section_util::inRecoveryMode(opCtx)) {
+        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
         const auto& deletedDoc = doc;
         invariant(!deletedDoc.isEmpty());
         const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
