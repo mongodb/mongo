@@ -1312,7 +1312,15 @@ tasks:
 
   - <<: *task_template
     name: jsCore_heap_profiling
-    tags: ["assigned_to_jira_team_server_servicearch", "default", "jscore"]
+    tags:
+      [
+        "assigned_to_jira_team_server_servicearch",
+        "default",
+        "jscore",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "incompatible_debug_mode",
+      ]
     commands:
       - func: "do setup"
       - func: "run tests"
