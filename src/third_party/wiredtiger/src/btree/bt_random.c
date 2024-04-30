@@ -346,6 +346,37 @@ __random_leaf(WT_CURSOR_BTREE *cbt)
 }
 
 /*
+ * __random_root_inmem_ref --
+ *     Return a random in-mem ref from a root page by applying reservoir sampling.
+ */
+static void
+__random_root_inmem_ref(
+  WT_SESSION_IMPL *session, WT_REF *current, WT_REF **refp, WT_RAND_STATE *rnd)
+{
+    WT_REF *ref, *ref_inmem;
+    uint64_t cnt;
+
+    cnt = 0;
+    ref_inmem = NULL;
+
+    WT_ASSERT(session, __wt_ref_is_root(current));
+
+    WT_STAT_CONN_INCR(session, cache_eviction_random_sample_inmem_root);
+    WT_STAT_DATA_INCR(session, cache_eviction_random_sample_inmem_root);
+
+    WT_INTL_FOREACH_BEGIN (session, current->page, ref)
+        if (WT_REF_GET_STATE(ref) == WT_REF_MEM) {
+            cnt++;
+            if ((__wt_random(rnd) % cnt) == 0)
+                ref_inmem = ref;
+        }
+    WT_INTL_FOREACH_END;
+
+    if (cnt != 0)
+        *refp = ref_inmem;
+}
+
+/*
  * __wt_random_descent --
  *     Find a random page in a tree for either sampling or eviction.
  */
@@ -357,15 +388,17 @@ __wt_random_descent(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags, WT_
     WT_PAGE *page;
     WT_PAGE_INDEX *pindex;
     WT_REF *current, *descent;
-    uint32_t i, entries, retry;
+    uint32_t i, entries;
     uint8_t descent_state;
-    bool eviction;
+    int retry;
+    bool eviction, sample_inmem_page;
 
     *refp = NULL;
 
     btree = S2BT(session);
     current = NULL;
     retry = 100;
+    sample_inmem_page = false;
     /*
      * This function is called by eviction to find a random page in the cache. That case is
      * indicated by the WT_READ_CACHE flag. Ordinary lookups in a tree will read pages into cache as
@@ -394,6 +427,8 @@ restart:
         /* Eviction just wants any random child. */
         if (eviction) {
             descent = pindex->index[__wt_random(rnd) % entries];
+            if (sample_inmem_page && __wt_ref_is_root(current))
+                __random_root_inmem_ref(session, current, &descent, rnd);
             goto descend;
         }
 
@@ -447,10 +482,17 @@ descend:
     }
 
     /*
-     * There is no point starting with the root page: the walk will exit immediately. In that case
-     * we aren't holding a hazard pointer so there is nothing to release.
+     * There is no point starting with the root page: continue attempting the process until we
+     * encounter a non-root page.
      */
-    if (!eviction || !__wt_ref_is_root(current))
+    if (eviction && __wt_ref_is_root(current)) {
+        if (--retry > 0)
+            goto restart;
+        else if (S2C(session)->evict_sample_inmem && !sample_inmem_page) {
+            sample_inmem_page = true;
+            goto restart;
+        }
+    } else
         *refp = current;
     return (0);
 }
