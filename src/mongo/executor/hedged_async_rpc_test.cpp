@@ -136,7 +136,7 @@ public:
         CommandType cmd,
         std::vector<HostAndPort> hosts,
         std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
-        GenericArgs genericArgs = GenericArgs(),
+        GenericArguments genericArgs = GenericArguments(),
         BatonHandle bh = nullptr) {
         // Use a readPreference that's elgible for hedging.
         ReadPreferenceSetting readPref(ReadPreference::Nearest);
@@ -267,18 +267,14 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRequestWithGenericArgs) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
-    // Populate structs for generic arguments to be passed along when the command is converted
+    // Populate generic arguments to be passed along when the command is converted
     // to BSON.
-    GenericArgsAPIV1 genericArgsApiV1;
-    GenericArgsAPIV1Unstable genericArgsUnstable;
+    GenericArguments genericArgs;
     auto configTime = Timestamp(1, 1);
-    genericArgsUnstable.setDollarConfigTime(configTime);
+    genericArgs.setDollarConfigTime(configTime);
 
-    auto resultFuture =
-        sendHedgedCommandWithHosts(helloCmd,
-                                   kTwoHosts,
-                                   std::make_shared<NeverRetryPolicy>(),
-                                   GenericArgs(genericArgsApiV1, genericArgsUnstable));
+    auto resultFuture = sendHedgedCommandWithHosts(
+        helloCmd, kTwoHosts, std::make_shared<NeverRetryPolicy>(), genericArgs);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -307,14 +303,13 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRemoteErrorWithGenericReplyFields) {
     auto now = network->now();
     network->enterNetwork();
 
-    GenericReplyFieldsAPIV1 stableFields;
+    GenericReplyFields genericReplyFields;
     auto clusterTime = ClusterTime();
     clusterTime.setClusterTime(Timestamp(2, 3));
     clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
-    stableFields.setDollarClusterTime(clusterTime);
-    GenericReplyFieldsAPIV1Unstable unstableFields;
-    unstableFields.setDollarConfigTime(Timestamp(1, 1));
-    unstableFields.setOk(false);
+    genericReplyFields.setDollarClusterTime(clusterTime);
+    genericReplyFields.setDollarConfigTime(Timestamp(1, 1));
+    genericReplyFields.setOk(false);
 
     // Send "ignorable" error responses for both requests.
     performAuthoritativeHedgeBehavior(
@@ -322,8 +317,7 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRemoteErrorWithGenericReplyFields) {
         [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
             NetworkInterfaceMock::NetworkOperationIterator hedged) {
             auto remoteErrorBson = createErrorResponse(ignorableMaxTimeMSExpiredStatus);
-            remoteErrorBson = remoteErrorBson.addFields(stableFields.toBSON());
-            remoteErrorBson = remoteErrorBson.addFields(unstableFields.toBSON());
+            remoteErrorBson = remoteErrorBson.addFields(genericReplyFields.toBSON());
             const auto rcr = RemoteCommandResponse(remoteErrorBson, Milliseconds(1));
             network->scheduleResponse(hedged, now, rcr);
             network->scheduleSuccessfulResponse(authoritative, now + Milliseconds(100), rcr);
@@ -344,8 +338,7 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRemoteErrorWithGenericReplyFields) {
 
     // Check generic reply fields.
     auto replyFields = remoteError.getGenericReplyFields();
-    ASSERT_BSONOBJ_EQ(stableFields.toBSON(), replyFields.stable.toBSON());
-    ASSERT_BSONOBJ_EQ(unstableFields.toBSON(), replyFields.unstable.toBSON());
+    ASSERT_BSONOBJ_EQ(genericReplyFields.toBSON(), replyFields.toBSON());
 }
 
 TEST_F(HedgedAsyncRPCTest, HedgedAsyncRPCWithRetryPolicy) {
@@ -1114,7 +1107,7 @@ TEST_F(HedgedAsyncRPCTest, RemoteErrorAttemptedTargetsContainActual) {
 TEST_F(HedgedAsyncRPCTest, BatonTest) {
     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>();
     auto resultFuture = sendHedgedCommandWithHosts(
-        testFindCmd, kTwoHosts, retryPolicy, GenericArgs(), getOpCtx()->getBaton());
+        testFindCmd, kTwoHosts, retryPolicy, GenericArguments(), getOpCtx()->getBaton());
 
     Notification<void> seenNetworkRequests;
     // This thread will respond to the requests we sent via sendHedgedCommandWithHosts above.
@@ -1156,8 +1149,8 @@ TEST_F(HedgedAsyncRPCTest, BatonShutdownExecutorAlive) {
     for (int i = 0; i < maxNumRetries; ++i)
         retryPolicy->pushRetryDelay(retryDelay);
     auto subBaton = getOpCtx()->getBaton()->makeSubBaton();
-    auto resultFuture =
-        sendHedgedCommandWithHosts(testFindCmd, kTwoHosts, retryPolicy, GenericArgs(), *subBaton);
+    auto resultFuture = sendHedgedCommandWithHosts(
+        testFindCmd, kTwoHosts, retryPolicy, GenericArguments(), *subBaton);
 
     subBaton.shutdown();
     auto net = getNetworkInterfaceMock();
@@ -1211,9 +1204,9 @@ TEST_F(HedgedAsyncRPCTest, OperationKeyIsSetByDefault) {
 TEST_F(HedgedAsyncRPCTest, UseOperationKeyWhenProvided) {
     const auto opKey = UUID::gen();
 
-    // Set OperationKey via GenericArgs
-    GenericArgs args;
-    args.stable.setClientOperationKey(opKey);
+    // Set OperationKey via GenericArguments
+    GenericArguments args;
+    args.setClientOperationKey(opKey);
     auto future =
         sendHedgedCommandWithHosts(write_ops::InsertCommandRequest(testNS, {BSON("id" << 1)}),
                                    kTwoHosts,
@@ -1229,8 +1222,8 @@ TEST_F(HedgedAsyncRPCTest, UseOperationKeyWhenProvided) {
 
 TEST_F(HedgedAsyncRPCTest, RewriteOperationKeyWhenHedging) {
     const auto opKey = UUID::gen();
-    GenericArgs args;
-    args.stable.setClientOperationKey(opKey);
+    GenericArguments args;
+    args.setClientOperationKey(opKey);
     auto future = sendHedgedCommandWithHosts(
         testFindCmd, kTwoHosts, std::make_shared<NeverRetryPolicy>(), args, nullptr);
     onCommand([&](const auto& request) {

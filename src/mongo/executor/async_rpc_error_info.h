@@ -55,19 +55,6 @@ using executor::RemoteCommandOnAnyResponse;
 enum class CommandErrorProvenance { kLocal, kRemote };
 
 /**
- * Contains generic reply fields that can be part of any command response, separated based on
- * whether fields are part of the stable API. The generic reply fields are generated from
- * '../idl/generic_argument.idl'.
- */
-struct GenericReplyFields {
-    GenericReplyFields(GenericReplyFieldsAPIV1 stable = GenericReplyFieldsAPIV1(),
-                       GenericReplyFieldsAPIV1Unstable unstable = GenericReplyFieldsAPIV1Unstable())
-        : stable{stable}, unstable{unstable} {}
-    GenericReplyFieldsAPIV1 stable;
-    GenericReplyFieldsAPIV1Unstable unstable;
-};
-
-/**
  * Contains information to augment the 'RemoteCommandExecutionError' error code. In particular, this
  * class holds the provenance and data of the underlying error(s).
  */
@@ -93,11 +80,8 @@ public:
             if (BSONElement errLabelsElem = _error["errorLabels"]; !errLabelsElem.eoo()) {
                 _errLabels = errLabelsElem.Array();
             }
-            auto stableReplyFields = GenericReplyFieldsAPIV1::parseSharingOwnership(
+            _genericReplyFields = GenericReplyFields::parseSharingOwnership(
                 IDLParserContext("AsyncRPCRunner"), _error);
-            auto unstableReplyFields = GenericReplyFieldsAPIV1Unstable::parseSharingOwnership(
-                IDLParserContext("AsyncRPCRunner"), _error);
-            _genericReplyFields = GenericReplyFields(stableReplyFields, unstableReplyFields);
         }
 
         Status getRemoteCommandResult() const {

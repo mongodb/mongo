@@ -58,8 +58,7 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
     if (auto txnRouter = TransactionRouter::get(opCtx); txnRouter) {
         cmdBSON = txnRouter.attachTxnFieldsIfNeeded(opCtx, targeter->getShardId(), cmdBSON);
     }
-    auto genericArgs =
-        options->genericArgs.stable.toBSON().addFields(options->genericArgs.unstable.toBSON());
+    auto genericArgs = options->genericArgs.toBSON();
     auto cmdBsonWithArgs = cmdBSON.addFields(genericArgs);
     return detail::sendCommandWithRunner(
                options, opCtx, runner, std::move(targeter), cmdBsonWithArgs)
@@ -77,8 +76,7 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
                 // so we construct a fake one for now to appease the TxnRouter API.
                 auto fakeResponseObj = [&] {
                     BSONObjBuilder bob;
-                    gens.stable.serialize(&bob);
-                    gens.unstable.serialize(&bob);
+                    gens.serialize(&bob);
                     return bob.obj();
                 }();
                 txnRouter.processParticipantResponse(opCtx, shardId, fakeResponseObj);

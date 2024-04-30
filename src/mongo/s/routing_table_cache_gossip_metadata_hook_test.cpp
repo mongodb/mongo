@@ -62,7 +62,7 @@ TEST_F(RoutingTableCacheGossipMetadataHookTest, readReplyMetadata) {
     ASSERT_OK(gossipHook->readReplyMetadata(operationContext(), BSON("otherStuff" << 1)));
     ASSERT_OK(gossipHook->readReplyMetadata(
         operationContext(),
-        BSON("otherStuff" << 1 << GenericReplyFieldsAPIV1Unstable::kRoutingCacheGossipFieldName
+        BSON("otherStuff" << 1 << GenericReplyFields::kRoutingCacheGossipFieldName
                           << BSONArray())));
 
     // Read metadata with gossip info and check that the CatalogCache is notified.
@@ -78,7 +78,7 @@ TEST_F(RoutingTableCacheGossipMetadataHookTest, readReplyMetadata) {
     arrBuilder.append(gossip2.toBSON());
     ASSERT_OK(gossipHook->readReplyMetadata(
         operationContext(),
-        BSON("otherStuff" << 1 << GenericReplyFieldsAPIV1Unstable::kRoutingCacheGossipFieldName
+        BSON("otherStuff" << 1 << GenericReplyFields::kRoutingCacheGossipFieldName
                           << arrBuilder.arr())));
 
     ASSERT_EQ(gossip1.getCollectionVersion(),
@@ -90,7 +90,7 @@ TEST_F(RoutingTableCacheGossipMetadataHookTest, readReplyMetadata) {
     // Read ill-formed gossip info. Should return error.
     ASSERT_NOT_OK(gossipHook->readReplyMetadata(
         operationContext(),
-        BSON("otherStuff" << 1 << GenericReplyFieldsAPIV1Unstable::kRoutingCacheGossipFieldName
+        BSON("otherStuff" << 1 << GenericReplyFields::kRoutingCacheGossipFieldName
                           << "unexpected")));
 }
 

@@ -460,6 +460,11 @@ def is_unstable(stability: Optional[str]) -> bool:
     return stability is not None and stability != 'stable'
 
 
+def is_stable(stability: Optional[str]) -> bool:
+    """Check whether the given stability value is considered as stable."""
+    return not is_unstable(stability)
+
+
 def get_new_commands(
         ctxt: IDLCompatibilityContext, new_idl_dir: str, import_directories: List[str]
 ) -> Tuple[Dict[str, syntax.Command], Dict[str, syntax.IDLParsedSpec], Dict[str, str]]:
@@ -1626,7 +1631,8 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str, old_import_directori
     return ctxt.errors
 
 
-def get_generic_arguments(gen_args_file_path: str, includes: str) -> Tuple[Set[str], Set[str]]:
+def get_generic_arguments(gen_args_file_path: str,
+                          includes: List[str]) -> Tuple[Set[str], Set[str]]:
     """Get arguments and reply fields from generic_argument.idl and check validity."""
     arguments: Set[str] = set()
     reply_fields: Set[str] = set()
@@ -1636,31 +1642,41 @@ def get_generic_arguments(gen_args_file_path: str, includes: str) -> Tuple[Set[s
                                        CompilerImportResolver(includes), False)
         if parsed_idl_file.errors:
             parsed_idl_file.errors.dump_errors()
-            raise ValueError(f"Cannot parse {gen_args_file_path}")
+            raise ValueError(f"Cannot parse {gen_args_file_path} {parsed_idl_file.errors}")
 
-        generic_arguments = parsed_idl_file.spec.symbols.get_generic_argument_list(
-            "GenericArgsAPIV1")
-        if generic_arguments is None:
-            generic_arguments = parsed_idl_file.spec.symbols.get_generic_argument_list(
-                "generic_args_api_v1")
-            generic_reply_fields = parsed_idl_file.spec.symbols.get_generic_reply_field_list(
-                "generic_reply_fields_api_v1")
-        else:
-            generic_reply_fields = parsed_idl_file.spec.symbols.get_generic_reply_field_list(
-                "GenericReplyFieldsAPIV1")
+        # The generic argument/reply field structs have been renamed a few times, so to
+        # account for this when comparing against older releases, we try each set of names.
+        struct_names = [
+            # 8.0.0rc5 and forward
+            ("GenericArguments", "GenericReplyFields"),
+            # 8.0.0rc4
+            ("GenericArgsAPIV1", "GenericReplyFieldsAPIV1"),
+            # Before 8.0.0rc4
+            ("generic_args_api_v1", "generic_reply_fields_api_v1")
+        ]
+        for args_struct, reply_struct in struct_names:
+            generic_arguments = parsed_idl_file.spec.symbols.get_generic_argument_list(args_struct)
+            if generic_arguments is None:
+                continue
+            else:
+                generic_reply_fields = parsed_idl_file.spec.symbols.get_generic_reply_field_list(
+                    reply_struct)
+                break
 
         for argument in generic_arguments.fields:
-            arguments.add(argument.name)
+            if is_stable(argument.stability):
+                arguments.add(argument.name)
 
         for reply_field in generic_reply_fields.fields:
-            reply_fields.add(reply_field.name)
+            if is_stable(reply_field.stability):
+                reply_fields.add(reply_field.name)
 
     return arguments, reply_fields
 
 
-def check_generic_arguments_compatibility(old_gen_args_file_path: str, new_gen_args_file_path: str,
-                                          old_includes: str,
-                                          new_includes: str) -> IDLCompatibilityErrorCollection:
+def check_generic_arguments_compatibility(
+        old_gen_args_file_path: str, new_gen_args_file_path: str, old_includes: List[str],
+        new_includes: List[str]) -> IDLCompatibilityErrorCollection:
     """Check IDL compatibility between old and new generic_argument.idl files."""
     # IDLCompatibilityContext takes in both 'old_idl_dir' and 'new_idl_dir',
     # but for generic_argument.idl, the parent directories aren't helpful for logging purposes.

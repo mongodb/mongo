@@ -28,35 +28,46 @@
 global:
     cpp_namespace: "mongo"
 
-generic_argument_lists:
-    GenericArgsAPIV1:
-        description: "Add a new generic argument and should still pass"
+imports:
+    - "test_types.idl"
+
+structs:
+    GenericArguments:
+        description: "Adding new generic arguments, removing an unstable generic argument should still pass"
+        is_generic_cmd_list: "arg"
         fields:
             genericArgument:
+                type: dummyType
                 forward_to_shards: false
-
-    GenericArgsAPIV1Unstable:
-        description: "IDL checker provides no guarantees about unstable generic arguments.
-                      Removing an unstable argument should still pass"
-        fields:
             unstableGenericArgument:
+                type: dummyType
                 forward_to_shards: false
+                stability: unstable
             removedUnstableGenericArgument:
+                type: dummyType
                 forward_to_shards: false
+                stability: unstable
+            removedInternalGenericArgument:
+                type: dummyType
+                forward_to_shards: false
+                stability: internal
 
-
-generic_reply_field_lists:
-    GenericReplyFieldsAPIV1:
-        description: "Add a new generic reply field and should still pass"
+    GenericReplyFields:
+        description: "Adding new generic reply fields, removing an unstable generic reply field should still pass"
+        is_generic_cmd_list: "reply"
         fields:
             genericReplyField:
+                type: dummyType
                 forward_from_shards: false
-
-    GenericReplyFieldsAPIV1Unstable:
-        description: "IDL checker provides no guarantees about unstable generic reply fields.
-                      Removing an unstable reply field should still pass"
-        fields:
             unstableGenericReplyField:
+                type: dummyType
                 forward_from_shards: false
+                stability: unstable
             removedUnstableGenericReplyField:
+                type: dummyType
                 forward_from_shards: false
+                stability: unstable
+            removedInternalGenericReplyField:
+                type: dummyType
+                forward_from_shards: false
+                stability: internal

@@ -283,8 +283,6 @@ A IDL file consist of a series of top-level sections (i.e. YAML maps).
 - `server_parameters` - See [docs/server-parameters.md](../../../docs/server-parameters.md)
 - `configs` - TODO SERVER-79135
 - `feature_flags` - TODO SERVER-79135
-- `generic_argument_lists`- List of arguments common to all commands requests - not documented
-- `generic_reply_field_lists`-Li st of arguments common to all command replies - not documented
 
 ## Global
 

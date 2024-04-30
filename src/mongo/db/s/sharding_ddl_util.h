@@ -108,9 +108,9 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     // AsyncRPC ignores impersonation metadata so we need to manually attach them to
     // the command
     if (auto meta = rpc::getAuthDataToImpersonatedUserMetadata(opCtx)) {
-        originalOpts->genericArgs.unstable.setDollarAudit(*meta);
+        originalOpts->genericArgs.setDollarAudit(*meta);
     }
-    originalOpts->genericArgs.unstable.setMayBypassWriteBlocking(
+    originalOpts->genericArgs.setMayBypassWriteBlocking(
         WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
 
     std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<typename CommandType::Reply>>> futures;
@@ -123,8 +123,8 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
         std::unique_ptr<async_rpc::Targeter> targeter =
             std::make_unique<async_rpc::ShardIdTargeter>(
                 originalOpts->exec, opCtx, shardIds[i], readPref);
-        bool startTransaction = originalOpts->genericArgs.stable.getStartTransaction()
-            ? *originalOpts->genericArgs.stable.getStartTransaction()
+        bool startTransaction = originalOpts->genericArgs.getStartTransaction()
+            ? *originalOpts->genericArgs.getStartTransaction()
             : false;
         auto retryPolicy = std::make_shared<async_rpc::ShardRetryPolicyWithIsStartingTransaction>(
             Shard::RetryPolicy::kIdempotentOrCursorInvalidated, startTransaction);
@@ -148,8 +148,7 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
                              size_t index) -> AsyncRequestsSender::Response {
                 BSONObjBuilder replyBob;
                 reply.response.serialize(&replyBob);
-                reply.genericReplyFields.stable.serialize(&replyBob);
-                reply.genericReplyFields.unstable.serialize(&replyBob);
+                reply.genericReplyFields.serialize(&replyBob);
                 return AsyncRequestsSender::Response{
                     (*indexToShardId)[index],
                     executor::RemoteCommandOnAnyResponse(

@@ -36,21 +36,19 @@
 namespace mongo {
 
 bool isGenericArgument(StringData arg) {
-    return GenericArgsAPIV1::hasField(arg) || GenericArgsAPIV1Unstable::hasField(arg);
+    return GenericArguments::hasField(arg);
 }
 
 bool isGenericReply(StringData arg) {
-    return GenericReplyFieldsAPIV1::hasField(arg) || GenericReplyFieldsAPIV1Unstable::hasField(arg);
+    return GenericReplyFields::hasField(arg);
 }
 
 bool shouldForwardToShards(StringData arg) {
-    return GenericArgsAPIV1::shouldForwardToShards(arg) &&
-        GenericArgsAPIV1Unstable::shouldForwardToShards(arg);
+    return GenericArguments::shouldForwardToShards(arg);
 }
 
 bool shouldForwardFromShards(StringData replyField) {
-    return GenericReplyFieldsAPIV1::shouldForwardFromShards(replyField) &&
-        GenericReplyFieldsAPIV1Unstable::shouldForwardFromShards(replyField);
+    return GenericReplyFields::shouldForwardFromShards(replyField);
 }
 
 void appendGenericCommandArguments(const BSONObj& commandPassthroughFields,

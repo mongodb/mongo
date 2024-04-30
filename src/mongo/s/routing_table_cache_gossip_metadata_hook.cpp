@@ -53,7 +53,7 @@ Status RoutingTableCacheGossipMetadataHook::readReplyMetadata(OperationContext* 
                                                               const BSONObj& metadataObj) {
     try {
         const auto routerCacheVersionsObj =
-            metadataObj[GenericReplyFieldsAPIV1Unstable::kRoutingCacheGossipFieldName];
+            metadataObj[GenericReplyFields::kRoutingCacheGossipFieldName];
         if (!routerCacheVersionsObj.eoo()) {
             const auto catalogCache = Grid::get(_serviceContext)->catalogCache();
             for (const auto& elem : routerCacheVersionsObj.Array()) {

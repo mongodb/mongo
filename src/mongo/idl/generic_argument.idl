@@ -46,8 +46,8 @@ imports:
 # This file lists the generic arguments accepted by all commands.
 
 structs:
-    GenericArgsAPIV1:
-        description: "Arguments accepted by all commands. These are guaranteed backwards-compatible for as long as the server supports API Version 1. Previously named generic_args_api_v1."
+    GenericArguments:
+        description: "Arguments accepted by all commands."
         strict: false
         is_generic_cmd_list: "arg" 
         # Note that the _types_ of these fields are not checked for API version compatability! 
@@ -59,77 +59,87 @@ structs:
                 type: string
                 forward_to_shards: false
                 optional: true
+                stability: "stable"
             apiStrict:
                 type: bool
                 forward_to_shards: false
                 optional: true
+                stability: "stable"
             apiDeprecationErrors:
                 type: bool
                 forward_to_shards: false
                 optional: true
+                stability: "stable"
             $db:
                 type: IDLAnyType
                 cpp_name: "dbName"
                 forward_to_shards: false
                 # The IDL compiler injects this directly into command requests, so we ignore it here.
                 ignore: true
+                stability: "stable"
             maxTimeMS:
                 type: safeInt64
                 validator: { gte: 0 }
                 forward_to_shards: true
                 optional: true
+                stability: "stable"
             readConcern:
                 type: ReadConcernIdl
                 forward_to_shards: true
                 optional: true
+                stability: "stable"
             writeConcern:
                 type: WriteConcern
                 forward_to_shards: true
                 optional: true            
+                stability: "stable"
             lsid:
                 type: LogicalSessionFromClient
                 forward_to_shards: true
                 optional: true
+                stability: "stable"
             clientOperationKey:
                 type: uuid
                 forward_to_shards: true
                 optional: true                
+                stability: "stable"
             txnNumber:
                 type: TxnNumber
                 forward_to_shards: true
                 optional: true            
+                stability: "stable"
             autocommit:
                 type: bool
                 forward_to_shards: true
                 optional: true
+                stability: "stable"
             startTransaction:
                 type: bool
                 forward_to_shards: true
                 optional: true
+                stability: "stable"
             stmtId:
                 type: StmtId
                 forward_to_shards: true
                 optional: true
+                stability: "stable"
             comment:
                 type: IDLAnyType
                 forward_to_shards: true
                 optional: true
+                stability: "stable"
             $readPreference:
                 type: ReadPreferenceIdl
                 cpp_name: "readPreference"
                 forward_to_shards: false
                 optional: true
+                stability: "stable"
             $clusterTime:
                 type: ClusterTime
                 cpp_name: "dollarClusterTime"
                 forward_to_shards: false
                 optional: true
-
-    GenericArgsAPIV1Unstable:
-        description: "Arguments accepted by all commands. These are not guaranteed backwards-compatible. Previously named generic_args_unstable_v1."
-        strict: false
-        is_generic_cmd_list: "arg"
-        fields:
+                stability: "stable"
             $audit:
                 type: ImpersonatedUserMetadata
                 cpp_name: "dollarAudit"
@@ -245,74 +255,88 @@ structs:
                 optional: true
                 stability: "internal"
 
-    GenericReplyFieldsAPIV1:
-        description: "Fields that may appear in any command reply. These are guaranteed backwards-compatible for as long as the server supports API Version 1."
+    GenericReplyFields:
+        description: "Fields that may appear in any command reply."
         strict: false
         is_generic_cmd_list: "reply"
+        # The unstable fields here are marked as "internal" rather than actually "unstable" because otherwise the
+        # server internally parsing a command reply that contained one of the unstable fields along with
+        # apiStrict: true would fail at no fault to the user. apiStrict doesn't really make sense to use with reply
+        # parsing, but it's very difficult to audit the codebase to ensure it isn't being used for that. That said,
+        # the drawback here is mostly just aesthetic--as far as the API compatibility checker is concerned, "internal"
+        # and "unstable" are both considered unstable, so we don't lose any functionality here or risk breaking any stable
+        # fields.
         fields:
             $clusterTime:
                 type: ClusterTime
                 cpp_name: "dollarClusterTime"
                 forward_from_shards: false
                 optional: true
+                stability: "stable"
             operationTime:
                 type: logicalTime
                 forward_from_shards: false
                 optional: true
-
-    GenericReplyFieldsAPIV1Unstable:
-        description: "Fields that may appear in any command reply. These are not guaranteed backwards-compatible."
-        strict: false
-        is_generic_cmd_list: "reply"
-        fields:
+                stability: "stable"
             $configServerState:
                 type: object_owned
                 cpp_name: "dollarConfigServerState"
                 forward_from_shards: false
                 optional: true
+                stability: "internal"
             $gleStats:
                 type: object_owned
                 cpp_name: "dollarGleStats"
                 forward_from_shards: false
                 optional: true
+                stability: "internal"
             lastCommittedOpTime:
                 type: optime
                 forward_from_shards: false
                 optional: true
+                stability: "internal"
             readOnly:
                 type: bool
                 forward_from_shards: false
                 optional: true
+                stability: "internal"
             additionalParticipants:
                 type: array<object_owned> 
                 forward_from_shards: false
                 optional: true
+                stability: "internal"
             $configTime:
                 type: timestamp
                 cpp_name: "dollarConfigTime"
                 forward_from_shards: false
                 optional: true
+                stability: "internal"
             $replData:
                 type: object_owned
                 cpp_name: "dollarReplData"
                 forward_from_shards: false
                 optional: true
+                stability: "internal"
             $topologyTime:
                 type: timestamp
                 cpp_name: "dollarTopologyTime"
                 forward_from_shards: false
                 optional: true
+                stability: "internal"
             $oplogQueryData:
                 type: object_owned
                 cpp_name: "dollarOplogQueryData"
                 forward_from_shards: false
                 optional: true
+                stability: "internal"
             ok:
                 type: safeBool
                 forward_from_shards: true
                 optional: true
+                stability: "internal"
             routingCacheGossip:
                 type: array<GossipedRoutingCache>
                 forward_from_shards: false
                 optional: true
+                stability: "internal"
 

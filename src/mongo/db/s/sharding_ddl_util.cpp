@@ -537,7 +537,7 @@ void performNoopRetryableWriteOnShards(OperationContext* opCtx,
                                        const OperationSessionInfo& osi,
                                        const std::shared_ptr<executor::TaskExecutor>& executor) {
     const auto updateOp = buildNoopWriteRequestCommand();
-    async_rpc::GenericArgs args;
+    GenericArguments args;
     async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>>(
@@ -576,7 +576,7 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
     dropCollectionParticipant.setFromMigrate(fromMigrate);
     dropCollectionParticipant.setDropSystemCollections(dropSystemCollections);
     dropCollectionParticipant.setCollectionUUID(collectionUUID);
-    async_rpc::GenericArgs args;
+    GenericArguments args;
     async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>>(
