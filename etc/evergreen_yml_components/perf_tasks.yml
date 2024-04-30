@@ -1,5 +1,9 @@
 functions:
   f_dsi_run_workload: &dsi_run_func # this function replaces f_run_dsi_workload
+    - command: timeout.update
+      params:
+        exec_timeout_secs: ${exec_timeout_secs_override}
+        timeout_secs: ${timeout_secs_override}
     - command: git.get_project
       params:
         directory: src/mongo

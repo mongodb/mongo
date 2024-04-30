@@ -1,5 +1,6 @@
 command_type: system
 stepback: false
+# Updating these values also requires updating them for the exec_timeout_secs_override and timeout_secs_override parameters.
 exec_timeout_secs: 21600
 timeout_secs: 7200
 
@@ -21,6 +22,12 @@ parameters:
   # see https://github.com/10gen/performance-tooling-docs/blob/main/patch_testing.md#skipping-compilation-on-sys-perf-projects
   - key: reuse_compile_from
     description: "Version_id of the commit/patch to reuse the compile artifacts from, e.g., sys_perf_ef8504eefef4c9fe2062b8424e85053b3e1ad8d2"
+  - key: exec_timeout_secs_override
+    value: 21600
+    description: "Overrides the default exec_timeout_secs defined at the top of this file for the f_dsi_run_workload task"
+  - key: timeout_secs_override
+    value: 7200
+    description: "Overrides the default timeout_secs defined at the top of this file for the f_dsi_run_workload task"
 
 variables:
   ###
