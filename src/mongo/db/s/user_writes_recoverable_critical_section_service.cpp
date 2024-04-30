@@ -71,20 +71,6 @@
 
 namespace mongo {
 
-namespace user_writes_recoverable_critical_section_util {
-
-bool inRecoveryMode(OperationContext* opCtx) {
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->getSettings().isReplSet()) {
-        return false;
-    }
-
-    const auto memberState = replCoord->getMemberState();
-    return memberState.startup2() || memberState.rollback();
-}
-
-}  // namespace user_writes_recoverable_critical_section_util
-
 namespace {
 MONGO_FAIL_POINT_DEFINE(skipRecoverUserWriteCriticalSections);
 

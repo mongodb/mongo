@@ -716,17 +716,6 @@ void performNoopWrite(OperationContext* opCtx, StringData msg) {
         });
 }
 
-bool inRecoveryMode(OperationContext* opCtx) {
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->getSettings().isReplSet()) {
-        return false;
-    }
-
-    auto memberState = replCoord->getMemberState();
-
-    return memberState.startup() || memberState.startup2() || memberState.rollback();
-}
-
 bool shouldExclude(OperationContext* opCtx) {
     return repl::tenantMigrationInfo(opCtx) || opCtx->getClient()->isInDirectClient() ||
         (opCtx->getClient()->session() && opCtx->getClient()->isInternalClient());

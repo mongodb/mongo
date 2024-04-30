@@ -138,13 +138,6 @@ Status handleTenantMigrationConflict(OperationContext* opCtx, Status status);
  */
 void performNoopWrite(OperationContext* opCtx, StringData msg);
 
-/**
- * Returns true if the node is in startup recovery, initial sync or rollback. If the node is any
- * of these mode, the TenantMigrationAccessBlocker will be recovered outside of the OpObserver
- * by tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers.
- */
-bool inRecoveryMode(OperationContext* opCtx);
-
 /*
  * Returns true if a command should be excluded from access blocker filtering.
  */
