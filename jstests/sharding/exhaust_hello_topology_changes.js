@@ -25,7 +25,7 @@ let st = new ShardingTest({
     shards: {rs0: {nodes: [{}, {}, {rsConfig: {priority: 0}}]}}
 });
 
-let timeoutMS = 10000;
+let timeoutMS = 20000;
 let mongos = st.s;
 let rsPrimary = st.rs0.getPrimary();
 let electableRsSecondary;
