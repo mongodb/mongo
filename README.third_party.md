@@ -40,6 +40,7 @@ a notice will be included in
 | [libmongocrypt]            | Apache-2.0                                                     | 1.8.4                                              |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause                                                   | 6cdc775 + changes                                  |                      |                ✗                |
 | [mongo-c-driver]           | Apache-2.0                                                     | 1.23.0                                             |          ✗           |                ✗                |
+| [mongo-cxx-driver]         | Apache-2.0                                                     | r3.7.1                                             |          ✗           |                ✗                |
 | [MozJS]                    | MPL-2.0                                                        | ESR 91.3.0                                         |                      |                ✗                |
 | [MurmurHash3]              | Public Domain                                                  | a6bd3ce + changes                                  |          ✗           |                ✗                |
 | [ocspbuilder]              | MIT                                                            | 0.10.2                                             |                      |                                 |
@@ -84,6 +85,7 @@ a notice will be included in
 [linenoise]: https://github.com/antirez/linenoise
 [lz4]: https://github.com/lz4/lz4
 [mongo-c-driver]: https://github.com/mongodb/mongo-c-driver
+[mongo-cxx-driver]: https://github.com/mongodb/mongo-cxx-driver
 [MozJS]: https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/a6bd3ce/
 [ocspbuilder]: https://github.com/wbond/ocspbuilder

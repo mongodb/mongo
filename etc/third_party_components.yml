@@ -264,6 +264,14 @@ components:
     upgrade_suppression: TODO SERVER-72019
     vulnerability_suppression: TODO SERVER-72019
 
+  mongo-cxx-driver:
+    homepage_url: https://github.com/mongodb/mongo-cxx-driver
+    open_hub_url: https://www.openhub.net/p/mongo-cxx-driver
+    release_monitoring_id: 6167
+    local_directory_path: enterprise/src/streams/third_party/mongocxx
+    team_owner: "Streams"
+    upgrade_suppression: TODO SERVER-90035
+
   "Mozilla Firefox":
     homepage_url: https://www.mozilla.org/en-US/firefox/organizations/
     open_hub_url: https://www.openhub.net/p/firefox
