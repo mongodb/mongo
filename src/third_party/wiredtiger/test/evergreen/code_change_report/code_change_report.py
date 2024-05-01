@@ -532,10 +532,10 @@ def build_pr_comment(code_change_info: dict) -> str | None:
             message += ":warning: This PR touches methods that have an extremely high complexity score!\n"
 
         complexity_warnings = [
-            f"In `{filename}` the complexity of `{method}` has increased by {info['complexity'] - info['prev_complexity']} to {info['complexity']}."
+            f"In `{filename}` the complexity of `{method}` has increased by {info['complexity'] - info.get('prev_complexity', 0)} to {info['complexity']}."
             for filename, methods in changed_functions.items()
             for method, info in methods.items()
-            if info['complexity'] > info['prev_complexity'] and info['complexity'] > threshold_to_warn
+            if info['complexity'] > info.get('prev_complexity', -1) and info['complexity'] > threshold_to_warn
         ]
         for warning in complexity_warnings:
             message += f"- {warning}\n"
