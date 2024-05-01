@@ -89,22 +89,49 @@ static bool containsDuplicateFields(mongo::BSONObj obj) {
 
 static void findAllScalarPaths(std::vector<mongo::sbe::value::CellBlock::Path>& paths,
                                const mongo::BSONElement& elem,
-                               mongo::sbe::value::CellBlock::Path path) {
+                               mongo::sbe::value::CellBlock::Path path,
+                               bool previousIsArray) {
     using namespace mongo;
     if (!elem.isABSONObj()) {
-        path.push_back(sbe::value::CellBlock::Get{elem.fieldNameStringData().toString()});
+        // Array elements have a field that is their index in the array. We shouldn't
+        // append that field in the 'Path'.
+        if (!previousIsArray) {
+            path.push_back(sbe::value::CellBlock::Get{elem.fieldNameStringData().toString()});
+        }
         path.push_back(sbe::value::CellBlock::Id{});
         paths.push_back(path);
         return;
     }
 
-    // Start a new path for each element in the sub-object.
     BSONObj obj = elem.embeddedObject();
+
+    if (elem.type() == Array) {
+        // We only want to decompress an array if there is a single element.
+        // TODO SERVER-90044 remove this condition.
+        if (obj.nFields() != 1) {
+            return;
+        }
+
+        // All array elements are turned into an object. The field is the index and the value is the
+        // array element. We don't want to generate 'Path's for the fields that are indexes, so we
+        // manually track when the element is an array element or an object.
+        // If the next element is an object
+        if (!previousIsArray) {
+            path.push_back(sbe::value::CellBlock::Get{elem.fieldNameStringData().toString()});
+        }
+        path.push_back(sbe::value::CellBlock::Traverse{});
+        findAllScalarPaths(paths, obj.firstElement(), path, true);
+        return;
+    }
+
+    // Start a new path for each element in the sub-object.
     for (auto&& newElem : obj) {
         auto nPath = path;
-        nPath.push_back(sbe::value::CellBlock::Get{elem.fieldNameStringData().toString()});
-        nPath.push_back(sbe::value::CellBlock::Traverse{});
-        findAllScalarPaths(paths, newElem, nPath);
+        if (!previousIsArray) {
+            nPath.push_back(sbe::value::CellBlock::Get{elem.fieldNameStringData().toString()});
+            nPath.push_back(sbe::value::CellBlock::Traverse{});
+        }
+        findAllScalarPaths(paths, newElem, nPath, false);
     }
 }
 
@@ -142,7 +169,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
 
     // Find all the fields including fields nested inside objects that we can decompress.
     for (auto&& elem : refObj) {
-        findAllScalarPaths(fieldPaths, elem, {});
+        findAllScalarPaths(fieldPaths, elem, {}, false);
     }
 
     // Set up 'SBEPath' for the block-based API, and 'PathRequest' for the iterator API. We need to
