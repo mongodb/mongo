@@ -1,6 +1,7 @@
 /**
  * Contains helper functions for testing dbCheck.
  */
+
 load("jstests/libs/feature_flag_util.js");
 load("jstests/libs/fail_point_util.js");
 

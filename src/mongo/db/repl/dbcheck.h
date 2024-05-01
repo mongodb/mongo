@@ -86,6 +86,39 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     const repl::OpTime& optime,
     const boost::optional<CollectionOptions>& options = boost::none);
 
+struct ReadSourceWithTimestamp {
+    RecoveryUnit::ReadSource readSource;
+    boost::optional<Timestamp> timestamp = boost::none;
+};
+
+/**
+ * DbCheckAcquisition is a helper class to acquire locks and set RecoveryUnit state for the dbCheck
+ * operation.
+ */
+class DbCheckAcquisition {
+public:
+    explicit DbCheckAcquisition(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                ReadSourceWithTimestamp readSource,
+                                PrepareConflictBehavior prepareConflictBehavior);
+
+    ~DbCheckAcquisition();
+
+private:
+    const Collection* _getCollection(OperationContext* opCtx, const NamespaceString& nss);
+    OperationContext* _opCtx;
+
+public:
+    const Lock::GlobalLock globalLock;
+    const ReadSourceScope readSourceScope;
+    const PrepareConflictBehavior prevPrepareConflictBehavior;
+    const DataCorruptionDetectionMode prevDataCorruptionMode;
+    // The CollectionCatalog to use for lock-free reads with point-in-time catalog lookups.
+    std::shared_ptr<const CollectionCatalog> catalog;
+    boost::optional<AutoGetCollection> autoColl;
+    const CollectionPtr coll;
+};
+
 /**
  * Hashing collections and plans.
  *
@@ -110,18 +143,20 @@ public:
      * @param maxBytes The maximum number of bytes to hash.
      */
     DbCheckHasher(OperationContext* opCtx,
-                  const CollectionPtr& collection,
+                  const DbCheckAcquisition& acquisition,
                   const BSONKey& start,
                   const BSONKey& end,
                   int64_t maxCount = std::numeric_limits<int64_t>::max(),
                   int64_t maxBytes = std::numeric_limits<int64_t>::max());
 
-    ~DbCheckHasher();
+    ~DbCheckHasher() = default;
 
     /**
      * Hash all documents up to the deadline.
      */
-    Status hashAll(OperationContext* opCtx, Date_t deadline = Date_t::max());
+    Status hashAll(OperationContext* opCtx,
+                   const CollectionPtr& collPtr,
+                   Date_t deadline = Date_t::max());
 
     /**
      * Return the total hash of all documents seen so far.
@@ -157,9 +192,6 @@ private:
 
     int64_t _maxBytes = 0;
     int64_t _bytesSeen = 0;
-
-    DataCorruptionDetectionMode _previousDataCorruptionMode;
-    PrepareConflictBehavior _previousPrepareConflictBehavior;
 };
 
 namespace repl {

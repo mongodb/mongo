@@ -44,6 +44,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -222,32 +223,84 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     return dbCheckHealthLogEntry(nss, severity, msg, OplogEntriesEnum::Batch, builder.obj());
 }
 
+PrepareConflictBehavior swapPrepareConflictBehavior(
+    OperationContext* opCtx, PrepareConflictBehavior prepareConflictBehavior) {
+    auto ru = opCtx->recoveryUnit();
+    auto prevBehavior = ru->getPrepareConflictBehavior();
+    ru->setPrepareConflictBehavior(prepareConflictBehavior);
+    return prevBehavior;
+}
+
+DataCorruptionDetectionMode swapDataCorruptionMode(OperationContext* opCtx,
+                                                   DataCorruptionDetectionMode dataCorruptionMode) {
+    auto ru = opCtx->recoveryUnit();
+    auto prevMode = ru->getDataCorruptionDetectionMode();
+    ru->setDataCorruptionDetectionMode(dataCorruptionMode);
+    return prevMode;
+}
+
+std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(OperationContext* opCtx) {
+    // Loop until we get a consistent catalog and snapshot
+    while (true) {
+        const auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
+        opCtx->recoveryUnit()->preallocateSnapshot();
+        const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
+        if (catalogBeforeSnapshot == catalogAfterSnapshot) {
+            return catalogBeforeSnapshot;
+        }
+        opCtx->recoveryUnit()->abandonSnapshot();
+    }
+}
+
+const Collection* DbCheckAcquisition::_getCollection(OperationContext* opCtx,
+                                                     const NamespaceString& nss) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
+        // Make sure we get a CollectionCatalog in sync with our snapshot.
+        catalog = getConsistentCatalogAndSnapshot(opCtx);
+        return catalog->establishConsistentCollection(
+            opCtx, nss, opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
+    }
+
+    autoColl.emplace(opCtx, nss, MODE_IS);
+    return autoColl->getCollection().get();
+}
+
+DbCheckAcquisition::DbCheckAcquisition(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       ReadSourceWithTimestamp readSource,
+                                       PrepareConflictBehavior prepareConflictBehavior)
+    : _opCtx(opCtx),
+      // dbCheck writes to the oplog, so we need to take an IX global lock.
+      globalLock(opCtx, MODE_IX),
+      // Set all of the RecoveryUnit parameters before the colleciton acquisition, which opens a
+      // storage snapshot.
+      readSourceScope(opCtx, readSource.readSource, readSource.timestamp),
+      prevPrepareConflictBehavior(swapPrepareConflictBehavior(opCtx, prepareConflictBehavior)),
+      // We don't want detected data corruption to prevent us from finishing our scan. Locations
+      // where we throw these errors should already be writing to the health log anyway.
+      prevDataCorruptionMode(
+          swapDataCorruptionMode(opCtx, DataCorruptionDetectionMode::kLogAndContinue)),
+      coll(CollectionPtr(_getCollection(opCtx, nss))) {}
+
+DbCheckAcquisition::~DbCheckAcquisition() {
+    _opCtx->recoveryUnit()->abandonSnapshot();
+    swapDataCorruptionMode(_opCtx, prevDataCorruptionMode);
+    swapPrepareConflictBehavior(_opCtx, prevPrepareConflictBehavior);
+}
+
 DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
-                             const CollectionPtr& collection,
+                             const DbCheckAcquisition& acquisition,
                              const BSONKey& start,
                              const BSONKey& end,
                              int64_t maxCount,
                              int64_t maxBytes)
-    : _opCtx(opCtx),
-      _maxKey(end),
-      _maxCount(maxCount),
-      _maxBytes(maxBytes),
-      _previousDataCorruptionMode(opCtx->recoveryUnit()->getDataCorruptionDetectionMode()),
-      _previousPrepareConflictBehavior(opCtx->recoveryUnit()->getPrepareConflictBehavior()) {
+    : _opCtx(opCtx), _maxKey(end), _maxCount(maxCount), _maxBytes(maxBytes) {
 
     // Get the MD5 hasher set up.
     md5_init(&_state);
 
-    // We don't want detected data corruption to prevent us from finishing our scan. Locations where
-    // we throw these errors should already be writing to the health log anyways.
-    opCtx->recoveryUnit()->setDataCorruptionDetectionMode(
-        DataCorruptionDetectionMode::kLogAndContinue);
-
-    // We need to enforce prepare conflicts in order to return correct results. This can't be done
-    // while a snapshot is already open.
-    if (_previousPrepareConflictBehavior != PrepareConflictBehavior::kEnforce) {
-        opCtx->recoveryUnit()->setPrepareConflictBehavior(PrepareConflictBehavior::kEnforce);
-    }
+    const auto& collection = acquisition.coll;
 
     if (!collection->isClustered()) {
         // Get the _id index.
@@ -261,9 +314,9 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
                                            start.obj(),
                                            end.obj(),
                                            BoundInclusion::kIncludeEndKeyOnly,
-                                           PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                           PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                            InternalPlanner::FORWARD,
-                                           InternalPlanner::IXSCAN_FETCH);
+                                           InternalPlanner::IXSCAN_DEFAULT);
     } else {
         CollectionScanParams params;
         params.minRecord = RecordIdBound(uassertStatusOK(
@@ -280,13 +333,6 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
     }
 }
 
-DbCheckHasher::~DbCheckHasher() {
-    _opCtx->recoveryUnit()->setDataCorruptionDetectionMode(_previousDataCorruptionMode);
-    if (_previousPrepareConflictBehavior != PrepareConflictBehavior::kEnforce) {
-        _opCtx->recoveryUnit()->setPrepareConflictBehavior(_previousPrepareConflictBehavior);
-    }
-}
-
 
 template <typename T>
 const md5_byte_t* md5Cast(const T* ptr) {
@@ -299,17 +345,39 @@ void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
     }
 }
 
-Status DbCheckHasher::hashAll(OperationContext* opCtx, Date_t deadline) {
-    BSONObj currentObj;
-
+Status DbCheckHasher::hashAll(OperationContext* opCtx,
+                              const CollectionPtr& collPtr,
+                              Date_t deadline) {
+    BSONObj currentObjId;
+    RecordId currentRecordId;
+    RecordData record;
     PlanExecutor::ExecState lastState;
-    while (PlanExecutor::ADVANCED == (lastState = _exec->getNext(&currentObj, nullptr))) {
+    while (PlanExecutor::ADVANCED ==
+           (lastState = _exec->getNext(&currentObjId, &currentRecordId))) {
 
         SleepDbCheckInBatch.execute([opCtx](const BSONObj& data) {
             int sleepMs = data["sleepMs"].safeNumberInt();
             opCtx->sleepFor(Milliseconds(sleepMs));
         });
 
+        if (!collPtr->getRecordStore()->findRecord(opCtx, currentRecordId, &record)) {
+            // TODO (SERVER-81117): Determine if this is the correct error code to return.
+            const auto msg = "Error fetching record from record id";
+            const auto status = Status(ErrorCodes::KeyNotFound, msg);
+            const auto logEntry =
+                dbCheckErrorHealthLogEntry(collPtr->ns(),
+                                           msg,
+                                           OplogEntriesEnum::Batch,
+                                           status,
+                                           BSON("recordID" << currentRecordId.toString()));
+            HealthLogInterface::get(opCtx)->log(*logEntry);
+
+            // If we cannot find the record in the record store, continue onto the next recordId.
+            // The inconsistency will be caught when we compare hashes.
+            continue;
+        }
+
+        BSONObj currentObj = record.toBson();
         if (!currentObj.hasField("_id")) {
             return Status(ErrorCodes::NoSuchKey, "Document missing _id");
         }
@@ -407,13 +475,18 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             return Status::OK();
         }
 
-        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                      entry.getReadTimestamp());
+        const DbCheckAcquisition acquisition(
+            opCtx,
+            entry.getNss(),
+            {RecoveryUnit::ReadSource::kProvided, entry.getReadTimestamp()},
+            // We must ignore prepare conflicts on secondaries. Primaries will block on prepare
+            // conflicts, which guarantees that the range we scan does not have any prepared
+            // updates. Secondaries can encounter prepared updates in normal operation if a document
+            // is prepared after it has been scanned on the primary, and before the dbCheck oplog
+            // entry is replicated.
+            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
-        AutoGetCollection coll(opCtx, entry.getNss(), MODE_IS);
-        const auto& collection = coll.getCollection();
-
-        if (!collection) {
+        if (!acquisition.coll) {
             const auto msg = "Collection under dbCheck no longer exists";
             auto logEntry = dbCheckHealthLogEntry(entry.getNss(),
                                                   SeverityEnum::Info,
@@ -424,8 +497,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             return Status::OK();
         }
 
-        hasher.emplace(opCtx, collection, entry.getMinKey(), entry.getMaxKey());
-        uassertStatusOK(hasher->hashAll(opCtx));
+        hasher.emplace(opCtx, acquisition, entry.getMinKey(), entry.getMaxKey());
+        uassertStatusOK(hasher->hashAll(opCtx, acquisition.coll));
 
         std::string expected = entry.getMd5().toString();
         std::string found = hasher->total();
@@ -439,7 +512,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                           hasher->lastKey(),
                                           entry.getReadTimestamp(),
                                           optime,
-                                          collection->getCollectionOptions());
+                                          acquisition.coll->getCollectionOptions());
 
         batchesProcessed++;
         if (kDebugBuild || logEntry->getSeverity() != SeverityEnum::Info ||
