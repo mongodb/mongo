@@ -168,6 +168,30 @@ static std::pair<value::TypeTags, value::Value> makeBsonObject(const BSONObj& bo
                             value::bitcastFrom<const char*>(bo.objdata()));
 }
 
+static std::pair<value::TypeTags, value::Value> makeArraySetWithCollator(
+    const BSONArray& arr, CollatorInterface* collator) {
+    auto [tmpTag, tmpVal] = makeBsonArray(arr);
+    value::ValueGuard tmpGuard{tmpTag, tmpVal};
+
+    value::ArrayEnumerator enumerator{tmpTag, tmpVal};
+
+    auto [arrTag, arrVal] = value::makeNewArraySet(collator);
+    value::ValueGuard guard{arrTag, arrVal};
+
+    auto arrView = value::getArraySetView(arrVal);
+
+    while (!enumerator.atEnd()) {
+        auto [tag, val] = enumerator.getViewOfValue();
+        enumerator.advance();
+
+        auto [copyTag, copyVal] = value::copyValue(tag, val);
+        arrView->push_back(copyTag, copyVal);
+    }
+    guard.reset();
+
+    return {arrTag, arrVal};
+}
+
 static std::pair<value::TypeTags, value::Value> makeArraySet(const BSONArray& arr) {
     auto [tmpTag, tmpVal] = makeBsonArray(arr);
     value::ValueGuard tmpGuard{tmpTag, tmpVal};

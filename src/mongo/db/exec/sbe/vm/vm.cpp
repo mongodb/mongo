@@ -86,6 +86,7 @@
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/matcher/in_list_data.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/str_trim_utils.h"
@@ -4169,40 +4170,50 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggConcatArraysC
     return {ownArr, tagArr, valArr};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(ArityType arity) {
-    invariant(arity == 2);
-
-    auto [inputOwned, inputTag_, inputVal_] = getFromStack(0);
-    auto [arrOwned, arrTag, arrVal] = getFromStack(1);
-
-    auto inputTag = inputTag_;
-    auto inputVal = inputVal_;
-
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::isMemberImpl(value::TypeTags exprTag,
+                                                                      value::Value exprVal,
+                                                                      value::TypeTags arrTag,
+                                                                      value::Value arrVal,
+                                                                      CollatorInterface* collator) {
     if (!value::isArray(arrTag) && arrTag != value::TypeTags::inListData) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    if (arrTag == value::TypeTags::inListData) {
-        if (inputTag == value::TypeTags::Nothing) {
-            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
-        }
-
-        auto inListData = value::getInListDataView(arrVal);
-        const bool found = inListData->contains(inputTag, inputVal);
-
-        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
-    } else if (arrTag == value::TypeTags::ArraySet) {
-        auto arrSet = value::getArraySetView(arrVal);
-        auto& values = arrSet->values();
-
-        const bool found = values.find({inputTag, inputVal}) != values.end();
-
-        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
+    if (exprTag == value::TypeTags::Nothing) {
+        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
     }
 
+    if (arrTag == value::TypeTags::inListData) {
+        auto inListData = value::getInListDataView(arrVal);
+        if (collator != nullptr) {
+            inListData->setCollator(collator);
+        }
+        const bool found = inListData->contains(exprTag, exprVal);
+        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
+    } else if (arrTag == value::TypeTags::ArraySet) {
+        // An empty ArraySet may not have a collation, but we don't need one to definitively
+        // determine that the empty set doesn't contain the value we are checking.
+        auto arrSet = value::getArraySetView(arrVal);
+        if (arrSet->size() == 0) {
+            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
+        }
+        auto values = arrSet->values();
+        if (collator != nullptr) {
+            // An ArraySet with a collation can lose information about its members that would be
+            // necessary to answer membership queries using a different collation. We require that
+            // well formed SBE programs do not execute a "collIsMember" instruction with mismatched
+            // collations.
+            tassert(5153701,
+                    "Expected ArraySet to have matching collator",
+                    CollatorInterface::collatorsMatch(collator, arrSet->getCollator()));
+        }
+        return {false,
+                value::TypeTags::Boolean,
+                value::bitcastFrom<bool>(values.find({exprTag, exprVal}) != values.end())};
+    }
     const bool found =
         value::arrayAny(arrTag, arrVal, [&](value::TypeTags elemTag, value::Value elemVal) {
-            auto [tag, val] = value::compareValue(inputTag, inputVal, elemTag, elemVal);
+            auto [tag, val] = value::compareValue(exprTag, exprVal, elemTag, elemVal, collator);
             if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(val) == 0) {
                 return true;
             }
@@ -4210,6 +4221,32 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(ArityTy
         });
 
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(ArityType arity) {
+    invariant(arity == 2);
+    auto [_, exprTag, exprVal] = getFromStack(0);
+    auto [__, arrTag, arrVal] = getFromStack(1);
+
+    return ByteCode::isMemberImpl(exprTag, exprVal, arrTag, arrVal, nullptr);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollIsMember(ArityType arity) {
+    invariant(arity == 3);
+    auto [_, exprTag, exprVal] = getFromStack(0);
+    auto [__, arrTag, arrVal] = getFromStack(1);
+
+    CollatorInterface* collator = nullptr;
+    auto [collatorOwned, collatorType, collatorVal] = getFromStack(2);
+
+    if (collatorType == value::TypeTags::collator) {
+        collator = value::getCollatorView(collatorVal);
+    } else {
+        // If a third parameter was supplied but it is not a Collator, return Nothing.
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    return ByteCode::isMemberImpl(exprTag, exprVal, arrTag, arrVal, collator);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfBytes(ArityType arity) {
@@ -9540,6 +9577,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggCollSetUnionCapped(arity);
         case Builtin::isMember:
             return builtinIsMember(arity);
+        case Builtin::collIsMember:
+            return builtinCollIsMember(arity);
         case Builtin::indexOfBytes:
             return builtinIndexOfBytes(arity);
         case Builtin::indexOfCP:
@@ -10085,6 +10124,8 @@ std::string builtinToString(Builtin b) {
             return "round";
         case Builtin::isMember:
             return "isMember";
+        case Builtin::collIsMember:
+            return "collIsMember";
         case Builtin::indexOfBytes:
             return "indexOfBytes";
         case Builtin::indexOfCP:

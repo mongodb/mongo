@@ -218,6 +218,7 @@ env.CppUnitTest(
         'expressions/sbe_integral_test.cpp',
         'expressions/sbe_is_array_empty_builtin_test.cpp',
         'expressions/sbe_is_member_builtin_test.cpp',
+        'expressions/sbe_collIsMember_builtin_test.cpp',
         'expressions/sbe_iso_date_to_parts_test.cpp',
         'expressions/sbe_ks_builtin_test.cpp',
         'expressions/sbe_lambda_test.cpp',

@@ -2247,9 +2247,7 @@ public:
 class ExpressionIn final : public ExpressionFixedArity<ExpressionIn, 2> {
 public:
     explicit ExpressionIn(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionIn, 2>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-    }
+        : ExpressionFixedArity<ExpressionIn, 2>(expCtx) {}
 
     ExpressionIn(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionIn, 2>(expCtx, std::move(children)) {}

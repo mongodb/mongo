@@ -2360,7 +2360,30 @@ public:
         pushABT(std::move(resultExpr));
     }
     void visit(const ExpressionIn* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto arrExpArg = _context->popABTExpr();
+        auto expArg = _context->popABTExpr();
+        auto expLocalVar = makeLocalVariableName(_context->state.frameId(), 0);
+        auto arrLocalVar = makeLocalVariableName(_context->state.frameId(), 0);
+
+        optimizer::ABTVector functionArgs{makeVariable(expLocalVar), makeVariable(arrLocalVar)};
+        auto collatorSlot = _context->state.getCollatorSlot();
+        if (collatorSlot) {
+            functionArgs.emplace_back(makeABTVariable(*collatorSlot));
+        }
+
+        auto inExpr = optimizer::make<optimizer::If>(
+            // Check that the arr argument is an array and is not missing.
+            makeFillEmptyFalse(makeABTFunction("isArray", makeVariable(arrLocalVar))),
+            (collatorSlot
+                 ? optimizer::make<optimizer::FunctionCall>("collIsMember", std::move(functionArgs))
+                 : optimizer::make<optimizer::FunctionCall>("isMember", std::move(functionArgs))),
+            makeABTFail(ErrorCodes::Error{5153700}, "$in requires an array as a second argument"));
+
+        pushABT(optimizer::make<optimizer::Let>(
+            std::move(expLocalVar),
+            std::move(expArg),
+            optimizer::make<optimizer::Let>(
+                std::move(arrLocalVar), std::move(arrExpArg), std::move(inExpr))));
     }
     void visit(const ExpressionIndexOfArray* expr) final {
         unsupportedExpression(expr->getOpName());

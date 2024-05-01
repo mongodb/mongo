@@ -577,6 +577,7 @@ enum class Builtin : uint16_t {
     tanh,
     round,
     isMember,
+    collIsMember,
     indexOfBytes,
     indexOfCP,
     isDayOfWeek,
@@ -1787,6 +1788,11 @@ private:
                                                                       value::Value valNewElem,
                                                                       int32_t sizeCap,
                                                                       CollatorInterface* collator);
+    FastTuple<bool, value::TypeTags, value::Value> isMemberImpl(value::TypeTags exprTag,
+                                                                value::Value exprVal,
+                                                                value::TypeTags arrTag,
+                                                                value::Value arrVal,
+                                                                CollatorInterface* collator);
     FastTuple<bool, value::TypeTags, value::Value> builtinAddToSetCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetToArray(ArityType arity);
@@ -1853,6 +1859,7 @@ private:
         int32_t sizeCap,
         CollatorInterface* collator);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsDayOfWeek(ArityType arity);

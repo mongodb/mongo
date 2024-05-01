@@ -32,7 +32,9 @@ let assertDBOutputEquals = (expected, output) => {
 };
 
 assertErrorCode(coll, [{$project: {sorted: {$sortArray: 1}}}], 2942500);
+// $num exists in all documents, while $notAField doesn't exist in any.
 assertErrorCode(coll, [{$project: {sorted: {$sortArray: "$num"}}}], 2942500);
+assertErrorCode(coll, [{$project: {sorted: {$sortArray: "$notAField"}}}], 2942500);
 
 assertDBOutputEquals([1, 2, 3], coll.aggregate([
     {$project: {sorted: {$sortArray: {input: {$literal: [1, 2, 3]}, sortBy: 1}}}}
