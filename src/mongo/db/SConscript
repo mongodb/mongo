@@ -1643,6 +1643,7 @@ execEnv.Library(
         'exec/delete_stage.cpp',
         'exec/distinct_scan.cpp',
         'exec/eof.cpp',
+        'exec/express/express_plan.cpp',
         'exec/fetch.cpp',
         'exec/geo_near.cpp',
         'exec/idhack.cpp',
