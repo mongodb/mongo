@@ -1398,17 +1398,12 @@ void StorageEngineImpl::TimestampMonitor::addListener(TimestampListener* listene
     _listeners.push_back(listener);
 }
 
-void StorageEngineImpl::TimestampMonitor::removeListener_forTestOnly(TimestampListener* listener) {
+void StorageEngineImpl::TimestampMonitor::removeListener(TimestampListener* listener) {
     stdx::lock_guard<Latch> lock(_monitorMutex);
     if (auto it = std::find(_listeners.begin(), _listeners.end(), listener);
         it != _listeners.end()) {
         _listeners.erase(it);
     }
-}
-
-void StorageEngineImpl::TimestampMonitor::clearListeners() {
-    stdx::lock_guard<Latch> lock(_monitorMutex);
-    _listeners.clear();
 }
 
 int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) {
