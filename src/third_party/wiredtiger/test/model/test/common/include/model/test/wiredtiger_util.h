@@ -209,6 +209,25 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
 }
 
 /*
+ * wt_model_assert_equal --
+ *     Check that the two values are the same.
+ */
+#define wt_model_assert_equal(a, b)                                               \
+    {                                                                             \
+        auto ret_a = a;                                                           \
+        auto ret_b = b;                                                           \
+        if (ret_a != ret_b) {                                                     \
+            std::cerr << std::endl;                                               \
+            std::cerr << "Assertion failure in " << __PRETTY_FUNCTION__           \
+                      << ": Values are not equal. " << std::endl;                 \
+            std::cerr << "  Location: " << __FILE__ ":" << __LINE__ << std::endl; \
+            std::cerr << "  " << #a << ": " << ret_a << std::endl;                \
+            std::cerr << "  " << #b << ": " << ret_b << std::endl;                \
+            testutil_die(0, nullptr);                                             \
+        }                                                                         \
+    }
+
+/*
  * wt_model_assert --
  *     Check that the key has the same value in the model as in the database.
  */
@@ -218,16 +237,16 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
         int __ret_model, __ret_wt;                                         \
         __ret_model = table->get_ext(key, __out_model, ##__VA_ARGS__);     \
         __ret_wt = wt_get_ext(session, uri, key, __out_wt, ##__VA_ARGS__); \
-        testutil_assert(__ret_model == __ret_wt);                          \
-        testutil_assert(__out_model == __out_wt);                          \
+        wt_model_assert_equal(__ret_model, __ret_wt);                      \
+        wt_model_assert_equal(__out_model, __out_wt);                      \
     }
 
 /*
  * wt_model_insert_both --
  *     Insert both into the model and the database.
  */
-#define wt_model_insert_both(table, uri, key, value, ...)       \
-    testutil_assert(table->insert(key, value, ##__VA_ARGS__) == \
+#define wt_model_insert_both(table, uri, key, value, ...)           \
+    wt_model_assert_equal(table->insert(key, value, ##__VA_ARGS__), \
       wt_insert(session, uri, key, value, ##__VA_ARGS__));
 
 /*
@@ -235,23 +254,23 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
  *     Remove both from the model and from the database.
  */
 #define wt_model_remove_both(table, uri, key, ...) \
-    testutil_assert(                               \
-      table->remove(key, ##__VA_ARGS__) == wt_remove(session, uri, key, ##__VA_ARGS__));
+    wt_model_assert_equal(                         \
+      table->remove(key, ##__VA_ARGS__), wt_remove(session, uri, key, ##__VA_ARGS__));
 
 /*
  * wt_model_truncate_both --
  *     Truncate in both from the model and from the database.
  */
 #define wt_model_truncate_both(table, uri, start, ...) \
-    testutil_assert(                                   \
-      table->truncate(start, ##__VA_ARGS__) == wt_truncate(session, uri, start, ##__VA_ARGS__));
+    wt_model_assert_equal(                             \
+      table->truncate(start, ##__VA_ARGS__), wt_truncate(session, uri, start, ##__VA_ARGS__));
 
 /*
  * wt_model_update_both --
  *     Update both in the model and in the database.
  */
-#define wt_model_update_both(table, uri, key, value, ...)       \
-    testutil_assert(table->update(key, value, ##__VA_ARGS__) == \
+#define wt_model_update_both(table, uri, key, value, ...)           \
+    wt_model_assert_equal(table->update(key, value, ##__VA_ARGS__), \
       wt_update(session, uri, key, value, ##__VA_ARGS__));
 
 /*
@@ -259,8 +278,8 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
  *     Check that the key has the same value in the model as in the database.
  */
 #define wt_model_txn_assert(table, uri, txn, session, key, ...) \
-    testutil_assert(                                            \
-      table->get(txn, key, ##__VA_ARGS__) == wt_txn_get(session, uri, key, ##__VA_ARGS__));
+    wt_model_assert_equal(                                      \
+      table->get(txn, key, ##__VA_ARGS__), wt_txn_get(session, uri, key, ##__VA_ARGS__));
 
 /*
  * wt_model_txn_begin_both --
@@ -327,15 +346,15 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
  *     Insert both into the model and the database.
  */
 #define wt_model_txn_insert_both(table, uri, txn, session, key, value, ...) \
-    testutil_assert(table->insert(txn, key, value, ##__VA_ARGS__) ==        \
+    wt_model_assert_equal(table->insert(txn, key, value, ##__VA_ARGS__),    \
       wt_txn_insert(session, uri, key, value, ##__VA_ARGS__));
 
 /*
  * wt_model_ckpt_assert --
  *     Check that the key has the same value in the model as in the database.
  */
-#define wt_model_ckpt_assert(table, uri, ckpt_name, key, ...)                         \
-    testutil_assert(table->get(database.checkpoint(ckpt_name), key, ##__VA_ARGS__) == \
+#define wt_model_ckpt_assert(table, uri, ckpt_name, key, ...)                             \
+    wt_model_assert_equal(table->get(database.checkpoint(ckpt_name), key, ##__VA_ARGS__), \
       wt_ckpt_get(session, uri, key, ckpt_name, ##__VA_ARGS__));
 
 /*

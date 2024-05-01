@@ -66,6 +66,13 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
     "log=(enabled,file_max=10M,remove=false),session_max=100," \
     "statistics=(all),statistics_log=(wait=1,json,on_close)"
 
+/* Byte values. */
+const model::data_value byte1((uint64_t)1);
+const model::data_value byte2((uint64_t)2);
+const model::data_value byte3((uint64_t)3);
+const model::data_value byte4((uint64_t)4);
+const model::data_value byte5((uint64_t)5);
+
 /* Keys. */
 const model::data_value key1("Key 1");
 const model::data_value key2("Key 2");
@@ -73,6 +80,14 @@ const model::data_value key3("Key 3");
 const model::data_value key4("Key 4");
 const model::data_value key5("Key 5");
 const model::data_value keyX("Key X");
+
+/* Column keys. */
+const model::data_value recno1((uint64_t)1);
+const model::data_value recno2((uint64_t)2);
+const model::data_value recno3((uint64_t)3);
+const model::data_value recno4((uint64_t)4);
+const model::data_value recno5((uint64_t)5);
+const model::data_value recnoX((uint64_t)10);
 
 /* Values. */
 const model::data_value value1("Value 1");
@@ -351,11 +366,232 @@ test_model_basic_wt(void)
 }
 
 /*
+ * test_model_basic_column_wt --
+ *     The basic test of the model - with columns and with WiredTiger.
+ */
+static void
+test_model_basic_column_wt(void)
+{
+    model::kv_database database;
+
+    model::kv_table_config table_config;
+    table_config.type = model::kv_table_type::column;
+    model::kv_table_ptr table = database.create_table("table", table_config);
+
+    /* Create the test's home directory and database. */
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    const char *uri = "table:table";
+
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "basic-column";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    testutil_check(
+      session->create(session, uri, "key_format=r,value_format=S,log=(enabled=false)"));
+
+    /* Populate the table with a few values and check that we get the expected results. */
+    wt_model_insert_both(table, uri, recno1, value1, 10);
+    wt_model_insert_both(table, uri, recno1, value2, 20);
+    wt_model_remove_both(table, uri, recno1, 30);
+    wt_model_insert_both(table, uri, recno1, value4, 40);
+
+    wt_model_assert(table, uri, recno1, 10);
+    wt_model_assert(table, uri, recno1, 20);
+    wt_model_assert(table, uri, recno1, 30);
+    wt_model_assert(table, uri, recno1, 40);
+
+    wt_model_assert(table, uri, recno1, 5);
+    wt_model_assert(table, uri, recno1, 15);
+    wt_model_assert(table, uri, recno1, 25);
+    wt_model_assert(table, uri, recno1, 35);
+    wt_model_assert(table, uri, recno1, 45);
+    wt_model_assert(table, uri, recno1);
+
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Test globally visible (non-timestamped) updates. */
+    wt_model_insert_both(table, uri, recno2, value1);
+    wt_model_assert(table, uri, recno2, 0);
+    wt_model_assert(table, uri, recno2, 10);
+    wt_model_assert(table, uri, recno2);
+
+    wt_model_remove_both(table, uri, recno2);
+    wt_model_assert(table, uri, recno2);
+
+    /* Try a missing recno. */
+    wt_model_assert(table, uri, recnoX);
+
+    wt_model_remove_both(table, uri, recnoX);
+    wt_model_assert(table, uri, recnoX);
+
+    /* Try timestamped updates to the second recno. */
+    wt_model_insert_both(table, uri, recno2, value3, 30);
+
+    wt_model_assert(table, uri, recno2, 5);
+    wt_model_assert(table, uri, recno2, 35);
+    wt_model_assert(table, uri, recno2);
+
+    /* Test multiple inserts with the same timestamp. */
+    wt_model_insert_both(table, uri, recno1, value1, 50);
+    wt_model_insert_both(table, uri, recno1, value2, 50);
+    wt_model_insert_both(table, uri, recno1, value3, 50);
+    wt_model_insert_both(table, uri, recno1, value4, 60);
+
+    wt_model_assert(table, uri, recno1, 50);
+    wt_model_assert(table, uri, recno1, 55);
+    wt_model_assert(table, uri, recno1);
+
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Test insert without overwrite. */
+    wt_model_insert_both(table, uri, recno1, value1, 60, false);
+    wt_model_insert_both(table, uri, recno1, value1, 65, false);
+    wt_model_remove_both(table, uri, recno1, 65);
+    wt_model_insert_both(table, uri, recno1, value1, 70, false);
+
+    /* Test updates. */
+    wt_model_update_both(table, uri, recno1, value2, 70);
+    wt_model_update_both(table, uri, recno1, value3, 75);
+    wt_model_assert(table, uri, recno1, 70);
+    wt_model_assert(table, uri, recno1, 75);
+    wt_model_remove_both(table, uri, recno1, 80);
+    wt_model_update_both(table, uri, recno1, value1, 80, false);
+    wt_model_update_both(table, uri, recno1, value1, 85, false);
+
+    /* Verify. */
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Now try to get the verification to fail. */
+    testutil_check(table->remove(recno2, 1000));
+    testutil_assert(!table->verify_noexcept(conn));
+
+    /* Clean up. */
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+
+    /* Verify using the debug log. */
+    verify_using_debug_log(opts, test_home.c_str(), true);
+}
+
+/*
+ * test_model_basic_column_fix_wt --
+ *     The basic test of the model - with FLCS and with WiredTiger.
+ */
+static void
+test_model_basic_column_fix_wt(void)
+{
+    model::kv_database database;
+
+    model::kv_table_config table_config;
+    table_config.type = model::kv_table_type::column_fix;
+    model::kv_table_ptr table = database.create_table("table", table_config);
+
+    /* Create the test's home directory and database. */
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    const char *uri = "table:table";
+
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "basic-column-fix";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    testutil_check(
+      session->create(session, uri, "key_format=r,value_format=8t,log=(enabled=false)"));
+
+    /* Populate the table with a few values and check that we get the expected results. */
+    wt_model_insert_both(table, uri, recno2, byte1, 10);
+    wt_model_insert_both(table, uri, recno2, byte2, 20);
+    wt_model_remove_both(table, uri, recno2, 30);
+    wt_model_insert_both(table, uri, recno2, byte4, 40);
+
+    wt_model_assert(table, uri, recno2, 10);
+    wt_model_assert(table, uri, recno2, 20);
+    wt_model_assert(table, uri, recno2, 30);
+    wt_model_assert(table, uri, recno2, 40);
+
+    wt_model_assert(table, uri, recno2, 5);
+    wt_model_assert(table, uri, recno2, 15);
+    wt_model_assert(table, uri, recno2, 25);
+    wt_model_assert(table, uri, recno2, 35);
+    wt_model_assert(table, uri, recno2, 45);
+    wt_model_assert(table, uri, recno2);
+
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Test globally visible (non-timestamped) updates. */
+    wt_model_insert_both(table, uri, recno3, byte1);
+    wt_model_assert(table, uri, recno3, 0);
+    wt_model_assert(table, uri, recno3, 10);
+    wt_model_assert(table, uri, recno3);
+
+    wt_model_remove_both(table, uri, recno3);
+    wt_model_assert(table, uri, recno3);
+
+    /* Try missing recnos. */
+    wt_model_assert(table, uri, recno1);
+    wt_model_assert(table, uri, recno4);
+
+    wt_model_remove_both(table, uri, recno4);
+    wt_model_assert(table, uri, recno4);
+
+    /* Try a missing recno, if a higher recno exists. */
+    wt_model_insert_both(table, uri, recno5, byte5, 30);
+    wt_model_assert(table, uri, recno4);
+
+    /* Try timestamped updates on the recno that had only non-timestamped updates so far. */
+    wt_model_insert_both(table, uri, recno3, byte3, 30);
+
+    wt_model_assert(table, uri, recno3, 5);
+    wt_model_assert(table, uri, recno3, 35);
+    wt_model_assert(table, uri, recno3);
+
+    /* Test multiple inserts with the same timestamp. */
+    wt_model_insert_both(table, uri, recno2, byte1, 50);
+    wt_model_insert_both(table, uri, recno2, byte2, 50);
+    wt_model_insert_both(table, uri, recno2, byte3, 50);
+    wt_model_insert_both(table, uri, recno2, byte4, 60);
+
+    wt_model_assert(table, uri, recno2, 50);
+    wt_model_assert(table, uri, recno2, 55);
+    wt_model_assert(table, uri, recno2);
+
+    /* Test insert without overwrite. */
+    wt_model_insert_both(table, uri, recno2, byte1, 60, false);
+    wt_model_insert_both(table, uri, recno2, byte1, 65, false);
+    wt_model_remove_both(table, uri, recno2, 65);
+    wt_model_insert_both(table, uri, recno2, byte1, 70, false);
+
+    /* Test updates. */
+    wt_model_update_both(table, uri, recno2, byte2, 70);
+    wt_model_update_both(table, uri, recno2, byte3, 75);
+    wt_model_assert(table, uri, recno2, 70);
+    wt_model_assert(table, uri, recno2, 75);
+    wt_model_remove_both(table, uri, recno2, 80);
+    wt_model_update_both(table, uri, recno2, byte1, 80, false);
+    wt_model_update_both(table, uri, recno2, byte1, 85, false);
+
+    /* Verify. */
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Now try to get the verification to fail. */
+    testutil_check(table->remove(recno2, 1000));
+    testutil_assert(!table->verify_noexcept(conn));
+
+    /* Clean up. */
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+
+    /* Verify using the debug log. */
+    verify_using_debug_log(opts, test_home.c_str(), true);
+}
+
+/*
  * test_model_logged --
  *     Test tables that use logging.
  */
 static void
-test_model_logged(void)
+test_model_basic_logged(void)
 {
     model::kv_database database;
 
@@ -430,7 +666,7 @@ test_model_logged(void)
  *     Test tables that use logging - with WiredTiger.
  */
 static void
-test_model_logged_wt(void)
+test_model_basic_logged_wt(void)
 {
     model::kv_database database;
 
@@ -443,7 +679,7 @@ test_model_logged_wt(void)
     WT_SESSION *session;
     const char *uri = "table:table";
 
-    std::string test_home = std::string(home) + DIR_DELIM_STR + "logged";
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "basic-logged";
     testutil_recreate_dir(test_home.c_str());
     testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
@@ -687,6 +923,200 @@ test_model_truncate_wt(bool logging)
 }
 
 /*
+ * test_model_truncate_column_wt --
+ *     Test truncation - with columns and with WiredTiger.
+ */
+static void
+test_model_truncate_column_wt(bool logging)
+{
+    model::kv_database database;
+
+    model::kv_table_config table_config;
+    table_config.log_enabled = logging;
+    table_config.type = model::kv_table_type::column;
+    model::kv_table_ptr table = database.create_table("table", table_config);
+
+    /* Create the test's home directory and database. */
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    const char *uri = "table:table";
+
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "truncate-column";
+    if (logging)
+        test_home += "-logged";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    std::string config = "key_format=r,value_format=S,log=(enabled=";
+    config += std::string(logging ? "true" : "false") + ")";
+    testutil_check(session->create(session, uri, config.c_str()));
+
+    /* Populate the table. */
+    wt_model_insert_both(table, uri, recno1, value1, 10);
+    wt_model_insert_both(table, uri, recno2, value2, 20);
+    wt_model_insert_both(table, uri, recno3, value3, 20);
+    wt_model_insert_both(table, uri, recno4, value4, 30);
+    wt_model_insert_both(table, uri, recno5, value5, 30);
+
+    /* Truncate. */
+    wt_model_truncate_both(table, uri, recno2, recno4, 30);
+    wt_model_assert(table, uri, recno1);
+    wt_model_assert(table, uri, recno2);
+    wt_model_assert(table, uri, recno3);
+    wt_model_assert(table, uri, recno4);
+    wt_model_assert(table, uri, recno5);
+
+    /* Add the recnos back and try range truncates that involve the beginning and the end. */
+    wt_model_insert_both(table, uri, recno2, value2, 40);
+    wt_model_insert_both(table, uri, recno3, value3, 40);
+    wt_model_insert_both(table, uri, recno4, value4, 40);
+
+    wt_model_truncate_both(table, uri, model::NONE, recno2, 40);
+    wt_model_truncate_both(table, uri, recno4, model::NONE, 40);
+    wt_model_assert(table, uri, recno1);
+    wt_model_assert(table, uri, recno2);
+    wt_model_assert(table, uri, recno3);
+    wt_model_assert(table, uri, recno4);
+    wt_model_assert(table, uri, recno5);
+
+    /* Now try the full range truncate. */
+    wt_model_insert_both(table, uri, recno2, value2, 50);
+    wt_model_insert_both(table, uri, recno3, value3, 50);
+    wt_model_insert_both(table, uri, recno4, value4, 50);
+
+    wt_model_truncate_both(table, uri, model::NONE, model::NONE, 50);
+    wt_model_assert(table, uri, recno1);
+    wt_model_assert(table, uri, recno2);
+    wt_model_assert(table, uri, recno3);
+    wt_model_assert(table, uri, recno4);
+    wt_model_assert(table, uri, recno5);
+
+    /* Start and stop recnos don't actually need to exist. */
+    wt_model_insert_both(table, uri, recno2, value2, 60);
+    wt_model_insert_both(table, uri, recno3, value3, 60);
+    wt_model_insert_both(table, uri, recno4, value4, 60);
+
+    wt_model_truncate_both(table, uri, recno1, recno2, 60);
+    wt_model_truncate_both(table, uri, recno4, recno5, 60);
+    wt_model_assert(table, uri, recno1);
+    wt_model_assert(table, uri, recno2);
+    wt_model_assert(table, uri, recno3);
+    wt_model_assert(table, uri, recno4);
+    wt_model_assert(table, uri, recno5);
+
+    /* Verify. */
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Now try to get the verification to fail. */
+    testutil_check(table->insert(recno2, value1, 1000));
+    testutil_assert(!table->verify_noexcept(conn));
+
+    /* Clean up. */
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+
+    /* Verify using the debug log. */
+    verify_using_debug_log(opts, test_home.c_str(), true);
+}
+
+/*
+ * test_model_truncate_column_fix_wt --
+ *     Test truncation - with FLCS and with WiredTiger.
+ */
+static void
+test_model_truncate_column_fix_wt(bool logging)
+{
+    model::kv_database database;
+
+    model::kv_table_config table_config;
+    table_config.log_enabled = logging;
+    table_config.type = model::kv_table_type::column_fix;
+    model::kv_table_ptr table = database.create_table("table", table_config);
+
+    /* Create the test's home directory and database. */
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    const char *uri = "table:table";
+
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "truncate-column-fix";
+    if (logging)
+        test_home += "-logged";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    std::string config = "key_format=r,value_format=8t,log=(enabled=";
+    config += std::string(logging ? "true" : "false") + ")";
+    testutil_check(session->create(session, uri, config.c_str()));
+
+    /* Populate the table. */
+    wt_model_insert_both(table, uri, recno1, byte1, 10);
+    wt_model_insert_both(table, uri, recno2, byte2, 20);
+    wt_model_insert_both(table, uri, recno3, byte3, 20);
+    wt_model_insert_both(table, uri, recno4, byte4, 30);
+    wt_model_insert_both(table, uri, recno5, byte5, 30);
+
+    /* Truncate. */
+    wt_model_truncate_both(table, uri, recno2, recno4, 30);
+    wt_model_assert(table, uri, recno1);
+    wt_model_assert(table, uri, recno2);
+    wt_model_assert(table, uri, recno3);
+    wt_model_assert(table, uri, recno4);
+    wt_model_assert(table, uri, recno5);
+
+    /* Add the recnos back and try range truncates that involve the beginning and the end. */
+    wt_model_insert_both(table, uri, recno2, byte2, 40);
+    wt_model_insert_both(table, uri, recno3, byte3, 40);
+    wt_model_insert_both(table, uri, recno4, byte4, 40);
+
+    wt_model_truncate_both(table, uri, model::NONE, recno2, 40);
+    wt_model_truncate_both(table, uri, recno4, model::NONE, 40);
+    wt_model_assert(table, uri, recno1);
+    wt_model_assert(table, uri, recno2);
+    wt_model_assert(table, uri, recno3);
+    wt_model_assert(table, uri, recno4);
+    wt_model_assert(table, uri, recno5);
+
+    /* Now try the full range truncate. */
+    wt_model_insert_both(table, uri, recno2, byte2, 50);
+    wt_model_insert_both(table, uri, recno3, byte3, 50);
+    wt_model_insert_both(table, uri, recno4, byte4, 50);
+
+    wt_model_truncate_both(table, uri, model::NONE, model::NONE, 50);
+    wt_model_assert(table, uri, recno1);
+    wt_model_assert(table, uri, recno2);
+    wt_model_assert(table, uri, recno3);
+    wt_model_assert(table, uri, recno4);
+    wt_model_assert(table, uri, recno5);
+
+    /* Start and stop recnos don't actually need to exist. */
+    wt_model_insert_both(table, uri, recno2, byte2, 60);
+    wt_model_insert_both(table, uri, recno3, byte3, 60);
+    wt_model_insert_both(table, uri, recno4, byte4, 60);
+
+    wt_model_truncate_both(table, uri, recno1, recno2, 60);
+    wt_model_truncate_both(table, uri, recno4, recno5, 60);
+    wt_model_assert(table, uri, recno1);
+    wt_model_assert(table, uri, recno2);
+    wt_model_assert(table, uri, recno3);
+    wt_model_assert(table, uri, recno4);
+    wt_model_assert(table, uri, recno5);
+
+    /* Verify. */
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Now try to get the verification to fail. */
+    testutil_check(table->insert(recnoX, byte1, 1000));
+    testutil_assert(!table->verify_noexcept(conn));
+
+    /* Clean up. */
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+
+    /* Verify using the debug log. */
+    verify_using_debug_log(opts, test_home.c_str(), true);
+}
+
+/*
  * test_model_oldest --
  *     Test setting the oldest timestamp.
  */
@@ -881,12 +1311,18 @@ main(int argc, char *argv[])
         test_data_value();
         test_model_basic();
         test_model_basic_wt();
-        test_model_logged();
-        test_model_logged_wt();
+        test_model_basic_column_wt();
+        test_model_basic_column_fix_wt();
+        test_model_basic_logged();
+        test_model_basic_logged_wt();
         test_model_truncate(false);
         test_model_truncate_wt(false);
         test_model_truncate(true);
         test_model_truncate_wt(true);
+        test_model_truncate_column_wt(false);
+        test_model_truncate_column_wt(true);
+        test_model_truncate_column_fix_wt(false);
+        test_model_truncate_column_fix_wt(true);
         test_model_oldest();
         test_model_oldest_wt();
     } catch (std::exception &e) {

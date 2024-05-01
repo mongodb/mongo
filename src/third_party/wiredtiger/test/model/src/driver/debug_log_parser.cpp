@@ -46,6 +46,41 @@ namespace model {
  *     Parse the given log entry.
  */
 static void
+from_json(const json &j, debug_log_parser::col_put &out)
+{
+    j.at("fileid").get_to(out.fileid);
+    j.at("recno").get_to(out.recno);
+    j.at("value").get_to(out.value);
+}
+
+/*
+ * from_json --
+ *     Parse the given log entry.
+ */
+static void
+from_json(const json &j, debug_log_parser::col_remove &out)
+{
+    j.at("fileid").get_to(out.fileid);
+    j.at("recno").get_to(out.recno);
+}
+
+/*
+ * from_json --
+ *     Parse the given log entry.
+ */
+static void
+from_json(const json &j, debug_log_parser::col_truncate &out)
+{
+    j.at("fileid").get_to(out.fileid);
+    j.at("start").get_to(out.start);
+    j.at("stop").get_to(out.stop);
+}
+
+/*
+ * from_json --
+ *     Parse the given log entry.
+ */
+static void
 from_json(const json &j, debug_log_parser::commit_header &out)
 {
     j.at("txnid").get_to(out.txnid);
@@ -94,6 +129,19 @@ from_json(const json &j, debug_log_parser::row_remove &out)
  *     Parse the given log entry.
  */
 static void
+from_json(const json &j, debug_log_parser::row_truncate &out)
+{
+    j.at("fileid").get_to(out.fileid);
+    j.at("mode").get_to(out.mode);
+    j.at("start").get_to(out.start);
+    j.at("stop").get_to(out.stop);
+}
+
+/*
+ * from_json --
+ *     Parse the given log entry.
+ */
+static void
 from_json(const json &j, debug_log_parser::txn_timestamp &out)
 {
     j.at("commit_ts").get_to(out.commit_ts);
@@ -102,16 +150,66 @@ from_json(const json &j, debug_log_parser::txn_timestamp &out)
 }
 
 /*
- * from_json --
- *     Parse the given log entry.
+ * from_debug_log --
+ *     Parse the given debug log entry.
  */
-static void
-from_json(const json &j, debug_log_parser::row_truncate &out)
+static int
+from_debug_log(
+  WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, debug_log_parser::col_put &out)
 {
-    j.at("fileid").get_to(out.fileid);
-    j.at("mode").get_to(out.mode);
-    j.at("start").get_to(out.start);
-    j.at("stop").get_to(out.stop);
+    int ret;
+    uint32_t fileid;
+    uint64_t recno;
+    WT_ITEM value;
+
+    if ((ret = __wt_logop_col_put_unpack(session, pp, end, &fileid, &recno, &value)) != 0)
+        return ret;
+
+    out.fileid = fileid;
+    out.recno = recno;
+    out.value = std::string((const char *)value.data, value.size);
+    return 0;
+}
+
+/*
+ * from_debug_log --
+ *     Parse the given debug log entry.
+ */
+static int
+from_debug_log(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
+  debug_log_parser::col_remove &out)
+{
+    int ret;
+    uint32_t fileid;
+    uint64_t recno;
+
+    if ((ret = __wt_logop_col_remove_unpack(session, pp, end, &fileid, &recno)) != 0)
+        return ret;
+
+    out.fileid = fileid;
+    out.recno = recno;
+    return 0;
+}
+
+/*
+ * from_debug_log --
+ *     Parse the given debug log entry.
+ */
+static int
+from_debug_log(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
+  debug_log_parser::col_truncate &out)
+{
+    int ret;
+    uint32_t fileid;
+    uint64_t start, stop;
+
+    if ((ret = __wt_logop_col_truncate_unpack(session, pp, end, &fileid, &start, &stop)) != 0)
+        return ret;
+
+    out.fileid = fileid;
+    out.start = start;
+    out.stop = stop;
+    return 0;
 }
 
 /*
@@ -200,6 +298,30 @@ from_debug_log(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
  */
 static int
 from_debug_log(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
+  debug_log_parser::row_truncate &out)
+{
+    int ret;
+    uint32_t fileid;
+    WT_ITEM start, stop;
+    uint32_t mode;
+
+    if ((ret = __wt_logop_row_truncate_unpack(session, pp, end, &fileid, &start, &stop, &mode)) !=
+      0)
+        return ret;
+
+    out.fileid = fileid;
+    out.start = std::string((const char *)start.data, start.size);
+    out.stop = std::string((const char *)stop.data, stop.size);
+    out.mode = mode;
+    return 0;
+}
+
+/*
+ * from_debug_log --
+ *     Parse the given debug log entry.
+ */
+static int
+from_debug_log(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
   debug_log_parser::txn_timestamp &out)
 {
     int ret;
@@ -218,30 +340,6 @@ from_debug_log(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
     out.commit_ts = commit_ts;
     out.durable_ts = durable_ts;
     out.prepare_ts = prepare_ts;
-    return 0;
-}
-
-/*
- * from_debug_log --
- *     Parse the given debug log entry.
- */
-static int
-from_debug_log(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
-  debug_log_parser::row_truncate &out)
-{
-    int ret;
-    uint32_t fileid;
-    WT_ITEM start, stop;
-    uint32_t mode;
-
-    if ((ret = __wt_logop_row_truncate_unpack(session, pp, end, &fileid, &start, &stop, &mode)) !=
-      0)
-        return ret;
-
-    out.fileid = fileid;
-    out.start = std::string((const char *)start.data, start.size);
-    out.stop = std::string((const char *)stop.data, stop.size);
-    out.mode = mode;
     return 0;
 }
 
@@ -299,13 +397,16 @@ debug_log_parser::metadata_apply(kv_transaction_ptr txn, const row_put &op)
             std::shared_ptr<config_map> file_config = _metadata[source];
             std::shared_ptr<config_map> table_config = _metadata["table:" + name];
 
+            std::string key_format = table_config->get_string("key_format");
+            std::string value_format = table_config->get_string("value_format");
+
             kv_table_config config;
             if (file_config->contains("log"))
                 config.log_enabled = file_config->get_map("log")->get_bool("enabled");
+            config.type = kv_table::type_by_key_value_format(key_format, value_format);
 
             kv_table_ptr table = _database.create_table(name, config);
-            table->set_key_value_format(
-              table_config->get_string("key_format"), table_config->get_string("value_format"));
+            table->set_key_value_format(key_format, value_format);
         }
 
         /* Establish mapping from the file ID to the table object. */
@@ -422,6 +523,77 @@ debug_log_parser::metadata_checkpoint_apply(
  *     Apply the given operation to the model.
  */
 void
+debug_log_parser::apply(kv_transaction_ptr txn, const col_put &op)
+{
+    /* Handle metadata operations. */
+    if (op.fileid == 0)
+        throw model_exception("Unsupported metadata operation: col_put");
+
+    /* Find the table. */
+    kv_table_ptr table = table_by_fileid(op.fileid);
+
+    /* Parse the key and the value. */
+    data_value key = data_value(op.recno);
+    data_value value = data_value::unpack(op.value, table->value_format());
+
+    /* Perform the operation. */
+    int ret = table->insert(std::move(txn), key, value);
+    if (ret != 0)
+        throw wiredtiger_exception(ret);
+}
+
+/*
+ * debug_log_parser::apply --
+ *     Apply the given operation to the model.
+ */
+void
+debug_log_parser::apply(kv_transaction_ptr txn, const col_remove &op)
+{
+    /* Handle metadata operations. */
+    if (op.fileid == 0)
+        throw model_exception("Unsupported metadata operation: col_remove");
+
+    /* Find the table. */
+    kv_table_ptr table = table_by_fileid(op.fileid);
+
+    /* Parse the key. */
+    data_value key = data_value(op.recno);
+
+    /* Perform the operation. */
+    int ret = table->remove(std::move(txn), key);
+    if (ret != 0)
+        throw wiredtiger_exception(ret);
+}
+
+/*
+ * debug_log_parser::apply --
+ *     Apply the given operation to the model.
+ */
+void
+debug_log_parser::apply(kv_transaction_ptr txn, const col_truncate &op)
+{
+    /* Handle metadata operations. */
+    if (op.fileid == 0)
+        throw model_exception("Unsupported metadata operation: col_truncate");
+
+    /* Find the table. */
+    kv_table_ptr table = table_by_fileid(op.fileid);
+
+    /* Parse the keys. */
+    data_value start = op.start == 0 ? NONE : data_value(op.start);
+    data_value stop = op.stop == 0 ? NONE : data_value(op.stop);
+
+    /* Perform the operation. */
+    int ret = table->truncate(std::move(txn), start, stop);
+    if (ret != 0)
+        throw wiredtiger_exception(ret);
+}
+
+/*
+ * debug_log_parser::apply --
+ *     Apply the given operation to the model.
+ */
+void
 debug_log_parser::apply(kv_transaction_ptr txn, const row_put &op)
 {
     /* Handle metadata operations. */
@@ -471,31 +643,6 @@ debug_log_parser::apply(kv_transaction_ptr txn, const row_remove &op)
  *     Apply the given operation to the model.
  */
 void
-debug_log_parser::apply(kv_transaction_ptr txn, const txn_timestamp &op)
-{
-    /* Handle the prepare operation. */
-    if (op.commit_ts == k_timestamp_none && op.prepare_ts != k_timestamp_none) {
-        txn->prepare(op.prepare_ts);
-        return;
-    }
-
-    /* Handle the commit of a prepared transaction. */
-    if (op.commit_ts != k_timestamp_none && op.prepare_ts != k_timestamp_none) {
-        if (txn->state() != kv_transaction_state::prepared)
-            throw model_exception("The transaction must be in a prepared state before commit");
-        txn->commit(op.commit_ts, op.durable_ts);
-        return;
-    }
-
-    /* Otherwise it is just an operation to set the commit timestamp. */
-    txn->set_commit_timestamp(op.commit_ts);
-}
-
-/*
- * debug_log_parser::row_truncate --
- *     Apply the given operation to the model.
- */
-void
 debug_log_parser::apply(kv_transaction_ptr txn, const row_truncate &op)
 {
     /* Handle metadata operations. */
@@ -518,6 +665,31 @@ debug_log_parser::apply(kv_transaction_ptr txn, const row_truncate &op)
     int ret = table->truncate(std::move(txn), start, stop);
     if (ret != 0)
         throw wiredtiger_exception(ret);
+}
+
+/*
+ * debug_log_parser::apply --
+ *     Apply the given operation to the model.
+ */
+void
+debug_log_parser::apply(kv_transaction_ptr txn, const txn_timestamp &op)
+{
+    /* Handle the prepare operation. */
+    if (op.commit_ts == k_timestamp_none && op.prepare_ts != k_timestamp_none) {
+        txn->prepare(op.prepare_ts);
+        return;
+    }
+
+    /* Handle the commit of a prepared transaction. */
+    if (op.commit_ts != k_timestamp_none && op.prepare_ts != k_timestamp_none) {
+        if (txn->state() != kv_transaction_state::prepared)
+            throw model_exception("The transaction must be in a prepared state before commit");
+        txn->commit(op.commit_ts, op.durable_ts);
+        return;
+    }
+
+    /* Otherwise it is just an operation to set the commit timestamp. */
+    txn->set_commit_timestamp(op.commit_ts);
 }
 
 /*
@@ -645,6 +817,27 @@ from_debug_log_helper(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, W
 
             /* Parse and apply the operation. */
             switch (op_type) {
+            case WT_LOGOP_COL_PUT: {
+                debug_log_parser::col_put v;
+                if ((ret = from_debug_log(session, pp, op_end, v)) != 0)
+                    return ret;
+                args.parser.apply(txn, v);
+                break;
+            }
+            case WT_LOGOP_COL_REMOVE: {
+                debug_log_parser::col_remove v;
+                if ((ret = from_debug_log(session, pp, op_end, v)) != 0)
+                    return ret;
+                args.parser.apply(txn, v);
+                break;
+            }
+            case WT_LOGOP_COL_TRUNCATE: {
+                debug_log_parser::col_truncate v;
+                if ((ret = from_debug_log(session, pp, op_end, v)) != 0)
+                    return ret;
+                args.parser.apply(txn, v);
+                break;
+            }
             case WT_LOGOP_ROW_PUT: {
                 debug_log_parser::row_put v;
                 if ((ret = from_debug_log(session, pp, op_end, v)) != 0)
@@ -796,6 +989,22 @@ debug_log_parser::from_json(kv_database &database, const char *path)
             for (auto &op_entry : log_entry.at("ops")) {
                 std::string op_type = op_entry.at("optype").get<std::string>();
 
+                /* Column-store operations. */
+                if (op_type == "col_modify")
+                    throw model_exception("Unsupported operation: " + op_type);
+                if (op_type == "col_put") {
+                    parser.apply(txn, op_entry.get<col_put>());
+                    continue;
+                }
+                if (op_type == "col_remove") {
+                    parser.apply(txn, op_entry.get<col_remove>());
+                    continue;
+                }
+                if (op_type == "col_truncate") {
+                    parser.apply(txn, op_entry.get<col_truncate>());
+                    continue;
+                }
+
                 /* Row-store operations. */
                 if (op_type == "row_modify")
                     throw model_exception("Unsupported operation: " + op_type);
@@ -821,10 +1030,6 @@ debug_log_parser::from_json(kv_database &database, const char *path)
                 /* Operations that we can skip... for now. */
                 if (op_type == "prev_lsn" || op_type == "checkpoint_start")
                     continue;
-
-                /* Column-store operations (unsupported). */
-                if (op_type.substr(0, 4) == "col_")
-                    throw model_exception("The parser does not currently support column stores.");
 
                 throw model_exception("Unsupported operation \"" + op_type + "\"");
             }

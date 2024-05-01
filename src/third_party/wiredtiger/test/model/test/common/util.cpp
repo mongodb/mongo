@@ -90,7 +90,7 @@ current_time()
 std::pair<uint64_t, uint64_t>
 parse_uint64_range(const char *str)
 {
-    char *end;
+    const char *end;
     uint64_t first = parse_uint64(str, &end);
 
     uint64_t second = first;
@@ -166,9 +166,12 @@ verify_using_debug_log(TEST_OPTS *opts, const char *home, bool test_failing)
     /* Now try to get the verification to fail, just to make sure it's working. */
     if (test_failing)
         for (auto &t : tables) {
+            model::kv_table_ptr p = db_from_debug_log.table(t.c_str());
+            /* The following works only for tables with string keys. */
+            if (strcmp(p->key_format(), "S") != 0)
+                continue;
             model::data_value key("A key that does not exists");
             model::data_value value("A data value");
-            model::kv_table_ptr p = db_from_debug_log.table(t.c_str());
             p->insert(key, value, 100 * 1000);
             testutil_assert(!p->verify_noexcept(conn));
         }

@@ -142,8 +142,12 @@ protected:
     int
     do_operation(const operation::create_table &op)
     {
-        kv_table_ptr table = _database.create_table(op.name);
+        kv_table_config config;
+        config.type = kv_table::type_by_key_value_format(op.key_format, op.value_format);
+
+        kv_table_ptr table = _database.create_table(op.name, config);
         table->set_key_value_format(op.key_format, op.value_format);
+
         add_table(op.table_id, std::move(table));
         return 0;
     }

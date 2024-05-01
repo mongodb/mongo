@@ -31,6 +31,7 @@
 #include <iostream>
 
 #include "model/data_value.h"
+#include "model/util.h"
 #include "wiredtiger.h"
 
 extern "C" {
@@ -44,6 +45,12 @@ namespace model {
  *     The "None" value.
  */
 const data_value NONE = data_value::create_none();
+
+/*
+ * ZERO --
+ *     The unsigned zero value.
+ */
+const data_value ZERO = data_value((uint64_t)0);
 
 /*
  * item_to_byte_vector --
@@ -67,9 +74,15 @@ data_value::unpack(const void *buffer, size_t length, const char *format)
         throw model_exception("NULL buffer");
     if (format == NULL)
         throw model_exception("NULL format");
+    if (*format == '\0')
+        throw model_exception("Empty format");
+
+    /* Remove length from the format. */
+    if (isdigit(format[0]))
+        (void)parse_uint64(format, &format);
 
     if (strlen(format) != 1)
-        throw model_exception("The model does not currently support structs or types with sizes");
+        throw model_exception("The model does not currently support structs");
 
     int ret = 0;
 
@@ -183,8 +196,15 @@ get_wt_cursor_key_or_value(
 {
     if (format == NULL)
         format = "u";
+    if (*format == '\0')
+        throw model_exception("Empty format");
+
+    /* Remove length from the format. */
+    if (isdigit(format[0]))
+        (void)parse_uint64(format, &format);
+
     if (strlen(format) != 1)
-        throw model_exception("The model does not currently support structs or types with sizes");
+        throw model_exception("The model does not currently support structs");
 
     int ret = 0;
 
@@ -254,8 +274,15 @@ set_wt_cursor_key_or_value(WT_CURSOR *cursor, void set_fn(WT_CURSOR *cursor, ...
 {
     if (format == NULL)
         format = "u";
+    if (*format == '\0')
+        throw model_exception("Empty format");
+
+    /* Remove length from the format. */
+    if (isdigit(format[0]))
+        (void)parse_uint64(format, &format);
+
     if (strlen(format) != 1)
-        throw model_exception("The model does not currently support structs or types with sizes");
+        throw model_exception("The model does not currently support structs");
     if (std::holds_alternative<std::monostate>(value) || value.valueless_by_exception())
         throw model_exception("Cannot use the NONE value in a WiredTiger cursor");
 
@@ -284,6 +311,7 @@ set_wt_cursor_key_or_value(WT_CURSOR *cursor, void set_fn(WT_CURSOR *cursor, ...
         SET_DATA_VALUE("q", int64_t, int64_t);
         SET_DATA_VALUE("Q", uint64_t, uint64_t);
         SET_DATA_VALUE("r", uint64_t, uint64_t);
+        SET_DATA_VALUE("t", uint8_t, uint64_t);
     case 's':
     case 'S': {
         if (!std::holds_alternative<std::string>(value))

@@ -288,7 +288,7 @@ shared_memory::~shared_memory()
  *     Parse the string into a number. Throw an exception on error.
  */
 uint64_t
-parse_uint64(const char *str, char **end)
+parse_uint64(const char *str, const char **end)
 {
     if (str == nullptr || str[0] == '\0')
         throw std::runtime_error("Cannot parse a number");
