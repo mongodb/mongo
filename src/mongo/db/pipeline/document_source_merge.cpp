@@ -394,8 +394,8 @@ std::pair<DocumentSourceMerge::BatchObject, int> DocumentSourceMerge::makeBatchO
     auto upsertType = _mergeProcessor->getMergeStrategyDescriptor().upsertType;
 
     tassert(6628901, "_writeSizeEstimator should be initialized", _writeSizeEstimator);
-    return {std::move(batchObject),
-            _writeSizeEstimator->estimateUpdateSizeBytes(batchObject, upsertType)};
+    int size = _writeSizeEstimator->estimateUpdateSizeBytes(batchObject, upsertType);
+    return {std::move(batchObject), size};
 }
 
 void DocumentSourceMerge::flush(BatchedCommandRequest bcr, BatchedObjects batch) {
