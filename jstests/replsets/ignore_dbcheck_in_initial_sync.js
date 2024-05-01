@@ -66,30 +66,30 @@ replSet.reInitiate();
 
 initialSyncHangBeforeSplittingControlFlowFailPoint.wait();
 
-const primaryDbCheckFailPoint = configureFailPoint(primary, "sleepAfterExtraIndexKeysHashing");
-
+// TODO SERVER-89921: Uncomment validateMode once the relevant tickets are backported.
 runDbCheck(replSet, primaryDb, collName, {
     maxDocsPerBatch: maxDocsPerBatch  // , validateMode: "dataConsistencyAndMissingIndexKeysCheck"
 });
 
-primaryDbCheckFailPoint.wait({timesEntered: 1});
+// Wait until the primary finished dbcheck before turning off the initial sync failpoint so that the
+// initial sync node would need to apply (ignore) dbCheckStop in initial sync.
+checkHealthLog(primaryHealthlog, {"operation": "dbCheckStop"}, 1);
 
 assert.commandWorked(initialSyncNode.adminCommand(
     {configureFailPoint: 'initialSyncHangBeforeSplittingControlFlow', mode: 'off'}));
 
 replSet.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
 
+// TODO SERVER-89921: Uncomment all of the following checkHealthLog once the relevant tickets are
+// backported.
 // Check that the primary logged an error health log entry for each document with missing index key.
 // checkHealthLog(primaryHealthlog, logQueries.missingIndexKeysQuery, nDocs);
 // Check that the primary does not have other error/warning entries.
 // checkHealthLog(primaryHealthlog, logQueries.allErrorsOrWarningsQuery, nDocs);
-
 // Check that the start, batch, and stop entries are warning logs since the node skips dbcheck
 // during initial sync.
 const initialSyncNodeHealthLog = initialSyncNode.getDB("local").system.healthlog;
-// checkHealthLog(initialSyncNodeHealthLog, logQueries.duringInitialSyncQuery, 3);
-checkHealthLog(initialSyncNodeHealthLog, logQueries.duringInitialSyncStart, 1);
-checkHealthLog(initialSyncNodeHealthLog, logQueries.duringInitialSyncBatch, 1);
+checkHealthLog(initialSyncNodeHealthLog, logQueries.duringInitialSyncQuery, 3);
 // Check that the initial sync node does not have other info or error/warning entries.
 // checkHealthLog(initialSyncNodeHealthLog, logQueries.infoBatchQuery, 0);
 // checkHealthLog(initialSyncNodeHealthLog, logQueries.allErrorsOrWarningsQuery, 3);

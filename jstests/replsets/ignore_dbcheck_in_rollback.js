@@ -63,6 +63,8 @@ primaryDB = primary.getDB(dbName);
 const stableTimestampFailPoint = configureFailPoint(
     primary, "holdStableTimestampAtSpecificTimestamp", {timestamp: stableTimestamp});
 
+// TODO SERVER-89921: Uncomment validateMode and secondaryIndex once the relevant tickets are
+// backported.
 runDbCheck(rollbackTest,
            primaryDB,
            collName,
@@ -70,6 +72,7 @@ runDbCheck(rollbackTest,
                maxDocsPerBatch: 20  // , validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1"
            });
 
+// TODO SERVER-89921: Uncomment checkHealthLog once the relevant tickets are backported.
 // Check that the old primary prior to transitioning to rollback has start, batch, and stop entries.
 const oldPrimaryHealthLog = primary.getDB("local").system.healthlog;
 // checkHealthLog(oldPrimaryHealthLog, logQueries.recordNotFoundQuery, nDocs);
@@ -84,6 +87,7 @@ primary = rollbackTest.getPrimary();
 const primaryHealthLog = primary.getDB("local").system.healthlog;
 const rollbackNodeHealthLog = rollbackNode.getDB("local").system.healthlog;
 
+// TODO SERVER-89921: Change the # of logs to check once the relevant tickets are backported.
 // Check that the start, batch (10 batches), and stop entries on the rollback node are all warning
 // logs.
 checkHealthLog(rollbackNodeHealthLog, logQueries.duringStableRecovery, 3);  // 12
@@ -93,6 +97,8 @@ checkHealthLog(rollbackNodeHealthLog, logQueries.startStopQuery, 2);
 // checkHealthLog(rollbackNodeHealthLog, logQueries.recordNotFoundQuery, nDocs);
 checkHealthLog(rollbackNodeHealthLog, logQueries.allErrorsOrWarningsQuery, 3);  // nDocs + 12
 
+// TODO SERVER-89921: Uncomment the following checkHealthLog once the relevant tickets are
+// backported.
 // Check that the primary only has the batch inconsistent entries from when it was secondary.
 // checkHealthLog(primaryHealthLog, logQueries.inconsistentBatchQuery, 10);
 // Check that the primary does not have other error/warning entries.
