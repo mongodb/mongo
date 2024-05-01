@@ -63,8 +63,6 @@ public:
     void setUp() override {
         _opCtx = makeOperationContext();
         gAggregateOperationResourceConsumptionMetrics = true;
-        gDocumentUnitSizeBytes = 128;
-        gIndexEntryUnitSizeBytes = 16;
 
         auto svcCtx = getServiceContext();
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(svcCtx);
@@ -255,7 +253,7 @@ TEST_F(ResourceConsumptionMetricsTest, NestedScopedMetricsCollector) {
 namespace {
 ResourceConsumption::DocumentUnitCounter makeDocUnits(int64_t bytes) {
     ResourceConsumption::DocumentUnitCounter docUnitsReturned;
-    docUnitsReturned.observeOne(bytes);
+    docUnitsReturned.observeOneDoc(bytes);
     return docUnitsReturned;
 }
 }  // namespace
@@ -565,9 +563,7 @@ TEST_F(ResourceConsumptionMetricsTest, IdxEntryUnitsRead) {
         ResourceConsumption::ScopedMetricsCollector scope(
             _opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "db1"));
 
-        gIndexEntryUnitSizeBytes = 16;
-
-        // Each of these should be counted as 1 document unit.
+        // Each of these should be counted as 1 index unit.
         operationMetrics.incrementOneIdxEntryRead("", 2);
         operationMetrics.incrementOneIdxEntryRead("", 4);
         operationMetrics.incrementOneIdxEntryRead("", 8);
@@ -575,28 +571,24 @@ TEST_F(ResourceConsumptionMetricsTest, IdxEntryUnitsRead) {
         expectedBytes += 2 + 4 + 8 + 16;
         expectedUnits += 4;
 
-        // Each of these should be counted as 2 document unit.
+        // Each of these should be counted as 2 index units.
         operationMetrics.incrementOneIdxEntryRead("", 17);
         operationMetrics.incrementOneIdxEntryRead("", 31);
         operationMetrics.incrementOneIdxEntryRead("", 32);
         expectedBytes += 17 + 31 + 32;
         expectedUnits += 6;
 
-        gIndexEntryUnitSizeBytes = 32;
-
-        // Each of these should be counted as 1 document unit.
-        operationMetrics.incrementOneIdxEntryRead("", 17);
-        operationMetrics.incrementOneIdxEntryRead("", 31);
-        operationMetrics.incrementOneIdxEntryRead("", 32);
-        expectedBytes += 17 + 31 + 32;
-        expectedUnits += 3;
-
-        // Each of these should be counted as 2 document units.
+        // Each of these should be counted as 3 index units.
         operationMetrics.incrementOneIdxEntryRead("", 33);
-        operationMetrics.incrementOneIdxEntryRead("", 63);
-        operationMetrics.incrementOneIdxEntryRead("", 64);
-        expectedBytes += 33 + 63 + 64;
+        operationMetrics.incrementOneIdxEntryRead("", 48);
+        expectedBytes += 33 + 48;
         expectedUnits += 6;
+
+        // Each of these should be counted as 4 index units.
+        operationMetrics.incrementOneIdxEntryRead("", 49);
+        operationMetrics.incrementOneIdxEntryRead("", 64);
+        expectedBytes += 49 + 64;
+        expectedUnits += 8;
     }
 
     auto metricsCopy = globalResourceConsumption.getDbMetrics();
@@ -615,9 +607,7 @@ TEST_F(ResourceConsumptionMetricsTest, IdxEntryUnitsWritten) {
         ResourceConsumption::ScopedMetricsCollector scope(
             _opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "db1"));
 
-        gIndexEntryUnitSizeBytes = 16;
-
-        // Each of these should be counted as 1 document unit.
+        // Each of these should be counted as 1 index unit.
         operationMetrics.incrementOneIdxEntryWritten("", 2);
         operationMetrics.incrementOneIdxEntryWritten("", 4);
         operationMetrics.incrementOneIdxEntryWritten("", 8);
@@ -625,28 +615,24 @@ TEST_F(ResourceConsumptionMetricsTest, IdxEntryUnitsWritten) {
         expectedBytes += 2 + 4 + 8 + 16;
         expectedUnits += 4;
 
-        // Each of these should be counted as 2 document units.
+        // Each of these should be counted as 2 index units.
         operationMetrics.incrementOneIdxEntryWritten("", 17);
         operationMetrics.incrementOneIdxEntryWritten("", 31);
         operationMetrics.incrementOneIdxEntryWritten("", 32);
         expectedBytes += 17 + 31 + 32;
         expectedUnits += 6;
 
-        gIndexEntryUnitSizeBytes = 32;
-
-        // Each of these should be counted as 1 document unit.
-        operationMetrics.incrementOneIdxEntryWritten("", 17);
-        operationMetrics.incrementOneIdxEntryWritten("", 31);
-        operationMetrics.incrementOneIdxEntryWritten("", 32);
-        expectedBytes += 17 + 31 + 32;
-        expectedUnits += 3;
-
-        // Each of these should be counted as 2 document units.
+        // Each of these should be counted as 3 index units.
         operationMetrics.incrementOneIdxEntryWritten("", 33);
-        operationMetrics.incrementOneIdxEntryWritten("", 63);
-        operationMetrics.incrementOneIdxEntryWritten("", 64);
-        expectedBytes += 33 + 63 + 64;
+        operationMetrics.incrementOneIdxEntryWritten("", 48);
+        expectedBytes += 33 + 48;
         expectedUnits += 6;
+
+        // Each of these should be counted as 4 index units.
+        operationMetrics.incrementOneIdxEntryWritten("", 49);
+        operationMetrics.incrementOneIdxEntryWritten("", 64);
+        expectedBytes += 49 + 64;
+        expectedUnits += 8;
     }
 
     auto metricsCopy = globalResourceConsumption.getDbMetrics();
@@ -862,5 +848,4 @@ TEST_F(ResourceConsumptionMetricsTest, MergeWithTenantId) {
     ASSERT_EQ(metricsCopy[otherDbName1Str].primaryReadMetrics.docsReturned.bytes(), 32);
     ASSERT_EQ(metricsCopy[otherDbName1Str].primaryReadMetrics.docsReturned.units(), 1);
 }
-
 }  // namespace mongo
