@@ -3423,7 +3423,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         if (jsTest.options().nonClusteredConfigTransactions) {
             options.setParameter.featureFlagClusteredConfigTransactions = false;
         }
-        if (TestData.replicaSetEndpointIncompatible) {
+        if (typeof TestData !== "undefined" && TestData.replicaSetEndpointIncompatible) {
             options.setParameter.featureFlagReplicaSetEndpoint = false;
         }
 
