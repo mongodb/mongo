@@ -460,7 +460,7 @@ main(int argc, char *argv[])
 {
     model::kv_workload_generator_spec spec;
 
-    uint64_t base_seed = (uint64_t)time(NULL);
+    uint64_t base_seed = model::random::next_seed(__wt_rdtsc() ^ time(NULL));
     std::string home = "WT_TEST";
     uint64_t min_iterations = 1;
     uint64_t min_runtime_s = 0;
@@ -593,10 +593,13 @@ main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
         }
-    else
+    else {
         /* Run the test, potentially many times. */
+        uint64_t next_seed = base_seed;
         for (uint64_t iteration = 1;; iteration++) {
-            uint64_t seed = base_seed + iteration - 1;
+            uint64_t seed = next_seed;
+            next_seed = model::random::next_seed(next_seed);
+
             std::cout << "Iteration " << iteration << ", seed 0x" << std::hex << seed << std::dec
                       << std::endl;
 
@@ -638,6 +641,7 @@ main(int argc, char *argv[])
             if (total_time >= min_runtime_s && iteration >= min_iterations)
                 break;
         }
+    }
 
     /* Clean up the database directory. */
     if (!preserve)

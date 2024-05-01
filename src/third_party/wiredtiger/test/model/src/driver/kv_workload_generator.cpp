@@ -635,7 +635,8 @@ kv_workload_generator::run()
 
             /* Simulate how checkpoints, crashes, and restarts manipulate the timestamps. */
             if (s->sequence->type() == kv_workload_sequence_type::checkpoint ||
-              s->sequence->type() == kv_workload_sequence_type::restart) {
+              s->sequence->type() == kv_workload_sequence_type::restart ||
+              s->sequence->type() == kv_workload_sequence_type::rollback_to_stable) {
                 ckpt_oldest = oldest;
                 ckpt_stable = stable;
                 if (ckpt_stable == k_timestamp_none)
@@ -688,7 +689,8 @@ kv_workload_generator::run()
         /* Validate that we filled in the timestamps in the correct order. */
         assert_timestamps(*s->sequence, op, oldest, stable);
         if (std::holds_alternative<operation::checkpoint>(op) ||
-          std::holds_alternative<operation::restart>(op)) {
+          std::holds_alternative<operation::restart>(op) ||
+          std::holds_alternative<operation::rollback_to_stable>(op)) {
             ckpt_oldest = oldest;
             ckpt_stable = stable;
             if (ckpt_stable == k_timestamp_none)
