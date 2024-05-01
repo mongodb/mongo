@@ -70,6 +70,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -1385,7 +1386,12 @@ public:
           _entry(std::move(entry)),
           _collectionDecorations(collectionDecorations) {}
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) final {
+        if (commitTime) {
+            HistoricalIdentTracker::get(opCtx).recordDrop(
+                _entry->getIdent(), _nss, _uuid, commitTime.value());
+        }
+
         _entry->setDropped();
     }
 
