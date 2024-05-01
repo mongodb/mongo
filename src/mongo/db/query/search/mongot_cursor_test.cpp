@@ -100,15 +100,21 @@ public:
         RemoteCommandRequest rcr,
         std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
         bool preFetchNextBatch = true,
-        boost::optional<int64_t> startingBatchSize = boost::none) {
+        boost::optional<long long> startingBatchSize = boost::none) {
         std::unique_ptr<MongotTaskExecutorCursorGetMoreStrategy> mongotGetMoreStrategy;
 
-        if (startingBatchSize) {
+        // If calcDocsNeededFn is provided, that enables use of the docsRequested option. Otherwise,
+        // enable use of batchSize option.
+        if (calcDocsNeededFn != nullptr) {
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(
-                preFetchNextBatch, calcDocsNeededFn, startingBatchSize.get());
+                preFetchNextBatch, calcDocsNeededFn, /*startingBatchSize*/ boost::none);
+        } else if (startingBatchSize.has_value()) {
+            mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(
+                preFetchNextBatch, /*calcDocsNeededFn*/ nullptr, startingBatchSize);
         } else {
+            // Use the default startingBatchSize.
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(
-                preFetchNextBatch, calcDocsNeededFn);
+                preFetchNextBatch, /*calcDocsNeededFn*/ nullptr);
         }
         return Base::makeTec(rcr, {std::move(mongotGetMoreStrategy)});
     }
@@ -263,9 +269,6 @@ public:
     }
 
     void BatchSizeGrowsExponentiallyFromDefaultStartingSizeTest() {
-        RAIIServerParameterControllerForTest featureFlagController(
-            "featureFlagSearchBatchSizeTuning", true);
-
         // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
         // throughout the test.
         unittest::threadAssertionMonitoredTest([&](auto& monitor) {
@@ -336,9 +339,6 @@ public:
     }
 
     void BatchSizeGrowsExponentiallyFromCustomStartingSizeTest() {
-        RAIIServerParameterControllerForTest featureFlagController(
-            "featureFlagSearchBatchSizeTuning", true);
-
         // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
         // throughout the test.
         unittest::threadAssertionMonitoredTest([&](auto& monitor) {

@@ -69,22 +69,17 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
         cmdBob.append(kIntermediateField, *protocolVersion);
     }
 
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const auto needsSetBatchSize =
-        feature_flags::gFeatureFlagSearchBatchSizeTuning.isEnabled(fcvSnapshot) &&
-        batchSize.has_value();
-    // (Ignore FCV check): This feature is enabled on an earlier FCV.
-    // We should only set docsRequested if we're not setting batchSize.
-    // TODO SERVER-74941 Remove docsRequested alongside featureFlagSearchBatchSizeLimit.
-    const auto needsSetDocsRequested = !needsSetBatchSize &&
-        feature_flags::gFeatureFlagSearchBatchSizeLimit.isEnabledAndIgnoreFCVUnsafe() &&
-        docsRequested.has_value();
-    if (needsSetBatchSize || needsSetDocsRequested || requiresSearchSequenceToken) {
+    if (docsRequested.has_value() || batchSize.has_value() || requiresSearchSequenceToken) {
+        tassert(
+            8953001,
+            "Only one of docsRequested or batchSize should be set on the initial mongot request.",
+            !docsRequested.has_value() || !batchSize.has_value());
+
         BSONObjBuilder cursorOptionsBob(cmdBob.subobjStart(kCursorOptionsField));
-        if (needsSetBatchSize) {
+        if (batchSize.has_value()) {
             cursorOptionsBob.append(kBatchSizeField, batchSize.get());
         }
-        if (needsSetDocsRequested) {
+        if (docsRequested.has_value()) {
             cursorOptionsBob.append(kDocsRequestedField, docsRequested.get());
         }
         if (requiresSearchSequenceToken) {
@@ -163,10 +158,11 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     bool preFetchNextBatch,
     std::function<boost::optional<long long>()> calcDocsNeededFn,
-    std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy,
+    boost::optional<long long> batchSize) {
     std::vector<std::unique_ptr<executor::TaskExecutorCursor>> cursors;
     auto getMoreStrategy = std::make_shared<executor::MongotTaskExecutorCursorGetMoreStrategy>(
-        preFetchNextBatch, calcDocsNeededFn);
+        preFetchNextBatch, calcDocsNeededFn, batchSize);
     auto initialCursor =
         makeTaskExecutorCursor(expCtx->opCtx,
                                taskExecutor,
@@ -203,13 +199,27 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     }
 
     boost::optional<long long> batchSize = boost::none;
-    if (minDocsNeededBounds.has_value() & maxDocsNeededBounds.has_value()) {
+    // We should only use batchSize if the batchSize feature flag (featureFlagSearchBatchSizeTuning)
+    // is enabled and we've already computed min/max bounds.
+    if (feature_flags::gFeatureFlagSearchBatchSizeTuning.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        minDocsNeededBounds.has_value() && maxDocsNeededBounds.has_value()) {
         // TODO SERVER-87077 This manual check for storedSource shouldn't be necessary if we pass
         // all arguments via the mongot remote spec.
         const auto storedSourceElem = query[kReturnStoredSourceArg];
         bool isStoredSource = !storedSourceElem.eoo() && storedSourceElem.Bool();
         batchSize = computeInitialBatchSize(
             expCtx, *minDocsNeededBounds, *maxDocsNeededBounds, userBatchSize, isStoredSource);
+    }
+    // We disable setting docsRequested if we're already setting batchSize or if
+    // the docsRequested feature flag (featureFlagSearchBatchSizeLimit) is disabled.
+    // TODO SERVER-74941 Remove docsRequested alongside featureFlagSearchBatchSizeLimit.
+    // (Ignore FCV check): This feature is enabled on an earlier FCV.
+    if (batchSize.has_value() ||
+        !feature_flags::gFeatureFlagSearchBatchSizeLimit.isEnabledAndIgnoreFCVUnsafe()) {
+        docsRequested = boost::none;
+        // Set calcDocsNeededFn to disable docsRequested for getMore requests.
+        calcDocsNeededFn = nullptr;
     }
 
     // If we are sending docsRequested to mongot, then we should avoid prefetching the next
@@ -232,7 +242,8 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
                             taskExecutor,
                             prefetchNextBatch,
                             calcDocsNeededFn,
-                            std::move(yieldPolicy));
+                            std::move(yieldPolicy),
+                            batchSize);
 }
 
 std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSearchMetaStage(
