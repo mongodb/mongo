@@ -766,10 +766,9 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     }
 
     // Throws exception if index contains duplicates.
-    auto violatingRecordsList = scanIndexForDuplicates(opCtx, cmr.indexRequest.idx);
-    if (!violatingRecordsList.empty()) {
-        uassertStatusOK(
-            buildConvertUniqueErrorStatus(opCtx, collection.get(), violatingRecordsList));
+    auto violatingRecords = scanIndexForDuplicates(opCtx, cmr.indexRequest.idx);
+    if (!violatingRecords.empty()) {
+        uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, collection.get(), violatingRecords));
     }
 
     return Status::OK();
@@ -802,7 +801,7 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(
     }
     const auto& cmr = statusW.getValue().first;
     auto idx = cmr.indexRequest.idx;
-    auto violatingRecordsList = scanIndexForDuplicates(opCtx, idx);
+    auto violatingRecords = scanIndexForDuplicates(opCtx, idx);
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangAfterCollModIndexUniqueFullIndexScan,
@@ -811,9 +810,8 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(
         []() {},
         nss);
 
-    if (!violatingRecordsList.empty()) {
-        uassertStatusOK(
-            buildConvertUniqueErrorStatus(opCtx, collection.get(), violatingRecordsList));
+    if (!violatingRecords.empty()) {
+        uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, collection.get(), violatingRecords));
     }
 
     return idx;

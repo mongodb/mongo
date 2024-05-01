@@ -47,17 +47,14 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/throttle_cursor.h"
-#include "mongo/db/catalog/validate_gen.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -173,10 +170,9 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
     // similarly to initial sync that we don't need to perform this check in the destination
     // cluster.
     if (mode && *mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
-        auto duplicateRecordsList = scanIndexForDuplicates(opCtx, idx);
-        if (!duplicateRecordsList.empty()) {
-            uassertStatusOK(
-                buildConvertUniqueErrorStatus(opCtx, writableColl, duplicateRecordsList));
+        auto duplicateRecords = scanIndexForDuplicates(opCtx, idx);
+        if (!duplicateRecords.empty()) {
+            uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, writableColl, duplicateRecords));
         }
     }
 
@@ -343,56 +339,55 @@ void processCollModIndexRequest(OperationContext* opCtx,
     }
 }
 
-std::list<std::set<RecordId>> scanIndexForDuplicates(OperationContext* opCtx,
-                                                     const IndexDescriptor* idx) {
+std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCtx,
+                                                          const IndexDescriptor* idx) {
     auto entry = idx->getEntry();
     auto accessMethod = entry->accessMethod()->asSortedData();
 
     // Scans index for duplicates, comparing consecutive index entries.
     // KeyStrings will be in strictly increasing order because all keys are sorted and they are
     // in the format (Key, RID), and all RecordIDs are unique.
-    DataThrottle dataThrottle(opCtx, [&]() { return gMaxValidateMBperSec.load(); });
-    dataThrottle.turnThrottlingOff();
-    SortedDataInterfaceThrottleCursor indexCursor(opCtx, accessMethod, &dataThrottle);
+    auto indexCursor = accessMethod->newCursor(opCtx);
     boost::optional<KeyStringEntry> prevIndexEntry;
-    std::list<std::set<RecordId>> duplicateRecordsList;
-    std::set<RecordId> duplicateRecords;
+    std::vector<std::vector<RecordId>> allDuplicateRecords;
+    std::vector<RecordId> recordsWithDuplicateKeys;
 
-    for (auto indexEntry = indexCursor.nextKeyString(opCtx); indexEntry;
-         indexEntry = indexCursor.nextKeyString(opCtx)) {
+    for (auto indexEntry = indexCursor->nextKeyString(); indexEntry;
+         indexEntry = indexCursor->nextKeyString()) {
         if (prevIndexEntry &&
             (indexEntry->loc.isLong()
                  ? indexEntry->keyString.compareWithoutRecordIdLong(prevIndexEntry->keyString)
                  : indexEntry->keyString.compareWithoutRecordIdStr(prevIndexEntry->keyString)) ==
                 0) {
-            if (duplicateRecords.empty()) {
-                duplicateRecords.insert(prevIndexEntry->loc);
+            if (recordsWithDuplicateKeys.empty()) {
+                recordsWithDuplicateKeys.push_back(std::move(prevIndexEntry->loc));
             }
-            duplicateRecords.insert(indexEntry->loc);
+            recordsWithDuplicateKeys.push_back(std::move(indexEntry->loc));
         } else {
-            if (!duplicateRecords.empty()) {
+            if (!recordsWithDuplicateKeys.empty()) {
                 // Adds the current group of violations with the same duplicate value.
-                duplicateRecordsList.push_back(duplicateRecords);
-                duplicateRecords.clear();
+                allDuplicateRecords.push_back(std::move(recordsWithDuplicateKeys));
+                recordsWithDuplicateKeys.clear();
             }
         }
         prevIndexEntry = indexEntry;
     }
-    if (!duplicateRecords.empty()) {
-        duplicateRecordsList.push_back(duplicateRecords);
+    if (!recordsWithDuplicateKeys.empty()) {
+        allDuplicateRecords.push_back(std::move(recordsWithDuplicateKeys));
     }
-    return duplicateRecordsList;
+    return allDuplicateRecords;
 }
 
-Status buildConvertUniqueErrorStatus(OperationContext* opCtx,
-                                     const Collection* collection,
-                                     const std::list<std::set<RecordId>>& duplicateRecordsList) {
+Status buildConvertUniqueErrorStatus(
+    OperationContext* opCtx,
+    const Collection* collection,
+    const std::vector<std::vector<RecordId>>& allDuplicateRecords) {
     BSONArrayBuilder duplicateViolations;
     size_t violationsSize = 0;
 
-    for (const auto& duplicateRecords : duplicateRecordsList) {
+    for (const auto& recordsWithDuplicateKeys : allDuplicateRecords) {
         BSONArrayBuilder currViolatingIds;
-        for (const auto& recordId : duplicateRecords) {
+        for (const auto& recordId : recordsWithDuplicateKeys) {
             auto doc = collection->docFor(opCtx, recordId).value();
             auto id = doc["_id"];
             violationsSize += id.size();
