@@ -221,7 +221,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         blockCRUDOperationsRequest.setBlockType(
             mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
         blockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
-        async_rpc::GenericArgs args;
+        GenericArguments args;
         async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
         async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
         auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
@@ -278,7 +278,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss);
         unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
         unblockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
-        async_rpc::GenericArgs args;
+        GenericArguments args;
         async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
         async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
         auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
@@ -439,7 +439,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         std::remove(participants.begin(), participants.end(), primaryShardId),
                         participants.end());
 
-                    async_rpc::GenericArgs args;
+                    GenericArguments args;
                     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
                     async_rpc::AsyncRPCCommandHelpers::appendDbVersionIfPresent(
                         args, *metadata().getDatabaseVersion());
@@ -496,7 +496,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 FlushDatabaseCacheUpdatesWithWriteConcern flushDbCacheUpdatesCmd(db);
                 flushDbCacheUpdatesCmd.setSyncFromConfig(true);
                 flushDbCacheUpdatesCmd.setDbName(DatabaseName::kAdmin);
-                async_rpc::GenericArgs args;
+                GenericArguments args;
                 async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
 
                 IgnoreAPIParametersBlock ignoreApiParametersBlock{opCtx};

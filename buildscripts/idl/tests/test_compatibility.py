@@ -1549,25 +1549,28 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
     def test_generic_argument_compatibility_pass(self):
         """Tests that compatible old and new generic_argument.idl files should pass."""
         dir_path = path.dirname(path.realpath(__file__))
-        self.assertFalse(
-            idl_check_compatibility.check_generic_arguments_compatibility(
-                path.join(dir_path,
-                          "compatibility_test_pass/old_generic_argument/generic_argument.idl"),
-                path.join(dir_path,
-                          "compatibility_test_pass/new_generic_argument/generic_argument.idl"),
-                path.join(dir_path, "compatibility_test_pass/old_generic_argument/"),
-                path.join(dir_path, "compatibility_test_pass/new_generic_argument/")).has_errors())
+        test_path = path.join(dir_path, "compatibility_test_pass/generic_argument/")
+        include_paths = [path.join(dir_path, "include/")]
+
+        error_collection = idl_check_compatibility.check_generic_arguments_compatibility(
+            path.join(test_path, "old.idl"), path.join(test_path, "new.idl"), include_paths,
+            include_paths)
+
+        error_collection.dump_errors()
+
+        self.assertFalse(error_collection.has_errors())
 
     def test_generic_argument_compatibility_fail(self):
         """Tests that incompatible old and new generic_argument.idl files should fail."""
         dir_path = path.dirname(path.realpath(__file__))
+        test_path = path.join(dir_path, "compatibility_test_fail/generic_argument/")
+        include_paths = [path.join(dir_path, "include/")]
+
         error_collection = idl_check_compatibility.check_generic_arguments_compatibility(
-            path.join(dir_path,
-                      "compatibility_test_fail/old_generic_argument/generic_argument.idl"),
-            path.join(dir_path,
-                      "compatibility_test_fail/new_generic_argument/generic_argument.idl"),
-            path.join(dir_path, "compatibility_test_pass/old_generic_argument/"),
-            path.join(dir_path, "compatibility_test_pass/new_generic_argument/"))
+            path.join(test_path, "old.idl"), path.join(test_path, "new.idl"), include_paths,
+            include_paths)
+
+        error_collection.dump_errors()
 
         self.assertTrue(error_collection.has_errors())
         self.assertTrue(error_collection.count() == 2)

@@ -279,9 +279,8 @@ public:
             }
 
             if (arrayBuilder.arrSize() > 0) {
-                metadataBob->appendArray(
-                    GenericReplyFieldsAPIV1Unstable::kRoutingCacheGossipFieldName,
-                    arrayBuilder.obj());
+                metadataBob->appendArray(GenericReplyFields::kRoutingCacheGossipFieldName,
+                                         arrayBuilder.obj());
             }
         }
     }

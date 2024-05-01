@@ -322,7 +322,7 @@ void renameIndexMetadataInShards(OperationContext* opCtx,
         {doc->getNewTargetCollectionUuid().get_value_or(doc->getSourceUUID().value()),
          newIndexVersion});
     renameIndexCatalogReq.setDbName(toNss.dbName());
-    async_rpc::GenericArgs args;
+    GenericArguments args;
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
     async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrRenameIndexMetadata>>(
@@ -1092,7 +1092,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     std::remove(participants.begin(), participants.end(), primaryShardId),
                     participants.end());
 
-                async_rpc::GenericArgs args;
+                GenericArguments args;
                 async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
                 async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
                 auto opts = std::make_shared<
@@ -1178,7 +1178,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 unblockParticipantRequest.setRenameCollectionRequest(_request);
                 auto participants = getAllShardsAndConfigServerIds(opCtx);
 
-                async_rpc::GenericArgs args;
+                GenericArguments args;
                 async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
                 async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
                 auto opts = std::make_shared<

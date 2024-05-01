@@ -88,12 +88,12 @@ HedgingMetrics* getHedgingMetrics(ServiceContext* svcCtx) {
     return hm;
 }
 
-UUID getOrCreateOperationKey(bool isHedge, GenericArgs& genericArgs) {
+UUID getOrCreateOperationKey(bool isHedge, GenericArguments& genericArgs) {
     // Check if the caller has provided an operation key, and hedging is not enabled. If so,
     // we will attach the caller-provided key to all remote commands sent to resolved
     // targets. Note that doing so may have side-effects if the operation is retried:
     // cancelling the Nth attempt may impact the (N + 1)th attempt as they share `opKey`.
-    if (auto& opKey = genericArgs.stable.getClientOperationKey(); opKey && !isHedge) {
+    if (auto& opKey = genericArgs.getClientOperationKey(); opKey && !isHedge) {
         return *opKey;
     }
 
@@ -102,7 +102,7 @@ UUID getOrCreateOperationKey(bool isHedge, GenericArgs& genericArgs) {
     // operations. A new one is generated here to ensure retry attempts are isolated:
     // cancelling the Nth attempt does not impact the (N + 1)th attempt.
     auto opKey = UUID::gen();
-    genericArgs.stable.setClientOperationKey(opKey);
+    genericArgs.setClientOperationKey(opKey);
     return opKey;
 }
 
@@ -120,7 +120,7 @@ void killOperations(ServiceContext* svcCtx,
         CancellationToken::uncancelable(),
         std::move(cmd),
         std::make_shared<NeverRetryPolicy>(),
-        GenericArgs());
+        GenericArguments());
     for (const auto& target : targets) {
         LOGV2_DEBUG(7301601,
                     2,
@@ -156,7 +156,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     std::unique_ptr<Targeter> targeter,
     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
     ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-    GenericArgs genericArgs = GenericArgs(),
+    GenericArguments genericArgs = GenericArguments(),
     BatonHandle baton = nullptr) {
     using SingleResponse = AsyncRPCResponse<typename CommandType::Reply>;
 
@@ -229,7 +229,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                             }
                         }
 
-                        options->genericArgs.unstable.setMaxTimeMSOpOnly(maxTimeMSOpOnly);
+                        options->genericArgs.setMaxTimeMSOpOnly(maxTimeMSOpOnly);
                     }
 
                     options->baton = baton;

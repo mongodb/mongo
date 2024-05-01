@@ -194,35 +194,33 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
-    // Populate structs for generic arguments to be passed along when the command is converted
+    // Populate generic arguments to be passed along when the command is converted
     // to BSON.
-    GenericArgsAPIV1 genericArgsApiV1;
-    GenericArgsAPIV1Unstable genericArgsUnstable;
+    GenericArguments genericArgs;
 
-    genericArgsApiV1.setAutocommit(false);
+    genericArgs.setAutocommit(false);
     const UUID clientOpKey = UUID::gen();
-    genericArgsApiV1.setClientOperationKey(clientOpKey);
+    genericArgs.setClientOperationKey(clientOpKey);
 
-    // Populate structs for generic reply fields that are expected to be parsed from the
+    // Populate struct for generic reply fields that are expected to be parsed from the
     // response object.
-    GenericReplyFieldsAPIV1 genericReplyApiV1;
-    GenericReplyFieldsAPIV1Unstable genericReplyUnstable;
-    genericReplyUnstable.setOk(1);
-    genericReplyUnstable.setDollarConfigTime(Timestamp(1, 1));
+    GenericReplyFields genericReplyFields;
+    genericReplyFields.setOk(1);
+    genericReplyFields.setDollarConfigTime(Timestamp(1, 1));
     auto clusterTime = ClusterTime();
     clusterTime.setClusterTime(Timestamp(2, 3));
     clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
-    genericReplyApiV1.setDollarClusterTime(clusterTime);
+    genericReplyFields.setDollarClusterTime(clusterTime);
     auto configTime = Timestamp(1, 1);
-    genericArgsUnstable.setDollarConfigTime(configTime);
+    genericArgs.setDollarConfigTime(configTime);
 
     auto opCtxHolder = makeOperationContext();
-    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        getExecutorPtr(),
-        _cancellationToken,
-        helloCmd,
-        std::make_shared<NeverRetryPolicy>(),
-        GenericArgs(genericArgsApiV1, genericArgsUnstable));
+    auto options =
+        std::make_shared<AsyncRPCOptions<HelloCommand>>(getExecutorPtr(),
+                                                        _cancellationToken,
+                                                        helloCmd,
+                                                        std::make_shared<NeverRetryPolicy>(),
+                                                        genericArgs);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
         sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
@@ -248,8 +246,7 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
 
     ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
     ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), res.targetUsed);
-    ASSERT_BSONOBJ_EQ(genericReplyApiV1.toBSON(), res.genericReplyFields.stable.toBSON());
-    ASSERT_BSONOBJ_EQ(genericReplyUnstable.toBSON(), res.genericReplyFields.unstable.toBSON());
+    ASSERT_BSONOBJ_EQ(genericReplyFields.toBSON(), res.genericReplyFields.toBSON());
 }
 
 /*
@@ -450,21 +447,19 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorWithGenericReplyFields) {
         getExecutorPtr(), _cancellationToken, helloCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
-    GenericReplyFieldsAPIV1 stableFields;
+    GenericReplyFields genericReplyFields;
     auto clusterTime = ClusterTime();
     clusterTime.setClusterTime(Timestamp(2, 3));
     clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
-    stableFields.setDollarClusterTime(clusterTime);
-    GenericReplyFieldsAPIV1Unstable unstableFields;
-    unstableFields.setDollarConfigTime(Timestamp(1, 1));
-    unstableFields.setOk(false);
+    genericReplyFields.setDollarClusterTime(clusterTime);
+    genericReplyFields.setDollarConfigTime(Timestamp(1, 1));
+    genericReplyFields.setOk(false);
 
-    onCommand([&, stableFields, unstableFields](const auto& request) {
+    onCommand([&, genericReplyFields](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
         ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
         auto remoteErrorBson = createErrorResponse(Status(ErrorCodes::BadValue, "mock"));
-        auto ret = remoteErrorBson.addFields(stableFields.toBSON());
-        return ret.addFields(unstableFields.toBSON());
+        return remoteErrorBson.addFields(genericReplyFields.toBSON());
     });
 
     auto error = resultFuture.getNoThrow().getStatus();
@@ -483,8 +478,7 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorWithGenericReplyFields) {
 
     // Check generic reply fields.
     auto replyFields = remoteError.getGenericReplyFields();
-    ASSERT_BSONOBJ_EQ(stableFields.toBSON(), replyFields.stable.toBSON());
-    ASSERT_BSONOBJ_EQ(unstableFields.toBSON(), replyFields.unstable.toBSON());
+    ASSERT_BSONOBJ_EQ(genericReplyFields.toBSON(), replyFields.toBSON());
 }
 
 TEST_F(AsyncRPCTestFixture, SuccessfulFind) {
@@ -1037,24 +1031,23 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandWithGenericArgs) {
 
     FindCommandRequest findCmd(nss);
 
-    // Populate structs for generic arguments to be passed along when the command is converted
+    // Populate generic arguments to be passed along when the command is converted
     // to BSON. This is simply to test that generic args are passed properly and they should not
     // contribute to any other behaviors of this test.
-    GenericArgsAPIV1 genericArgsApiV1;
-    GenericArgsAPIV1Unstable genericArgsUnstable;
+    GenericArguments genericArgs;
     const UUID clientOpKey = UUID::gen();
-    genericArgsApiV1.setClientOperationKey(clientOpKey);
+    genericArgs.setClientOperationKey(clientOpKey);
     auto configTime = Timestamp(1, 1);
-    genericArgsUnstable.setDollarConfigTime(configTime);
+    genericArgs.setDollarConfigTime(configTime);
     auto expectedShardVersion = ShardVersion();
-    genericArgsUnstable.setShardVersion(expectedShardVersion);
+    genericArgs.setShardVersion(expectedShardVersion);
 
-    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        getExecutorPtr(),
-        _cancellationToken,
-        findCmd,
-        std::make_shared<NeverRetryPolicy>(),
-        GenericArgs(genericArgsApiV1, genericArgsUnstable));
+    auto options =
+        std::make_shared<AsyncRPCOptions<FindCommandRequest>>(getExecutorPtr(),
+                                                              _cancellationToken,
+                                                              findCmd,
+                                                              std::make_shared<NeverRetryPolicy>(),
+                                                              genericArgs);
     auto resultFuture = sendTxnCommand(options, getOpCtx(), std::move(targeter));
 
     onCommand([&](const auto& request) {
@@ -1283,7 +1276,7 @@ TEST_F(AsyncRPCTestFixture, UseOperationKeyWhenProvided) {
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
         getExecutorPtr(), _cancellationToken, findCmd);
     // Set OperationKey via AsyncRPCOptions.
-    options->genericArgs.stable.setClientOperationKey(opKey);
+    options->genericArgs.setClientOperationKey(opKey);
     auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
     onCommand([&](const auto& request) {
         ASSERT_EQ(getOpKeyFromCommand(request.cmdObj), opKey);

@@ -229,7 +229,7 @@ std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToPri
     // 'performViewChange' flag only to the primary shard.
     request.setPerformViewChange(true);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
-        **executor, token, request, async_rpc::GenericArgs());
+        **executor, token, request, GenericArguments());
 
     return sendAuthenticatedCommandWithOsiToShards(opCtx,
                                                    opts,
@@ -245,7 +245,7 @@ std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToPar
     const CancellationToken& token) {
     request.setPerformViewChange(false);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
-        **executor, token, request, async_rpc::GenericArgs());
+        **executor, token, request, GenericArguments());
 
     // The collMod command targets all shards, regardless of whether they have chunks. The shards
     // that have no chunks for the collection will not throw nor will be included in the responses.
@@ -334,10 +334,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         CriticalSectionBlockTypeEnum::kReadsAndWrites);
                     auto opts =
                         std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-                            **executor,
-                            token,
-                            blockCRUDOperationsRequest,
-                            async_rpc::GenericArgs());
+                            **executor, token, blockCRUDOperationsRequest, GenericArguments());
                     std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
                     if (_shardingInfo->isPrimaryOwningChunks) {
                         shards.push_back(_shardingInfo->primaryShard);
@@ -411,7 +408,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             // strip out other incompatible options.
                             auto dryRunRequest = ShardsvrCollModParticipant{
                                 originalNss(), makeCollModDryRunRequest(_request)};
-                            async_rpc::GenericArgs args;
+                            GenericArguments args;
                             async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
                             auto optsDryRun = std::make_shared<
                                 async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
