@@ -83,7 +83,6 @@ class _TransitionThread(threading.Thread):
         self._random_balancer_on = random_balancer_on
         self._client = fixture_interface.build_client(self._fixture, self._auth_options)
         self._current_mode = self._current_fixture_mode()
-        self._should_wait_for_balancer_round = False
 
         # Event set when the thread has been stopped using the 'stop()' method.
         self._is_stopped_evt = threading.Event()
@@ -239,54 +238,15 @@ class _TransitionThread(threading.Thread):
         self.logger.info("Starting transition from " + self._current_mode)
         res = None
         start_time = time.time()
-        last_balancer_status = None
 
         while True:
             try:
-                if self._should_wait_for_balancer_round:
-                    # TODO SERVER-77768: Remove.
-                    #
-                    # Wait for one balancer round after starting to drain if the config server owned no
-                    # chunks to avoid a race where the migration of the first chunk to the config server
-                    # can leave the collection orphaned on it after it's been removed as a shard.
-                    if last_balancer_status is None:
-                        last_balancer_status = self._client.admin.command({"balancerStatus": 1})
-
-                    latest_status = self._client.admin.command({"balancerStatus": 1})
-
-                    if last_balancer_status["term"] != latest_status["term"]:
-                        self.logger.info(
-                            "Detected change in repl set term while waiting for a balancer round "
-                            "before transitioning to dedicated CSRS. last term: %d, new term: %d",
-                            last_balancer_status["term"], latest_status["term"])
-                        last_balancer_status = latest_status
-                        time.sleep(1)
-                        continue
-
-                    if last_balancer_status["numBalancerRounds"] >= latest_status[
-                            "numBalancerRounds"]:
-                        self.logger.info(
-                            "Waiting for a balancer round before transition to dedicated. "
-                            "Last round: %d, latest round: %d",
-                            last_balancer_status["numBalancerRounds"],
-                            latest_status["numBalancerRounds"])
-                        time.sleep(1)
-                        continue
-
-                    self.logger.info(
-                        "Done waiting for a balancer round before transition to dedicated")
-                    self._should_wait_for_balancer_round = False
-                    last_balancer_status = None
-
                 res = self._client.admin.command({"transitionToDedicatedConfigServer": 1})
 
                 if res["state"] == "completed":
                     self.logger.info("Completed transition to %s in %0d ms", self.DEDICATED,
                                      (time.time() - start_time) * 1000)
                     return True
-                elif res["state"] == "started":
-                    if self._client.config.chunks.count_documents({"shard": "config"}) == 0:
-                        self._should_wait_for_balancer_round = True
                 elif res["state"] == "ongoing":
                     if self._random_balancer_on:
                         # With random balancing, the balancer will move unsplittable collections
