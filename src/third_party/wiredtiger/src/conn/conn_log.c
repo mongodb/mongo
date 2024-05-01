@@ -309,8 +309,12 @@ __wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
      * dictates.
      */
     WT_RET(__wt_config_gets(session, cfg, "log.prealloc", &cval));
-    if (cval.val != 0)
-        conn->log_prealloc = 1;
+    if (cval.val != 0) {
+        WT_RET(__wt_config_gets(session, cfg, "log.prealloc_init_count", &cval));
+        conn->log_prealloc = (uint32_t)cval.val;
+        conn->log_prealloc_init_count = (uint32_t)cval.val;
+        WT_ASSERT(session, conn->log_prealloc > 0);
+    }
 
     WT_RET(__wt_config_gets(session, cfg, "log.force_write_wait", &cval));
     if (cval.val != 0)
@@ -510,7 +514,8 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
         conn->log_prealloc += log->prep_missed;
         __wt_verbose(session, WT_VERB_LOG, "Missed %" PRIu32 ". Now pre-allocating up to %" PRIu32,
           log->prep_missed, conn->log_prealloc);
-    } else if (reccount > conn->log_prealloc / 2 && conn->log_prealloc > 2) {
+    } else if (reccount > conn->log_prealloc / 2 &&
+      conn->log_prealloc > conn->log_prealloc_init_count) {
         /*
          * If we used less than half, then start adjusting down.
          */

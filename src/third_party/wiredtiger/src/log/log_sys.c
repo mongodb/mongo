@@ -183,6 +183,8 @@ __wt_verbose_dump_log(WT_SESSION_IMPL *session)
     WT_RET(__wt_msg(session, "Zero fill files: %s",
       FLD_ISSET(conn->log_flags, WT_CONN_LOG_ZERO_FILL) ? "yes" : "no"));
     WT_RET(__wt_msg(session, "Pre-allocate files: %s", conn->log_prealloc > 0 ? "yes" : "no"));
+    WT_RET(__wt_msg(
+      session, "Initial number of pre-allocated files: %" PRIu32, conn->log_prealloc_init_count));
     WT_RET(__wt_msg(session, "Logging directory: %s", conn->log_path));
     WT_RET(__wt_msg(session, "Logging maximum file size: %" PRId64, (int64_t)conn->log_file_max));
     WT_RET(__wt_msg(session, "Log sync setting: %s",

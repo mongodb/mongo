@@ -2397,12 +2397,13 @@ struct __wt_connection {
      * \c 100; default \c 0.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a
      * boolean flag; default \c true.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;remove, automatically remove
-     * unneeded log files., a boolean flag; default \c true.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-     * zero_fill, manually write zeroes into log files., a boolean flag; default \c false.}
-     * @config{
-     * ),,}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc_init_count, initial
+     * number of pre-allocated log files., an integer between \c 1 and \c 500; default \c 1.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;remove, automatically remove unneeded log files., a boolean
+     * flag; default \c true.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into
+     * log files., a boolean flag; default \c false.}
+     * @config{ ),,}
      * @config{lsm_manager = (, configure database wide options for LSM tree management.  The LSM
      * manager is started automatically the first time an LSM tree is opened.  The LSM manager uses
      * a session from the configured session_max., a set of related configuration options defined as
@@ -3276,15 +3277,16 @@ struct __wt_connection {
  * \c ".".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean flag;
  * default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery or fail with an error if
- * recovery needs to run after an unclean shutdown., a string\, chosen from the following options:
- * \c "error"\, \c "on"; default \c on.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;remove, automatically
- * remove unneeded log files., a boolean flag; default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * zero_fill, manually write zeroes into log files., a boolean flag; default \c false.}
- * @config{
- * ),,}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc_init_count, initial number of
+ * pre-allocated log files., an integer between \c 1 and \c 500; default \c 1.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery or fail with an error if recovery needs to
+ * run after an unclean shutdown., a string\, chosen from the following options: \c "error"\, \c
+ * "on"; default \c on.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;remove, automatically remove unneeded log
+ * files., a boolean flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually
+ * write zeroes into log files., a boolean flag; default \c false.}
+ * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree management.  The LSM
  * manager is started automatically the first time an LSM tree is opened.  The LSM manager uses a
  * session from the configured session_max., a set of related configuration options defined as
