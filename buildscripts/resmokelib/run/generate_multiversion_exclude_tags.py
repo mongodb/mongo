@@ -10,6 +10,7 @@ from github import GithubIntegration
 import subprocess
 
 import requests
+from retry import retry
 
 from buildscripts.resmokelib.testing import tags as _tags
 from buildscripts.resmokelib.config import MultiversionOptions
@@ -90,6 +91,7 @@ def get_git_file_content_locally(commit_hash: str) -> str:
         )
 
 
+@retry(tries=15, delay=60)
 def get_git_file_content_ci(commit_hash: str, expansions_file: str) -> str:
     """Retrieve the content of a file from a specific commit in a Git repository in a CI environment."""
 
