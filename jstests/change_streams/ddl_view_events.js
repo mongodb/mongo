@@ -150,13 +150,19 @@ const cst = new ChangeStreamTest(testDB);
 
 // Cannot start a change stream on a view namespace.
 assert.commandWorked(testDB.createView("view", "base", viewPipeline));
-assert.commandFailedWithCode(
-    assert.throws(() => cst.startWatchingChanges({
-                     pipeline: [{$changeStream: {showExpandedEvents: true}}],
-                     collection: "view",
-                     doNotModifyInPassthroughs: true
-                 })),
-                 ErrorCodes.CommandNotSupportedOnView);
+assert.soon(() => {
+    try {
+        cst.startWatchingChanges({
+            pipeline: [{$changeStream: {showExpandedEvents: true}}],
+            collection: "view",
+            doNotModifyInPassthroughs: true
+        });
+    } catch (e) {
+        assert.commandFailedWithCode(e, ErrorCodes.CommandNotSupportedOnView);
+        return true;
+    }
+    return false;
+});
 
 // Creating a collection level change stream before creating a view with the same name, does not
 // produce any view related events.
