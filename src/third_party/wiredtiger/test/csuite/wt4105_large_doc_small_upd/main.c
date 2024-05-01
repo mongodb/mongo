@@ -151,9 +151,10 @@ main(int argc, char *argv[])
             /*
              * FIXME-WT-6113: extend timeout to pass the test.
              *
-             * Ignore this alarm for MSan builds due to the typical slowdown introduced by MSan.
+             * Ignore this alarm for some sanitizer builds due to the typical slowdown they
+             * introduce.
              */
-            if (!testutil_is_flag_set("TESTUTIL_MSAN"))
+            if (!(testutil_is_flag_set("TESTUTIL_MSAN") || testutil_is_flag_set("TESTUTIL_UBSAN")))
                 (void)alarm(15);
             testutil_check(c->modify(c, &modify_entry, 1));
             (void)alarm(0);

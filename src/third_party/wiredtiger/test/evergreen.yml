@@ -65,6 +65,7 @@ functions:
               export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ UBSan ]]; then
               export UBSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_stacktrace=1"
+              export TESTUTIL_UBSAN=1
             fi
 
             ${additional_env_vars}
