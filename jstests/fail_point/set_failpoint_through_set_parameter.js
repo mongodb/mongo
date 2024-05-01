@@ -1,6 +1,9 @@
 /**
  * Tests that failpoints can be set via --setParameter on the command line for mongos and mongod
  * only when running with enableTestCommands=1.
+ * @tags: [
+ *   disables_test_commands,
+ * ]
  */
 function assertStartupSucceeds(conn) {
     assert.commandWorked(conn.adminCommand({hello: 1}));

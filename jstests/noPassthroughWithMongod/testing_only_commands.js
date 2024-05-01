@@ -1,6 +1,9 @@
 /**
  * Test to make sure that commands and agg stages that should only work when testing commands are
  * enabled via the --enableTestCommands flag fail when that flag isn't provided.
+ * @tags: [
+ *   disables_test_commands,
+ * ]
  */
 
 var testOnlyCommands = [

@@ -4,6 +4,10 @@
  *
  * @tags: [
  *   featureFlagRecordIdsReplicated,
+ *   # TODO (SERVER-89640): The recordIdsReplicated:true builder automatically
+ *   # strips the recordIdsReplicated:true option on downgrade, causing this test
+ *   # to fail.
+ *   exclude_when_record_ids_replicated
  * ]
  */
 const replSet = new ReplSetTest({nodes: [{}, {rsConfig: {votes: 0, priority: 0}}]});

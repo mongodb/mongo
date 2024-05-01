@@ -1,5 +1,8 @@
 // Tests basic sharding with x509 cluster auth. The purpose is to verify the connectivity between
 // mongos and the shards.
+// @tags: [
+//   disables_test_commands,
+// ]
 import {findMatchingLogLine} from "jstests/libs/log.js";
 
 const x509_options = {

@@ -3,6 +3,9 @@
  *
  * @tags: [
  *   featureFlagRecordIdsReplicated,
+ *   # TODO (SERVER-89640): This test requires some collections to be created with
+ *   # recordIdsReplicated:false.
+ *   exclude_when_record_ids_replicated
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

@@ -73,6 +73,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
@@ -117,6 +118,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(throwWCEDuringTxnCollCreate);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
+MONGO_FAIL_POINT_DEFINE(overrideRecordIdsReplicatedDefault);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
 MONGO_FAIL_POINT_DEFINE(openCreateCollectionWindowFp);
 
@@ -774,6 +776,32 @@ Collection* DatabaseImpl::_createCollection(
     if (canAcceptWrites && !coordinator->isOplogDisabledFor(opCtx, nss) &&
         !opCtx->inMultiDocumentTransaction()) {
         createOplogSlot = repl::getNextOpTime(opCtx);
+    }
+
+    // If we generated a UUID for the collection, then it MUST be the case
+    // that we are creating the collection for the first time - i.e. the collection
+    // isn't being copied over / migrated as in initial sync or a chunk migration.
+    //
+    // Therefore, since we are sure that we are creating the collection for the first
+    // time, set recordIdsReplicated:true on all non-internal collections. We don't set
+    // recordIdsReplicated:true on internal collections because many of these collections
+    // are partially implicitly replicated (for example, on config.image_collection inserts
+    // are implicitly replicated while deletes are not) and this makes it hard to ensure
+    // that they have the same recordIds.
+    //
+    // Additionally, we do not set the recordIdsReplicated:true option on timeseries and
+    // clustered collections because in those cases the recordId is the _id, or on capped
+    // collections which utilizes a separate mechanism for ensuring uniform recordIds.
+    if (generatedUUID && !nss.isOnInternalDb() && !optionsWithUUID.timeseries &&
+        !optionsWithUUID.clusteredIndex && !optionsWithUUID.capped &&
+        gFeatureFlagRecordIdsReplicated.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        overrideRecordIdsReplicatedDefault.shouldFail()) {
+        LOGV2_DEBUG(8700501,
+                    0,
+                    "Collection will use recordIdsReplicated:true.",
+                    "oldValue"_attr = optionsWithUUID.recordIdsReplicated);
+        optionsWithUUID.recordIdsReplicated = true;
     }
 
     hangAndFailAfterCreateCollectionReservesOpTime.executeIf(

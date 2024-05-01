@@ -13,7 +13,9 @@
  *   # Can be removed once PM-1965-Milestone-1 is completed.
  *   does_not_support_transactions,
  *   # Requires all nodes to be running the latest binary.
- *   multiversion_incompatible
+ *   multiversion_incompatible,
+ *   # TODO (SERVER-88964, SERVER-89634): Enable this test
+ *   exclude_when_record_ids_replicated,
  *  ]
  */
 

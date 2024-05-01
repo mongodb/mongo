@@ -4,6 +4,10 @@
  *
  * @tags: [
  *   featureFlagRecordIdsReplicated,
+ *   # TODO (SERVER-89640): Remove tag.
+ *   # Incompatible with the recordIdsReplicated:true builder, as it sets the option
+ *   # on all collections.
+ *   exclude_when_record_ids_replicated
  * ]
  */
 import {planHasStage} from "jstests/libs/analyze_plan.js";

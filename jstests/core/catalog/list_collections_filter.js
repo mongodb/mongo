@@ -10,6 +10,10 @@
  *   tenant_migration_incompatible,
  *   # Requires no extra options present
  *   incompatible_with_preimages_by_default,
+ *   # TODO (SERVER-89668): Remove tag. Currently incompatible due to collection
+ *   # options containing the recordIdsReplicated:true option, which
+ *   # this test dislikes.
+ *   exclude_when_record_ids_replicated
  * ]
  */
 

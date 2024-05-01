@@ -5,6 +5,10 @@
  *   # The test assumes certain ordering of the events. The chunk migrations on a sharded collection
  *   # could break the test.
  *   assumes_unsharded_collection,
+ *   # TODO (SERVER-89668): Remove tag. Currently incompatible due to change
+ *   # change events containing the recordIdsReplicated:true option, which
+ *   # this test dislikes.
+ *   exclude_when_record_ids_replicated
  * ]
  */
 import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";

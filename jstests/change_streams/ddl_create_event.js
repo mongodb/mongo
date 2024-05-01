@@ -2,7 +2,13 @@
  * Test that change streams returns create events which captures the options specified on the
  * original user command.
  *
- * @tags: [ requires_fcv_60, ]
+ * @tags: [
+ *   requires_fcv_60,
+ *   # TODO (SERVER-89668): Remove tag. Currently incompatible due to change
+ *   # events containing the recordIdsReplicated:true option, which
+ *   # this test dislikes.
+ *   exclude_when_record_ids_replicated
+ * ]
  */
 import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";

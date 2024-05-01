@@ -5,6 +5,8 @@
  *
  * @tags: [
  *   requires_sharding,
+ *   # TODO (SERVER-89634): Enable this test
+ *   exclude_when_record_ids_replicated,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

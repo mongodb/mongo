@@ -1,6 +1,9 @@
 // Check that if a hello command for intracluster auth contains both the saslSupportedMechs field
 // for the __system user and a speculativeAuthenticate field for X509, we do not see a log marking
 // the changing of the username from __system to that specified in the x509 certificate.
+// @tags: [
+//   disables_test_commands,
+// ]
 import {findMatchingLogLine} from "jstests/libs/log.js";
 
 const x509_options = {

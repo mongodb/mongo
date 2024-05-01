@@ -5,6 +5,8 @@
  * @tags: [
  *   requires_persistence,
  *   requires_replication,
+ *   # TODO (SERVER-89741): Remove this tag once recordIdsReplicated:true works with recovery.
+ *   exclude_when_record_ids_replicated,
  * ]
  */
 // This test appends 'insert' and 'delete' oplogs directly to the oplog system collection in

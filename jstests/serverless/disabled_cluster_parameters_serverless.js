@@ -6,7 +6,8 @@
  *   does_not_support_stepdowns,
  *   requires_replication,
  *   requires_fcv_62,
- *   serverless
+ *   serverless,
+ *   disables_test_commands,
  *  ]
  */
 import {
