@@ -79,6 +79,7 @@ function runReplSetTest(fixture) {
 
     // Assert that FCV downgrade remains hung (Current FCV is still latestFCV) while
     // setClusterParameter is incomplete. This occurs due to contention for the global lock.
+    sleep(3000);
     fixture.assertFCV(latestFCV);
 
     // Turn off the failpoint and allow setClusterParameter to drain successfully.
