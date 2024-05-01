@@ -30,6 +30,8 @@
 import argparse
 import json
 import html
+import requests
+import textwrap
 from code_change_helpers import is_useful_line
 
 
@@ -472,15 +474,121 @@ def generate_html_report_as_text(code_change_info: dict, verbose: bool):
 
     return report
 
+def build_pr_comment(code_change_info: dict) -> str | None:
+    # Do nothing if the PR has no relevant changes.
+    if int(code_change_info['summary_info']['num_lines']) == 0:
+        return None
+
+    message = ""
+
+    # Code Coverage
+    summary_info = code_change_info['summary_info']
+    num_lines = int(summary_info['num_lines'])
+    num_lines_covered = int(summary_info['num_lines_covered'])
+    pct_lines_covered = num_lines_covered / num_lines * 100
+    num_branches = int(summary_info['num_branches'])
+    num_branches_covered = int(summary_info['num_branches_covered'])
+    pct_branches_covered = num_branches_covered / num_branches * 100
+    lines_covered = (
+        f"{round(pct_lines_covered)}% ({num_lines_covered}/{num_lines})"
+        if num_lines > 0 else
+        "N/A"
+    )
+    branches_covered = (
+        f"{round(pct_branches_covered)}% ({num_branches_covered}/{num_branches})"
+        if num_branches > 0 else
+        "N/A"
+    )
+
+    if pct_branches_covered >= 80:
+        coverage_note = "Woohoo, the code changed in this PR is pretty well tested! :tada:"
+    elif pct_branches_covered >= 50 and pct_lines_covered >= 80:
+        coverage_note = "Test coverage is ok, please try and improve it if that's feasible."
+    else:
+        coverage_note = "Test coverage is too low, this change probably shouldn't be merged as-is."
+
+    message += textwrap.dedent(f"""
+        {coverage_note}
+
+        | Metric (for added/changed code) | Coverage |
+        |------------------------------------------|-------|
+        | Line coverage                            | {lines_covered} |
+        | Branch coverage                          | {branches_covered} |
+    """)
+
+    # Complexity
+    changed_functions = code_change_info["changed_functions"]
+    threshold_to_warn = 30
+    if changed_functions:
+        message += "\n\n"
+
+        highest_complexity_touched = max(
+            method['complexity']
+            for methods in changed_functions.values()
+            for method in methods.values()
+        )
+
+        if highest_complexity_touched > threshold_to_warn:
+            message += ":warning: This PR touches methods that have an extremely high complexity score!\n"
+
+        complexity_warnings = [
+            f"In `{filename}` the complexity of `{method}` has increased by {info['complexity'] - info['prev_complexity']} to {info['complexity']}."
+            for filename, methods in changed_functions.items()
+            for method, info in methods.items()
+            if info['complexity'] > info['prev_complexity'] and info['complexity'] > threshold_to_warn
+        ]
+        for warning in complexity_warnings:
+            message += f"- {warning}\n"
+
+    return message
+
+def post_pr_comment(fq_repo, pr_id, token, body):
+    url = f"https://api.github.com/repos/{fq_repo}/issues/{pr_id}/comments"
+    magic_string = "<!-- STICKY_COMMENT:CODE_QUALITY -->"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    # First lets see if an existing comment exists
+    # We can cheat here and assume it will be one of the earlier comments, so no need to paginate
+    existing = None
+    resp = requests.get(url, headers=headers, params={"sort": "created_at", "direction": "asc"})
+    resp.raise_for_status()
+    for comment in resp.json():
+        if magic_string in comment["body"]:
+            existing = comment
+            break
+
+    if body is None:
+        if existing:
+            resp = requests.delete(existing["url"], headers=headers)
+            resp.raise_for_status()
+        return
+
+    # Now create/update the comment with the new contents
+    data = {
+        "body": f"{body}\n\n{magic_string}"
+    }
+
+    if existing:
+        resp = requests.patch(existing["url"], json=data, headers=headers)
+    else:
+        resp = requests.post(url, json=data, headers=headers)
+    resp.raise_for_status()
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--code_change_info', required=True, help='Path to the code change info file')
     parser.add_argument('-o', '--html_output', required=True, help='Path of the html file to write output to')
+    parser.add_argument('--github_repo', default='wiredtiger/wiredtiger', help='The github repo for this change')
+    parser.add_argument('--github_pr_number', help='A github PR id for this change')
+    parser.add_argument('--github_token', help='An API token for github for leaving pr comments')
     parser.add_argument('-v', '--verbose', action="store_true", help='be verbose')
     args = parser.parse_args()
 
     verbose = args.verbose
+    leave_pr_comment = bool(args.github_pr_number and args.github_token)
 
     if verbose:
         print('Code Coverage Report')
@@ -488,12 +596,17 @@ def main():
         print('Configuration:')
         print('  Code change info file:  {}'.format(args.code_change_info))
         print('  Html output file:  {}'.format(args.html_output))
+        print('  Leave PR Comment: {}'.format(leave_pr_comment))
 
     code_change_info = read_code_change_info(code_change_info_path=args.code_change_info)
     html_report_as_text = generate_html_report_as_text(code_change_info=code_change_info, verbose=verbose)
 
     with open(args.html_output, "w") as output_file:
         output_file.writelines(html_report_as_text)
+
+    if leave_pr_comment:
+        comment = build_pr_comment(code_change_info=code_change_info)
+        post_pr_comment(args.github_repo, args.github_pr_number, args.github_token, comment)
 
 
 if __name__ == '__main__':
