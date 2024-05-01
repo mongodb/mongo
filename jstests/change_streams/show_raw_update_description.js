@@ -5,6 +5,7 @@
  * events.
  * @tags: [
  *   requires_fcv_60,
+ *   uses_change_streams,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
@@ -118,10 +119,15 @@ cst.assertNextChangesEqualUnordered({cursor: cursor, expectedChanges: expected})
 //
 
 function assertCollectionsAreIdentical(coll1, coll2) {
-    const values1 = coll1.find().toArray();
-    const values2 = coll2.find().toArray();
-    assert(arrayEq(values1, values2),
-           () => "actual: " + tojson(values1) + "  expected: " + tojson(values2));
+    // Some passthrough suites use secondary read preference, so we use assert.soon to ensure that
+    // the updates have time to replicate to secondary nodes.
+    assert.soon(() => {
+        const values1 = coll1.find().toArray();
+        const values2 = coll2.find().toArray();
+
+        return arrayEq(values1, values2),
+               () => "actual: " + tojson(values1) + "  expected: " + tojson(values2);
+    });
 }
 
 function assertCanApplyRawUpdate(origColl, copyColl, events) {
