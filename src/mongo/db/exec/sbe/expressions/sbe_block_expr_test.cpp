@@ -3487,7 +3487,7 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberWithArraySet) {
     assertBlockOfBool(runTag, runVal, {true, false, false, false, true});
 }
 
-TEST_F(SBEBlockExpressionTest, BlockIsMemberWithInListData) {
+TEST_F(SBEBlockExpressionTest, BlockIsMemberWithInList) {
     value::ViewOfValueAccessor blockAccessor;
 
     auto blockSlot = bindAccessor(&blockAccessor);
@@ -3501,15 +3501,17 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberWithInListData) {
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
 
-    auto inListData = std::make_unique<InListData>();
+    auto inListData = std::make_shared<InListData>();
     ASSERT_OK(inListData->setElementsArray(BSON_ARRAY(1 << 5 << 10)));
-    inListData->prepare();
+    inListData->setShared();
+
+    auto inList = std::make_unique<InList>(std::shared_ptr<const InListData>(inListData));
+
+    auto inListConstant =
+        makeE<EConstant>(value::TypeTags::inList, value::bitcastFrom<InList*>(inList.release()));
 
     auto expr = makeE<sbe::EFunction>(
-        "valueBlockIsMember",
-        sbe::makeEs(makeE<EVariable>(blockSlot),
-                    makeE<EConstant>(value::TypeTags::inListData,
-                                     value::bitcastFrom<InListData*>(inListData.get()))));
+        "valueBlockIsMember", sbe::makeEs(makeE<EVariable>(blockSlot), std::move(inListConstant)));
 
     auto compiledExpr = compileExpression(*expr);
 

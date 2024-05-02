@@ -842,7 +842,7 @@ int getApproximateSize(TypeTags tag, Value val) {
             result += sizeof(TimeZone);
             break;
         case TypeTags::collator:
-        case TypeTags::inListData:
+        case TypeTags::inList:
             // This type points to a block of memory that it doesn't own, so we don't acccount
             // for the size of this block of memory here.
             break;

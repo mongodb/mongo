@@ -33,13 +33,13 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
 
+#include "mongo/db/exec/sbe/in_list.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/generic_compare.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
-#include "mongo/db/matcher/in_list_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/represent_as.h"
@@ -2505,7 +2505,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockIsMemb
             valBlockTag == value::TypeTags::valueBlock);
     auto valueBlockView = value::getValueBlock(valBlockVal);
 
-    if (!value::isArray(arrTag_) && arrTag_ != value::TypeTags::inListData) {
+    if (!value::isArray(arrTag_) && arrTag_ != value::TypeTags::inList) {
         auto blockOut = std::make_unique<value::MonoBlock>(
             valueBlockView->count(), value::TypeTags::Nothing, 0);
         return {true,
@@ -2517,14 +2517,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockIsMemb
     auto arrVal = arrVal_;
 
     auto res = [&]() {
-        if (arrTag == value::TypeTags::inListData) {
-            auto inListData = value::getInListDataView(arrVal);
+        if (arrTag == value::TypeTags::inList) {
+            auto inList = value::getInListView(arrVal);
 
             return valueBlockView->map(value::makeColumnOp<ColumnOpType::kNoFlags>(
                 [&](value::TypeTags tag, value::Value val) {
                     return std::pair{value::TypeTags::Boolean,
                                      value::bitcastFrom<bool>(tag != value::TypeTags::Nothing &&
-                                                              inListData->contains(tag, val))};
+                                                              inList->contains(tag, val))};
                 }));
         } else if (arrTag == value::TypeTags::ArraySet) {
             auto arrSet = value::getArraySetView(arrVal);

@@ -44,6 +44,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/js_function.h"
+#include "mongo/db/exec/sbe/in_list.h"
 #include "mongo/db/exec/sbe/util/pcre.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -118,21 +119,20 @@ public:
         // contains any regexes.
         tassert(6279503, "Unexpected parameter marker for $in with regexes", !expr->hasRegex());
 
-        // Prepare the inList. We also store a shared_ptr pointing to the InListData object inside
-        // 'data' to ensure the InListData object stays alive even if 'expr' gets mutated in the
-        // future and drops its reference to the InListData.
-        InListData* l = prepareInList(_data, expr->getInList());
-
-        auto listTag = sbe::value::TypeTags::inListData;
-        auto listVal = sbe::value::bitcastFrom<InListData*>(l);
-
-        bindParam(*slotId, false, listTag, listVal);
-
         // Auto-parameterization should not kick in if the $in's list of equalities includes any
         // arrays, objects or null values.
-        tassert(6988502, "Should not auto-parameterize $in with an array value", !l->hasArray());
-        tassert(6988503, "Should not auto-parameterize $in with a null value", !l->hasNull());
-        tassert(6988504, "Should not auto-parameterize $in with an object value", !l->hasObject());
+        tassert(6988502, "Should not auto-parameterize $in with an array value", !expr->hasArray());
+        tassert(6988503, "Should not auto-parameterize $in with a null value", !expr->hasNull());
+        tassert(
+            6988504, "Should not auto-parameterize $in with an object value", !expr->hasObject());
+
+        // Create an InList from 'expr'.
+        auto inListPtr = std::make_unique<sbe::InList>(expr->getInListDataPtr());
+
+        auto tag = sbe::value::TypeTags::inList;
+        auto val = sbe::value::bitcastFrom<sbe::InList*>(inListPtr.release());
+
+        bindParam(*slotId, true /*owned*/, tag, val);
     }
 
     void visit(const ModMatchExpression* expr) final {
@@ -316,17 +316,15 @@ private:
 
     void bindParam(sbe::value::SlotId slotId,
                    bool owned,
-                   sbe::value::TypeTags typeTag,
-                   sbe::value::Value value) {
-        boost::optional<sbe::value::ValueGuard> guard;
-        if (owned) {
-            guard.emplace(typeTag, value);
-        }
+                   sbe::value::TypeTags tag,
+                   sbe::value::Value val) {
+        // Set up a guard and call getAccessor().
+        sbe::value::ValueGuard guard(owned, tag, val);
         auto accessor = _data.env->getAccessor(slotId);
-        if (owned) {
-            guard->reset();
-        }
-        accessor->reset(owned, typeTag, value);
+
+        // Reset the guard and store 'owned/tag/val' into 'accessor'.
+        guard.reset();
+        accessor->reset(owned, tag, val);
     }
 
     boost::optional<sbe::value::SlotId> getSlotId(
@@ -342,21 +340,8 @@ private:
         return boost::none;
     }
 
-    InListData* prepareInList(stage_builder::PlanStageData& data,
-                              const std::shared_ptr<InListData>& inList) const {
-        InListData* l = inList.get();
-        if (!l->isPrepared()) {
-            l->prepare();
-        }
-
-        if (data.inListsSet.insert(l).second) {
-            data.inLists.emplace_back(inList);
-        }
-
-        return l;
-    }
-
     stage_builder::PlanStageData& _data;
+
     // True if the plan for which we are binding parameter values is being recovered from the SBE
     // plan cache.
     const bool _bindingCachedPlan;

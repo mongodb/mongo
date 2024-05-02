@@ -578,17 +578,17 @@ ConstEval::Nullability ConstEval::transport(ABT& n,
             return Nullability::kNonNullable;
         }
     }
-    // The isInListData check currently only pertains to parameterized InMatchExpressions, whose
-    // equalities list is bound into the SBE runtime environment as InListData. In this case, no
-    // constant folding will be performed for op.name() == "isInListData" because InListData is
-    // never used in the optimizer; it is generated in a later phase in SBE.
+    // The isInList check currently only pertains to parameterized InMatchExpressions, whose
+    // equalities list is bound into the SBE runtime environment as InList. In this case, no
+    // constant folding will be performed for op.name() == "isInList" because InList is never
+    // used in the optimizer; it is generated in a later phase in SBE.
     //
-    // If the child node is a Constant that's not of type inListData, the check can be ignored and
+    // If the child node is a Constant that's not of type inList, the check can be ignored and
     // set directly to false.
-    else if (op.name() == "isInListData") {
+    else if (op.name() == "isInList") {
         if (args.size() == 1 && args[0].is<Constant>()) {
             const auto tag = args[0].cast<Constant>()->get().first;
-            swapAndUpdate(n, Constant::boolean(tag == sbe::value::TypeTags::inListData));
+            swapAndUpdate(n, Constant::boolean(tag == sbe::value::TypeTags::inList));
             return Nullability::kNonNullable;
         }
     } else if (op.name() == kParameterFunctionName) {

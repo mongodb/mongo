@@ -101,27 +101,27 @@ TEST(ConstEvalTest, FoldRedundantExists) {
         exists);
 }
 
-TEST(ConstEvalTest, FoldIsInListDataForConstants) {
-    ABT abt = make<FunctionCall>("isInListData", makeSeq(Constant::int32(1)));
+TEST(ConstEvalTest, FoldIsInListForConstants) {
+    ABT abt = make<FunctionCall>("isInList", makeSeq(Constant::int32(1)));
     ConstEval::constFold(abt);
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
         "Const [false]\n",
         abt);
 
-    abt = _fn("isInListData", getParam(TypeTags::Array))._n;
+    abt = _fn("isInList", getParam(TypeTags::Array))._n;
     ConstEval::constFold(abt);
-    // Can't simplify this expression because child of FunctionCall[isInListData] is not a Constant
+    // Can't simplify this expression because child of FunctionCall[isInList] is not a Constant
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
-        "FunctionCall [isInListData]\n"
+        "FunctionCall [isInList]\n"
         "FunctionCall [getParam]\n"
         "|   Const [15]\n"
         "Const [0]\n",
         abt);
 
-    InListData* inList = nullptr;
-    abt = make<FunctionCall>("isInListData",
-                             makeSeq(make<Constant>(TypeTags::inListData,
-                                                    sbe::value::bitcastFrom<InListData*>(inList))));
+    sbe::InList* inList = nullptr;
+    abt = make<FunctionCall>(
+        "isInList",
+        makeSeq(make<Constant>(TypeTags::inList, sbe::value::bitcastFrom<sbe::InList*>(inList))));
     ConstEval::constFold(abt);
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
         "Const [true]\n",

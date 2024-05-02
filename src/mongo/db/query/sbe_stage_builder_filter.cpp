@@ -744,20 +744,19 @@ std::tuple<SbExpr, bool, bool, bool> _generateInExprInternal(StageBuilderState& 
     // register a SlotId for it and use the slot directly. Note we don't auto-parameterize
     // $in if it contains null, regexes, or nested arrays or objects.
     if (exprIsParameterized) {
-        auto listVar = b.makeVariable(state.registerInputParamSlot(*expr->getInputParamId()));
-        return std::make_tuple(std::move(listVar), false, false, false);
+        auto var = b.makeVariable(state.registerInputParamSlot(*expr->getInputParamId()));
+        return std::make_tuple(std::move(var), false, false, false);
     }
 
-    InListData* l = state.prepareOwnedInList(expr->getInList());
+    sbe::InList* inList = state.makeOwnedInList(expr);
 
-    auto listTag = sbe::value::TypeTags::inListData;
-    auto listVal = sbe::value::bitcastFrom<InListData*>(l);
-    bool listOwned = false;
+    auto tag = sbe::value::TypeTags::inList;
+    auto val = sbe::value::bitcastFrom<sbe::InList*>(inList);
+    const bool owned = false;
 
-    auto listVar =
-        b.makeVariable(state.env->registerSlot(listTag, listVal, listOwned, state.slotIdGenerator));
+    auto var = b.makeVariable(state.env->registerSlot(tag, val, owned, state.slotIdGenerator));
 
-    return std::make_tuple(std::move(listVar), l->hasArray(), l->hasObject(), l->hasNull());
+    return std::make_tuple(std::move(var), expr->hasArray(), expr->hasObject(), expr->hasNull());
 }
 
 /**

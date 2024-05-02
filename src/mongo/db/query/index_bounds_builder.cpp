@@ -1102,28 +1102,31 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         const bool entireNullIntervalMatchesPredicate =
             detectIfEntireNullIntervalMatchesPredicate(ime, index);
 
-        // Ensure that we own the BSON buffer containing the $in array. This will allow us to create
-        // Interval objects which point to this BSON without having to make copies just to strip out
-        // the field name as is usually done in IndexBoundsBuilder::translateEquality.
-        // If the InList has already been prepared, as will be the case if we reach this codepath
-        // from IntervalEvalutionTree evaluation (SBE plan was retrieved from the cache and
-        // parameters are being bound), then we cannot make a copy of the BSON buffer. In this case,
-        // we clone() the InList, which will share the underlying BSON but the copy will not be in
-        // the prepared state, allowing us to make a copy of the BSON.
-        auto inList = ime->getInList();
-        if (!inList->isBSONOwned()) {
-            if (inList->isPrepared()) {
-                inList = inList->clone();
-            }
-            inList->makeBSONOwned();
+        // Ensure that we own the BSON buffer containing the $in array.
+        std::unique_ptr<MatchExpression> clonedME;
+
+        if (!ime->isBSONOwned()) {
+            // If the InMatchExpression doesn't own its BSON storage, then we need to make a copy
+            // of the InMatchExpression so that we can call makeBSONOwned().
+            clonedME = ime->clone();
+            auto clonedInMatchExpr = static_cast<InMatchExpression*>(clonedME.get());
+
+            clonedInMatchExpr->makeBSONOwned();
+
+            ime = clonedInMatchExpr;
         }
 
+        invariant(ime->isBSONOwned());
+
+        // Because we own the BSON buffer for the $in array, this allows us to create Interval
+        // objects which point directly to this BSON (without having to make copies just to strip
+        // out the field name as is usually done in IndexBoundsBuilder::translateEquality()).
         for (auto&& equality : ime->getEqualities()) {
             // First, we generate the bounds the same way that we would do for an individual
             // equality. This will set tightness to the value it should be if this equality is being
             // considered in isolation.
             IndexBoundsBuilder::translateEquality(
-                ime, equality, &inList->getOwnedBSONStorage(), index, isHashed, oilOut, &tightness);
+                ime, equality, &ime->getOwnedBSONStorage(), index, isHashed, oilOut, &tightness);
 
             if (entireNullIntervalMatchesPredicate && BSONType::jstNULL == equality.type()) {
                 // We may have a covered null query. In this case, we update null interval

@@ -1135,8 +1135,8 @@ private:
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
 
-    // Hash set tracking the InListDatas used by the SBE plan being built.
-    absl::flat_hash_set<InListData*> _inListsSet;
+    // Hash map tracking the InLists used by the SBE plan being built.
+    absl::flat_hash_map<const InMatchExpression*, sbe::InList*> _inListsMap;
 
     // Hash set tracking the Collators used by the SBE plan being built.
     absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*> _collatorsMap;

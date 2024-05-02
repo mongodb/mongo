@@ -753,8 +753,17 @@ public:
         return _equalities->getElements();
     }
 
-    const std::shared_ptr<InListData>& getInList() const {
-        return _equalities;
+    bool isBSONOwned() const {
+        return _equalities->isBSONOwned();
+    }
+
+    const BSONObj& getOwnedBSONStorage() const {
+        return _equalities->getOwnedBSONStorage();
+    }
+
+    void makeBSONOwned() {
+        cloneEqualitiesBeforeWriteIfNeeded();
+        _equalities->makeBSONOwned();
     }
 
     const std::vector<std::unique_ptr<RegexMatchExpression>>& getRegexes() const {
@@ -837,6 +846,9 @@ public:
     bool hasNonScalarOrNonEmptyValues() const {
         return hasNonEmptyArrayOrObject() || hasNull() || hasRegex();
     }
+    bool equalitiesHasSingleElement() const {
+        return _equalities->hasSingleElement();
+    }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -854,11 +866,33 @@ public:
         return _inputParamId;
     }
 
+    // This method returns a 'shared_ptr<const InListData>' that points to this InMatchExpression's
+    // internal InListData object.
+    //
+    // You should only call this method if you specifically need a shared_ptr to the InListData
+    // for some reason. If you just need information about this InMatchExpression or its elements,
+    // you should use different InMatchExpression methods that provide the information you need.
+    std::shared_ptr<const InListData> getInListDataPtr() const {
+        // Mark '_equalities' as "shared" (if it's not already marked) before exposing a reference
+        // to '_equalities' outside of this class. This will prevent the InListData object from
+        // potentially being mutated in the future.
+        _equalities->setShared();
+
+        // We don't want to return a non-const reference to the contents of this InMatchExpression
+        // (because this is a const method), so it's important to use "shared_ptr<const InListData>"
+        // here instead of "shared_ptr<InListData>".
+        return std::shared_ptr<const InListData>{_equalities};
+    }
+
 private:
-    inline void cloneEqualitiesBeforeWriteIfNeeded() {
-        // If '_equalities' has been prepared then it can't be modified, so make a mutable copy
-        // and then update '_equalities' to point to the copy.
-        if (_equalities->isPrepared()) {
+    // If references to '_equalities' has been exposed outside this object (as indicated by the
+    // '_shared' flag), then this method will make a copy of '_equalities'. Otherwise this method
+    // will do nothing. After this method returns, the caller is guaranteed 'equalities->isShared()'
+    // will return false.
+    MONGO_COMPILER_ALWAYS_INLINE void cloneEqualitiesBeforeWriteIfNeeded() {
+        // If '_equalities' is marked as "shared" then it cannot be modified, so make a copy and
+        // then update '_equalities' to point to the copy.
+        if (_equalities->isShared()) {
             _equalities = _equalities->clone();
         }
     }

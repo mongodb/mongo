@@ -190,8 +190,8 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
         case TypeTags::indexBounds:
             stream << "indexBounds";
             break;
-        case TypeTags::inListData:
-            stream << "inListData";
+        case TypeTags::inList:
+            stream << "inList";
             break;
         case TypeTags::csiCell:
             stream << "csiCell";
@@ -619,7 +619,7 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         case TypeTags::sortSpec:
         case TypeTags::makeObjSpec:
         case TypeTags::indexBounds:
-        case TypeTags::inListData:
+        case TypeTags::inList:
             stream << getExtendedTypeOps(tag)->print(val);
             break;
         default:
