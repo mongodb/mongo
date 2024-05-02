@@ -1675,7 +1675,7 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
         vars:
-          use_large_distro: "true"
+          use_xlarge_distro: "true"
 
   - <<: *gen_task_template
     name: sharded_collections_txns_uninitialized_fcv_jscore_passthrough_gen

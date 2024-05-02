@@ -108,6 +108,7 @@ variables:
     max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
     large_distro_name: rhel80-build
+    xlarge_distro_name: rhel80-xxlarge
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
