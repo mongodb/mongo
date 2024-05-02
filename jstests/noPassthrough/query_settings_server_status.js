@@ -61,19 +61,27 @@ function runTest({expectedQueryShapeConfiguration, assertionFunc}) {
                          new QuerySettingsUtils(connection.getDB(db.getName()), collName)
                              .assertQueryShapeConfiguration(expectedQueryShapeConfiguration));
 
-    // Ensure that each node emits the exact same query settings metrics, then validate them using
-    // the provided `assertionFunc()` assertion.
-    const allDataPoints = mapOnEachNode(
-        (nodeDB) => new QuerySettingsUtils(nodeDB, collName).getQuerySettingsServerStatus());
-    // Check that all the expected nodes have emitted their own set of metrics.
+    // Ensure that each node emits the exact same query settings metrics. Some nodes might be slower
+    // to startup and load the cluster parameter, therefore the need for wrapping this in an
+    // 'assert.soon()' construct.
+    let dataPoints;
+    assert.soon(() => {
+        dataPoints = mapOnEachNode(
+            (nodeDB) => new QuerySettingsUtils(nodeDB, collName).getQuerySettingsServerStatus());
+        if (!dataPoints || dataPoints.length === 0) {
+            return false;
+        }
+        return dataPoints.every(el => bsonWoCompare(dataPoints[0], el) === 0);
+    }, `expected all data points to be equal, but found ${tojson(dataPoints)}`);
+
     // Since the test is running in a sharded cluster environment, the number of data points should
     // equal 2 (noMongos) + 2 (noShards) * 3 (noNodesPerReplSet) = 8.
-    assert.eq(allDataPoints.length, 8, `expected 8 data points but found ${tojson(allDataPoints)}`);
-    const representativeDataPoint = allDataPoints[0];
-    assert(
-        allDataPoints.every((dataPoint) => bsonWoCompare(dataPoint, representativeDataPoint) == 0),
-        `expected all data points to be equal, but found ${tojson(allDataPoints)}`);
-    assertionFunc(representativeDataPoint);
+    assert.eq(dataPoints.length, 8, `expected 8 data points but found ${tojson(dataPoints)}`);
+
+    // Validate the first data point via the provided `assertionFunc()` assertion. All the emitted
+    // data points should be equal thanks to the previous 'assert.soon()', so it's sufficient to
+    // check only one entry.
+    assertionFunc(dataPoints[0]);
 }
 
 // Expect both the count and the size to be zero, as this is a newly created replica set.
