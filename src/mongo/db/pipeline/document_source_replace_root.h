@@ -156,9 +156,6 @@ public:
     bool pushDotRenamedMatchBefore(Pipeline::SourceContainer::iterator itr,
                                    Pipeline::SourceContainer* container);
 
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
-
     boost::intrusive_ptr<Expression>& getExpressionToModify() {
         return _newRoot;
     }

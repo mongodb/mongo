@@ -54,11 +54,6 @@ void GroupFromFirstDocumentTransformation::optimize() {
     }
 }
 
-Pipeline::SourceContainer::iterator GroupFromFirstDocumentTransformation::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    return std::next(itr);
-}
-
 Document GroupFromFirstDocumentTransformation::serializeTransformation(
     boost::optional<ExplainOptions::Verbosity> explain, const SerializationOptions& options) const {
     MutableDocument newRoot(_accumulatorExprs.size());
