@@ -455,9 +455,11 @@ __checkpoint_cleanup_eligibility(WT_SESSION_IMPL *session, const char *uri, cons
     WT_CONFIG_ITEM cval, key, value;
     WT_DECL_RET;
     wt_timestamp_t newest_stop_durable_ts;
+    size_t addr_size;
     bool logged;
 
     newest_stop_durable_ts = WT_TS_NONE;
+    addr_size = 0;
     logged = false;
 
     /* Checkpoint cleanup cannot remove obsolete pages from tiered tables. */
@@ -472,23 +474,30 @@ __checkpoint_cleanup_eligibility(WT_SESSION_IMPL *session, const char *uri, cons
 
     WT_RET(__wt_config_getones(session, config, "checkpoint", &cval));
     __wt_config_subinit(session, &ckptconf, &cval);
-    for (; __wt_config_next(&ckptconf, &key, &cval) == 0;) {
+    while ((ret = __wt_config_next(&ckptconf, &key, &cval)) == 0) {
         ret = __wt_config_subgets(session, &cval, "newest_stop_durable_ts", &value);
         if (ret == 0)
             newest_stop_durable_ts = WT_MAX(newest_stop_durable_ts, (wt_timestamp_t)value.val);
         WT_RET_NOTFOUND_OK(ret);
+        ret = __wt_config_subgets(session, &cval, "addr", &value);
+        if (ret == 0)
+            addr_size = value.len;
+        WT_RET_NOTFOUND_OK(ret);
     }
+    WT_RET_NOTFOUND_OK(ret);
 
     /*
      * The checkpoint cleanup eligibility is decided based on the following:
-     * 1. The file has a durable stop timestamp.
-     * 2. Logged table. The logged tables do not support timestamps, so we need
+     * 1. Not an empty or newly created table.
+     * 2. The table has a durable stop timestamp.
+     * 3. Logged table. The logged tables do not support timestamps, so we need
      *    to check for obsolete pages in them.
-     * 3. History store table. This table contains the historical versions that
+     * 4. History store table. This table contains the historical versions that
      *    are needed to be removed regularly. This condition is required when
      *    timestamps are not in use, otherwise, the first condition will be satisfied.
      */
-    if (newest_stop_durable_ts != WT_TS_NONE || logged || strcmp(uri, WT_HS_URI) == 0)
+    if ((addr_size != 0) &&
+      (newest_stop_durable_ts != WT_TS_NONE || logged || strcmp(uri, WT_HS_URI) == 0))
         return (true);
 
     return (false);
