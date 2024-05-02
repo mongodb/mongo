@@ -758,6 +758,9 @@ bool ChunkManager::rangeOverlapsShard(const ChunkRange& range, const ShardId& sh
 boost::optional<Chunk> ChunkManager::getNextChunkOnShard(const BSONObj& shardKey,
                                                          const ShardId& shardId) const {
     tassert(7626422, "Expected routing table to be initialized", _rt->optRt);
+    tassert(8719704,
+            "Should never call getNextChunkOnShard when ChunkManager is at point-in-time",
+            !_clusterTime);
 
     boost::optional<Chunk> optChunk;
     forEachChunk(

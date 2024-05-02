@@ -609,8 +609,10 @@ void executeWriteWithoutShardKey(
             return childBatches.begin()->second.get();
         }();
 
+        // Note: It is fine to use 'getAproxNShardsOwningChunks' here because the result is only
+        // used to update stats.
         bulkWriteOp.noteTwoPhaseWriteProtocol(
-            *targetedWriteBatch, nsIdx, targeter->getNShardsOwningChunks());
+            *targetedWriteBatch, nsIdx, targeter->getAproxNShardsOwningChunks());
 
         auto cmdObj = bulkWriteOp
                           .buildBulkCommandRequest(targeters,
@@ -866,7 +868,10 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
     }
 
     for (size_t nsIdx = 0; nsIdx < targeters.size(); ++nsIdx) {
-        bulkWriteOp.noteNumShardsOwningChunks(nsIdx, targeters[nsIdx]->getNShardsOwningChunks());
+        // Note: It is fine to use 'getAproxNShardsOwningChunks' here because the result is only
+        // used to update stats.
+        bulkWriteOp.noteNumShardsOwningChunks(nsIdx,
+                                              targeters[nsIdx]->getAproxNShardsOwningChunks());
     }
 
     LOGV2_DEBUG(7263701, 4, "Finished execution of bulkWrite");

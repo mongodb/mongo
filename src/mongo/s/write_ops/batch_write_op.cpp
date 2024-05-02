@@ -579,7 +579,9 @@ StatusWith<WriteType> BatchWriteOp::targetBatch(const NSTargeter& targeter,
         return targetStatus;
     }
 
-    _nShardsOwningChunks = targeter.getNShardsOwningChunks();
+    // Note: It is fine to use 'getAproxNShardsOwningChunks' here because the result is only used to
+    // update stats.
+    _nShardsOwningChunks = targeter.getAproxNShardsOwningChunks();
 
     return targetStatus;
 }

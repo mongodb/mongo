@@ -173,8 +173,12 @@ public:
 
     /**
      * Returns the number of shards on which the collection has any chunks.
+     *
+     * To be only used for logging/metrics which do not need to be always correct. The returned
+     * value may be incorrect when this targeter is at point-in-time (it will reflect the 'latest'
+     * number of shards, rather than the one at the point-in-time).
      */
-    int getNShardsOwningChunks() const override;
+    int getAproxNShardsOwningChunks() const override;
 
     bool isTargetedCollectionSharded() const override;
 

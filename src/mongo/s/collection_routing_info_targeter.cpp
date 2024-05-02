@@ -956,9 +956,9 @@ bool CollectionRoutingInfoTargeter::createCollectionIfNeeded(OperationContext* o
     return true;
 }
 
-int CollectionRoutingInfoTargeter::getNShardsOwningChunks() const {
+int CollectionRoutingInfoTargeter::getAproxNShardsOwningChunks() const {
     if (_cri.cm.hasRoutingTable()) {
-        return _cri.cm.getNShardsOwningChunks();
+        return _cri.cm.getAproxNShardsOwningChunks();
     }
 
     return 0;
