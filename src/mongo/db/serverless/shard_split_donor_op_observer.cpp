@@ -352,7 +352,7 @@ void ShardSplitDonorOpObserver::onInserts(OperationContext* opCtx,
                                           bool defaultFromMigrate,
                                           OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kShardSplitDonorsNamespace ||
-        repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 
@@ -377,7 +377,7 @@ void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
                                          const OplogUpdateEntryArgs& args,
                                          OpStateAccumulator* opAccumulator) {
     if (args.coll->ns() != NamespaceString::kShardSplitDonorsNamespace ||
-        repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 
@@ -406,7 +406,7 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
                                               OplogDeleteEntryArgs* args,
                                               OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kShardSplitDonorsNamespace ||
-        repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 
@@ -441,7 +441,7 @@ void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
                                          const OplogDeleteEntryArgs& args,
                                          OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kShardSplitDonorsNamespace || !splitCleanupDetails(opCtx) ||
-        repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 

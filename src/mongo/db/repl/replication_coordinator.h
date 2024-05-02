@@ -1276,11 +1276,6 @@ public:
      */
     virtual boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) = 0;
 
-    /**
-     * Returns true if the node undergoes startup recovery, initial sync or rollback.
-     */
-    bool isDataRecovering() const;
-
 protected:
     ReplicationCoordinator();
 };
