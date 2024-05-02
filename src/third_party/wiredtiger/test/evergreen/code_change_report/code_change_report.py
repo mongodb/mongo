@@ -488,24 +488,26 @@ def build_pr_comment(code_change_info: dict) -> str | None:
     pct_lines_covered = num_lines_covered / num_lines * 100
     num_branches = int(summary_info['num_branches'])
     num_branches_covered = int(summary_info['num_branches_covered'])
-    pct_branches_covered = num_branches_covered / num_branches * 100
+
     lines_covered = (
         f"{round(pct_lines_covered)}% ({num_lines_covered}/{num_lines})"
         if num_lines > 0 else
         "N/A"
     )
-    branches_covered = (
-        f"{round(pct_branches_covered)}% ({num_branches_covered}/{num_branches})"
-        if num_branches > 0 else
-        "N/A"
-    )
 
-    if pct_branches_covered >= 80:
-        coverage_note = "Woohoo, the code changed in this PR is pretty well tested! :tada:"
-    elif pct_branches_covered >= 50 and pct_lines_covered >= 80:
-        coverage_note = "Test coverage is ok, please try and improve it if that's feasible."
-    else:
-        coverage_note = "Test coverage is too low, this change probably shouldn't be merged as-is."
+    branches_covered = "N/A"
+    coverage_note = ""
+
+    if num_branches > 0:
+        pct_branches_covered = num_branches_covered / num_branches * 100
+        branches_covered = f"{round(pct_branches_covered)}% ({num_branches_covered}/{num_branches})"
+
+        if pct_branches_covered >= 80:
+            coverage_note = "Woohoo, the code changed in this PR is pretty well tested! :tada:"
+        elif pct_branches_covered >= 50 and pct_lines_covered >= 80:
+            coverage_note = "Test coverage is ok, please try and improve it if that's feasible."
+        else:
+            coverage_note = "Test coverage is too low, this change probably shouldn't be merged as-is."
 
     message += textwrap.dedent(f"""
         {coverage_note}
