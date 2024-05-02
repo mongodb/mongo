@@ -39,6 +39,7 @@
 #include "MongoMutexCheck.h"
 #include "MongoNoUniqueAddressCheck.h"
 #include "MongoPolyFillCheck.h"
+#include "MongoRWMutexCheck.h"
 #include "MongoRandCheck.h"
 #include "MongoStdAtomicCheck.h"
 #include "MongoStdOptionalCheck.h"
@@ -84,6 +85,7 @@ public:
         CheckFactories.registerCheck<MongoNoUniqueAddressCheck>("mongo-no-unique-address-check");
         CheckFactories.registerCheck<MongoStringDataConstRefCheck>(
             "mongo-stringdata-const-ref-check");
+        CheckFactories.registerCheck<MongoRWMutexCheck>("mongo-rwmutex-check");
     }
 };
 

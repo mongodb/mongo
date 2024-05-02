@@ -143,6 +143,7 @@ mongo_custom_check = env.SharedLibrary(
         "MongoMacroDefinitionLeaksCheck.cpp",
         "MongoNoUniqueAddressCheck.cpp",
         "MongoRandCheck.cpp",
+        "MongoRWMutexCheck.cpp",
         "MongoStringDataConstRefCheck.cpp",
     ],
     LIBDEPS_NO_INHERIT=[

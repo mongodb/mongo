@@ -401,6 +401,20 @@ class MongoTidyTests(unittest.TestCase):
         ]
 
         self.run_clang_tidy()
+    
+    def test_MongoRWMutexCheck(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-rwmutex-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "error: Prefer using other mutex types over `WriteRarelyRWMutex`. [mongo-rwmutex-check,-warnings-as-errors]\nWriteRarelyRWMutex mutex_vardecl;",
+            "error: Prefer using other mutex types over `WriteRarelyRWMutex`. [mongo-rwmutex-check,-warnings-as-errors]\n    WriteRarelyRWMutex mutex_fielddecl;",
+        ]
+
+        self.run_clang_tidy()
 
     def test_MongoStringDataConstRefCheck1(self):
         self.write_config(

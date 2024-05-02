@@ -45,6 +45,7 @@ if env.GetOption('ninja') == 'disabled':
         'test_MongoCollectionShardingRuntimeCheck.cpp',
         'test_MongoMacroDefinitionLeaksCheck.cpp',
         'test_MongoRandCheck.cpp',
+        'test_MongoRWMutexCheck.cpp',
         'test_MongoPolyFillCheck.cpp',
         'test_MongoNoUniqueAddressCheck.cpp',
         "test_MongoStringDataConstRefCheck1.cpp",
