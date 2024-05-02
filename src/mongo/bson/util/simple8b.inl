@@ -1243,6 +1243,18 @@ inline size_t visitAll(const char* buffer,
     return numVisited;
 }
 
+inline size_t count(const char* buffer, size_t size) {
+    invariant(size % 8 == 0);
+    const char* end = buffer + size;
+    size_t numElements = 0;
+    while (buffer != end) {
+        uint64_t currentBlock = ConstDataView(buffer).read<LittleEndian<uint64_t>>();
+        numElements += simple8b_internal::blockCount(currentBlock);
+        buffer += sizeof(uint64_t);
+    }
+    return numElements;
+}
+
 template <typename T>
 T sum(const char* buffer, size_t size, uint64_t& prevNonRLE) {
     invariant(size % 8 == 0);
