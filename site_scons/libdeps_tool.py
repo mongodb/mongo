@@ -64,6 +64,7 @@ import hashlib
 import json
 import fileinput
 import subprocess
+import time
 
 try:
     import networkx
@@ -777,8 +778,7 @@ def _get_libdeps(node, debug=False):
         if str(libdep) not in BAZEL_LIBDEPS_AUTOINSTALLED:
             env = libdep.get_build_env()
             shlib_suffix = env.subst("$SHLIBSUFFIX")
-            if env.get('BAZEL_BUILD_ENABLED'):
-                env.BazelAutoInstall(libdep, shlib_suffix)
+            env.BazelAutoInstall(libdep, shlib_suffix)
             BAZEL_LIBDEPS_AUTOINSTALLED.add(str(libdep))
 
     setattr(node.attributes, Constants.LibdepsCached, tsorted)
@@ -896,6 +896,14 @@ def get_syslibdeps(source, target, env, for_signature, debug=False, shared=True)
                             but no suitable library was found during configuration."""))
 
                 deps.append(syslib)
+
+        cleaned_deps = []
+        seen = set()
+        for dep in reversed(deps):
+            if dep not in seen:
+                seen.add(str(dep))
+                cleaned_deps.append(dep)
+        deps = list(reversed(cleaned_deps))
 
         setattr(target[0].attributes, Constants.SysLibdepsCached, deps)
     return stringify_deps(env, deps)
@@ -1148,16 +1156,158 @@ def expand_libdeps_tags(source, target, env, for_signature):
     return results
 
 
+def get_digest(file_path):
+    h = hashlib.sha256()
+
+    with open(file_path, 'rb') as file:
+        while True:
+            # Reading is buffered, so we can read smaller chunks.
+            chunk = file.read(h.block_size)
+            if not chunk:
+                break
+            h.update(chunk)
+
+    return h.hexdigest()
+
+
+def handle_bazel_lib_link_flags(env, libext, libs):
+    if env.TargetOSIs('linux', 'freebsd', 'openbsd'):
+        if libext == env.subst("$SHLIBSUFFIX"):
+            return [env['LINK_AS_NEEDED_LIB_END']] + libs
+        else:
+            return [env['LINK_WHOLE_ARCHIVE_LIB_START']
+                    ] + libs + [env['LINK_WHOLE_ARCHIVE_LIB_END']]
+
+    elif env.TargetOSIs('darwin'):
+        if libext != env.subst("$SHLIBSUFFIX"):
+            return env.Flatten([[env['LINK_WHOLE_ARCHIVE_LIB_START'], lib] for lib in libs])
+    elif env.TargetOSIs('windows'):
+        return [env['LINK_WHOLE_ARCHIVE_LIB_START'] + ":" + lib for lib in libs]
+
+
+def add_bazel_libdep(env, libdep, bazel_libdeps):
+    if libdep.has_builder() and libdep.get_builder().get_name(env) == "ThinTarget":
+
+        bazel_libdep = env["SCONS2BAZEL_TARGETS"].bazel_target(libdep)
+        if bazel_libdep not in bazel_libdeps:
+            bazel_libdeps.append(bazel_libdep)
+        return True
+    return False
+
+
+def query_for_results(env, bazel_target, libdeps_ext, bazel_targets_checked):
+
+    # first check if the deps query is in the cache
+    results = env.CheckBazelDepsCache(bazel_target)
+    if results is None:
+        # new query to run, run and cache it
+        bazel_query = ["cquery"] + env['BAZEL_FLAGS_STR'] + [
+            f'kind("extract_debuginfo", deps(@{bazel_target}))', "--output", "files"
+        ]
+        results = env.RunBazelQuery(bazel_query, "getting bazel libdeps")
+        if results.returncode != 0:
+            print("ERROR: bazel libdeps query failed:")
+            print(results)
+            sys.exit(1)
+        env.AddBazelDepsCache(bazel_target, results)
+
+    # now we have some hidden deps to process, if they are the correct
+    # ext we want to link with, make scons node, verify its a ThinTarget, and then add
+    # to the results
+    libs_to_cache = []
+    for line in results.stdout.splitlines():
+        if line.endswith(libdeps_ext):
+            scons_node = env.File(
+                line.replace(f"{env['BAZEL_OUT_DIR']}/src",
+                             env.Dir("$BUILD_DIR").path))
+            if scons_node.has_builder():
+                if scons_node.get_builder().get_name(env) == "ThinTarget":
+                    libs_to_cache.append(line)
+                    # Since the deps from the query are transitive we can look for other targets that will be
+                    # covered by that transitive tree for the given link command. This allow us to skip doing
+                    # unnecessary queries and processing
+                    bazel_targets_checked.add(env["SCONS2BAZEL_TARGETS"].bazel_target(scons_node))
+
+    # now we have some the deps in link specific form, we can cache the for linking specificaly to
+    # save time on the processing, not just the original query
+    env.AddBazelLinkDepsCache(bazel_target, libs_to_cache)
+
+    return libs_to_cache
+
+
+BAZEL_SIG_CACHE = {}
+
+
+def process_bazel_libdeps(env, bazel_libdeps_to_add, libdeps_ext, for_sig):
+
+    global BAZEL_SIG_CACHE
+
+    bazel_libs = []
+    bazel_targets_checked = set()
+    signature = ""
+    start_time = time.time()
+    try:
+
+        # check the cache for any queries we need to run, and add the hidden deps to the list to link
+        for bazel_target in bazel_libdeps_to_add:
+            if bazel_target not in bazel_targets_checked:
+                bazel_targets_checked.add(bazel_target)
+                results = env.CheckBazelLinkDepsCache(bazel_target)
+                if not results:
+                    results = query_for_results(env, bazel_target, libdeps_ext,
+                                                bazel_targets_checked)
+                bazel_libs.extend([lib for lib in results if lib not in bazel_libs])
+
+        # if this is running to generate a signature to determine up to dateness, generate one for scons
+        if for_sig:
+            for lib in bazel_libs:
+                if str(lib) in BAZEL_SIG_CACHE:
+                    signature += BAZEL_SIG_CACHE[str(lib)]
+                else:
+                    sig = get_digest(str(lib))
+                    BAZEL_SIG_CACHE[str(lib)] = sig
+                    signature += sig
+            return signature
+
+        # add any per library link flags (whole archive flags)
+        bazel_libs_to_append = handle_bazel_lib_link_flags(env, libdeps_ext, bazel_libs)
+    except:
+        traceback.print_exc()
+    # record time for metrics
+    env.AddLibdepsTime(time.time() - start_time)
+
+    return bazel_libs_to_append
+
+
+EMITTING_SHARED = None
+
+
 def expand_libdeps_for_link(source, target, env, for_signature):
 
-    libdeps_with_flags = []
+    global EMITTING_SHARED, BAZEL_SIG_CACHE
 
+    libdeps_with_flags = []
     # Used to make modifications to the previous libdep on the link line
     # if needed. An empty class here will make the switch_flag conditionals
     # below a bit cleaner.
     prev_libdep = None
+    bazel_libdeps_to_add = []
+
+    if EMITTING_SHARED == "dynamic":
+        libdeps_ext = env.subst('$SHLIBSUFFIX')
+    elif EMITTING_SHARED == "dynamic-sdk":
+        libdeps_ext = env.subst('$SHLIBSUFFIX') + env.subst('$LIBSUFFIX')
+    else:
+        libdeps_ext = env.subst('$LIBSUFFIX')
+
+    # check if we are ThinTarget ourselves
+    add_bazel_libdep(env, target[0], bazel_libdeps_to_add)
 
     for flagged_libdep in _get_libdeps_with_link_flags(source, target, env, for_signature):
+
+        # thin targets will be processed different so continue if we find one
+        if add_bazel_libdep(env, flagged_libdep.libnode, bazel_libdeps_to_add):
+            continue
 
         # If there are no flags to process we can move on to the next lib.
         # start_index wont mater in the case because if there are no flags
@@ -1196,7 +1346,13 @@ def expand_libdeps_for_link(source, target, env, for_signature):
         prev_libdep = flagged_libdep
         prev_libdep.start_index = start_index
 
-    return libdeps_with_flags
+    if "conftest" not in str(target[0]):
+        # process all the thin targets we gathers to search for hidden deps to link
+        bazel_libdeps = process_bazel_libdeps(env, bazel_libdeps_to_add, libdeps_ext, for_signature)
+    else:
+        bazel_libdeps = []
+
+    return libdeps_with_flags + bazel_libdeps
 
 
 def generate_libdeps_graph(env):
@@ -1333,6 +1489,8 @@ def setup_environment(env, emitting_shared=False, debug='off', linting='on'):
 
     LibdepLinter.skip_linting = linting == 'off'
     LibdepLinter.print_linter_errors = linting == 'print'
+    global EMITTING_SHARED
+    EMITTING_SHARED = emitting_shared
 
     try:
         env["_LIBDEPS"]
@@ -1342,7 +1500,8 @@ def setup_environment(env, emitting_shared=False, debug='off', linting='on'):
     env["_LIBDEPS_TAGS"] = expand_libdeps_tags
     env["_LIBDEPS_GET_LIBS"] = partial(get_libdeps, debug=debug)
     env["_LIBDEPS_OBJS"] = partial(get_libdeps_objs, debug=debug)
-    env["_SYSLIBDEPS"] = partial(get_syslibdeps, debug=debug, shared=emitting_shared)
+    env["_SYSLIBDEPS"] = partial(get_syslibdeps, debug=debug,
+                                 shared=emitting_shared.startswith("dynamic"))
 
     env[Constants.Libdeps] = SCons.Util.CLVar()
     env[Constants.SysLibdeps] = SCons.Util.CLVar()
@@ -1360,7 +1519,7 @@ def setup_environment(env, emitting_shared=False, debug='off', linting='on'):
         # Detect if the current system has the tools to perform the generation.
         if env.GetOption('ninja') != 'disabled':
             env.FatalError("Libdeps graph generation is not supported with ninja builds.")
-        if not emitting_shared:
+        if not emitting_shared.startswith("dynamic"):
             env.FatalError("Libdeps graph generation currently only supports dynamic builds.")
 
         if env['PLATFORM'] == 'darwin':
@@ -1454,7 +1613,7 @@ def setup_environment(env, emitting_shared=False, debug='off', linting='on'):
         LIBDEPS_PROGEMITTER=partial(
             libdeps_emitter,
             debug=debug,
-            builder="SharedLibrary" if emitting_shared else "StaticLibrary",
+            builder="SharedLibrary" if emitting_shared.startswith("dynamic") else "StaticLibrary",
         ),
         PROGEMITTER=lambda target, source, env: env["LIBDEPS_PROGEMITTER"](target, source, env),
     )

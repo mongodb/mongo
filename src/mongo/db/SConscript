@@ -87,7 +87,7 @@ env.Library(
         'auth/auth_name.cpp',
         'auth/auth_types.idl',
         'auth/validated_tenancy_scope.cpp',
-        env.BazelIdlc('basic_types.idl')[0],
+        'basic_types_gen.cpp',
         'catalog_shard_feature_flag.idl',
         'cluster_role.cpp',
         'dump_lock_manager.cpp',

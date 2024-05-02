@@ -88,17 +88,9 @@ If a library or binary depends on another library, this must be declared in the 
 
 During migration from SCons to Bazel, the Build Team has created an integration layer between the two while working towards converting all SCons targets to Bazel targets.
 
-This allows SCons build targets to depend on Bazel build targets directly. The Bazel targets depended on by the SCons build target will be built with the normal scons.py invocation automatically.
+Targets which are built by bazel will be labeled as ThinTarget builder types. You can reference them by the same name you would use in scons in LIBDEPS lists.
 
-    env.BazelLibrary(
-        target='fsync_locked',
-        source=[
-            'fsync_locked.cpp',
-        ],
-        LIBDEPS=[
-            'new_library', # depend on the bazel "new_library" target defined above
-        ],
-    )
+If adding a a new library to the build, check to see if it should be added as a bazel or scons library. This will depend on how deep it is in the dependency tree. You can ask the build team at #ask-devprod-build for advice on if a given library should be added to the bazel or scons part of the build.
 
 ## Running clang-tidy via Bazel
 

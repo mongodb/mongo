@@ -45,7 +45,7 @@ mongo_cc_library(
     ],
     linkopts = select({
         "@platforms//os:windows": [
-            "-lShLwApi",
+            "ShLwApi.lib",
         ],
         "//conditions:default": [],
     }),

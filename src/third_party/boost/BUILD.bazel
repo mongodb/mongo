@@ -197,6 +197,10 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+    linkopts = select({
+        "@platforms//os:windows": ["synchronization.lib"],
+        "//conditions:default": [],
+    }),
     local_defines = BOOST_DEFINES + [
         "BOOST_LOG_USE_COMPILER_TLS",
         "BOOST_LOG_USE_STD_REGEX",

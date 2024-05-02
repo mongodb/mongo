@@ -1102,14 +1102,6 @@ env_vars.Add(
 )
 
 env_vars.Add(
-    'BAZEL_BUILD_ENABLED',
-    help=
-    'Enables/disables building with bazel. Note that this project is in flight, and thus subject to breaking changes. See https://jira.mongodb.org/browse/PM-3332 for details.',
-    converter=functools.partial(bool_var_converter, var='BAZEL_BUILD_ENABLED'),
-    default="1",
-)
-
-env_vars.Add(
     'BAZEL_FLAGS',
     help='Flags specific to bazel to pass through to the underlying bazel build command.',
     default="",
@@ -1736,7 +1728,7 @@ env = Environment(variables=env_vars, **envDict)
 del envDict
 env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), 'AddOption')
 
-# Preload to perform early fetch of repositories
+# Preload to perform early fetch fo repositories
 tool = Tool('integrate_bazel')
 tool.exists(env)
 
@@ -2270,10 +2262,9 @@ if env.TargetOSIs('windows') and not visibility_annotations_enabled:
             "Windows builds must use the 'object', 'dynamic-sdk', or 'static' link models")
 
 # TODO(SERVER-85904): remove check when object mode & LTO are supported in bazel
-if link_model == "object" and env.get("BAZEL_BUILD_ENABLED"):
+if link_model == "object":
     env.FatalError(
-        "Bazel-enabled builds currently do not support the \"object\" link model. "
-        "Please add BAZEL_BUILD_ENABLED=0 to the end of your command line argument if you need to build with the \"object\" link model."
+        "Bazel-enabled builds currently do not support the \"object\" link model. Reffer to SERVER-85904 for more info."
     )
 
 # The 'object' mode for libdeps is enabled by setting _LIBDEPS to $_LIBDEPS_OBJS. The other two
@@ -2588,12 +2579,8 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
 
 import libdeps_tool as libdeps
 
-libdeps.setup_environment(
-    env,
-    emitting_shared=(link_model.startswith("dynamic")),
-    debug=get_option('libdeps-debug'),
-    linting=get_option('libdeps-linting'),
-)
+libdeps.setup_environment(env, emitting_shared=link_model, debug=get_option('libdeps-debug'),
+                          linting=get_option('libdeps-linting'))
 
 # The abilink/tapilink tools and the thin archive tool must be loaded
 # after libdeps, so that the scanners they inject can see the library
@@ -3664,8 +3651,8 @@ def doConfigure(myenv):
 
         linker_ld = get_option('linker')
 
-        if linker_ld == "bfd" and env.get("BAZEL_BUILD_ENABLED"):
-            myenv.FatalError(f"The linker 'bfd' is not supported with BAZEL_BUILD_ENABLED.")
+        if linker_ld == "bfd":
+            myenv.FatalError(f"The linker 'bfd' is not supported.")
         elif linker_ld == 'auto':
             if not env.TargetOSIs('darwin', 'macOS'):
                 if not myenv.AddToLINKFLAGSIfSupported('-fuse-ld=lld'):
@@ -6557,19 +6544,6 @@ def injectModule(env, module, **kwargs):
 
 env.AddMethod(injectModule, 'InjectModule')
 
-replacements = {
-    '@MONGO_BUILD_DIR@': (pathlib.Path(env.Dir('$BUILD_DIR').path) / 'mongo').as_posix(),
-}
-
-clang_tidy_config = env.Substfile(
-    target='.clang-tidy',
-    source=[
-        '.clang-tidy.in',
-    ],
-    SUBST_DICT=replacements,
-)
-env.Alias("generated-sources", clang_tidy_config)
-
 if get_option('ninja') == 'disabled':
     compileCommands = env.CompilationDatabase('compile_commands.json')
     # Initialize generated-sources Alias as a placeholder so that it can be used as a
@@ -6751,7 +6725,34 @@ if env.GetOption('build-mongot'):
 # load the tool late to make sure we can copy over any new
 # emitters/scanners we may have created in the SConstruct when
 # we go to make stand in bazel builders for the various scons builders
-env.Tool('integrate_bazel')
+
+# __NINJA_NO is ninja callback to scons signal, in that case we care about
+# scons only targets not thin targets.
+if env.get('__NINJA_NO') != "1":
+    env.Tool('integrate_bazel')
+else:
+    env.LoadBazelBuilders()
+
+    def noop(*args, **kwargs):
+        pass
+
+    env.AddMethod(noop, "WaitForBazel")
+    env.AddMethod(noop, "BazelAutoInstall")
+
+replacements = {
+    '@MONGO_BUILD_DIR@': (';'.join(
+        [(pathlib.Path(env.Dir('$BUILD_DIR').path) / 'mongo').as_posix(),
+         (pathlib.Path(env.Dir('$BAZEL_OUT_DIR').path) / 'src' / 'mongo').as_posix()])),
+}
+
+clang_tidy_config = env.Substfile(
+    target='.clang-tidy',
+    source=[
+        '.clang-tidy.in',
+    ],
+    SUBST_DICT=replacements,
+)
+env.Alias("generated-sources", clang_tidy_config)
 
 env.SConscript(
     dirs=[
@@ -6883,16 +6884,15 @@ libdeps.generate_libdeps_graph(env)
 # We put this next section at the end of the SConstruct since all the targets
 # have been declared, and we know all possible bazel targets so
 # we can now generate this info into a file for the ninja build to consume.
-if env.get("BAZEL_BUILD_ENABLED"):
-    if env.GetOption('ninja') != "disabled":
+if env.GetOption('ninja') != "disabled" and env.get('__NINJA_NO') != "1":
 
-        # convert the SCons FunctioAction into a format that ninja can understand
-        env.NinjaRegisterFunctionHandler("bazel_builder_action", env.NinjaBazelBuilder)
+    # convert the SCons FunctioAction into a format that ninja can understand
+    env.NinjaRegisterFunctionHandler("bazel_builder_action", env.NinjaBazelBuilder)
 
-        # we generate the list of all targets that were labeled Bazel* builder targets
-        # via the emitter, this outputs a json file which will be read during the ninja
-        # build.
-        env.GenerateBazelInfoForNinja()
+    # we generate the list of all targets that were labeled Bazel* builder targets
+    # via the emitter, this outputs a json file which will be read during the ninja
+    # build.
+    env.GenerateBazelInfoForNinja()
 
-    else:
-        env.WaitForBazel()
+else:
+    env.WaitForBazel()

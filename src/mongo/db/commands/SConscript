@@ -10,7 +10,7 @@ env.Library(
     target='test_commands_enabled',
     source=[
         'test_commands_enabled.cpp',
-        env.BazelIdlc('test_commands_enabled.idl')[0],
+        'test_commands_enabled_gen.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
@@ -80,7 +80,7 @@ env.Library(
         'fle2_compact.cpp',
         'fle2_compact.idl',
         'generic.cpp',
-        env.BazelIdlc('generic.idl')[0],
+        'generic_gen.cpp',
         'hashcmd.cpp',
         'kill_all_sessions_by_pattern_command.cpp',
         'kill_all_sessions_command.cpp',
@@ -298,14 +298,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/storage/storage_options',
     ],
-)
-
-env.BazelLibrary(
-    target='fsync_locked',
-    source=[
-        'fsync_locked.cpp',
-    ],
-    LIBDEPS=[],
 )
 
 env.Library(

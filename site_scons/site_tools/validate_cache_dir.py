@@ -206,6 +206,8 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
                     size = os.path.getsize(cachefile)
                 except FileNotFoundError:
                     size = 'FileNotFoundError'
+                except NotADirectoryError:
+                    size = 'NotADirectoryError'
 
             cksum_cachefile = str(pathlib.Path(cachefile).parent)
             if cksum_cachefile.endswith(self.get_ext()):

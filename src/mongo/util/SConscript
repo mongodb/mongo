@@ -76,22 +76,6 @@ if env.TargetOSIs('windows'):
     )
     env.Alias('generated-sources', generatedResourceConstantFile)
 
-# Shim library for boost to depend on
-env.BazelLibrary(
-    target='boost_assert_shim',
-    source=[
-        'boost_assert_shim.cpp',
-    ],
-    LIBDEPS_TAGS=[
-        # NOTE: This library *must not* depend on any mongodb code
-        'lint-leaf-node-no-deps',
-    ],
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
-        '$BUILD_DIR/third_party/shim_unwind',
-    ],
-)
-
 env.SConscript(
     dirs=[
         'cmdline_utils',

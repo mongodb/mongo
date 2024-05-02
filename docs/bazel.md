@@ -4,7 +4,7 @@ To perform a Bazel build via SCons:
 
 - You must be on a arm64 virtual workstation
 - You must generate engflow credentials and store them in the correct location (see below)
-- Build the Bazel-compatible target: `python3 ./buildscripts/scons.py BAZEL_BUILD_ENABLED=1 --build-profile=fast --ninja=disabled --link-model=static -j 200  --modules= build/fast/mongo/db/commands/libfsync_locked.a`
+- Build the Bazel-compatible target: `python3 ./buildscripts/scons.py --build-profile=fast --ninja=disabled --link-model=static -j 200  --modules= build/fast/mongo/db/commands/libfsync_locked.a`
 
 To generate and install the engflow credentials:
 

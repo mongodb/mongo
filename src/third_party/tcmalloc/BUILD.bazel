@@ -169,6 +169,7 @@ mongo_cc_library(
         "tcmalloc_internal_logging",
         "tcmalloc_internal_page_size",
         "tcmalloc_internal_percpu",
+        "tcmalloc_internal_percpu_tcmalloc",
         "tcmalloc_malloc_extension",
         "tcmalloc_malloc_tracing_extension",
         "tcmalloc_new_extension",
@@ -359,6 +360,7 @@ mongo_cc_library(
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
+        ":tcmalloc_internal_sysinfo",
         "//src/third_party/abseil-cpp:absl_base",
     ],
 )

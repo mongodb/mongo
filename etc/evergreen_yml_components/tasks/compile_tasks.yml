@@ -262,7 +262,6 @@ tasks:
             build/opt/mongo/db/commands/fsync_locked.lib
             build/opt/mongo/db/commands/test_commands_enabled.lib
           task_compile_flags: >-
-            BAZEL_BUILD_ENABLED=1
             ICECC=
             --build-profile=opt
             --ninja=disabled
@@ -301,7 +300,6 @@ tasks:
           targets: >-
             build/opt/third_party/unwind/libunwind.a
           task_compile_flags: >-
-            BAZEL_BUILD_ENABLED=1
             ICECC=
             --build-profile=opt
             --ninja=disabled
@@ -324,7 +322,6 @@ tasks:
             build/opt/mongo/platform/visibility_test1
           separate_debug: on
           task_compile_flags: >-
-            BAZEL_BUILD_ENABLED=1
             ICECC=
             --build-profile=opt
             --ninja=disabled
@@ -347,7 +344,6 @@ tasks:
             +visibility_test1 +visibility_test2
           separate_debug: on
           task_compile_flags: >-
-            BAZEL_BUILD_ENABLED=1
             ICECC=
             --build-profile=opt
             --ninja=disabled
@@ -369,7 +365,6 @@ tasks:
             +visibility_test1 +visibility_test2
           separate_debug: on
           task_compile_flags: >-
-            BAZEL_BUILD_ENABLED=1
             ICECC=
             --build-profile=san
             --ninja=disabled
@@ -718,7 +713,6 @@ tasks:
           separate_debug: off
           task_compile_flags: >-
             --build-profile=fast
-            BAZEL_BUILD_ENABLED=1
             CCACHE=
             ICECC=
       - func: "f_expansions_write"
@@ -759,7 +753,6 @@ tasks:
           separate_debug: off
           task_compile_flags: >-
             --build-profile=fast
-            BAZEL_BUILD_ENABLED=1
             BAZEL_INTEGRATION_DEBUG=1
             CCACHE=
             ICECC=icecc
