@@ -470,7 +470,7 @@ __wt_rec_col_fix(
     WT_PAGE *page;
     WT_UPDATE *upd;
     WT_UPDATE_SELECT upd_select;
-    uint64_t curstartrecno, i, rawbitmapsize, origstartrecno, recno;
+    uint64_t curstartrecno, i, origstartrecno, rawbitmapsize, recno;
     uint32_t auxspace, bitmapsize, entry, maxrecs, nrecs, numtws, tw;
     uint8_t val;
 

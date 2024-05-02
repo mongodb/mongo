@@ -720,7 +720,7 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     const char *cfg[3] = {NULL, NULL, NULL}, *stripped_config;
-    bool running, enable;
+    bool enable, running;
 
     conn = S2C(session);
     cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_compact);

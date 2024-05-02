@@ -29,7 +29,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     wt_timestamp_t prev_upd_ts;
     size_t ins_size, upd_size;
     u_int i, skipdepth;
-    bool append, inserted_to_update_chain, added_to_txn;
+    bool added_to_txn, append, inserted_to_update_chain;
 
     btree = CUR2BT(cbt);
     ins = NULL;

@@ -518,8 +518,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *first_upd
     WT_UPDATE *upd;
     wt_timestamp_t max_ts;
     uint64_t max_txn, session_txnid, txnid;
-    bool is_hs_page;
-    bool seen_prepare;
+    bool is_hs_page, seen_prepare;
 
     max_ts = WT_TS_NONE;
     max_txn = WT_TXN_NONE;
@@ -665,7 +664,7 @@ __rec_fill_tw_from_upd_select(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_KV *vpack, WT_UPDATE_SELECT *upd_select)
 {
     WT_TIME_WINDOW *select_tw;
-    WT_UPDATE *last_upd, *upd, *tombstone;
+    WT_UPDATE *last_upd, *tombstone, *upd;
 
     upd = upd_select->upd;
     last_upd = tombstone = NULL;

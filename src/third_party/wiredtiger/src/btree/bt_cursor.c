@@ -1108,7 +1108,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     size_t insert_bytes;
-    uint64_t yield_count, sleep_usecs;
+    uint64_t sleep_usecs, yield_count;
     bool append_key, key_out_of_bounds, valid;
 
     btree = CUR2BT(cbt);
@@ -1327,7 +1327,7 @@ __wt_btcur_insert_check(WT_CURSOR_BTREE *cbt)
     WT_CURSOR *cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    uint64_t yield_count, sleep_usecs;
+    uint64_t sleep_usecs, yield_count;
 
     cursor = &cbt->iface;
     session = CUR2S(cbt);
@@ -1378,7 +1378,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt, bool positioned)
     WT_CURSOR *cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    uint64_t yield_count, sleep_usecs;
+    uint64_t sleep_usecs, yield_count;
     bool searched, valid;
 
     btree = CUR2BT(cbt);
@@ -1553,7 +1553,7 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
     WT_CURSOR *cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    uint64_t yield_count, sleep_usecs;
+    uint64_t sleep_usecs, yield_count;
     bool key_out_of_bounds, valid;
 
     btree = CUR2BT(cbt);
@@ -1798,7 +1798,7 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
     WT_DECL_ITEM(modify);
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    size_t orig, new;
+    size_t new, orig;
     bool overwrite;
 
     cursor = &cbt->iface;
@@ -2043,7 +2043,7 @@ __wt_cursor_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop,
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     size_t records_truncated;
-    uint64_t yield_count, sleep_usecs;
+    uint64_t sleep_usecs, yield_count;
 
     session = CUR2S(start);
     records_truncated = yield_count = sleep_usecs = 0;
@@ -2103,7 +2103,7 @@ __cursor_truncate_fix(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop,
 {
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    uint64_t yield_count, sleep_usecs;
+    uint64_t sleep_usecs, yield_count;
     const uint8_t *value;
 
     session = CUR2S(start);

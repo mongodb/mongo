@@ -306,7 +306,7 @@ __hazard_check_callback(
   WT_SESSION_IMPL *session, WT_SESSION_IMPL *array_session, bool *exit_walkp, void *cookiep)
 {
     WT_HAZARD_COOKIE *cookie;
-    uint32_t i, hazard_inuse;
+    uint32_t hazard_inuse, i;
 
     cookie = (WT_HAZARD_COOKIE *)cookiep;
     hazard_get_reference(array_session, &cookie->ret_hp, &hazard_inuse);
@@ -381,7 +381,7 @@ u_int
 __wt_hazard_count(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_HAZARD *hp;
-    uint32_t i, hazard_inuse;
+    uint32_t hazard_inuse, i;
     u_int count;
 
     hazard_get_reference(session, &hp, &hazard_inuse);

@@ -19,7 +19,7 @@ static int
 __block_addr_unpack(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t **pp, size_t addr_size,
   uint32_t *objectidp, wt_off_t *offsetp, uint32_t *sizep, uint32_t *checksump)
 {
-    uint64_t i, o, s, c;
+    uint64_t c, i, o, s;
     uint8_t flags;
     const uint8_t *begin;
 
@@ -88,7 +88,7 @@ int
 __wt_block_addr_pack(WT_BLOCK *block, uint8_t **pp, uint32_t objectid, wt_off_t offset,
   uint32_t size, uint32_t checksum)
 {
-    uint64_t i, o, s, c;
+    uint64_t c, i, o, s;
 
     /* See the comment above about storing large offsets: this is the reverse operation. */
     if (size == 0) {

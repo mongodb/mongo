@@ -24,7 +24,7 @@ __wt_session_array_walk(WT_SESSION_IMPL *session,
 {
     WT_CONNECTION_IMPL *conn;
     WT_SESSION_IMPL *array_session;
-    uint32_t session_cnt, i;
+    uint32_t i, session_cnt;
     u_int active;
     bool exit_walk;
 

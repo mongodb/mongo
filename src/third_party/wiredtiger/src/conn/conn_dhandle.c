@@ -687,8 +687,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session, const char *uri,
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
-    uint64_t bucket;
-    uint64_t time_diff, time_start, time_stop;
+    uint64_t bucket, time_diff, time_start, time_stop;
 
     conn = S2C(session);
     /*

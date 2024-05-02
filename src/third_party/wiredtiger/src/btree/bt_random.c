@@ -388,7 +388,7 @@ __wt_random_descent(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags, WT_
     WT_PAGE *page;
     WT_PAGE_INDEX *pindex;
     WT_REF *current, *descent;
-    uint32_t i, entries;
+    uint32_t entries, i;
     uint8_t descent_state;
     int retry;
     bool eviction, sample_inmem_page;

@@ -452,7 +452,7 @@ static bool
 __checkpoint_cleanup_eligibility(WT_SESSION_IMPL *session, const char *uri, const char *config)
 {
     WT_CONFIG ckptconf;
-    WT_CONFIG_ITEM cval, value, key;
+    WT_CONFIG_ITEM cval, key, value;
     WT_DECL_RET;
     wt_timestamp_t newest_stop_durable_ts;
     bool logged;

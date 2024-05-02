@@ -39,7 +39,7 @@ __wt_row_leaf_key_work(
     WT_CELL_UNPACK_KV *unpack, _unpack;
     WT_DECL_RET;
     WT_IKEY *ikey;
-    WT_ROW *rip, *jump_rip;
+    WT_ROW *jump_rip, *rip;
     size_t group_size, key_size;
     uint32_t slot;
     u_int jump_slot_offset, slot_offset;

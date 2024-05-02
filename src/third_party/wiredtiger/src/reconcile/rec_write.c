@@ -221,7 +221,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     WT_DECL_RET;
     WT_PAGE *page;
     WT_RECONCILE *r;
-    uint64_t rec_hs_wrapup, rec_img_build, rec, rec_start, rec_finish;
+    uint64_t rec, rec_finish, rec_hs_wrapup, rec_img_build, rec_start;
     void *addr;
 
     btree = S2BT(session);
@@ -1400,7 +1400,7 @@ static void
 __rec_split_fix_shrink(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
     uint32_t auxsize, emptysize, primarysize, totalsize;
-    uint8_t *src, *dst;
+    uint8_t *dst, *src;
 
     /* Total size of page. */
     totalsize = WT_PTRDIFF32(r->aux_first_free, r->cur_ptr->image.mem);

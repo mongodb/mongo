@@ -362,7 +362,7 @@ err:
 static WT_INLINE bool
 __increment_bound_array(WT_ITEM *user_item)
 {
-    size_t usz, i;
+    size_t i, usz;
     uint8_t *userp;
 
     usz = user_item->size;

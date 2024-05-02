@@ -903,7 +903,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
     WT_CACHE *cache;
     WT_DECL_RET;
     WT_EVICT_ENTRY *evict;
-    u_int i, elem, q;
+    u_int elem, i, q;
 
     btree = S2BT(session);
     cache = S2C(session)->cache;
@@ -1215,7 +1215,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_EVICT_QUEUE *queue, *other_queue;
+    WT_EVICT_QUEUE *other_queue, *queue;
     WT_TRACK_OP_DECL;
     uint64_t read_gen_oldest;
     uint32_t candidates, entries;
@@ -1662,7 +1662,7 @@ static bool
 __evict_push_candidate(
   WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, WT_EVICT_ENTRY *evict, WT_REF *ref)
 {
-    uint16_t orig_flags, new_flags;
+    uint16_t new_flags, orig_flags;
     u_int slot;
 
     /*
@@ -1791,7 +1791,7 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
     WT_PAGE *last_parent, *page;
     WT_REF *ref;
     uint64_t internal_pages_already_queued, internal_pages_queued, internal_pages_seen;
-    uint64_t min_pages, pages_already_queued, pages_seen, pages_queued, refs_walked;
+    uint64_t min_pages, pages_already_queued, pages_queued, pages_seen, refs_walked;
     uint32_t read_flags, remaining_slots, target_pages, walk_flags;
     int restarts;
     bool give_up, modified, urgent_queued, want_page;
@@ -2855,7 +2855,7 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
     WT_DECL_RET;
     double pct;
     uint64_t bytes_dirty_intl, bytes_dirty_leaf, bytes_inmem;
-    uint64_t total_bytes, total_dirty_bytes, total_updates_bytes, cache_bytes_updates;
+    uint64_t cache_bytes_updates, total_bytes, total_dirty_bytes, total_updates_bytes;
     bool needed;
 
     conn = S2C(session);

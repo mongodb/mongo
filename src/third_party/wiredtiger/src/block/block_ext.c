@@ -134,7 +134,7 @@ __block_size_srch(WT_SIZE **head, wt_off_t size, WT_SIZE ***stack)
 static WT_INLINE void
 __block_off_srch_pair(WT_EXTLIST *el, wt_off_t off, WT_EXT **beforep, WT_EXT **afterp)
 {
-    WT_EXT **head, **extp;
+    WT_EXT **extp, **head;
     int i;
 
     *beforep = *afterp = NULL;
@@ -171,7 +171,7 @@ static int
 __block_ext_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 {
     WT_EXT **astack[WT_SKIP_MAXDEPTH];
-    WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
+    WT_SIZE **sstack[WT_SKIP_MAXDEPTH], *szp;
     u_int i;
 
     /*
@@ -248,6 +248,7 @@ WT_EXT *
 __wt_block_off_srch_inclusive(WT_EXTLIST *el, wt_off_t off)
 {
     WT_EXT *after, *before;
+
     __block_off_srch_pair(el, off, &before, &after);
 
     /* Check if the search key is in the before extent. Otherwise return the after extent. */
@@ -265,7 +266,7 @@ __wt_block_off_srch_inclusive(WT_EXTLIST *el, wt_off_t off)
 static bool
 __block_off_match(WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
-    WT_EXT *before, *after;
+    WT_EXT *after, *before;
 
     /* Search for before and after entries for the offset. */
     __block_off_srch_pair(el, off, &before, &after);
@@ -331,8 +332,8 @@ static int
 __block_off_remove(
   WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t off, WT_EXT **extp)
 {
-    WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
-    WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
+    WT_EXT **astack[WT_SKIP_MAXDEPTH], *ext;
+    WT_SIZE **sstack[WT_SKIP_MAXDEPTH], *szp;
     u_int i;
 
     /* Find and remove the record from the by-offset skiplist. */
@@ -402,7 +403,7 @@ int
 __wt_block_off_remove_overlap(
   WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
-    WT_EXT *before, *after, *ext;
+    WT_EXT *after, *before, *ext;
     wt_off_t a_off, a_size, b_off, b_size;
 
     WT_ASSERT(session, off != WT_BLOCK_INVALID_OFFSET);
@@ -526,9 +527,9 @@ __block_extend(
 int
 __wt_block_alloc(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t *offp, wt_off_t size)
 {
-    WT_EXT *ext, **estack[WT_SKIP_MAXDEPTH];
+    WT_EXT **estack[WT_SKIP_MAXDEPTH], *ext;
     WT_EXTLIST *el;
-    WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
+    WT_SIZE **sstack[WT_SKIP_MAXDEPTH], *szp;
 
     /* The live lock must be locked. */
     WT_ASSERT_SPINLOCK_OWNED(session, &block->live_lock);
@@ -983,7 +984,7 @@ static int
 __block_append(
   WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
-    WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
+    WT_EXT **astack[WT_SKIP_MAXDEPTH], *ext;
     u_int i;
 
     WT_UNUSED(block);
@@ -1049,7 +1050,7 @@ static int
 __block_merge(
   WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
-    WT_EXT *ext, *after, *before;
+    WT_EXT *after, *before, *ext;
 
     /*
      * Retrieve the records preceding/following the offset. If the records are contiguous with the
@@ -1322,7 +1323,7 @@ err:
 int
 __wt_block_extlist_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
-    WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
+    WT_EXT **astack[WT_SKIP_MAXDEPTH], *ext;
     wt_off_t size;
 
     /*
@@ -1377,7 +1378,7 @@ void
 __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 {
     WT_EXT *ext, *next;
-    WT_SIZE *szp, *nszp;
+    WT_SIZE *nszp, *szp;
 
     __wt_free(session, el->name);
 

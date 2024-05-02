@@ -940,8 +940,7 @@ __cursor_reuse_or_init(WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *
   bool *readonlyp, WT_CURSOR **ownerp, WT_CURSOR **cdumpp)
 {
     WT_CONFIG_ITEM cval;
-    WT_CURSOR *cdump;
-    WT_CURSOR *owner;
+    WT_CURSOR *cdump, *owner;
 
     if (cfg != NULL) {
         /*
@@ -1016,14 +1015,11 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_v
   WT_CURSOR *to_dup, const char *cfg[], WT_CURSOR **cursorp)
 {
     WT_CONFIG_ITEM cval;
-    WT_CURSOR *cdump;
-    WT_CURSOR *cursor;
+    WT_CURSOR *cdump, *cursor;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
     uint64_t bucket, overwrite_flag;
-    bool cacheable;
-    bool have_config;
-    bool readonly;
+    bool cacheable, have_config, readonly;
 
     /* cacheable */
     if (!F_ISSET(session, WT_SESSION_CACHE_CURSORS))

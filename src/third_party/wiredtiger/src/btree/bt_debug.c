@@ -1582,7 +1582,7 @@ __debug_row_skip(WT_DBG *ds, WT_INSERT_HEAD *head)
 static int
 __debug_modify(WT_DBG *ds, const uint8_t *data)
 {
-    size_t nentries, data_size, offset, size;
+    size_t data_size, nentries, offset, size;
     const size_t *p;
 
     p = (size_t *)data;
