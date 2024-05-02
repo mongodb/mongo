@@ -49,8 +49,8 @@ function testFindQuerySettingsApplication(collOrViewName) {
 
     setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
-    // Ensure that query settings cluster parameter is empty.
-    qsutils.assertQueryShapeConfiguration([]);
+    // Ensure that there are no query settings set.
+    qsutils.removeAllQuerySettings();
 
     const querySettingsFindQuery = qsutils.makeFindQueryInstance({
         filter: {a: 1, b: 1},
