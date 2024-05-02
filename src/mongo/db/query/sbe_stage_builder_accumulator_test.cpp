@@ -2156,7 +2156,7 @@ public:
                  &_slotIdGenerator,
                  &_frameIdGenerator,
                  nullptr /* spoolIdGenerator */,
-                 nullptr /* inListsSet */,
+                 nullptr /* inListsMap */,
                  nullptr /* collatorsMap */,
                  _expCtx,
                  false /* needsMerge */,

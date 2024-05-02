@@ -37,8 +37,12 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 
 namespace mongo {
-class InListData;
+class InMatchExpression;
 class StringListSet;
+
+namespace sbe {
+class InList;
+}
 
 namespace stage_builder {
 struct Environment;
@@ -51,7 +55,7 @@ static constexpr auto kNothingEnvSlotName = "nothing"_sd;
  * argument passing. Also contains a mapping of global variable ids to slot ids.
  */
 struct StageBuilderState {
-    using InListsSet = absl::flat_hash_set<InListData*>;
+    using InListsMap = absl::flat_hash_map<const InMatchExpression*, sbe::InList*>;
     using CollatorsMap = absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*>;
 
     StageBuilderState(OperationContext* opCtx,
@@ -61,7 +65,7 @@ struct StageBuilderState {
                       sbe::value::SlotIdGenerator* slotIdGenerator,
                       sbe::value::FrameIdGenerator* frameIdGenerator,
                       sbe::value::SpoolIdGenerator* spoolIdGenerator,
-                      InListsSet* inListsSet,
+                      InListsMap* inListsMap,
                       CollatorsMap* collatorsMap,
                       boost::intrusive_ptr<ExpressionContext> expCtx,
                       bool needsMerge,
@@ -69,7 +73,7 @@ struct StageBuilderState {
         : slotIdGenerator{slotIdGenerator},
           frameIdGenerator{frameIdGenerator},
           spoolIdGenerator{spoolIdGenerator},
-          inListsSet{inListsSet},
+          inListsMap{inListsMap},
           collatorsMap{collatorsMap},
           opCtx{opCtx},
           env{env},
@@ -108,14 +112,18 @@ struct StageBuilderState {
      * SBE plan currently being built. If 'coll' is already owned by the SBE plan being built,
      * then this method will simply return 'coll'.
      */
-    const CollatorInterface* makeCollatorOwned(const CollatorInterface* coll);
+    const CollatorInterface* makeOwnedCollator(const CollatorInterface* coll);
 
     /**
-     * Given an InListData 'inList', this method makes inList's BSON owned, it makes the inList's
-     * Collator owned, it sorts and de-dups the inList's elements if needed, it initializes the
-     * inList's hash set if needed, and it marks the 'inList' as "prepared".
+     * Given an in-list in the form of an InMatchExpression, this method builds an "owned" InList
+     * that can be used to search the in-list's elements and returns a pointer to it. This InList
+     * object will be owned by the PlanStageStaticData.
+     *
+     * If an InList has already been built for the specified InMatchExpression and is found in
+     * 'inListsMap', this method will return a pointer to the same InList (instead of building
+     * a new InList).
      */
-    InListData* prepareOwnedInList(const std::shared_ptr<InListData>& inList);
+    sbe::InList* makeOwnedInList(const InMatchExpression* ime);
 
     /**
      * Register a Slot in the 'RuntimeEnvironment'. The newly registered Slot should be associated
@@ -129,7 +137,7 @@ struct StageBuilderState {
     sbe::value::FrameIdGenerator* const frameIdGenerator;
     sbe::value::SpoolIdGenerator* const spoolIdGenerator;
 
-    absl::flat_hash_set<InListData*>* const inListsSet;
+    absl::flat_hash_map<const InMatchExpression*, sbe::InList*>* const inListsMap;
     absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*>* const collatorsMap;
 
     OperationContext* const opCtx;

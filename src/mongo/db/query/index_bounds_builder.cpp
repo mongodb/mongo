@@ -1094,6 +1094,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // basis of indexes, null intervals, and array intervals.
         const bool entireNullIntervalMatchesPredicate =
             detectIfEntireNullIntervalMatchesPredicate(ime, index);
+
         for (auto&& equality : ime->getEqualities()) {
             // First, we generate the bounds the same way that we would do for an individual
             // equality. This will set tightness to the value it should be if this equality is being

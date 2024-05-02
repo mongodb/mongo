@@ -134,7 +134,7 @@ public:
             &_slotIdGenerator,
             &_frameIdGenerator,
             &_spoolIdGenerator,
-            &_inListsSet,
+            &_inListsMap,
             &_collatorsMap,
             _expCtx,
             false /* needsMerge */,
@@ -198,7 +198,7 @@ private:
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
-    stage_builder::StageBuilderState::InListsSet _inListsSet;
+    stage_builder::StageBuilderState::InListsMap _inListsMap;
     stage_builder::StageBuilderState::CollatorsMap _collatorsMap;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 

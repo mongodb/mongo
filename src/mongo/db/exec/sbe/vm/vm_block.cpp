@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/values/generic_compare.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/represent_as.h"
@@ -969,5 +970,4 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellBlockGetFlat
             value::TypeTags::valueBlock,
             value::bitcastFrom<value::ValueBlock*>(&cell->getValueBlock())};
 }
-
 }  // namespace mongo::sbe::vm

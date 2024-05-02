@@ -180,7 +180,7 @@ void MatchExpressionParameterizationVisitor::visit(InMatchExpression* expr) {
     // multiple-element $in query has more than one (point) intervals for the index bounds, which is
     // ineligible for COUNT_SCAN. This is to make sure that $in queries with multiple elements will
     // not share the same query shape with any other single-element $in query.
-    if (auto inList = expr->getInList(); inList && inList->hasSingleElement()) {
+    if (expr->equalitiesHasSingleElement()) {
         return;
     }
 
