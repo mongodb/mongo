@@ -256,7 +256,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
         }
 
         if (nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
-            !sharding_recovery_util::inRecoveryMode(opCtx)) {
+            !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
             const auto collCSDoc = CollectionCriticalSectionDocument::parse(
                 IDLParserContext("ShardServerOpObserver"), insertedDoc);
             invariant(!collCSDoc.getBlockReads());
@@ -407,7 +407,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
     }
 
     if (args.coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace &&
-        !sharding_recovery_util::inRecoveryMode(opCtx)) {
+        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
         invariant(collCSDoc.getBlockReads());
@@ -480,9 +480,9 @@ void ShardServerOpObserver::onModifyCollectionShardingIndexCatalog(OperationCont
                                                                    const NamespaceString& nss,
                                                                    const UUID& uuid,
                                                                    BSONObj indexDoc) {
-    // If we are in recovery mode (STARTUP or ROLLBACK) let the sharding recovery service to take
+    // If we are in recovery mode (STARTUP2 or ROLLBACK) let the sharding recovery service to take
     // care of the in-memory state.
-    if (sharding_recovery_util::inRecoveryMode(opCtx)) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
         return;
     }
     LOGV2_DEBUG(6712303,
@@ -661,7 +661,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     }
 
     if (nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
-        !sharding_recovery_util::inRecoveryMode(opCtx)) {
+        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
         const auto& deletedDoc = documentId;
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), deletedDoc);
