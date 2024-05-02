@@ -299,7 +299,7 @@ void ServiceEntryPointMongos::onClientConnect(Client* client) {
     }
 }
 
-void ServiceEntryPointMongos::onClientDisconnect(Client* client) {
+void ServiceEntryPointMongos::onClientDisconnect(Client* client) try {
     if (load_balancer_support::isFromLoadBalancer(client)) {
         _loadBalancedConnections.decrement();
 
@@ -339,6 +339,11 @@ void ServiceEntryPointMongos::onClientDisconnect(Client* client) {
                  "aborting in-progress transaction because load-balanced client disconnected"});
         }
     }
+} catch (const DBException& ex) {
+    LOGV2_DEBUG(8969800,
+                2,
+                "Encountered error while performing client connection cleanup",
+                "error"_attr = ex.toStatus());
 }
 
 void ServiceEntryPointMongos::appendStats(BSONObjBuilder* bob) const {
