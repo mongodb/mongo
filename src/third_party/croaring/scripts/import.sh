@@ -8,8 +8,8 @@ IFS=$'\n\t'
 set -vx
 
 NAME=croaring
-REVISION="v2.1.2"
-VERSION="v2.1.2"
+REVISION="v3.0.1"
+VERSION="v3.0.1"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/croaring
 if [[ -d $DEST_DIR/dist ]]; then
