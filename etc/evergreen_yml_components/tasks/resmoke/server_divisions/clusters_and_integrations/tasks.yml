@@ -1317,9 +1317,7 @@ tasks:
         "assigned_to_jira_team_server_servicearch",
         "default",
         "jscore",
-        "incompatible_aubsan",
-        "incompatible_tsan",
-        "incompatible_debug_mode",
+        "incompatible_system_allocator",
       ]
     commands:
       - func: "do setup"

@@ -163,32 +163,32 @@ buildvariants:
       - name: crypt_build_debug_and_test
         distros:
           - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
-      - name: .development_critical !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
-      - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .development_critical !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
-      - name: .development_critical .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
-      - name: .release_critical !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
-      - name: .release_critical .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .release_critical !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .release_critical .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
-      - name: .release_critical .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .release_critical .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
-      - name: .default !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
-      - name: .default .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .default !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .default .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
-      - name: .default .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .default .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
-      - name: .non_deterministic !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
-      - name: .non_deterministic .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .non_deterministic !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .non_deterministic .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
-      - name: .non_deterministic .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.requires_all_feature_flags
+      - name: .non_deterministic .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-80-64-bit-dynamic-debug-mode-large-distro-name
 
@@ -419,20 +419,20 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
     tasks:
-      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
-      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - rhel80-large
-      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
-      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - rhel80-large
-      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
-      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - rhel80-large
-      - name: .non_deterministic !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
-      - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_all_feature_flags
+      - name: .non_deterministic !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - rhel80-large
 
