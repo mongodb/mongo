@@ -76,10 +76,16 @@ kv_workload_generator_spec::kv_workload_generator_spec()
 }
 
 /*
+ * kv_workload_generator::_default_spec --
+ *     The default workload specification.
+ */
+const kv_workload_generator_spec kv_workload_generator::_default_spec;
+
+/*
  * kv_workload_generator::kv_workload_generator --
  *     Create a new workload generator.
  */
-kv_workload_generator::kv_workload_generator(kv_workload_generator_spec spec, uint64_t seed)
+kv_workload_generator::kv_workload_generator(const kv_workload_generator_spec &spec, uint64_t seed)
     : _workload_ptr(std::make_shared<kv_workload>()), _workload(*(_workload_ptr.get())),
       _last_table_id(0), _last_txn_id(0), _random(seed), _spec(spec)
 {
@@ -811,6 +817,8 @@ kv_workload_generator::random_data_value(const std::string &format)
     case 't':
         if (length == 0)
             length = 1;
+        if (length > 8)
+            throw model_exception("The length cannot be higher than 8 for type \"t\"");
         return data_value(_random.next_uint64(1 << (length - 1)));
     default:
         throw model_exception("Unsupported type.");
