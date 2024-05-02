@@ -43,10 +43,8 @@ public:
 
     ~ClusterStatisticsMock() override {}
 
-    void setStats(std::vector<ShardStatistics>&& clusterStats,
-                  std::map<NamespaceString, std::vector<ShardStatistics>>&& collStats) {
+    void setStats(std::vector<ShardStatistics>&& clusterStats) {
         _clusterStats.swap(clusterStats);
-        _collStats.swap(collStats);
     }
 
     StatusWith<std::vector<ShardStatistics>> getStats(OperationContext* opCtx) override {
@@ -58,20 +56,8 @@ public:
         return _clusterStats;
     }
 
-    StatusWith<std::vector<ShardStatistics>> getCollStats(OperationContext* opCtx,
-                                                          NamespaceString const& ns) override {
-        auto& stats = _collStats[ns];
-        if (stats.empty()) {
-            return Status(ErrorCodes::DataCorruptionDetected,
-                          "Failure on getCollStats() raised by mock");
-        }
-        return stats;
-    }
-
 private:
     std::vector<ShardStatistics> _clusterStats;
-
-    std::map<NamespaceString, std::vector<ShardStatistics>> _collStats;
 
     bool _forceErrorOnGetStats{false};
 

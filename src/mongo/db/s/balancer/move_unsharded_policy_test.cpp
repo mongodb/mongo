@@ -30,25 +30,17 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <cstddef>
-#include <cstdint>
-#include <map>
 #include <memory>
 #include <ostream>
 #include <set>
 #include <string>
-#include <system_error>
-#include <type_traits>
-#include <utility>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 #include "mongo/db/s/balancer/move_unsharded_policy.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -69,38 +61,6 @@ const int kSizeOnDisk = 1;
 class MoveUnshardedPolicyTest : public MigrationTestFixture {
 protected:
     MoveUnshardedPolicyTest() : _clusterStats(std::make_unique<ClusterStatisticsImpl>()) {}
-
-    /**
-     * Sets up mock network to expect a listDatabases command and returns a BSON response with
-     * a dummy sizeOnDisk.
-     */
-    void expectListDatabasesCommand() {
-        BSONObjBuilder resultBuilder;
-        CommandHelpers::appendCommandStatusNoThrow(resultBuilder, Status::OK());
-
-        onCommand([&resultBuilder](const RemoteCommandRequest& request) {
-            ASSERT(request.cmdObj["listDatabases"]);
-            std::vector<BSONObj> dbInfos;
-            BSONObjBuilder b;
-            b.append("name", kDbName.toString_forTest());
-            b.append("sizeOnDisk", kSizeOnDisk);
-            b.append("empty", kSizeOnDisk > 0);
-            resultBuilder.append("databases", dbInfos);
-            resultBuilder.append("totalSize", kSizeOnDisk);
-            return resultBuilder.obj();
-        });
-    }
-
-    /**
-     * Sets up mock network for all the shards to expect the commands executed for computing cluster
-     * stats, which include listDatabase and serverStatus.
-     */
-    void expectGetStatsCommands(int numShards) {
-        for (int i = 0; i < numShards; i++) {
-            expectListDatabasesCommand();
-        }
-    }
-
 
     std::vector<ClusterStatistics::ShardStatistics> getShardStats(OperationContext* opCtx) {
         return uassertStatusOK(_clusterStats.get()->getStats(opCtx));
@@ -140,19 +100,11 @@ TEST_F(MoveUnshardedPolicyTest, MigrateUnsplittableCollection) {
             kShardId0));
     }
 
-    auto future = launchAsync([&] {
-        ThreadClient tc(getServiceContext()->getService());
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        auto availableShards = getAllShardIds(opCtx.get());
-
-        const auto& migrateInfoVector = _unshardedPolicy.selectCollectionsToMove(
-            opCtx.get(), getShardStats(opCtx.get()), &availableShards);
-        ASSERT_EQ(1, migrateInfoVector.size());
-        ASSERT_EQ(collections[0].getUuid(), migrateInfoVector[0].uuid);
-    });
-
-    expectGetStatsCommands(2 /*numShards*/);
-    future.default_timed_get();
+    auto availableShards = getAllShardIds(operationContext());
+    const auto& migrateInfoVector = _unshardedPolicy.selectCollectionsToMove(
+        operationContext(), getShardStats(operationContext()), &availableShards);
+    ASSERT_EQ(1, migrateInfoVector.size());
+    ASSERT_EQ(collections[0].getUuid(), migrateInfoVector[0].uuid);
 }
 
 
@@ -200,21 +152,16 @@ TEST_F(MoveUnshardedPolicyTest, MigrateAnyCollectionFPOn) {
 
     int attemptsLeft = collectionsToCheck.size() * 50;
     while (!collectionsToCheck.empty() && attemptsLeft > 0) {
-        auto future = launchAsync([&] {
-            ThreadClient tc(getServiceContext()->getService());
-            auto opCtx = Client::getCurrent()->makeOperationContext();
-            auto availableShards = getAllShardIds(opCtx.get());
 
-            const auto& migrateInfoVector = _unshardedPolicy.selectCollectionsToMove(
-                opCtx.get(), getShardStats(opCtx.get()), &availableShards);
+        auto availableShards = getAllShardIds(operationContext());
 
-            ASSERT_EQ(1, migrateInfoVector.size());
-            std::cout << "Removing " << migrateInfoVector[0].nss.toString_forTest() << std::endl;
-            collectionsToCheck.erase(migrateInfoVector[0].nss);
-        });
+        const auto& migrateInfoVector = _unshardedPolicy.selectCollectionsToMove(
+            operationContext(), getShardStats(operationContext()), &availableShards);
 
-        expectGetStatsCommands(2 /*numShards*/);
-        future.default_timed_get();
+        ASSERT_EQ(1, migrateInfoVector.size());
+        std::cout << "Removing " << migrateInfoVector[0].nss.toString_forTest() << std::endl;
+        collectionsToCheck.erase(migrateInfoVector[0].nss);
+
         attemptsLeft--;
     }
     // If we fail here, the balancer is (with very high probability) not picking randomly

@@ -92,6 +92,11 @@ struct ShardSpec {
     std::set<std::string> shardZones;
 };
 
+struct ClusterStats {
+    ShardStatisticsVector shardStats;
+    ShardDataSizeMap shardDataSizeMap;
+};
+
 ShardId getShardId(size_t shardIdx) {
     return {std::string(str::stream() << "shard_" << shardIdx)};
 }
@@ -145,7 +150,7 @@ DistributionStatus makeDistStatus(const ChunkManager& cm, ZoneInfo zoneInfo = Zo
  *
  * [MinKey, 1), [1, 2), [2, 3) ... [N - 1, MaxKey)
  */
-std::pair<std::pair<ShardStatisticsVector, ShardToChunksMap>, ChunkManager> generateCluster(
+std::pair<std::pair<ClusterStats, ShardToChunksMap>, ChunkManager> generateCluster(
     const vector<ShardSpec>& shardsSpec) {
 
     const auto totalNumChunks = [&] {
@@ -158,7 +163,7 @@ std::pair<std::pair<ShardStatisticsVector, ShardToChunksMap>, ChunkManager> gene
 
     std::vector<ChunkType> chunks;
     ShardToChunksMap chunkMap;
-    ShardStatisticsVector shardStats;
+    ClusterStats clusterStats;
 
     size_t currentChunk{0};
 
@@ -190,46 +195,39 @@ std::pair<std::pair<ShardStatisticsVector, ShardToChunksMap>, ChunkManager> gene
             chunks.push_back(std::move(chunk));
         }
 
-        shardStats.emplace_back(shardId,
-                                shardSpec.currSizeBytes,
-                                shardSpec.isDraining,
-                                shardSpec.shardZones,
-                                ShardStatistics::use_bytes_t());
+        clusterStats.shardStats.emplace_back(
+            shardId, shardSpec.isDraining, std::set<std::string>(shardSpec.shardZones));
+        clusterStats.shardDataSizeMap[shardId] = shardSpec.currSizeBytes;
     }
 
-    return std::make_pair(std::make_pair(std::move(shardStats), std::move(chunkMap)),
+    return std::make_pair(std::make_pair(std::move(clusterStats), std::move(chunkMap)),
                           makeChunkManager(chunks));
 }
 
-stdx::unordered_set<ShardId> getAllShardIds(const ShardStatisticsVector& shardStats) {
+stdx::unordered_set<ShardId> getAllShardIds(const ClusterStats& clusterStats) {
     stdx::unordered_set<ShardId> shards;
-    std::transform(shardStats.begin(),
-                   shardStats.end(),
+    std::transform(clusterStats.shardStats.begin(),
+                   clusterStats.shardStats.end(),
                    std::inserter(shards, shards.end()),
                    [](const ShardStatistics& shardStatistics) { return shardStatistics.shardId; });
     return shards;
 }
 
 CollectionDataSizeInfoForBalancing buildDataSizeInfoForBalancingFromShardStats(
-    const ShardStatisticsVector& shardStats) {
-    std::map<ShardId, int64_t> collSizePerShard;
-    for (const auto& shard : shardStats) {
-        collSizePerShard.try_emplace(shard.shardId, shard.currSizeBytes);
-    }
-
-    return CollectionDataSizeInfoForBalancing(std::move(collSizePerShard),
+    const ClusterStats& clusterStats) {
+    return CollectionDataSizeInfoForBalancing(ShardDataSizeMap(clusterStats.shardDataSizeMap),
                                               kDefaultMaxChunkSizeBytes);
 }
 
-MigrateInfosWithReason balanceChunks(const ShardStatisticsVector& shardStats,
+MigrateInfosWithReason balanceChunks(const ClusterStats& clusterStats,
                                      const DistributionStatus& distribution,
                                      bool shouldAggressivelyBalance,
                                      bool forceJumbo) {
-    auto availableShards = getAllShardIds(shardStats);
+    auto availableShards = getAllShardIds(clusterStats);
 
-    return BalancerPolicy::balance(shardStats,
+    return BalancerPolicy::balance(clusterStats.shardStats,
                                    distribution,
-                                   buildDataSizeInfoForBalancingFromShardStats(shardStats),
+                                   buildDataSizeInfoForBalancingFromShardStats(clusterStats),
                                    &availableShards,
                                    forceJumbo);
 }
@@ -383,15 +381,15 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNe
                                           {0, 0 * kDefaultMaxChunkSizeBytes},
                                           {0, 0 * kDefaultMaxChunkSizeBytes}});
 
-    const auto& shardStats = cluster.first;
+    const auto& clusterStats = cluster.first;
 
     // Here getShardId(0) would have been selected as a donor
-    auto availableShards = getAllShardIds(shardStats);
+    auto availableShards = getAllShardIds(clusterStats);
     availableShards.erase(getShardId(0));
     const auto [migrations, reason] =
-        BalancerPolicy::balance(shardStats,
+        BalancerPolicy::balance(clusterStats.shardStats,
                                 makeDistStatus(cm),
-                                buildDataSizeInfoForBalancingFromShardStats(shardStats),
+                                buildDataSizeInfoForBalancingFromShardStats(clusterStats),
                                 &availableShards,
                                 false);
 
@@ -413,7 +411,7 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNo
     auto availableShards = getAllShardIds(cluster.first);
     availableShards.erase(getShardId(0));
     const auto [migrations, reason] =
-        BalancerPolicy::balance(cluster.first,
+        BalancerPolicy::balance(cluster.first.shardStats,
                                 makeDistStatus(cm),
                                 buildDataSizeInfoForBalancingFromShardStats(cluster.first),
                                 &availableShards,
@@ -431,7 +429,7 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseDestinationShards) {
     auto availableShards = getAllShardIds(cluster.first);
     availableShards.erase(getShardId(2));
     const auto [migrations, reason] =
-        BalancerPolicy::balance(cluster.first,
+        BalancerPolicy::balance(cluster.first.shardStats,
                                 makeDistStatus(cm),
                                 buildDataSizeInfoForBalancingFromShardStats(cluster.first),
                                 &availableShards,
@@ -1062,7 +1060,7 @@ TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleZonesSkipZoneWithShardI
     auto availableShards = getAllShardIds(cluster.first);
     availableShards.erase(getShardId(1));
     const auto [migrations, reason] =
-        BalancerPolicy::balance(cluster.first,
+        BalancerPolicy::balance(cluster.first.shardStats,
                                 distribution,
                                 buildDataSizeInfoForBalancingFromShardStats(cluster.first),
                                 &availableShards,

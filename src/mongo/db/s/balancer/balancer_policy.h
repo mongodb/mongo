@@ -47,7 +47,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
@@ -56,10 +55,10 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/request_types/get_stats_for_balancing_gen.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -231,17 +230,29 @@ typedef std::variant<Status, StatusWith<DataSizeResponse>, StatusWith<NumMergedC
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef StringMap<StringMap<ShardZoneInfo>> ShardZoneInfoMap;
 
+using ShardDataSizeMap = std::map<ShardId, int64_t>;
+using NamespaceStringToShardDataSizeMap = stdx::unordered_map<NamespaceString, ShardDataSizeMap>;
 /*
  * Keeps track of info needed for data size aware balancing.
  */
 struct CollectionDataSizeInfoForBalancing {
-    CollectionDataSizeInfoForBalancing(std::map<ShardId, int64_t>&& shardToDataSizeMap,
+    CollectionDataSizeInfoForBalancing(ShardDataSizeMap&& shardToDataSizeMap,
                                        long maxChunkSizeBytes)
         : shardToDataSizeMap(std::move(shardToDataSizeMap)), maxChunkSizeBytes(maxChunkSizeBytes) {}
 
-    std::map<ShardId, int64_t> shardToDataSizeMap;
+    ShardDataSizeMap shardToDataSizeMap;
     const int64_t maxChunkSizeBytes;
 };
+
+NamespaceStringToShardDataSizeMap getStatsForBalancing(
+    OperationContext* opCtx,
+    const std::vector<ShardId>& shardIds,
+    const std::vector<NamespaceWithOptionalUUID>& namespacesWithUUIDsForStatsRequest);
+
+ShardDataSizeMap getStatsForBalancing(
+    OperationContext* opCtx,
+    const std::vector<ShardId>& shardIds,
+    const NamespaceWithOptionalUUID& namespaceWithUUIDsForStatsRequest);
 
 /**
  * Keeps track of zones for a collection.

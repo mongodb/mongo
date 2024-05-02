@@ -36,7 +36,6 @@
 #include <limits>
 #include <memory>
 #include <random>
-#include <type_traits>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -51,6 +50,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -58,6 +58,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
@@ -956,5 +957,62 @@ DataSizeInfo::DataSizeInfo(const ShardId& shardId,
       keyPattern(keyPattern),
       estimatedValue(estimatedValue),
       maxSize(maxSize) {}
+
+NamespaceStringToShardDataSizeMap getStatsForBalancing(
+    OperationContext* opCtx,
+    const std::vector<ShardId>& shardIds,
+    const std::vector<NamespaceWithOptionalUUID>& namespacesWithUUIDsForStatsRequest) {
+
+    ShardsvrGetStatsForBalancing req{namespacesWithUUIDsForStatsRequest};
+    req.setScaleFactor(1);
+    const auto reqObj = req.toBSON({});
+
+    const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto responsesFromShards = sharding_util::sendCommandToShards(
+        opCtx, DatabaseName::kAdmin, reqObj, shardIds, executor, false /* throwOnError */);
+
+    using namespace fmt::literals;
+    NamespaceStringToShardDataSizeMap namespaceToShardDataSize;
+    for (auto&& response : responsesFromShards) {
+        try {
+            const auto& shardId = response.shardId;
+            auto errorContext =
+                "Failed to get stats for balancing from shard '{}'"_format(shardId.toString());
+            const auto responseValue =
+                uassertStatusOKWithContext(std::move(response.swResponse), errorContext);
+
+            const ShardsvrGetStatsForBalancingReply reply =
+                ShardsvrGetStatsForBalancingReply::parse(
+                    IDLParserContext("ShardsvrGetStatsForBalancingReply"), responseValue.data);
+            const auto collStatsFromShard = reply.getStats();
+
+            tassert(8245200,
+                    "Collection count mismatch",
+                    collStatsFromShard.size() == namespacesWithUUIDsForStatsRequest.size());
+
+            for (const auto& stats : collStatsFromShard) {
+                namespaceToShardDataSize[stats.getNs()][shardId] = stats.getCollSize();
+            }
+        } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& ex) {
+            // Handle `removeShard`: skip shards removed during a balancing round
+            LOGV2_DEBUG(6581603,
+                        1,
+                        "Skipping shard for the current balancing round",
+                        "error"_attr = redact(ex));
+        }
+    }
+    return namespaceToShardDataSize;
+}
+
+ShardDataSizeMap getStatsForBalancing(
+    OperationContext* opCtx,
+    const std::vector<ShardId>& shardIds,
+    const NamespaceWithOptionalUUID& namespaceWithUUIDsForStatsRequest) {
+    return getStatsForBalancing(
+               opCtx,
+               shardIds,
+               std::vector<NamespaceWithOptionalUUID>{namespaceWithUUIDsForStatsRequest})
+        .at(namespaceWithUUIDsForStatsRequest.getNs());
+}
 
 }  // namespace mongo

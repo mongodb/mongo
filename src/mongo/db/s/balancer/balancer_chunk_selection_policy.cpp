@@ -152,44 +152,12 @@ getDataSizeInfoForCollections(OperationContext* opCtx,
         namespacesWithUUIDsForStatsRequest.push_back(nssWithUUID);
     }
 
-    ShardsvrGetStatsForBalancing req{namespacesWithUUIDsForStatsRequest};
-    req.setScaleFactor(1);
-    const auto reqObj = req.toBSON({});
-
-    const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    auto responsesFromShards = sharding_util::sendCommandToShards(
-        opCtx, DatabaseName::kAdmin, reqObj, shardIds, executor, false /* throwOnError */);
-
-    using namespace fmt::literals;
-    for (auto&& response : responsesFromShards) {
-        try {
-            const auto& shardId = response.shardId;
-            auto errorContext =
-                "Failed to get stats for balancing from shard '{}'"_format(shardId.toString());
-            const auto responseValue =
-                uassertStatusOKWithContext(std::move(response.swResponse), errorContext);
-
-            const ShardsvrGetStatsForBalancingReply reply =
-                ShardsvrGetStatsForBalancingReply::parse(
-                    IDLParserContext("ShardsvrGetStatsForBalancingReply"), responseValue.data);
-            const auto collStatsFromShard = reply.getStats();
-
-            tassert(8245200,
-                    "Collection count mismatch",
-                    collStatsFromShard.size() == collections.size());
-            for (const auto& stats : collStatsFromShard) {
-                tassert(8245201, "Namespace not found", dataSizeInfoMap.contains(stats.getNs()));
-                dataSizeInfoMap.at(stats.getNs()).shardToDataSizeMap[shardId] = stats.getCollSize();
-            }
-        } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& ex) {
-            // Handle `removeShard`: skip shards removed during a balancing round
-            LOGV2_DEBUG(6581603,
-                        1,
-                        "Skipping shard for the current balancing round",
-                        "error"_attr = redact(ex));
-        }
+    auto namespaceToShardDataSize =
+        getStatsForBalancing(opCtx, shardIds, namespacesWithUUIDsForStatsRequest);
+    for (auto& [ns, shardDataSizeMap] : namespaceToShardDataSize) {
+        tassert(8245201, "Namespace not found", dataSizeInfoMap.contains(ns));
+        dataSizeInfoMap.at(ns).shardToDataSizeMap = std::move(shardDataSizeMap);
     }
-
     return dataSizeInfoMap;
 }
 

@@ -35,16 +35,13 @@
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <compare>
 #include <cstddef>
 #include <fmt/format.h>
 #include <iterator>
 #include <limits>
 #include <list>
 #include <map>
-#include <mutex>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -453,11 +450,25 @@ public:
         const CollectionType& coll,
         std::vector<ShardStatistics>&& collectionShardStats) {
         auto collectionZones = getCollectionZones(opCtx, coll);
+        auto shardDataSizeMap = [&]() {
+            NamespaceWithOptionalUUID nsWithUUID = coll.getNss();
+            nsWithUUID.setUUID(coll.getUuid());
+
+            std::vector<ShardId> shardIds;
+            shardIds.reserve(collectionShardStats.size());
+            std::transform(
+                collectionShardStats.begin(),
+                collectionShardStats.end(),
+                std::back_inserter(shardIds),
+                [](const ShardStatistics& shardStatistics) { return shardStatistics.shardId; });
+            return getStatsForBalancing(opCtx, shardIds, nsWithUUID);
+        }();
 
         stdx::unordered_map<ShardId, ShardInfo> shardInfos;
         for (const auto& shardStats : collectionShardStats) {
-            shardInfos.emplace(shardStats.shardId,
-                               ShardInfo(shardStats.currSizeBytes, shardStats.isDraining));
+            shardInfos.emplace(
+                shardStats.shardId,
+                ShardInfo(shardDataSizeMap[shardStats.shardId], shardStats.isDraining));
         }
 
         auto collectionChunks = getCollectionChunks(opCtx, coll);
@@ -1522,8 +1533,7 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicy::_transition
                 nextPhaseObject = MergeAndMeasureChunksPhase::build(opCtx, coll);
                 break;
             case DefragmentationPhaseEnum::kMoveAndMergeChunks: {
-                auto collectionShardStats =
-                    uassertStatusOK(_clusterStats->getCollStats(opCtx, coll.getNss()));
+                auto collectionShardStats = uassertStatusOK(_clusterStats->getStats(opCtx));
                 nextPhaseObject =
                     MoveAndMergeChunksPhase::build(opCtx, coll, std::move(collectionShardStats));
             } break;

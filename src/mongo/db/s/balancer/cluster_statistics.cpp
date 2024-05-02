@@ -27,19 +27,9 @@
  *    it in the license file.
  */
 
-#include <limits>
 #include <utility>
 
 #include "mongo/db/s/balancer/cluster_statistics.h"
-
-namespace {
-uint64_t convertMBToBytes(uint64_t inMB) {
-    if (inMB > std::numeric_limits<uint64_t>::max() / (1024 * 1024)) {
-        return std::numeric_limits<uint64_t>::max();
-    }
-    return inMB * 1024 * 1024;
-}
-}  // namespace
 
 namespace mongo {
 
@@ -48,23 +38,9 @@ ClusterStatistics::ClusterStatistics() = default;
 ClusterStatistics::~ClusterStatistics() = default;
 
 ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
-                                                    uint64_t inCurrSizeBytes,
-                                                    bool inIsDraining,
-                                                    std::set<std::string> inShardZones,
-                                                    use_bytes_t t)
-    : shardId(std::move(inShardId)),
-      currSizeBytes(inCurrSizeBytes),
-      isDraining(inIsDraining),
-      shardZones(std::move(inShardZones)) {}
-
-ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
-                                                    uint64_t inCurrSizeMB,
                                                     bool inIsDraining,
                                                     std::set<std::string> inShardZones)
-    : ShardStatistics(inShardId,
-                      convertMBToBytes(inCurrSizeMB),
-                      inIsDraining,
-                      std::move(inShardZones),
-                      use_bytes_t{}) {}
-
+    : shardId(std::move(inShardId)),
+      isDraining(inIsDraining),
+      shardZones(std::move(inShardZones)) {}
 }  // namespace mongo

@@ -59,26 +59,10 @@ public:
      */
     struct ShardStatistics {
     public:
-        // hack so we do not accidentally miss code using MB
-        struct use_bytes_t {
-            explicit use_bytes_t() = default;
-        };
-        ShardStatistics(ShardId shardId,
-                        uint64_t currSizeBytes,
-                        bool isDraining,
-                        std::set<std::string> shardZones,
-                        use_bytes_t t);
-
-        ShardStatistics(ShardId shardId,
-                        uint64_t currSizeMB,
-                        bool isDraining,
-                        std::set<std::string> shardZones);
+        ShardStatistics(ShardId shardId, bool isDraining, std::set<std::string> shardZones);
 
         // The id of the shard for which this statistic applies
         ShardId shardId;
-
-        // The current storage size of the shard.
-        uint64_t currSizeBytes{0};
 
         // Whether the shard is in draining mode
         bool isDraining{false};
@@ -86,17 +70,13 @@ public:
         // Set of zones for the shard
         std::set<std::string> shardZones;
     };
-
     virtual ~ClusterStatistics();
 
     /**
-     * Retrieves a snapshot of the current shard utilization state. The implementation of this
+     * Retrieves a snapshot of the current state of the shards. The implementation of this
      * method may block if necessary in order to refresh its state or may return a cached value.
      */
     virtual StatusWith<std::vector<ShardStatistics>> getStats(OperationContext* opCtx) = 0;
-
-    virtual StatusWith<std::vector<ShardStatistics>> getCollStats(OperationContext* opCtx,
-                                                                  NamespaceString const& ns) = 0;
 
 protected:
     ClusterStatistics();
