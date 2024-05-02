@@ -4,8 +4,6 @@
  *
  * @tags: [
  *   multiversion_incompatible,
- *   # TODO: SERVER-88739 Remove this and handle stepdowns.
- *   does_not_support_stepdowns,
  *   requires_replication,
  *   requires_persistence,
  * ]
