@@ -363,7 +363,7 @@ Libraries are added to these variables as lists per each SCons builder instance 
 
 #### The `LIBDEPS` lint rules and tags
 
-The libdeps subsystem is capable of linting and automatically detecting issues. Some of these linting rules are automatically checked during build-time (while the SConscripts are read and the build is performed) while others need to be manually run post-build (after the the generated graph file has been built). Some rules will include exemption tags which can be added to a libraries `LIBDEPS_TAGS` to override a rule for that library.
+The libdeps subsystem is capable of linting and automatically detecting issues. Some of these linting rules are automatically checked during build-time (while the SConscripts are read and the build is performed) while others need to be manually run post-build (after the generated graph file has been built). Some rules will include exemption tags which can be added to a libraries `LIBDEPS_TAGS` to override a rule for that library.
 
 The build-time linter also has a print option `--libdeps-linting=print` which will print all issues without failing the build and ignoring exemption tags. This is useful for getting an idea of what issues are currently outstanding.
 
