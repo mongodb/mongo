@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -51,6 +52,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
@@ -114,6 +116,14 @@ public:
                 uassert(ErrorCodes::IllegalOperation,
                         "Can't move an internal resharding collection",
                         !ns().isTemporaryReshardingCollection());
+
+                FixedFCVRegion fixedFcvRegion{opCtx};
+                bool isReshardingForTimeseriesEnabled =
+                    mongo::resharding::gFeatureFlagReshardingForTimeseries.isEnabled(
+                        fixedFcvRegion->acquireFCVSnapshot());
+                uassert(ErrorCodes::IllegalOperation,
+                        "Can't move a timeseries collection",
+                        !ns().isTimeseriesBucketsCollection() || isReshardingForTimeseriesEnabled);
 
                 // TODO (SERVER-88623): re-evalutate the need to track the collection before calling
                 // into moveCollection
