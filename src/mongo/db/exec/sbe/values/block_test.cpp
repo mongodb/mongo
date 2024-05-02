@@ -38,6 +38,7 @@
 #include "mongo/db/exec/sbe/values/ts_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/itoa.h"
@@ -133,9 +134,18 @@ public:
         // First run the tests using the direct BSON implementation for extracting paths.
         base->run();
 
-        // Then run the tests with the time series implementation.
+        // Now run the tests with time series implementation, using all permutations of both block
+        // and path-based block decoding feature flags.
         useTsImpl = true;
-        base->run();
+        for (bool enableBlockDecoding : {false, true}) {
+            for (bool enablePathBasedBlockDecoding : {false, true}) {
+                RAIIServerParameterControllerForTest blockController(
+                    "featureFlagBlockBasedDecodingScalarAPI", enableBlockDecoding);
+                RAIIServerParameterControllerForTest pathController(
+                    "featureFlagBlockBasedDecodingPathAPI", enablePathBasedBlockDecoding);
+                base->run();
+            }
+        }
     }
 
     std::pair<std::vector<std::unique_ptr<value::TsBlock>>,
@@ -147,6 +157,13 @@ public:
             // Shred the bsons here, produce a time series "bucket"-like thing, and pass it to the
             // TS decoding implementation.
             StringMap<std::unique_ptr<BSONColumnBuilder<>>> shredMap;
+            StringMap<std::pair<BSONElement, BSONElement>> minMaxMap;
+
+            SimpleStringDataComparator strCmpor;
+            BSONElementComparator cmpor{BSONElementComparator::FieldNamesMode::kIgnore, &strCmpor};
+            auto bsonCmp = [&cmpor](BSONElement a, BSONElement b) {
+                return cmpor.evaluate(a < b);
+            };
 
             size_t bsonIdx = 0;
             for (auto&& bson : bsons) {
@@ -166,6 +183,13 @@ public:
 
                     it->second->append(elt);
                     fieldsVisited.insert(elt.fieldNameStringData());
+
+                    if (auto&& it = minMaxMap.find(elt.fieldName()); it != minMaxMap.end()) {
+                        it->second.first = std::min(it->second.first, elt, bsonCmp);
+                        it->second.second = std::max(it->second.first, elt, bsonCmp);
+                    } else {
+                        minMaxMap.insert({elt.fieldName(), {elt, elt}});
+                    }
                 }
 
                 // Fill in missings for fields not present in this document.
@@ -183,14 +207,23 @@ public:
                 dataFieldBuilder.append(fieldName, builder->finalize());
             }
 
+            BSONObjBuilder controlMinBuilder, controlMaxBuilder;
+            for (auto& [_, minMax] : minMaxMap) {
+                controlMinBuilder.append(minMax.first);
+                controlMaxBuilder.append(minMax.second);
+            }
+
             // Store the bucket into a member variable so that the memory remains valid for the
             // rest of the test.
             _bucketStorage =
                 BSON(timeseries::kBucketControlFieldName
-                     << BSON(timeseries::kBucketControlCountFieldName << (long long)bsons.size())
+                     << BSON(timeseries::kBucketControlCountFieldName
+                             << (long long)bsons.size() << timeseries::kBucketControlMinFieldName
+                             << controlMinBuilder.obj() << timeseries::kBucketControlMaxFieldName
+                             << controlMaxBuilder.obj())
                      << timeseries::kBucketDataFieldName << dataFieldBuilder.obj());
-            // Now call into the time series extractor.
 
+            // Now call into the time series extractor.
             value::TsBucketPathExtractor extractor(paths, "time");
             auto [n, storageBlocks, cellBlocks] = extractor.extractCellBlocks(_bucketStorage);
             return {std::move(storageBlocks), std::move(cellBlocks)};
@@ -200,7 +233,9 @@ public:
         }
     }
 
-    void testPaths(const std::vector<PathTestCase>& testCases, const std::vector<BSONObj>& bsons);
+    void testPaths(const std::vector<PathTestCase>& testCases,
+                   const std::vector<BSONObj>& bsons,
+                   bool skipProjectPath = false);
 
 private:
     BSONObj _bucketStorage;
@@ -209,24 +244,26 @@ private:
 };
 
 void BsonBlockDecodingTest::testPaths(const std::vector<PathTestCase>& testCases,
-                                      const std::vector<BSONObj>& bsons) {
+                                      const std::vector<BSONObj>& bsons,
+                                      bool skipProjectPath) {
     std::vector<value::CellBlock::PathRequest> pathReqs;
     for (auto& tc : testCases) {
         pathReqs.push_back(
             value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter, tc.path));
-        pathReqs.push_back(
-            value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kProject, tc.path));
+
+        if (!skipProjectPath) {
+            pathReqs.push_back(value::CellBlock::PathRequest(
+                value::CellBlock::PathRequestType::kProject, tc.path));
+        }
     }
 
     auto [tsBlocks, cellBlocks] = extractCellBlocks(pathReqs, bsons);
     ASSERT_EQ(cellBlocks.size(), pathReqs.size());
 
     size_t idx = 0;
+    const size_t step = skipProjectPath ? 1 : 2;
     for (auto& tc : testCases) {
-        // const auto filterIdx = idx;
-
-        const auto filterIdx = idx * 2;
-        const auto projectIdx = idx * 2 + 1;
+        const auto filterIdx = idx * step;
 
         auto& valsOut = cellBlocks[filterIdx]->getValueBlock();
         auto numObj = blockToBsonArr(valsOut);
@@ -240,11 +277,14 @@ void BsonBlockDecodingTest::testPaths(const std::vector<PathTestCase>& testCases
             << posInfoToString(cellBlocks[filterIdx]->filterPositionInfo())
             << " == " << posInfoToString(tc.filterPosInfo);
 
-
-        auto projectValues = blockToBsonArr(cellBlocks[projectIdx]->getValueBlock());
-        ASSERT_TRUE(SimpleBSONObjComparator::kInstance.evaluate(projectValues == tc.projectValues))
-            << "Incorrect values for project path " << pathReqs[projectIdx].toString() << " got "
-            << projectValues << " expected " << tc.projectValues;
+        if (!skipProjectPath) {
+            const auto projectIdx = idx * step + 1;
+            auto projectValues = blockToBsonArr(cellBlocks[projectIdx]->getValueBlock());
+            ASSERT_TRUE(
+                SimpleBSONObjComparator::kInstance.evaluate(projectValues == tc.projectValues))
+                << "Incorrect values for project path " << pathReqs[projectIdx].toString()
+                << " got " << projectValues << " expected " << tc.projectValues;
+        }
 
         ++idx;
     }
@@ -301,17 +341,17 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockMissings) {
 
 TEST_F(BsonBlockDecodingTest, BSONDocumentBlockGetTraverse) {
     std::vector<BSONObj> bsons{
-        fromjson("{a:1, b:1}"),
-        fromjson("{a:2, b:2}"),
-        fromjson("{a:[3,4,[999]], b:2}"),
-        fromjson("{a:5, b:2}"),
+        fromjson("{a:[1,2,[3]], b:1}"),
+        fromjson("{a:[4,5,[6]], b:2}"),
+        fromjson("{a:[7,8,[999]], b:2}"),
+        fromjson("{a:[10, 11, [12]], b:2}"),
     };
 
-    std::vector<PathTestCase> tests{
-        PathTestCase{.path = {Get{"a"}, Traverse{}, Id{}},
-                     .filterValues = fromjson("{result: [1,2,3,4,[999], 5]}"),
-                     .filterPosInfo = {1, 1, 3, 1},
-                     .projectValues = fromjson("{result: [1,2,[3,4,[999]], 5]}")}};
+    std::vector<PathTestCase> tests{PathTestCase{
+        .path = {Get{"a"}, Traverse{}, Id{}},
+        .filterValues = fromjson("{result: [1,2,[3],4,5,[6],7,8,[999],10,11,[12]]}"),
+        .filterPosInfo = {3, 3, 3, 3},
+        .projectValues = fromjson("{result:[[1,2,[3]],[4,5,[6]],[7,8,[999]],[10,11,[12]]]}")}};
     testPaths(tests, bsons);
 }
 
@@ -471,6 +511,187 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockFieldDoesNotExist) {
                      .filterPosInfo = {1, 1, 1, 4},
                      .projectValues = fromjson("{result: [1, [], [], [[4, 5], [], [6, 7]]]}")}};
     testPaths(tests, bsons);
+}
+
+TEST_F(BsonBlockDecodingTest, PathBasedDecompressionBasic) {
+    std::vector<BSONObj> bsons{
+        fromjson("{a: {b: 0, c: 10}}"),
+        fromjson("{a: {b: 1, c: 20}}"),
+        fromjson("{a: {b: 2, c: 30}}"),
+        fromjson("{a: {b: 3, c: 40}}"),
+    };
+
+    // These test cases can use path-based decompression (when the feature flag is enabled) for both
+    // the filter paths and the project paths since the bsons contain no arrays.
+    std::vector<PathTestCase> tests{
+        PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Traverse{}, Id{}},
+                     .filterValues = fromjson("{result: [0, 1, 2, 3]}"),
+                     .filterPosInfo = {1, 1, 1, 1},
+                     .projectValues = fromjson("{result: [0, 1, 2, 3]}")},
+        PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"c"}, Traverse{}, Id{}},
+                     .filterValues = fromjson("{result: [10, 20, 30, 40]}"),
+                     .filterPosInfo = {1, 1, 1, 1},
+                     .projectValues = fromjson("{result: [10, 20, 30, 40]}")},
+        PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"d"}, Traverse{}, Id{}},
+                     .filterValues = fromjson("{result: [null, null, null, null]}"),
+                     .filterPosInfo = {1, 1, 1, 1},
+                     .projectValues = fromjson("{result: [null, null, null, null]}")}};
+    testPaths(tests, bsons);
+}
+
+TEST_F(BsonBlockDecodingTest, PathBasedDecompressionOneElementArrays) {
+    std::vector<BSONObj> bsons{
+        fromjson("{a: {b: 0, c: [10]}}"),
+        fromjson("{a: {b: 1, c: [20]}}"),
+        fromjson("{a: {b: 2, c: [30]}}"),
+        fromjson("{a: {b: 3, c: [40]}}"),
+    };
+
+    // In these tests, traversing "c" is interesting:
+    //   - If we omit the project paths, then we can use fast path-based decompression for the
+    //     filter paths.
+    //   - If we don't omit the projects, we need to use the normal (slow) path and won't use
+    //     path-based decompression at all, since we need to decompress and shred the whole column
+    //     anyways.
+    // Therefore, we run the tests with and wihtout skipping the project paths, below.
+    std::vector<PathTestCase> tests{
+        PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Traverse{}, Id{}},
+                     .filterValues = fromjson("{result: [0, 1, 2, 3]}"),
+                     .filterPosInfo = {1, 1, 1, 1},
+                     .projectValues = fromjson("{result: [0, 1, 2, 3]}")},
+        PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"c"}, Traverse{}, Id{}},
+                     .filterValues = fromjson("{result: [10, 20, 30, 40]}"),
+                     .filterPosInfo = {1, 1, 1, 1},
+                     .projectValues = fromjson("{result: [[10], [20], [30], [40]]}")}};
+    testPaths(tests, bsons);
+    testPaths(tests, bsons, true /* skip project paths */);
+}
+
+TEST_F(BsonBlockDecodingTest, PathBasedDecompressionDoublyNestedArrays) {
+    std::vector<BSONObj> bsons{
+        fromjson("{a: [{b: [[3]], c: 4}]}"),
+        fromjson("{a: [{b: [[30]], c: 5}]}"),
+        fromjson("{a: [{b: [[300]], c: 6}]}"),
+        fromjson("{a: [{b: [[3000]], c: 7}]}"),
+    };
+
+    std::vector<PathTestCase> tests{
+        PathTestCase{
+            .path = {Get{"a"}, Traverse{}, Get{"b"}, Traverse{}, Id{}},
+            .filterValues = fromjson("{result: [[3], [30], [300], [3000]]}"),
+            .filterPosInfo = {1, 1, 1, 1},
+            .projectValues = fromjson("{result: [[[[3]]], [[[30]]], [[[300]]], [[[3000]]]]}"),
+        },
+    };
+
+    testPaths(tests, bsons);
+    testPaths(tests, bsons, true /* skip project paths */);
+}
+
+TEST_F(BsonBlockDecodingTest, PathBasedDecompressionEmptyObject) {
+    // Include different combinations of missing elements, empty objects, and objects with empty
+    // sub-objects.
+    std::vector<BSONObj> bsons{
+        fromjson("{}"),                      // 0
+        fromjson("{tlf: {}}"),               // 1
+        fromjson("{}"),                      // 2
+        fromjson("{tlf: {a: 100, b: {}}}"),  // 3
+        fromjson("{tlf: {a: 200, b: {}}}"),  // 4
+        fromjson("{}"),                      // 5
+        fromjson("{tlf: {a: 300, b: {}}}"),  // 6
+        fromjson("{tlf: {a: 400, b: {}}}"),  // 7
+        fromjson("{}"),                      // 8
+        fromjson("{tlf: {}}"),               // 9
+        fromjson("{}"),                      // 10
+    };
+
+    // Test the paths for the root of 'tlf', the scalars at 'a' and the empty objects at 'b'.
+    std::vector<PathTestCase> tests{
+        PathTestCase{.path = {Get{"tlf"}, Traverse{}, Id{}},
+                     .filterValues = fromjson("{result: ["
+                                              "null, {}, null, "
+                                              "{a: 100, b: {}}, {a: 200, b: {}}, "
+                                              "null, "
+                                              "{a: 300, b: {}}, {a: 400, b: {}}, "
+                                              "null, {}, null"
+                                              "]}"),
+                     .filterPosInfo = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+                     .projectValues = fromjson("{result: ["
+                                               "null, {}, null, "
+                                               "{a: 100, b: {}}, {a: 200, b: {}}, "
+                                               "null, "
+                                               "{a: 300, b: {}}, {a: 400, b: {}}, "
+                                               "null, {}, null"
+                                               "]}")},
+        PathTestCase{.path = {Get{"tlf"}, Traverse{}, Get{"a"}, Traverse{}, Id{}},
+                     .filterValues = fromjson("{result: ["
+                                              "null, null, null, "
+                                              "100, 200, "
+                                              "null, "
+                                              "300, 400, "
+                                              "null, null, null"
+                                              "]}"),
+                     .filterPosInfo = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+                     .projectValues = fromjson("{result: ["
+                                               "null, null, null, "
+                                               "100, 200, "
+                                               "null, "
+                                               "300, 400, "
+                                               "null, null, null"
+                                               "]}")},
+        PathTestCase{.path = {Get{"tlf"}, Traverse{}, Get{"b"}, Traverse{}, Id{}},
+                     .filterValues = fromjson("{result: ["
+                                              "null, null, null, "
+                                              "{}, {}, "
+                                              "null, "
+                                              "{}, {}, "
+                                              "null, null, null"
+                                              "]}"),
+                     .filterPosInfo = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+                     .projectValues = fromjson("{result: ["
+                                               "null, null, null, "
+                                               "{}, {}, "
+                                               "null, "
+                                               "{}, {}, "
+                                               "null, null, null"
+                                               "]}")},
+    };
+    // Test each path separately so that we get as much coverage for path-based decompression as
+    // possible.
+    for (const PathTestCase& tc : tests) {
+        testPaths({tc}, bsons);
+        testPaths({tc}, bsons, true /* skip project paths */);
+    }
+}
+
+TEST_F(BsonBlockDecodingTest, PathBasedDecompressionOneBadPath) {
+    std::vector<BSONObj> bsons{
+        fromjson("{a: {b: [{c: 10}], d: {e: [20, 30]}}}"),
+        fromjson("{a: {b: [{c: 11}], d: {e: [21, 31]}}}"),
+        fromjson("{a: {b: [{c: 12}], d: {e: [22, 32]}}}"),
+        fromjson("{a: {b: [{c: 13}], d: {e: [23, 33]}}}"),
+    };
+
+    // This tests the case where one path can use path-based decompression (the first), but the
+    // second cannot because it needs to get interleaved elements from two scalar streams. In this
+    // case we don't use path-based compression since we need to decompress and shred the whole
+    // BSONColumn anyways.
+    std::vector<PathTestCase> tests{
+        PathTestCase{
+            .path = {Get{"a"}, Traverse{}, Get{"b"}, Traverse{}, Get{"c"}, Traverse{}, Id{}},
+            .filterValues = fromjson("{result: [10, 11, 12, 13]}"),
+            .filterPosInfo = {1, 1, 1, 1},
+            .projectValues = fromjson("{result: [[10], [11], [12], [13]]}")},
+        PathTestCase{
+            .path = {Get{"a"}, Traverse{}, Get{"d"}, Traverse{}, Get{"e"}, Traverse{}, Id{}},
+            .filterValues = fromjson("{result: [20, 30, 21, 31, 22, 32, 23, 33]}"),
+            .filterPosInfo = {2, 2, 2, 2},
+            .projectValues = fromjson("{result: [[20, 30], [21, 31], [22, 32], [23, 33]]}")},
+    };
+    testPaths(tests, bsons);
+    // Path-based decompression not applied even when only extracting filter paths because of the
+    // array traversal in the second path.
+    testPaths(tests, bsons, true /* skip project paths */);
 }
 
 class ValueBlockTest : public mongo::unittest::Test {

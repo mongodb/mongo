@@ -767,36 +767,63 @@ public:
     static void verifyDecompressPathFast(BSONBinData columnBinary,
                                          const std::vector<BSONElement>& expected,
                                          TestPath path) {
-        std::vector<BSONElement> vec0;
+        std::vector<TestPath> testPaths{path};
+        verifyDecompressPathFast(columnBinary, expected, testPaths);
+    }
+
+    static void verifyDecompressPathFast(BSONBinData columnBinary,
+                                         const std::vector<BSONElement>& expected,
+                                         std::span<TestPath> paths) {
+        std::vector<std::vector<BSONElement>> vecs;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths;
+        vecs.reserve(paths.size());
+        testPaths.reserve(paths.size());
+        for (const auto& p : paths) {
+            vecs.emplace_back();
+            testPaths.emplace_back(p, vecs.back());
+        }
+
         boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
         BSONColumnBlockBased c((const char*)columnBinary.data, columnBinary.length);
 
-        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths{{path, vec0}};
         c.decompress<BSONElementMaterializer>(allocator, std::span(testPaths));
 
-        ASSERT_EQ(vec0.size(), expected.size());
+        for (auto&& vec : vecs) {
+            ASSERT_EQ(vec.size(), expected.size());
+        }
+
         // Each result is a BSONElement at the end of a path
         // Each expected is a root level object
         // Check result matches where path points to in expected
-        for (size_t i = 0; i < vec0.size(); ++i) {
-            BSONObj obj = expected[i].Obj();
-            for (auto iter = path._fields.begin(); iter != path._fields.end();) {
-                auto elem = obj[*iter];
-                iter++;
-                if (elem.eoo()) {
-                    // Path failed to resolve in expected, result should be missing
-                    ASSERT_TRUE(vec0[i].eoo());
-                    break;
+        size_t pathIdx = 0;
+        for (auto&& path : paths) {
+            auto&& vec = vecs[pathIdx];
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (expected[i].eoo()) {
+                    ASSERT_TRUE(vec[i].eoo());
+                    continue;
                 }
-                if (iter == path._fields.end()) {
-                    // Path resolved in expected, result should match
-                    ASSERT_TRUE(vec0[i].binaryEqualValues(elem));
-                } else {
-                    // Path is ongoing, expected should not have found a leaf
-                    ASSERT_EQ(elem.type(), Object);
-                    obj = elem.Obj();
+
+                BSONObj obj = expected[i].Obj();
+                for (auto iter = path._fields.begin(); iter != path._fields.end();) {
+                    auto elem = obj[*iter];
+                    iter++;
+                    if (elem.eoo()) {
+                        // Path failed to resolve in expected, result should be missing
+                        ASSERT_TRUE(vec[i].eoo());
+                        break;
+                    }
+                    if (iter == path._fields.end()) {
+                        // Path resolved in expected, result should match
+                        ASSERT_TRUE(vec[i].binaryEqualValues(elem));
+                    } else {
+                        // Path is ongoing, expected should not have found a leaf
+                        ASSERT_EQ(elem.type(), Object);
+                        obj = elem.Obj();
+                    }
                 }
             }
+            ++pathIdx;
         }
     }
 
@@ -8436,6 +8463,151 @@ TEST_F(BSONColumnTest, DecompressPathFastNestedScalarsLargeDeltas) {
 
     TestPath testPath{{"a", "b", "c"}};
     verifyDecompressPathFast(binData, elems, testPath);
+}
+
+TEST_F(BSONColumnTest, DecompressPathFastDuplicatePaths) {
+    BSONColumnBuilder cb;
+
+    std::vector<BSONElement> values = {
+        createElementInt64(0),
+        createElementInt64(10),
+        createElementInt64(20),
+        createElementInt64(30),
+        createElementInt64(40),
+        createElementInt64(50),
+        createElementInt64(60),
+        createElementInt64(70),
+    };
+    std::vector<BSONElement> elems;
+
+    for (size_t i = 0; i < values.size(); i += 2) {
+        auto elem = createElementObj(BSON("a" << values[i] << "b" << values[i + 1]));
+        elems.push_back(elem);
+        cb.append(elem);
+    }
+
+    auto binData = cb.finalize();
+    verifyDecompression(binData, elems);
+
+    // Test that we can decompress duplicate paths that refer to the same element.
+    std::vector<TestPath> testPaths{TestPath{{"b"}}, TestPath{{"b"}}};
+    verifyDecompressPathFast(binData, elems, testPaths);
+}
+
+TEST_F(BSONColumnTest, InterleavedAfterSkip) {
+    std::vector<BSONElement> elems{
+        BSONElement{},
+        BSONElement{},
+        createElementObj(BSON("a" << int32_t(100))),
+        createElementObj(BSON("a" << int32_t(200))),
+    };
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    auto binData = cb.finalize();
+
+    BufBuilder expected;
+    appendSimple8bControl(expected, 0b1000, 0b000);
+    std::vector<boost::optional<uint64_t>> missingDeltas{boost::none, boost::none};
+    appendSimple8bBlocks64(expected, missingDeltas, 1);
+    appendInterleavedStart(expected, elems[2].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b000);
+    std::vector<boost::optional<uint64_t>> aDeltas{
+        deltaInt32(elems[2].Obj()["a"], elems[2].Obj()["a"]),
+        deltaInt32(elems[3].Obj()["a"], elems[2].Obj()["a"])};
+    appendSimple8bBlocks64(expected, aDeltas, 1);
+    appendEOO(expected);  // End interleaved
+    appendEOO(expected);  // End BSONColumn
+
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+    verifyDecompressPathFast(binData, elems, TestPath{{"a"}});
+}
+
+TEST_F(BSONColumnTest, SkipAfterInterleaved) {
+    // These objects contain an empty subobject, so top-level skips cannot be represented as skips
+    // in the scalar streams. The compressor will append the skips outside of interleaved mode.
+    std::vector<BSONElement> elems{
+        createElementObj(BSON("a" << int32_t(100) << "b" << BSONObj{})),
+        createElementObj(BSON("a" << int32_t(200) << "b" << BSONObj{})),
+        BSONElement{},
+        BSONElement{},
+        createElementObj(BSON("a" << int32_t(300) << "b" << BSONObj{})),
+        createElementObj(BSON("a" << int32_t(400) << "b" << BSONObj{})),
+        BSONElement{},
+        BSONElement{},
+    };
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    auto binData = cb.finalize();
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems[0].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b000);
+    std::vector<boost::optional<uint64_t>> aDeltas0{
+        deltaInt32(elems[0].Obj()["a"], elems[0].Obj()["a"]),
+        deltaInt32(elems[1].Obj()["a"], elems[0].Obj()["a"])};
+    appendSimple8bBlocks64(expected, aDeltas0, 1);
+    appendEOO(expected);  // End interleaved
+    appendSimple8bControl(expected, 0b1000, 0b000);
+    std::vector<boost::optional<uint64_t>> missingDeltas{boost::none, boost::none};
+    appendSimple8bBlocks64(expected, missingDeltas, 1);
+
+    appendInterleavedStart(expected, elems[4].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b000);
+    std::vector<boost::optional<uint64_t>> aDeltas1{
+        deltaInt32(elems[4].Obj()["a"], elems[4].Obj()["a"]),
+        deltaInt32(elems[5].Obj()["a"], elems[4].Obj()["a"])};
+    appendSimple8bBlocks64(expected, aDeltas1, 1);
+    appendEOO(expected);  // End interleaved
+    appendSimple8bControl(expected, 0b1000, 0b000);
+    appendSimple8bBlocks64(expected, missingDeltas, 1);
+
+    appendEOO(expected);  // End BSONColumn
+
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+    verifyDecompressPathFast(binData, elems, TestPath{{"a"}});
+}
+
+TEST_F(BSONColumnTest, EmptyObjectSkipAndInterleaved) {
+    // These objects contain an empty subobject, so top-level skips cannot be represented as skips
+    // in the scalar streams. The compressor will append the skips outside of interleaved mode.
+    std::vector<BSONElement> elems{
+        BSONElement{},
+        BSONElement{},
+        createElementObj(BSONObj{}),
+        createElementObj(BSONObj{}),
+        createElementObj(BSONObj{}),
+        BSONElement{},
+        BSONElement{},
+        createElementObj(BSON("a" << int32_t(100) << "b" << BSONObj{})),
+        createElementObj(BSON("a" << int32_t(200) << "b" << BSONObj{})),
+        BSONElement{},
+        BSONElement{},
+        createElementObj(BSON("a" << int32_t(300) << "b" << BSONObj{})),
+        createElementObj(BSON("a" << int32_t(400) << "b" << BSONObj{})),
+        BSONElement{},
+        createElementObj(BSONObj{}),
+        createElementObj(BSONObj{}),
+        BSONElement{},
+    };
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    auto binData = cb.finalize();
+
+    verifyDecompression(binData, elems);
+    verifyDecompressPathFast(binData, elems, TestPath{{"a"}});
+    verifyDecompressPathFast(binData, elems, TestPath{{"b"}});
+    verifyDecompressPathFast(binData, elems, TestPath{{}});
 }
 
 TEST_F(BSONColumnTest, FuzzerDiscoveredEdgeCases) {

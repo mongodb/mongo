@@ -961,5 +961,14 @@ struct RootPath {
     }
 };
 
+/**
+ * Returns true if the given path is the root path. If it returns anything given the empty object,
+ * then it's the root path.
+ */
+template <class Path>
+bool isRootPath(Path& path) {
+    return !path.elementsToMaterialize(BSONObj{}).empty();
+}
+
 }  // namespace bsoncolumn
 }  // namespace mongo

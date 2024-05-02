@@ -457,6 +457,9 @@ std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
         if (node->filterPosInfoRecorder) {
             bsonPointers.push_back(bson::getValue(bson));
         }
+        if (node->projRecorder) {
+            bsonPointers.push_back(bson::getValue(bson));
+        }
     };
 
     walkObj(extractor.getRoot(), obj.objdata(), recordValuePointer);
