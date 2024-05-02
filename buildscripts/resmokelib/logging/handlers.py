@@ -231,6 +231,29 @@ class BufferedHandler(logging.Handler):
         logging.Handler.close(self)
 
 
+class BufferedFileHandler(BufferedHandler):
+    """File handler with in-memory buffering."""
+
+    def __init__(self, filename, capacity=2000, interval_secs=600):
+        """Initialize the handler with the filename and buffer capacity and flush interval."""
+        super().__init__(capacity, interval_secs)
+        self.file = open(filename, "a")
+
+    def process_record(self, record):
+        """Return the formatted record message appended with a newline."""
+        return self.format(record) + "\n"
+
+    def _flush_buffer_with_lock(self, buf, close_called):
+        """Write the buffered log lines to the destination file."""
+        self.file.writelines(buf)
+
+    def close(self):
+        """Close the handler and the file descriptor."""
+        super().close()
+
+        self.file.close()
+
+
 class HTTPHandler(object):
     """A class which sends data to a web server using POST requests."""
 
