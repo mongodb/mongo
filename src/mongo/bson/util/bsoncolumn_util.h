@@ -49,6 +49,11 @@ inline bool isInterleavedStartControlByte(char control) {
         control == kInterleavedStartControlByte || control == kInterleavedStartArrayRootControlByte;
 }
 
+inline bool isSimple8bControlByte(uint8_t control) {
+    return control != EOO && !isUncompressedLiteralControlByte(control) &&
+        !isInterleavedStartControlByte(control);
+}
+
 inline uint8_t numSimple8bBlocksForControlByte(uint8_t control) {
     return (control & 0x0F) + 1;
 }

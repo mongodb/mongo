@@ -261,8 +261,6 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize(Element
  */
 struct SBEPath {
     std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
-        invariant(_pathRequest.type == value::MaterializedCellBlock::kFilter,
-                  "we only support filter path requests.");
         // Get the vector of value pointers the pathRequest asks for, in the refObj.
         auto result = extractValuePointersFromBson(refObj, _pathRequest);
         return result;

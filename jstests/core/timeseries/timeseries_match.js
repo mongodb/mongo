@@ -44,7 +44,9 @@ TimeseriesTest.run((insert) => {
         arrOfObj: [{x: 1}, {x: 2}, {x: 3}, {x: 4}],
         emptyArray: [],
         nestedArray: [{subField: [1]}, {subField: [2]}, {subField: 3}],
-        sometimesDoublyNestedArray: [[1], [2], [3], []]
+        sometimesDoublyNestedArray: [[1], [2], [3], []],
+        simpleObj: {a: 1},
+        objWithOneElemArray: {a: 1, b: {c: [5]}},
     });
     insert(coll, {
         _id: 1,
@@ -55,7 +57,9 @@ TimeseriesTest.run((insert) => {
         arrOfObj: [{x: 101}, {x: 102}, {x: 103}, {x: 104}],
         emptyArray: [],
         nestedArray: [{subField: [101]}, {subField: [102]}, {subField: 103}],
-        sometimesDoublyNestedArray: [[101], 102, [103]]
+        sometimesDoublyNestedArray: [[101], 102, [103]],
+        simpleObj: {a: 100},
+        objWithOneElemArray: {a: 100, b: {c: [500]}},
     });
     insert(coll, {
         _id: 2,
@@ -79,6 +83,8 @@ TimeseriesTest.run((insert) => {
         arrOfObj: [{x: [101, 102, 103]}, {x: [104]}],
         nestedArray: [{subField: []}, {subField: []}],
         sometimesDoublyNestedArray: [[]],
+        simpleObj: {a: 200},
+        objWithOneElemArray: {a: 2, b: {c: [600]}},
     });
 
     const kTestCases = [
@@ -370,6 +376,9 @@ TimeseriesTest.run((insert) => {
             usesBlockProcessing: true
         },
         {pred: {"sometimesDoublyNestedArray": [101]}, ids: [1], usesBlockProcessing: false},
+        // Tests for fast path-based decompression:
+        {pred: {"simpleObj.a": {$gt: 99}}, ids: [1, 4], usesBlockProcessing: true},
+        {pred: {"objWithOneElemArray.b.c": {$gt: 499}}, ids: [1, 4], usesBlockProcessing: true},
     ];
 
     // $match pushdown requires sbe to be fully enabled and featureFlagTimeSeriesInSbe to be set.
