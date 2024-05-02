@@ -40,12 +40,6 @@
 
 namespace mongo {
 
-namespace topology_time_ticker_utils {
-
-bool inRecoveryMode(OperationContext* opCtx);
-
-}
-
 /**
  * This object is responsible for ticking the topology time of the Vector Clock when needed. It only
  * exists on the CSRS nodes and it is associated with the mongod instance.

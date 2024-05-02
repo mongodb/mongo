@@ -38,12 +38,6 @@
 
 namespace mongo {
 
-namespace user_writes_recoverable_critical_section_util {
-
-bool inRecoveryMode(OperationContext* opCtx);
-
-}
-
 /**
  * Represents the 'user writes blocking' critical section. The critical section status is persisted
  * on disk and it's in-memory representation is kept in sync with the persisted state through an

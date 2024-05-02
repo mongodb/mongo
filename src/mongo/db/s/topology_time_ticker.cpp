@@ -63,22 +63,6 @@ const auto serviceDecorator = ServiceContext::declareDecoration<TopologyTimeTick
 
 }  // namespace
 
-namespace topology_time_ticker_utils {
-
-bool inRecoveryMode(OperationContext* opCtx) {
-    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked());
-
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->getSettings().isReplSet()) {
-        return false;
-    }
-
-    const auto memberState = replCoord->getMemberState();
-    return memberState.startup2() || memberState.rollback();
-}
-
-}  // namespace topology_time_ticker_utils
-
 TopologyTimeTicker& TopologyTimeTicker::get(ServiceContext* serviceContext) {
     return serviceDecorator(serviceContext);
 }

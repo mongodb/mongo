@@ -66,20 +66,6 @@
 
 namespace mongo {
 
-namespace fallback_op_observer_util {
-
-bool inRecoveryMode(OperationContext* opCtx) {
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->getSettings().isReplSet()) {
-        return false;
-    }
-
-    const auto memberState = replCoord->getMemberState();
-    return memberState.startup2() || memberState.rollback();
-}
-
-}  // namespace fallback_op_observer_util
-
 void FallbackOpObserver::onInserts(OperationContext* opCtx,
                                    const CollectionPtr& coll,
                                    std::vector<InsertStatement>::const_iterator first,
@@ -100,7 +86,7 @@ void FallbackOpObserver::onInserts(OperationContext* opCtx,
     if (nss.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (nss.isSystemDotViews()) {
-        if (fallback_op_observer_util::inRecoveryMode(opCtx)) {
+        if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
             return;
         }
 
@@ -168,7 +154,7 @@ void FallbackOpObserver::onUpdate(OperationContext* opCtx,
     if (nss.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (nss.isSystemDotViews()) {
-        if (fallback_op_observer_util::inRecoveryMode(opCtx)) {
+        if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
             return;
         }
 
@@ -234,7 +220,7 @@ void FallbackOpObserver::onDelete(OperationContext* opCtx,
     if (nss.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (nss.isSystemDotViews()) {
-        if (fallback_op_observer_util::inRecoveryMode(opCtx)) {
+        if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
             return;
         }
 
@@ -265,7 +251,7 @@ repl::OpTime FallbackOpObserver::onDropCollection(OperationContext* opCtx,
     if (collectionName.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (collectionName.isSystemDotViews()) {
-        if (fallback_op_observer_util::inRecoveryMode(opCtx)) {
+        if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
             return {};
         }
 
