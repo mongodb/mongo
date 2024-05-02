@@ -21,9 +21,12 @@
  *   # Checks that SBE is never used when SBE full is not enabled. For implicitly created column
  *   # indexes this check would be violated, since it is not covered by other SBE feature flags.
  *   assumes_no_implicit_index_creation,
+ *   # This test looks for plan cache hits, which would change with repeated reads.
+ *   does_not_support_repeated_reads,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     checkExperimentalCascadesOptimizerEnabled,
     runWithParamsAllNodes
@@ -39,17 +42,17 @@ runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", val
     const isBonsaiEnabled = checkExperimentalCascadesOptimizerEnabled(db);
     const isBonsaiPlanCacheEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "OptimizerPlanCache");
 
-    assert.commandWorked(coll.insert({a: 1, b: 1}));
+    for (let i = 0; i < 5; i++) {
+        assert.commandWorked(coll.insert({a: i, b: 1}));
+    }
 
     // Check that a new entry is added to the plan cache even for single plans.
     if (isSbeEnabled) {
         assert.eq(1, coll.find({a: 1}).itcount());
         // Validate sbe plan cache stats entry.
         const allStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
-        jsTestLog(allStats);
         assert.eq(allStats.length, 1, allStats);
         const stats = allStats[0];
-        jsTestLog(stats);
         assert(stats.hasOwnProperty("isPinned"), stats);
         assert(stats.isPinned, stats);
         assert(stats.hasOwnProperty("cachedPlan"), stats);
@@ -69,10 +72,8 @@ runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", val
 
         // Validate plan cache stats entry.
         const allStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
-        jsTestLog(allStats);
         assert.eq(allStats.length, 1, allStats);
         const stats = allStats[0];
-        jsTestLog(stats);
         assert(stats.hasOwnProperty("cachedPlan"), stats);
         assert(stats.hasOwnProperty("solutionHash"), stats);
 
@@ -89,14 +90,27 @@ runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", val
         // Test that the plan cached for a query with a $match pushed down to SBE via
         // 'CanonicalQuery::_cqPipeline' is shared across queries with the same shape but different
         // constants.
-        let pipeline = [{$addFields: {a: 0}}, {$match: {a: {$gt: 0}}}];
+        function getPipeline(gtVal) {
+            return [{$addFields: {a: {$add: ["$a", 1]}}}, {$match: {a: {$gt: gtVal}}}];
+        }
         coll.getPlanCache().clear();
+        const serverStatusBefore = db.serverStatus();
+
         for (let val = 0; val < 5; ++val) {
-            pipeline[1]["$match"]["a"]["$gt"] = val;
-            coll.aggregate(pipeline);
+            const pipeline = getPipeline(val)
+            assert.eq(coll.aggregate(pipeline).toArray().length, 5 - val);
         }
         const planCacheStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
         assert.eq(1, planCacheStats.length, planCacheStats);
+
+        const serverStatusAfter = db.serverStatus();
+        const numPlanCacheHits = serverStatusAfter.metrics.query.planCache['sbe'].hits -
+            serverStatusBefore.metrics.query.planCache['sbe'].hits;
+        if (FixtureHelpers.isStandalone(db)) {
+            // The first query will get cached, and since the entry will be pinned, the remaining
+            // four will read the cache. Only assert on a standalone since the plan cache is local.
+            assert.eq(numPlanCacheHits, 4, {serverStatusBefore, serverStatusAfter});
+        }
     }
 
     if (isSbeEnabled) {

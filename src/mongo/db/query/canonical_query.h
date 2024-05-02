@@ -318,10 +318,7 @@ public:
     }
 
     void setCqPipeline(std::vector<boost::intrusive_ptr<DocumentSource>> cqPipeline,
-                       bool containsEntirePipeline) {
-        _cqPipeline = std::move(cqPipeline);
-        _containsEntirePipeline = containsEntirePipeline;
-    }
+                       bool containsEntirePipeline);
 
     const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline() const {
         return _cqPipeline;
