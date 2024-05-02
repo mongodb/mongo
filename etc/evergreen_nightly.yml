@@ -598,6 +598,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     test_flags: >-
       --additionalFeatureFlags=featureFlagQueryStats
+      --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: .aggfuzzer
   - name: .aggregation
@@ -704,6 +705,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     test_flags: >-
       --additionalFeatureFlags=featureFlagQueryStats
+      --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   # - name: .aggfuzzer
   - name: .aggregation
