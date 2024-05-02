@@ -1728,4 +1728,12 @@ DB.prototype.checkMetadataConsistency = function(options = {}) {
         this.runCommand(Object.extend({checkMetadataConsistency: 1}, options)));
     return new DBCommandCursor(this, res);
 };
+
+DB.prototype.getDatabasePrimaryShardId = function() {
+    let x = this.getSiblingDB('config').databases.findOne({_id: this.getName()});
+    if (!x) {
+        throw Error(`Database '${this.getName()}' not found`);
+    }
+    return x.primary;
+};
 }());
