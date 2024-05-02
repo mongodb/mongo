@@ -218,10 +218,17 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsSetAndReset) {
     ASSERT_EQ(manager().getClusterParameterTime(opCtx(), otherTenantId), firstWriteTime);
 
     // Reset the parameter value and ensure that the in-memory storage is cleared for tenant with
-    // 'tenantId'. QueryShapeConfigurations for tenant with 'otherTenantId' must not be affected..
+    // 'tenantId'.
     manager().removeAllQueryShapeConfigurations(opCtx(), tenantId);
     assertQueryShapeConfigurationsEquals(
         {}, manager().getAllQueryShapeConfigurations(opCtx(), tenantId).queryShapeConfigurations);
+
+    // Attempt to remove QueryShapeConfigurations for a tenant that does not have any.
+    manager().removeAllQueryShapeConfigurations(opCtx(), tenantId);
+    assertQueryShapeConfigurationsEquals(
+        {}, manager().getAllQueryShapeConfigurations(opCtx(), tenantId).queryShapeConfigurations);
+
+    // Verify that QueryShapeConfigurations for tenant with 'otherTenantId' were not be affected.
     assertQueryShapeConfigurationsEquals(
         {firstConfig},
         manager().getAllQueryShapeConfigurations(opCtx(), otherTenantId).queryShapeConfigurations);
@@ -230,7 +237,7 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsSetAndReset) {
 }
 
 TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
-    using Result = boost::optional<std::pair<QuerySettings, boost::optional<QueryInstance>>>;
+    using Result = boost::optional<QuerySettings>;
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     // Helper function for ensuring that two
@@ -243,16 +250,7 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
         if (!r0.has_value() || !r1.has_value()) {
             return;
         }
-
-        // Otherwise, ensure that both pair components are equal.
-        ASSERT_BSONOBJ_EQ(r0->first.toBSON(), r1->first.toBSON());
-        ASSERT_EQ(r0->second.has_value(), r1->second.has_value());
-
-        // Early exit if query instances are missing.
-        if (!r0->second.has_value()) {
-            return;
-        }
-        ASSERT_BSONOBJ_EQ(*r0->second, *r1->second);
+        ASSERT_BSONOBJ_EQ(r0->toBSON(), r1->toBSON());
     };
 
     TenantId tenantId(OID::fromTerm(1));
@@ -266,10 +264,10 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
                         opCtx(), query_shape::QueryShapeHash(), tenantId),
                     boost::none);
 
-    // Ensure QuerySettingsManager returns a valid (QuerySettings, QueryInstance) pair on lookup.
+    // Ensure QuerySettingsManager returns a valid QuerySettings on lookup.
     assertResultsEq(manager().getQuerySettingsForQueryShapeHash(
                         opCtx(), configs[1].getQueryShapeHash(), tenantId),
-                    std::make_pair(configs[1].getSettings(), configs[1].getRepresentativeQuery()));
+                    configs[1].getSettings());
 }
 
 }  // namespace mongo::query_settings
