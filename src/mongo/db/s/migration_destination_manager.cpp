@@ -111,6 +111,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -120,6 +121,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/database_name_util.h"
@@ -375,6 +377,18 @@ void replaceShardingIndexCatalogInShardIfNeeded(OperationContext* opCtx,
     } else {
         clearCollectionShardingIndexCatalog(opCtx, nss, uuid);
     }
+}
+
+// Throws if this configShard is currently draining.
+void checkConfigShardIsNotDraining(OperationContext* opCtx) {
+    DBDirectClient dbClient(opCtx);
+    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+    const auto doc = dbClient.findOne(NamespaceString::kConfigsvrShardsNamespace,
+                                      BSON(ShardType::name << thisShardId));
+    uassert(ErrorCodes::ShardNotFound, "Shard has been removed", !doc.isEmpty());
+
+    const auto shardDoc = uassertStatusOK(ShardType::fromBSON(doc));
+    uassert(ErrorCodes::ShardNotFound, "Shard is currently draining", !shardDoc.getDraining());
 }
 
 // Enabling / disabling these fail points pauses / resumes MigrateStatus::_go(), the thread which
@@ -1270,6 +1284,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     }};
 
     if (!skipToCritSecTaken) {
+        // If this is a configShard, throw if we are draining. This is to avoid creating the
+        // db/collections on the local catalog once we have already completed cleanup after drain.
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            checkConfigShardIsNotDraining(outerOpCtx);
+        }
+
         timing.emplace(outerOpCtx, "to", _nss, _min, _max, 8 /* steps */, _toShard, _fromShard);
 
         LOGV2(22000,
