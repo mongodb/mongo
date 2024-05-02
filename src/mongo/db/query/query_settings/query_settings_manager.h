@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
+#include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <string>
@@ -52,7 +52,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/trusted_hasher.h"
-#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 /**
@@ -72,27 +71,20 @@ namespace query_settings {
 using QueryInstance = BSONObj;
 
 using QueryShapeConfigurationsMap =
-    stdx::unordered_map<query_shape::QueryShapeHash,
+    absl::flat_hash_map<query_shape::QueryShapeHash,
                         std::pair<QuerySettings, boost::optional<QueryInstance>>,
                         QueryShapeHashHasher>;
 
 /**
- * Struct which stores all query shape configurations for a given tenant, containing the same
- * information as the QuerySettingsClusterParameterValue. The data present in the 'settingsArray' is
- * stored in the QueryShapeConfigurationsMap for faster access.
+ * Stores all query shape configurations for a tenant, containing the same information as the
+ * QuerySettingsClusterParameterValue. The data present in the 'settingsArray' is stored in the
+ * QueryShapeConfigurationsMap for faster access.
  */
 struct VersionedQueryShapeConfigurations {
     /**
-     * Nested map structure which essentially serves as a mapping from 'NamespaceString' ->
-     * 'QueryShapeHash' -> 'QueryShapeConfiguration'.
-     *
-     * Since computing the QueryShapeHash is the most expensive operation and its being done lazily,
-     * it just makes sense to skip this part whenever possible. This additional mapping enables
-     * first checking if there are any QueryShapeConfigurations set for the given namespace, and
-     * exiting early if none are found.
+     * 'QueryShapeHash' -> 'QueryShapeConfiguration' mapping.
      */
-    stdx::unordered_map<NamespaceString, QueryShapeConfigurationsMap>
-        nssToQueryShapeConfigurationsMap;
+    QueryShapeConfigurationsMap queryShapeHashToQueryShapeConfigurationsMap;
 
     /**
      * Cluster time of the current version of the QuerySettingsClusterParameter.
@@ -141,13 +133,13 @@ public:
     static QuerySettingsManager& get(OperationContext* opCtx);
 
     /**
-     * Returns (QuerySettings, QueryInstance) pair associated with the QueryShapeHash for the given
-     * tenant.
+     * Returns QuerySettings associated with a query which query shape hash is 'queryShapeHash' for
+     * the given tenant.
      */
-    boost::optional<std::pair<QuerySettings, boost::optional<QueryInstance>>>
-    getQuerySettingsForQueryShapeHash(OperationContext* opCtx,
-                                      const query_shape::QueryShapeHash& queryShapeHash,
-                                      const boost::optional<TenantId>& tenantId) const;
+    boost::optional<QuerySettings> getQuerySettingsForQueryShapeHash(
+        OperationContext* opCtx,
+        const query_shape::QueryShapeHash& queryShapeHash,
+        const boost::optional<TenantId>& tenantId) const;
 
     /**
      * Returns all query shape configurations and an associated timestamp for the given tenant
@@ -199,7 +191,8 @@ private:
     LogicalTime getClusterParameterTime_inlock(OperationContext* opCtx,
                                                const boost::optional<TenantId>& tenantId) const;
 
-    TenantIdMap<VersionedQueryShapeConfigurations> _tenantIdToVersionedQueryShapeConfigurationsMap;
+    absl::flat_hash_map<boost::optional<TenantId>, VersionedQueryShapeConfigurations>
+        _tenantIdToVersionedQueryShapeConfigurationsMap;
     Lock::ResourceMutex _mutex = Lock::ResourceMutex("QuerySettingsManager::mutex");
     std::function<void(OperationContext*)> _clusterParameterRefreshFn;
 };
