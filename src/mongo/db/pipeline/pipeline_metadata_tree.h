@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/util/assert_util.h"
@@ -179,6 +180,13 @@ inline auto makeAdditionalChildren(
                            offTheEndContents.push_back(offTheEndReshaper(child.get().contents));
                            return std::move(*child);
                        });
+    if (auto unionWithSource = dynamic_cast<const DocumentSourceUnionWith*>(&source);
+        unionWithSource && unionWithSource->hasNonEmptyPipeline()) {
+        auto [child, offTheEndReshaper] = makeTreeWithOffTheEndStage(
+            initialStageContents, unionWithSource->getPipeline(), propagator);
+        offTheEndContents.push_back(offTheEndReshaper(child.get().contents));
+        children.push_back(std::move(*child));
+    }
     return std::pair(std::move(children), std::move(offTheEndContents));
 }
 
@@ -249,6 +257,12 @@ inline void walk(Stage<T>* stage,
             auto iter = facetIter++->pipeline->getSources().begin();
             walk(&child, &iter, zipper);
         }
+    }
+
+    if (auto unionWithSource = dynamic_cast<DocumentSourceUnionWith*>(&***sourceIter);
+        unionWithSource && unionWithSource->hasNonEmptyPipeline()) {
+        auto iter = unionWithSource->getPipeline().getSources().begin();
+        walk(&stage->additionalChildren.front(), &iter, zipper);
     }
 
     zipper(stage, &**(*sourceIter)++);

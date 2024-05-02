@@ -172,7 +172,17 @@ public:
         return &_stats;
     }
 
+    bool hasNonEmptyPipeline() const {
+        return _pipeline && !_pipeline->getSources().empty();
+    }
+
     const Pipeline& getPipeline() const {
+        tassert(7113100, "Pipeline has been already disposed", _pipeline);
+        return *_pipeline;
+    }
+
+    Pipeline& getPipeline() {
+        tassert(7113101, "Pipeline has been already disposed", _pipeline);
         return *_pipeline;
     }
 
