@@ -601,6 +601,8 @@ last-continuous:
     ticket: SERVER-86667
   - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
     ticket: SERVER-89618
+  - test_file: jstests/core/timeseries/timeseries_computed_field.js
+    ticket: SERVER-88072
   suites: null
 last-lts:
   all:
@@ -1258,4 +1260,6 @@ last-lts:
     ticket: SERVER-86667
   - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
     ticket: SERVER-89618
+  - test_file: jstests/core/timeseries/timeseries_computed_field.js
+    ticket: SERVER-88072
   suites: null
