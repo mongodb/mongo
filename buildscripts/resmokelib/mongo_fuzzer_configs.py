@@ -119,6 +119,7 @@ def generate_mongod_parameters(rng, mode):
     ret["chunkMigrationConcurrency"] = rng.choice([1, 4, 16])
     ret["disableLogicalSessionCacheRefresh"] = rng.choice([True, False])
     ret["enableAutoCompaction"] = rng.choice([True, False])
+    ret["ingressAdmissionControllerTicketPoolSize"] = rng.randint(4, 1000 * 1000)
     ret["initialServiceExecutorUseDedicatedThread"] = rng.choice([True, False])
     # TODO (SERVER-75632): Uncomment this to enable passthrough testing.
     # ret["lockCodeSegmentsInMemory"] = rng.choice([True, False])
