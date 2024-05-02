@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import uuid
 import json
+from pathlib import Path
 
 _MAX_RUNS = 1000
 
@@ -31,31 +32,64 @@ def print_pb_version_ids(run_id: str):
     print("---")
 
 
-def deflakinator(runs: int, evergreen_args: str):
-    """Run the deflakinator."""
-    run_id = uuid.uuid4()
+def commands_from_json_file(base_evergreen_args: str, json_file: Path):
+    if json_file is None:
+        return ""
 
-    print("Kicking off evergreen patch builds:")
-    print("---")
+    with json_file.open() as f:
+        data = json.load(f)
+
+    commands = []
+    for variants_to_tasks in data["variants_to_tasks"]:
+        variant = variants_to_tasks["_id"]
+        tasks = ",".join(variants_to_tasks["tasks"])
+        commands += [f"{base_evergreen_args} --tasks {tasks} --variants {variant}"]
+
+    return commands
+
+
+def deflakinator(run_id: str, runs: int, evergreen_args: str):
+    """Run the deflakinator."""
 
     command = f"evergreen patch {evergreen_args} --yes --finalize --description \"flakinator run id: {run_id}\""
     for _ in range(runs):
         print(command)
-        subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE, text=True)
-
-    print_pb_version_ids(run_id)
+        try:
+            subprocess.run(command, shell=True, check=True, text=True)
+        except subprocess.CalledProcessError as e:
+            print(e.stderr)
+            break
 
 
 def main():
     """Run the main function."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--runs", type=int, choices=range(1, _MAX_RUNS), metavar=f"[1-{_MAX_RUNS}]",
-                        help="Number of times to run each patch build")
-    parser.add_argument("--evergreen-args", type=str, help="Arguments to pass to evergreen patch")
+    parser.add_argument("--runs", type=int, required=True, choices=range(1, _MAX_RUNS),
+                        metavar=f"[1-{_MAX_RUNS}]", help="Number of times to run each patch build")
+    parser.add_argument(
+        "--evergreen-args", type=str, required=True, help=
+        "Arguments to pass to evergreen patch, example \"--project mongodb-mongo-master --alias required\""
+    )
+    parser.add_argument(
+        "--json-file", type=Path, help=
+        "Path to the JSON file containing additional variants and tasks to run. If not provided, --evergreen-args will be used alone."
+    )
+
+    run_id = uuid.uuid4()
+
+    print("Kicking off evergreen patch builds:")
+    print("---")
 
     args = parser.parse_args()
-    deflakinator(args.runs, args.evergreen_args)
+
+    if args.json_file is not None:
+        commands = commands_from_json_file(args.evergreen_args, args.json_file)
+        for command in commands:
+            deflakinator(run_id, args.runs, command)
+    else:
+        deflakinator(run_id, args.runs, args.evergreen_args)
+
+    print_pb_version_ids(run_id)
 
 
 if __name__ == "__main__":
