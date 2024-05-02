@@ -25,12 +25,6 @@ let b = db_b.rename_different_db;
 a.drop();
 b.drop();
 
-// TODO (SERVER-84330): renameCollection on sharded cluster fails if the destination database
-// doesn't exist but doesn't fail on replica set.
-if (TestData.testingReplicaSetEndpoint) {
-    assert.commandWorked(db_b.createCollection("dummy_coll"));
-}
-
 // Put some documents and indexes in a.
 a.insertMany([{a: 1}, {a: 2}, {a: 3}]);
 assert.commandWorked(a.createIndexes([{a: 1}, {b: 1}]));

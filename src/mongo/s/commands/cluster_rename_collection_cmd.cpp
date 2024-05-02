@@ -47,6 +47,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rename_collection_common.h"
 #include "mongo/db/commands/rename_collection_gen.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -57,6 +58,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_version.h"
@@ -69,6 +71,7 @@
 
 
 namespace mongo {
+MONGO_FAIL_POINT_DEFINE(renameWaitAfterDatabaseCreation);
 namespace {
 
 class RenameCollectionCmd final : public TypedCommand<RenameCollectionCmd> {
@@ -148,6 +151,16 @@ public:
 
             auto shard = uassertStatusOK(
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbInfo->getPrimary()));
+
+            // Creates the destination database if it doesn't exist already.
+            cluster::createDatabase(opCtx, toNss.dbName(), shard->getId());
+
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &renameWaitAfterDatabaseCreation, opCtx, "renameWaitAfterDatabaseCreation", []() {
+                    LOGV2(8433001,
+                          "Hanging rename due to 'renameWaitAfterDatabaseCreation' "
+                          "failpoint");
+                });
 
             auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
                 opCtx,

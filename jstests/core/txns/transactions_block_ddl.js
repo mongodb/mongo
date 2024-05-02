@@ -7,6 +7,7 @@
 //   uses_transactions
 // ]
 
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
 const dbName = "transactions_block_ddl";
@@ -47,7 +48,7 @@ function testTimeout(cmdDBName, ddlCmd) {
     assert.commandWorked(sessionColl.insert({a: 5, b: 6}));
     assert.commandFailedWithCode(
         testDB.getSiblingDB(cmdDBName).runCommand(Object.assign({}, ddlCmd, {maxTimeMS: 500})),
-        ErrorCodes.MaxTimeMSExpired);
+        [ErrorCodes.MaxTimeMSExpired, ErrorCodes.CommandFailed]);
     assert.commandWorked(session.commitTransaction_forTesting());
 }
 
@@ -71,12 +72,22 @@ function testSuccessOnTxnCommit(cmdDBName, ddlCmd, currentOpFilter) {
         function() {
             // Note that we cannot use the $currentOp agg stage because it acquires locks
             // (SERVER-35289).
-            return testDB.currentOp({$and: [currentOpFilter, {waitingForLock: true}]})
-                       .inprog.length === 1;
+            let currOpResult = FixtureHelpers.mapOnEachShardNode({
+                db: testDB.getSiblingDB("admin"),
+                func: (testDB) => testDB.currentOp({$and: [currentOpFilter]}).inprog.length === 1,
+                primaryNodeOnly: true,
+            });
+
+            return currOpResult.includes(true);
         },
         function() {
-            return "Failed to find DDL command in currentOp output: " +
-                tojson(testDB.currentOp().inprog);
+            let currOpResult = FixtureHelpers.mapOnEachShardNode({
+                db: testDB.getSiblingDB("admin"),
+                func: (testDB) => testDB.currentOp().inprog,
+                primaryNodeOnly: true,
+            });
+
+            return "Failed to find DDL command in currentOp output: " + tojson(currOpResult);
         });
     jsTestLog("Committing transaction");
     assert.commandWorked(session.commitTransaction_forTesting());
@@ -91,7 +102,12 @@ const dropCmd = {
     writeConcern: {w: "majority"}
 };
 testTimeout(dbName, dropCmd);
-testSuccessOnTxnCommit(dbName, dropCmd, {"command.drop": collName});
+testSuccessOnTxnCommit(dbName, dropCmd, {
+    $or: [
+        {"command._shardsvrParticipantBlock": collName},
+        {$and: [{"command.drop": collName}, {waitingForLock: true}]}
+    ]
+});
 
 jsTestLog("Testing that 'dropDatabase' blocks on transactions");
 const dropDatabaseCmd = {
@@ -99,30 +115,47 @@ const dropDatabaseCmd = {
     writeConcern: {w: "majority"}
 };
 testTimeout(dbName, dropDatabaseCmd);
-testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {"command.dropDatabase": 1});
+testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
+    $or: [
+        {"command._shardsvrDropDatabase": 1},
+        {$and: [{"command.dropDatabase": 1}, {waitingForLock: true}]}
+    ]
+});
 
 jsTestLog("Testing that 'renameCollection' within databases blocks on transactions");
-testDB.runCommand({drop: otherCollName, writeConcern: {w: "majority"}});
+assert.commandWorked(testDB.runCommand({drop: otherCollName, writeConcern: {w: "majority"}}));
+// TODO(SERVER-90070): remove 'dropTarget: true'.
 const renameCollectionCmdSameDB = {
     renameCollection: sessionColl.getFullName(),
     to: dbName + "." + otherCollName,
+    dropTarget: true,
     writeConcern: {w: "majority"}
 };
 testTimeout("admin", renameCollectionCmdSameDB);
-testSuccessOnTxnCommit(
-    "admin", renameCollectionCmdSameDB, {"command.renameCollection": sessionColl.getFullName()});
+testSuccessOnTxnCommit("admin", renameCollectionCmdSameDB, {
+    $or: [
+        {"command._shardsvrRenameCollectionParticipant": collName},
+        {$and: [{"command.renameCollection": sessionColl.getFullName()}, {waitingForLock: true}]}
+    ]
+});
 
 jsTestLog("Testing that 'renameCollection' across databases blocks on transactions");
-testDB.getSiblingDB(otherDBName).runCommand({drop: otherCollName, writeConcern: {w: "majority"}});
+assert.commandWorked(testDB.getSiblingDB(otherDBName)
+                         .runCommand({drop: otherCollName, writeConcern: {w: "majority"}}));
+// TODO(SERVER-90070): remove 'dropTarget: true'.
 const renameCollectionCmdDifferentDB = {
     renameCollection: sessionColl.getFullName(),
     to: otherDBName + "." + otherCollName,
+    dropTarget: true,
     writeConcern: {w: "majority"}
 };
 testTimeout("admin", renameCollectionCmdDifferentDB);
-testSuccessOnTxnCommit("admin",
-                       renameCollectionCmdDifferentDB,
-                       {"command.renameCollection": sessionColl.getFullName()});
+testSuccessOnTxnCommit("admin", renameCollectionCmdSameDB, {
+    $or: [
+        {"command._shardsvrRenameCollectionParticipant": collName},
+        {$and: [{"command.renameCollection": sessionColl.getFullName()}, {waitingForLock: true}]}
+    ]
+});
 
 jsTestLog("Testing that 'createIndexes' blocks on transactions");
 // The transaction will insert a document that has a field 'a'.
@@ -132,7 +165,9 @@ const createIndexesCmd = {
     writeConcern: {w: "majority"}
 };
 testTimeout(dbName, createIndexesCmd);
-testSuccessOnTxnCommit(dbName, createIndexesCmd, {"command.createIndexes": collName});
+testSuccessOnTxnCommit(dbName,
+                       createIndexesCmd,
+                       {$and: [{"command.createIndexes": collName}, {waitingForLock: true}]});
 
 jsTestLog("Testing that 'dropIndexes' blocks on transactions");
 // The setup creates an index on {b: 1} called 'b_1'. The transaction will insert a document
@@ -143,5 +178,6 @@ const dropIndexesCmd = {
     writeConcern: {w: "majority"}
 };
 testTimeout(dbName, dropIndexesCmd);
-testSuccessOnTxnCommit(dbName, dropIndexesCmd, {"command.dropIndexes": collName});
+testSuccessOnTxnCommit(
+    dbName, dropIndexesCmd, {$and: [{"command.dropIndexes": collName}, {waitingForLock: true}]});
 session.endSession();
