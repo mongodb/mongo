@@ -423,8 +423,8 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
 
                     auto inEqualities = bab.obj();
 
-                    // Since the $in expression's InListData elements haven't yet been initialized,
-                    // we have to manually count the equalities on the path (rather than calling
+                    // Since the $in expression's elements haven't yet been initialized, we
+                    // have to manually count the equalities on the path (rather than calling
                     // inExpression->getEqualities()).
                     tassert(3401205,
                             "Incorrect number of in-equivalent expressions",

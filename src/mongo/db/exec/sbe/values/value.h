@@ -89,15 +89,12 @@ namespace KeyString {
 class Value;
 }  // namespace KeyString
 
-class InListData;
-
 class TimeZoneDatabase;
 class TimeZone;
 
 class JsFunction;
 
 namespace sbe {
-
 /**
  * Trivially copyable variation on a tuple theme. This allow us to return tuples through registers.
  */
@@ -116,6 +113,7 @@ struct FastTuple<A, B, C> {
 
 struct MakeObjSpec;
 class SortSpec;
+class InList;
 
 using FrameId = int64_t;
 using SpoolId = int64_t;
@@ -160,7 +158,6 @@ enum class TypeTags : uint8_t {
 
     Boolean,
     Null,
-    StringSmall,
 
     MinKey,
     MaxKey,
@@ -174,8 +171,10 @@ enum class TypeTags : uint8_t {
     // destroyed by SBE.
     csiCell,
 
+    StringSmall,
+
     // Special marker
-    EndOfShallowTypeTags = csiCell,
+    EndOfShallowTypeTags = StringSmall,
 
     // Heap values
     NumberDecimal,
@@ -249,8 +248,8 @@ enum class TypeTags : uint8_t {
     // Pointer to an IndexBounds object.
     indexBounds,
 
-    // Pointer to an InListData object.
-    inListData,
+    // Pointer to an InList object.
+    inList,
 
     // Special marker, must be last.
     TypeTagsMax,
@@ -275,8 +274,8 @@ inline constexpr bool isArray(TypeTags tag) noexcept {
         tag == TypeTags::bsonArray;
 }
 
-inline constexpr bool isInListData(TypeTags tag) noexcept {
-    return tag == TypeTags::inListData;
+inline constexpr bool isInList(TypeTags tag) noexcept {
+    return tag == TypeTags::inList;
 }
 
 inline constexpr bool isNullish(TypeTags tag) noexcept {
@@ -1677,8 +1676,8 @@ inline std::pair<TypeTags, Value> makeIntOrLong(int64_t longVal) {
     return {TypeTags::NumberInt64, bitcastFrom<int64_t>(longVal)};
 }
 
-inline InListData* getInListDataView(Value val) noexcept {
-    return reinterpret_cast<InListData*>(val);
+inline InList* getInListView(Value val) noexcept {
+    return reinterpret_cast<InList*>(val);
 }
 
 inline key_string::Value* getKeyStringView(Value val) noexcept {
@@ -1954,6 +1953,7 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
         case TypeTags::sortSpec:
         case TypeTags::makeObjSpec:
         case TypeTags::indexBounds:
+        case TypeTags::inList:
             return getExtendedTypeOps(tag)->makeCopy(val);
         case TypeTags::keyString:
             return {TypeTags::keyString,

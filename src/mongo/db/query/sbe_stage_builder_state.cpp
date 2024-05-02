@@ -30,7 +30,8 @@
 #include "mongo/db/query/sbe_stage_builder_state.h"
 
 #include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/matcher/in_list_data.h"
+#include "mongo/db/exec/sbe/in_list.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo::stage_builder {
@@ -46,7 +47,7 @@ sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variab
     return slotId;
 }
 
-const CollatorInterface* StageBuilderState::makeCollatorOwned(const CollatorInterface* coll) {
+const CollatorInterface* StageBuilderState::makeOwnedCollator(const CollatorInterface* coll) {
     if (!coll) {
         return nullptr;
     }
@@ -68,46 +69,46 @@ const CollatorInterface* StageBuilderState::makeCollatorOwned(const CollatorInte
     return clonedColl;
 }
 
-InListData* StageBuilderState::prepareOwnedInList(const std::shared_ptr<InListData>& inList) {
-    // If 'l' is already in 'inListsSet', then there's no further work to do and we can just
-    // use 'l' as-is.
-    InListData* l = inList.get();
-    if (inListsSet->count(l)) {
-        tassert(7690410,
-                "Expected InListData to be in the 'prepared' state and own its BSON data",
-                l->isPrepared() && l->isBSONOwned());
-        return l;
+sbe::InList* StageBuilderState::makeOwnedInList(const InMatchExpression* ime) {
+    if (inListsMap) {
+        if (auto it = inListsMap->find(ime); it != inListsMap->end()) {
+            return it->second;
+        }
     }
 
-    // If 'l' is already prepared and its BSON is saved and it doesn't have a collator, then we can
-    // just add it to 'inLists' and 'inListsSet' and use it as-is.
-    if (l->isPrepared() && l->isBSONOwned() && l->getCollator() == nullptr) {
-        data->inLists.emplace_back(inList);
-        inListsSet->emplace(l);
-        return l;
+    // Get the InMatchExpression's InListData.
+    std::shared_ptr<const InListData> inListData = ime->getInListDataPtr();
+
+    // If the InListData's BSON is not owned, clone the InListData object and make its BSON owned.
+    if (!inListData->isBSONOwned()) {
+        std::shared_ptr<InListData> clonedData = inListData->clone();
+        clonedData->makeBSONOwned();
+        clonedData->setShared();
+
+        inListData = std::move(clonedData);
     }
 
-    // Otherwise, make a copy of 'l' if needed, save l's BSON and collator, mark 'l' as "prepared",
-    // and then add 'l' to 'inLists' and 'inListsSet' and return it.
-    if (l->isPrepared()) {
-        auto inListCopy = l->clone();
-        l = inListCopy.get();
-        data->inLists.emplace_back(std::move(inListCopy));
+    const CollatorInterface* coll = inListData->getCollator();
 
-        tassert(7690411, "Expected InListData to not be in the 'prepared' state", !l->isPrepared());
-    } else {
-        data->inLists.emplace_back(inList);
+    // If 'coll' is not null, make it owned.
+    if (coll != nullptr) {
+        coll = makeOwnedCollator(coll);
     }
 
-    inListsSet->emplace(l);
-    l->makeBSONOwned();
-    if (auto coll = l->getCollator()) {
-        l->setCollator(makeCollatorOwned(coll));
+    // Create an InList from 'inListData' and 'coll'.
+    auto inListPtr = std::make_unique<sbe::InList>(std::move(inListData), coll);
+    sbe::InList* inList = inListPtr.get();
+
+    // Store 'inListPtr' into the PlanStageStaticData.
+    data->inLists.emplace_back(std::move(inListPtr));
+
+    // Add 'inList' to 'inListsMap' so that we can retrieve it if makeOwnedInList() is called
+    // again on the same InMatchExpression.
+    if (inListsMap) {
+        inListsMap->emplace(ime, inList);
     }
 
-    l->prepare();
-
-    return l;
+    return inList;
 }
 
 sbe::value::SlotId StageBuilderState::getSortSpecSlot(const AccumulationStatement* acc) {

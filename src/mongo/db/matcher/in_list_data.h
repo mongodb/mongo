@@ -39,77 +39,112 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/lazily_initialized.h"
 
 namespace mongo {
+class InListElemLessThan {
+public:
+    using TypeTags = sbe::value::TypeTags;
+    using Value = sbe::value::Value;
+    using TagValuePair = std::pair<TypeTags, Value>;
+    using Cmp = StringDataComparator;
+
+    static constexpr BSONObj::ComparisonRulesSet kIgnoreFieldName = 0;
+
+    explicit InListElemLessThan(const Cmp* cmp) : _cmp(cmp) {}
+
+    inline bool operator()(const BSONElement& lhs, const BSONElement& rhs) const {
+        return compareImpl(lhs, rhs);
+    }
+
+    // Overloads of operator() that compare a BSONElement with a TagValuePair.
+    inline bool operator()(const BSONElement& lhs, TagValuePair rhs) const {
+        return compareImpl(sbe::bson::convertFrom<true>(lhs), rhs);
+    }
+    inline bool operator()(TagValuePair lhs, const BSONElement& rhs) const {
+        return compareImpl(lhs, sbe::bson::convertFrom<true>(rhs));
+    }
+
+    // Overloads of operator() that compare a BSONElement's type with a BSONType.
+    inline bool operator()(const BSONElement& lhs, BSONType rhsType) const {
+        return canonicalizeBSONType(lhs.type()) < canonicalizeBSONType(rhsType);
+    }
+    inline bool operator()(BSONType lhsType, const BSONElement& rhs) const {
+        return canonicalizeBSONType(lhsType) < canonicalizeBSONType(rhs.type());
+    }
+
+private:
+    inline bool compareImpl(const BSONElement& lhs, const BSONElement& rhs) const {
+        return lhs.woCompare(rhs, kIgnoreFieldName, _cmp) < 0;
+    }
+
+    inline bool compareImpl(TagValuePair lhs, TagValuePair rhs) const {
+        auto [lhsTag, lhsVal] = lhs;
+        auto [rhsTag, rhsVal] = rhs;
+        auto [resTag, resVal] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal, _cmp);
+        return resTag == TypeTags::NumberInt32 ? (sbe::value::bitcastTo<int32_t>(resVal) < 0)
+                                               : false;
+    }
+
+    const Cmp* _cmp = nullptr;
+};
+
+class InListElemEqualTo {
+public:
+    using Cmp = StringDataComparator;
+
+    static constexpr BSONObj::ComparisonRulesSet kIgnoreFieldName = 0;
+
+    explicit InListElemEqualTo(const Cmp* cmp) : _cmp(cmp) {}
+
+    inline bool operator()(const BSONElement& lhs, const BSONElement& rhs) const {
+        return lhs.woCompare(rhs, kIgnoreFieldName, _cmp) == 0;
+    }
+
+private:
+    const Cmp* _cmp = nullptr;
+};
+
+/**
+ * This class is used by InMatchExpression to represent the contents of the in-list (excluding
+ * regex values).
+ *
+ * InListData supports two concurrency models:
+ * - Exclusive model: For a given InListsData object, one thread has non-const access to the object,
+ *   and NO other threads have const access or non-const access.
+ * - Shared model: For a given InListsData object, any number of threads have const-only access to
+ *   the object and NO threads have non-const access.
+ *
+ * Non-const InListData methods when invoked can assume the current model in use is the "Exclusive"
+ * model. Thus they can assume that there aren't other threads potentially reading or writing to the
+ * InListData, and therefore it is safe for non-const methods to mutate the InListData.
+ *
+ * Const InListData methods (because they have to work with both models) must assume that there
+ * might be other threads accessing the InListData object via const reference. Const methods
+ * therefore cannot mutate the InListData object (with the exception of the '_shared' and
+ * '_sortedElements' fields, for which we have appropriate synchronization in place to allow
+ * for mutation). Furthermore, const methods cannot return non-const references or pointers to
+ * the InListData object or any of its contents.
+ *
+ * (Note: The rules above regarding concurrency models and const / non-const methods are also
+ * applicable to the InMatchExpression class and all the other subclasses of MatchExpression.)
+ */
 class InListData {
 public:
     static constexpr size_t kLargeStringThreshold = 1000u;
     static constexpr BSONObj::ComparisonRulesSet kIgnoreFieldName = 0;
 
-    class InListElemLessThan {
-    public:
-        using TypeTags = sbe::value::TypeTags;
-        using Value = sbe::value::Value;
-        using TagValuePair = std::pair<TypeTags, Value>;
-        using Cmp = StringDataComparator;
+    InListData() : _sortedElements(boost::in_place_init) {}
 
-        explicit InListElemLessThan(const Cmp* cmp) : _cmp(cmp) {}
-
-        inline bool operator()(const BSONElement& lhs, const BSONElement& rhs) const {
-            return lhs.woCompare(rhs, kIgnoreFieldName, _cmp) < 0;
-        }
-        inline bool operator()(const BSONElement& lhs, TagValuePair rhs) const {
-            return compareHelper(sbe::bson::convertFrom<true>(lhs), rhs);
-        }
-        inline bool operator()(TagValuePair lhs, const BSONElement& rhs) const {
-            return compareHelper(lhs, sbe::bson::convertFrom<true>(rhs));
-        }
-        inline bool operator()(const BSONElement& lhs, BSONType rhsType) const {
-            return canonicalizeBSONType(lhs.type()) < canonicalizeBSONType(rhsType);
-        }
-        inline bool operator()(BSONType lhsType, const BSONElement& rhs) const {
-            return canonicalizeBSONType(lhsType) < canonicalizeBSONType(rhs.type());
-        }
-
-    private:
-        inline bool compareHelper(const BSONElement& lhs, const BSONElement& rhs) const {
-            return lhs.woCompare(rhs, kIgnoreFieldName, _cmp) < 0;
-        }
-
-        inline bool compareHelper(TagValuePair lhs, TagValuePair rhs) const {
-            auto [lhsTag, lhsVal] = lhs;
-            auto [rhsTag, rhsVal] = rhs;
-            auto [resTag, resVal] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal, _cmp);
-            return resTag == TypeTags::NumberInt32 ? (sbe::value::bitcastTo<int32_t>(resVal) < 0)
-                                                   : false;
-        }
-
-        const Cmp* _cmp = nullptr;
-    };
-
-    class InListElemEqualTo {
-    public:
-        using Cmp = StringDataComparator;
-
-        explicit InListElemEqualTo(const Cmp* cmp) : _cmp(cmp) {}
-
-        inline bool operator()(const BSONElement& lhs, const BSONElement& rhs) const {
-            return lhs.woCompare(rhs, kIgnoreFieldName, _cmp) == 0;
-        }
-
-    private:
-        const Cmp* _cmp = nullptr;
-    };
-
-    InListData() : _hashSet(0, sbe::value::ValueHash{}, sbe::value::ValueEq{}) {}
-
+    InListData(const InListData& other) = delete;
     InListData(InListData&& other) = delete;
 
     InListData& operator=(const InListData& other) = delete;
     InListData& operator=(InListData&& other) = delete;
 
     std::shared_ptr<InListData> clone() const {
-        return std::shared_ptr<InListData>(new InListData(*this));
+        return std::shared_ptr<InListData>(new InListData(CloneCtorTag{}, *this));
     }
 
     bool hasNull() const {
@@ -137,98 +172,77 @@ public:
     uint32_t getTypeMask() const {
         return _typeMask;
     }
+    uint64_t getSbeTagMask() const {
+        return _sbeTagMask;
+    }
+    uint64_t getHashSetSbeTagMask() const {
+        return _hashSetSbeTagMask;
+    }
+    bool hasLargeStrings() const {
+        return _hasLargeStrings;
+    }
 
-    const std::vector<BSONElement>& getElements() {
-        return _elements;
+    const std::vector<BSONElement>& getElements(bool getSortedAndDeduped = true) const {
+        return getSortedAndDeduped ? getSortedElements() : _originalElements;
     }
 
     const CollatorInterface* getCollator() const {
         return _collator;
     }
 
-    bool contains(const BSONElement& e) {
+    // Returns true if the specified BSONElement is equal to one of this InListData's elements,
+    // otherwise returns false.
+    bool contains(const BSONElement& e) const {
         // If 'e.type()' is not present in _typeMask, bail out and return false.
-        if (!(getBSONTypeMask(e.type()) & _typeMask)) {
+        if ((getBSONTypeMask(e.type()) & _typeMask) == 0) {
             return false;
         }
 
         // Use binary search.
         auto elemLt = InListElemLessThan(_collator);
-        return std::binary_search(_elements.begin(), _elements.end(), e, elemLt);
-    }
-
-    bool contains(sbe::value::TypeTags tag, sbe::value::Value val) const {
-        constexpr uint64_t stringOrSymbolSbeTagMask =
-            (1ull << static_cast<uint64_t>(sbe::value::TypeTags::StringSmall)) |
-            (1ull << static_cast<uint64_t>(sbe::value::TypeTags::StringBig)) |
-            (1ull << static_cast<uint64_t>(sbe::value::TypeTags::bsonString)) |
-            (1ull << static_cast<uint64_t>(sbe::value::TypeTags::bsonSymbol));
-
-        dassert(isPrepared());
-
-        uint64_t mask = 1ull << static_cast<uint64_t>(tag);
-
-        bool searchHashSet = false;
-
-        if ((mask & stringOrSymbolSbeTagMask) == 0u) {
-            if (sbe::value::isShallowType(tag) || tag == sbe::value::TypeTags::NumberDecimal) {
-                searchHashSet = true;
-            } else if ((mask & _sbeTagMask) == 0u) {
-                // If 'mask' is not present in '_sbeTagMask', then we know 'tag'/'val' cannot
-                // possibly in the in-list so we return false.
-                return false;
-            }
-        } else {
-            if (mask & _hashSetSbeTagMask) {
-                if (sbe::value::getStringOrSymbolLength(tag, val) <= kLargeStringThreshold) {
-                    searchHashSet = true;
-                }
-            } else if ((mask & _sbeTagMask) == 0u) {
-                // If 'mask' is not present in '_sbeTagMask', then we know 'tag'/'val' cannot
-                // possibly in the in-list so we return false.
-                return false;
-            }
-        }
-
-        if (searchHashSet) {
-            // Search the hash set.
-            return _hashSet.find({tag, val}) != _hashSet.end();
-        }
-
-        // Use binary search.
-        auto beginIt = _elements.begin() + _binarySearchStartOffset;
-        auto elemLt = InListElemLessThan(_collator);
-        return std::binary_search(beginIt, _elements.end(), std::pair(tag, val), elemLt);
+        const auto& elems = getSortedElements();
+        return std::binary_search(elems.begin(), elems.end(), e, elemLt);
     }
 
     bool elementsIsEmpty() const {
-        return _elements.empty();
+        return _originalElements.empty();
     }
 
     bool hasSingleElement() const {
-        return !_hasMultipleUniqueElements && !_elements.empty();
+        return _hasSingleUniqueElement;
     }
 
     void appendElements(BSONArrayBuilder& bab, bool getSortedAndDeduped = true);
-
-    void appendOriginalElements(BSONArrayBuilder& bab) const;
 
     /**
      * Reduces the potentially large vector of elements to just the first of each "canonical" type.
      * Different types of numbers are not considered distinct.
      *
-     * For example, collapses [2, 4, NumberInt(3), "foo", "bar", 3, 5] into just [2, "foo"].
+     * For example, collapses [2, 4, NumberInt(3), "foo", "bar"] into just [2, "foo"].
      */
-    std::vector<BSONElement> getFirstOfEachType(bool getSortedAndDeduped);
+    std::vector<BSONElement> getFirstOfEachType(bool getSortedAndDeduped = true) const;
 
     /**
-     * This method writes the contents of '_elements' to the specified stream. Note that if
-     * '_elements' has not been sorted or deduped yet, this method will leave '_elements' as-is.
+     * This method writes this InListData's elements to the specified stream. If the sorted elements
+     * are available then the sorted elements will be used, otherwise '_originalElements' will be
+     * This method writes this InListData's elements to the specified stream. If the sorted elements
+     * are available then the sorted elements will be used, otherwise '_originalElements' will be
+     * used.
      */
     template <typename StreamT>
-    void writeToStream(StreamT& stream) {
-        for (auto&& e : _elements) {
-            stream << e.toString(false) << " ";
+    void writeToStream(StreamT& stream) const {
+        const auto* sortedElems = getSortedElementsIfAvailable();
+        const auto& elems = sortedElems ? *sortedElems : _originalElements;
+
+        bool first = true;
+        for (const auto& elem : elems) {
+            if (first) {
+                first = false;
+            } else {
+                stream << " ";
+            }
+
+            stream << elem.toString(false);
         }
     }
 
@@ -245,36 +259,47 @@ public:
 
     void setCollator(const CollatorInterface* coll);
 
-    bool isSortedAndDeduped() const {
-        return _sortedAndDeduped;
-    }
-
     bool isBSONOwned() const {
         return _arr.has_value() && _arr->isOwned();
     }
-
-    bool isPrepared() const {
-        return _prepared;
-    }
-
-    // If '_arr.has_value() && !_arr->isOwned()' is true, this method will make a copy of the BSON
-    // and then update update '_arr' and '_elements' to point to the copied BSON instead of the
-    // original BSON. If '_arr.has_value() && !_arr->isOwned()' is false, this method does nothing.
-    // After this method returns, you are guaranteed that '!_arr.has_value() || _arr->isOwned()'
-    // will be true.
-    void makeBSONOwned();
-
-    // This method is called by SBE to "prepare" this InListData for use in an SBE plan. Once
-    // prepare() is called on an InListData, it can no longer be modified.
-    void prepare();
 
     const BSONObj& getOwnedBSONStorage() const {
         tassert(8558800, "Expected BSON storage to be owned", isBSONOwned());
         return *_arr;
     }
 
+    void makeBSONOwned();
+
+    MONGO_COMPILER_ALWAYS_INLINE
+    bool isShared() const {
+        return _shared.load();
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE
+    void setShared() const {
+        if (!isShared()) {
+            _shared.store(true);
+        }
+    }
+
+    bool elementsHaveBeenSorted() const {
+        return getSortedElementsIfAvailable() != nullptr;
+    }
+
 private:
-    InListData(const InListData& other);
+    struct CloneCtorTag {};
+
+    InListData(CloneCtorTag, const InListData& other);
+
+    MONGO_COMPILER_ALWAYS_INLINE
+    static std::unique_ptr<std::vector<BSONElement>> cloneSortedElements(
+        const boost::optional<LazilyInitialized<std::vector<BSONElement>>>& sortedElems) {
+        // If 'sortedElems' is initialized return a copy of its contents, otherwise return null.
+        if (const std::vector<BSONElement>* vec = sortedElems->getIfInitialized()) {
+            return std::make_unique<std::vector<BSONElement>>(*vec);
+        }
+        return {};
+    }
 
     Status setElementsImpl(boost::optional<BSONObj> arr,
                            boost::optional<std::vector<BSONElement>> elementsIn,
@@ -282,62 +307,104 @@ private:
                            boost::optional<uint32_t> elemsSizeHint = boost::none,
                            const std::function<Status(const BSONElement&)>& fn = {});
 
+    MONGO_COMPILER_ALWAYS_INLINE
+    const std::vector<BSONElement>* getSortedElementsIfAvailable() const {
+        // If '_originalElements' is already in sorted order and doesn't have any duplicates,
+        // then return a pointer to '_originalElements'.
+        if (_wasPreSortedAndDeduped) {
+            return &_originalElements;
+        }
+
+        return _sortedElements->getIfInitialized();
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE
+    const std::vector<BSONElement>& getSortedElements() const {
+        // If '_originalElements' is already in sorted order and doesn't have any duplicates,
+        // then return a reference to '_originalElements'.
+        if (_wasPreSortedAndDeduped) {
+            return _originalElements;
+        }
+
+        // Get '_sortedElements' (initializing it if needed) and return a reference to it.
+        return _sortedElements->get([&] {
+            // Copy '_originalElements' into 'elems'.
+            auto elems = std::make_unique<std::vector<BSONElement>>(_originalElements);
+
+            // If 'elems' isn't already in sorted order, sort it now.
+            if (!_wasPreSorted) {
+                auto elemLt = InListElemLessThan(_collator);
+                std::sort(elems->begin(), elems->end(), elemLt);
+            }
+
+            // De-duplicate 'elems' and return it.
+            auto elemEq = InListElemEqualTo(_collator);
+            auto newEnd = std::unique(elems->begin(), elems->end(), elemEq);
+            if (newEnd != elems->end()) {
+                elems->erase(newEnd, elems->end());
+            }
+
+            return elems;
+        });
+    }
+
     void updateSbeTagMasks();
 
-    // This method will sort and de-dup the BSONElements in '_elements' if they haven't already
-    // been sorted and de-duped.
-    void sortAndDedupElements();
+    void sortAndDedupElementsImpl();
 
-    void buildHashSet();
+    // If '_arr' is defined and '_arr->isOwned()' is false, this helper function will call
+    // makeOwned() on '_arr' and then it will fixup the BSONElements in '_originalElements'
+    // and '_sortedElements'. Otherwise, this helper does nothing and returns.
+    void makeArrOwned();
 
     // Collator used to construct the comparator for comparing elements.
     const CollatorInterface* _collator = nullptr;
 
     // Bitset that indicates which SBE TypeTags could potentially be equal to an element in
-    // '_elements'.
+    // '_originalElements'.
     uint64_t _sbeTagMask = 0;
     uint64_t _hashSetSbeTagMask = 0;
 
     // Bitset that indicates which BSONTypes could potentially be equal to an element in
-    // '_elements'.
+    // '_originalElements'.
     uint32_t _typeMask = 0;
 
-    // Whether or not '_elements' has been initialized.
+    // Whether or not '_originalElements' has been initialized.
     bool _elementsInitialized = false;
 
-    // Whether or not '_elements' contains an empty array.
+    // Whether or not '_originalElements' contains an empty array.
     bool _hasEmptyArray = false;
 
-    // Whether or not '_elements' contains an empty object.
+    // Whether or not '_originalElements' contains an empty object.
     bool _hasEmptyObject = false;
 
-    // Whether or not '_elements' contains a non-empty array.
+    // Whether or not '_originalElements' contains a non-empty array.
     bool _hasNonEmptyArray = false;
 
-    // Whether or not '_elements' contains a non-empty object.
+    // Whether or not '_originalElements' contains a non-empty object.
     bool _hasNonEmptyObject = false;
 
-    // Whether or not '_elements' contains one or more strings whose lengths (in bytes) exceed
-    // 'kLargeStringThreshold'.
+    // Whether or not '_originalElements' contains one or more strings whose lengths (in bytes)
+    // exceed 'kLargeStringThreshold'.
     bool _hasLargeStrings = false;
 
-    // Boolean flags that track whether '_elements' is sorted, whether it's sorted and de-duped,
-    // and whether it contains multiple unique elements (i.e. after de-duping it has more than
-    // one element).
-    bool _sorted = false;
-    bool _sortedAndDeduped = false;
-    bool _hasMultipleUniqueElements = false;
+    // Whether or not '_originalElements' was pre-sorted.
+    bool _wasPreSorted = false;
 
-    // Whether or not '_hashSet' has been initialized.
-    bool _hashSetInitialized = false;
+    // Whether or not '_originalElements' was pre-sorted and pre-deduped.
+    bool _wasPreSortedAndDeduped = false;
 
-    // Whether or not this InListData has been "prepared". Once an InListData transitions to the
-    // "prepared" state, it cannot be modified and will remain in the "prepared" state for the
-    // rest of its lifetime.
-    bool _prepared = false;
+    // Whether or not the contents of '_originalElements', after de-duping, will consist of exactly
+    // one element.
+    bool _hasSingleUniqueElement = false;
+
+    // Whether or not this InListData has been "shared". Once an InListData transitions to the
+    // "shared" state, it cannot be modified and will remain in the "shared" state for the res
+    // of its lifetime.
+    mutable AtomicWord<bool> _shared{false};
 
     // An optional BSON array field. If this field is not boost::none, it will point to a BSON array
-    // that contains all of the BSONElements from '_elements'.
+    // that contains all of the BSONElements from '_originalElements'.
     boost::optional<BSONObj> _arr;
 
     // An optional BSON array field. If the 'setElements(BSONObj)' method is called and then later
@@ -346,21 +413,11 @@ private:
     boost::optional<BSONObj> _oldBackingArr;
 
     // If '_elementsInitialized' is true, then this field will contain the all elements (with regex
-    // type values filtered out). If '_arr.has_value()' is false, this field will be empty.
-    std::vector<BSONElement> _elements;
+    // type values filtered out).
+    std::vector<BSONElement> _originalElements;
 
-    // Optional vector of BSONElements. If the 'setElements(vector<BSONElement>)' method is called
-    // and then 'sortAndDedupElements()' is called, this field is used to save a copy of '_elements'
-    // prior to sorting and deduping.
-    boost::optional<std::vector<BSONElement>> _originalElements;
-
-    // De-duped hash set containing all non-string shallow-type elements and all NumberDecimal
-    // elements. If _collator is null, this hash set will also contain all non-large strings/symbols
-    // (i.e. strings and symbols whose length doesn't exceed 'kLargeStringThreshold').
-    sbe::value::ValueSetType _hashSet;
-
-    // This field indicates where the beginning of the binary search range should be when using
-    // binary search as a fallback to searching '_hashSet'.
-    size_t _binarySearchStartOffset = 0;
+    // A lazily initialized vector of BSONElements. When '_sortedElements' has been initialized,
+    // it will contain a sorted and deduped copy of the elements from '_originalElements'.
+    boost::optional<LazilyInitialized<std::vector<BSONElement>>> _sortedElements;
 };
 }  // namespace mongo

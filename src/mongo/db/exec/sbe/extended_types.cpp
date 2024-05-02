@@ -33,6 +33,7 @@
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/db/exec/js_function.h"
+#include "mongo/db/exec/sbe/in_list.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
@@ -237,18 +238,21 @@ struct IndexBoundsOps {
     static constexpr ExtendedTypeOps typeOps{&makeCopy, &release, &print, &getApproxSize};
 };
 
-struct InListDataOps {
+struct InListOps {
     static std::pair<TypeTags, Value> makeCopy(Value val) {
-        return {TypeTags::inListData, val};
+        auto inListCopy = new InList(*value::getInListView(val));
+        return {TypeTags::inList, value::bitcastFrom<InList*>(inListCopy)};
     }
 
     static void release(Value val) {
-        // Do nothing.
+        delete value::getInListView(val);
     }
 
     static std::string print(Value val) {
         std::stringstream ss;
-        value::getInListDataView(val)->writeToStream(ss);
+        ss << "InList(";
+        value::getInListView(val)->writeToStream(ss);
+        ss << ")";
         return ss.str();
     }
 
@@ -268,6 +272,6 @@ MONGO_INITIALIZER(ExtendedSbeTypes)(InitializerContext* context) {
     value::registerExtendedTypeOps(TypeTags::sortSpec, &SortSpecOps::typeOps);
     value::registerExtendedTypeOps(TypeTags::makeObjSpec, &MakeObjSpecOps::typeOps);
     value::registerExtendedTypeOps(TypeTags::indexBounds, &IndexBoundsOps::typeOps);
-    value::registerExtendedTypeOps(TypeTags::inListData, &InListDataOps::typeOps);
+    value::registerExtendedTypeOps(TypeTags::inList, &InListOps::typeOps);
 }
 }  // namespace mongo::sbe

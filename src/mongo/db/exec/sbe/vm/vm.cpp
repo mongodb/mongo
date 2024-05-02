@@ -68,6 +68,7 @@
 #include "mongo/db/exec/sbe/columnar.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/in_list.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/sbe_pattern_value_cmp.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
@@ -84,7 +85,6 @@
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/btree_key_generator.h"
-#include "mongo/db/matcher/in_list_data.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -186,7 +186,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isNull
     0,  // isObject
     0,  // isArray
-    0,  // isInListData
+    0,  // isInList
     0,  // isString
     0,  // isNumber
     0,  // isBinData
@@ -857,8 +857,8 @@ void CodeFragment::appendIsArray(Instruction::Parameter input) {
     appendSimpleInstruction(Instruction::isArray, input);
 }
 
-void CodeFragment::appendIsInListData(Instruction::Parameter input) {
-    appendSimpleInstruction(Instruction::isInListData, input);
+void CodeFragment::appendIsInList(Instruction::Parameter input) {
+    appendSimpleInstruction(Instruction::isInList, input);
 }
 
 void CodeFragment::appendIsString(Instruction::Parameter input) {
@@ -4175,7 +4175,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::isMemberImpl(value::Typ
                                                                       value::TypeTags arrTag,
                                                                       value::Value arrVal,
                                                                       CollatorInterface* collator) {
-    if (!value::isArray(arrTag) && arrTag != value::TypeTags::inListData) {
+    if (!value::isArray(arrTag) && arrTag != value::TypeTags::inList) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
@@ -4183,12 +4183,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::isMemberImpl(value::Typ
         return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
     }
 
-    if (arrTag == value::TypeTags::inListData) {
-        auto inListData = value::getInListDataView(arrVal);
-        if (collator != nullptr) {
-            inListData->setCollator(collator);
+    if (arrTag == value::TypeTags::inList) {
+        if (exprTag == value::TypeTags::Nothing) {
+            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
         }
-        const bool found = inListData->contains(exprTag, exprVal);
+
+        // For InLists, we intentionally ignore the 'collator' parmeter and we use the
+        // InList's collator instead.
+        InList* inList = value::getInListView(arrVal);
+        const bool found = inList->contains(exprTag, exprVal);
+
         return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
     } else if (arrTag == value::TypeTags::ArraySet) {
         // An empty ArraySet may not have a collation, but we don't need one to definitively
@@ -11419,8 +11423,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 runTagCheck(pcPointer, value::isArray);
                 break;
             }
-            case Instruction::isInListData: {
-                runTagCheck(pcPointer, value::isInListData);
+            case Instruction::isInList: {
+                runTagCheck(pcPointer, value::isInList);
                 break;
             }
             case Instruction::isString: {

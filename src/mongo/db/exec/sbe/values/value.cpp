@@ -278,6 +278,7 @@ void releaseValueDeep(TypeTags tag, Value val) noexcept {
         case TypeTags::sortSpec:
         case TypeTags::makeObjSpec:
         case TypeTags::indexBounds:
+        case TypeTags::inList:
             getExtendedTypeOps(tag)->release(val);
             break;
         default:

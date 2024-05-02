@@ -179,7 +179,7 @@ struct Instruction {
         isNull,
         isObject,
         isArray,
-        isInListData,
+        isInList,
         isString,
         isNumber,
         isBinData,
@@ -401,8 +401,8 @@ struct Instruction {
                 return "isObject";
             case isArray:
                 return "isArray";
-            case isInListData:
-                return "isInListData";
+            case isInList:
+                return "isInList";
             case isString:
                 return "isString";
             case isNumber:
@@ -1161,7 +1161,7 @@ public:
     void appendIsNull(Instruction::Parameter input);
     void appendIsObject(Instruction::Parameter input);
     void appendIsArray(Instruction::Parameter input);
-    void appendIsInListData(Instruction::Parameter input);
+    void appendIsInList(Instruction::Parameter input);
     void appendIsString(Instruction::Parameter input);
     void appendIsNumber(Instruction::Parameter input);
     void appendIsBinData(Instruction::Parameter input);

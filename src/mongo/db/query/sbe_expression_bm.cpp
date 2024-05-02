@@ -135,7 +135,7 @@ public:
             &_slotIdGenerator,
             &_frameIdGenerator,
             &_spoolIdGenerator,
-            &_inListsSet,
+            &_inListsMap,
             &_collatorsMap,
             &_sortSpecMap,
             _expCtx,
@@ -203,7 +203,7 @@ private:
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
-    stage_builder::StageBuilderState::InListsSet _inListsSet;
+    stage_builder::StageBuilderState::InListsMap _inListsMap;
     stage_builder::StageBuilderState::CollatorsMap _collatorsMap;
     stage_builder::StageBuilderState::SortSpecMap _sortSpecMap;
     boost::intrusive_ptr<ExpressionContext> _expCtx;

@@ -234,7 +234,7 @@ public:
                 case Instruction::isNull:
                 case Instruction::isObject:
                 case Instruction::isArray:
-                case Instruction::isInListData:
+                case Instruction::isInList:
                 case Instruction::isString:
                 case Instruction::isNumber:
                 case Instruction::isBinData:
