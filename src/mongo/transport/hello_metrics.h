@@ -102,7 +102,6 @@ public:
     void incrementNumAwaitingTopologyChanges();
     void decrementNumAwaitingTopologyChanges();
 
-    void resetNumAwaitingTopologyChanges();
     friend InExhaustHello;
 
     /**
@@ -114,6 +113,7 @@ public:
     void serialize(BSONObjBuilder*) const;
 
 private:
+    void resetNumAwaitingTopologyChanges();
     void incrementNumExhaustIsMaster();
     void decrementNumExhaustIsMaster();
 

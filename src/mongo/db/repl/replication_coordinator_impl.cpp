@@ -2687,8 +2687,8 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorImpl::awaitHelloRespo
         LOGV2_DEBUG(6208204, 1, "Error while waiting for hello response", "status"_attr = status);
 
         // We decrement the counter on most errors. Note that some errors may already be covered
-        // by calls to resetNumAwaitingTopologyChanges(), which sets the counter to zero, so we
-        // only decrement non-zero counters. This is safe so long as:
+        // by calls to resetNumAwaitingTopologyChangesForAllSessionManagers(), which sets the
+        // counter to zero, so we only decrement non-zero counters. This is safe so long as:
         // 1) Increment + decrement calls always occur at a 1:1 ratio and in that order.
         // 2) All callers to increment/decrement/reset take locks.
         stdx::lock_guard lk(_mutex);
@@ -4733,7 +4733,8 @@ void ReplicationCoordinatorImpl::_errorOnPromisesIfHorizonChanged(WithLock lk,
                                "Received a reconfig that changed the horizon mappings."});
         }
         _sniToValidConfigPromiseMap.clear();
-        HelloMetrics::get(opCtx)->resetNumAwaitingTopologyChanges();
+        HelloMetrics::get(opCtx)->resetNumAwaitingTopologyChangesForAllSessionManagers(
+            opCtx->getServiceContext());
     }
 
     if (oldIndex >= 0) {
@@ -4747,7 +4748,8 @@ void ReplicationCoordinatorImpl::_errorOnPromisesIfHorizonChanged(WithLock lk,
                                    "Received a reconfig that changed the horizon mappings."});
             }
             _createHorizonTopologyChangePromiseMapping(lk);
-            HelloMetrics::get(opCtx)->resetNumAwaitingTopologyChanges();
+            HelloMetrics::get(opCtx)->resetNumAwaitingTopologyChangesForAllSessionManagers(
+                opCtx->getServiceContext());
         }
     }
 }
