@@ -1,19 +1,14 @@
 // Tests query settings are applied to aggregate queries regardless of the query engine (SBE or
 // classic).
 // @tags: [
-//   # $planCacheStats can not be run with specified read preferences/concerns.
-//   assumes_read_preference_unchanged,
-//   assumes_read_concern_unchanged,
-//   # $planCacheStats can not be run in transactions.
-//   does_not_support_transactions,
+//   # Balancer may impact the explain output (e.g. data was previously present on both shards and
+//   # now only on one).
+//   assumes_balancer_off,
 //   directly_against_shardsvrs_incompatible,
 //   simulate_atlas_proxy_incompatible,
 //   # 'planCacheClear' command is not allowed with the security token.
 //   not_allowed_with_signed_security_token,
 //   requires_fcv_80,
-//   # Explain for tracked unsharded collections return IXSCAN as inputStage
-//   # TODO SERVER-87164 re-enable the tests in suites with random migrations
-//   assumes_balancer_off,
 // ]
 //
 
