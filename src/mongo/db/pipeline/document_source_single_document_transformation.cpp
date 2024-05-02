@@ -106,14 +106,15 @@ Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::
 
     if (std::next(itr) == container->end()) {
         return container->end();
-    } else if (dynamic_cast<DocumentSourceSkip*>(std::next(itr)->get())) {
+    }
+
+    auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
+
+    if (nextSkip) {
         std::swap(*itr, *std::next(itr));
         return itr == container->begin() ? itr : std::prev(itr);
-    } else if (_transformationProcessor) {
-        return _transformationProcessor->getTransformer().doOptimizeAt(itr, container);
-    } else {
-        return std::next(itr);
     }
+    return std::next(itr);
 }
 
 DepsTracker::State DocumentSourceSingleDocumentTransformation::getDependencies(
