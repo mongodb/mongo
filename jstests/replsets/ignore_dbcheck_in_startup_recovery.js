@@ -46,6 +46,8 @@ assert.eq(secondaryDb.getCollection(collName).find({}).count(), 0);
 
 configureFailPoint(primary, "holdStableTimestampAtSpecificTimestamp", {timestamp: stableTimestamp});
 
+// TODO SERVER-89921: Uncomment validateMode and secondaryIndex once the relevant tickets are
+// backported.
 runDbCheck(replSet,
            primaryDb,
            collName,
@@ -78,6 +80,7 @@ checkHealthLog(secondaryHealthLog, logQueries.duringStableRecovery, 3);
 checkHealthLog(secondaryHealthLog, logQueries.infoBatchQuery, 0);
 checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 3);
 
+// TODO SERVER-89921: Uncomment checkHealthLog once the relevant tickets are backported.
 // Check that the primary logged an error health log entry for each document with missing index key.
 // checkHealthLog(primaryHealthLog, logQueries.recordNotFoundQuery, nDocs);
 // Check that the primary does not have other error/warning entries.

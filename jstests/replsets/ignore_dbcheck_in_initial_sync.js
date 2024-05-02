@@ -57,6 +57,7 @@ replSet.reInitiate();
 
 initialSyncHangBeforeSplittingControlFlowFailPoint.wait();
 
+// TODO SERVER-89921: Uncomment validateMode once the relevant tickets are backported.
 runDbCheck(replSet,
            primaryDb,
            collName,
@@ -74,6 +75,8 @@ assert.commandWorked(initialSyncNode.adminCommand(
 
 replSet.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
 
+// TODO SERVER-89921: Uncomment all of the following checkHealthLog once the relevant tickets are
+// backported.
 // Check that the primary logged an error health log entry for each document with missing index key.
 // checkHealthLog(primaryHealthlog, logQueries.missingIndexKeysQuery, nDocs);
 // Check that the primary does not have other error/warning entries.
