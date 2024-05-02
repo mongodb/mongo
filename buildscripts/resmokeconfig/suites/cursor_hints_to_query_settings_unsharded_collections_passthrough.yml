@@ -56,6 +56,7 @@ selector:
     - jstests/core/index/index_diag.js
     - jstests/core/index/index_multikey.js
     - jstests/core/query/covered_multikey.js
+    - jstests/core/query/cursor/getmore_invalidated_cursors.js
     - jstests/core/query/explain/explain_shell_helpers.js
     - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
     - jstests/core/return_key.js
@@ -77,11 +78,6 @@ selector:
     # additional hashed shard key indexes that are automatically added by this passthrough.
     - jstests/core/query/mr/mr_merge.js
     - jstests/core/query/mr/mr_preserve_indexes.js
-
-    # This suite intercepts exceptions in order to override only commands which worked originally. This interferes
-    # with the expected exit code of the test and/or 'assert.throws()'.
-    - jstests/core/query/count/count_plan_summary.js
-    - jstests/core/query/cursor/getmore_invalidated_cursors.js
 
     # Query settings have a higher precedence over index filters.
     - jstests/core/index/index_filter_catalog_independent.js
@@ -107,6 +103,7 @@ selector:
     - assumes_against_mongod_not_mongos
     - requires_non_retryable_commands
     - requires_profiling
+    - requires_fsync
 executor:
   archive:
     hooks:

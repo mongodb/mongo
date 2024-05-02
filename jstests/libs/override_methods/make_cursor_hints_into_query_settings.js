@@ -19,14 +19,11 @@ function requestsResumeToken(cmdObj) {
     return "$_requestResumeToken" in cmdObj && cmdObj["$_requestResumeToken"] === true;
 }
 
-function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {
+function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, makeFuncArgs) {
     // Execute the original command and return the result immediately if it failed. This allows test
     // cases which assert on thrown error codes to still pass.
     const originalResponse = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-    if (!OverrideHelpers.commandMaybeWorked(originalResponse)) {
-        jsTestLog(
-            `Skipped converting cursor hints into query settings because the original command ` +
-            `${tojson(cmdObj)} was not successful.`)
+    if (!originalResponse.ok) {
         return originalResponse;
     }
 
@@ -50,7 +47,10 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     delete innerCmd.hint;
 
     const explainCmd = getExplainCommand(innerCmd);
-    const explain = assert.commandWorked(db.runCommand(explainCmd));
+    const explain = assert.commandWorked(
+        db.runCommand(explainCmd),
+        `Failed running explain command ${
+            tojson(explainCmd)} while transforming cursor hints into query settings`);
     const isIdHackQuery =
         explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
     if (isIdHackQuery) {
@@ -59,17 +59,16 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     }
 
     // If the collection used is a view, determine the underlying collection.
-    const collectionName = getCollectionName(innerCmd);
+    const collectionName = getCollectionName(db, innerCmd);
     if (!collectionName) {
         return originalResponse;
     }
 
+    // Set the equivalent query settings, execute the original command without the hint, and finally
+    // remove all the settings.
     const settings = {indexHints: {ns: {db: dbName, coll: collectionName}, allowedIndexes}};
     const qsutils = new QuerySettingsUtils(db, collectionName);
     const representativeQuery = qsutils.makeQueryInstance(innerCmd);
-
-    // Set the equivalent query settings, execute the original command without the hint, and finally
-    // remove all the settings.
     return qsutils.withQuerySettings(
         representativeQuery, settings, () => clientFunction.apply(conn, makeFuncArgs(cmdObj)));
 }

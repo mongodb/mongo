@@ -15,6 +15,7 @@ export class QuerySettingsUtils {
      * Create a query settings utility class.
      */
     constructor(db, collName) {
+        // TODO SERVER-89927: Prefix private properties with '_'.
         this.db = db;
         this.adminDB = this.db.getSiblingDB("admin");
         this.collName = collName;
@@ -193,15 +194,20 @@ export class QuerySettingsUtils {
      * been propagated throughout the cluster.
      */
     withQuerySettings(representativeQuery, settings, runTest) {
-        const queryShapeHash = assert
-                                   .commandWorked(this.db.adminCommand(
-                                       {setQuerySettings: representativeQuery, settings: settings}))
-                                   .queryShapeHash;
-        assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 1));
-        const result = runTest();
-        assert.commandWorked(this.db.adminCommand({removeQuerySettings: representativeQuery}));
-        assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 0));
-        return result;
+        let queryShapeHash = undefined;
+        try {
+            const setQuerySettingsCmd = {setQuerySettings: representativeQuery, settings: settings};
+            queryShapeHash =
+                assert.commandWorked(this.db.adminCommand(setQuerySettingsCmd)).queryShapeHash;
+            assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 1));
+            return runTest();
+        } finally {
+            if (queryShapeHash) {
+                const removeQuerySettingsCmd = {removeQuerySettings: representativeQuery};
+                assert.commandWorked(this.db.adminCommand(removeQuerySettingsCmd));
+                assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 0));
+            }
+        }
     }
 
     withoutDollarDB(cmd) {

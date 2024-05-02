@@ -97,36 +97,13 @@ export const OverrideHelpers = (function() {
      * Example usage:
      *  const res = OverrideHelpers.withPreOverrideRunCommand(() => db.adminCommand(cmd));
      */
-    function withPreOverrideRunCommand(exec) {
+    function withPreOverrideRunCommand(fn) {
         const overriddenRunCommand = Mongo.prototype.runCommand;
-        Mongo.prototype.runCommand = preOverrideRunCommand;
-        const res = exec();
-        Mongo.prototype.runCommand = overriddenRunCommand;
-        return res;
-    }
-
-    /**
-     * Higher order function for running an 'exec' function without any log messages.
-     * Example usage:
-     * OverrideHelpers.withSuppressedLogs(() => jsTestLog('Hello!')); // Doesn't output anything.
-     */
-    function withSuppressedLogs(exec) {
-        const originalPrintFn = globalThis.print;
-        globalThis.print = (_msg) => { /* do nothing */ };
-        const res = exec();
-        globalThis.print = originalPrintFn;
-        return res;
-    }
-
-    /**
-     * Non-failing alternative for 'assert.commandWorked()' which returns the response object if the
-     * command worked, and 'undefined' otherwise.
-     */
-    function commandMaybeWorked(resObj) {
         try {
-            return withSuppressedLogs(() => assert.commandWorked(resObj));
-        } catch (e) {
-            return undefined;
+            Mongo.prototype.runCommand = preOverrideRunCommand;
+            return fn();
+        } finally {
+            Mongo.prototype.runCommand = overriddenRunCommand;
         }
     }
 
@@ -140,7 +117,5 @@ export const OverrideHelpers = (function() {
         prependOverrideInParallelShell: prependOverrideInParallelShell,
         overrideRunCommand: overrideRunCommand,
         withPreOverrideRunCommand: withPreOverrideRunCommand,
-        withSuppressedLogs: withSuppressedLogs,
-        commandMaybeWorked: commandMaybeWorked,
     };
 })();

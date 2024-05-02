@@ -30,7 +30,10 @@ selector:
     - jstests/aggregation/sources/geonear/geonear_hint.js
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
     - jstests/core/administrative/current_op/**/*.js
+    - jstests/core/collation.js
     - jstests/core/operation_latency_histogram.js
+    - jstests/core/top.js
+    - jstests/core/views/views_stats.js
 
     # Cannot clear the plan cache due to timeseries lock.
     - jstests/core/write/bulk/bulk_write_timeseries_basic.js
@@ -59,13 +62,17 @@ selector:
     - jstests/core/index/express.js
     - jstests/core/index/index_filter_commands.js
     - jstests/core/query/query_settings/**/*.js
-    - jstests/core/queryable_encryption/query_settings_fle.js
+
+    # Query settings application is skipped for queries targeting collections containing encryption information,
+    # and as such it's not possible to engage the fallback mechanism.
+    - jstests/core/queryable_encryption/**/*.js
 
     - jstests/core/txns/**/*.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_getmore
     - requires_profiling
+    - requires_fsync
 executor:
   archive:
     hooks:
