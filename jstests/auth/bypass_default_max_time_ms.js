@@ -4,7 +4,7 @@
  *
  * @tags: [
  *   creates_and_authenticates_user,
- *   requires_fcv_81,
+ *   requires_fcv_80,
  *   # Transactions aborted upon fcv upgrade or downgrade; cluster parameters use internal txns.
  *   requires_auth,
  *   requires_replication,

@@ -7,7 +7,7 @@
  *   # Transactions aborted upon fcv upgrade or downgrade; cluster parameters use internal txns.
  *   uses_transactions,
  *   featureFlagSecurityToken,
- *   requires_fcv_81,
+ *   requires_fcv_80,
  * ]
  */
 
