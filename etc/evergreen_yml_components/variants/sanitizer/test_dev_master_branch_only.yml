@@ -377,7 +377,6 @@ buildvariants:
         archive-mongocryptd-debug
       lang_environment: LANG=C
       san_options: *ubsan_options
-      # TODO SERVER-86610 add tcmalloc-google as the allocator for ubsan
       compile_flags: >-
         --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
         --dbg=on
