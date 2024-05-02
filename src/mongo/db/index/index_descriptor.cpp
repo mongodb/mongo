@@ -175,10 +175,6 @@ IndexDescriptor::SharedState::SharedState(const std::string& accessMethodName, B
     }
 
     if (BSONElement prepareUniqueElement = _infoObj[kPrepareUniqueFieldName]) {
-        uassert(ErrorCodes::InvalidOptions,
-                "Index does not support the 'prepareUnique' field",
-                feature_flags::gCollModIndexUnique.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
         _prepareUnique = prepareUniqueElement.trueValue();
     }
 
