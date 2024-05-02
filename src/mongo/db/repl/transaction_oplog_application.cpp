@@ -33,6 +33,7 @@
 
 #include "mongo/db/repl/transaction_oplog_application.h"
 
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -538,6 +539,8 @@ void _reconstructPreparedTransaction(OperationContext* opCtx,
                                      const OplogEntry& prepareEntry,
                                      repl::OplogApplication::Mode mode) {
     repl::UnreplicatedWritesBlock uwb(opCtx);
+    // The transaction may have been prepared originally with document validation bypassed.
+    DisableDocumentValidation validationDisabler(opCtx);
 
     // Snapshot transaction can never conflict with the PBWM lock.
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
