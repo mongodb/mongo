@@ -1,8 +1,8 @@
 """Test resmoke's handling of test/task timeouts and archival."""
 
 import datetime
-import logging
 import json
+import logging
 import os
 import os.path
 import re
@@ -16,8 +16,10 @@ import yaml
 
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
 from buildscripts.resmokelib import config, core, suitesconfig
-from buildscripts.resmokelib.hang_analyzer.attach_core_analyzer_task import matches_generated_task_pattern
-from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import get_generated_task_name
+from buildscripts.resmokelib.hang_analyzer.attach_core_analyzer_task import \
+    matches_generated_task_pattern
+from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import \
+    get_generated_task_name
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
 
 
@@ -607,12 +609,13 @@ class TestEvergreenYML(unittest.TestCase):
         cls.evg_conf = parse_evergreen_file("etc/evergreen.yml")
         config.CONFIG_DIR = "buildscripts/resmokeconfig"
 
-    def validate_jstestfuzz_selector(self, suite_name):
-        suite_config = suitesconfig.get_suite(suite_name).get_config()
-        expected_selector = ["jstestfuzz/out/*.js"]
-        self.assertEqual(
-            suite_config["selector"]["roots"], expected_selector,
-            msg=f"The jstestfuzz selector for {suite_name} did not match 'jstestfuzz/out/*.js'")
+    def validate_jstestfuzz_selector(self, suite_names):
+        for suite_name in suite_names:
+            suite_config = suitesconfig.get_suite(suite_name).get_config()
+            expected_selector = ["jstestfuzz/out/*.js"]
+            self.assertEqual(
+                suite_config["selector"]["roots"], expected_selector,
+                msg=f"The jstestfuzz selector for {suite_name} did not match 'jstestfuzz/out/*.js'")
 
     # This test asserts that the jstestfuzz tasks uploads the the URL we expect it to
     # If the remote url changes, also change it in the _log_local_resmoke_invocation method
@@ -664,12 +667,7 @@ class TestEvergreenYML(unittest.TestCase):
 
             jstestfuzz_count += 1
 
-            multiversion_func = task.find_func_command("initialize multiversion tasks")
-            if multiversion_func is not None:
-                for subtask in multiversion_func["vars"]:
-                    self.validate_jstestfuzz_selector(subtask)
-            else:
-                self.validate_jstestfuzz_selector(task.get_suite_name())
+            self.validate_jstestfuzz_selector(task.get_suite_names())
 
         self.assertNotEqual(0, jstestfuzz_count, msg="Could not find any jstestfuzz tasks")
 
