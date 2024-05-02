@@ -139,6 +139,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/request_types/shardsvr_join_migrations_request_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -1221,6 +1222,21 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     }
 
     if (shardId == ShardId::kConfigServerId) {
+        // Join migrations to make sure there's no ongoing MigrationDestinationManager. New ones
+        // will observe the draining state and abort before performing any work that could re-create
+        // local catalog collections/dbs.
+        {
+            DBDirectClient client(opCtx);
+            BSONObj resultInfo;
+            ShardsvrJoinMigrations shardsvrJoinMigrations;
+            shardsvrJoinMigrations.setDbName(DatabaseName::kAdmin);
+            const auto result = client.runCommand(
+                DatabaseName::kAdmin, shardsvrJoinMigrations.toBSON({}), resultInfo);
+            uassert(8955101,
+                    "Failed to await ongoing migrations before removing catalog shard",
+                    result);
+        }
+
         // The config server may be added as a shard again, so we locally drop its drained
         // sharded collections to enable that without user intervention. But we have to wait for
         // the range deleter to quiesce to give queries and stale routers time to discover the
