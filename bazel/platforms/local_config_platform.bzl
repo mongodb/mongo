@@ -64,15 +64,17 @@ def _setup_local_config_platform(ctx):
     else:
         exec_props = ""
 
-    result = ctx.execute([
-        "uname",
-        "-r",
-    ])
-    version_numbers = result.stdout.split(".")
-    if int(version_numbers[0]) > 4 or (int(version_numbers[0]) == 4 and int(version_numbers[1]) > 3):
-        platform_constraints_str = constraints_str + ',\n        "@//bazel/platforms:kernel_version_4_4_or_greater"'
-    else:
-        platform_constraints_str = constraints_str + ',\n        "@//bazel/platforms:kernel_version_less_than_4_4"'
+    platform_constraints_str = constraints_str
+    if os != "windows":
+        result = ctx.execute([
+            "uname",
+            "-r",
+        ])
+        version_numbers = result.stdout.split(".")
+        if int(version_numbers[0]) > 4 or (int(version_numbers[0]) == 4 and int(version_numbers[1]) > 3):
+            platform_constraints_str = constraints_str + ',\n        "@//bazel/platforms:kernel_version_4_4_or_greater"'
+        else:
+            platform_constraints_str = constraints_str + ',\n        "@//bazel/platforms:kernel_version_less_than_4_4"'
 
     substitutions = {
         "{constraints}": constraints_str,
