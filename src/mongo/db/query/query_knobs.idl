@@ -36,6 +36,7 @@ global:
     - "mongo/db/query/ce_mode_parameter.h"
     - "mongo/db/query/explain_version_validator.h"
     - "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
+    - "mongo/db/query/query_knob_expressions.h"
     - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
     - "mongo/platform/atomic_proxy.h"
     - "mongo/platform/atomic_word.h"
@@ -308,7 +309,7 @@ server_parameters:
     cpp_varname: "internalPipelineLengthLimit"
     cpp_vartype: int
     default:
-      expr: 'kDebugBuild ? 200 : 1000'
+      expr: 'defaultInternalPipelineLengthLimit()'
     validator:
       gt: 0
     redact: false

@@ -172,7 +172,9 @@ function skipMatchCase() {
 // Test pipeline length.
 function testPipelineLimits() {
     jsTestLog("Testing large agg pipelines");
-    const pipelineLimit = 1000;
+    const pipelineLimit =
+        assert.commandWorked(db.adminCommand({getParameter: 1, internalPipelineLengthLimit: 1}))
+            .internalPipelineLengthLimit;
     let stages = [
         {$limit: 1},
         {$skip: 1},
