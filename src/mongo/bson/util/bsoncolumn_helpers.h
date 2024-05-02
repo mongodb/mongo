@@ -728,7 +728,6 @@ public:
                                             Buffer& buffer,
                                             uint64_t lastNonRLEBlock,
                                             const Finish& finish) {
-        // The last element in the buffer is missing (EOO).
         size_t elemCount = 0;
         while (ptr < end) {
             const uint8_t control = *ptr;
@@ -742,22 +741,26 @@ public:
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
-            elemCount += simple8b::visitAll<int64_t>(
-                ptr + 1,
-                size,
-                lastNonRLEBlock,
-                [&buffer](int64_t v) {
-                    // We can have non-zero deltas following an EOO, so we don't need to assert
-                    // here.
-                    buffer.appendMissing();
-                },
-                [&buffer]() { buffer.appendMissing(); });
+            elemCount = simple8b::count(ptr + 1, size);
+            for (size_t i = 0; i < elemCount; ++i) {
+                buffer.appendMissing();
+            }
 
             ptr += 1 + size;
         }
 
         finish(elemCount, lastNonRLEBlock);
         return ptr;
+    }
+
+    template <class Buffer>
+    requires Appendable<Buffer>
+    static const char* decompressAllMissing(const char* ptr, const char* end, Buffer& buffer) {
+        return decompressAllMissing(ptr,
+                                    end,
+                                    buffer,
+                                    simple8b::kSingleZero /* lastNonRLEBlock */,
+                                    [](size_t count, uint64_t lastNonRLEBlock) {});
     }
 
     template <class Buffer>
@@ -783,6 +786,7 @@ public:
                                             uint64_t lastNonRLEBlock,
                                             const Finish& finish) {
         if (buffer.isLastMissing()) {
+            // The last element in the buffer is missing (EOO).
             return decompressAllMissing(ptr, end, buffer, lastNonRLEBlock, finish);
         }
 

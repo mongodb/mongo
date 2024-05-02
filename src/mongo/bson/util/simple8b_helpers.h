@@ -35,6 +35,7 @@
 
 #include "mongo/platform/bits.h"
 #include "mongo/platform/int128.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::simple8b_internal {
 /*
@@ -294,6 +295,31 @@ inline uint8_t getSelectorIndex(uint8_t intsNeeded, uint8_t extensionType) {
         kIntsStoreForSelector[extensionType].begin() + kMaxSelector[extensionType],
         [intsNeeded](uint8_t intsPerSelectorIdx) { return intsNeeded >= intsPerSelectorIdx; });
     return iteratorIdx - kIntsStoreForSelector[extensionType].begin();
+}
+
+/*
+ * Returns the total number of values in the specified block, including missing values.
+ */
+inline size_t blockCount(uint64_t encoded) {
+    auto selector = encoded & kBaseSelectorMask;
+    uassert(8946900, "invalid extended selector", selector != 0);
+
+    uint8_t selectorExtension = ((encoded >> kSelectorBits) & kBaseSelectorMask);
+    if (selector == kRleSelector) {
+        return (selectorExtension + 1) * kRleMultiplier;
+    }
+
+    uint8_t extensionType = kBaseSelector;
+    // If Selectors 7 or 8 check if we are using extended selectors
+    if (selector == 7 || selector == 8) {
+        extensionType = kSelectorToExtension[selector - 7][selectorExtension];
+        uassert(8946901, "invalid extended selector", extensionType != kInvalidSelector);
+        // Use the extended selector if extension is != 0
+        if (extensionType != kBaseSelector) {
+            selector = selectorExtension;
+        }
+    }
+    return kIntsStoreForSelector[extensionType][selector];
 }
 
 }  // namespace mongo::simple8b_internal

@@ -379,6 +379,11 @@ inline size_t visitAll(const char* buffer,
 }
 
 /**
+ * Returns the total number of values over multiple Simple8b blocks including missing values.
+ */
+inline size_t count(const char* buffer, size_t size);
+
+/**
  * Calculates the sum for multiple simple8b blocks in a buffer. 'prevNonRLE' should be initialized
  * to 'kSingleSkip' when calculating sum for the first buffer. If the caller needs sum from multiple
  * buffers the value should be passed along between the calls.
