@@ -11,7 +11,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-arm64-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
-  - amazon2-arm64-large
+  - amazon2-arm64-latest-large
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
   stepback: false
 
@@ -60,8 +60,8 @@ variables:
   packager_arch: aarch64
   packager_distro: amazon2
   repo_edition: enterprise
-  large_distro_name: amazon2-arm64-large
-  core_analyzer_distro_name: amazon2-arm64-xlarge
+  large_distro_name: amazon2-arm64-latest-large
+  core_analyzer_distro_name: amazon2-arm64-latest-xlarge
   num_scons_link_jobs_available: 0.99
 
 # THIS HAS COPIES IN:
@@ -101,7 +101,7 @@ buildvariants:
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-arm64-large
+  - amazon2-arm64-latest-large
   expansions:
     scons_cache_scope: none
     compile_flags: >-
@@ -218,7 +218,7 @@ buildvariants:
   tags: ["required"]
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
-    - amazon2-arm64-small
+    - amazon2-arm64-latest-small
   stepback: true
   expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
     <<: *amazon_linux2_arm64_dynamic_expansions

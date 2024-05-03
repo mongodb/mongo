@@ -9,7 +9,7 @@ buildvariants:
   display_name: "Amazon Linux 2"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-test
+  - amazon2-latest-small
   expansions:
     test_flags: >-
       --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
@@ -33,12 +33,12 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2-large
+    large_distro_name: amazon2-latest-large
     compile_variant: amazon2
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2-build
+    - amazon2-latest-large
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -49,7 +49,7 @@ buildvariants:
   display_name: "Enterprise Amazon Linux 2"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-test
+  - amazon2-latest-small
   expansions:
     additional_package_targets: >-
       archive-mongocryptd
@@ -78,11 +78,11 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-amazon2
-    core_analyzer_distro_name: amazon2-large
+    core_analyzer_distro_name: amazon2-latest-large
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2-build
+    - amazon2-latest-large
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -94,7 +94,7 @@ buildvariants:
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-openssl111-small
+  - amazon2-openssl111-latest-small
   expansions:
     additional_package_targets: >-
       archive-mongocryptd
@@ -125,11 +125,11 @@ buildvariants:
     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
     external_auth_jobs_max: 1
     compile_variant: enterprise-amazon2-openssl111
-    core_analyzer_distro_name: amazon2-openssl111-large
+    core_analyzer_distro_name: amazon2-openssl111-latest-large
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2-openssl111-large
+    - amazon2-openssl111-latest-large
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -140,7 +140,7 @@ buildvariants:
   display_name: "Amazon Linux 2 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-arm64-small
+  - amazon2-arm64-latest-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -162,13 +162,13 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2-arm64-large
-    core_analyzer_distro_name: amazon2-arm64-xlarge
+    large_distro_name: amazon2-arm64-latest-large
+    core_analyzer_distro_name: amazon2-arm64-latest-xlarge
     compile_variant: amazon2-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
@@ -180,7 +180,7 @@ buildvariants:
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-arm64-openssl111-small
+  - amazon2-arm64-openssl111-latest-small
   expansions:
     additional_package_targets: >-
       archive-mongocryptd
@@ -214,10 +214,10 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
@@ -480,7 +480,7 @@ buildvariants:
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-test
+  - amazon2-latest-small
   expansions:
     test_flags: >-
       --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer,requires_ldap_pool
@@ -505,11 +505,11 @@ buildvariants:
     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
     external_auth_jobs_max: 1
     compile_variant: enterprise-amazon2-streams
-    large_distro_name: amazon2-large
+    large_distro_name: amazon2-latest-large
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2-build
+    - amazon2-latest-large
   - name: .development_critical
   - name: .release_critical !crypt_push
   - name: streams
@@ -520,7 +520,7 @@ buildvariants:
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-arm64-small
+  - amazon2-arm64-latest-small
   expansions:
     additional_package_targets: >-
       archive-mongocryptd
@@ -549,14 +549,14 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-amazon2-arm64
-    core_analyzer_distro_name: amazon2-arm64-xlarge
+    core_analyzer_distro_name: amazon2-arm64-latest-xlarge
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
