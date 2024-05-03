@@ -283,5 +283,5 @@ feature_flags:
     featureFlagBlockBasedDecodingPathAPI:
         description: "Enable support for decompressing BSON columns using the block based Path API"
         cpp_varname: feature_flags::gBlockBasedDecodingPathAPI
-        default: false
+        default: true
         shouldBeFCVGated: false
