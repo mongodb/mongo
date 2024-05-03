@@ -124,7 +124,7 @@ components:
     local_directory_path: src/third_party/timelib
     team_owner: "Query"
 
-  discover-python:
+  discover:
     homepage_url: https://pypi.org/project/discover/
     open_hub_url: N/A
     release_monitoring_id: -1
