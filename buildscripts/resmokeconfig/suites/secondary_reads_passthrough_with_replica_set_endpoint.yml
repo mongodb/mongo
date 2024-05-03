@@ -76,10 +76,6 @@ selector:
     # TODO (SERVER-84329): renameCollection command against a collection with invalid views fails on
     # sharded cluster but succeeds on replica set
     - jstests/core/views/invalid_system_views.js
-    # TODO (SERVER-88472): Make EncryptedDBClientBase and ImplicitEncryptedDBClientBase work with
-    # direct connection to a secondary.
-    - jstests/core/queryable_encryption/basic_crud.js
-    - jstests/core/queryable_encryption/query_settings_fle.js
     # TODO (SERVER-86364): Secondary reads assertion fails.
     - jstests/core/clustered/clustered_collection_creation.js
 
