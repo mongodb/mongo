@@ -592,8 +592,10 @@ buildvariants:
     test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     multiversion_platform: linux_x86_64
     multiversion_edition: base
-    multiversion_platform_42_or_later: debian11
+    multiversion_platform_42_or_later: debian10
     multiversion_edition_42_or_later: targeted
+    multiversion_platform_last_lts: debian11
+    multiversion_edition_last_lts: targeted
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -645,8 +647,10 @@ buildvariants:
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: linux_x86_64
     multiversion_edition: base
-    multiversion_platform_42_or_later: debian11
+    multiversion_platform_42_or_later: debian10
     multiversion_edition_42_or_later: enterprise
+    multiversion_platform_last_lts: debian11
+    multiversion_edition_last_lts: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64

@@ -93,5 +93,30 @@ db-contrib-tool setup-repro-env \
   --fallbackToMaster \
   --resmokeCmd "python buildscripts/resmoke.py" \
   --debug \
-  $last_lts_arg \
-  $last_continuous_arg 4.4 5.0
+  $last_continuous_arg 4.4
+
+# Certain build variants define additional multiversion_*_last_lts expansions in order to
+# be able to fetch a complete set of versions.
+
+if [ ! -z "${multiversion_edition_last_lts}" ]; then
+  edition="${multiversion_edition_last_lts}"
+fi
+
+if [ ! -z "${multiversion_platform_last_lts}" ]; then
+  platform="${multiversion_platform_last_lts}"
+fi
+
+if [ ! -z "${multiversion_architecture_last_lts}" ]; then
+  architecture="${multiversion_architecture_last_lts}"
+fi
+
+db-contrib-tool setup-repro-env \
+  --installDir /data/install \
+  --linkDir /data/multiversion \
+  --edition $edition \
+  --platform $platform \
+  --architecture $architecture \
+  --fallbackToMaster \
+  --resmokeCmd "python buildscripts/resmoke.py" \
+  --debug \
+  $last_lts_arg
