@@ -204,57 +204,55 @@ buildvariants:
         distros:
           - amazon2023.0-large
 
-  # This variant is a special variant to test LTO.
-  # We just want it to bake for a while before considering that we turn it on by default.
-  - name: enterprise-amazon2023-lto
-    display_name: "Enterprise Amazon Linux 2023 LTO"
-    tags: []
-    # TODO(SERVER-85904): Re-enable this to run in nightly once Bazel supports LTO.
-    # cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-    activate: false
-    run_on:
-      - amazon2023.0-small
-    expansions:
-      additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --lto
-        --linker=gold
-        --link-model=object
-      crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
-      has_packages: true
-      packager_script: packager_enterprise.py
-      packager_arch: x86_64
-      packager_distro: amazon2023
-      multiversion_platform: amazon2023
-      multiversion_edition: enterprise
-      multiversion_architecture: x86_64
-      repo_edition: enterprise
-      scons_cache_scope: shared
-      # TODO SERVER-64479 remove external_auth_jobs_max once resolved
-      external_auth_jobs_max: 1
-      compile_variant: enterprise-amazon2023-lto
-      large_distro_name: amazon2023.0-large
-    tasks:
-      - name: compile_test_and_package_serial_lto_no_unittests_TG
-        distros:
-          - amazon2023.0-large
-      # TODO: SERVER-79886 Fix broken test_packages task
-      # - name: test_packages
-      #   distros:
-      #   - amazon2023.0-large
-      - name: .development_critical !.requires_large_host
-      - name: .development_critical .requires_large_host
-        distros:
-          - amazon2023.0-large
-      - name: .release_critical !.requires_large_host !publish_packages !push !crypt_push
-      - name: .release_critical .requires_large_host !publish_packages !push !crypt_push
-        distros:
-          - amazon2023.0-large
+  # TODO(SERVER-85904): Enable when Bazel supports --link-model=object.
+  # This variant is a special variant to test Link Time Optimization (LTO).
+  # - name: enterprise-amazon2023-lto
+  #   display_name: "Enterprise Amazon Linux 2023 LTO"
+  #   tags: []
+  #   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  #   run_on:
+  #     - amazon2023.0-small
+  #   expansions:
+  #     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+  #     compile_flags: >-
+  #       --ssl
+  #       MONGO_DISTMOD=amazon2023
+  #       -j$(grep -c ^processor /proc/cpuinfo)
+  #       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+  #       --lto
+  #       --linker=gold
+  #       --link-model=object
+  #     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+  #     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+  #     has_packages: true
+  #     packager_script: packager_enterprise.py
+  #     packager_arch: x86_64
+  #     packager_distro: amazon2023
+  #     multiversion_platform: amazon2023
+  #     multiversion_edition: enterprise
+  #     multiversion_architecture: x86_64
+  #     repo_edition: enterprise
+  #     scons_cache_scope: shared
+  #     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+  #     external_auth_jobs_max: 1
+  #     compile_variant: enterprise-amazon2023-lto
+  #     large_distro_name: amazon2023.0-large
+  #   tasks:
+  #     - name: compile_test_and_package_serial_lto_no_unittests_TG
+  #       distros:
+  #         - amazon2023.0-large
+  #     # TODO: SERVER-79886 Fix broken test_packages task
+  #     # - name: test_packages
+  #     #   distros:
+  #     #   - amazon2023.0-large
+  #     - name: .development_critical !.requires_large_host
+  #     - name: .development_critical .requires_large_host
+  #       distros:
+  #         - amazon2023.0-large
+  #     - name: .release_critical !.requires_large_host !publish_packages !push !crypt_push
+  #     - name: .release_critical .requires_large_host !publish_packages !push !crypt_push
+  #       distros:
+  #         - amazon2023.0-large
 
   - name: amazon2023-arm64
     display_name: Amazon Linux 2023 arm64
@@ -348,57 +346,56 @@ buildvariants:
         distros:
           - amazon2023.0-arm64-large
 
-  # This variant is a special variant to test LTO.
-  # We just want it to bake for a while before considering that we turn it on by default.
-  - name: enterprise-amazon2023-arm64-lto
-    display_name: "Enterprise Amazon Linux 2023 arm64 LTO"
-    tags: []
-    # TODO(SERVER-85904): Re-enable this to run in nightly once Bazel supports LTO.
-    # cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-    activate: false
-    run_on:
-      - amazon2023.0-arm64-small
-    expansions:
-      additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --lto
-        --linker=gold
-        --link-model=object
-      crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
-      has_packages: true
-      multiversion_platform: amazon2023
-      multiversion_edition: enterprise
-      multiversion_architecture: aarch64
-      packager_script: packager_enterprise.py
-      packager_arch: aarch64
-      packager_distro: amazon2023
-      repo_edition: enterprise
-      scons_cache_scope: shared
-      # TODO SERVER-64479 remove external_auth_jobs_max once resolved
-      external_auth_jobs_max: 1
-      compile_variant: enterprise-amazon2023-arm64-lto
-      large_distro_name: amazon2023.0-arm64-large
-    tasks:
-      - name: compile_test_and_package_serial_lto_no_unittests_TG
-        distros:
-          - amazon2023.0-arm64-large
-      # TODO: SERVER-79886 Fix broken test_packages task
-      # - name: test_packages
-      #   distros:
-      #   - ubuntu2204-arm64-large
-      - name: .development_critical !.requires_large_host
-      - name: .development_critical .requires_large_host
-        distros:
-          - amazon2023.0-arm64-large
-      - name: .release_critical !.requires_large_host !publish_packages !push !crypt_push
-      - name: .release_critical .requires_large_host !publish_packages !push !crypt_push
-        distros:
-          - amazon2023.0-arm64-large
+  # TODO(SERVER-85904): Enable when Bazel supports --link-model=object.
+  # This variant is a special variant to test Link Time Optimization (LTO).
+  # - name: enterprise-amazon2023-arm64-lto
+  #   display_name: "Enterprise Amazon Linux 2023 arm64 LTO"
+  #   tags: []
+  #   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  #   activate: false
+  #   run_on:
+  #     - amazon2023.0-arm64-small
+  #   expansions:
+  #     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+  #     compile_flags: >-
+  #       --ssl
+  #       MONGO_DISTMOD=amazon2023
+  #       -j$(grep -c ^processor /proc/cpuinfo)
+  #       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+  #       --lto
+  #       --linker=gold
+  #       --link-model=object
+  #     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+  #     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+  #     has_packages: true
+  #     multiversion_platform: amazon2023
+  #     multiversion_edition: enterprise
+  #     multiversion_architecture: aarch64
+  #     packager_script: packager_enterprise.py
+  #     packager_arch: aarch64
+  #     packager_distro: amazon2023
+  #     repo_edition: enterprise
+  #     scons_cache_scope: shared
+  #     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+  #     external_auth_jobs_max: 1
+  #     compile_variant: enterprise-amazon2023-arm64-lto
+  #     large_distro_name: amazon2023.0-arm64-large
+  #   tasks:
+  #     - name: compile_test_and_package_serial_lto_no_unittests_TG
+  #       distros:
+  #         - amazon2023.0-arm64-large
+  #     # TODO: SERVER-79886 Fix broken test_packages task
+  #     # - name: test_packages
+  #     #   distros:
+  #     #   - ubuntu2204-arm64-large
+  #     - name: .development_critical !.requires_large_host
+  #     - name: .development_critical .requires_large_host
+  #       distros:
+  #         - amazon2023.0-arm64-large
+  #     - name: .release_critical !.requires_large_host !publish_packages !push !crypt_push
+  #     - name: .release_critical .requires_large_host !publish_packages !push !crypt_push
+  #       distros:
+  #         - amazon2023.0-arm64-large
 
   - name: enterprise-amazon2-streams
     display_name: "Amazon Linux 2 enterprise build with streams"

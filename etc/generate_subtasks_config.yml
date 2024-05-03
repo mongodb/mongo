@@ -7,9 +7,9 @@ build_variant_large_distro_exceptions:
   - enterprise-amazon2-openssl111
   - enterprise-amazon2-arm64-openssl111
   - enterprise-amazon2023
-  - enterprise-amazon2023-lto
+  # TODO(SERVER-85904) - enterprise-amazon2023-lto
   - enterprise-amazon2023-arm64
-  - enterprise-amazon2023-arm64-lto
+  # TODO(SERVER-85904) - enterprise-amazon2023-arm64-lto
   - enterprise-debian12-64
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
