@@ -16,6 +16,7 @@ selector:
     - jstests/core/index/index_diag.js
     - jstests/core/index/index_multikey.js
     - jstests/core/query/covered_multikey.js
+    - jstests/core/query/cursor/getmore_invalidated_cursors.js
     - jstests/core/query/explain/explain_shell_helpers.js
     - jstests/core/query/index_deduplication.js
     - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
@@ -29,11 +30,6 @@ selector:
     # This suite emits additional explains alongside the tested command. This interferes with the number of
     # expected plan cache entries.
     - jstests/core/query/plan_cache/plan_cache_sbe_hinted.js
-
-    # This suite intercepts exceptions in order to override only commands which worked originally. This interferes
-    # with the expected exit code of the test and/or 'assert.throws()'.
-    - jstests/core/query/count/count_plan_summary.js
-    - jstests/core/query/cursor/getmore_invalidated_cursors.js
 
     # Query settings have a higher precedence over index filters.
     - jstests/core/index/index_filter_catalog_independent.js
@@ -56,6 +52,7 @@ selector:
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_profiling
+    - requires_fsync
 executor:
   archive:
     hooks:

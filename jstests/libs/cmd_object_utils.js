@@ -36,13 +36,26 @@ export function getExplainCommand(cmdObj) {
  * will return the underlying collection's name. Returns 'undefined' if the collection does not
  * exist.
  */
-export function getCollectionName(cmdObj) {
-    const name = cmdObj[getCommandName(cmdObj)];
-    const collInfos = db.getCollectionInfos({name});
-    if (!collInfos || collInfos.length === 0) {
-        return undefined;
+export function getCollectionName(db, cmdObj) {
+    try {
+        const name = cmdObj[getCommandName(cmdObj)];
+        const collInfos = db.getCollectionInfos({name});
+        if (!collInfos || collInfos.length === 0) {
+            return undefined;
+        }
+        return collInfos[0].options.viewOn || name;
+    } catch (ex) {
+        switch (ex.code) {
+            case ErrorCodes.InvalidViewDefinition: {
+                // The 'DB.prototype.getCollectionInfos()' implementation may throw an exception
+                // when faced with a malformed view definition. This is analogous to a missing
+                // collection for the purpose of passthrough suites.
+                return undefined;
+            }
+            default:
+                throw ex;
+        }
     }
-    return collInfos[0].options.viewOn || name;
 }
 
 export function isSystemCollectionName(collectionName) {
