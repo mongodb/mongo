@@ -10872,8 +10872,10 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-debian10
     compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: debian10
-    multiversion_edition: enterprise
+    multiversion_platform: linux_x86_64
+    multiversion_edition: base
+    multiversion_platform_42_or_later: debian10
+    multiversion_edition_42_or_later: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -10913,8 +10915,10 @@ buildvariants:
     push_arch: x86_64-debian10
     compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
-    multiversion_platform: debian10
-    multiversion_edition: targeted
+    multiversion_platform: linux_x86_64
+    multiversion_edition: base
+    multiversion_platform_42_or_later: debian10
+    multiversion_edition_42_or_later: targeted
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
