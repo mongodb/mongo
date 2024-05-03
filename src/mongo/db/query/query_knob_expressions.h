@@ -44,7 +44,7 @@ constexpr int defaultInternalPipelineLengthLimit() {
     }
 
 #if defined(__s390x__)
-    return 900;
+    return 700;
 #else
     return 1000;
 #endif
