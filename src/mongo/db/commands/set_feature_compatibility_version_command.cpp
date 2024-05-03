@@ -492,9 +492,10 @@ public:
                 if (role && role->has(ClusterRole::ConfigServer)) {
                     uassert(ErrorCodes::CannotDowngrade,
                             "Cannot downgrade while cluster server parameters are being set",
-                            ConfigsvrCoordinatorService::getService(opCtx)
-                                ->areAllCoordinatorsOfTypeFinished(
-                                    opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter));
+                            (requestedVersion > actualVersion ||
+                             ConfigsvrCoordinatorService::getService(opCtx)
+                                 ->areAllCoordinatorsOfTypeFinished(
+                                     opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter)));
                 }
 
                 // We pass boost::none as the setIsCleaningServerMetadata argument in order to
