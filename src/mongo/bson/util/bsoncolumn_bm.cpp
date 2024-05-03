@@ -93,6 +93,26 @@ private:
 
 std::mt19937_64 seedGen(1337);
 
+std::vector<BSONObj> generateObjects(int numObjects, int numElements) {
+    std::mt19937 gen(seedGen());
+    std::normal_distribution<> d(100, 10);
+
+    std::vector<BSONObj> objs;
+
+    for (int i = 0; i < numObjects; ++i) {
+        BSONObjBuilder builderOuter;
+        BSONObjBuilder builderInner;
+        for (int i = 0; i < numElements; ++i) {
+            int32_t value = std::lround(d(gen));
+            builderInner.append("x" + std::to_string(i), value);
+        }
+        builderOuter.appendElements(builderInner.obj());
+        objs.push_back(builderOuter.obj());
+    }
+
+    return objs;
+}
+
 std::vector<BSONObj> generateIntegers(int num, int skipPercentage) {
     std::mt19937 gen(seedGen());
     std::normal_distribution<> d(100, 10);
@@ -185,6 +205,21 @@ BSONObj buildCompressed(const std::vector<BSONObj>& elems) {
     for (auto&& elem : elems) {
         if (!elem.isEmpty()) {
             col.append(elem.firstElement());
+        } else {
+            col.skip();
+        }
+    }
+    auto binData = col.finalize();
+    BSONObjBuilder objBuilder;
+    objBuilder.append(""_sd, binData);
+    return objBuilder.obj();
+}
+
+BSONObj buildCompressedWithObjs(const std::vector<BSONObj>& elems) {
+    BSONColumnBuilder col;
+    for (auto&& elem : elems) {
+        if (!elem.isEmpty()) {
+            col.append(elem);
         } else {
             col.skip();
         }
@@ -368,6 +403,22 @@ void benchmarkReopenNaive(benchmark::State& state,
     }
 }
 
+void BM_decompressObjects(benchmark::State& state, int numElements, DecompressMode mode) {
+    BSONObj compressed = buildCompressedWithObjs(generateObjects(10000, numElements));
+    switch (mode) {
+        case kBlockBSON:
+            benchmarkBlockBasedDecompression(state, compressed.firstElement(), sizeof(int32_t));
+            break;
+        case kBlockSBE:
+            benchmarkBlockBasedDecompression_SBE(state, compressed.firstElement(), sizeof(int32_t));
+            break;
+        case kIterator:
+        default:
+            benchmarkDecompression(state, compressed.firstElement(), sizeof(int32_t));
+            break;
+    }
+}
+
 void BM_decompressIntegers(benchmark::State& state, int skipPercentage, DecompressMode mode) {
     BSONObj compressed = buildCompressed(generateIntegers(10000, skipPercentage));
     switch (mode) {
@@ -498,6 +549,9 @@ BENCHMARK_CAPTURE(BM_decompressIntegers, Block API BSON Skip = 0 %, 0, kBlockBSO
 BENCHMARK_CAPTURE(BM_decompressIntegers, Block API BSON Skip = 50 %, 50, kBlockBSON);
 BENCHMARK_CAPTURE(BM_decompressIntegers, Block API BSON Skip = 99 %, 99, kBlockBSON);
 
+BENCHMARK_CAPTURE(BM_decompressObjects, Block API BSON Objects Small, 1, kBlockBSON);
+BENCHMARK_CAPTURE(BM_decompressObjects, Block API BSON Objects Large, 10, kBlockBSON);
+
 BENCHMARK_CAPTURE(BM_decompressDoubles, Block API BSON Decimals = 0 / Skip = 0 %, 0, 0, kBlockBSON);
 BENCHMARK_CAPTURE(BM_decompressDoubles, Block API BSON Decimals = 1 / Skip = 0 %, 1, 0, kBlockBSON);
 BENCHMARK_CAPTURE(BM_decompressDoubles, Block API BSON Decimals = 4 / Skip = 0 %, 4, 0, kBlockBSON);
@@ -544,6 +598,9 @@ BENCHMARK_CAPTURE(BM_decompressIntegers, Block API SBE Skip = 0 %, 0, kBlockSBE)
 BENCHMARK_CAPTURE(BM_decompressIntegers, Block API SBE Skip = 50 %, 50, kBlockSBE);
 BENCHMARK_CAPTURE(BM_decompressIntegers, Block API SBE Skip = 99 %, 99, kBlockSBE);
 
+BENCHMARK_CAPTURE(BM_decompressObjects, Block API SBE Objects Small, 1, kBlockSBE);
+BENCHMARK_CAPTURE(BM_decompressObjects, Block API SBE Objects Large, 10, kBlockSBE);
+
 BENCHMARK_CAPTURE(BM_decompressDoubles, Block API SBE Decimals = 0 / Skip = 0 %, 0, 0, kBlockSBE);
 BENCHMARK_CAPTURE(BM_decompressDoubles, Block API SBE Decimals = 1 / Skip = 0 %, 1, 0, kBlockSBE);
 BENCHMARK_CAPTURE(BM_decompressDoubles, Block API SBE Decimals = 4 / Skip = 0 %, 4, 0, kBlockSBE);
@@ -578,6 +635,9 @@ BENCHMARK_CAPTURE(BM_decompressIntegers, Iterator API Skip = 10 %, 10, kIterator
 BENCHMARK_CAPTURE(BM_decompressIntegers, Iterator API Skip = 50 %, 50, kIterator);
 BENCHMARK_CAPTURE(BM_decompressIntegers, Iterator API Skip = 90 %, 90, kIterator);
 BENCHMARK_CAPTURE(BM_decompressIntegers, Iterator API Skip = 99 %, 99, kIterator);
+
+BENCHMARK_CAPTURE(BM_decompressObjects, Iterator API Objects Small, 1, kIterator);
+BENCHMARK_CAPTURE(BM_decompressObjects, Iterator API Objects Large, 10, kIterator);
 
 BENCHMARK_CAPTURE(BM_decompressDoubles, Iterator API Decimals = 0 / Skip = 0 %, 0, 0, kIterator);
 BENCHMARK_CAPTURE(BM_decompressDoubles, Iterator API Decimals = 1 / Skip = 0 %, 1, 0, kIterator);
