@@ -11,7 +11,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux-arm64-dynamic-compile-params # Essential set of compile parameters used for Linux dev variants.
     run_on:
-      - amazon2-arm64-large
+      - amazon2-arm64-latest-large
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     stepback: false
 
@@ -58,8 +58,8 @@ variables:
     packager_arch: aarch64
     packager_distro: amazon2
     repo_edition: enterprise
-    large_distro_name: amazon2-arm64-atlas-large
-    core_analyzer_distro_name: amazon2-arm64-xlarge
+    large_distro_name: amazon2-arm64-atlas-latest-large
+    core_analyzer_distro_name: amazon2-arm64-latest-xlarge
     num_scons_link_jobs_available: 0.99
 
   # THIS HAS COPIES IN:
@@ -98,7 +98,7 @@ buildvariants:
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - amazon2-arm64-large
+      - amazon2-arm64-latest-large
     expansions:
       scons_cache_scope: none
       compile_flags: >-
@@ -294,7 +294,7 @@ buildvariants:
     cron: "0 */4 * * *" # Run these tasks every 4 hours
     patchable: false
     run_on:
-      - amazon2-arm64-small
+      - amazon2-arm64-latest-small
     stepback: true
     expansions: &amazon-linux2-arm64-mongot-integration-expansions
       compile_flags: >-
@@ -314,7 +314,7 @@ buildvariants:
     tasks: &amazon-linux2-arm64-mongot-distro-tasks
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
-          - amazon2-arm64-large
+          - amazon2-arm64-latest-large
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
       - name: search_auth
@@ -333,7 +333,7 @@ buildvariants:
     tags: []
     patch_only: true
     run_on:
-      - amazon2-arm64-small
+      - amazon2-arm64-latest-small
     stepback: true
     expansions:
       <<: *amazon-linux2-arm64-mongot-integration-expansions
@@ -349,7 +349,7 @@ buildvariants:
     cron: "0 */4 * * *" # Run these tasks every 4 hours
     patchable: false
     run_on:
-      - amazon2-large
+      - amazon2-latest-large
     expansions: &amazon2-x86-mongot-integration-expansions
       compile_flags: >-
         --ssl
@@ -371,7 +371,7 @@ buildvariants:
     tasks: &amazon2-x86-mongot-distro-tasks
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
-          - amazon2-large
+          - amazon2-latest-large
       - name: search
       - name: search_auth
       - name: search_end_to_end_sharded_cluster
@@ -389,7 +389,7 @@ buildvariants:
     tags: []
     cron: "0 */4 * * *" # Run these tasks every 4 hours
     run_on:
-      - amazon2-large
+      - amazon2-latest-large
     expansions:
       <<: *amazon2-x86-mongot-integration-expansions
       compile_variant: amazon2-x86-mongot-integration-patchable
@@ -402,7 +402,7 @@ buildvariants:
     tags: ["required"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - amazon2-arm64-atlas-small
+      - amazon2-arm64-atlas-latest-small
     stepback: true
     expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
       <<: *amazon_linux2_arm64_dynamic_expansions
@@ -422,15 +422,15 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
-          - amazon2-arm64-atlas-large
+          - amazon2-arm64-atlas-latest-large
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
-          - amazon2-arm64-atlas-large
+          - amazon2-arm64-atlas-latest-large
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
-          - amazon2-arm64-atlas-large
+          - amazon2-arm64-atlas-latest-large
 
   - &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
     <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
@@ -473,15 +473,15 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
         distros:
-          - amazon2-arm64-atlas-large
+          - amazon2-arm64-atlas-latest-large
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
         distros:
-          - amazon2-arm64-atlas-large
+          - amazon2-arm64-atlas-latest-large
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
         distros:
-          - amazon2-arm64-atlas-large
+          - amazon2-arm64-atlas-latest-large
     expansions:
       <<: *enterprise-amazon-linux2-arm64-all-feature-flags-expansions
       # This builder excludes tests tagged with:

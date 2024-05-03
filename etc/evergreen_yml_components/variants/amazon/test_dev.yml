@@ -11,7 +11,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux-arm64-dynamic-compile-params # Essential set of compile parameters used for Linux dev variants.
     run_on:
-      - amazon2-arm64-large
+      - amazon2-arm64-latest-large
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     stepback: false
 
@@ -42,8 +42,8 @@ variables:
     packager_arch: aarch64
     packager_distro: amazon2
     repo_edition: enterprise
-    large_distro_name: amazon2-arm64-atlas-large
-    core_analyzer_distro_name: amazon2-arm64-xlarge
+    large_distro_name: amazon2-arm64-atlas-latest-large
+    core_analyzer_distro_name: amazon2-arm64-latest-xlarge
     num_scons_link_jobs_available: 0.99
 
   # THIS HAS COPIES IN:
@@ -99,15 +99,15 @@ buildvariants:
       - name: .development_critical_single_variant !.requires_large_host
       - name: .development_critical_single_variant .requires_large_host
         distros:
-          - amazon2-arm64-xlarge
+          - amazon2-arm64-latest-xlarge
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
         distros:
-          - amazon2-arm64-xlarge
+          - amazon2-arm64-latest-xlarge
       - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant
       - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
         distros:
-          - amazon2-arm64-xlarge
+          - amazon2-arm64-latest-xlarge
 
   - &enterprise-amazon-linux2-arm64-template
     <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
@@ -116,7 +116,7 @@ buildvariants:
     tags: ["suggested"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - amazon2-arm64-atlas-small
+      - amazon2-arm64-atlas-latest-small
     stepback: true
     expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
       <<: *amazon_linux2_arm64_dynamic_expansions
@@ -135,22 +135,22 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
         distros:
-          - amazon2-arm64-atlas-large
+          - amazon2-arm64-atlas-latest-large
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
         distros:
-          - amazon2-arm64-atlas-large
+          - amazon2-arm64-atlas-latest-large
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
         distros:
-          - amazon2-arm64-atlas-large
+          - amazon2-arm64-atlas-latest-large
 
   - name: &commit-queue commit-queue
     display_name: "~ Commit Queue"
     tags: ["bazel_check"]
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
     run_on:
-      - amazon2-arm64-small
+      - amazon2-arm64-latest-small
     stepback: false
     expansions:
       <<: *linux_arm64_generic_expansions
@@ -187,11 +187,11 @@ buildvariants:
       - name: .development_critical_single_variant !.requires_large_host !.clang_tidy !libdeps_graph_linting
       - name: .development_critical_single_variant .requires_large_host !.clang_tidy !libdeps_graph_linting
         distros:
-          - amazon2-arm64-large
+          - amazon2-arm64-latest-large
       - name: .development_critical !.requires_large_host_commit_queue
       - name: .development_critical .requires_large_host_commit_queue
         distros:
-          - amazon2-arm64-large
+          - amazon2-arm64-latest-large
 
   - <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
     name: amazon-linux2-arm64-try-sbe-engine
@@ -199,7 +199,7 @@ buildvariants:
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     run_on:
-      - amazon2-arm64-atlas-small
+      - amazon2-arm64-atlas-latest-small
     stepback: true
     expansions:
       <<: *amazon_linux2_arm64_dynamic_expansions
@@ -229,10 +229,10 @@ buildvariants:
       - name: noPassthroughWithMongod_gen
       - name: jsCore
         distros:
-          - amazon2-arm64-atlas-large
+          - amazon2-arm64-atlas-latest-large
       - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
         distros:
-          - amazon2-arm64-atlas-large
+          - amazon2-arm64-atlas-latest-large
       - name: replica_sets_jscore_passthrough_gen
       - name: sharded_collections_jscore_passthrough_gen
       - name: sharding_jscore_passthrough_gen
