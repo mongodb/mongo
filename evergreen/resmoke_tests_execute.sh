@@ -143,7 +143,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     $extra_args \
     ${test_flags} \
     --suites=${suite_name} \
-    --log=buildlogger \
+    --log=${resmoke_logger} \
     --staggerJobs=on \
     --installDir=${install_dir} \
     --buildId=${build_id} \
