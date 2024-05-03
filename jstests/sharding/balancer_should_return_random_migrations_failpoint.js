@@ -32,6 +32,10 @@ const dbNames = ["db0", "db1"];
 const numDocuments = 25;
 const timeFieldName = 'time';
 
+// TODO SERVER-84744 remove the feature flag
+const isReshardingForTimeseriesEnabled =
+    FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB('admin'), 'ReshardingForTimeseries');
+
 // Setup collections
 {
     for (const dbName of dbNames) {
@@ -47,9 +51,13 @@ const timeFieldName = 'time';
         // Create sharded collection
         st.adminCommand({shardCollection: `${dbName}.sharded`, key: {x: 1}});
 
-        // Create timeseries collection
-        assert.commandWorked(
-            db.createCollection('timeseries', {timeseries: {timeField: timeFieldName}}));
+        // TODO (SERVER-88852): Create the timeseries collection regardless of the feature flag
+        // status.
+        if (isReshardingForTimeseriesEnabled) {
+            // Create timeseries collection
+            assert.commandWorked(
+                db.createCollection('timeseries', {timeseries: {timeField: timeFieldName}}));
+        }
 
         // Create view
         assert.commandWorked(db.createCollection('view', {viewOn: 'unsharded'}));
@@ -75,9 +83,6 @@ let initialPlacements = {};
 
 let trackableCollections = ['unsharded'];
 
-// TODO SERVER-84744 remove the feature flag
-const isReshardingForTimeseriesEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB('admin'), 'ReshardingForTimeseries');
 if (isReshardingForTimeseriesEnabled) {
     trackableCollections.push('system.buckets.timeseries');
 }
