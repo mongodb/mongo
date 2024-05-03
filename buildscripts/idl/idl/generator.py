@@ -1754,6 +1754,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         cpp_type_info = cpp_types.get_cpp_type(field)
         cpp_type = cpp_type_info.get_type_name()
 
+        # If field (cpp_type) is the same type as sequence.objs, just copy and skip loop
+        if cpp_type == "mongo::BSONObj" and not field.type.deserializer:
+            self._writer.write_line('%s = sequence.objs;' % (_get_field_member_name(field)))
+            return
+
         self._writer.write_line('std::vector<%s> values;' % (cpp_type))
         self._writer.write_line('values.reserve(sequence.objs.size());')
         self._writer.write_empty_line()
