@@ -776,6 +776,8 @@ public:
     /**
      * Given a shardKey, returns the first chunk which is owned by shardId and overlaps or sorts
      * after that shardKey. If the return value is empty, this means no such chunk exists.
+     *
+     * Can only be used when this ChunkManager is not at point-in-time.
      */
     boost::optional<Chunk> getNextChunkOnShard(const BSONObj& shardKey,
                                                const ShardId& shardId) const;
@@ -824,9 +826,23 @@ public:
 
     /**
      * Returns the ids of all shards on which the collection has any chunks.
+     * Can only be used when this ChunkManager is not at point-in-time.
      */
     void getAllShardIds(std::set<ShardId>* all) const {
         tassert(7626409, "Expected routing table to be initialized", _rt->optRt);
+        tassert(8719700,
+                "Should never call getAllShardIds when ChunkManager is at point-in-time",
+                !_clusterTime);
+        _rt->optRt->getAllShardIds(all);
+    }
+
+    /**
+     * Returns the ids of all shards on which the collection has any chunks.
+     * Can be used when this ChunkManager is at point-in-time, but it returns the shardIds as of the
+     * latest known placement (instead of the ones at the point-in-time).
+     */
+    void getAllShardIds_UNSAFE_NotPointInTime(std::set<ShardId>* all) const {
+        tassert(8719701, "Expected routing table to be initialized", _rt->optRt);
         _rt->optRt->getAllShardIds(all);
     }
 
@@ -839,9 +855,25 @@ public:
     }
 
     /**
-     * Returns the number of shards on which the collection has any chunks
+     * Returns the number of shards on which the collection has any chunks.
+     * Can only be used when this ChunkManager is not at point-in-time.
      */
     size_t getNShardsOwningChunks() const {
+        tassert(8719702, "Expected routing table to be initialized", _rt->optRt);
+        tassert(8719703,
+                "Should never call getNShardsOwningChunks when ChunkManager is at point-in-time",
+                !_clusterTime);
+        return _rt->optRt->getNShardsOwningChunks();
+    }
+
+    /**
+     * Returns the approximate number of shards on which the collection has any chunks.
+     *
+     * To be only used for logging/metrics which do not need to be always correct. The returned
+     * value may be incorrect when this ChunkManager is at point-in-time (it will reflect the
+     * 'latest' number of shards, rather than the one at the point-in-time).
+     */
+    size_t getAproxNShardsOwningChunks() const {
         tassert(7626411, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getNShardsOwningChunks();
     }

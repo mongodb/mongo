@@ -185,8 +185,12 @@ public:
 
     /**
      * Returns the number of shards that own one or more chunks for the targeted collection.
+     *
+     * To be only used for logging/metrics which do not need to be always correct. The returned
+     * value may be incorrect when this targeter is at point-in-time (it will reflect the 'latest'
+     * number of shards, rather than the one at the point-in-time).
      */
-    virtual int getNShardsOwningChunks() const = 0;
+    virtual int getAproxNShardsOwningChunks() const = 0;
 
     /**
      * Returns whether the targeted collection is sharded or not

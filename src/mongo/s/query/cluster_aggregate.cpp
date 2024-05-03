@@ -203,7 +203,9 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
 
         if (cm->isSharded()) {
             std::set<ShardId> shardIdsForNs;
-            cm->getAllShardIds(&shardIdsForNs);
+            // Note: It is fine to use 'getAllShardIds_UNSAFE_NotPointInTime' here because the
+            // result is only used to update stats.
+            cm->getAllShardIds_UNSAFE_NotPointInTime(&shardIdsForNs);
             for (const auto& shardId : shardIdsForNs) {
                 shardsIds.insert(shardId);
             }
@@ -217,7 +219,9 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
                 uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
             if (resolvedNsCM.isSharded()) {
                 std::set<ShardId> shardIdsForNs;
-                resolvedNsCM.getAllShardIds(&shardIdsForNs);
+                // Note: It is fine to use 'getAllShardIds_UNSAFE_NotPointInTime' here because the
+                // result is only used to update stats.
+                resolvedNsCM.getAllShardIds_UNSAFE_NotPointInTime(&shardIdsForNs);
                 for (const auto& shardId : shardIdsForNs) {
                     shardsIds.insert(shardId);
                 }
