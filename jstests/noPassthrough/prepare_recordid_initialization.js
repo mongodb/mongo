@@ -28,8 +28,6 @@
  * @tags: [
  *   requires_persistence,
  *   requires_replication,
- *   # TODO (SERVER-89741): Remove this tag once recordIdsReplicated:true works with recovery.
- *   exclude_when_record_ids_replicated,
  * ]
  */
 TestData.skipEnforceFastCountOnValidate = true;
@@ -83,8 +81,15 @@ let readCollidingTs = assert.commandWorked(primary.getDB("test").runCommand(
 assert.commandWorked(coll.remove({_id: 4}));
 
 // After deleting _id: 4, the highest visible RID will be 3. When reconstructing the prepared insert
-// that was previously at RID 2, we should not insert at RID 4. Instead, we will determine that RID
-// 4 is not visible and insert at RID 5.
+// that was previously at RID 2, we should not insert at RID 4. Instead, depending on whether the
+// collection that we are inserting to had recordIdsReplicated:true or not, we will:
+// a) if recordIdsReplicated:true, replaying the prepare oplog entry will give the previously
+// inserted document the same RID it had then - RID: 2 - as this info is present in the oplog entry.
+// b) if recordIdsReplicated:false, determine that RID 4 is not visible and insert at RID 5.
+let preparedRecordId =
+    (primary.getDB('test').getCollectionInfos({name: 'foo'})[0].options.recordIdsReplicated)
+    ? NumberLong(2)
+    : NumberLong(5);
 replTest.restart(primary);
 primary = replTest.getPrimary();
 replTest.awaitLastOpCommitted();
@@ -111,20 +116,24 @@ assert(arrayEq(docs,
                    {"_id": 1, "$recordId": NumberLong(1)},
                    {"_id": 3, "cnt": 1, "$recordId": NumberLong(3)},
                    {"_id": 4, "cnt": 1, "$recordId": NumberLong(4)},
-                   {"_id": 2, "prepared": true, "$recordId": NumberLong(5)}
+                   {"_id": 2, "prepared": true, "$recordId": preparedRecordId}
                ]),
        tojson(docs));
 assert.commandWorked(s2.commitTransaction_forTesting());
 
 coll = primary.getDB("test")["foo"];
 assert.commandWorked(coll.insert({_id: 6}));  // Should not re-use any RecordIds
+const newestRecordId =
+    (primary.getDB('test').getCollectionInfos({name: 'foo'})[0].options.recordIdsReplicated)
+    ? NumberLong(5)
+    : NumberLong(6);
 docs = sessionDb["foo"].find().showRecordId().toArray();
 assert(arrayEq(docs,
                [
                    {"_id": 1, "$recordId": NumberLong(1)},
                    {"_id": 3, "cnt": 1, "$recordId": NumberLong(3)},
-                   {"_id": 2, "prepared": true, "$recordId": NumberLong(5)},
-                   {"_id": 6, "$recordId": NumberLong(6)}
+                   {"_id": 2, "prepared": true, "$recordId": preparedRecordId},
+                   {"_id": 6, "$recordId": newestRecordId}
                ]),
        tojson(docs));
 

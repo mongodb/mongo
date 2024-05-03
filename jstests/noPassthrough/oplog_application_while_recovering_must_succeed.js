@@ -5,8 +5,6 @@
  * @tags: [
  *   requires_persistence,
  *   requires_replication,
- *   # TODO (SERVER-89741): Remove this tag once recordIdsReplicated:true works with recovery.
- *   exclude_when_record_ids_replicated,
  * ]
  */
 // This test appends 'insert' and 'delete' oplogs directly to the oplog system collection in
@@ -46,6 +44,13 @@ function runTest(op, result) {
                 ts: oplogToInsertTS
             });
         } else if (op === "Insert") {
+            // If a recordId is present in the insert oplog entry, this means that
+            // recordIdsReplicated:true for the collection. Therefore, in constructing a new oplog
+            // entry, we need to ensure that we don't reuse the recordId that a previous insert has
+            // used already.
+            if (testCollOplogEntry.rid) {
+                testCollOplogEntry.rid++;
+            }
             return Object.extend(
                 testCollOplogEntry,
                 {op: "i", ns: "test.coll", o: {_id: 1, a: 1}, ts: oplogToInsertTS});
