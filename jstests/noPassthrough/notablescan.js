@@ -24,6 +24,9 @@ function checkError(err) {
     assert.includes(err.toString(), "'notablescan'");
 }
 
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod failed to start.");
+let db = conn.getDB(jsTestName());
 const colName = jsTestName();
 let coll = db.getCollection(colName);
 coll.drop();
@@ -81,6 +84,5 @@ assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
     assert.commandWorked(
         db.runCommand({aggregate: colName, pipeline: [{$match: {_id: 22}}], cursor: {}}));
 }
-// Set it back to the original value.
-assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: false}));
+MongoRunner.stopMongod(conn);
 })();
