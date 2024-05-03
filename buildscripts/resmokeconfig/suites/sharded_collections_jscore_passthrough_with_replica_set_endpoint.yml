@@ -49,9 +49,6 @@ selector:
     - jstests/core/**/create_indexes.js
     - jstests/core/**/list_indexes_non_existent_ns.js
     - jstests/core/**/mr_preserve_indexes.js
-    # These tests fail because sharded clusters do not clean up correctly after failed index builds.
-    # See SERVER-33207 as an example.
-    - jstests/core/**/geo_borders.js
     # TODO: Remove after fixing SERVER-29449. executionStats.nReturned is incorrect for sharded
     # queries with a limit or for distinct commands.
     - jstests/core/**/distinct_index1.js
