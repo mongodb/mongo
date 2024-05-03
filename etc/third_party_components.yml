@@ -53,7 +53,7 @@ components:
     team_owner: "Security"
     # Not covered in Black Duck
 
-  "ASIO C++ Library":
+  "Asio C++ Library":
     homepage_url: http://think-async.com/Asio/
     open_hub_url: N/A
     release_monitoring_id: 117
