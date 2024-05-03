@@ -386,12 +386,10 @@ tasks:
           target: >-
             //src/mongo/platform:visibility_test1
 
-  - name: run_bazel_clang_tidy
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
+  - <<: *clang_tidy_task_template
+    name: run_bazel_clang_tidy
     commands:
+      - func: "do scons setup"
       - func: "fetch bazel"
       - func: "bazel compile (gcc)"
         vars:
@@ -2666,7 +2664,6 @@ task_groups:
       - compile_bazel_program
       - run_bazel_scons_unittest
       - run_bazel_program
-      - run_bazel_clang_tidy
 
   - <<: *compile_task_group_template
     name: bazel_workstation_TG
