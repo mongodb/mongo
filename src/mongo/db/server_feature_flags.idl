@@ -156,6 +156,13 @@ feature_flags:
         cpp_varname: gFeatureFlagIngressAdmissionControl
         default: true
         shouldBeFCVGated: false
+    # TODO SERVER-89999 remove once the version becomes last LTS
+    featureFlagDisallowBucketCollectionWithoutTimeseriesOptions:
+        description: "Disallow creation of timeseries bucket collection without timeseries options"
+        cpp_varname: gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
+        default: true
+        shouldBeFCVGated: true
+        version: 8.1
     featureFlagPrefetch:
         description: "Feature flag to make pre-fetching available"
         cpp_varname: gFeatureFlagPrefetch

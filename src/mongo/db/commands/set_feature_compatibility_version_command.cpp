@@ -778,30 +778,51 @@ private:
     // of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
     void _userCollectionsWorkForUpgrade(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+
+        std::vector<std::function<void(const Collection* collection)>> collValidationFunctions;
+
         const auto& [originalVersion, _] = getTransitionFCVFromAndTo(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion());
+
         if (gFeatureFlagQERangeV2.isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
                                                                                originalVersion)) {
-            auto checkForDeprecatedQueryType = [](const Collection* collection) {
+            collValidationFunctions.emplace_back([](const Collection* collection) -> void {
                 const auto& encryptedFields =
                     collection->getCollectionOptions().encryptedFieldConfig;
                 if (encryptedFields) {
                     uassert(ErrorCodes::CannotUpgrade,
-                            str::stream()
-                                << "Collection " << collection->ns().toStringForErrorMsg()
-                                << " has an encrypted field with query type rangePreview, "
-                                   "which is deprecated. Please drop this collection "
-                                   "before trying to upgrade FCV.",
+                            fmt::format("Collection {} has an encrypted field with query type "
+                                        "rangePreview, which is deprecated. Please drop this "
+                                        "collection before upgrading FCV.",
+                                        collection->ns().toStringForErrorMsg()),
                             !hasQueryType(encryptedFields.get(),
                                           QueryTypeEnum::RangePreviewDeprecated));
                 }
-                return true;
-            };
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-                catalog::forEachCollectionFromDb(
-                    opCtx, dbName, MODE_IS, checkForDeprecatedQueryType);
-            }
+            });
+        }
+
+        if (gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
+                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            collValidationFunctions.emplace_back([](const Collection* collection) {
+                uassert(ErrorCodes::CannotUpgrade,
+                        fmt::format("Bucket collection '{}' does not have timeseries options, "
+                                    "which is not allowed in new FCV version. Please rename or "
+                                    "drop this collection before upgrading FCV.",
+                                    collection->ns().toStringForErrorMsg()),
+                        !collection->ns().isTimeseriesBucketsCollection() ||
+                            collection->getTimeseriesOptions());
+            });
+        }
+
+        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+            Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+            catalog::forEachCollectionFromDb(
+                opCtx, dbName, MODE_IS, [&](const Collection* collection) {
+                    for (const auto& collValidationFunc : collValidationFunctions) {
+                        collValidationFunc(collection);
+                    }
+                    return true;
+                });
         }
     }
 

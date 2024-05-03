@@ -197,3 +197,15 @@ db.dropDatabase()
         "8.0"  // minRequiredVersion
     );
 }
+
+{
+    jsTest.log(
+        "Creation of unsharded bucket collections without timeseries options is not permitted.");
+    runTest(
+        () => {
+            createFailed(kBucket, {}, ErrorCodes.IllegalOperation);
+        },
+        // TODO BACKPORT-20546: Remove minRequired version once the backport is completed.
+        "8.1"  // minRequiredVersion
+    );
+}

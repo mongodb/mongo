@@ -81,6 +81,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/record_data.h"
@@ -950,6 +951,23 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
                     ->isAuthorizedForActionsOnResource(
                         ResourcePattern::forClusterResource(target.tenantId()),
                         ActionType::setUserWriteBlockMode));
+    }
+
+    if (gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot rename non timeseries buckets collection '"
+                              << source.toStringForErrorMsg()
+                              << "' to a timeseries buckets namespace '"
+                              << target.toStringForErrorMsg() << "'.",
+                source.isTimeseriesBucketsCollection() || !target.isTimeseriesBucketsCollection());
+
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot rename timeseries buckets collection '"
+                              << source.toStringForErrorMsg()
+                              << "' to a non timeseries buckets namespace '"
+                              << target.toStringForErrorMsg() << "'.",
+                !source.isTimeseriesBucketsCollection() || target.isTimeseriesBucketsCollection());
     }
 }
 

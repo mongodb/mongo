@@ -308,9 +308,9 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
     Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
 
     // Create a time series collection
-    auto tsOptions = TimeseriesOptions("t");
+    const auto tsOptions = TimeseriesOptions("t");
     CreateCommand cmd = CreateCommand(curNss);
-    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    cmd.getCreateCollectionRequest().setTimeseries(tsOptions);
     uassertStatusOK(createCollection(opCtx.get(), cmd));
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
 
@@ -320,10 +320,12 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
     auto uuid2 = UUID::gen();
     ASSERT_NOT_EQUALS(uuid1, uuid2);
     // This should rename the old collection to a randomly generated collection name.
+    cmd = CreateCommand(bucketsColl);
+    cmd.getCreateCollectionRequest().setTimeseries(tsOptions);
     ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
                                           bucketsColl.dbName(),
                                           uuid2,
-                                          BSON("create" << bucketsColl.coll()),
+                                          cmd.toBSON({}),
                                           /*allowRenameOutOfTheWay*/ true));
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
     ASSERT_EQUALS(uuid2, getCollectionUuid(opCtx.get(), bucketsColl));
@@ -346,10 +348,12 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
     ASSERT_FALSE(collectionExists(opCtx.get(), bucketsColl));
 
     // Now call createCollectionForApplyOps with uuid1.
+    cmd = CreateCommand(bucketsColl);
+    cmd.getCreateCollectionRequest().setTimeseries(tsOptions);
     ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
                                           bucketsColl.dbName(),
                                           uuid1,
-                                          BSON("create" << bucketsColl.coll()),
+                                          cmd.toBSON({}),
                                           /*allowRenameOutOfTheWay*/ false));
     // This should rename the old collection back to its original name.
     ASSERT_FALSE(collectionExists(opCtx.get(), *renamedCollectionNss));

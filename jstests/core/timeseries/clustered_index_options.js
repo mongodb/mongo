@@ -67,8 +67,5 @@ testInvalidCreateBucketsCollectionOptions({...options, idIndex: {key: {_id: 1}, 
 
 // Using the 'expireAfterSeconds' option on any namespace other than a time-series namespace or
 // time-series buckets collection namespace should fail.
-//
-// TODO SERVER-79630: Test that 'expireAfterSeconds' is only accepted when alongside other options
-// required to create a true time-series buckets collection.
 assert.commandFailedWithCode(testDB.createCollection('test', {expireAfterSeconds: 10}),
                              ErrorCodes.InvalidOptions);

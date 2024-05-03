@@ -969,6 +969,15 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
         return swCollator.getStatus();
     }
 
+    if (gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
+            .isEnabledUseLastLTSFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        nss.isTimeseriesBucketsCollection() && !collectionOptions.timeseries) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "Creation of a timeseries bucket collection without timeseries "
+                      "options is not allowed");
+    }
+
     if (!collectionOptions.validator.isEmpty()) {
         boost::intrusive_ptr<ExpressionContext> expCtx(
             new ExpressionContext(opCtx, std::move(swCollator.getValue()), nss));
