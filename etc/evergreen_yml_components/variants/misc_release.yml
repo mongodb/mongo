@@ -5,7 +5,7 @@ buildvariants:
   display_name: Amazon Linux 2
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-test
+  - amazon2-latest-small
   expansions:
     test_flags: >-
       --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_latch_analyzer --enableEnterpriseTests=off
@@ -22,14 +22,14 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2-large
+    large_distro_name: amazon2-latest-large
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-build
+    - amazon2-latest-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - amazon2-build
+    - amazon2-latest-large
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -57,7 +57,7 @@ buildvariants:
   display_name: "Enterprise Amazon Linux 2"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-test
+  - amazon2-latest-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
@@ -80,13 +80,13 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-build
+    - amazon2-latest-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - amazon2-build
+    - amazon2-latest-large
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
-    - amazon2-build
+    - amazon2-latest-large
   - name: .aggfuzzer .common
   - name: aggregation
   - name: audit
@@ -115,7 +115,7 @@ buildvariants:
   display_name: Amazon Linux 2 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-arm64-small
+  - amazon2-arm64-latest-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -129,21 +129,21 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2-arm64-large
+    large_distro_name: amazon2-arm64-latest-large
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: .jscore .common
@@ -162,7 +162,7 @@ buildvariants:
   display_name: "Enterprise Amazon Linux 2 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-arm64-small
+  - amazon2-arm64-latest-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
@@ -187,13 +187,13 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer
   - name: .aggregation
@@ -206,25 +206,25 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: config_fuzzer_concurrency
   - name: config_fuzzer_simulate_crash_concurrency_replication
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: config_fuzzer_concurrency_replication
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: config_fuzzer_jsCore
   - name: config_fuzzer_replica_sets_jscore_passthrough
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
   - name: jsCore
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: .jscore .common !jsCore
   - name: jsCore_minimum_batch_size
   - name: jsCore_txns_large_txns_format
@@ -236,17 +236,17 @@ buildvariants:
   - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: .read_only
   - name: .rollbackfuzzer
   - name: sasl
@@ -262,16 +262,16 @@ buildvariants:
   - name: snmp
   - name: .crypt
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: .publish_crypt
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: server_selection_json_test_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
   - name: vector_search
@@ -2301,7 +2301,7 @@ buildvariants:
   display_name: Amazon Linux 2 arm64 Query Patch Only (trySbeEngine)
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter.
   run_on:
-  - amazon2-arm64-small
+  - amazon2-arm64-latest-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
@@ -2331,11 +2331,11 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
-    large_distro_name: amazon2-arm64-large
+    large_distro_name: amazon2-arm64-latest-large
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: aggregation_mongos_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: aggregation_one_shard_sharded_collections
@@ -2345,7 +2345,7 @@ buildvariants:
   - name: noPassthroughWithMongod_gen
   - name: jsCore
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: replica_sets_jscore_passthrough_gen
   - name: sharded_collections_jscore_passthrough_gen
   - name: sharding_jscore_passthrough

@@ -3,7 +3,7 @@ buildvariants:
   display_name: "Enterprise Amazon Linux 2 (openssl 1.1.1)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-openssl111-small
+  - amazon2-openssl111-latest-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: >-
@@ -25,10 +25,10 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-openssl111-large
+    - amazon2-openssl111-latest-large
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
-    - amazon2-openssl111-large
+    - amazon2-openssl111-latest-large
   - name: .aggfuzzer .common
   - name: aggregation
   - name: audit
@@ -58,7 +58,7 @@ buildvariants:
   display_name: "Enterprise Amazon Linux 2 arm64 (openssl 1.1.1)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-arm64-openssl111-small
+  - amazon2-arm64-openssl111-latest-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
@@ -82,10 +82,10 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer
   - name: .aggregation
@@ -98,25 +98,25 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: config_fuzzer_concurrency
   - name: config_fuzzer_simulate_crash_concurrency_replication
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: config_fuzzer_concurrency_replication
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: config_fuzzer_jsCore
   - name: config_fuzzer_replica_sets_jscore_passthrough
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
   - name: jsCore
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: .jscore .common !jsCore
   - name: jsCore_minimum_batch_size
   - name: jsCore_txns_large_txns_format
@@ -128,17 +128,17 @@ buildvariants:
   - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: .read_only
   - name: .rollbackfuzzer
   - name: sasl
@@ -155,15 +155,15 @@ buildvariants:
   - name: .stitch
   - name: .crypt
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: server_selection_json_test_TG
     distros:
-    - amazon2-arm64-openssl111-large
+    - amazon2-arm64-openssl111-latest-large
   - name: crypt_push
   - name: push
   - name: generate_buildid_to_debug_symbols_mapping
