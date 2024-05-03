@@ -8,7 +8,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-arm64-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
-  - amazon2-arm64-large
+  - amazon2-arm64-latest-large
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
   modules:
     - enterprise
@@ -42,7 +42,7 @@ variables:
   packager_arch: aarch64
   packager_distro: amazon2
   repo_edition: enterprise
-  large_distro_name: amazon2-arm64-large
+  large_distro_name: amazon2-arm64-latest-large
   num_scons_link_jobs_available: 0.99
 
 # THIS HAS COPIES IN:
@@ -90,7 +90,7 @@ buildvariants:
   tasks:
     - name: clang_tidy_TG
       distros:
-        - amazon2-arm64-xlarge
+        - amazon2-arm64-latest-xlarge
     - name: compile_ninja_quick_TG
     - name: compile_test_parallel_unittest_stream_TG
     - name: compile_test_parallel_core_stream_TG
@@ -110,7 +110,7 @@ buildvariants:
   modules:
     - enterprise
   run_on:
-    - amazon2-arm64-small
+    - amazon2-arm64-latest-small
   stepback: false
   expansions:
     <<: *linux_arm64_generic_expansions
@@ -146,7 +146,7 @@ buildvariants:
     - amazon2-arm64-xlarge-commitqueue
   - name: jsCore
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: .lint
   - name: test_api_version_compatibility
   - name: validate_commit_message
@@ -162,7 +162,7 @@ buildvariants:
   display_name: "Amazon Linux 2 arm64 Enterprise Query Patch Only (trySbeEngine)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   run_on:
-  - amazon2-arm64-small
+  - amazon2-arm64-latest-small
   stepback: true
   expansions:
     <<: *amazon_linux2_arm64_dynamic_expansions
@@ -192,7 +192,7 @@ buildvariants:
   - name: noPassthroughWithMongod_gen
   - name: jsCore
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: replica_sets_jscore_passthrough_gen
   - name: sharded_collections_jscore_passthrough_gen
   - name: sharding_jscore_passthrough_gen

@@ -8,7 +8,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-arm64-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
-  - amazon2-arm64-large
+  - amazon2-arm64-latest-large
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
   modules:
     - enterprise
@@ -58,7 +58,7 @@ variables:
   packager_arch: aarch64
   packager_distro: amazon2
   repo_edition: enterprise
-  large_distro_name: amazon2-arm64-large
+  large_distro_name: amazon2-arm64-latest-large
   num_scons_link_jobs_available: 0.99
 
 # THIS HAS COPIES IN:
@@ -112,7 +112,7 @@ buildvariants:
   modules:
     - enterprise
   run_on:
-    - amazon2-arm64-small
+    - amazon2-arm64-latest-small
   stepback: true
   expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
     <<: *amazon_linux2_arm64_dynamic_expansions
@@ -156,10 +156,10 @@ buildvariants:
   - name: .config_fuzzer !.large
   - name: .config_fuzzer .large
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: .config_fuzzer_stress
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: disk_wiredtiger
   - name: embedded_router_jscore_passthrough_gen
   - name: embedded_router_jscore_passthrough_with_config_shard_gen
@@ -209,7 +209,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_with_replica_set_endpoint_gen
   - name: .serverless
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: .timeseries_crud
   - name: session_jscore_passthrough
   - name: .shard_split
@@ -250,7 +250,7 @@ buildvariants:
   modules:
     - enterprise
   run_on:
-    - amazon2-arm64-small
+    - amazon2-arm64-latest-small
   expansions:
     <<: *amazon_linux2_arm64_dynamic_expansions
     test_flags: >-
@@ -291,10 +291,10 @@ buildvariants:
   - name: .config_fuzzer !.large
   - name: .config_fuzzer .large
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: .config_fuzzer_stress
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: feature_flag_multiversion_gen
@@ -333,7 +333,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: .serverless
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: .timeseries_crud
   - name: session_jscore_passthrough
   - name: .shard_split
