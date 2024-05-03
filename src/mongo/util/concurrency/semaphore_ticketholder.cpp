@@ -72,10 +72,6 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
                                                                        AdmissionContext* admCtx,
                                                                        Date_t until,
                                                                        bool interruptible) {
-    if (interruptible) {
-        opCtx->checkForInterrupt();
-    }
-
     auto nextDeadline = [&]() {
         // Timed waits can be problematic if we have a large number of waiters, since each time we
         // check for interrupt we risk waking up all waiting threads at the same time. We introduce
@@ -118,7 +114,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
 }
 
 void SemaphoreTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
-    if (_tickets.fetchAndAdd(1) == 0) {
+    if (_tickets.fetchAndAdd(1) >= 0) {
         _tickets.notifyOne();
     }
 }

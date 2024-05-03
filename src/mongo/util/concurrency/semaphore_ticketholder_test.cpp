@@ -279,4 +279,54 @@ TEST_F(SemaphoreTicketHolderTest, ImmediateResize) {
     resizeWaiter3.join();
 }
 
+TEST_F(SemaphoreTicketHolderTest, ReleaseToPoolWakesWaiters) {
+    // We had a bug where releasing a ticket back to the ticket holder would only waker waiters when
+    // adding a ticket would result in 0 available tickets (a case only reachable after resize).
+    // This test is meant to prove that we always wake waiters when a ticket is returned, if there
+    // are available tickets
+
+    auto holder =
+        std::make_unique<SemaphoreTicketHolder>(getServiceContext(),
+                                                2,
+                                                false /* trackPeakUsed */,
+                                                SemaphoreTicketHolder::ResizePolicy::kImmediate);
+
+    // Here's the approach: We need to have a SemaphoreTicketHolder of size >1 in order to meet the
+    // condition that we possibly have a non-zero number of tickets when returning a ticket to the
+    // pool. Initially acquire two tickets, and spin up two waiters which will queue. A third
+    // waiting thread waits for the initial waiters to queue before enqueueing itself. Back on the
+    // main thread, wait for all three queued waiters before returning two tickets to the pool
+    // immediately.
+
+    MockAdmissionContext admCtx{};
+    std::vector<Ticket> tickets;
+    for (size_t i = 0; i < 2; ++i) {
+        auto ticket = holder->waitForTicket(_opCtx.get(), &admCtx);
+        tickets.push_back(std::move(ticket));
+    }
+
+    std::vector<stdx::thread> threads;
+    for (size_t i = 0; i < 3; ++i) {
+        threads.emplace_back([&] {
+            Timer t;
+            MockAdmission admission{getServiceContext(), AdmissionContext::Priority::kNormal};
+            auto ticket = holder->waitForTicket(admission.opCtx.get(), &admission.admCtx);
+            // TODO(SERVER-89297): SemaphoreTicketHolder currently does timed waits in the 500ms
+            // range, which prevents deadlock with the bug this test is meant to test. Remove this
+            // assertion when we switch to the NotifyableParkingLot. Choose a value of 400 because
+            // the timed waiters introduce jitter for each wait using a base value of 500ms.
+            ASSERT_LTE(t.millis(), 400);
+        });
+    }
+
+    // await 3 queued waiters, and then return 2 tickets to the pool
+    assertSoon([&] { return holder->queued() == 3; });
+    tickets.erase(tickets.end() - 2, tickets.end());
+
+    // join all threads and drain the waiters one-by-one
+    for (auto& t : threads) {
+        t.join();
+    }
+}
+
 }  // namespace

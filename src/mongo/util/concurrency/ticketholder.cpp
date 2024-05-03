@@ -29,6 +29,7 @@
 
 #include "mongo/util/concurrency/ticketholder.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source.h"
@@ -77,6 +78,8 @@ bool TicketHolder::_resizeImpl(WithLock,
             _outof.fetchAndAdd(1);
         }
     } else {
+        // Make sure the operation isn't interrupted before waiting for tickets.
+        opCtx->checkForInterrupt();
         // Take tickets one-by-one without releasing.
         for (auto remaining = -difference; remaining > 0; remaining--) {
             // This call bypasses statistics reporting.
