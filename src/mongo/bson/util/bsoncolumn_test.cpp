@@ -3115,6 +3115,28 @@ TEST_F(BSONColumnTest, BinDataLargerThan16Interleaved) {
     verifyDecompressPathFast(binData, {elemBinData, elemBinDataLong}, testPathX);
 }
 
+TEST_F(BSONColumnTest, BinDataLargerThan16InterleavedDuplicatePath) {
+    // This test is similar to the above but verifies that we keep track of decompression state
+    // correctly even when there are duplicate paths.
+    std::vector<uint8_t> bytes{
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '8'};
+    std::vector<BSONElement> elems;
+    const size_t kNElems = 8;
+    for (size_t i = 0; i < kNElems; ++i) {
+        elems.push_back(createElementObj(
+            BSON("a" << createElementBinData(BinDataGeneral, bytes) << "b" << int64_t(i))));
+        cb.append(elems.back());
+    }
+
+    auto binData = cb.finalize();
+    verifyDecompression(binData, elems);
+
+    // Test that we can decompress duplicate paths that refer to the same element.
+    std::vector<TestPath> testPaths{TestPath{{"a"}}, TestPath{{"a"}}};
+    verifyDecompressPathFast(binData, elems, testPaths);
+}
+
+
 TEST_F(BSONColumnTest, BinDataEqualTo16) {
     std::vector<uint8_t> input{
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7'};

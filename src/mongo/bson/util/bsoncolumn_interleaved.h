@@ -770,6 +770,14 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
         }
         ++bufIdx;
     };
+    auto finishLiteral = [&state, &bufIdx, lastBufIdx](size_t valueCount,
+                                                       uint64_t lastNonRLEBlock) {
+        if (bufIdx == lastBufIdx) {
+            state._valueCount += valueCount;
+            state._lastNonRLEBlock = lastNonRLEBlock;
+        }
+        ++bufIdx;
+    };
 
     const char* ptr = nullptr;
     const char* end = control + size + 1;
@@ -922,10 +930,10 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
             }
             break;
         case BinData:
-            for (auto&& buffer : state._buffers) {
-                // If the lastValue is not a 'int128_t', then the binData is too large to be
-                // decoded and should be treated as a literal.
-                if (auto lastValue = std::get_if<int128_t>(&state._lastValue)) {
+            // If the lastValue is not a 'int128_t', then the binData is too large to be decoded and
+            // should be treated as a literal.
+            if (auto lastValue = std::get_if<int128_t>(&state._lastValue)) {
+                for (auto&& buffer : state._buffers) {
                     ptr = BSONColumnBlockDecompressHelpers::
                         decompressAllDelta<BSONBinData, int128_t, Buffer>(
                             control,
@@ -941,16 +949,11 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                                 buffer.append(BSONBinData(data, size, ref.binDataType()));
                             },
                             finish128);
-                } else {
+                }
+            } else {
+                for (auto&& buffer : state._buffers) {
                     ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(
-                        control,
-                        end,
-                        *buffer,
-                        state._lastNonRLEBlock,
-                        [&state](size_t valueCount, uint64_t lastNonRLEBlock) {
-                            state._valueCount += valueCount;
-                            state._lastNonRLEBlock = lastNonRLEBlock;
-                        });
+                        control, end, *buffer, state._lastNonRLEBlock, finishLiteral);
                 }
             }
             break;
@@ -983,17 +986,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
         case MaxKey:
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral(
-                    control,
-                    end,
-                    *buffer,
-                    state._lastNonRLEBlock,
-                    [&state, &bufIdx, lastBufIdx](size_t valueCount, uint64_t lastNonRLEBlock) {
-                        if (bufIdx == lastBufIdx) {
-                            state._valueCount += valueCount;
-                            state._lastNonRLEBlock = lastNonRLEBlock;
-                        }
-                        ++bufIdx;
-                    });
+                    control, end, *buffer, state._lastNonRLEBlock, finishLiteral);
             }
             break;
         default:
