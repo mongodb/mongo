@@ -13,7 +13,7 @@ from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.core import redirect as redirect_lib
 from buildscripts.resmokelib.logging import buildlogger
 from buildscripts.resmokelib.logging import formatters
-from buildscripts.resmokelib.logging.handlers import ExceptionExtractionHandler, ExceptionExtractor, Truncate
+from buildscripts.resmokelib.logging.handlers import BufferedFileHandler, ExceptionExtractionHandler, ExceptionExtractor, Truncate
 
 _DEFAULT_FORMAT = "[%(name)s] %(message)s"
 
@@ -404,7 +404,7 @@ def _add_evergreen_handler(logger, job_num, test_id=None):
         fp = f"{_get_evergreen_log_dirname()}/{get_evergreen_log_name(job_num, test_id)}"
         os.makedirs(os.path.dirname(fp), exist_ok=True)
 
-        handler = logging.FileHandler(filename=fp, mode="a")
+        handler = BufferedFileHandler(fp)
         handler.setFormatter(
             formatters.EvergreenLogFormatter(fmt=logger_info.get("format", _DEFAULT_FORMAT)))
         logger.addHandler(handler)
