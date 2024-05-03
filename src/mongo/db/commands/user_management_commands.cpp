@@ -1151,21 +1151,8 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
             (cmd.getMechanisms() == boost::none) || !cmd.getMechanisms()->empty());
 
 #ifdef MONGO_CONFIG_SSL
-    // An internal caller of 'createUser' won't have a transport session bound to the client.
-    // Instead, we should retrieve the SSL manager from the SSLManagerCoordinator.
-    const auto& sslManager = [&]() -> std::shared_ptr<SSLManagerInterface> {
-        const auto& session = opCtx->getClient()->session();
-        if (session) {
-            return session->getSSLManager();
-        }
-        // If SSL is supported but disabled, the SSLManagerCoordinator will not exist. We should
-        // return an empty pointer.
-        const auto sslCoord = SSLManagerCoordinator::get();
-        if (!sslCoord) {
-            return nullptr;
-        }
-        return sslCoord->getSSLManager();
-    }();
+    auto& sslManager = opCtx->getClient()->session()->getSSLManager();
+
     if (isExternal && sslManager && sslGlobalParams.clusterAuthX509ExtensionValue.empty() &&
         sslManager->getSSLConfiguration().isClusterMember(
             userName.getUser(), boost::none /* clusterExtensionValue */)) {
