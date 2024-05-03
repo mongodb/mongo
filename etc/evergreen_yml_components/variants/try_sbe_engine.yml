@@ -10,8 +10,8 @@ variables:
   packager_arch: aarch64
   packager_distro: amazon2
   repo_edition: enterprise
-  large_distro_name: amazon2-arm64-large
-  core_analyzer_distro_name: amazon2-arm64-xlarge
+  large_distro_name: amazon2-arm64-latest-large
+  core_analyzer_distro_name: amazon2-arm64-latest-xlarge
   num_scons_link_jobs_available: 0.99
 
 # THIS HAS COPIES IN misc_release.yml and evergreen.yml - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE
@@ -38,7 +38,7 @@ buildvariants:
   display_name: "Amazon Linux 2 arm64 Enterprise Query Patch Only (trySbeEngine)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   run_on:
-  - amazon2-arm64-small
+  - amazon2-arm64-latest-small
   stepback: true
   expansions:
     <<: *amazon_linux2_arm64_dynamic_expansions
@@ -68,7 +68,7 @@ buildvariants:
   - name: noPassthroughWithMongod_gen
   - name: jsCore
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: replica_sets_jscore_passthrough_gen
   - name: sharded_collections_jscore_passthrough_gen
   - name: sharding_jscore_passthrough
