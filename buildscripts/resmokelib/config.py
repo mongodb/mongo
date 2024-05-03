@@ -145,6 +145,7 @@ DEFAULTS = {
     "task_doc": None,
     "variant_name": None,
     "version_id": None,
+    "work_dir": None,
     "evg_project_config_path": "etc/evergreen.yml",
 
     # WiredTiger options.
@@ -381,6 +382,9 @@ EVERGREEN_VARIANT_NAME = None
 # The identifier consisting of the project name and the commit hash. For patch builds, it is just
 # the commit hash.
 EVERGREEN_VERSION_ID = None
+
+# The Evergreen task's working directory.
+EVERGREEN_WORK_DIR = None
 
 # Path to evergreen project configuration yaml file
 EVERGREEN_PROJECT_CONFIG_PATH = None

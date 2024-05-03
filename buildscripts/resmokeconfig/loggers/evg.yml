@@ -1,0 +1,27 @@
+logging:
+  executor:
+    format: '[%(name)s] %(asctime)s %(message)s'
+    handlers:
+      - class: logging.StreamHandler
+  fixture:
+    format: '[%(name)s] %(message)s'
+    handlers:
+      - class: evergreen
+  tests:
+    format: '[%(name)s] %(message)s'
+    handlers:
+      - class: evergreen
+
+shorten_logger_name:
+  remove:
+    - MongoDFixture
+    - ReplicaSetFixture
+    - ShardedClusterFixture
+  replace:
+    primary: prim
+    secondary: sec
+    node: n
+    shard: s
+    configsvr: c
+    mongos: s
+    job: j

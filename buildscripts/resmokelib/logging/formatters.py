@@ -19,3 +19,16 @@ class TimestampFormatter(logging.Formatter):
 
         formatted_time = time.strftime("%H:%M:%S", converted_time)
         return "%s.%03dZ" % (formatted_time, record.msecs)
+
+
+class EvergreenLogFormatter(logging.Formatter):
+    """Log line formatter for Evergreen log messages.
+
+    See `https://docs.devprod.prod.corp.mongodb.com/evergreen/Project-Configuration/Task-Output-Directory#test-logs`
+    for more info.
+    """
+
+    def format(self, record):
+        ts = int(record.created * 1e9)
+
+        return "\n".join([f"{ts} {line}" for line in super().format(record).split("\n")])

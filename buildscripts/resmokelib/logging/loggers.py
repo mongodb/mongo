@@ -1,10 +1,12 @@
 """Module to hold the logger instances themselves."""
 
 import logging
+import os
 import re
 import shutil
 import subprocess
 import sys
+import yaml
 
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
@@ -95,6 +97,13 @@ def configure_loggers():
     global ROOT_EXECUTOR_LOGGER  # pylint: disable=global-statement
     ROOT_EXECUTOR_LOGGER = new_root_logger(EXECUTOR_LOGGER_NAME)
 
+    _write_evergreen_log_spec()
+
+
+def get_evergreen_log_name(job_num, test_id=None):
+    """Return the log name, relative to the reserved test log directory, on the Evergreen task host."""
+    return f"job{job_num}/" + (f"{test_id}.log" if test_id else "global.log")
+
 
 def new_root_logger(name):
     """
@@ -173,6 +182,7 @@ def new_fixture_logger(fixture_class, job_num):
     logger = FixtureLogger(_shorten(full_name), full_name, external_sut_hostname)
     logger.parent = ROOT_FIXTURE_LOGGER
     _add_build_logger_handler(logger, job_num)
+    _add_evergreen_handler(logger, job_num)
 
     _FIXTURE_LOGGER_REGISTRY[job_num] = logger
     return logger
@@ -225,6 +235,7 @@ def new_test_logger(test_shortname, test_basename, command, parent, job_num, tes
     name = "%s:%s" % (parent.name, test_shortname)
     logger = logging.Logger(name)
     logger.parent = parent
+    _add_evergreen_handler(logger, job_num, test_id)
 
     def _get_test_endpoint(job_num, test_basename, command, meta_logger):
         """Get a new test endpoint for the buildlogger server."""
@@ -284,6 +295,8 @@ def _add_handler(logger, handler_info, formatter):
         handler = logging.StreamHandler(sys.stdout)
     elif handler_class == "buildlogger":
         return  # Buildlogger handlers are applied when creating specific child loggers
+    elif handler_class == "evergreen":
+        return  # Evergreen handlers are applied when creating specific child loggers
     else:
         raise ValueError("Unknown handler class '%s'" % handler_class)
     handler.setFormatter(formatter)
@@ -353,3 +366,55 @@ def _shorten(logger_name):
     logger_name = re.sub(r"(^[:_]+|[:_]+$)", "", logger_name)
 
     return logger_name
+
+
+# Utility functions for Evergreen file system logging.
+# See `https://docs.devprod.prod.corp.mongodb.com/evergreen/Project-Configuration/Task-Output-Directory#test-logs`
+# for more information.
+
+
+def _write_evergreen_log_spec():
+    """Configure file system logging for Evergreen tasks."""
+    if not config.EVERGREEN_WORK_DIR:
+        return
+
+    fp = f"{_get_evergreen_log_dirname()}/log_spec.yaml"
+    os.makedirs(os.path.dirname(fp), exist_ok=True)
+
+    ROOT_EXECUTOR_LOGGER.info("Writing Evergreen test log spec to %s.", fp)
+
+    log_spec = {
+        "version": 0,
+        "format": "text-timestamp",
+    }
+    with open(fp, "w") as f:
+        yaml.dump(log_spec, f)
+
+
+def _add_evergreen_handler(logger, job_num, test_id=None):
+    """Add a new evergreen handler to a logger."""
+    logger_info = config.LOGGING_CONFIG[TESTS_LOGGER_NAME]
+    evergreen_handler_info = None
+    for handler_info in logger_info["handlers"]:
+        if handler_info["class"] == "evergreen":
+            evergreen_handler_info = handler_info
+            break
+
+    if evergreen_handler_info:
+        fp = f"{_get_evergreen_log_dirname()}/{get_evergreen_log_name(job_num, test_id)}"
+        os.makedirs(os.path.dirname(fp), exist_ok=True)
+
+        handler = logging.FileHandler(filename=fp, mode="a")
+        handler.setFormatter(
+            formatters.EvergreenLogFormatter(fmt=logger_info.get("format", _DEFAULT_FORMAT)))
+        logger.addHandler(handler)
+
+        if test_id:
+            ROOT_EXECUTOR_LOGGER.info("Writing output of %s to %s.", test_id, fp)
+        else:
+            ROOT_EXECUTOR_LOGGER.info("Writing output of job #%d to %s.", job_num, fp)
+
+
+def _get_evergreen_log_dirname():
+    """Return the reserved directory for test logs on the Evergreen task host."""
+    return f"{config.EVERGREEN_WORK_DIR}/build/TestLogs"
