@@ -60,7 +60,7 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
     // Setting the server parameter should cause warnings to be emitted if the cluster only has one
     // shard.
     let res = assert.commandWorkedOrFailedWithCode(
-        shardAdminDB.runCommand({setParameter: 1, directConnectionChecksWithSingleShards: true}),
+        shardAdminDB.runCommand({setParameter: 1, directConnectionChecksWithSingleShard: true}),
         ErrorCodes.InvalidOptions);
     // Skip this test in multiversion tests where the server parameter does not exist.
     if (res.ok) {
@@ -73,7 +73,12 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
             assert.commandWorked(userTestDB.getCollection("coll").update(
                 {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
         }
-        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+        // No warning will be emitted even if the parameter is set if RSEndpoint is enabled.
+        if (st.isReplicaSetEndpointActive()) {
+            assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
+        } else {
+            assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+        }
         assert.commandWorked(shardAdminDB.runCommand(
             {setParameter: 1, directConnectionChecksWithSingleShard: false}));
         userTestDB.logout();
