@@ -111,7 +111,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     ${resmoke_args} \
     $extra_args \
     ${test_flags} \
-    --log=buildlogger \
+    --log=${resmoke_logger} \
     --staggerJobs=on \
     --installDir=${install_dir} \
     --buildId=${build_id} \
