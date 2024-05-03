@@ -374,10 +374,8 @@ void logStartup(OperationContext* opCtx) {
         repl::UnreplicatedWritesBlock uwb(opCtx);
         CollectionOptions collectionOptions = uassertStatusOK(
             CollectionOptions::parse(options, CollectionOptions::ParseKind::parseForCommand));
-        uassertStatusOK(
-            db->userCreateNS(opCtx, NamespaceString::kStartupLogNamespace, collectionOptions));
-        collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-            opCtx, NamespaceString::kStartupLogNamespace);
+        collection =
+            db->createCollection(opCtx, NamespaceString::kStartupLogNamespace, collectionOptions);
     }
     invariant(collection);
 

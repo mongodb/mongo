@@ -73,6 +73,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
@@ -939,6 +940,15 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
     auto swCollator = _validateCollator(opCtx, collectionOptions);
     if (!swCollator.isOK()) {
         return swCollator.getStatus();
+    }
+
+    if (gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
+            .isEnabledUseLastLTSFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        nss.isTimeseriesBucketsCollection() && !collectionOptions.timeseries) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "Creation of a timeseries bucket collection without timeseries "
+                      "options is not allowed");
     }
 
     if (!collectionOptions.validator.isEmpty()) {
