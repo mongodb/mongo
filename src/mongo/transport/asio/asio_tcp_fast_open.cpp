@@ -202,7 +202,7 @@ void checkEnabledByKernel(bool srv, bool cli) {
     std::fstream f(procfile, std::ifstream::in);
     iassert(ErrorCodes::BadValue, "Unable to read {}"_format(procfile), f.is_open());
 
-    uint64_t k;  // The kernel setting.
+    int64_t k;  // The kernel setting.
     f >> k;
     networkCounter.setTFOKernelSetting(k);
 
