@@ -58,7 +58,14 @@ public:
 
     ~MongotTaskExecutorCursorGetMoreStrategy() final {}
 
-    BSONObj createGetMoreRequest(const CursorId& cursorId, const NamespaceString& nss) final;
+    /**
+     * Generates a BSONObj that represents the next getMore command to be dispatched to mongot.
+     * CursorId and NamespaceString are included in the command object, and prevBatchNumReceived is
+     * used to configure batchSize tuning.
+     */
+    BSONObj createGetMoreRequest(const CursorId& cursorId,
+                                 const NamespaceString& nss,
+                                 long long prevBatchNumReceived) final;
 
     bool shouldPrefetch() const final {
         return _preFetchNextBatch;
@@ -80,7 +87,7 @@ private:
      * If batchSize tuning is not enabled, we'll see the initial batchSize for any getMore requests.
      * Otherwise, we'll apply tuning strategies to optimize batchSize of each batch requested.
      */
-    long long _getNextBatchSize();
+    long long _getNextBatchSize(long long prevBatchNumReceived);
 
     bool _preFetchNextBatch;
 

@@ -45,10 +45,23 @@ namespace executor {
  */
 class TaskExecutorCursorGetMoreStrategy {
 public:
-    virtual BSONObj createGetMoreRequest(const CursorId& cursorId, const NamespaceString& nss) = 0;
-    // If true, we will fetch the next batch as soon as the current one is recieved.
-    // If false, we will fetch the next batch when the current batch is exhausted and
-    // 'getNext()' is invoked.
+    /**
+     * Generates a BSONObj that represents the next getMore command to be dispatched. Some
+     * implementations (e.g., MongotTaskExecutorCursorGetMoreStrategy) may change internal state
+     * (like batchSize) per batch, with the assumption that each call is for the subsequent batch.
+     * For that reason, it's important this method is only called once per batch.
+     *
+     * The CursorId and NamespaceString are necessary to be included in the command obj, and
+     * prevBatchNumReceived may be used to configure the request options (again, like batchSize).
+     */
+    virtual BSONObj createGetMoreRequest(const CursorId& cursorId,
+                                         const NamespaceString& nss,
+                                         long long prevBatchNumReceived) = 0;
+
+    /**
+     * If true, we'll fetch the next batch as soon as the current one is received. If false, we'll
+     * fetch the next batch when the current batch is exhausted and 'getNext()' is invoked.
+     */
     virtual bool shouldPrefetch() const = 0;
     virtual ~TaskExecutorCursorGetMoreStrategy() {}
 };
@@ -68,7 +81,9 @@ public:
 
     ~DefaultTaskExecutorCursorGetMoreStrategy() final {}
 
-    BSONObj createGetMoreRequest(const CursorId& cursorId, const NamespaceString& nss) final;
+    BSONObj createGetMoreRequest(const CursorId& cursorId,
+                                 const NamespaceString& nss,
+                                 long long prevBatchNumReceived) final;
 
     bool shouldPrefetch() const final {
         return _preFetchNextBatch;

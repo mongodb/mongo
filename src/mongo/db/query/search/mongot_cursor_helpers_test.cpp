@@ -54,7 +54,8 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromDefaultStartingSi
 
     // The first GetMore request should contain a batchSize of kDefaultMongotBatchSize *
     // kInternalSearchBatchSizeGrowthFactor.
-    BSONObj getMoreRequest = getMoreStrategy.createGetMoreRequest(cursorId, nss);
+    BSONObj getMoreRequest =
+        getMoreStrategy.createGetMoreRequest(cursorId, nss, /*prevBatchNumReceived*/ 101);
     BSONObj expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                                     << "cursorOptions" << BSON("batchSize" << 202));
 
@@ -64,7 +65,8 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromDefaultStartingSi
 
     // The next GetMore should exponentially increase the batchSize by
     // kInternalSearchBatchSizeFactor.
-    getMoreRequest = getMoreStrategy.createGetMoreRequest(cursorId, nss);
+    getMoreRequest =
+        getMoreStrategy.createGetMoreRequest(cursorId, nss, /*prevBatchNumReceived*/ 202);
     expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                             << "cursorOptions" << BSON("batchSize" << 404));
 
@@ -85,7 +87,8 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromCustomStartingSiz
 
     // The first GetMore request should contain a batchSize of startingBatchSize *
     // kInternalSearchBatchSizeGrowthFactor.
-    BSONObj getMoreRequest = getMoreStrategy.createGetMoreRequest(cursorId, nss);
+    BSONObj getMoreRequest =
+        getMoreStrategy.createGetMoreRequest(cursorId, nss, /*prevBatchNumReceived*/ 3);
     BSONObj expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                                     << "cursorOptions" << BSON("batchSize" << 6));
 
@@ -95,13 +98,78 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromCustomStartingSiz
 
     // The next GetMore should exponentially increase the batchSize by
     // kInternalSearchBatchSizeFactor.
-    getMoreRequest = getMoreStrategy.createGetMoreRequest(cursorId, nss);
+    getMoreRequest =
+        getMoreStrategy.createGetMoreRequest(cursorId, nss, /*prevBatchNumReceived*/ 6);
     expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                             << "cursorOptions" << BSON("batchSize" << 12));
 
     ASSERT_BSONOBJ_EQ(getMoreRequest, expectedGetMoreRequest);
     ASSERT_EQ(12, getMoreStrategy.getCurrentBatchSize());
     ASSERT_EQ(std::vector<long long>({3, 6, 12}), getMoreStrategy.getBatchSizeHistory());
+}
+
+TEST_F(MongotCursorHelpersTest, BatchSizeGrowthPausesAndResumes) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagSearchBatchSizeTuning",
+                                                               true);
+    MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
+        MongotTaskExecutorCursorGetMoreStrategy(
+            /*preFetchNextBatch*/ true, /*calcDocsNeededFn*/ nullptr, /*startingBatchSize*/ 10);
+
+    // Check that GetMoreStrategy is properly initialized with our specified startingBatchSize
+    // value.
+    ASSERT_EQ(10, getMoreStrategy.getCurrentBatchSize());
+    ASSERT_EQ(std::vector<long long>{10}, getMoreStrategy.getBatchSizeHistory());
+
+    // The batchSize shouldn't increase if it only received 9 but requested 10.
+    BSONObj getMoreRequest =
+        getMoreStrategy.createGetMoreRequest(cursorId, nss, /*prevBatchNumReceived*/ 9);
+    BSONObj expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
+                                                    << "cursorOptions" << BSON("batchSize" << 10));
+
+    ASSERT_BSONOBJ_EQ(getMoreRequest, expectedGetMoreRequest);
+    ASSERT_EQ(10, getMoreStrategy.getCurrentBatchSize());
+    ASSERT_EQ(std::vector<long long>({10, 10}), getMoreStrategy.getBatchSizeHistory());
+
+    // The next GetMore batchSize should exponentially increase if it received all 10 requested.
+    getMoreRequest =
+        getMoreStrategy.createGetMoreRequest(cursorId, nss, /*prevBatchNumReceived*/ 10);
+    expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
+                                            << "cursorOptions" << BSON("batchSize" << 20));
+
+    ASSERT_BSONOBJ_EQ(getMoreRequest, expectedGetMoreRequest);
+    ASSERT_EQ(20, getMoreStrategy.getCurrentBatchSize());
+    ASSERT_EQ(std::vector<long long>({10, 10, 20}), getMoreStrategy.getBatchSizeHistory());
+
+    // The next GetMore batchSize should exponentially increase if it received all 20 requested.
+    getMoreRequest =
+        getMoreStrategy.createGetMoreRequest(cursorId, nss, /*prevBatchNumReceived*/ 20);
+    expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
+                                            << "cursorOptions" << BSON("batchSize" << 40));
+
+    ASSERT_BSONOBJ_EQ(getMoreRequest, expectedGetMoreRequest);
+    ASSERT_EQ(40, getMoreStrategy.getCurrentBatchSize());
+    ASSERT_EQ(std::vector<long long>({10, 10, 20, 40}), getMoreStrategy.getBatchSizeHistory());
+
+    // batchSize growth should pause again if it doesn't receive all requested.
+    getMoreRequest =
+        getMoreStrategy.createGetMoreRequest(cursorId, nss, /*prevBatchNumReceived*/ 38);
+    expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
+                                            << "cursorOptions" << BSON("batchSize" << 40));
+
+    ASSERT_BSONOBJ_EQ(getMoreRequest, expectedGetMoreRequest);
+    ASSERT_EQ(40, getMoreStrategy.getCurrentBatchSize());
+    ASSERT_EQ(std::vector<long long>({10, 10, 20, 40, 40}), getMoreStrategy.getBatchSizeHistory());
+
+    // batchSize growth should remain paused if it doesn't receive all requested.
+    getMoreRequest =
+        getMoreStrategy.createGetMoreRequest(cursorId, nss, /*prevBatchNumReceived*/ 39);
+    expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
+                                            << "cursorOptions" << BSON("batchSize" << 40));
+
+    ASSERT_BSONOBJ_EQ(getMoreRequest, expectedGetMoreRequest);
+    ASSERT_EQ(40, getMoreStrategy.getCurrentBatchSize());
+    ASSERT_EQ(std::vector<long long>({10, 10, 20, 40, 40, 40}),
+              getMoreStrategy.getBatchSizeHistory());
 }
 
 /**

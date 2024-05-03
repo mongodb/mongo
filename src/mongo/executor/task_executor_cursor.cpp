@@ -277,8 +277,8 @@ void TaskExecutorCursor::_scheduleGetMore(OperationContext* opCtx) {
     invariant(_cursorId >= kMinLegalCursorId);
     // There cannot be an existing in-flight request.
     invariant(!_cmdState);
-    _runRemoteCommand(
-        _createRequest(opCtx, _options.getMoreStrategy->createGetMoreRequest(_cursorId, _ns)));
+    _runRemoteCommand(_createRequest(
+        opCtx, _options.getMoreStrategy->createGetMoreRequest(_cursorId, _ns, _batch.size())));
 }
 
 void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
