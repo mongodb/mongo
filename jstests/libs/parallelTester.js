@@ -156,7 +156,6 @@ if (typeof _threadInject != "undefined") {
 
             // Tests that set the notablescan parameter, which makes queries fail rather than use a
             // non-indexed plan.
-            "notablescan.js",
             "notablescan_capped.js",
 
             "query/mr/mr_fail_invalid_js.js",
