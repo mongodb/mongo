@@ -15,7 +15,7 @@ Additional parameters for the run subcommand can be found on the help page,
 accessible by running `buildscripts/resmoke.py run --help`
 
 Additional documentation on our suite configuration can be found on the
-[Suites configuration file page](../suites.md)
+[Suites configuration file page](../../buildscripts/docs/suites.md)
 
 ### Testable Installations (`--installDir`)
 
