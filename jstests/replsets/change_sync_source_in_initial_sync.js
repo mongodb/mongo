@@ -44,7 +44,8 @@ assert.soon(function() {
     const res = assert.commandWorked(initialSyncNode.adminCommand({"replSetGetStatus": 1}));
     // failedInitialSyncAttempts can be > 0 due to transient network errors in our testing
     // environment.
-    failedInitialSyncAttempts = res.initialSyncStatus.failedInitialSyncAttempts;
+    failedInitialSyncAttempts =
+        res.initialSyncStatus ? res.initialSyncStatus.failedInitialSyncAttempts : 0;
     return primary.name === res.syncSourceHost;
 });
 assert.commandWorked(
