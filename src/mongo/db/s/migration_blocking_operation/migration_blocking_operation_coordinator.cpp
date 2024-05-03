@@ -162,7 +162,10 @@ void MigrationBlockingOperationCoordinator::_recoverIfNecessary(WithLock lk,
 
 void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opCtx,
                                                            const UUID& operationUUID) {
+    getConstructionCompletionFuture().get();
+
     stdx::unique_lock lock(_mutex);
+
     _throwIfCleaningUp(lock);
     _recoverIfNecessary(lock, opCtx, true);
 
@@ -199,7 +202,10 @@ void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opC
 
 void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx,
                                                          const UUID& operationUUID) {
+    getConstructionCompletionFuture().get();
+
     stdx::unique_lock lock(_mutex);
+
     _recoverIfNecessary(lock, opCtx, false);
 
     if (!_operations.contains(operationUUID)) {
