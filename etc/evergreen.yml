@@ -8049,7 +8049,7 @@ buildvariants:
 - name: enterprise-amazon2
   display_name: "Enterprise Amazon Linux 2"
   run_on:
-  - amazon2-test
+  - amazon2-latest-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: >-
@@ -8070,7 +8070,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-build
+    - amazon2-latest-large
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -8098,7 +8098,7 @@ buildvariants:
 - name: amazon2
   display_name: Amazon Linux 2
   run_on:
-  - amazon2-test
+  - amazon2-latest-small
   expansions:
     test_flags: >-
       --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_latch_analyzer
@@ -8116,11 +8116,11 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2-large
+    large_distro_name: amazon2-latest-large
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-build
+    - amazon2-latest-large
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -8148,7 +8148,7 @@ buildvariants:
 - name: enterprise-amazon2-openssl111
   display_name: "Enterprise Amazon Linux 2 (openssl 1.1.1)"
   run_on:
-  - amazon2-openssl111-small
+  - amazon2-openssl111-latest-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: >-
@@ -8169,7 +8169,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-openssl111-large
+    - amazon2-openssl111-latest-large
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -8198,7 +8198,7 @@ buildvariants:
 - name: enterprise-amazon2-arm64
   display_name: "Enterprise Amazon Linux 2 arm64"
   run_on:
-  - amazon2-arm64-small
+  - amazon2-arm64-latest-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
@@ -8216,7 +8216,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: build_variant_gen
   - name: .aggfuzzer !.multiversion
   - name: audit
@@ -8246,7 +8246,7 @@ buildvariants:
 - name: amazon2-arm64
   display_name: Amazon Linux 2 arm64
   run_on:
-  - amazon2-arm64-small
+  - amazon2-arm64-latest-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -8260,11 +8260,11 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2-arm64-large
+    large_distro_name: amazon2-arm64-latest-large
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-latest-large
   - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -8272,7 +8272,7 @@ buildvariants:
   - name: .misc_js
   - name: .concurrency .common
     distros:
-      - amazon2-arm64-large
+      - amazon2-arm64-latest-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: .jscore .common
@@ -8491,7 +8491,7 @@ buildvariants:
 - name: enterprise-amazon2-arm64-openssl111
   display_name: "Enterprise Amazon Linux 2 arm64 (openssl 1.1.1)"
   run_on:
-  - amazon2-arm64-openssl111-small
+  - amazon2-arm64-openssl111-latest-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
@@ -8509,7 +8509,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-arm64-large
+    - amazon2-arm64-openssl111-latest-large
   - name: build_variant_gen
   - name: .aggfuzzer !.multiversion
   - name: audit
