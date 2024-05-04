@@ -2389,11 +2389,11 @@ committed. However, this is safe because we do not allow rollbacks before the
   SECONDARY -- [4] --> MAINTENANCE(MAINTENANCE #91;2#93;)
   MAINTENANCE -- [3] --> SECONDARY
   STARTUP --> ARBITER
-  ARBITER --> REMOVED
+  ARBITER <--> REMOVED
   REMOVED <--> SECONDARY
   ROLLBACK --> REMOVED
   STARTUP --> REMOVED
-  REMOVED --> STARTUP2
+  REMOVED <--> STARTUP2
   UNKNOWN(UNKNOWN #91;1#93;)
   DOWN(DOWN #91;1#93;)
 
