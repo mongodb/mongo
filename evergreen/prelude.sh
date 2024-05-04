@@ -12,6 +12,7 @@ evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$evergreen_dir/prelude_venv.sh"
 . "$evergreen_dir/prelude_db_contrib_tool.sh"
 . "$evergreen_dir/prelude_mongo_task_generator.sh"
+. "$evergreen_dir/prelude_system_env_variables.sh"
 
 expansions_yaml="$evergreen_dir/../../expansions.yml"
 expansions_default_yaml="$evergreen_dir/../etc/expansions.default.yml"
