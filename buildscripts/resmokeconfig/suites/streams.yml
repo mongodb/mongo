@@ -12,4 +12,5 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagStreams: true
+        diagnosticDataCollectionEnabled: false
     num_nodes: 1
