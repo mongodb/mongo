@@ -77,12 +77,21 @@ function checkMissingIndexKeys(doc, numDocs = 1, maxDocsPerBatch = 10000) {
         validateMode: "dataConsistencyAndMissingIndexKeysCheck"
     });
 
+    let missingIndexKeysQuery = {
+        ...getMissingIndexKeysQuery(Object.keys(doc).length),
+        "data.context.missingIndexKeys.0.keyString.a": 1
+    };
+    if (Object.keys(doc).length > 1) {
+        missingIndexKeysQuery = {
+            ...missingIndexKeysQuery,
+            "data.context.missingIndexKeys.1.keyString.b": 1
+        }
+    }
+
     forEachNonArbiterNode(replSet, function(node) {
         // Verify that dbCheck caught the missing index keys inconsistency and logged one health log
         // entry per inconsistency.
-        checkHealthLog(node.getDB("local").system.healthlog,
-                       getMissingIndexKeysQuery(Object.keys(doc).length),
-                       numDocs);
+        checkHealthLog(node.getDB("local").system.healthlog, missingIndexKeysQuery, numDocs);
         // Verify that dbCheck did not log any additional errors outside of the missing keys
         // inconsistency.
         checkHealthLog(node.getDB("local").system.healthlog, errQuery, numDocs);
@@ -125,7 +134,9 @@ function testMultipleDocsOneInconsistency() {
 
     forEachNonArbiterNode(replSet, function(node) {
         // Verify that only one missing keys inconsistency was caught.
-        checkHealthLog(node.getDB("local").system.healthlog, missingKeyErrQuery, 1);
+        checkHealthLog(node.getDB("local").system.healthlog,
+                       {...missingKeyErrQuery, "data.context.missingIndexKeys.0.keyString.a": 1},
+                       1);
         // Verify that there were no other error entries in the health log.
         checkHealthLog(node.getDB("local").system.healthlog, errQuery, 1);
     });
@@ -169,7 +180,10 @@ function testPrimaryOnly() {
                true);
 
     // Verify that the primary has a missing key health log entry, but the secondary does not.
-    checkHealthLog(primary.getDB("local").system.healthlog, getMissingIndexKeysQuery(1), 1);
+    checkHealthLog(
+        primary.getDB("local").system.healthlog,
+        {...getMissingIndexKeysQuery(1), "data.context.missingIndexKeys.0.keyString.a": 1},
+        1);
     checkHealthLog(secondary.getDB("local").system.healthlog, getMissingIndexKeysQuery(1), 0);
 
     // Verify that both the primary and secondary don't have any other errors.
@@ -196,7 +210,10 @@ function testSecondaryOnly() {
 
     // Verify that the secondary has a missing key health log entry, but the primary does not.
     checkHealthLog(primary.getDB("local").system.healthlog, getMissingIndexKeysQuery(1), 0);
-    checkHealthLog(secondary.getDB("local").system.healthlog, getMissingIndexKeysQuery(1), 1);
+    checkHealthLog(
+        secondary.getDB("local").system.healthlog,
+        {...getMissingIndexKeysQuery(1), "data.context.missingIndexKeys.0.keyString.a": 1},
+        1);
 
     // Verify that both the primary and secondary don't have any other errors.
     checkHealthLog(primary.getDB("local").system.healthlog, errQuery, 0);
