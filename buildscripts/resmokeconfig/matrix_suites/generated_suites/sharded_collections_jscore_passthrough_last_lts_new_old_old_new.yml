@@ -70,7 +70,6 @@ selector:
   - jstests/core/**/create_indexes.js
   - jstests/core/**/list_indexes_non_existent_ns.js
   - jstests/core/**/mr_preserve_indexes.js
-  - jstests/core/**/geo_borders.js
   - jstests/core/**/distinct_index1.js
   - jstests/core/**/explain1.js
   - jstests/core/**/explain4.js

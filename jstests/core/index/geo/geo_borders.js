@@ -1,5 +1,8 @@
 /**
  * @tags: [
+ *     # Sharded clusters do not clean up correctly after failed index builds.
+ *     # See SERVER-33207 as an example.
+ *     assumes_unsharded_collection,
  *     does_not_support_stepdowns,
  * ]
  */
