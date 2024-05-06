@@ -323,7 +323,7 @@ kv_database::start_nolock()
         t = k_timestamp_latest;
 
     /* Restore highest recnos for each FLCS. */
-    for (auto p : ckpt->highest_recnos())
+    for (auto &p : ckpt->highest_recnos())
         table_nolock(p.first)->truncate_recnos_after(p.second);
 
     rollback_to_stable_nolock(t, ckpt->snapshot());

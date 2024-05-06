@@ -416,7 +416,7 @@ public:
      *     Generate the workload.
      */
     static inline std::shared_ptr<kv_workload>
-    generate(kv_workload_generator_spec spec = kv_workload_generator_spec{}, uint64_t seed = 0)
+    generate(const kv_workload_generator_spec &spec = _default_spec, uint64_t seed = 0)
     {
         kv_workload_generator generator(spec, seed);
         generator.run();
@@ -428,8 +428,7 @@ protected:
      * kv_workload_generator::kv_workload_generator --
      *     Create a new workload generator.
      */
-    kv_workload_generator(
-      kv_workload_generator_spec spec = kv_workload_generator_spec{}, uint64_t seed = 0);
+    kv_workload_generator(const kv_workload_generator_spec &spec, uint64_t seed = 0);
 
     /*
      * kv_workload_generator::run --
@@ -504,6 +503,8 @@ protected:
     data_value random_data_value(const std::string &format);
 
 private:
+    static const kv_workload_generator_spec _default_spec;
+
     std::shared_ptr<kv_workload> _workload_ptr;
     kv_workload &_workload;
 

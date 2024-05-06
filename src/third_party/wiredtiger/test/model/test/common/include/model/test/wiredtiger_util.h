@@ -32,6 +32,10 @@
 #include "model/kv_database.h"
 #include "wiredtiger.h"
 
+extern "C" {
+#include "test_util.h"
+}
+
 /*
  * wt_get --
  *     Read from WiredTiger.
@@ -209,36 +213,43 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
 }
 
 /*
- * wt_model_assert_equal --
+ * wt_model_assert_equal_with_labels --
  *     Check that the two values are the same.
  */
-#define wt_model_assert_equal(a, b)                                               \
+#define wt_model_assert_equal_with_labels(a, b, label_a, label_b)                 \
     {                                                                             \
-        auto ret_a = a;                                                           \
-        auto ret_b = b;                                                           \
+        auto ret_a = (a);                                                         \
+        auto ret_b = (b);                                                         \
         if (ret_a != ret_b) {                                                     \
             std::cerr << std::endl;                                               \
             std::cerr << "Assertion failure in " << __PRETTY_FUNCTION__           \
                       << ": Values are not equal. " << std::endl;                 \
             std::cerr << "  Location: " << __FILE__ ":" << __LINE__ << std::endl; \
-            std::cerr << "  " << #a << ": " << ret_a << std::endl;                \
-            std::cerr << "  " << #b << ": " << ret_b << std::endl;                \
+            std::cerr << "  " << (label_a) << ": " << ret_a << std::endl;         \
+            std::cerr << "  " << (label_b) << ": " << ret_b << std::endl;         \
             testutil_die(0, nullptr);                                             \
         }                                                                         \
     }
 
 /*
+ * wt_model_assert_equal --
+ *     Check that the two values are the same.
+ */
+#define wt_model_assert_equal(a, b) wt_model_assert_equal_with_labels(a, b, #a, #b)
+
+/*
  * wt_model_assert --
  *     Check that the key has the same value in the model as in the database.
  */
-#define wt_model_assert(table, uri, key, ...)                              \
-    {                                                                      \
-        model::data_value __out_model, __out_wt;                           \
-        int __ret_model, __ret_wt;                                         \
-        __ret_model = table->get_ext(key, __out_model, ##__VA_ARGS__);     \
-        __ret_wt = wt_get_ext(session, uri, key, __out_wt, ##__VA_ARGS__); \
-        wt_model_assert_equal(__ret_model, __ret_wt);                      \
-        wt_model_assert_equal(__out_model, __out_wt);                      \
+#define wt_model_assert(table, uri, key, ...)                                          \
+    {                                                                                  \
+        model::data_value __out_model, __out_wt;                                       \
+        int __ret_model, __ret_wt;                                                     \
+        __ret_model = table->get_ext(key, __out_model, ##__VA_ARGS__);                 \
+        __ret_wt = wt_get_ext(session, uri, key, __out_wt, ##__VA_ARGS__);             \
+        wt_model_assert_equal(__ret_model, __ret_wt);                                  \
+        wt_model_assert_equal_with_labels(std::move(__out_model), std::move(__out_wt), \
+          "__out_model", "__out_wt"); /* To make Coverity happy. */                    \
     }
 
 /*

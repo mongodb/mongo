@@ -51,7 +51,7 @@ public:
       timestamp_t oldest_timestamp, timestamp_t stable_timestamp,
       std::map<std::string, uint64_t> &&highest_recnos) noexcept
         : _name(name), _snapshot(std::move(snapshot)), _oldest_timestamp(oldest_timestamp),
-          _stable_timestamp(stable_timestamp), _highest_recnos(highest_recnos)
+          _stable_timestamp(stable_timestamp), _highest_recnos(std::move(highest_recnos))
     {
     }
 
