@@ -98,10 +98,6 @@ void notifyOne(const void* uaddr) {
     futexWake(uaddr, 1);
 }
 
-void notifyMany(const void* uaddr, int nToWake) {
-    futexWake(uaddr, nToWake);
-}
-
 void notifyAll(const void* uaddr) {
     futexWake(uaddr, INT_MAX);
 }
@@ -130,12 +126,6 @@ bool waitUntil(const void* uaddr,
 
 void notifyOne(const void* uaddr) {
     WakeByAddressSingle(const_cast<void*>(uaddr));
-}
-
-void notifyMany(const void* uaddr, int nToWake) {
-    for (int i = 0; i < nToWake; ++i) {
-        WakeByAddressSingle(const_cast<void*>(uaddr));
-    }
 }
 
 void notifyAll(const void* uaddr) {
@@ -194,12 +184,6 @@ void notifyOne(const void* uaddr) {
     __ulock_wake(UL_COMPARE_AND_WAIT, const_cast<void*>(uaddr), 0);
 }
 
-void notifyMany(const void* uaddr, int nToWake) {
-    for (int i = 0; i < nToWake; ++i) {
-        __ulock_wake(UL_COMPARE_AND_WAIT, const_cast<void*>(uaddr), 0);
-    }
-}
-
 void notifyAll(const void* uaddr) {
     __ulock_wake(UL_COMPARE_AND_WAIT | ULF_WAKE_ALL, const_cast<void*>(uaddr), 0);
 }
@@ -236,7 +220,7 @@ bool waitUntil(const void* uaddr,
 }
 
 #else
-#error "Need an implementation of waitUntil(), notifyOne(), notifyMany(), notifyAll() for this OS"
+#error "Need an implementation of waitUntil(), notifyOne(), notifyAll() for this OS"
 #endif
 
 }  // namespace mongo::waitable_atomic_details

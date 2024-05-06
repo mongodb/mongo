@@ -29,60 +29,11 @@
 
 #pragma once
 
-#include <atomic>
 #include <condition_variable>
-#include <list>
 
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/notifyable.h"
 
 namespace mongo {
-
-namespace stdx {
-class condition_variable;
-}
-
-/**
- * Notifyable is a slim type meant to allow integration of special kinds of waiters for
- * stdx::condition_variable.  Specifially, the notify() on this type will be called directly from
- * stdx::condition_varibale::notify_(one|all).
- *
- * See Waitable for the stdx::condition_variable integration.
- */
-class Notifyable {
-    friend class stdx::condition_variable;
-
-public:
-    Notifyable() = default;
-
-    // !!! PAY ATTENTION, THERE IS DANGER HERE !!!
-    //
-    // Implementers of the notifyable api must be level triggered by notify, rather than edge
-    // triggered.
-    //
-    // I.e. a call to notify() must either unblock the notifyable immediately, if it is currently
-    // blocked, or unblock it the next time it would wait, if it is not currently blocked.
-    //
-    // In addition to unblocking, the notifyable should also atomically consume that notification
-    // state as a result of waking.  I.e. any number of calls to notify before or during a wait must
-    // unblock exactly one wait.
-    //
-    // Notifyable::notify is not like condition_variable::notify_X()
-    virtual void notify() noexcept = 0;
-
-protected:
-    ~Notifyable() = default;
-
-private:
-    // Notifyable's own a list node which they splice into a stdx::condition_variable's wait list
-    // when waiting on one.  It's important that we pre-allocate this entry on construction.
-    //
-    // Note that the notifyable** in this list is only used and meaningful while the notifyable
-    // waits on a condition variable (so the ownership of a self pointer doesn't really have
-    // implications for copy/move, as the objects shouldn't be moved/copied while waiting)
-    std::list<Notifyable*> _handleContainer{this};
-};
 
 class Waitable;
 
@@ -101,25 +52,13 @@ public:
     using std::condition_variable_any::condition_variable_any;  // NOLINT
 
     void notify_one() noexcept {
-        if (_notifyableCount.load()) {
-            stdx::lock_guard lk(_mutex);
-
-            if (_notifyNextNotifyable(lk)) {
-                return;
-            }
+        if (!_parkingLot.notifyOne()) {
+            std::condition_variable_any::notify_one();  // NOLINT
         }
-
-        std::condition_variable_any::notify_one();  // NOLINT
     }
 
     void notify_all() noexcept {
-        if (_notifyableCount.load()) {
-            stdx::lock_guard lk(_mutex);
-
-            while (_notifyNextNotifyable(lk)) {
-            }
-        }
-
+        _parkingLot.notifyAll();
         std::condition_variable_any::notify_all();  // NOLINT
     }
 
@@ -130,84 +69,12 @@ public:
 private:
     friend class ::mongo::Waitable;
 
-    /**
-     * Runs the callback with the Notifyable registered on the condvar.  This ensures that for the
-     * duration of the callback execution, a notification on the condvar will trigger a notify() to
-     * the Notifyable.
-     *
-     * The scheme here is that list entries are spliced back to their Notifyable from the
-     * notification list when notified (so that they don't eat multiple notify_one's).  We detect
-     * that condition by noting that our list isn't empty (in which case we should avoid a double
-     * splice back).
-     *
-     * The method is private, and accessed via friendship in Waitable.
-     */
     template <typename Callback>
     void _runWithNotifyable(Notifyable& notifyable, Callback&& cb) noexcept {
-        static_assert(noexcept(std::forward<Callback>(cb)()),
-                      "Only noexcept functions may be invoked with _runWithNotifyable");
-
-        auto iter = [&] {
-            stdx::lock_guard localMutex(_mutex);
-            _notifyableCount.addAndFetch(1);
-            _notifyables.splice(_notifyables.end(),
-                                notifyable._handleContainer,
-                                notifyable._handleContainer.begin());
-            return --_notifyables.end();
-        }();
-
-        // The supplied callback should do the equivalent of waiting on this condition_variable
-        // (i.e. return on notify), as well as any other work the waiter would like to do while
-        // waiting.
-        std::forward<Callback>(cb)();
-
-        stdx::lock_guard localMutex(_mutex);
-
-        // If our list isn't empty, we were notified, and spliced back in _notifyNextNotifyable.
-        // If it is empty, we need to stash our wait queue iterator ourselves.
-        if (notifyable._handleContainer.empty()) {
-            _notifyableCount.subtractAndFetch(1);
-            _spliceBack(localMutex, iter);
-        }
+        _parkingLot.runWithNotifyable(notifyable, std::forward<Callback>(cb));
     }
 
-    /**
-     * Notifies the next notifyable.
-     *
-     * Returns true if there was a notifyable to be notified.
-     *
-     * Note that as part of notifying, we splice back iterators to _runWithNotifyable callers.  This
-     * is safe because we hold _mutex while we do so, and our splicing communicates that those
-     * waiters need not clear themselves from the notification list on wakeup.
-     */
-    bool _notifyNextNotifyable(WithLock wl) noexcept {
-        auto iter = _notifyables.begin();
-        if (iter == _notifyables.end()) {
-            return false;
-        }
-
-        _notifyableCount.subtractAndFetch(1);
-
-        (*iter)->notify();
-
-        _spliceBack(wl, iter);
-
-        return true;
-    }
-
-    /**
-     * Splice the notifyable iterator back into the notifyable (out from this condvar's wait list)
-     */
-    void _spliceBack(WithLock, std::list<Notifyable*>::iterator iter) {
-        auto notifyable = *iter;
-        notifyable->_handleContainer.splice(
-            notifyable->_handleContainer.begin(), _notifyables, iter);
-    }
-
-    AtomicWord<unsigned long long> _notifyableCount;
-
-    stdx::mutex _mutex;  // NOLINT
-    std::list<Notifyable*> _notifyables;
+    NotifyableParkingLot _parkingLot;
 };
 
 using condition_variable_any = stdx::condition_variable;

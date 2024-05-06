@@ -160,9 +160,10 @@ TEST_F(SemaphoreTicketHolderTest, ImmediateResize) {
     ASSERT_EQ(holder->outof(), 10);
 
     // acquire 5 tickets
-    std::array<boost::optional<Ticket>, 5> tickets;
+    std::vector<Ticket> tickets;
     for (size_t i = 0; i < 5; ++i) {
-        tickets[i] = holder->waitForTicket(_opCtx.get(), &admCtx);
+        auto ticket = holder->waitForTicket(_opCtx.get(), &admCtx);
+        tickets.push_back(std::move(ticket));
     }
     ASSERT_EQ(holder->used(), 5);
     ASSERT_EQ(holder->available(), 5);
@@ -185,14 +186,10 @@ TEST_F(SemaphoreTicketHolderTest, ImmediateResize) {
         stdx::lock_guard lk(ticketCheckMutex);
         releaseWaiterAdmission.ticket = std::move(ticket);
     });
-    while (holder->queued() < 1) {
-        // spin
-    }
+    assertSoon([&]() { return holder->queued() >= 1; });
 
     // release 3 tickets
-    for (size_t i = 0; i < 3; i++) {
-        tickets[i].reset();
-    }
+    tickets.erase(tickets.end() - 3, tickets.end());
 
     // check that the waiter acquired a ticket
     assertSoon([&] {
@@ -233,9 +230,7 @@ TEST_F(SemaphoreTicketHolderTest, ImmediateResize) {
         stdx::lock_guard lk(ticketCheckMutex);
         resizeWaiterAdmission3.ticket = std::move(ticket);
     });
-    while (holder->queued() < 3) {
-        // spin
-    }
+    assertSoon([&]() { return holder->queued() >= 3; });
 
     // grow the pool to 5
     ASSERT_TRUE(holder->resize(_opCtx.get(), 5));
@@ -308,14 +303,8 @@ TEST_F(SemaphoreTicketHolderTest, ReleaseToPoolWakesWaiters) {
     std::vector<stdx::thread> threads;
     for (size_t i = 0; i < 3; ++i) {
         threads.emplace_back([&] {
-            Timer t;
             MockAdmission admission{getServiceContext(), AdmissionContext::Priority::kNormal};
             auto ticket = holder->waitForTicket(admission.opCtx.get(), &admission.admCtx);
-            // TODO(SERVER-89297): SemaphoreTicketHolder currently does timed waits in the 500ms
-            // range, which prevents deadlock with the bug this test is meant to test. Remove this
-            // assertion when we switch to the NotifyableParkingLot. Choose a value of 400 because
-            // the timed waiters introduce jitter for each wait using a base value of 500ms.
-            ASSERT_LTE(t.millis(), 400);
         });
     }
 

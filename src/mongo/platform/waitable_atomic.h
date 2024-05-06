@@ -46,7 +46,6 @@ namespace waitable_atomic_details {
  * Must not error even if uaddr is unmapped as there are some algorithms where that is valid.
  */
 void notifyOne(const void* uaddr);
-void notifyMany(const void* uaddr, int nToWake);
 void notifyAll(const void* uaddr);
 
 /**
@@ -166,22 +165,6 @@ public:
      */
     void notifyOne() {
         waitable_atomic_details::notifyOne(this);
-    }
-
-    /**
-     * Notifies up to nToWake threads waiting on the atomic object.
-     *
-     * WARNING: This is expensive even if there are no active waiters. Callers should track
-     * presence of active waiters unless notify is never called in performance-sensitive contexts.
-     *
-     * WARNING: Be very careful with this function if callers may be waiting with
-     * different old values. It is unspecified which waiters will be woken, and if any thread is
-     * waiting with the current value of this, they will consume the wakeup but treat it as spurious
-     * (since it is) and block again. From the consumer's perspective, it will be as-if the
-     * notification was lost.
-     */
-    void notifyMany(int nToWake) {
-        waitable_atomic_details::notifyMany(this, nToWake);
     }
 };
 

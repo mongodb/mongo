@@ -32,11 +32,10 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/random.h"
-#include "mongo/platform/waitable_atomic.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/notifyable.h"
 
 namespace mongo {
 
@@ -82,8 +81,9 @@ private:
     }
 
     ResizePolicy _resizePolicy;
-    BasicWaitableAtomic<int32_t> _tickets;
     QueueStats _semaphoreStats;
+    Atomic<int64_t> _tickets;
+    NotifyableParkingLot _parkingLot;
 };
 
 }  // namespace mongo

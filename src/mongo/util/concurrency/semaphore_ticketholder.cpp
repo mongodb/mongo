@@ -56,7 +56,7 @@ SemaphoreTicketHolder::SemaphoreTicketHolder(ServiceContext* serviceContext,
       _tickets(numTickets) {}
 
 boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
-    int32_t available = _tickets.load();
+    int64_t available = _tickets.load();
     while (true) {
         if (available <= 0) {
             return boost::none;
@@ -70,44 +70,29 @@ boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext*
 
 boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
                                                                        AdmissionContext* admCtx,
-                                                                       Date_t until,
+                                                                       Date_t deadline,
                                                                        bool interruptible) {
-    auto nextDeadline = [&]() {
-        // Timed waits can be problematic if we have a large number of waiters, since each time we
-        // check for interrupt we risk waking up all waiting threads at the same time. We introduce
-        // some jitter here to try to reduce the impact of a thundering herd of waiters woken at
-        // the same time.
-        static int32_t baseIntervalMs = 500;
-        static double jitterFactor = 0.2;
-        static thread_local XorShift128 urbg(SecureRandom().nextInt64());
-        int32_t offset = std::uniform_int_distribution<int32_t>(
-            -jitterFactor * baseIntervalMs, baseIntervalMs * jitterFactor)(urbg);
-        return std::min(until, Date_t::now() + Milliseconds{baseIntervalMs + offset});
-    };
-
     while (true) {
-        auto oldAvailable = _tickets.load();
+        if (boost::optional<Ticket> maybeTicket = _tryAcquireImpl(admCtx)) {
+            if (interruptible) {
+                opCtx->checkForInterrupt();
+            }
 
-        if (boost::optional<Ticket> maybeTicket = _tryAcquireImpl(admCtx); maybeTicket) {
             return std::move(*maybeTicket);
         }
 
-        if (oldAvailable != _tickets.loadRelaxed()) {
-            continue;
-        }
+        Waitable::TimeoutState status;
+        _parkingLot.runWithNotifyable(*opCtx->getBaton(), [&]() noexcept {
+            ClockSource* clockSource = opCtx->getServiceContext()->getPreciseClockSource();
+            Baton* baton = opCtx->getBaton().get();
+            status = baton->run_until(clockSource, std::min(deadline, opCtx->getDeadline()));
+        });
 
-        Date_t deadline = nextDeadline();
-        auto canAcquire = _tickets.waitUntil(oldAvailable, deadline);
         if (interruptible) {
             opCtx->checkForInterrupt();
         }
 
-        if (canAcquire) {
-            if (boost::optional<Ticket> maybeTicket = _tryAcquireImpl(admCtx)) {
-                return std::move(*maybeTicket);
-            }
-        } else if (deadline == until) {
-            // We hit the end of our deadline, so return nothing.
+        if (MONGO_unlikely(status == Waitable::TimeoutState::Timeout)) {
             return boost::none;
         }
     }
@@ -115,7 +100,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
 
 void SemaphoreTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
     if (_tickets.fetchAndAdd(1) >= 0) {
-        _tickets.notifyOne();
+        _parkingLot.notifyOne();
     }
 }
 
@@ -124,7 +109,7 @@ void SemaphoreTicketHolder::_immediateResize(WithLock, int32_t newSize) {
     auto delta = newSize - oldSize;
     auto oldAvailable = _tickets.fetchAndAdd(delta);
     if ((oldAvailable <= 0) && ((oldAvailable + delta) > 0)) {
-        _tickets.notifyMany(oldAvailable + delta);
+        _parkingLot.notifySome(oldAvailable + delta);
     }
 }
 
@@ -139,6 +124,7 @@ bool SemaphoreTicketHolder::_resizeImpl(WithLock lock,
             _immediateResize(lock, newSize);
             return true;
     }
+
     MONGO_UNREACHABLE;
 }
 
