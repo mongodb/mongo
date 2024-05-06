@@ -1318,12 +1318,16 @@ backup_worker(void *arg)
     WT_DECL_RET;
     WT_SESSION *session;
     uint32_t i;
+    int nfiles, nranges;
+    bool first;
 
     thread = (WTPERF_THREAD *)arg;
     wtperf = thread->wtperf;
+    nfiles = nranges = 0;
     opts = wtperf->opts;
     conn = wtperf->conn;
     session = NULL;
+    first = true;
 
     if ((ret = conn->open_session(conn, NULL, opts->sess_config, &session)) != 0) {
         lprintf(wtperf, ret, 0, "open_session failed in backup thread.");
@@ -1348,8 +1352,16 @@ backup_worker(void *arg)
         if (opts->backup_complete == 0)
             backup_read(wtperf, session);
         else {
-            testutil_backup_create_full(
-              conn, wtperf->home, (int)thread->backup.ops, false, 1024, NULL);
+            if (first) {
+                testutil_backup_create_full(
+                  conn, wtperf->home, (int)thread->backup.ops, false, 1024, &nfiles);
+                first = false;
+            } else {
+                testutil_assert(thread->backup.ops > 0);
+                testutil_backup_create_incremental(conn, wtperf->home, (int)thread->backup.ops,
+                  (int)thread->backup.ops - 1, false, &nfiles, &nranges, NULL);
+            }
+            lprintf(wtperf, 0, 0, "Backed up %d files, %d ranges", nfiles, nranges);
             testutil_delete_old_backups(BACKUP_RETAIN);
         }
         wtperf->backup = false;
