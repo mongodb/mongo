@@ -441,7 +441,7 @@ def generate_html_report_as_text(code_change_info: dict, verbose: bool):
     # Create table with a list of changed files
     report.append("<table class=\"center\">\n")
     report.append("  <tr>\n")
-    report.append("    <th>Changed File(s), excluding any new 0-length files</th>\n")
+    report.append("    <th>Changed File(s), excluding all 0-length or deleted files</th>\n")
     report.append("  </tr>\n")
     for file in change_info_list:
         escaped_file = html.escape(file, quote=True)

@@ -52,6 +52,11 @@ def run_command(directory: str, command: str) -> str:
     return output.decode()
 
 
+def get_merge_base_commit(git_working_tree_dir: str) -> str:
+    merge_base_commit = run_command(git_working_tree_dir, "git merge-base develop HEAD").strip()
+    return merge_base_commit
+
+
 def find_zero_length_files(directory: str) -> List[str]:
     working_directory = PushWorkingDirectory(directory)
     files = glob.glob('./**/*', recursive=True)
@@ -60,24 +65,63 @@ def find_zero_length_files(directory: str) -> List[str]:
     return zero_length_files
 
 
+def find_deleted_files(git_working_tree_dir: str) -> List[str]:
+    working_directory = PushWorkingDirectory(git_working_tree_dir)
+    merge_base_commit = get_merge_base_commit(git_working_tree_dir)
+    result = run_command(git_working_tree_dir, f"git diff --name-status {merge_base_commit} --diff-filter D")
+    deleted_files = result.replace("D\t", "./").splitlines()
+    working_directory.pop()
+    return deleted_files
+
+
+def find_moved_zero_length_files(git_working_tree_dir: str) -> List[str]:
+    zero_length_files = find_zero_length_files(directory=git_working_tree_dir)
+    working_directory = PushWorkingDirectory(git_working_tree_dir)
+    merge_base_commit = get_merge_base_commit(git_working_tree_dir)
+    result = run_command(git_working_tree_dir, f"git diff --name-status {merge_base_commit} --diff-filter R")
+    moved_zero_length_files = []
+    for line in result.splitlines():
+        line_parts = line.split()
+        file_name_1 = './' + line_parts[1]
+        file_name_2 = './' + line_parts[2]
+        if file_name_1 in zero_length_files or file_name_2 in zero_length_files:
+            moved_zero_length_files.append(file_name_1)
+            moved_zero_length_files.append(file_name_2)
+    working_directory.pop()
+    return moved_zero_length_files
+
+
 def create_diff_file(git_working_tree_dir: str, diff_file: str, verbose: bool) -> None:
-    # Exclude files with 0-length from the diff, as pygit2 doesn't handle such diffs well
-    zero_length_files = find_zero_length_files(git_working_tree_dir)
-    exclude_files_param = ' '.join([f"':(exclude){file}'" for file in zero_length_files])
+    # Exclude files with 0-length from the diff, as pygit2 doesn't handle such diffs well.
+    zero_length_files = find_zero_length_files(directory=git_working_tree_dir)
+
+    # Deleted files may be 0-length and therefore cause problems with pygit2
+    # It's not easy to detect which deleted files were 0-length, but as deleted
+    # files are not relevant anyway for the code change report, they can all be excluded.
+    all_deleted_files = find_deleted_files(git_working_tree_dir=git_working_tree_dir)
+
+    # Sometimes, Git will treat a combination of a deleted + added 0-length file as a move
+    # of a file. Again, these need to be excluded as pygit2 will have issues with them.
+    moved_zero_length_files = find_moved_zero_length_files(git_working_tree_dir=git_working_tree_dir)
+
+    exclude_files = zero_length_files + all_deleted_files + moved_zero_length_files
+    exclude_files_param = ' '.join([f"':(exclude){file}'" for file in exclude_files])
 
     repository_path = discover_repository(git_working_tree_dir)
     assert repository_path is not None
     repo = Repository(repository_path)
 
     head_commit = repo.head.target
-    merge_base_commit = run_command(git_working_tree_dir, "git merge-base develop HEAD").strip()
+    merge_base_commit = get_merge_base_commit(git_working_tree_dir)
     diff_command = f"git diff {merge_base_commit} -- {exclude_files_param}"
 
     if verbose:
-        print(f"head_commit:        {head_commit}")
-        print(f"merge_base_commit:  {merge_base_commit}")
-        print(f"zero_length_files = {zero_length_files}")
-        print(f"diff_command:       {diff_command}")
+        print(f"head_commit:            {head_commit}")
+        print(f"merge_base_commit:      {merge_base_commit}")
+        print(f"zero_length_files:      {zero_length_files}")
+        print(f"moved_zero_length_files {moved_zero_length_files}")
+        print(f"all_deleted_files:      {all_deleted_files}")
+        print(f"diff_command:           {diff_command}")
 
     diff_output = run_command(git_working_tree_dir, diff_command)
     diff_output += "\n"   # Ensure there is a newline on the end of the diff before writing to a file.
