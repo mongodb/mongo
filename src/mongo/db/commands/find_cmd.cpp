@@ -838,6 +838,20 @@ public:
                      ReadPreferenceSetting::get(opCtx),
                      _request.body,
                      {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
+                ScopeGuard deleteCursorOnError([&] {
+                    // In case of an error while creating and stashing the cursor we have to delete
+                    // the underlying resources since they might have been left in an inconsistent
+                    // state.
+                    pinnedCursor.deleteUnderlying();
+                });
+                ON_BLOCK_EXIT([&] {
+                    // During destruction of the pinned cursor we may discover that the operation
+                    // has been interrupted. This would cause the transaction resources we just
+                    // stashed to be released and destroyed. As we hold a reference here to them in
+                    // the form of the acquisition which modifies the resources, we must release it
+                    // now before destroying the pinned cursor.
+                    collectionOrView.reset();
+                });
                 cursorId = pinnedCursor.getCursor()->cursorid();
 
                 invariant(!exec);
@@ -873,18 +887,16 @@ public:
                 }
 
                 stashTransactionResourcesFromOperationContext(opCtx, pinnedCursor.getCursor());
-                // During destruction of the pinned cursor we may discover that the operation has
-                // been interrupted. This would cause the transaction resources we just stashed to
-                // be released and destroyed. As we hold a reference here to them in the form of the
-                // acquisition which modifies the resources, we must release it now before
-                // destroying the pinned cursor.
-                collectionOrView.reset();
+
+                deleteCursorOnError.dismiss();
             } else {
+                ON_BLOCK_EXIT([&] {
+                    // We want to destroy the executor as soon as possible to release any resources
+                    // locks it may hold.
+                    exec.reset();
+                    collectionOrView.reset();
+                });
                 endQueryOp(opCtx, collectionPtr, *exec, numResults, boost::none, cmdObj);
-                // We want to destroy executor as soon as possible to release any resources locks it
-                // may hold.
-                exec.reset();
-                collectionOrView.reset();
             }
 
             // Generate the response object to send to the client.
