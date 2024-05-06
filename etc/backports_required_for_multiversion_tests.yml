@@ -83,6 +83,8 @@ last-continuous:
       ticket: SERVER-89664
     - test_file: jstests/sharding/non_transaction_snapshot_reads_retry.js
       ticket: SERVER-89664
+    - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
+      ticket: SERVER-86674
   suites: null
 last-lts:
   all:
@@ -148,4 +150,6 @@ last-lts:
       ticket: SERVER-89664
     - test_file: jstests/sharding/non_transaction_snapshot_reads_retry.js
       ticket: SERVER-89664
+    - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
+      ticket: SERVER-86674
   suites: null
