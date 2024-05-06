@@ -24,7 +24,7 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
     WT_DECL_ITEM(checkpoint);
     WT_DECL_RET;
     WT_KEYED_ENCRYPTOR *kencryptor;
-    char *checkpoint_list, *config, *config_tmp, *metadata, fileid[64];
+    char *checkpoint_list, *config, *config_tmp, fileid[64], *metadata;
     const char *cfg[] = {WT_CONFIG_BASE(session, file_meta), NULL, NULL, NULL, NULL, NULL, NULL};
 
     ckptbase = NULL;

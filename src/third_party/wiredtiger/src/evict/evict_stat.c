@@ -22,8 +22,8 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
     uint64_t dsk_size, gen_gap, gen_gap_max, gen_gap_sum, max_pagesize;
     uint64_t min_written_size, num_memory, num_not_queueable, num_queued;
     uint64_t num_smaller_allocsz, pages_clean, pages_dirty, pages_internal;
-    uint64_t pages_leaf, seen_count, visited_count;
-    uint64_t visited_age_gap_sum, unvisited_count, unvisited_age_gap_sum;
+    uint64_t pages_leaf, seen_count, visited_age_gap_sum, visited_count;
+    uint64_t unvisited_age_gap_sum, unvisited_count;
     uint64_t walk_count, written_size_cnt, written_size_sum;
 
     btree = S2BT(session);

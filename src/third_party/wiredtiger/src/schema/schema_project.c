@@ -23,7 +23,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *pro
     WT_PACK_VALUE old_pv;
     size_t len, offset, old_len;
     u_long arg;
-    uint8_t *p, *end;
+    uint8_t *end, *p;
     const uint8_t *next;
     char *proj;
 
@@ -147,7 +147,7 @@ __wt_schema_project_out(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *pr
     WT_DECL_PACK(pack);
     WT_DECL_PACK_VALUE(pv);
     u_long arg;
-    uint8_t *p, *end;
+    uint8_t *end, *p;
     char *proj;
 
     p = end = NULL; /* -Wuninitialized */
@@ -215,7 +215,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *
     size_t len, offset, old_len;
     u_long arg;
     uint8_t *end, *p;
-    const uint8_t *next, *vp, *vend;
+    const uint8_t *next, *vend, *vp;
     char *proj;
     bool skip;
 

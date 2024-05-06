@@ -277,7 +277,7 @@ __wt_rts_btree_walk_btree_apply(
   WT_SESSION_IMPL *session, const char *uri, const char *config, wt_timestamp_t rollback_timestamp)
 {
     WT_CONFIG ckptconf;
-    WT_CONFIG_ITEM cval, value, key;
+    WT_CONFIG_ITEM cval, key, value;
     WT_DECL_RET;
     wt_timestamp_t max_durable_ts, newest_start_durable_ts, newest_stop_durable_ts;
     size_t addr_size;

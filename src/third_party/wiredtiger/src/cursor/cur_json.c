@@ -67,8 +67,8 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv, u_char *buf, size_t bu
   WT_CONFIG_ITEM *name, size_t *retsizep)
 {
     WT_PACK_VALUE *pv;
-    size_t s, n;
-    const u_char *p, *end;
+    size_t n, s;
+    const u_char *end, *p;
 
     pv = (WT_PACK_VALUE *)voidpv;
 
@@ -179,7 +179,7 @@ __json_struct_size(WT_SESSION_IMPL *session, const void *buffer, size_t size, co
     WT_PACK pack;
     WT_PACK_NAME packname;
     size_t result;
-    const uint8_t *p, *end;
+    const uint8_t *end, *p;
     bool needcr;
 
     p = buffer;
@@ -220,7 +220,7 @@ __json_struct_unpackv(WT_SESSION_IMPL *session, const void *buffer, size_t size,
     WT_PACK pack;
     WT_PACK_NAME packname;
     size_t jsize;
-    const uint8_t *p, *end;
+    const uint8_t *end, *p;
     bool needcr;
 
     p = buffer;
@@ -725,7 +725,7 @@ __json_pack_struct(
     WT_DECL_RET;
     WT_PACK pack;
     size_t toksize;
-    uint8_t *p, *end;
+    uint8_t *end, *p;
     const char *tokstart;
     bool multi;
 

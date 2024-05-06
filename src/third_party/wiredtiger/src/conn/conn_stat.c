@@ -309,7 +309,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
     size_t prefixlen;
     int64_t val;
     const char *cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL};
-    const char *desc, *endprefix, *valstr, *uri;
+    const char *desc, *endprefix, *uri, *valstr;
     bool first, groupfirst;
 
     conn = S2C(session);

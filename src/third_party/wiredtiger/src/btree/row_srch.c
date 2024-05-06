@@ -221,10 +221,9 @@ static WT_INLINE int
 __validate_next_stack(
   WT_SESSION_IMPL *session, WT_INSERT *next_stack[WT_SKIP_MAXDEPTH], WT_ITEM *srch_key)
 {
-
-    WT_ITEM upper_key, lower_key;
-    int32_t i, cmp;
     WT_COLLATOR *collator;
+    WT_ITEM lower_key, upper_key;
+    int32_t cmp, i;
 
     /*
      * Hide the flag check for non-diagnostics builds, too.
@@ -362,7 +361,7 @@ __wt_row_search(WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, bool insert, WT_REF *le
     WT_INSERT_HEAD *ins_head;
     WT_ITEM *item;
     WT_PAGE *page;
-    WT_PAGE_INDEX *pindex, *parent_pindex;
+    WT_PAGE_INDEX *parent_pindex, *pindex;
     WT_REF *current, *descent;
     WT_ROW *rip;
     WT_SESSION_IMPL *session;

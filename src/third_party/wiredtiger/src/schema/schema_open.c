@@ -132,7 +132,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
     WT_DECL_ITEM(buf);
     WT_DECL_ITEM(plan);
     WT_DECL_RET;
-    u_int npublic_cols, i;
+    u_int i, npublic_cols;
 
     WT_ERR(__wt_scr_alloc(session, 0, &buf));
 

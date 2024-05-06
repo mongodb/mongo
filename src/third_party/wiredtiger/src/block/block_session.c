@@ -228,7 +228,7 @@ static int
 __block_size_discard(WT_SESSION_IMPL *session, u_int max)
 {
     WT_BLOCK_MGR_SESSION *bms;
-    WT_SIZE *sz, *nsz;
+    WT_SIZE *nsz, *sz;
 
     bms = session->block_manager;
     if (max != 0 && bms->sz_cache_cnt <= max)

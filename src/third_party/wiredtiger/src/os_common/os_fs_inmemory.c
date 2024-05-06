@@ -101,7 +101,7 @@ __im_fs_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, cons
     WT_SESSION_IMPL *session;
     size_t dirallocsz, len;
     uint32_t count;
-    char *name, **entries;
+    char **entries, *name;
 
     im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
     session = (WT_SESSION_IMPL *)wt_session;

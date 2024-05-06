@@ -830,7 +830,7 @@ __wt_chunkcache_get(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t objectid
     WT_CHUNKCACHE_CHUNK *chunk;
     WT_CHUNKCACHE_HASHID hash_id;
     WT_DECL_RET;
-    size_t already_read, remains_to_read, readable_in_chunk, size_copied;
+    size_t already_read, readable_in_chunk, remains_to_read, size_copied;
     uint64_t bucket_id, retries, sleep_usec;
     const char *object_name;
     bool chunk_cached, valid;

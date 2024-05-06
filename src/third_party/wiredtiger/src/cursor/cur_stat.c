@@ -618,6 +618,7 @@ int
 __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, const char *cfg[],
   WT_CURSOR **cursorp)
 {
+    WT_CONFIG_ITEM cval, sval;
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR_STATIC_INIT(iface, __curstat_get_key, /* get-key */
       __curstat_get_value,                          /* get-value */
@@ -643,7 +644,6 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
       __wt_cursor_reopen_notsup,                    /* reopen */
       __wt_cursor_checkpoint_id,                    /* checkpoint ID */
       __curstat_close);                             /* close */
-    WT_CONFIG_ITEM cval, sval;
     WT_CURSOR *cursor;
     WT_CURSOR_STAT *cst;
     WT_DECL_RET;

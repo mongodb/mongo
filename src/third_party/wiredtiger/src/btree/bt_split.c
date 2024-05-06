@@ -56,7 +56,7 @@ static void
 __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_BTREE *btree;
-    WT_ITEM *next, _next, *last, _last, *tmp;
+    WT_ITEM *last, _last, *next, _next, *tmp;
     WT_REF *ref;
     uint64_t recno;
     uint32_t slot;
@@ -398,8 +398,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
     WT_SPLIT_ERROR_PHASE complete;
     size_t child_incr, root_decr, root_incr, size;
     uint64_t split_gen;
-    uint32_t children, chunk, i, j, remain;
-    uint32_t slots;
+    uint32_t children, chunk, i, j, remain, slots;
     void *p;
 
     btree = S2BT(session);
@@ -648,9 +647,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     WT_SPLIT_ERROR_PHASE complete;
     size_t parent_decr, size;
     uint64_t split_gen;
-    uint32_t deleted_entries, parent_entries, result_entries;
-    uint32_t *deleted_refs;
-    uint32_t hint, i, j;
+    uint32_t deleted_entries, *deleted_refs, hint, i, j, parent_entries, result_entries;
     bool empty_parent;
 
     btree = S2BT(session);
@@ -904,8 +901,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
     WT_SPLIT_ERROR_PHASE complete;
     size_t child_incr, page_decr, page_incr, parent_incr, size;
     uint64_t split_gen;
-    uint32_t children, chunk, i, j, remain;
-    uint32_t slots;
+    uint32_t children, chunk, i, j, remain, slots;
     void *p;
 
     /* Mark the page dirty. */
@@ -1380,7 +1376,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     WT_PAGE *page;
     WT_PAGE_MODIFY *mod;
     WT_SAVE_UPD *supd;
-    WT_UPDATE *prev_onpage, *upd, *tmp;
+    WT_UPDATE *prev_onpage, *tmp, *upd;
     uint64_t orig_read_gen, recno;
     uint32_t i, slot;
     bool prepare;
@@ -1610,7 +1606,7 @@ static void
 __split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT_REF *ref)
 {
     WT_SAVE_UPD *supd;
-    WT_UPDATE *upd, *tmp;
+    WT_UPDATE *tmp, *upd;
     uint32_t i, slot;
 
     if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))

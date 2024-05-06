@@ -205,7 +205,7 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool update_shared_state)
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_SHARED *s, *txn_shared;
-    uint64_t current_id, id, prev_oldest_id, pinned_id, snapshot_gen;
+    uint64_t current_id, id, pinned_id, prev_oldest_id, snapshot_gen;
     uint32_t i, n, session_cnt;
 
     conn = S2C(session);
@@ -1180,6 +1180,7 @@ __txn_append_tombstone(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_CURSOR_BTREE 
     WT_DECL_RET;
     WT_UPDATE *tombstone;
     size_t not_used;
+
     tombstone = NULL;
     btree = S2BT(session);
 
@@ -1249,7 +1250,7 @@ __txn_resolve_prepared_update_chain(WT_SESSION_IMPL *session, WT_UPDATE *upd, bo
 
     /* Sleep for 100ms in the prepared resolution path if configured. */
     if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_PREPARE_RESOLUTION_2))
-        __wt_sleep(0, 100000);
+        __wt_sleep(0, 100 * WT_THOUSAND);
     WT_STAT_CONN_INCR(session, txn_prepared_updates_committed);
 }
 
@@ -1270,10 +1271,9 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     WT_TXN *txn;
     WT_UPDATE *first_committed_upd, *upd, *upd_followed_tombstone;
     WT_UPDATE *head_upd;
-
-    uint8_t *p, resolve_case, hs_recno_key_buf[WT_INTPACK64_MAXSIZE];
+    uint8_t hs_recno_key_buf[WT_INTPACK64_MAXSIZE], *p, resolve_case;
     char ts_string[3][WT_TS_INT_STRING_SIZE];
-    bool tw_found, has_hs_record;
+    bool has_hs_record, tw_found;
 
     hs_cursor = NULL;
     txn = session->txn;
@@ -2080,7 +2080,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_TXN *txn;
     WT_TXN_OP *op;
-    WT_UPDATE *upd, *tmp;
+    WT_UPDATE *tmp, *upd;
     u_int i, prepared_updates, prepared_updates_key_repeated;
 
     txn = session->txn;

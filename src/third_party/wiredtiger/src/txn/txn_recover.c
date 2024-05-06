@@ -149,7 +149,7 @@ __txn_system_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const ui
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     uint64_t granularity;
-    uint32_t index, optype, opsize;
+    uint32_t index, opsize, optype;
     const char *id_str;
 
     session = r->session;
@@ -240,7 +240,7 @@ __txn_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *
     WT_SESSION_IMPL *session;
     wt_timestamp_t commit, durable, first_commit, prepare, read;
     uint64_t recno, start_recno, stop_recno, t_nsec, t_sec;
-    uint32_t fileid, mode, optype, opsize;
+    uint32_t fileid, mode, opsize, optype;
 
     session = r->session;
     cursor = NULL;
@@ -778,7 +778,7 @@ __recovery_file_scan_prefix(WT_RECOVERY *r, const char *prefix, const char *igno
     WT_CURSOR *c;
     WT_DECL_RET;
     int cmp;
-    const char *uri, *config;
+    const char *config, *uri;
 
     /* Scan through all entries in the metadata matching the prefix. */
     c = r->files[0].c;
@@ -903,12 +903,11 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
     WT_DECL_RET;
     WT_RECOVERY r;
     WT_RECOVERY_FILE *metafile;
-    WT_TIMER timer, rts_timer, checkpoint_timer;
+    WT_TIMER checkpoint_timer, rts_timer, timer;
     wt_off_t hs_size;
     char *config;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
-    bool do_checkpoint, eviction_started, hs_exists, needs_rec, was_backup;
-    bool rts_executed;
+    bool do_checkpoint, eviction_started, hs_exists, needs_rec, rts_executed, was_backup;
 
     conn = S2C(session);
     F_SET(conn, WT_CONN_RECOVERING);

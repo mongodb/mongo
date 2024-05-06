@@ -83,7 +83,7 @@ __curversion_get_value(WT_CURSOR *cursor, ...)
     WT_DECL_RET;
     WT_PACK pack;
     WT_SESSION_IMPL *session;
-    const uint8_t *p, *end;
+    const uint8_t *end, *p;
     va_list ap;
 
     version_cursor = (WT_CURSOR_VERSION *)cursor;
@@ -151,7 +151,7 @@ __curversion_set_value_with_format(WT_CURSOR *cursor, const char *fmt, ...)
 static int
 __curversion_next_int(WT_CURSOR *cursor)
 {
-    WT_CURSOR *hs_cursor, *file_cursor;
+    WT_CURSOR *file_cursor, *hs_cursor;
     WT_CURSOR_BTREE *cbt;
     WT_CURSOR_VERSION *version_cursor;
     WT_DECL_ITEM(hs_value);
@@ -160,21 +160,21 @@ __curversion_next_int(WT_CURSOR *cursor)
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
     WT_TIME_WINDOW *twp;
-    WT_UPDATE *first, *next_upd, *upd, *tombstone;
+    WT_UPDATE *first, *next_upd, *tombstone, *upd;
     wt_timestamp_t durable_start_ts, durable_stop_ts, stop_ts;
-    uint64_t stop_txn, hs_upd_type, raw;
+    uint64_t hs_upd_type, raw, stop_txn;
     uint8_t *p, version_prepare_state;
     bool upd_found;
 
     session = CUR2S(cursor);
     version_cursor = (WT_CURSOR_VERSION *)cursor;
-    hs_cursor = version_cursor->hs_cursor;
     file_cursor = version_cursor->file_cursor;
+    hs_cursor = version_cursor->hs_cursor;
     cbt = (WT_CURSOR_BTREE *)file_cursor;
     page = cbt->ref->page;
     twp = NULL;
     upd_found = false;
-    first = upd = tombstone = NULL;
+    first = tombstone = upd = NULL;
 
     /* Temporarily clear the raw flag. We need to pack the data according to the format. */
     raw = F_MASK(cursor, WT_CURSTD_RAW);
@@ -448,7 +448,7 @@ err:
 static int
 __curversion_reset(WT_CURSOR *cursor)
 {
-    WT_CURSOR *hs_cursor, *file_cursor;
+    WT_CURSOR *file_cursor, *hs_cursor;
     WT_CURSOR_VERSION *version_cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
@@ -564,7 +564,7 @@ err:
 static int
 __curversion_close(WT_CURSOR *cursor)
 {
-    WT_CURSOR *hs_cursor, *file_cursor;
+    WT_CURSOR *file_cursor, *hs_cursor;
     WT_CURSOR_VERSION *version_cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;

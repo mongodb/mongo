@@ -156,7 +156,7 @@ __wt_buf_set_printable_format(WT_SESSION_IMPL *session, const void *buffer, size
     WT_DECL_PACK_VALUE(pv);
     WT_DECL_RET;
     WT_PACK pack;
-    const uint8_t *p, *end;
+    const uint8_t *end, *p;
     const char *sep;
 
     p = (const uint8_t *)buffer;
@@ -270,7 +270,7 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
   ) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
     WT_DECL_RET;
-    WT_ITEM *buf, **p, **best, **slot;
+    WT_ITEM **best, *buf, **p, **slot;
     size_t allocated;
     u_int i;
 

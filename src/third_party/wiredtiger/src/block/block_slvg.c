@@ -170,7 +170,7 @@ __wt_block_salvage_valid(
   WT_SESSION_IMPL *session, WT_BLOCK *block, uint8_t *addr, size_t addr_size, bool valid)
 {
     wt_off_t offset;
-    uint32_t size, objectid, checksum;
+    uint32_t checksum, objectid, size;
 
     /*
      * Crack the cookie. If the upper layer took the block, move past it; if the upper layer

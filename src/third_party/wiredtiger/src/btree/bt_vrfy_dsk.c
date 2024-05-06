@@ -69,7 +69,7 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session, const char *tag, const WT_PAGE_H
   size_t size, WT_ADDR *addr, uint32_t verify_flags)
 {
     uint8_t flags;
-    const uint8_t *p, *end;
+    const uint8_t *end, *p;
 
     /* Initialize the verify information. */
     WT_VERIFY_INFO vi;
@@ -816,7 +816,7 @@ __verify_dsk_col_fix(WT_VERIFY_INFO *vi)
     WT_DECL_RET;
     uint64_t recno_offset;
     uint32_t cell_num, datalen, i;
-    const uint8_t *bitstring, *p, *end;
+    const uint8_t *bitstring, *end, *p;
 
     btree = S2BT(vi->session);
     unpack = &_unpack;
@@ -1078,7 +1078,7 @@ __verify_dsk_chunk(WT_VERIFY_INFO *vi)
 {
     WT_BTREE *btree;
     uint32_t datalen;
-    uint8_t *p, *end;
+    uint8_t *end, *p;
 
     btree = S2BT(vi->session);
     end = (uint8_t *)vi->dsk + vi->dsk->mem_size;

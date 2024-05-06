@@ -685,7 +685,7 @@ __wt_schema_index_source(
 static int
 __fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 {
-    WT_CURSOR *tcur, *icur;
+    WT_CURSOR *icur, *tcur;
     WT_DECL_RET;
     WT_SESSION *wt_session;
 
@@ -735,7 +735,7 @@ __create_index(WT_SESSION_IMPL *session, const char *name, bool exclusive, const
     u_int i, npublic_cols;
     char *idxconf, *origconf;
     const char *cfg[4] = {WT_CONFIG_BASE(session, index_meta), NULL, NULL, NULL};
-    const char *source, *sourceconf, *idxname, *tablename;
+    const char *idxname, *source, *sourceconf, *tablename;
     const char *sourcecfg[] = {config, NULL, NULL};
     bool exists, have_extractor;
 
@@ -1256,7 +1256,7 @@ __create_fix_file_ids(WT_SESSION_IMPL *session, WT_IMPORT_LIST *import_list)
     WT_CONNECTION_IMPL *conn;
     size_t i;
     int64_t new_file_id, prev_file_id;
-    char fileid_cfg[64], *config_tmp;
+    char *config_tmp, fileid_cfg[64];
     const char *cfg[3] = {NULL, NULL, NULL};
 
     config_tmp = NULL;

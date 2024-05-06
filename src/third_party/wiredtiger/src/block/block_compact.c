@@ -17,7 +17,6 @@ static void __block_dump_file_stat(WT_SESSION_IMPL *, WT_BLOCK *, bool);
 int
 __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-
     if (block->compact_session_id != WT_SESSION_ID_INVALID)
         WT_RET_MSG(session, EBUSY,
           "Compaction already happening on data handle %s by session %" PRIu32, block->name,
@@ -145,7 +144,7 @@ __block_compact_skip_internal(WT_SESSION_IMPL *session, WT_BLOCK *block, bool es
   int *compact_pct_tenths_p)
 {
     WT_EXT *ext;
-    wt_off_t avail_eighty, avail_ninety, off, size, eighty, ninety;
+    wt_off_t avail_eighty, avail_ninety, eighty, ninety, off, size;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &block->live_lock);
 
@@ -238,8 +237,9 @@ __block_compact_estimate_remaining_work(WT_SESSION_IMPL *session, WT_BLOCK *bloc
 {
     WT_EXT *ext;
     WT_VERBOSE_LEVEL verbose_level;
-    wt_off_t avg_block_size, avg_internal_block_size, depth1_subtree_size, leaves_per_internal_page;
-    wt_off_t compact_start_off, extra_space, file_size, last, off, rewrite_size, size, write_off;
+    wt_off_t avg_block_size, avg_internal_block_size, compact_start_off, depth1_subtree_size;
+    wt_off_t extra_space, file_size, last, leaves_per_internal_page, off, rewrite_size, size;
+    wt_off_t write_off;
     uint64_t n, pages_to_move, pages_to_move_orig, total_pages_to_move;
     int compact_pct_tenths, iteration;
     bool skip;
@@ -605,7 +605,7 @@ __wt_block_compact_page_skip(
   WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, size_t addr_size, bool *skipp)
 {
     wt_off_t offset;
-    uint32_t size, checksum, objectid;
+    uint32_t checksum, objectid, size;
 
     WT_UNUSED(addr_size);
     *skipp = true; /* Return a default skip. */
@@ -628,8 +628,8 @@ __wt_block_compact_page_rewrite(
 {
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
-    wt_off_t offset, new_offset;
-    uint32_t size, checksum, objectid;
+    wt_off_t new_offset, offset;
+    uint32_t checksum, objectid, size;
     uint8_t *endp;
     bool discard_block;
 

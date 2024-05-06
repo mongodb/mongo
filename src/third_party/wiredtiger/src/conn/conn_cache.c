@@ -301,7 +301,7 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
     WT_CONNECTION_STATS **stats;
-    uint64_t inuse, intl, leaf;
+    uint64_t intl, inuse, leaf;
 
     conn = S2C(session);
     cache = conn->cache;

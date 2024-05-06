@@ -44,13 +44,13 @@ __wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_VERSION new_compat, min_compat, max_compat;
+    WT_VERSION max_compat, min_compat, new_compat;
     char *value;
     bool txn_active, unchg;
 
     conn = S2C(session);
     value = NULL;
-    new_compat = min_compat = max_compat = WT_NO_VERSION;
+    max_compat = min_compat = new_compat = WT_NO_VERSION;
     unchg = false;
 
     WT_RET(__wt_config_gets(session, cfg, "compatibility.release", &cval));

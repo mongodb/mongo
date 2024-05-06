@@ -650,7 +650,7 @@ static int
 __meta_ckptlist_allocate_new_ckpt(
   WT_SESSION_IMPL *session, WT_CKPT **ckptbasep, size_t *allocated, const char *config)
 {
-    WT_CKPT *ckptbase, *ckpt;
+    WT_CKPT *ckpt, *ckptbase;
     size_t slot;
 
     ckptbase = *ckptbasep;
@@ -775,7 +775,7 @@ __assert_ckpt_matches(WT_SESSION_IMPL *session, WT_CKPT *ckpt_a, WT_CKPT *ckpt_b
 static void
 __assert_checkpoint_list_matches(WT_SESSION_IMPL *session, WT_CKPT *saved_list, WT_CKPT *new_list)
 {
-    WT_CKPT *ckpt_saved, *ckpt_new;
+    WT_CKPT *ckpt_new, *ckpt_saved;
 
     for (ckpt_saved = saved_list, ckpt_new = new_list;
          ckpt_saved != NULL && ckpt_saved->order != 0 && ckpt_new != NULL && ckpt_new->order != 0;

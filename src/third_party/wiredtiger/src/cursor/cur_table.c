@@ -39,7 +39,7 @@ __curextract_insert(WT_CURSOR *cursor)
 {
     WT_CURSOR_EXTRACTOR *cextract;
     WT_DECL_RET;
-    WT_ITEM *key, ikey, pkey;
+    WT_ITEM ikey, *key, pkey;
     WT_SESSION_IMPL *session;
 
     CURSOR_API_CALL(cursor, session, ret, insert, NULL);
@@ -381,7 +381,7 @@ err:
 static int
 __curtable_next_random(WT_CURSOR *cursor)
 {
-    WT_CURSOR *primary, **cp;
+    WT_CURSOR **cp, *primary;
     WT_CURSOR_TABLE *ctable;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
@@ -495,7 +495,7 @@ err:
 static int
 __curtable_search_near(WT_CURSOR *cursor, int *exact)
 {
-    WT_CURSOR *primary, **cp;
+    WT_CURSOR **cp, *primary;
     WT_CURSOR_TABLE *ctable;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
@@ -531,7 +531,7 @@ err:
 static int
 __curtable_insert(WT_CURSOR *cursor)
 {
-    WT_CURSOR *primary, **cp;
+    WT_CURSOR **cp, *primary;
     WT_CURSOR_TABLE *ctable;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
@@ -1079,7 +1079,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
     WT_TABLE *table;
     size_t size;
     int cfg_cnt;
-    const char *tablename, *columns;
+    const char *columns, *tablename;
 
     WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_TABLE);
 

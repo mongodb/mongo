@@ -629,13 +629,12 @@ __conf_verbose_cat_config(WT_SESSION_IMPL *session, const char **cfg, WT_CONF *c
   uint64_t subkey_id, WT_ITEM *buf, const WT_CONFIG_CHECK *ccheck, u_int count,
   const char *subconf_name)
 {
-    WT_CONFIG_ITEM value, config_value;
+    WT_CONFIG_ITEM config_value, value;
     size_t name_remainder;
     uint64_t key_id, mask;
     u_int i, type;
     int shift;
-    char keyname[256];
-    char *namep;
+    char keyname[256], *namep;
     const char *p;
     bool need_quotes;
 

@@ -16,7 +16,7 @@ static WT_INLINE void
 __ref_index_slot(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
     WT_PAGE_INDEX *pindex;
-    WT_REF **start, **stop, **p, **t;
+    WT_REF **p, **start, **stop, **t;
     uint64_t sleep_usecs, yield_count;
     uint32_t entries, slot;
 
