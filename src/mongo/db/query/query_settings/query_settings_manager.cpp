@@ -55,7 +55,7 @@ namespace mongo::query_settings {
 
 namespace {
 const auto getQuerySettingsManager =
-    ServiceContext::declareDecoration<boost::optional<QuerySettingsManager>>();
+    ServiceContext::declareDecoration<std::unique_ptr<QuerySettingsManager>>();
 
 class QuerySettingsServerStatusSection final : public ServerStatusSection {
 public:
@@ -115,14 +115,15 @@ QuerySettingsManager& QuerySettingsManager::get(OperationContext* opCtx) {
 
 void QuerySettingsManager::create(
     ServiceContext* service, std::function<void(OperationContext*)> clusterParameterRefreshFn) {
-    getQuerySettingsManager(service).emplace(service, clusterParameterRefreshFn);
+    getQuerySettingsManager(service) =
+        std::make_unique<QuerySettingsManager>(service, clusterParameterRefreshFn);
 }
 
 boost::optional<QuerySettings> QuerySettingsManager::getQuerySettingsForQueryShapeHash(
     OperationContext* opCtx,
     const query_shape::QueryShapeHash& queryShapeHash,
     const boost::optional<TenantId>& tenantId) const {
-    Lock::SharedLock readLock(opCtx, _mutex);
+    auto readLock = _mutex.readLock();
 
     // Perform the lookup of query shape configurations for the given tenant.
     const auto versionedQueryShapeConfigurationsIt =
@@ -154,7 +155,7 @@ void QuerySettingsManager::setQueryShapeConfigurations(
 
     // Install the query shape configurations.
     {
-        Lock::ExclusiveLock writeLock(opCtx, _mutex);
+        auto writeLock = _mutex.writeLock();
         const auto versionedQueryShapeConfigurationsIt =
             _tenantIdToVersionedQueryShapeConfigurationsMap.find(tenantId);
         if (_tenantIdToVersionedQueryShapeConfigurationsMap.end() !=
@@ -172,7 +173,7 @@ void QuerySettingsManager::setQueryShapeConfigurations(
 
 QueryShapeConfigurationsWithTimestamp QuerySettingsManager::getAllQueryShapeConfigurations(
     OperationContext* opCtx, const boost::optional<TenantId>& tenantId) const {
-    Lock::SharedLock readLock(opCtx, _mutex);
+    auto readLock = _mutex.readLock();
     return {getAllQueryShapeConfigurations_inlock(opCtx, tenantId),
             getClusterParameterTime_inlock(opCtx, tenantId)};
 }
@@ -209,7 +210,7 @@ void QuerySettingsManager::removeAllQueryShapeConfigurations(
     // Previous query shape configurations for destruction outside the critical section.
     VersionedQueryShapeConfigurations previousQueryShapeConfigurations;
     {
-        Lock::ExclusiveLock writeLock(opCtx, _mutex);
+        auto writeLock = _mutex.writeLock();
         const auto versionedQueryShapeConfigurationsIt =
             _tenantIdToVersionedQueryShapeConfigurationsMap.find(tenantId);
         if (_tenantIdToVersionedQueryShapeConfigurationsMap.end() !=
@@ -227,7 +228,7 @@ void QuerySettingsManager::removeAllQueryShapeConfigurations(
 
 LogicalTime QuerySettingsManager::getClusterParameterTime(
     OperationContext* opCtx, const boost::optional<TenantId>& tenantId) const {
-    Lock::SharedLock readLock(opCtx, _mutex);
+    auto readLock = _mutex.readLock();
     return getClusterParameterTime_inlock(opCtx, tenantId);
 }
 
@@ -244,7 +245,7 @@ LogicalTime QuerySettingsManager::getClusterParameterTime_inlock(
 
 void QuerySettingsManager::appendQuerySettingsClusterParameterValue(
     OperationContext* opCtx, BSONObjBuilder* bob, const boost::optional<TenantId>& tenantId) {
-    Lock::SharedLock readLock(opCtx, _mutex);
+    auto readLock = _mutex.readLock();
     bob->append("_id"_sd, QuerySettingsManager::kQuerySettingsClusterParameterName);
     BSONArrayBuilder arrayBuilder(
         bob->subarrayStart(QuerySettingsClusterParameterValue::kSettingsArrayFieldName));

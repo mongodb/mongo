@@ -50,7 +50,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/trusted_hasher.h"
 
 namespace mongo {
@@ -191,9 +191,9 @@ private:
     LogicalTime getClusterParameterTime_inlock(OperationContext* opCtx,
                                                const boost::optional<TenantId>& tenantId) const;
 
+    mutable WriteRarelyRWMutex _mutex;
     absl::flat_hash_map<boost::optional<TenantId>, VersionedQueryShapeConfigurations>
         _tenantIdToVersionedQueryShapeConfigurationsMap;
-    Lock::ResourceMutex _mutex = Lock::ResourceMutex("QuerySettingsManager::mutex");
     std::function<void(OperationContext*)> _clusterParameterRefreshFn;
 };
 };  // namespace query_settings
