@@ -992,9 +992,8 @@ statistics_log_configuration_common = [
     Config('on_close', 'false', r'''log statistics on database close''',
         type='boolean'),
     Config('sources', '', r'''
-        if non-empty, include statistics for the list of data source URIs, if they are open at the
-        time of the statistics logging. The list may include URIs matching a single data source
-        ("table:mytable"), or a URI matching all data sources of a particular type ("table:")''',
+        if non-empty, include statistics for the list of "file:" and "lsm:" data source URIs,
+        if they are open at the time of the statistics logging.''',
         type='list'),
     Config('timestamp', '"%b %d %H:%M:%S"', r'''
         a timestamp prepended to each log record. May contain \c strftime conversion specifications.

@@ -2465,17 +2465,14 @@ struct __wt_connection {
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log statistics on database
      * close., a boolean flag; default \c false.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if
-     * non-empty\, include statistics for the list of data source URIs\, if they are open at the
-     * time of the statistics logging.  The list may include URIs matching a single data source
-     * ("table:mytable")\, or a URI matching all data sources of a particular type ("table:")., a
-     * list of strings; default empty.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp
-     * prepended to each log record.  May contain \c strftime conversion specifications.  When \c
-     * json is configured\, defaults to \c "%Y-%m-%dT%H:%M:%S.000Z"., a string; default \c "%b %d
-     * %H:%M:%S".}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each write of the
-     * log records; setting this value above 0 configures statistics logging., an integer between \c
-     * 0 and \c 100000; default \c 0.}
+     * non-empty\, include statistics for the list of "file:" and "lsm:" data source URIs\, if they
+     * are open at the time of the statistics logging., a list of strings; default empty.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to each log record.  May
+     * contain \c strftime conversion specifications.  When \c json is configured\, defaults to \c
+     * "%Y-%m-%dT%H:%M:%S.000Z"., a string; default \c "%b %d %H:%M:%S".}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each write of the log records;
+     * setting this value above 0 configures statistics logging., an integer between \c 0 and \c
+     * 100000; default \c 0.}
      * @config{ ),,}
      * @config{tiered_storage = (, enable tiered storage.  Enabling tiered storage may use one
      * session from the configured session_max., a set of related configuration options defined as
@@ -3378,13 +3375,11 @@ struct __wt_connection {
  * value is not an absolute path\, the path is relative to the database home (see @ref absolute_path
  * for more information)., a string; default \c ".".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if
- * non-empty\, include statistics for the list of data source URIs\, if they are open at the time of
- * the statistics logging.  The list may include URIs matching a single data source
- * ("table:mytable")\, or a URI matching all data sources of a particular type ("table:")., a list
- * of strings; default empty.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to
- * each log record.  May contain \c strftime conversion specifications.  When \c json is
- * configured\, defaults to \c "%Y-%m-%dT%H:%M:%S.000Z"., a string; default \c "%b %d %H:%M:%S".}
+ * non-empty\, include statistics for the list of "file:" and "lsm:" data source URIs\, if they are
+ * open at the time of the statistics logging., a list of strings; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to each log record.  May contain
+ * \c strftime conversion specifications.  When \c json is configured\, defaults to \c
+ * "%Y-%m-%dT%H:%M:%S.000Z"., a string; default \c "%b %d %H:%M:%S".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each write of the log records;
  * setting this value above 0 configures statistics logging., an integer between \c 0 and \c 100000;
  * default \c 0.}
