@@ -83,6 +83,10 @@ public:
         _cache->abandon();
     }
 
+    bool hasOptimizedPos() const {
+        return _hasOptimizedPos;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,

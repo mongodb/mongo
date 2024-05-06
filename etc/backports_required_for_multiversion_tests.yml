@@ -155,6 +155,8 @@ last-continuous:
     ticket: SERVER-86253
   - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
     ticket: SERVER-89618
+  - test_file: jstests/core/timeseries/timeseries_lookup.js
+    ticket: SERVER-79637
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -372,6 +374,8 @@ last-lts:
     ticket: SERVER-86253
   - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
     ticket: SERVER-89618
+  - test_file: jstests/core/timeseries/timeseries_lookup.js
+    ticket: SERVER-79637
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

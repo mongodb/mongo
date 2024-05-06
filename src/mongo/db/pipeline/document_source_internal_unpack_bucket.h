@@ -232,6 +232,17 @@ public:
 private:
     GetNextResult doGetNext() final;
 
+    /**
+     * Applies optimizeAt() to all stages in the given pipeline after the stage that 'itr' points
+     * to, which is the bucket unpack stage.
+     *
+     * Due to the manipulation of 'itr' through the optimizations, it may be possible that
+     * preceeding stages will be optimized. However, optimization of the bucket unpack stage will be
+     * skipped.
+     */
+    Pipeline::SourceContainer::iterator optimizeAtRestOfPipeline(
+        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
+
     // If any bucket contains dates outside the range of 1970-2038, we are unable to rely on
     // the _id index, as _id is truncates to 32 bits
     bool _usesExtendedRange = false;
