@@ -272,7 +272,9 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 // TODO SERVER-89342 Remove OperationCannotBeBatched from whitelist
                 case ErrorCodes::OperationCannotBeBatched:
                 case ErrorCodes::OplogQueryMinTsMissing:
+                case ErrorCodes::ReshardCollectionAborted:
                 case ErrorCodes::ReshardCollectionInProgress:
+                case ErrorCodes::ReshardCollectionTruncatedError:
                 case ErrorCodes::SnapshotTooOld:
                 case ErrorCodes::StaleDbVersion:
                     return true;
