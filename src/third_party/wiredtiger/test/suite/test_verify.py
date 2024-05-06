@@ -214,7 +214,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         # wt verify -d dump_address performs a depth-first traversal of the BTree. So the first
         # leaf page it prints is the first child of its parent. Grab the offset of this one so we
         # can corrupt it.
-        self.runWt(['-p', 'verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
+        self.runWt(['verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
             outfilename='dump.out')
 
         # Grab the offset position of the first page.
@@ -234,7 +234,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         # open_and_position closed the session/connection, reopen them now.
         self.conn = self.setUpConnectionOpen(".")
         self.session = self.setUpSessionOpen(self.conn)
-        self.runWt(['verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
+        self.runWt(['-p', 'verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
             outfilename='dump_corrupt.out', errfilename="dump_corrupt.err", failure=True)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.verify('table:' + self.tablename, "read_corrupt"),
