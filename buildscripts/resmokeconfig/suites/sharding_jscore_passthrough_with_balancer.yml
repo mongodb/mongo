@@ -39,6 +39,9 @@ selector:
     - jstests/core/**/explain_upsert.js
     # override library is not able to intercept createIndex commands executed inside benchRun
     - jstests/core/**/bench_test1.js
+    # TODO SERVER-90157: Multi updates that implicitly run createCollection can deadlock with a MultiUpdateCoordinator
+    # when trying to acquire the DDL lock.
+    - jstests/core/server1470.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
@@ -93,3 +96,7 @@ executor:
     num_shards: 2
     enable_balancer: true
     random_migrations: true
+    set_cluster_parameter:
+      parameter: pauseMigrationsDuringMultiUpdates
+      value:
+        enabled: True

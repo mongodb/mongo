@@ -32,6 +32,10 @@ executor:
     num_rs_nodes_per_shard: 1
     num_shards: 2
     random_migrations: true
+    set_cluster_parameter:
+      parameter: pauseMigrationsDuringMultiUpdates
+      value:
+        enabled: true
   hooks:
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
@@ -64,6 +68,7 @@ selector:
   - jstests/core/**/operation_latency_histogram.js
   - jstests/core/**/explain_upsert.js
   - jstests/core/**/bench_test1.js
+  - jstests/core/server1470.js
   - jstests/core/**/*[aA]uth*.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
