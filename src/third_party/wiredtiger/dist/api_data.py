@@ -936,6 +936,9 @@ log_configuration_common = [
     Config('prealloc', 'true', r'''
         pre-allocate log files''',
         type='boolean'),
+    Config('prealloc_init_count', '1', r'''
+        initial number of pre-allocated log files''',
+        min='1', max='500'),
     Config('remove', 'true', r'''
         automatically remove unneeded log files''',
         type='boolean'),
