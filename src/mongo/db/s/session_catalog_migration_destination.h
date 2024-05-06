@@ -102,6 +102,12 @@ public:
     void finish();
 
     /**
+     * Returns true if the thread to initiate the session info transfer has been spawned and is
+     * therefore joinable.
+     */
+    bool joinable() const;
+
+    /**
      * Joins the spawned thread called by start(). Should only be called after finish()
      * was called.
      */
@@ -111,6 +117,11 @@ public:
      * Forces this into an error state which will also stop session transfer thread.
      */
     void forceFail(StringData errMsg);
+
+    /**
+     * Returns the session id for the migration.
+     */
+    MigrationSessionId getMigrationSessionId() const;
 
     /**
      * Returns the current state.

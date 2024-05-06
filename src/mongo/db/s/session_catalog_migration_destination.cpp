@@ -270,6 +270,10 @@ void SessionCatalogMigrationDestination::finish() {
     }
 }
 
+bool SessionCatalogMigrationDestination::joinable() const {
+    return _thread.joinable();
+}
+
 void SessionCatalogMigrationDestination::join() {
     invariant(_thread.joinable());
     _thread.join();
@@ -580,6 +584,10 @@ void SessionCatalogMigrationDestination::_errorOccurred(StringData errMsg) {
     stdx::lock_guard<Latch> lk(_mutex);
     _state = State::ErrorOccurred;
     _errMsg = errMsg.toString();
+}
+
+MigrationSessionId SessionCatalogMigrationDestination::getMigrationSessionId() const {
+    return _migrationSessionId;
 }
 
 SessionCatalogMigrationDestination::State SessionCatalogMigrationDestination::getState() {
