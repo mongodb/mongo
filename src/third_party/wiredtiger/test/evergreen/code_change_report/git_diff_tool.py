@@ -49,7 +49,7 @@ def run_command(directory: str, command: str) -> str:
     completed_process = subprocess.run(command, capture_output=True, check=True, shell=True)
     output = completed_process.stdout
     working_directory.pop()
-    return output.decode().strip()
+    return output.decode()
 
 
 def find_zero_length_files(directory: str) -> List[str]:
@@ -70,7 +70,7 @@ def create_diff_file(git_working_tree_dir: str, diff_file: str, verbose: bool) -
     repo = Repository(repository_path)
 
     head_commit = repo.head.target
-    merge_base_commit = run_command(git_working_tree_dir, "git merge-base develop HEAD")
+    merge_base_commit = run_command(git_working_tree_dir, "git merge-base develop HEAD").strip()
     diff_command = f"git diff {merge_base_commit} -- {exclude_files_param}"
 
     if verbose:
