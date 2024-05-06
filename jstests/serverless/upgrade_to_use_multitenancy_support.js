@@ -151,6 +151,9 @@ rst.waitForState(originalSecondary, ReplSetTest.State.SECONDARY);
 originalSecondary.setSecondaryOk();
 assert(originalSecondary.getDB("admin").auth('admin', 'pwd'));
 
+// Make sure the original primary is still primary after restarting secondary.
+rst.stepUp(originalPrimary);
+
 // Get another connecton of secondary as connection protocol cannot change once set.
 let prefixedOriginalSecondary = new Mongo(originalSecondary.host);
 prefixedOriginalSecondary.setSecondaryOk();
