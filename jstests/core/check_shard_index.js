@@ -157,7 +157,7 @@ f.drop();
 f.createIndex({x: 1});
 res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {y: 1}});
 assert.eq(false, res.ok);
-assert(res.errmsg.includes("Shard key is not a prefix of index key."));
+assert(res.errmsg.includes("is not a prefix of index key."));
 
 // Index key is partial:
 f.drop();
