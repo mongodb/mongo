@@ -52,6 +52,7 @@
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/procparser.h"
 #include "mongo/util/str.h"
 
 #ifndef _WIN32
@@ -222,6 +223,17 @@ void checkTHPSettings() {
     }
 #endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 }
+
+bool isSwapTotalNonZeroInProcMemInfo() {
+    const auto memInfoPath = "/proc/meminfo"_sd;
+    BSONObjBuilder b;
+    uassertStatusOK(procparser::parseProcMemInfoFile(memInfoPath, {"SwapTotal"_sd}, &b));
+    BSONObj obj = b.done();
+    uassert(ErrorCodes::FailedToParse,
+            "SwapTotal not found in /proc/meminfo",
+            obj.hasField("SwapTotal_kb"));
+    return obj["SwapTotal_kb"].trueValue();
+}
 #endif  // __linux__
 
 void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
@@ -293,19 +305,32 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
         tlm->checkMaxOpenSessionsAtStartup();
     }
 
-    // Check that swappiness is at a minimum (either 0 or 1)
-    auto swappinessPath = "/proc/sys/vm/swappiness";
-    if (boost::filesystem::exists(swappinessPath)) {
-        std::fstream f(swappinessPath, ios_base::in);
-        unsigned val;
-        f >> val;
-        if (val > 1) {
-            LOGV2_WARNING_OPTIONS(8386700,
-                                  {logv2::LogTag::kStartupWarnings},
-                                  "We suggest setting swappiness to 0 or 1, as swapping can cause "
-                                  "performance problems.",
-                                  "sysfsFile"_attr = swappinessPath,
-                                  "currentValue"_attr = val);
+    // Check that swappiness is at a minimum (either 0 or 1) if swap is enabled
+    bool swapEnabled = false;
+    try {
+        swapEnabled = isSwapTotalNonZeroInProcMemInfo();
+    } catch (DBException& e) {
+        LOGV2_WARNING_OPTIONS(8949500,
+                              {logv2::LogTag::kStartupWarnings},
+                              "Failed to parse /proc/meminfo",
+                              "error"_attr = e.toStatus());
+    }
+
+    if (swapEnabled) {
+        auto swappinessPath = "/proc/sys/vm/swappiness";
+        if (boost::filesystem::exists(swappinessPath)) {
+            std::fstream f(swappinessPath, ios_base::in);
+            unsigned val;
+            f >> val;
+            if (val > 1) {
+                LOGV2_WARNING_OPTIONS(
+                    8386700,
+                    {logv2::LogTag::kStartupWarnings},
+                    "We suggest setting swappiness to 0 or 1, as swapping can cause "
+                    "performance problems.",
+                    "sysfsFile"_attr = swappinessPath,
+                    "currentValue"_attr = val);
+            }
         }
     }
 #endif  // __linux__
