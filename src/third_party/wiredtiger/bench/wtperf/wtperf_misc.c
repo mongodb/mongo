@@ -221,9 +221,7 @@ backup_read(WTPERF *wtperf, WT_SESSION *session)
             total += (uint32_t)rdsize;
             buf_size = WT_MIN(buf_size, size - total);
         }
-
-        if (rfd != -1)
-            testutil_check(close(rfd));
+        testutil_check(close(rfd));
     }
     testutil_check(backup_cursor->close(backup_cursor));
 err:
