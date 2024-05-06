@@ -649,6 +649,8 @@ last-continuous:
     ticket: SERVER-69933
   - test_file: jstests/aggregation/unwind_sort.js
     ticket: SERVER-90485
+  - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
+    ticket: SERVER-86674
   suites: null
 last-lts:
   all:
@@ -1356,4 +1358,6 @@ last-lts:
     ticket: SERVER-69933
   - test_file: jstests/aggregation/unwind_sort.js
     ticket: SERVER-90485
+  - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
+    ticket: SERVER-86674
   suites: null
