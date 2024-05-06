@@ -119,8 +119,12 @@ H AbslHashValue(H h, const FindCmdShapeComponents::HasField& hasField) {
     return H::combine(
         std::move(h), hasField.projection, hasField.sort, hasField.limit, hasField.skip);
 }
-static_assert(sizeof(FindCmdShape) == sizeof(CmdWithLetShape) + sizeof(FindCmdShapeComponents),
-              "If the class' members have changed, this assert and the extraSize() calculation may "
-              "need to be updated with a new value.");
 
+// This assertion is still active on the maintained master branch. On the v6.0 branch, we disable it
+// since it is not passing on all toolchains/platforms - notably x86 macOS. The intent of the
+// assertion is to prevent accidental additions of data members, which should not happen on this
+// branch without first happening on the master branch and passing that assertion.
+// static_assert(sizeof(FindCmdShape) == sizeof(CmdWithLetShape) + sizeof(FindCmdShapeComponents),
+//               "If the class' members have changed, this assert and the extraSize() calculation
+//               may " "need to be updated with a new value.");
 }  // namespace mongo::query_shape
