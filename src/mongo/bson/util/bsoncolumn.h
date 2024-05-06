@@ -603,10 +603,6 @@ template <class CMaterializer, class Container, typename Path>
 requires Materializer<CMaterializer>
 void BSONColumnBlockBased::decompress(boost::intrusive_ptr<ElementStorage> allocator,
                                       std::span<std::pair<Path, Container&>> paths) const {
-    if (paths.empty()) {
-        // nothing to do.
-        return;
-    }
 
     // The Collector class wraps a reference to a buffer passed in by the caller.
     // BlockBasedInterleavedDecompressor expects references to collectors, so create a vector where
@@ -621,8 +617,6 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<ElementStorage> alloc
         ownedCollectors.emplace_back(p.second, allocator);
         pathCollectors.push_back({p.first, ownedCollectors.back()});
     }
-
-    invariant(!ownedCollectors.empty());
 
     const char* ptr = _binary;
     const char* end = _binary + _size;
