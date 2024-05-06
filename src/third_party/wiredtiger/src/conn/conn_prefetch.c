@@ -82,6 +82,13 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     if (F_ISSET(conn, WT_CONN_PREFETCH_RUN))
         __wt_cond_wait(session, conn->prefetch_threads.wait_cond, 10 * WT_THOUSAND, NULL);
 
+    /*
+     * Configure the timeout for the pre-fetch worker thread. This is one of the precautionary
+     * measures we have in place to prevent the application from hanging if the pre-fetch thread
+     * happens to be pulled into eviction.
+     */
+    WT_ERR(__wt_txn_config_operation_timeout(session, NULL, true));
+
     while (!TAILQ_EMPTY(&conn->pfqh)) {
         __wt_spin_lock(session, &conn->prefetch_lock);
         pe = TAILQ_FIRST(&conn->pfqh);
@@ -94,6 +101,20 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 
         TAILQ_REMOVE(&conn->pfqh, pe, q);
         --conn->prefetch_queue_count;
+
+        /*
+         * If the cache is getting close to its eviction clean trigger, don't attempt to pre-fetch
+         * the current ref as we may hang if the cache becomes full and we need to wait until space
+         * in the cache clears up. Repeat this process until either eviction has evicted enough
+         * eligible pages (allowing pre-fetch to read into the cache), or we iterate through and
+         * remove all the refs from the pre-fetch queue and pre-fetch becomes a no-op.
+         */
+        if (__wt_eviction_clean_pressure(session)) {
+            F_CLR_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH);
+            __wt_spin_unlock(session, &conn->prefetch_lock);
+            __wt_free(session, pe);
+            continue;
+        }
 
         /*
          * We increment this while in the prefetch lock as the thread reading from the queue expects
@@ -141,6 +162,14 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_PREFETCH_QUEUE_ENTRY *pe;
 
     conn = S2C(session);
+
+    /*
+     * Pre-fetch shouldn't wait until the cache is already full before it stops adding new refs to
+     * the queue. It should take a more conservative approach and stop as soon as it detects that we
+     * are close to hitting the eviction clean trigger.
+     */
+    if (__wt_eviction_clean_pressure(session))
+        return (EBUSY);
 
     WT_RET(__wt_calloc_one(session, &pe));
     pe->ref = ref;

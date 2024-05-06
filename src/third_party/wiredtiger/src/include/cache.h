@@ -174,6 +174,7 @@ struct __wt_cache {
     WT_EVICT_QUEUE *evict_urgent_queue;  /* LRU urgent queue */
     uint32_t evict_slots;                /* LRU list eviction slots */
 
+#define WT_EVICT_PRESSURE_THRESHOLD 0.95
 #define WT_EVICT_SCORE_BUMP 10
 #define WT_EVICT_SCORE_CUTOFF 10
 #define WT_EVICT_SCORE_MAX 100
