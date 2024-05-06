@@ -101,8 +101,11 @@ proc __wt_cell {} {
           $WT_CELL_KEY | $WT_CELL_VALUE | $WT_CELL_KEY_PFX {
             if {$desc_n == $WT_CELL_KEY_PFX} { uint8 -hex prefix }
             xentry -var len {
+              # ... the way WT_CELL_SIZE_ADJUST is done in __wt_cell_unpack_safe
               expr {
-                ($desc_n == $WT_CELL_KEY || $desc_n == $WT_CELL_KEY_PFX || ($desc_n == $WT_CELL_VALUE && !$extra)) ?
+                ($desc_n == $WT_CELL_KEY ||
+                 $desc_n == $WT_CELL_KEY_PFX ||
+                 ($desc_n == $WT_CELL_VALUE && !$extra && !($desc & $WT_CELL_64V))) ?
                 [long_cell_data_len] :
                 [vuint]
               }
@@ -288,7 +291,7 @@ proc wt_page {{allocsize 4096}} {
       }
     } else {
       if {$entries} {
-        ssection cells {
+        ssection -collapsed cells {
           #__wt_cell
           sectionvalue $entries
           for {set cell_idx 0} {$cell_idx < $entries} {incr cell_idx} {
