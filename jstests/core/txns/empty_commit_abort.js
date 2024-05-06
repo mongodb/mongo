@@ -3,6 +3,12 @@
  *
  * @tags: [uses_transactions]
  */
+
+import {
+    withRetryOnTransientTxnError,
+    withTxnAndAutoRetryOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+
 const dbName = "test";
 const collName = "empty_commit_abort";
 const testDB = db.getSiblingDB(dbName);
@@ -35,27 +41,39 @@ assert.commandFailedWithCode(sessionDB.adminCommand({abortTransaction: 1}),
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 // ---- Test 3. Only reads before commit ----
-session.startTransaction();
-assert.eq(doc, sessionColl.findOne({a: 1}));
-assert.commandWorked(session.commitTransaction_forTesting());
+withTxnAndAutoRetryOnMongos(session, () => {
+    assert.eq(doc, sessionColl.findOne({a: 1}));
+}, {});
 
 // ---- Test 4. Only reads before abort ----
-session.startTransaction();
-assert.eq(doc, sessionColl.findOne({a: 1}));
-assert.commandWorked(session.abortTransaction_forTesting());
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction();
+        assert.eq(doc, sessionColl.findOne({a: 1}));
+        assert.commandWorked(session.abortTransaction_forTesting());
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });
 
 // ---- Test 5. Noop writes before commit ----
-session.startTransaction();
-let res = assert.commandWorked(sessionColl.update({_id: 1}, {$set: {b: 1}}));
-assert.eq(res.nMatched, 1, tojson(res));
-assert.eq(res.nModified, 0, tojson(res));
-assert.eq(res.nUpserted, 0, tojson(res));
-assert.commandWorked(session.commitTransaction_forTesting());
+withTxnAndAutoRetryOnMongos(session, () => {
+    let res = assert.commandWorked(sessionColl.update({_id: 1}, {$set: {b: 1}}));
+    assert.eq(res.nMatched, 1, tojson(res));
+    assert.eq(res.nModified, 0, tojson(res));
+    assert.eq(res.nUpserted, 0, tojson(res));
+}, {});
 
 // ---- Test 6. Noop writes before abort ----
-session.startTransaction();
-res = assert.commandWorked(sessionColl.update({_id: 1}, {$set: {b: 1}}));
-assert.eq(res.nMatched, 1, tojson(res));
-assert.eq(res.nModified, 0, tojson(res));
-assert.eq(res.nUpserted, 0, tojson(res));
-assert.commandWorked(session.abortTransaction_forTesting());
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction();
+        let res = assert.commandWorked(sessionColl.update({_id: 1}, {$set: {b: 1}}));
+        assert.eq(res.nMatched, 1, tojson(res));
+        assert.eq(res.nModified, 0, tojson(res));
+        assert.eq(res.nUpserted, 0, tojson(res));
+        assert.commandWorked(session.abortTransaction_forTesting());
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });

@@ -8,7 +8,10 @@
 // ]
 
 // TODO (SERVER-39704): Remove the following load after SERVER-39704 is completed
-import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {
+    withRetryOnTransientTxnError,
+    withTxnAndAutoRetryOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "multi_transaction_test_using_api";
@@ -24,13 +27,16 @@ const sessionOptions = {
 const session = testDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
 const sessionColl = sessionDb.getCollection(collName);
-
+const txnOpts = {
+    readConcern: {level: "snapshot"},
+    writeConcern: {w: "majority"}
+};
 //
 // Test that calling abortTransaction as the first statement in a transaction is allowed and
 // modifies the state accordingly.
 //
 jsTestLog("Call abortTransaction as the first statement in a transaction");
-session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+session.startTransaction(txnOpts);
 
 // Successfully call abortTransaction.
 assert.commandWorked(session.abortTransaction_forTesting());
@@ -40,7 +46,7 @@ assert.commandWorked(session.abortTransaction_forTesting());
 // modifies the state accordingly.
 //
 jsTestLog("Call commitTransaction as the first statement in a transaction");
-session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+session.startTransaction(txnOpts);
 
 // Successfully call commitTransaction.
 assert.commandWorked(session.commitTransaction_forTesting());
@@ -79,7 +85,7 @@ withTxnAndAutoRetryOnMongos(session, () => {
     cursor = sessionColl.aggregate({$match: {_id: "insert-1"}});
     assert.docEq({_id: "insert-1", a: 1}, cursor.next());
     assert(!cursor.hasNext());
-}, {readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+}, txnOpts);
 
 // Make sure the correct documents exist after committing the transaciton.
 assert.eq({_id: "insert-1", a: 1}, sessionColl.findOne({_id: "insert-1"}));
@@ -87,37 +93,43 @@ assert.eq({_id: "insert-3", a: 2}, sessionColl.findOne({_id: "insert-3"}));
 assert.eq(null, sessionColl.findOne({_id: "insert-2"}));
 
 jsTestLog("Insert a doc and abort transaction.");
-session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction(txnOpts);
 
-assert.commandWorked(sessionColl.insert({_id: "insert-4", a: 0}));
+        assert.commandWorked(sessionColl.insert({_id: "insert-4", a: 0}));
 
-assert.commandWorked(session.abortTransaction_forTesting());
+        assert.commandWorked(session.abortTransaction_forTesting());
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });
 
 // Verify that we cannot see the document we tried to insert.
 assert.eq(null, sessionColl.findOne({_id: "insert-4"}));
 
 jsTestLog("Bulk insert and update operations within transaction.");
 
-session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
-let bulk = sessionColl.initializeUnorderedBulkOp();
-bulk.insert({_id: "bulk-1"});
-bulk.insert({_id: "bulk-2"});
-bulk.find({_id: "bulk-1"}).updateOne({$set: {status: "bulk"}});
-bulk.find({_id: "bulk-2"}).updateOne({$set: {status: "bulk"}});
-assert.commandWorked(bulk.execute());
-assert.commandWorked(session.commitTransaction_forTesting());
+withTxnAndAutoRetryOnMongos(session, () => {
+    let bulk = sessionColl.initializeUnorderedBulkOp();
+    bulk.insert({_id: "bulk-1"});
+    bulk.insert({_id: "bulk-2"});
+    bulk.find({_id: "bulk-1"}).updateOne({$set: {status: "bulk"}});
+    bulk.find({_id: "bulk-2"}).updateOne({$set: {status: "bulk"}});
+    assert.commandWorked(bulk.execute());
+}, txnOpts);
 
 assert.eq({_id: "bulk-1", status: "bulk"}, sessionColl.findOne({_id: "bulk-1"}));
 assert.eq({_id: "bulk-2", status: "bulk"}, sessionColl.findOne({_id: "bulk-2"}));
 
 jsTestLog("Bulk delete operations within transaction.");
 
-session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
-bulk = sessionColl.initializeUnorderedBulkOp();
-bulk.find({_id: "bulk-1"}).removeOne();
-bulk.find({_id: "bulk-2"}).removeOne();
-assert.commandWorked(bulk.execute());
-assert.commandWorked(session.commitTransaction_forTesting());
+withTxnAndAutoRetryOnMongos(session, () => {
+    let bulk = sessionColl.initializeUnorderedBulkOp();
+    bulk.find({_id: "bulk-1"}).removeOne();
+    bulk.find({_id: "bulk-2"}).removeOne();
+    assert.commandWorked(bulk.execute());
+}, txnOpts);
 
 assert.eq(null, sessionColl.findOne({_id: "bulk-1"}));
 assert.eq(null, sessionColl.findOne({_id: "bulk-2"}));

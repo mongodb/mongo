@@ -6,6 +6,11 @@
 //   uses_transactions
 // ]
 
+import {
+    withRetryOnTransientTxnError,
+    withTxnAndAutoRetryOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+
 const dbName = "test";
 const collName = "kill_transaction_cursors";
 const testDB = db.getSiblingDB(dbName);
@@ -19,19 +24,20 @@ for (let i = 0; i < 4; ++i) {
 }
 
 jsTest.log("Test that cursors created in transactions may be kill outside of the transaction.");
-session.startTransaction();
-let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
-assert(res.hasOwnProperty("cursor"), tojson(res));
-assert(res.cursor.hasOwnProperty("id"), tojson(res));
-assert.commandWorked(session.commitTransaction_forTesting());
-assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+withTxnAndAutoRetryOnMongos(session, () => {
+    let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+    assert(res.hasOwnProperty("cursor"), tojson(res));
+    assert(res.cursor.hasOwnProperty("id"), tojson(res));
+    assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+}, /* txnOpts = */ {});
 
 jsTest.log("Test that cursors created in transactions may be kill outside of the session.");
-session.startTransaction();
-res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
-assert(res.hasOwnProperty("cursor"), tojson(res));
-assert(res.cursor.hasOwnProperty("id"), tojson(res));
-assert.commandWorked(session.commitTransaction_forTesting());
-assert.commandWorked(testDB.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+withTxnAndAutoRetryOnMongos(session, () => {
+    let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+    assert(res.hasOwnProperty("cursor"), tojson(res));
+    assert(res.cursor.hasOwnProperty("id"), tojson(res));
+    assert.commandWorked(session.commitTransaction_forTesting());
+    assert.commandWorked(testDB.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+}, /* txnOpts = */ {});
 
 session.endSession();

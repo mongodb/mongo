@@ -134,6 +134,16 @@ export var FixtureHelpers = (function() {
         return db.getCollectionInfos({type: "view", name: collName}).shift();
     }
 
+    function getTopologyTime(db) {
+        const shards =
+            db.getSiblingDB('config').shards.find({}).sort({'topologyTime': -1}).limit(1).toArray();
+        if (!shards.length) {
+            // In case we are on a replicaset config.shards is empty
+            return Timestamp();
+        }
+        return shards[0].topologyTime;
+    }
+
     /**
      * Returns the number of shards that 'coll' has any chunks on. Returns 1 if the collection is
      * not sharded. Note that if the balancer is enabled then the number of shards with chunks for
@@ -271,6 +281,7 @@ export var FixtureHelpers = (function() {
         isTracked: isTracked,
         areCollectionsColocated: areCollectionsColocated,
         getShardsOwningDataForCollection: getShardsOwningDataForCollection,
+        getTopologyTime: getTopologyTime,
         getViewDefinition: getViewDefinition,
         numberOfShardsForCollection: numberOfShardsForCollection,
         awaitReplication: awaitReplication,

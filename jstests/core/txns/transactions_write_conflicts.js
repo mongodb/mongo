@@ -29,7 +29,9 @@
  * arbitrarily interleave operations between two different transactions, simulating the execution of
  * two "truly" concurrent transactions.
  *
- *  @tags: [uses_transactions]
+ *  @tags: [
+ *    uses_transactions,
+ *  ]
  */
 import {WriteConflictHelpers} from "jstests/core/txns/libs/write_conflicts.js";
 

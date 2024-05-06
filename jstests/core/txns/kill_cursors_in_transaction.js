@@ -7,6 +7,11 @@
 //   uses_parallel_shell
 // ]
 
+import {
+    withRetryOnTransientTxnError,
+    withTxnAndAutoRetryOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+
 const dbName = "test";
 const collName = "kill_cursors_in_transaction";
 const testDB = db.getSiblingDB(dbName);
@@ -22,31 +27,44 @@ for (let i = 0; i < 4; ++i) {
 
 jsTest.log("Test that the killCursors command is allowed in transactions.");
 
-session.startTransaction();
+withTxnAndAutoRetryOnMongos(session, () => {
+    let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+    assert(res.hasOwnProperty("cursor"), tojson(res));
+    assert(res.cursor.hasOwnProperty("id"), tojson(res));
+    assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+}, /* txnOpts = */ {});
+
+jsTest.log("Test that the killCursors cannot be the first operation in a transaction.");
 let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
 assert(res.hasOwnProperty("cursor"), tojson(res));
 assert(res.cursor.hasOwnProperty("id"), tojson(res));
-assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
-assert.commandWorked(session.commitTransaction_forTesting());
-
-jsTest.log("Test that the killCursors cannot be the first operation in a transaction.");
-res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
-assert(res.hasOwnProperty("cursor"), tojson(res));
-assert(res.cursor.hasOwnProperty("id"), tojson(res));
-session.startTransaction();
-assert.commandFailedWithCode(
-    sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
-    ErrorCodes.OperationNotSupportedInTransaction);
-assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction();
+        assert.commandFailedWithCode(
+            sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
+            ErrorCodes.OperationNotSupportedInTransaction);
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });
 
 jsTest.log("killCursors must not block on locks held by the transaction in which it is run.");
 
-session.startTransaction();
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction();
 
-// Open a cursor on the collection.
-res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
-assert(res.hasOwnProperty("cursor"), tojson(res));
-assert(res.cursor.hasOwnProperty("id"), tojson(res));
+        // Open a cursor on the collection.
+        let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("id"), tojson(res));
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });
 
 // Start a drop, which will hang.
 let awaitDrop = startParallelShell(function() {
