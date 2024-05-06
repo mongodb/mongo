@@ -538,6 +538,39 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
                                           ScopedReceiveChunk scopedReceiveChunk,
                                           const StartChunkCloneRequest& cloneRequest,
                                           const WriteConcernOptions& writeConcern) {
+    // Wait for the session migration thread and the migrate thread to finish. Do not hold the
+    // _mutex while waiting since it could lead to deadlock. It is safe to join _sessionMigration
+    // and _migrateThreadHandle without holding the _mutex since they are only (re)set in start()
+    // and restoreRecoveredMigrationState() and both of them require a ScopedReceiveChunk which
+    // guarantees that there can only be one start() and restoreRecoveredMigrationState() call at
+    // any given time.
+    if (_sessionMigration && _sessionMigration->joinable()) {
+        LOGV2_DEBUG(8991402,
+                    2,
+                    "Start waiting for the session migration thread for the previous migration to "
+                    "complete before starting a new migration",
+                    "previousMigrationSessionId"_attr = _sessionMigration->getMigrationSessionId(),
+                    "nextMigrationSessionId"_attr = cloneRequest.getSessionId());
+        _sessionMigration->join();
+        LOGV2_DEBUG(8991403,
+                    2,
+                    "Finished waiting for the session migration thread for the previous migration "
+                    "to complete before starting a new migration");
+    }
+    if (_migrateThreadHandle.joinable()) {
+        LOGV2_DEBUG(8991404,
+                    2,
+                    "Start waiting for the migrate thread for the previous migration to "
+                    "complete before starting a new migration",
+                    "previousMigrationId"_attr = _migrationId,
+                    "nextMigrationId"_attr = cloneRequest.getMigrationId());
+        _migrateThreadHandle.join();
+        LOGV2_DEBUG(8991405,
+                    2,
+                    "Finished waiting for the migrate thread for the previous migration to "
+                    "complete before starting a new migration");
+    }
+
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(!_sessionId);
     invariant(!_scopedReceiveChunk);
@@ -580,13 +613,6 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     invariant(!_migrateThreadFinishedPromise);
     _migrateThreadFinishedPromise = std::make_unique<SharedPromise<State>>();
 
-    // TODO: If we are here, the migrate thread must have completed, otherwise _active above
-    // would be false, so this would never block. There is no better place with the current
-    // implementation where to join the thread.
-    if (_migrateThreadHandle.joinable()) {
-        _migrateThreadHandle.join();
-    }
-
     _sessionMigration = std::make_unique<SessionCatalogMigrationDestination>(
         _nss, _fromShard, *_sessionId, _cancellationSource.token());
     ShardingStatistics::get(opCtx).countRecipientMoveChunkStarted.addAndFetch(1);
@@ -606,7 +632,27 @@ Status MigrationDestinationManager::restoreRecoveredMigrationState(
     OperationContext* opCtx,
     ScopedReceiveChunk scopedReceiveChunk,
     const MigrationRecipientRecoveryDocument& recoveryDoc) {
-    stdx::lock_guard<Latch> sl(_mutex);
+    // Wait for the migrate thread to finish. Do not hold the _mutex while waiting since it could
+    // lead to deadlock. It is safe to join _migrateThreadHandle without holding the _mutex since it
+    // is only (re)set in start() and restoreRecoveredMigrationState() and both of them require a
+    // ScopedReceiveChunk which guarantees that there can only be one start() and
+    // restoreRecoveredMigrationState() call at any given time. It is not necessary to wait for
+    // session migration thread since by design the recovery doc cannot exist if the session
+    // migration has not finished.
+    if (_migrateThreadHandle.joinable()) {
+        LOGV2_DEBUG(
+            8991406,
+            2,
+            "Start waiting for the existing migrate thread to complete before recovering it",
+            "migrationId"_attr = _migrationId);
+        _migrateThreadHandle.join();
+        LOGV2_DEBUG(
+            8991407,
+            2,
+            "Finished waiting for the existing migrate thread to complete before recovering it");
+    }
+
+    stdx::lock_guard<Latch> lk(_mutex);
     invariant(!_sessionId);
 
     _scopedReceiveChunk = std::move(scopedReceiveChunk);
@@ -626,10 +672,6 @@ Status MigrationDestinationManager::restoreRecoveredMigrationState(
     _migrateThreadFinishedPromise = std::make_unique<SharedPromise<State>>();
 
     LOGV2(6064500, "Recovering migration recipient", "sessionId"_attr = *_sessionId);
-
-    if (_migrateThreadHandle.joinable()) {
-        _migrateThreadHandle.join();
-    }
 
     _migrateThreadHandle = stdx::thread([this, cancellationToken = _cancellationSource.token()]() {
         _migrateThread(cancellationToken, true /* skipToCritSecTaken */);
@@ -2006,6 +2048,9 @@ void MigrationDestinationManager::onStepDown() {
 
     // Wait for the migrateThread to finish.
     if (migrateThreadFinishedFuture) {
+        LOGV2(8991401,
+              "Waiting for migrate thread to finish on stepdown",
+              "migrationId"_attr = _migrationId);
         migrateThreadFinishedFuture->wait();
     }
 }

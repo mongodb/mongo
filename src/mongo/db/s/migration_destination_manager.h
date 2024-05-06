@@ -143,7 +143,9 @@ public:
         const CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime& scopedCsrLock);
 
     /**
-     * Returns OK if migration started successfully.
+     * Returns OK if migration started successfully. Requires a ScopedReceiveChunk, which guarantees
+     * that there can only be one start() or restoreRecoveredMigrationState() call at any given
+     * time.
      */
     Status start(OperationContext* opCtx,
                  const NamespaceString& nss,
@@ -152,7 +154,9 @@ public:
                  const WriteConcernOptions& writeConcern);
 
     /**
-     * Restores the MigrationDestinationManager state for a migration recovered on step-up.
+     * Restores the MigrationDestinationManager state for a migration recovered on step-up. Requires
+     * a ScopedReceiveChunk, which guarantees that there can only be one start() or
+     * restoreRecoveredMigrationState() call at any given time.
      */
     Status restoreRecoveredMigrationState(OperationContext* opCtx,
                                           ScopedReceiveChunk scopedReceiveChunk,
