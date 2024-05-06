@@ -3058,7 +3058,7 @@ tasks:
             ${PREPARE_PATH}
             virtualenv -p ${python_binary|python3} venv
             source venv/bin/activate
-            pip3 install pygit2==1.10.1
+            pip3 install pygit2==1.10.1 requests
 
             EXTRA_CODE_CHANGE_PARAMETERS=''
 
@@ -3072,6 +3072,14 @@ tasks:
               # Logging for debugging
               ls -l coverage_report
               cat coverage_report/diff.txt
+            fi
+
+            pr_args=""
+            if [ ! -z "${github_pr_number}" ]; then
+              echo "Detected Github PR ${github_pr_number}"
+              pr_args+="--github_repo ${github_org}/${github_repo} "
+              pr_args+="--github_pr_number ${github_pr_number} "
+              pr_args+="--github_token ${github_app_token} "
             fi
 
             ######################################################
@@ -3117,7 +3125,8 @@ tasks:
             cat coverage_report/code_change_info.json
 
             # Generate the Code Change Report
-            ${python_binary|python3} test/evergreen/code_change_report/code_change_report.py -v -c coverage_report/code_change_info.json -o coverage_report/code_change_report.html
+            ${python_binary|python3} test/evergreen/code_change_report/code_change_report.py -v -c coverage_report/code_change_info.json -o coverage_report/code_change_report.html $pr_args
+
       - func: "code coverage publish report"
 
   - name: s3-tiered-storage-extensions-test
