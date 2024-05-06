@@ -92,16 +92,11 @@ function runMoveChunkAndCommitTransaction() {
 
 setup();
 const prepareTimestamp = prepareTransactionAndTriggerFailover();
-const processingDeferredXferModsFp =
-    configureFailPoint(st.rs0.getPrimary(), "hangAfterProcessingDeferredXferMods");
-const pauseBeforeCriticalSectionFp =
-    configureFailPoint(st.rs0.getPrimary(), "hangBeforeEnteringCriticalSection", {}, "alwaysOn");
-
+const fp = configureFailPoint(st.rs0.getPrimary(), "hangAfterProcessingDeferredXferMods");
 const joinMoveChunk = runMoveChunkAndCommitTransaction();
-processingDeferredXferModsFp.wait();
-assert.commandWorked(collection.update({_id: 4}, {$set: {x: 501}}));
-processingDeferredXferModsFp.off();
-pauseBeforeCriticalSectionFp.off();
+fp.wait();
+assert.commandWorked(st.s.getDB(dbName).getCollection(collName).update({_id: 4}, {$set: {x: 501}}));
+fp.off();
 joinMoveChunk();
 assert.eq(collection.findOne({_id: 4}).x, 501);
 
