@@ -282,8 +282,8 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         tune_checksum for more information.''',
         choices=['on', 'off', 'uncompressed', 'unencrypted']),
     Config('dictionary', '0', r'''
-        the maximum number of unique values remembered in the Btree row-store leaf page value
-        dictionary; see @ref file_formats_compression for more information''',
+        the maximum number of unique values remembered in the row-store/variable-length column-store
+        leaf page value dictionary; see @ref file_formats_compression for more information''',
         min='0'),
     Config('encryption', '', r'''
         configure an encryptor for file blocks. When a table is created, its encryptor is not
