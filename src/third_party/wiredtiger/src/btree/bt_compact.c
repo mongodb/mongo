@@ -173,10 +173,10 @@ __compact_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     WT_REF_LOCK(session, ref, &previous_state);
 
     /*
-     * Don't bother rewriting deleted pages but also don't skip. The on-disk block is discarded by
-     * the next checkpoint.
+     * Don't bother rewriting deleted pages but also don't skip. The on-disk block with an address
+     * is discarded by the next checkpoint, if it has not already been freed.
      */
-    if (previous_state == WT_REF_DELETED && ref->page_del == NULL)
+    if (previous_state == WT_REF_DELETED && ref->page_del == NULL && ref->addr != NULL)
         *skipp = false;
 
     /*
