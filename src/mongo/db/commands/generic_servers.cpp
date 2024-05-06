@@ -127,7 +127,12 @@ public:
         bSys.append("cpuAddrSize", static_cast<int>(p.getAddrSize()));
         bSys.append("memSizeMB", static_cast<long long>(p.getSystemMemSizeMB()));
         bSys.append("memLimitMB", static_cast<long long>(p.getMemSizeMB()));
-        bSys.append("numCores", static_cast<int>(p.getNumAvailableCores()));
+        bSys.append("numLogicalCores", static_cast<int>(p.getNumLogicalCores()));
+        const auto num_cores_avl_to_process = p.getNumCoresAvailableToProcess();
+        // Adding the num cores available to process only if API returns successfully ie. value >=0
+        if (num_cores_avl_to_process >= 0) {
+            bSys.append("numCoresAvailableToProcess", static_cast<int>(num_cores_avl_to_process));
+        }
         bSys.append("numPhysicalCores", static_cast<int>(p.getNumPhysicalCores()));
         bSys.append("numCpuSockets", static_cast<int>(p.getNumCpuSockets()));
         bSys.append("cpuArch", p.getArch());
