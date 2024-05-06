@@ -92,6 +92,10 @@ using PipelineValidatorCallback = std::function<void(const Pipeline&)>;
 
 struct MakePipelineOptions {
     bool optimize = true;
+    // It is assumed that the pipeline has already been optimized when we create the
+    // MakePipelineOptions. If this is not the case, the caller is responsible for setting
+    // alreadyOptimized to false.
+    bool alreadyOptimized = true;
     bool attachCursorSource = true;
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed;
     PipelineValidatorCallback validator = nullptr;
