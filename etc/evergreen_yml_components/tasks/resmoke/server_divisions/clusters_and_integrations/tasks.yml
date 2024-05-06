@@ -3001,6 +3001,28 @@ tasks:
           suite: jstestfuzz_sharded_with_replica_set_endpoint
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
+  ## jstestfuzz sharded cluster with config transitions ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_sharded_with_config_transitions_gen
+    # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "incompatible_debug_mode",
+        "jstestfuzz",
+        "sharding",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz_sharded_with_config_transitions
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
   - <<: *gen_task_template
     name: sharded_causally_consistent_jscore_passthrough_gen
     tags:
