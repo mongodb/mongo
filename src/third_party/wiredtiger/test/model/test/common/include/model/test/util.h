@@ -67,7 +67,7 @@ double current_time();
  *     Parse the string into a number. Throw an exception on error.
  */
 inline uint64_t
-parse_uint64(const char *str, char **end = nullptr)
+parse_uint64(const char *str, const char **end = nullptr)
 {
     /* Convenience function, at least until we refactor these utilities. */
     return model::parse_uint64(str, end);

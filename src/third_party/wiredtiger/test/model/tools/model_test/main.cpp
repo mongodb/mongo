@@ -114,12 +114,14 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
     }
 
     /* Compare the return codes. */
-    size_t min_ret_length = std::min(ret_model.size(), ret_wt.size());
-    for (size_t i = 0; i < min_ret_length; i++)
-        if (ret_model[i] != ret_wt[i])
-            throw std::runtime_error("Return codes differ for operation " + std::to_string(i + 1) +
-              ": WiredTiger returned " + std::to_string(ret_wt[i]) + ", but " +
-              std::to_string(ret_model[i]) + " was expected.");
+    size_t min_ret_length = std::min(std::min(ret_model.size(), ret_wt.size()), workload->size());
+    for (size_t i = 0; i < min_ret_length; i++) {
+        if (ret_model[i] == ret_wt[i])
+            continue;
+        throw std::runtime_error("Return codes differ for operation " + std::to_string(i + 1) +
+          ": WiredTiger returned " + std::to_string(ret_wt[i]) + ", but " +
+          std::to_string(ret_model[i]) + " was expected.");
+    }
     if (ret_model.size() != ret_wt.size())
         throw std::runtime_error("WiredTiger executed " + std::to_string(ret_wt.size()) +
           " operations, but " + std::to_string(ret_model.size()) + " was expected.");
@@ -175,7 +177,12 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
         UPDATE_SPEC(min_sequences, uint64);
         UPDATE_SPEC(max_sequences, uint64);
         UPDATE_SPEC(max_concurrent_transactions, uint64);
+
+        UPDATE_SPEC(max_recno, uint64);
         UPDATE_SPEC(max_value_uint64, uint64);
+
+        UPDATE_SPEC(column_fix, float);
+        UPDATE_SPEC(column_var, float);
 
         UPDATE_SPEC(use_set_commit_timestamp, float);
 

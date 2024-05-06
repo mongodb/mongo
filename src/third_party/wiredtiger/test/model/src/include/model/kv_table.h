@@ -45,17 +45,28 @@ namespace model {
 class kv_database;
 
 /*
+ * kv_table_type --
+ *     Table type.
+ */
+enum class kv_table_type {
+    column,
+    column_fix,
+    row,
+};
+
+/*
  * kv_table_config --
  *     Table configuration.
  */
 struct kv_table_config {
     bool log_enabled;
+    kv_table_type type;
 
     /*
      * kv_table_config::kv_table_config --
      *     Create the default configuration.
      */
-    inline kv_table_config() : log_enabled(false) {}
+    inline kv_table_config() : log_enabled(false), type(kv_table_type::row) {}
 };
 
 /*
@@ -73,6 +84,13 @@ public:
         : _database(database), _name(name), _config(config)
     {
     }
+
+    /*
+     * kv_table::type_by_key_value_format --
+     *     Infer the table type from the key and value formats.
+     */
+    static kv_table_type type_by_key_value_format(
+      const std::string &key_format, const std::string &value_format);
 
     /*
      * kv_table::name --
@@ -144,6 +162,16 @@ public:
     timestamped() const noexcept
     {
         return !_config.log_enabled;
+    }
+
+    /*
+     * kv_table::type --
+     *     Return the table type.
+     */
+    inline kv_table_type
+    type() const noexcept
+    {
+        return _config.type;
     }
 
     /*
@@ -313,6 +341,18 @@ public:
      */
     kv_table_verify_cursor verify_cursor();
 
+    /*
+     * kv_table::highest_recno --
+     *     Get the highest recno in the table. Return 0 if the table is empty.
+     */
+    uint64_t highest_recno() const;
+
+    /*
+     * kv_table::truncate_recnos_after --
+     *     Truncate all recnos higher than the given recno on a fixed-length column store table.
+     */
+    void truncate_recnos_after(uint64_t recno);
+
 protected:
     /*
      * kv_table::item --
@@ -322,8 +362,17 @@ protected:
     item(const data_value &key)
     {
         std::lock_guard lock_guard(_lock);
+        /* For FLCS, add missing keys to ensure that key rages are contiguous. */
+        if (_config.type == kv_table_type::column_fix)
+            fill_missing_column_fix_recnos_nolock(key);
         return _data[key]; /* this automatically instantiates the item if it does not exist */
     }
+
+    /*
+     * kv_table::fill_missing_column_fix_recnos_nolock --
+     *     Fill in missing recnos for FLCS to ensure that key rages are contiguous.
+     */
+    void fill_missing_column_fix_recnos_nolock(const data_value &key);
 
     /*
      * kv_table::item_if_exists --
@@ -375,6 +424,18 @@ protected:
         if (!timestamped() && update)
             update->set_timestamps(k_timestamp_none, k_timestamp_none);
         return update;
+    }
+
+    /*
+     * kv_table::fix_get --
+     *     Update the return value of "get" if necessary, e.g., for FLCS.
+     */
+    inline data_value
+    fix_get(const data_value &v) const noexcept
+    {
+        if (_config.type == kv_table_type::column_fix && v == NONE)
+            return ZERO;
+        return std::move(v);
     }
 
     /*

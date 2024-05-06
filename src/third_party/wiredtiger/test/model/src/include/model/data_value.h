@@ -144,6 +144,12 @@ public:
 extern const data_value NONE;
 
 /*
+ * ZERO --
+ *     The unsigned zero value.
+ */
+extern const data_value ZERO;
+
+/*
  * operator<< --
  *     Add human-readable output to the stream for a byte vector.
  */

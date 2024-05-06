@@ -122,9 +122,10 @@ public:
      * kv_update::kv_update --
      *     Create a new instance.
      */
-    inline kv_update(const data_value &value, timestamp_t timestamp) noexcept
+    inline kv_update(const data_value &value, timestamp_t timestamp, bool implicit = false) noexcept
         : _value(value), _commit_timestamp(timestamp), _durable_timestamp(timestamp),
-          _txn_id(k_txn_none), _wt_txn_id(k_txn_none), _wt_base_write_gen(k_write_gen_none)
+          _txn_id(k_txn_none), _implicit(implicit), _wt_txn_id(k_txn_none),
+          _wt_base_write_gen(k_write_gen_none)
     {
     }
 
@@ -135,7 +136,7 @@ public:
     inline kv_update(const data_value &value, kv_transaction_ptr txn) noexcept
         : _value(value), _commit_timestamp(txn ? txn->commit_timestamp() : k_timestamp_none),
           _durable_timestamp(txn ? txn->durable_timestamp() : k_timestamp_none), _txn(txn),
-          _txn_id(txn ? txn->id() : k_txn_none), _wt_txn_id(k_txn_none),
+          _txn_id(txn ? txn->id() : k_txn_none), _implicit(false), _wt_txn_id(k_txn_none),
           _wt_base_write_gen(k_write_gen_none)
     {
     }
@@ -275,6 +276,16 @@ public:
     }
 
     /*
+     * kv_update::implicit --
+     *     Check whether the update has been created implicitly, e.g., when filling in 0's in FLCS.
+     */
+    inline bool
+    implicit() const noexcept
+    {
+        return _implicit;
+    }
+
+    /*
      * kv_update::txn --
      *     Get the transaction pointer, if available.
      */
@@ -379,6 +390,9 @@ private:
     /* Transaction information for updates imported from WiredTiger's debug log. */
     txn_id_t _wt_txn_id;
     write_gen_t _wt_base_write_gen;
+
+    /* Whether this update has been created implicitly, e.g., when filling in zeros in FLCS. */
+    bool _implicit;
 };
 
 } /* namespace model */

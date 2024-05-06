@@ -44,6 +44,53 @@ class debug_log_parser {
 
 public:
     /*
+     * debug_log_parser::col_put --
+     *     The col_put log entry.
+     */
+    struct col_put {
+        uint64_t fileid;
+        uint64_t recno;
+        std::string value;
+
+        /*
+         * debug_log_parser::col_put::col_put --
+         *     Default constructor.
+         */
+        inline col_put() : fileid(0), recno(0) {}
+    };
+
+    /*
+     * debug_log_parser::col_remove --
+     *     The col_remove log entry.
+     */
+    struct col_remove {
+        uint64_t fileid;
+        uint64_t recno;
+
+        /*
+         * debug_log_parser::col_remove::col_remove --
+         *     Default constructor.
+         */
+        inline col_remove() : fileid(0), recno(0) {}
+    };
+
+    /*
+     * debug_log_parser::col_truncate --
+     *     The col_truncate log entry.
+     */
+    struct col_truncate {
+        uint64_t fileid;
+        uint64_t start;
+        uint64_t stop;
+
+        /*
+         * debug_log_parser::col_truncate::col_truncate --
+         *     Default constructor.
+         */
+        inline col_truncate() : fileid(0), start(0), stop(0) {}
+    };
+
+    /*
      * debug_log_parser::commit_header --
      *     The header for the commit log entry.
      */
@@ -149,6 +196,24 @@ public:
      * debug_log_parser::apply --
      *     Apply the given operation to the model.
      */
+    void apply(kv_transaction_ptr txn, const col_put &op);
+
+    /*
+     * debug_log_parser::apply --
+     *     Apply the given operation to the model.
+     */
+    void apply(kv_transaction_ptr txn, const col_remove &op);
+
+    /*
+     * debug_log_parser::apply --
+     *     Apply the given operation to the model.
+     */
+    void apply(kv_transaction_ptr txn, const col_truncate &op);
+
+    /*
+     * debug_log_parser::apply --
+     *     Apply the given operation to the model.
+     */
     void apply(kv_transaction_ptr txn, const row_put &op);
 
     /*
@@ -161,13 +226,13 @@ public:
      * debug_log_parser::apply --
      *     Apply the given operation to the model.
      */
-    void apply(kv_transaction_ptr txn, const txn_timestamp &op);
+    void apply(kv_transaction_ptr txn, const row_truncate &op);
 
     /*
      * debug_log_parser::apply --
      *     Apply the given operation to the model.
      */
-    void apply(kv_transaction_ptr txn, const row_truncate &op);
+    void apply(kv_transaction_ptr txn, const txn_timestamp &op);
 
     /*
      * debug_log_parser::apply --

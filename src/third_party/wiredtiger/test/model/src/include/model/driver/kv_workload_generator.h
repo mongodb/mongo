@@ -58,7 +58,12 @@ struct kv_workload_generator_spec {
     size_t max_concurrent_transactions;
 
     /* The maximum key/value to use in the generation. */
+    uint64_t max_recno;
     uint64_t max_value_uint64;
+
+    /* Probabilities for table types. */
+    float column_fix;
+    float column_var;
 
     /* The probability of allowing the use of "set commit timestamp" in a transaction. */
     float use_set_commit_timestamp;
@@ -142,9 +147,9 @@ protected:
          *     Create a new table context.
          */
         inline table_context(table_id_t id, const std::string &name, const std::string &key_format,
-          const std::string &value_format)
+          const std::string &value_format, kv_table_type type)
             : _id(id), _name(name), _key_format(key_format), _value_format(value_format),
-              _sum_key_ops(0)
+              _type(type), _sum_key_ops(0)
         {
         }
 
@@ -202,6 +207,16 @@ protected:
         }
 
         /*
+         * table_context::type --
+         *     Get the table type.
+         */
+        inline kv_table_type
+        type() const noexcept
+        {
+            return _type;
+        }
+
+        /*
          * table_context::remove_key --
          *     Mark the given key as removed.
          */
@@ -254,6 +269,7 @@ protected:
         table_id_t _id;
         std::string _name;
         std::string _key_format, _value_format;
+        kv_table_type _type;
 
         std::map<data_value, key_state> _keys;
         size_t _sum_key_ops;

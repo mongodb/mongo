@@ -67,10 +67,23 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
     "log=(enabled,file_max=10M,remove=false),session_max=100," \
     "statistics=(all),statistics_log=(wait=1,json,on_close)"
 
+/* Byte values. */
+const model::data_value byte1((uint64_t)1);
+const model::data_value byte2((uint64_t)2);
+const model::data_value byte3((uint64_t)3);
+const model::data_value byte4((uint64_t)4);
+const model::data_value byte5((uint64_t)5);
+const model::data_value byte6((uint64_t)6);
+
 /* Keys. */
 const model::data_value key1("Key 1");
 const model::data_value key2("Key 2");
 const model::data_value key3("Key 3");
+
+/* Column keys. */
+const model::data_value recno1((uint64_t)1);
+const model::data_value recno2((uint64_t)2);
+const model::data_value recno3((uint64_t)3);
 
 /* Values. */
 const model::data_value value1("Value 1");
@@ -338,6 +351,308 @@ test_transaction_basic_wt(void)
     wt_model_txn_insert_both(table, uri, txn2, session2, key1, value4); /* No conflict. */
     wt_model_txn_commit_both(txn2, session2, 90);
     wt_model_assert(table, uri, key1);
+
+    /* Verify. */
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Clean up. */
+    testutil_check(session->close(session, nullptr));
+    testutil_check(session1->close(session1, nullptr));
+    testutil_check(session2->close(session2, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+
+    /* Verify using the debug log. */
+    verify_using_debug_log(opts, test_home.c_str(), true);
+}
+
+/*
+ * test_transaction_column_wt --
+ *     The basic test of the transaction model with a column store, also in WiredTiger.
+ */
+static void
+test_transaction_column_wt(void)
+{
+    model::kv_database database;
+
+    model::kv_table_config table_config;
+    table_config.type = model::kv_table_type::column;
+    model::kv_table_ptr table = database.create_table("table", table_config);
+
+    /* Transactions. */
+    model::kv_transaction_ptr txn1, txn2;
+
+    /* Create the test's home directory and database. */
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    WT_SESSION *session1;
+    WT_SESSION *session2;
+    const char *uri = "table:table";
+
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "column";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
+    testutil_check(
+      session->create(session, uri, "key_format=r,value_format=S,log=(enabled=false)"));
+
+    /* A basic test with two transactions. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value1);
+    wt_model_txn_insert_both(table, uri, txn2, session2, recno2, value2);
+    wt_model_txn_assert(table, uri, txn1, session1, recno1);
+    wt_model_txn_assert(table, uri, txn2, session2, recno2);
+    wt_model_txn_assert(table, uri, txn1, session1, recno2);
+    wt_model_txn_assert(table, uri, txn2, session2, recno1);
+    wt_model_txn_commit_both(txn1, session1, 10);
+    wt_model_txn_commit_both(txn2, session2, 10);
+
+    /* Check the read timestamp. */
+    wt_model_txn_begin_both(txn1, session1, 5);
+    wt_model_txn_assert(table, uri, txn1, session1, recno1);
+    wt_model_txn_commit_both(txn1, session1, 10);
+    wt_model_txn_begin_both(txn1, session1, 10);
+    wt_model_txn_assert(table, uri, txn1, session1, recno1);
+    wt_model_txn_commit_both(txn1, session1, 15);
+
+    /* Check transaction conflicts: Concurrent update. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value3);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value4);
+    wt_model_txn_insert_both(table, uri, txn2, session2, recno1, value4); /* Rollback. */
+    wt_model_txn_commit_both(txn1, session1, 20);
+    wt_model_txn_commit_both(txn2, session2, 20);
+
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value3);
+    wt_model_txn_commit_both(txn1, session1, 30);
+    wt_model_txn_insert_both(table, uri, txn2, session2, recno1, value4); /* Rollback. */
+    wt_model_txn_commit_both(txn2, session2, 30);
+
+    /* Check transaction conflicts: Update not in the transaction snapshot. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_commit_both(txn1, session1, 40);
+    wt_model_txn_insert_both(table, uri, txn2, session2, recno1, value4); /* Rollback. */
+    wt_model_txn_commit_both(txn2, session2, 40);
+
+    // Not testing conflict between a transactional update and an update outside of a transaction;
+    // this can result in a hang or an abort.
+
+    /* Set timestamp. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value4);
+    wt_model_txn_set_timestamp_both(txn1, session1, 43);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno2, value5);
+    wt_model_txn_set_timestamp_both(txn1, session1, 44);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno3, value6);
+    wt_model_txn_commit_both(txn1, session1, 50);
+
+    wt_model_assert(table, uri, recno1, 50);
+    wt_model_assert(table, uri, recno2, 42);
+    wt_model_assert(table, uri, recno3, 44);
+    wt_model_assert(table, uri, recno1, 50 - 1);
+    wt_model_assert(table, uri, recno2, 42 - 1);
+    wt_model_assert(table, uri, recno3, 44 - 1);
+
+    /* Set timestamp: Check timestamp order within the same recno. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_set_timestamp_both(txn1, session1, 52);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value2);
+    wt_model_txn_set_timestamp_both(txn1, session1, 55);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value3);
+    wt_model_txn_set_timestamp_both(txn1, session1, 53);
+    // Cannot insert recno 1 at timestamp 53: Commit would result in abort.
+    // wt_txn_insert(session1, uri, recno1, value3);
+    wt_model_txn_commit_both(txn1, session1, 60);
+    wt_model_assert(table, uri, recno1, 52);
+    wt_model_assert(table, uri, recno1, 53);
+    wt_model_assert(table, uri, recno1, 55);
+
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value1);
+    wt_model_txn_set_timestamp_both(txn1, session1, 65);
+    // Cannot insert recno 1 at timestamp 65: Reconciliation would trigger abort.
+    // wt_txn_insert(session1, uri, recno1, value4);
+    wt_model_txn_commit_both(txn1, session1, 70);
+    wt_model_assert(table, uri, recno1, 65);
+    wt_model_assert(table, uri, recno1, 70);
+
+    /* Roll back a transaction. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value2);
+    wt_model_txn_rollback_both(txn1, session1);
+    wt_model_assert(table, uri, recno1);
+    wt_model_assert(table, uri, recno2);
+
+    /* Reset the transaction snapshot. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, value3);
+    wt_model_txn_commit_both(txn1, session1, 80);
+    wt_model_txn_reset_snapshot_both(txn2, session2);
+    wt_model_txn_assert(table, uri, txn2, session2, recno1);
+    wt_model_txn_insert_both(table, uri, txn2, session2, recno1, value4); /* No conflict. */
+    wt_model_txn_commit_both(txn2, session2, 90);
+    wt_model_assert(table, uri, recno1);
+
+    /* Verify. */
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Clean up. */
+    testutil_check(session->close(session, nullptr));
+    testutil_check(session1->close(session1, nullptr));
+    testutil_check(session2->close(session2, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+
+    /* Verify using the debug log. */
+    verify_using_debug_log(opts, test_home.c_str(), true);
+}
+
+/*
+ * test_transaction_column_fix_wt --
+ *     The basic test of the transaction model with FLCS, also in WiredTiger.
+ */
+static void
+test_transaction_column_fix_wt(void)
+{
+    model::kv_database database;
+
+    model::kv_table_config table_config;
+    table_config.type = model::kv_table_type::column_fix;
+    model::kv_table_ptr table = database.create_table("table", table_config);
+
+    /* Transactions. */
+    model::kv_transaction_ptr txn1, txn2;
+
+    /* Create the test's home directory and database. */
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    WT_SESSION *session1;
+    WT_SESSION *session2;
+    const char *uri = "table:table";
+
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "column-fix";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
+    testutil_check(
+      session->create(session, uri, "key_format=r,value_format=8t,log=(enabled=false)"));
+
+    /* A basic test with two transactions. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte1);
+    wt_model_txn_insert_both(table, uri, txn2, session2, recno2, byte2);
+    wt_model_txn_assert(table, uri, txn1, session1, recno1);
+    wt_model_txn_assert(table, uri, txn2, session2, recno2);
+    wt_model_txn_assert(table, uri, txn1, session1, recno2);
+    wt_model_txn_assert(table, uri, txn2, session2, recno1);
+    wt_model_txn_commit_both(txn1, session1, 10);
+    wt_model_txn_commit_both(txn2, session2, 10);
+
+    /* Check the read timestamp. */
+    wt_model_txn_begin_both(txn1, session1, 5);
+    wt_model_txn_assert(table, uri, txn1, session1, recno1);
+    wt_model_txn_commit_both(txn1, session1, 10);
+    wt_model_txn_begin_both(txn1, session1, 10);
+    wt_model_txn_assert(table, uri, txn1, session1, recno1);
+    wt_model_txn_commit_both(txn1, session1, 15);
+
+    /* Check transaction conflicts: Concurrent update. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte3);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte4);
+    wt_model_txn_insert_both(table, uri, txn2, session2, recno1, byte4); /* Rollback. */
+    wt_model_txn_commit_both(txn1, session1, 20);
+    wt_model_txn_commit_both(txn2, session2, 20);
+
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte3);
+    wt_model_txn_commit_both(txn1, session1, 30);
+    wt_model_txn_insert_both(table, uri, txn2, session2, recno1, byte4); /* Rollback. */
+    wt_model_txn_commit_both(txn2, session2, 30);
+
+    /* Check transaction conflicts: Update not in the transaction snapshot. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_commit_both(txn1, session1, 40);
+    wt_model_txn_insert_both(table, uri, txn2, session2, recno1, byte4); /* Rollback. */
+    wt_model_txn_commit_both(txn2, session2, 40);
+
+    // Not testing conflict between a transactional update and an update outside of a transaction;
+    // this can result in a hang or an abort.
+
+    /* Set timestamp. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte4);
+    wt_model_txn_set_timestamp_both(txn1, session1, 43);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno2, byte5);
+    wt_model_txn_set_timestamp_both(txn1, session1, 44);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno3, byte6);
+    wt_model_txn_commit_both(txn1, session1, 50);
+
+    wt_model_assert(table, uri, recno1, 50);
+    wt_model_assert(table, uri, recno2, 42);
+    wt_model_assert(table, uri, recno3, 44);
+    wt_model_assert(table, uri, recno1, 50 - 1);
+    wt_model_assert(table, uri, recno2, 42 - 1);
+    wt_model_assert(table, uri, recno3, 44 - 1);
+
+    /* Set timestamp: Check timestamp order within the same recno. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_set_timestamp_both(txn1, session1, 52);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte2);
+    wt_model_txn_set_timestamp_both(txn1, session1, 55);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte3);
+    wt_model_txn_set_timestamp_both(txn1, session1, 53);
+    // Cannot insert recno 1 at timestamp 53: Commit would result in abort.
+    // wt_txn_insert(session1, uri, recno1, byte3);
+    wt_model_txn_commit_both(txn1, session1, 60);
+    wt_model_assert(table, uri, recno1, 52);
+    wt_model_assert(table, uri, recno1, 53);
+    wt_model_assert(table, uri, recno1, 55);
+
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte1);
+    wt_model_txn_set_timestamp_both(txn1, session1, 65);
+    // Cannot insert recno 1 at timestamp 65: Reconciliation would trigger abort.
+    // wt_txn_insert(session1, uri, recno1, byte4);
+    wt_model_txn_commit_both(txn1, session1, 70);
+    wt_model_assert(table, uri, recno1, 65);
+    wt_model_assert(table, uri, recno1, 70);
+
+    /* Roll back a transaction. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte2);
+    wt_model_txn_rollback_both(txn1, session1);
+    wt_model_assert(table, uri, recno1);
+    wt_model_assert(table, uri, recno2);
+
+    /* Reset the transaction snapshot. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, recno1, byte3);
+    wt_model_txn_commit_both(txn1, session1, 80);
+    wt_model_txn_reset_snapshot_both(txn2, session2);
+    wt_model_txn_assert(table, uri, txn2, session2, recno1);
+    wt_model_txn_insert_both(table, uri, txn2, session2, recno1, byte4); /* No conflict. */
+    wt_model_txn_commit_both(txn2, session2, 90);
+    wt_model_assert(table, uri, recno1);
 
     /* Verify. */
     testutil_assert(table->verify_noexcept(conn));
@@ -858,6 +1173,8 @@ main(int argc, char *argv[])
         ret = EXIT_SUCCESS;
         test_transaction_basic();
         test_transaction_basic_wt();
+        test_transaction_column_wt();
+        test_transaction_column_fix_wt();
         test_transaction_prepared();
         test_transaction_prepared_wt();
         test_transaction_logged();

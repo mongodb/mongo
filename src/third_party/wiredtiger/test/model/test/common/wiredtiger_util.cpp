@@ -340,18 +340,18 @@ wt_txn_get(WT_SESSION *session, const char *uri, const model::data_value &key)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    const char *value;
-
-    value = nullptr;
+    model::data_value out;
 
     testutil_check(session->open_cursor(session, uri, nullptr, nullptr, &cursor));
     model::set_wt_cursor_key(cursor, key);
     testutil_check_error_ok(ret = cursor->search(cursor), WT_NOTFOUND);
     if (ret == 0)
-        testutil_check(cursor->get_value(cursor, &value));
+        out = model::get_wt_cursor_value(cursor);
+    else
+        out = model::NONE;
 
     testutil_check(cursor->close(cursor));
-    return ret == 0 ? model::data_value(value) : model::NONE;
+    return out;
 }
 
 /*
