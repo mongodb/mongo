@@ -250,6 +250,32 @@ assert.commandWorked(secondary1TestDB.setProfilingLevel(2));
     assert.eq(primaryTestDB.getCollectionInfos({name: newCollName}).length, 0);
 }
 
+{
+    jsTest.log("Testing that the replica set endpoint attaches error labels when writes are " +
+               "run against a secondary");
+
+    const lsid = {id: UUID()};
+    const txnNumber = NumberLong(1);
+
+    const insertRes = assert.commandFailedWithCode(secondary0TestDB.runCommand({
+        insert: collName,
+        documents: [{x: 100}],
+        lsid,
+        txnNumber,
+        startTransaction: true,
+        autocommit: false
+    }),
+                                                   ErrorCodes.NotWritablePrimary);
+    assert.eq(insertRes.errorLabels, ["TransientTransactionError"], insertRes);
+
+    const commitRes = assert.commandFailedWithCode(
+        secondary0TestDB.adminCommand({commitTransaction: 1, lsid, txnNumber, autocommit: false}),
+        ErrorCodes.NotWritablePrimary);
+    // TODO (SERVER-90015): Mongos communicates retryable error labels from shards to drivers.
+    assert(!commitRes.hasOwnProperty("errorLabels"), commitRes);
+    // assert.eq(commitRes.errorLabels, ["RetryableWriteError"], commitRes);
+}
+
 jsTest.log("Disabling profiler");
 assert.commandWorked(primaryTestDB.setProfilingLevel(0));
 assert.commandWorked(secondary0TestDB.setProfilingLevel(0));

@@ -145,32 +145,34 @@ bool shouldRouteRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
         return false;
     }
 
-
-    auto shardCommand =
-        CommandHelpers::findCommand(getShardService(opCtx), opMsgReq.getCommandName());
-    if (shardCommand &&
-        shardCommand->secondaryAllowed(opCtx->getServiceContext()) ==
-            BasicCommand::AllowedOnSecondary::kNever) {
-        // On the shard service, this is a primary-only command. Make it fail with a
-        // NotWritablePrimary error if this mongod is not the primary. This check is necessary for
-        // providing replica set user experience (i.e. writes should fail on secondaries) since by
-        // going through the router code paths the command would get routed to the primary and
-        // succeed whether or not this mongod is the primary. This check only needs to be
-        // best-effort since if this mongod steps down after the check, the write would be routed
-        // to the new primary. For this reason, just use canAcceptWritesForDatabase_UNSAFE to
-        // avoid taking the RSTL lock or the ReplicationCoordinator's mutex.
-        uassert(ErrorCodes::NotWritablePrimary,
-                "This command is only allowed on a primary",
-                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
-                    opCtx, opMsgReq.parseDbName()));
-    }
-
     // There is nothing that will prevent the cluster from becoming multi-shard (i.e. no longer
     // supporting as replica set endpoint) after the check here is done. However, the contract is
     // that users must have transitioned to the sharded connection string (i.e. connect to mongoses
     // and/or router port of mongods) before adding a second shard. Also, commands that make it to
     // here should be safe to route even when the cluster has more than one shard.
     return true;
+}
+
+void checkIfCanRunCommand(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
+    auto shardCommand = CommandHelpers::findCommand(replica_set_endpoint::getShardService(opCtx),
+                                                    opMsgReq.getCommandName());
+    if (shardCommand &&
+        shardCommand->secondaryAllowed(opCtx->getServiceContext()) ==
+            BasicCommand::AllowedOnSecondary::kNever) {
+        // On the shard service, this is a primary-only command. Make it fail with a
+        // NotWritablePrimary error if this mongod is not the primary. This check is necessary
+        // for providing replica set user experience (i.e. writes should fail on secondaries)
+        // since by going through the router code paths the command would get routed to the
+        // primary and succeed whether or not this mongod is the primary. This check only needs
+        // to be best-effort since if this mongod steps down after the check, the write would be
+        // routed to the new primary. For this reason, just use
+        // canAcceptWritesForDatabase_UNSAFE to avoid taking the RSTL lock or the
+        // ReplicationCoordinator's mutex.
+        uassert(ErrorCodes::NotWritablePrimary,
+                "This command is only allowed on a primary",
+                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
+                    opCtx, opMsgReq.parseDbName()));
+    }
 }
 
 }  // namespace replica_set_endpoint

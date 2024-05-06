@@ -31,7 +31,6 @@
 
 #include "mongo/db/replica_set_endpoint_util.h"
 
-#include "mongo/bson/json.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
@@ -211,7 +210,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterOnlyCommand) {
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
 
-TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_NeverAllowedOnSecondary) {
+TEST_F(ReplicaSetEndpointUtilTest,
+       CheckIfCanRunCommand_RouterAndShardCommand_NeverAllowedOnSecondary) {
     std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
     auto client = getServiceContext()->getService()->makeClient(
         "RouterAndShardCommand_NeverAllowedOnSecondary", session);
@@ -223,13 +223,15 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_NeverAllowe
         auth::ValidatedTenancyScope::kNotRequired, ns.dbName(), voidCmd.toBSON({}));
 
     ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
-    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+    checkIfCanRunCommand(opCtx.get(), opMsgRequest);
     ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_SECONDARY));
-    ASSERT_THROWS_CODE(
-        shouldRouteRequest(opCtx.get(), opMsgRequest), DBException, ErrorCodes::NotWritablePrimary);
+    ASSERT_THROWS_CODE(checkIfCanRunCommand(opCtx.get(), opMsgRequest),
+                       DBException,
+                       ErrorCodes::NotWritablePrimary);
 }
 
-TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_AlwaysAllowedOnSecondary) {
+TEST_F(ReplicaSetEndpointUtilTest,
+       CheckIfCanRunCommand_RouterAndShardCommand_AlwaysAllowedOnSecondary) {
     std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
     auto client = getServiceContext()->getService()->makeClient(
         "RouterAndShardCommand_AlwaysAllowedOnSecondary", session);
@@ -241,12 +243,13 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_AlwaysAllow
         auth::ValidatedTenancyScope::kNotRequired, ns.dbName(), voidCmd.toBSON({}));
 
     ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
-    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+    checkIfCanRunCommand(opCtx.get(), opMsgRequest);
     ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_SECONDARY));
-    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+    checkIfCanRunCommand(opCtx.get(), opMsgRequest);
 }
 
-TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_AllowedOnSecondaryIfOptedIn) {
+TEST_F(ReplicaSetEndpointUtilTest,
+       CheckIfCanRunCommand_RouterAndShardCommand_AllowedOnSecondaryIfOptedIn) {
     std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
     auto client = getServiceContext()->getService()->makeClient(
         "RouterAndShardCommand_AllowedOnSecondaryIfOptedIn", session);
@@ -258,9 +261,9 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_AllowedOnSe
         auth::ValidatedTenancyScope::kNotRequired, ns.dbName(), voidCmd.toBSON({}));
 
     ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
-    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+    checkIfCanRunCommand(opCtx.get(), opMsgRequest);
     ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_SECONDARY));
-    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+    checkIfCanRunCommand(opCtx.get(), opMsgRequest);
 }
 
 TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_LocalDatabase) {

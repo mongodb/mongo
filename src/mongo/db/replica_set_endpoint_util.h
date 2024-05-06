@@ -97,5 +97,11 @@ bool isReplicaSetEndpointClient(Client* client);
  */
 bool shouldRouteRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq);
 
+/**
+ * Returns true if this command be run on this shardsvr mongod. Currently, if the command is not
+ * allowed on secondaries, uasserts that the mongod is a primary.
+ */
+void checkIfCanRunCommand(OperationContext* opCtx, const OpMsgRequest& opMsgReq);
+
 }  // namespace replica_set_endpoint
 }  // namespace mongo

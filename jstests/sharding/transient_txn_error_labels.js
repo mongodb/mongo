@@ -47,13 +47,7 @@ let res = secondarySessionDb.runCommand({
     autocommit: false
 });
 assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
-if (isReplicaSetEndpointActive) {
-    // TODO (SERVER-88825): Make sure replica set endpoint return TransientTransactionError write
-    // command is run on a secondary.
-    assert(!res.hasOwnProperty("errorLabels"), res);
-} else {
-    assert.eq(res.errorLabels, ["TransientTransactionError"], res);
-}
+assert.eq(res.errorLabels, ["TransientTransactionError"], res);
 
 jsTest.log("failCommand with errorLabels but without errorCode or writeConcernError should not " +
            "interfere with server's error labels attaching");
@@ -74,13 +68,7 @@ res = secondarySessionDb.runCommand({
 });
 assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
 // Server should continue to return TransientTransactionError label.
-if (isReplicaSetEndpointActive) {
-    // TODO (SERVER-88825): Make sure replica set endpoint return TransientTransactionError write
-    // command is run on a secondary.
-    assert(!res.hasOwnProperty("errorLabels"), res);
-} else {
-    assert.eq(res.errorLabels, ["TransientTransactionError"], res);
-}
+assert.eq(res.errorLabels, ["TransientTransactionError"], res);
 assert.commandWorked(secondary.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 jsTest.log("Insert as a retryable write on secondary should fail with retryable error labels");
@@ -91,7 +79,7 @@ res = secondarySessionDb.runCommand(
 
 assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
 if (isReplicaSetEndpointActive) {
-    // TODO (PM-3038): Mongos communicates retryable error labels from shards to drivers.
+    // TODO (SERVER-90015): Mongos communicates retryable error labels from shards to drivers.
     assert(!res.hasOwnProperty("errorLabels"), res);
 } else {
     assert.eq(res.errorLabels, ["RetryableWriteError"], res);
@@ -193,7 +181,7 @@ assert.commandWorked(testDB.adminCommand({
 res = session.commitTransaction_forTesting();
 assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
 if (isReplicaSetEndpointActive) {
-    // TODO (PM-3038): Mongos communicates retryable error labels from shards to drivers.
+    // TODO (SERVER-90015): Mongos communicates retryable error labels from shards to drivers.
     assert(!res.hasOwnProperty("errorLabels"), res);
 } else {
     assert.eq(res.errorLabels, ["RetryableWriteError"], res);
@@ -217,7 +205,7 @@ res = sessionDb.adminCommand({
 });
 assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
 if (isReplicaSetEndpointActive) {
-    // TODO (PM-3038): Mongos communicates retryable error labels from shards to drivers.
+    // TODO (SERVER-90015): Mongos communicates retryable error labels from shards to drivers.
     assert(!res.hasOwnProperty("errorLabels"), res);
 } else {
     assert.eq(res.errorLabels, ["RetryableWriteError"], res);
@@ -300,7 +288,7 @@ res = sessionDb.adminCommand({
 });
 assert.commandFailedWithCode(res, ErrorCodes.HostUnreachable);
 if (isReplicaSetEndpointActive) {
-    // TODO (PM-3038): Mongos communicates retryable error labels from shards to drivers.
+    // TODO (SERVER-90015): Mongos communicates retryable error labels from shards to drivers.
     assert(!res.hasOwnProperty("errorLabels"), res);
 } else {
     assert.eq(res.errorLabels, ["RetryableWriteError"], res);
