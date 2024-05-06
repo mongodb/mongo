@@ -106,9 +106,11 @@ void MozJSScriptEngine::interrupt(ClientLock&, OperationContext* opCtx) {
     if (opCtx && (*opCtx)[operationMozJSScopeDecoration]) {
         (*opCtx)[operationMozJSScopeDecoration]->kill();
         LOGV2_DEBUG(22808, 2, "Interrupting op", "opId"_attr = opCtx->getOpID());
-    } else {
+    } else if (opCtx) {
         LOGV2_DEBUG(
             22790, 2, "Received interrupt request for unknown op", "opId"_attr = opCtx->getOpID());
+    } else {
+        LOGV2_DEBUG(8972600, 2, "Received interrupt request for unknown op without opId");
     }
 }
 
