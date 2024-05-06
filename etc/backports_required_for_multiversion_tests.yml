@@ -59,26 +59,6 @@ last-continuous:
       ticket: SERVER-88447
     - test_file: jstests/core/timeseries/timeseries_computed_field.js
       ticket: SERVER-88072
-    - test_file: jstests/core/ddl/collation_convert_to_capped.js
-      ticket: SERVER-85772
-    - test_file: jstests/core/ddl/convert_to_capped.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/convert_to_capped_collection.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/agg_out.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/timeseries_agg_out.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/convert_to_capped_unsplittable_collections.js
-      ticket: SERVER-85772
-    - test_file: jstests/sharding/not_allowed_on_sharded_collection_cmd.js
-      ticket: SERVER-85772
-    - test_file: jstests/sharding/convert_to_capped_failure.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/agg_out.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/timeseries_agg_out.js
-      ticket: SERVER-85772
     - test_file: jstests/auth/curop_auth_info.js
       ticket: SERVER-89664
     - test_file: jstests/auth/killop_own_ops.js
@@ -144,26 +124,6 @@ last-lts:
       ticket: SERVER-88447
     - test_file: jstests/core/timeseries/timeseries_computed_field.js
       ticket: SERVER-88072
-    - test_file: jstests/core/ddl/collation_convert_to_capped.js
-      ticket: SERVER-85772
-    - test_file: jstests/core/ddl/convert_to_capped.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/convert_to_capped_collection.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/agg_out.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/timeseries_agg_out.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/convert_to_capped_unsplittable_collections.js
-      ticket: SERVER-85772
-    - test_file: jstests/sharding/not_allowed_on_sharded_collection_cmd.js
-      ticket: SERVER-85772
-    - test_file: jstests/sharding/convert_to_capped_failure.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/agg_out.js
-      ticket: SERVER-85772
-    - test_file: jstests/concurrency/fsm_workloads/timeseries_agg_out.js
-      ticket: SERVER-85772
     - test_file: jstests/auth/curop_auth_info.js
       ticket: SERVER-89664
     - test_file: jstests/auth/killop_own_ops.js
