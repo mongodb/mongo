@@ -100,6 +100,8 @@ using namespace fmt::literals;
 // on stale version and snapshot errors.
 MONGO_FAIL_POINT_DEFINE(enableStaleVersionAndSnapshotRetriesWithinTransactions);
 
+MONGO_FAIL_POINT_DEFINE(hangWhenSubRouterHandlesResponseFromAddedParticipant);
+
 const char kCoordinatorField[] = "coordinator";
 const char kReadConcernLevelSnapshotName[] = "snapshot";
 
@@ -596,6 +598,10 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
                                                            const BSONObj& responseObj) {
     auto participant = getParticipant(shardId);
     invariant(participant, "Participant should exist if processing participant response");
+
+    if (MONGO_unlikely(hangWhenSubRouterHandlesResponseFromAddedParticipant.shouldFail())) {
+        hangWhenSubRouterHandlesResponseFromAddedParticipant.pauseWhileSet();
+    }
 
     if (p().terminationInitiated) {
         // Do not process the transaction metadata after commit or abort have been initiated,

@@ -200,6 +200,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(hangAfterSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSettingTxnInterruptFlag);
 MONGO_FAIL_POINT_DEFINE(hangAfterCheckingWritabilityForMultiDocumentTransactions);
+MONGO_FAIL_POINT_DEFINE(failWithErrorCodeAfterSessionCheckOut);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not primary error resulted in network disconnection.
@@ -822,6 +823,19 @@ void CheckoutSessionAndInvokeCommand::run() {
             tenant_migration_access_blocker::checkIfCanRunCommandOrBlock(
                 execContext.getOpCtx(), dbName, execContext.getRequest())
                 .get(execContext.getOpCtx());
+
+            if (auto scoped = failWithErrorCodeAfterSessionCheckOut.scoped();
+                MONGO_unlikely(scoped.isActive())) {
+                const auto errorCode =
+                    static_cast<ErrorCodes::Error>(scoped.getData()["errorCode"].numberInt());
+                LOGV2_DEBUG(8535500,
+                            1,
+                            "failWithErrorCodeAfterSessionCheckOut enabled, failing command",
+                            "errorCode"_attr = errorCode);
+                BSONObjBuilder errorBuilder;
+                return Status(errorCode, "failWithErrorCodeAfterSessionCheckOut enabled.");
+            }
+
             runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
             return Status::OK();
         } catch (const ExceptionForCat<ErrorCategory::TenantMigrationConflictError>& ex) {
