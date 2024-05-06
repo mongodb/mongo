@@ -1,5 +1,7 @@
 /**
  * Checks that a prepareUnique index does not block startup.
+ *
+ * @tags: [requires_persistence, requires_replication]
  */
 (function() {
 'use strict';
