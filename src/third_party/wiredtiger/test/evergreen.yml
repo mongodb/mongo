@@ -3072,8 +3072,8 @@ tasks:
 
             if [ ${is_patch|false} = true ]; then
               echo "This is a patch build"
-              # Obtain the diff for the changes in this patch
-              git diff `git merge-base develop HEAD` > coverage_report/diff.txt
+              # Obtain the diff for the changes in this patch, excluding newly added 0-length files.
+              python3 test/evergreen/code_change_report/git_diff_tool.py -g . -d coverage_report/diff.txt -v
               EXTRA_CODE_CHANGE_PARAMETERS='-d coverage_report/diff.txt'
               # Generate an HTML friendly version of the diff for
               sed 's/$/<br>/' coverage_report/diff.txt > coverage_report/diff.html
