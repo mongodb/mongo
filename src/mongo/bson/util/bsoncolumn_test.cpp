@@ -720,6 +720,52 @@ public:
         }
     }
 
+    static void verifyDecompressionInterleaved(const std::vector<BSONElement>& input,
+                                               bool testPathDecompression) {
+        BSONColumnBuilder interleavedCb;
+
+        // Store the BSONObj to ensure the BSONElements stay in scope.
+        std::vector<BSONObj> expected;
+        expected.reserve(input.size());
+
+        // Wrap each input in a BSONObj.
+        for (auto&& elem : input) {
+            BSONObjBuilder ob;
+            ob.append("0"_sd, (elem.eoo() ? BSONObj{} : BSON("fp" << elem)));
+            expected.push_back(ob.obj());
+            interleavedCb.append(expected.back().firstElement());
+        }
+        auto interleavedBinary = interleavedCb.finalize();
+
+        // Set up the iterative and block API.
+        BSONColumn col(interleavedBinary);
+        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        std::vector<BSONElement> collection;
+        BSONColumnBlockBased block((const char*)interleavedBinary.data, interleavedBinary.length);
+        block.decompress<BSONElementMaterializer, std::vector<BSONElement>>(collection, allocator);
+
+        // Verify the decompressed elements are the same and expected from both APIs.
+        ASSERT(col.size() == input.size() && collection.size() == input.size());
+        auto iterRes = col.begin();
+        auto blockRes = collection.begin();
+        std::vector<BSONElement> pathAPIElements;
+        pathAPIElements.reserve(input.size());
+        for (auto&& expectedObj : expected) {
+            pathAPIElements.push_back(expectedObj.firstElement());
+            ASSERT(expectedObj.firstElement().binaryEqualValues(*iterRes) &&
+                   (*iterRes).binaryEqualValues(*blockRes));
+            ++iterRes;
+            ++blockRes;
+        }
+
+        // If supported, validate the path API with the data created can handle decompressing
+        // duplicate paths.
+        if (testPathDecompression) {
+            std::vector<TestPath> testPaths{TestPath{{"fp"}}, TestPath{{"fp"}}};
+            verifyDecompressPathFast(interleavedBinary, pathAPIElements, testPaths);
+        }
+    }
+
     static void verifyDecompressionBasic(const BufBuilder& columnBinary,
                                          const std::vector<BSONElement>& expected) {
         BSONColumn col(columnBinary.buf(), columnBinary.len());
@@ -771,6 +817,16 @@ public:
         verifyDecompressPathFast(columnBinary, expected, testPaths);
     }
 
+    static void verifyDecompressPathFast(const BufBuilder& columnBinary,
+                                         const std::vector<BSONElement>& expected,
+                                         std::span<TestPath> paths) {
+        BSONBinData bsonBinData;
+        bsonBinData.data = columnBinary.buf();
+        bsonBinData.length = columnBinary.len();
+        bsonBinData.type = Column;
+        verifyDecompressPathFast(bsonBinData, expected, paths);
+    }
+
     static void verifyDecompressPathFast(BSONBinData columnBinary,
                                          const std::vector<BSONElement>& expected,
                                          std::span<TestPath> paths) {
@@ -818,7 +874,7 @@ public:
                         ASSERT_TRUE(vec[i].binaryEqualValues(elem));
                     } else {
                         // Path is ongoing, expected should not have found a leaf
-                        ASSERT_EQ(elem.type(), Object);
+                        ASSERT(elem.isABSONObj());
                         obj = elem.Obj();
                     }
                 }
@@ -828,16 +884,19 @@ public:
     }
 
     static void verifyDecompression(const BufBuilder& columnBinary,
-                                    const std::vector<BSONElement>& expected) {
+                                    const std::vector<BSONElement>& expected,
+                                    bool testPathDecompression = true) {
         BSONBinData bsonBinData;
         bsonBinData.data = columnBinary.buf();
         bsonBinData.length = columnBinary.len();
         bsonBinData.type = Column;
-        verifyDecompression(bsonBinData, expected);
+        verifyDecompression(bsonBinData, expected, testPathDecompression);
     }
 
+    // TODO SERVER-90169 remove 'testPathDecompression'.
     static void verifyDecompression(BSONBinData columnBinary,
-                                    const std::vector<BSONElement>& expected) {
+                                    const std::vector<BSONElement>& expected,
+                                    bool testPathDecompression = true) {
         BSONObjBuilder obj;
         obj.append(""_sd, columnBinary);
         BSONElement columnElement = obj.done().firstElement();
@@ -979,6 +1038,10 @@ public:
                 ASSERT(expected[i].binaryEqualValues(collection[i]));
             }
         }
+
+        // Validate that interleaved data returns the expected result in the iterative, block
+        // general and block path API.
+        verifyDecompressionInterleaved(expected, testPathDecompression);
     }
 
     /**
@@ -3094,27 +3157,6 @@ TEST_F(BSONColumnTest, BinDataLargerThan16) {
     verifyDecompression(binData, {elemBinData, elemBinDataLong});
 }
 
-TEST_F(BSONColumnTest, BinDataLargerThan16Interleaved) {
-    // The same test as above, but the data is wrapped in an object to test interleaved mode, and
-    // the fast implementation of the block API.
-    std::vector<uint8_t> input{
-        '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '8'};
-    auto elemBinData = createElementObj(BSON("x" << createElementBinData(BinDataGeneral, input)));
-    cb.append(elemBinData);
-
-    std::vector<uint8_t> inputLong{
-        '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '9'};
-    auto elemBinDataLong =
-        createElementObj(BSON("x" << createElementBinData(BinDataGeneral, inputLong)));
-
-    cb.append(elemBinDataLong);
-    auto binData = cb.finalize();
-
-    verifyDecompression(binData, {elemBinData, elemBinDataLong});
-    TestPath testPathX{{"x"}};
-    verifyDecompressPathFast(binData, {elemBinData, elemBinDataLong}, testPathX);
-}
-
 TEST_F(BSONColumnTest, BinDataLargerThan16InterleavedDuplicatePath) {
     // This test is similar to the above but verifies that we keep track of decompression state
     // correctly even when there are duplicate paths.
@@ -3135,7 +3177,6 @@ TEST_F(BSONColumnTest, BinDataLargerThan16InterleavedDuplicatePath) {
     std::vector<TestPath> testPaths{TestPath{{"a"}}, TestPath{{"a"}}};
     verifyDecompressPathFast(binData, elems, testPaths);
 }
-
 
 TEST_F(BSONColumnTest, BinDataEqualTo16) {
     std::vector<uint8_t> input{
@@ -3405,25 +3446,6 @@ TEST_F(BSONColumnTest, EmptyStringAfterUnencodableLiteralAndDelta) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
-}
-
-// TODO SERVER-89715 remove test.
-TEST_F(BSONColumnTest, EmptyStringAfterUnencodableLiteralAndDeltaInterleaved) {
-    // The same test as above, but the data is wrapped in an object to test interleaved mode, and
-    // the fast implementation of the block API.
-    std::vector<BSONElement> elems = {createElementObj(BSON("x" << createElementString("\0"_sd))),
-                                      createElementObj(BSON("x" << createElementString("a"_sd))),
-                                      createElementObj(BSON("x" << createElementString(""_sd))),
-                                      createElementObj(BSON("x" << createElementString(""_sd)))};
-
-    for (auto&& elem : elems) {
-        cb.append(elem);
-    }
-    auto binData = cb.finalize();
-
-    verifyDecompression(binData, elems);
-    TestPath testPathX{{"x"}};
-    verifyDecompressPathFast(binData, elems, testPathX);
 }
 
 TEST_F(BSONColumnTest, UnencodableStringBetweenZeroDelta) {
@@ -3864,27 +3886,6 @@ TEST_F(BSONColumnTest, NonZeroRLETwoControlBlocks) {
     verifyBinary(binData, expected, false);
     verifyDecompression(binData, elems);
     verifyColumnReopenFromBinary(reinterpret_cast<const char*>(binData.data), binData.length);
-}
-
-// TODO SERVER-89715 remove test.
-TEST_F(BSONColumnTest, InterleavedNonZeroRLETwoControlBlocks) {
-    // The same test as above, but the data is wrapped in an object to test interleaved mode, and
-    // the fast implementation of the block API.
-
-    size_t num = 1 + /*first non-RLE*/ 30 + /*RLE*/ 1920 * 12 + /*non-RLE at end*/ 59;
-    std::vector<BSONElement> elems;
-    for (size_t i = 0; i < num; ++i) {
-        elems.push_back(createElementObj(BSON("x" << int32_t(i))));
-    }
-
-    for (auto elem : elems) {
-        cb.append(elem);
-    }
-    auto binData = cb.finalize();
-
-    verifyDecompression(binData, elems);
-    TestPath testPathX{{"x"}};
-    verifyDecompressPathFast(binData, elems, testPathX);
 }
 
 TEST_F(BSONColumnTest, RLEAfterMixedValueBlock) {
@@ -4756,6 +4757,7 @@ TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescale) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(expected, elems);
+    verifyDecompressPathFast(binData, elems, TestPath{{"x"}});
 }
 
 TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescaleLegacyDecompress) {
@@ -4783,6 +4785,8 @@ TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescaleLegacyDec
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedScalarToObject) {
@@ -4995,6 +4999,8 @@ TEST_F(BSONColumnTest, InterleavedWithEmptySubObj) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}};
+    verifyDecompressPathFast(binData, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedWithEmptySubObjLegacyDecompress) {
@@ -5015,6 +5021,8 @@ TEST_F(BSONColumnTest, InterleavedWithEmptySubObjLegacyDecompress) {
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
@@ -5046,6 +5054,8 @@ TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}};
+    verifyDecompressPathFast(binData, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObjLegacyDecompress) {
@@ -5071,6 +5081,8 @@ TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObjLegacyDecompress) {
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedAddEmptySubObj) {
@@ -5098,6 +5110,8 @@ TEST_F(BSONColumnTest, InterleavedAddEmptySubObj) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}};
+    verifyDecompressPathFast(binData, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedAddEmptySubObjLegacyDecompress) {
@@ -5120,6 +5134,8 @@ TEST_F(BSONColumnTest, InterleavedAddEmptySubObjLegacyDecompress) {
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedAddEmptySubArray) {
@@ -5147,6 +5163,8 @@ TEST_F(BSONColumnTest, InterleavedAddEmptySubArray) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}};
+    verifyDecompressPathFast(binData, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedSchemaChange) {
@@ -5369,6 +5387,7 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyObjChange) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    verifyDecompressPathFast(binData, elems, TestPath{{"y", "z"}});
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectEmptyObjChangeLegacyDecompress) {
@@ -5399,6 +5418,8 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyObjChangeLegacyDecompress) {
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"y", "z"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectEmptyArrayChange) {
@@ -5435,6 +5456,7 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyArrayChange) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    verifyDecompressPathFast(binData, elems, TestPath{{"y", "z"}});
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjMiddle) {
@@ -5473,6 +5495,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjMiddle) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    verifyDecompressPathFast(binData, elems, TestPath{{"y"}});
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjMiddleLegacyDecompress) {
@@ -5505,6 +5528,8 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjMiddleLegacyDecompress) {
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"y"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayMiddle) {
@@ -5543,6 +5568,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayMiddle) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    verifyDecompressPathFast(binData, elems, TestPath{{"y"}});
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObj) {
@@ -6390,6 +6416,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObjEnd) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    verifyDecompressPathFast(binData, elems, TestPath{{"z", "z1"}});
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObjEndLegacyDecompress) {
@@ -6422,6 +6449,8 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObjEndLegacyDecompre
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"z", "z1"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObjEnd) {
@@ -6462,6 +6491,7 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObjEnd) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    verifyDecompressPathFast(binData, elems, TestPath{{"z", "z1"}});
 }
 
 TEST_F(BSONColumnTest, InterleavedArrayMissingEmptyObjUnderObjEnd) {
@@ -6693,6 +6723,8 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeRight) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}, TestPath{{"z"}}};
+    verifyDecompressPathFast(binData, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedAlternatingMergeRightLegacyDecompress) {
@@ -6739,6 +6771,8 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeRightLegacyDecompress) {
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}, TestPath{{"z"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRight) {
@@ -6771,6 +6805,8 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRight) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}, TestPath{{"z"}}};
+    verifyDecompressPathFast(binData, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRightLegacyDecompress) {
@@ -6797,6 +6833,8 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRightLegacyDecompress)
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}, TestPath{{"z"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedMergeWithUnrelatedArray) {
@@ -6840,6 +6878,8 @@ TEST_F(BSONColumnTest, InterleavedMergeWithUnrelatedArray) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}, TestPath{{"y"}}, TestPath{{"z"}}};
+    verifyDecompressPathFast(binData, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedMergeWithScalarObjectMismatch) {
@@ -6869,6 +6909,8 @@ TEST_F(BSONColumnTest, InterleavedMergeWithScalarObjectMismatch) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    std::vector<TestPath> testPaths{TestPath{{"z", "x"}}, TestPath{{"y"}}};
+    verifyDecompressPathFast(binData, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedMergeWithScalarObjectMismatchLegacyDecompress) {
@@ -6892,6 +6934,8 @@ TEST_F(BSONColumnTest, InterleavedMergeWithScalarObjectMismatchLegacyDecompress)
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"z", "x"}}, TestPath{{"y"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedArrayAppend) {
@@ -6937,7 +6981,7 @@ TEST_F(BSONColumnTest, InterleavedArrayAppend) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, false /* testPathDecompression */);
 }
 
 TEST_F(BSONColumnTest, InterleavedIncompatibleMerge) {
@@ -6972,6 +7016,7 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleMerge) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    verifyDecompressPathFast(binData, elems, TestPath{{"x"}});
 }
 
 TEST_F(BSONColumnTest, InterleavedIncompatibleMergeLegacyDecompress) {
@@ -7000,6 +7045,8 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleMergeLegacyDecompress) {
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"x"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InterleavedIncompatibleMergeMiddle) {
@@ -7237,7 +7284,7 @@ TEST_F(BSONColumnTest, ObjectEmpty) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, false /* testPathDecompression */);
 }
 
 TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
@@ -7258,7 +7305,7 @@ TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, false /* testPathDecompression */);
 }
 
 TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmptyLegacyDecompression) {
@@ -7273,7 +7320,7 @@ TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmptyLegacyDecompression) {
     appendLiteral(expected, elems[1]);
     appendEOO(expected);
 
-    verifyDecompression(expected, elems);
+    verifyDecompression(expected, elems, false /* testPathDecompression */);
 }
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
@@ -7292,7 +7339,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, false /* testPathDecompression */);
 }
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromDetermine) {
@@ -7318,7 +7365,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromDeterm
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, false /* testPathDecompression */);
 }
 
 TEST_F(BSONColumnTest,
@@ -7340,7 +7387,7 @@ TEST_F(BSONColumnTest,
     appendLiteral(expected, elems[1]);
     appendEOO(expected);
 
-    verifyDecompression(expected, elems);
+    verifyDecompression(expected, elems, false /* testPathDecompression */);
 }
 
 
@@ -7379,7 +7426,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromAppend
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, false /* testPathDecompression */);
 }
 
 TEST_F(BSONColumnTest,
@@ -7412,7 +7459,7 @@ TEST_F(BSONColumnTest,
     appendLiteral(expected, elems[6]);
     appendEOO(expected);
 
-    verifyDecompression(expected, elems);
+    verifyDecompression(expected, elems, false /* testPathDecompression */);
 }
 
 TEST_F(BSONColumnTest, InterleavedFullSkipAfterObjectSkip) {
@@ -7445,6 +7492,8 @@ TEST_F(BSONColumnTest, InterleavedFullSkipAfterObjectSkip) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+    std::vector<TestPath> testPaths{TestPath{{"yyyyyy", "z"}}};
+    verifyDecompressPathFast(binData, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
@@ -7580,6 +7629,8 @@ TEST_F(BSONColumnTest, ZeroDeltaAfterInterleaved) {
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+    std::vector<TestPath> testPaths{TestPath{{"a"}}};
+    verifyDecompressPathFast(expected, elems, testPaths);
 }
 
 TEST_F(BSONColumnTest, InvalidControlByte) {
@@ -8626,7 +8677,7 @@ TEST_F(BSONColumnTest, EmptyObjectSkipAndInterleaved) {
 
     auto binData = cb.finalize();
 
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, false /* testPathDecompression */);
     verifyDecompressPathFast(binData, elems, TestPath{{"a"}});
     verifyDecompressPathFast(binData, elems, TestPath{{"b"}});
     verifyDecompressPathFast(binData, elems, TestPath{{}});

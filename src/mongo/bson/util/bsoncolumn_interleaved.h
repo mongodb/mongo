@@ -969,7 +969,8 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                         state._refElem,
                         [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
                             auto string = Simple8bTypeUtil::decodeString(v);
-                            buffer.append(StringData((const char*)string.str.data(), string.size));
+                            buffer.append(
+                                BSONCode(StringData((const char*)string.str.data(), string.size)));
                         },
                         finish128);
             }
