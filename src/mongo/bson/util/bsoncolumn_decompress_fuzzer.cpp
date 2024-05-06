@@ -74,11 +74,6 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         return 0;
     }
 
-    // Interleaved mode in the block-based API is not fully implemented.
-    if (isDataInterleaved(Data, Size)) {
-        return 0;
-    }
-
     // Set up both APIs.
     BSONColumn column(Data, Size);
     bsoncolumn::BSONColumnBlockBased block(Data, Size);
