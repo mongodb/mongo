@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
@@ -45,6 +44,7 @@
 #include "mongo/db/repl/dbcheck_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -456,8 +456,8 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             /*
             // TODO SERVER-78399: Clean up handling minKey/maxKey once feature flag is removed.
             // If the dbcheck oplog entry doesn't contain batchStart, convert minKey to a BSONObj to
-            be used as batchStart.
-            BSONObj batchStart, batchEnd;
+            // be used as batchStart.
+            BSONObj batchStart, batchEnd, batchId;
             if (!invocation.getBatchStart()) {
                 batchStart = BSON("_id" << invocation.getMinKey().elem());
             } else {
@@ -470,21 +470,45 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             }
             */
 
-            if (!skipDbCheck) {
+            if (!skipDbCheck && !repl::skipApplyingDbCheckBatchOnSecondary.load()) {
                 return dbCheckBatchOnSecondary(opCtx, opTime, invocation);
             }
 
+            // TODO SERVER-89921: Uncomment once the relevant tickets are backported.
             /*
+            if (invocation.getBatchId()) {
+                batchId = invocation.getBatchId().get().toBSON();
+            }
+
             BSONObjBuilder data;
             data.append("batchStart", batchStart);
             data.append("batchEnd", batchEnd);
+
+            if (!batchId.isEmpty()) {
+                data.append("batchId", batchId);
+            }
             */
-            auto healthLogEntry = mongo::dbCheckHealthLogEntry(
-                boost::none /*nss*/,
-                SeverityEnum::Warning,
-                "cannot execute dbcheck due to ongoing " + oplogApplicationMode,
-                type,
-                boost::none /*data.obj()*/);
+
+            auto warningMsg = "cannot execute dbcheck due to ongoing " + oplogApplicationMode;
+            if (repl::skipApplyingDbCheckBatchOnSecondary.load()) {
+                warningMsg =
+                    "skipping applying dbcheck batch because the "
+                    "'skipApplyingDbCheckBatchOnSecondary' parameter is on";
+            }
+
+            LOGV2_DEBUG(8888500, 3, "skipping applying dbcheck batch", "reason"_attr = warningMsg);
+            // TODO SERVER-89921: Uncomment these logging attributes once the relevant tickets are
+            // backported.
+            //"batchStart"_attr = batchStart,
+            //"batchEnd"_attr = batchEnd,
+            //"batchId"_attr = batchId);
+
+            auto healthLogEntry = mongo::dbCheckHealthLogEntry(boost::none /*nss*/,
+                                                               SeverityEnum::Warning,
+                                                               warningMsg,
+                                                               type,
+                                                               boost::none /*data.obj()*/);
+
             HealthLogInterface::get(Client::getCurrent()->getServiceContext())
                 ->log(*healthLogEntry);
             return Status::OK();

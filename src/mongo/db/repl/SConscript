@@ -183,6 +183,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/util/md5',
+        'repl_server_parameters',
     ],
 )
 

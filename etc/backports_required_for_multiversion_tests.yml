@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/replsets/dbcheck_skip_applying_batch_on_secondary_parameter.js
+    ticket: SERVER-88885
   - test_file: jstests/replsets/ignore_dbcheck_in_startup_recovery.js
     ticket: SERVER-30832
   - test_file: jstests/replsets/ignore_dbcheck_in_rollback.js
@@ -164,6 +166,8 @@ last-continuous:
     sharding_jscore_multiversion_passthrough: null
 last-lts:
   all:
+  - test_file: jstests/replsets/dbcheck_skip_applying_batch_on_secondary_parameter.js
+    ticket: SERVER-88885
   - test_file: jstests/replsets/ignore_dbcheck_in_startup_recovery.js
     ticket: SERVER-30832
   - test_file: jstests/replsets/ignore_dbcheck_in_rollback.js
