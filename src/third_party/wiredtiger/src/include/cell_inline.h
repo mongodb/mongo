@@ -332,6 +332,9 @@ __wt_cell_pack_value_match(
         if (rle) /* Skip RLE */
             WT_RET(__wt_vunpack_uint(&a, 0, &v));
         WT_RET(__wt_vunpack_uint(&a, 0, &alen)); /* Length */
+        /* Adjust the size of data cells without a validity window or run-length encoding. */
+        if (!validity && !rle)
+            alen += WT_CELL_SIZE_ADJUST;
     } else
         return (0);
 
@@ -361,6 +364,9 @@ __wt_cell_pack_value_match(
         if (rle) /* Skip RLE */
             WT_RET(__wt_vunpack_uint(&b, 0, &v));
         WT_RET(__wt_vunpack_uint(&b, 0, &blen)); /* Length */
+        /* Adjust the size of data cells without a validity window or run-length encoding. */
+        if (!validity && !rle)
+            blen += WT_CELL_SIZE_ADJUST;
     } else
         return (0);
 

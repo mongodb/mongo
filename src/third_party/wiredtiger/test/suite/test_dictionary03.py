@@ -30,39 +30,44 @@
 # compression
 # [END_TAGS]
 #
-# test_dictionary.py
-#       Smoke test dictionary compression.
+# test_dictionary03.py
+#       Test cells with same values are reused through the dictionary despite time window
+#       information.
 
 from wtscenario import make_scenarios
 from wtdataset import simple_key
 from wiredtiger import stat
 import wttest
 
-# Smoke test dictionary compression.
-class test_dictionary(wttest.WiredTigerTestCase):
-    conn_config = 'statistics=(all)'
+class test_dictionary03(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('row', dict(key_format='S')),
         ('var', dict(key_format='r')),
     ])
 
-    # Smoke test dictionary compression.
-    def test_dictionary(self):
-        nentries = 25000
-        uri = 'file:test_dictionary'    # This is a btree layer test.
+    value_a = "aaa" * 100
+    value_b = "bbb" * 100
 
-        # Create the object, open the cursor, insert some records with identical values. Use
-        # a reasonably large page size so most of the items fit on a page. Use alternating
-        # values, otherwise column-store will RLE compress them into a single item.
-        config='leaf_page_max=64K,dictionary=100,value_format=S,key_format='
-        self.session.create(uri, config + self.key_format)
+    def test_dictionary03(self):
+        uri = 'file:test_dictionary03'
+
+        # Use a reasonably large page size so all of the items fit on a page.
+        config=f'leaf_page_max=64K,dictionary=100,value_format=S,key_format={self.key_format}'
+        self.session.create(uri, config)
         cursor = self.session.open_cursor(uri, None)
-        i = 0
-        while i < nentries:
-            i = i + 1
-            cursor[simple_key(cursor, i)] = "the same value as the odd items"
-            i = i + 1
-            cursor[simple_key(cursor, i)] = "the same value as the even items"
+
+        # Pin timestamps to ensure new modifications are not globally visible.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
+
+        # Write two values that will lead to two unique dictionary entries.
+        cursor[simple_key(cursor, 1)] = self.value_a
+        cursor[simple_key(cursor, 2)] = self.value_b
+
+        # The next cells will reuse an existing dictionary entry and have time window validity.
+        self.session.begin_transaction()
+        cursor[simple_key(cursor, 3)] = self.value_a
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
         cursor.close()
 
         # Checkpoint to force the pages through reconciliation.
@@ -70,4 +75,5 @@ class test_dictionary(wttest.WiredTigerTestCase):
 
         # Confirm the dictionary was effective.
         cursor = self.session.open_cursor('statistics:' + uri, None, None)
-        self.assertGreater(cursor[stat.dsrc.rec_dictionary][2], nentries - 100)
+        dict_value = cursor[stat.dsrc.rec_dictionary][2]
+        self.assertEqual(dict_value, 1)
