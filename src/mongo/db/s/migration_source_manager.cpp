@@ -171,7 +171,6 @@ MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep5);
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep6);
 
 MONGO_FAIL_POINT_DEFINE(failMigrationCommit);
-MONGO_FAIL_POINT_DEFINE(hangBeforeEnteringCriticalSection);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
 MONGO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
 MONGO_FAIL_POINT_DEFINE(hangBeforePostMigrationCommitRefresh);
@@ -464,8 +463,6 @@ void MigrationSourceManager::enterCriticalSection() {
     ScopeGuard scopedGuard([&] { _cleanupOnError(); });
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
-
-    hangBeforeEnteringCriticalSection.pauseWhileSet();
 
     const auto [cm, _] =
         uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(_opCtx, nss()));
