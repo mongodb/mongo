@@ -126,7 +126,7 @@
 # expression (as it appears in the output of dtruss on OS/X).
 
 from __future__ import print_function
-import argparse, distutils.spawn, fnmatch, os, platform, re, shutil, \
+import argparse, fnmatch, os, platform, re, shutil, \
     subprocess, sys
 
 # A class that represents a context in which predefined constants can be
@@ -832,7 +832,7 @@ class SyscallCommand:
         else:
             msg("systype '" + args.systype + "' unsupported")
             return False
-        if not distutils.spawn.find_executable(straceexe):
+        if not shutil.which(straceexe):
             msg("strace: does not exist")
             return False
         self.args = args

@@ -41,7 +41,7 @@ Currently only supports Linux. There are two issues with the MacOS and Windows i
 
 import csv, glob, itertools, logging, tempfile, traceback
 import os, sys, platform, subprocess, threading
-from distutils import spawn
+import shutil
 from io import BytesIO, TextIOWrapper
 from optparse import OptionParser
 _IS_WINDOWS = (sys.platform == "win32")
@@ -152,7 +152,7 @@ def callo(args, logger):
 
 def find_program(prog, paths):
     """Find the specified program in env PATH, or tries a set of paths."""
-    loc = spawn.find_executable(prog)
+    loc = shutil.which(prog)
 
     if loc is not None:
         return loc
@@ -190,7 +190,7 @@ class WindowsDumper(object):
     def __find_debugger(logger, debugger):
         """Find the installed debugger."""
         # We are looking for c:\Program Files (x86)\Windows Kits\8.1\Debuggers\x64.
-        cdb = spawn.find_executable(debugger)
+        cdb = shutil.which(debugger)
         if cdb is not None:
             return cdb
         from win32com.shell import shell, shellcon

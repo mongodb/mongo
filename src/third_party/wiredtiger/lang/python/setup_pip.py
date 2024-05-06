@@ -35,8 +35,6 @@
 from __future__ import print_function
 import os, os.path, re, shutil, sys
 from setuptools import setup, Distribution, Extension
-import distutils.sysconfig
-import distutils.ccompiler
 import subprocess
 from subprocess import call
 import setuptools.command.install
@@ -62,35 +60,6 @@ def build_commands(commands, build_dir, build_env):
         print('running: ' + verbose_command)
         if call(callargs, cwd=build_dir, env=build_env) != 0:
             die('build command failed: ' + verbose_command)
-
-# check_needed_dependencies --
-#   Make a quick check of any needed library dependencies, and
-# add to the library path and include path as needed.  If a library
-# is not found, it is not definitive.
-def check_needed_dependencies(builtins, inc_paths, lib_paths):
-    library_dirs = get_library_dirs()
-    compiler = distutils.ccompiler.new_compiler()
-    distutils.sysconfig.customize_compiler(compiler)
-    compiler.set_library_dirs(library_dirs)
-    missing = []
-    for _, libname, instructions in builtins:
-        found = compiler.find_library_file(library_dirs, libname)
-        if found is None:
-            msg(libname + ": missing")
-            msg(instructions)
-            msg("after installing it, set CMAKE_LIBRARY_PATH")
-            missing.append(libname)
-        else:
-            package_top = os.path.dirname(os.path.dirname(found))
-            inc_paths.append(os.path.join(package_top, 'include'))
-            lib_paths.append(os.path.join(package_top, 'lib'))
-
-    # XXX: we are not accounting for other directories that might be
-    # discoverable via /sbin/ldconfig. It might be better to write a tiny
-    # compile using  -lsnappy, -lz...
-    #
-    #if len(missing) > 0:
-    #    die("install packages for: " + str(missing))
 
 # get_compile_flags --
 #   Get system specific compile flags.  Return a triple: C preprocessor
@@ -195,43 +164,19 @@ long_description = 'WiredTiger is a ' + short_description + '.\n\n' + \
 
 wt_ver, wt_full_ver = get_wiredtiger_versions(wt_dir)
 
-# The builtins that we include in this distribution.
-builtins = [
-    # [ name, libname, instructions ]
-    [ 'snappy', 'snappy',
-      'Note: a suitable version of snappy can be found at\n' + \
-      '    https://github.com/google/snappy/releases/download/' + \
-      '1.1.3/snappy-1.1.3.tar.gz\n' + \
-      'It can be installed via: yum install snappy snappy-devel' + \
-      'or via: apt-get install libsnappy-dev' ],
-    [ 'zlib', 'z',
-      'Need to install zlib\n' + \
-      'It can be installed via: apt-get install zlib1g' ],
-    [ 'zstd', 'zstd',
-      'Need to install zstd\n' + \
-      'It can be installed via: apt-get install libzstd-dev' ]
-]
-builtin_names = [b[0] for b in builtins]
-builtin_libraries = [b[1] for b in builtins]
-
 # Here's the configure/make operations we perform before the python extension
 # is linked.
 configure_cmds = [
-    'cmake -B cmake_pip_build -G Ninja -DENABLE_STATIC=1 -DENABLE_SHARED=0 -DWITH_PIC=1 -DCMAKE_C_FLAGS="${CFLAGS:-}" -DENABLE_PYTHON=1 ' + \
-    ' '.join(map(lambda name: '-DHAVE_BUILTIN_EXTENSION_' + name.upper() + '=1', builtin_names)),
+    'cmake -B cmake_pip_build -G Ninja -DENABLE_STATIC=1 -DENABLE_SHARED=0 -DWITH_PIC=1 -DCMAKE_C_FLAGS="${CFLAGS:-}" -DENABLE_PYTHON=1 ',
 ]
 
 # build all the builtins, at the moment they are all compressors.
 make_cmds = []
-for name in builtin_names:
-    make_cmds.append('ninja -C ' + build_dir  +  ' ext/compressors/' + name + '/all')
 make_cmds.append('ninja -C ' + build_dir + ' libwiredtiger.a')
 make_cmds.append('ninja -C ' + build_dir + ' lang/python/all')
 
 inc_paths = [ os.path.join(build_dir, 'include'), os.path.join(build_dir, 'config'), build_dir, '.' ]
 lib_paths = [ '.' ]
-
-check_needed_dependencies(builtins, inc_paths, lib_paths)
 
 cppflags, cflags, ldflags = get_compile_flags(inc_paths, lib_paths)
 
@@ -279,7 +224,6 @@ wt_ext = Extension('_wiredtiger',
     sources = sources,
     extra_compile_args = cflags + cppflags,
     extra_link_args = ldflags,
-    libraries = builtin_libraries,
     extra_objects = [ os.path.join(build_dir, 'libwiredtiger.a') ],
     include_dirs = inc_paths,
     library_dirs = lib_paths,
