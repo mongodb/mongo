@@ -56,8 +56,8 @@ BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
 
 class DocumentKey {
 public:
-    DocumentKey(BSONObj id, boost::optional<BSONObj> _shardKey)
-        : _id(id.getOwned()), _shardKey(std::move(_shardKey)) {
+    DocumentKey(BSONObj id, boost::optional<BSONObj> shardKey)
+        : _id(id.getOwned()), _shardKey(std::move(shardKey)) {
         invariant(!id.isEmpty());
 
         if (_shardKey) {
