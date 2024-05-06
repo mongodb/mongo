@@ -601,7 +601,6 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
 
     // Sanity check that all this still works with multiple buckets in a namespace being cleared.
     auto& bucket3 = createBucket(info2, date);
-    bucket3.rolloverAction = RolloverAction::kArchive;  // Rollover before opening another bucket
     auto& bucket4 = createBucket(info2, date);
     ASSERT_EQ(bucket3.lastChecked, 1);
     ASSERT_EQ(bucket4.lastChecked, 1);
@@ -659,22 +658,14 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
     // Era 2 still has bucket4 in it, so its count remains non-zero.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
     auto& bucket5 = createBucket(info1, date);
-    bucket4.rolloverAction = RolloverAction::kArchive;  // Rollover before opening another bucket
     auto& bucket6 = createBucket(info2, date);
     ASSERT_EQ(bucket5.lastChecked, 3);
     ASSERT_EQ(bucket6.lastChecked, 3);
     clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket5);
-    if constexpr (!kDebugBuild) {
-        ASSERT_EQ(bucket4.lastChecked, 2);
-        // Eras 2 and 3 still have bucket4 and bucket6 in them respectively, so their counts remain
-        // non-zero.
-        ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 2);
-    } else {
-        ASSERT_EQ(bucket4.lastChecked, 3);  // Debug check advanced this while creating bucket6.
-        // Era3 still has bucket4 and bucket6, so its count remains non-zero.
-        ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
-    }
+    // Eras 2 and 3 still have bucket4 and bucket6 in them respectively, so their counts remain
+    // non-zero.
+    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 2);
     clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket4);
     checkAndRemoveClearedBucket(bucket6);

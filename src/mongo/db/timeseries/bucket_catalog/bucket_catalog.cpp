@@ -268,8 +268,7 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                             internal::AllowBucketCreation::kNo,
                                             insertContext,
                                             *bucket,
-                                            time,
-                                            nullptr);
+                                            time);
     // If our insert was successful, return a SuccessfulInsertion with our
     // WriteBatch.
     if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
@@ -296,8 +295,7 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                                internal::AllowBucketCreation::kNo,
                                                insertContext,
                                                *alternate,
-                                               time,
-                                               bucket);
+                                               time);
             if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
                 return SuccessfulInsertion{std::move(*batch),
                                            std::move(insertContext.closedBuckets)};
@@ -396,8 +394,7 @@ StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
                                                     internal::AllowBucketCreation::kYes,
                                                     insertContext,
                                                     bucket,
-                                                    time,
-                                                    nullptr);
+                                                    time);
             auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
             invariant(batch);
             return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
@@ -430,8 +427,7 @@ StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
                                             internal::AllowBucketCreation::kYes,
                                             insertContext,
                                             *bucket,
-                                            time,
-                                            nullptr);
+                                            time);
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);
     return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
@@ -467,8 +463,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                             internal::AllowBucketCreation::kYes,
                                             insertContext,
                                             *bucket,
-                                            time,
-                                            nullptr);
+                                            time);
 
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);

@@ -207,9 +207,7 @@ StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& ca
 
 /**
  * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, and 'mode'
- * is set to 'kYes', we will create a new bucket and insert into that bucket. If `existingBucket`
- * was selected via `useAlternateBucket`, then the previous bucket returned by `useBucket` should be
- * passed in as `excludedBucket`.
+ * is set to 'kYes', we will create a new bucket and insert into that bucket.
  */
 std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     OperationContext* opCtx,
@@ -221,8 +219,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     AllowBucketCreation mode,
     InsertContext& insertContext,
     Bucket& existingBucket,
-    const Date_t& time,
-    Bucket* excludedBucket);
+    const Date_t& time);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'
@@ -344,9 +341,7 @@ Bucket& allocateBucket(OperationContext* opCtx,
 /**
  * Close the existing, full bucket and open a new one for the same metadata.
  *
- * Writes information about the closed bucket to the 'info' parameter. Optionally, if `bucket` was
- * selected via `useAlternateBucket`, pass the current open bucket as `additionalBucket` to mark for
- * archival and preserve the invariant of only one open bucket per key.
+ * Writes information about the closed bucket to the 'info' parameter.
  */
 Bucket& rollover(OperationContext* opCtx,
                  BucketCatalog& catalog,
@@ -355,8 +350,7 @@ Bucket& rollover(OperationContext* opCtx,
                  Bucket& bucket,
                  InsertContext& info,
                  RolloverAction action,
-                 const Date_t& time,
-                 Bucket* additionalBucket);
+                 const Date_t& time);
 
 /**
  * Determines if 'bucket' needs to be rolled over to accommodate 'doc'. If so, determines whether

@@ -145,8 +145,6 @@ protected:
 
     Status _reopenBucket(const CollectionPtr& coll, const BSONObj& bucketDoc);
 
-    RolloverAction _rolloverAction(const std::shared_ptr<WriteBatch>& batch);
-
     OperationContext* _opCtx;
     BucketCatalog* _bucketCatalog;
 
@@ -437,11 +435,6 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
         .getStatus();
 }
 
-RolloverAction BucketCatalogTest::_rolloverAction(const std::shared_ptr<WriteBatch>& batch) {
-    auto& stripe = _bucketCatalog->stripes[batch->bucketHandle.stripe];
-    auto& [key, bucket] = *stripe->openBucketsById.find(batch->bucketHandle.bucketId);
-    return bucket->rolloverAction;
-}
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
     // The first insert should be able to take commit rights
@@ -911,43 +904,6 @@ TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
     ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, _ns1, batch));
     ASSERT(isWriteBatchFinished(*batch));
     ASSERT_EQ(getWriteBatchResult(*batch).getStatus(), ErrorCodes::TimeseriesBucketCleared);
-}
-
-TEST_F(BucketCatalogTest, InsertRollsOverAlternateBucket) {
-    // Open an initial bucket.
-    auto result1 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
-
-    // Insert something backward in time, so mark the first bucket to be archived.
-    auto result2 = _insertOneHelper(
-        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << (Date_t::now() - Days{1})));
-    auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
-    ASSERT_NE(batch1->bucketHandle.bucketId.oid, batch2->bucketHandle.bucketId.oid);
-    ASSERT_EQ(_rolloverAction(batch1), RolloverAction::kArchive);
-
-    // Continue to insert more to the initial bucket until we rollover to new bucket.
-    size_t bucketCount = 1;
-    while (true) {
-        // Using tryInsert will let us select an alternate bucket, even though it's been marked for
-        // archival.
-        auto result = _tryInsertOneHelper(
-            _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-        auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
-
-        if (batch->bucketHandle.bucketId.oid != batch1->bucketHandle.bucketId.oid) {
-            // We expect this rollover only happened because we hit a limit that results in a hard
-            // closure.
-            ASSERT_EQ(_rolloverAction(batch1), RolloverAction::kHardClose);
-            // We should go back and mark the open (non-alternate) bucket archived.
-            ASSERT_EQ(_rolloverAction(batch2), RolloverAction::kArchive);
-            // The new bucket should be open.
-            ASSERT_EQ(_rolloverAction(batch), RolloverAction::kNone);
-            break;
-        }
-
-        ASSERT_LTE(++bucketCount, gTimeseriesBucketMaxCount);
-    }
 }
 
 TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
