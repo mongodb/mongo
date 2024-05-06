@@ -162,7 +162,7 @@ feature_flags:
         cpp_varname: gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
         default: true
         shouldBeFCVGated: true
-        version: 8.1
+        version: 8.0
     featureFlagPrefetch:
         description: "Feature flag to make pre-fetching available"
         cpp_varname: gFeatureFlagPrefetch
