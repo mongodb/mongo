@@ -895,4 +895,41 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     assertNoInconsistencies();
 })();
 
+(function testFindingInconsistenciesWithDbPrimaryShardWithUnknownDbMetadata() {
+    if (jsTest.options().storageEngine === "inMemory") {
+        jsTestLog(
+            "Skipping testFindingInconsistenciesWithDbPrimaryShardWithUnknownDbMetadata because we \
+            need persistance to restart nodes");
+        return;
+    }
+
+    jsTest.log("Executing testFindingInconsistenciesWithDbPrimaryShardWithUnknownDbMetadata");
+
+    const db_MisplacedCollection = getNewDb();
+    assert.commandWorked(mongos.adminCommand(
+        {enableSharding: db_MisplacedCollection.getName(), primaryShard: st.shard0.shardName}));
+
+    // Insert MisplacedCollection inconsistency in db_MisplacedCollection.
+    assert.commandWorked(
+        st.shard1.getDB(db_MisplacedCollection.getName()).coll.insert({_id: "foo"}));
+
+    // Restart nodes to clear filtering metadata to trigger a refresh with following operations.
+    st.rs0.nodes.forEach(node => {
+        st.rs0.restart(node, undefined, undefined, false /* wait */);
+    });
+
+    // Waits for a stable primary.
+    st.rs0.getPrimary();
+
+    // Cluster level mode command.
+    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+
+    // Check that there is a MisplacedCollection.
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+
+    // Clean up the databases to pass the hooks that detect inconsistencies.
+    db_MisplacedCollection.dropDatabase();
+    assertNoInconsistencies();
+})();
+
 st.stop();

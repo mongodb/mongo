@@ -254,7 +254,7 @@ public:
                         // and we are going to skip the checks.
                         skippedMetadataChecks = true;
                     } else {
-                        // In case the shard doesn't know about the collection, we perform a refresh
+                        // In case the shard doesn't know about the database, we perform a refresh
                         // and re-try the metadata checks.
                         (void)onDbVersionMismatchNoExcept(
                             opCtx, dbNss.dbName(), extraInfo->getVersionReceived());
