@@ -83,7 +83,8 @@ __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session, bool big_sweep)
      * We determine the number of buckets to visit based on how this function is called. When
      * big_sweep is true and enough time has passed, walk through at least a quarter of the buckets,
      * and as long as there is progress finding enough cursors to close, continue on, up to the
-     * entire set of buckets.
+     * entire set of buckets. With the current settings, and assuming regular calls to the session
+     * reset API, we'll visit every cached cursor about once every two minutes, or sooner.
      *
      * When big_sweep is false, we start with a small set of buckets to look at and quit when we
      * stop making progress or when we reach the maximum configured. This way, we amortize the work
@@ -114,10 +115,20 @@ __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session, bool big_sweep)
         position = (position + 1) & (conn->hash_size - 1);
         TAILQ_FOREACH_SAFE(cursor, cached_list, q, cursor_tmp)
         {
-            /*
-             * First check to see if the cursor could be reopened and should be swept.
-             */
             ++nexamined;
+
+            /*
+             * When a cursor is cached, we retain various memory buffers. Thus, frequently used
+             * cursors will get reopened from cached state with those memory buffers intact, and
+             * thereby benefit from memory reuse. However, we don't want to retain this memory for
+             * too long, especially for infrequently used cached cursors. So regardless of whether
+             * we sweep this cursor, release any memory held by it now.
+             */
+            __wt_cursor_free_cached_memory(cursor);
+
+            /*
+             * Check to see if the cursor could be reopened and should be swept.
+             */
             t_ret = cursor->reopen(cursor, true);
             if (t_ret != 0) {
                 WT_TRET_NOTFOUND_OK(t_ret);

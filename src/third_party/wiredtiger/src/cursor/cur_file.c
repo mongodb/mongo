@@ -632,6 +632,9 @@ err:
 
     dead = F_ISSET(cursor, WT_CURSTD_DEAD);
 
+    /* For cached cursors, free any extra buffers retained now. */
+    __wt_cursor_free_cached_memory(cursor);
+
     /* Free the bulk-specific resources. */
     if (F_ISSET(cursor, WT_CURSTD_BULK))
         WT_TRET(__wt_curbulk_close(session, (WT_CURSOR_BULK *)cursor));
