@@ -754,10 +754,14 @@ Replica set nodes receive the `$readPreference` in a command invocation for vali
 This is to ensure that the given `$readPreference` matches the current state of the node, as the
 replica set state may have changed in the time between the client’s server selection and the node
 receiving the command. If it doesn't match, the operation will fail with one of the error codes
-mentioned below.
+mentioned below. Note that there are still edge cases for `primary` or `secondary` read preferences.
+With lock-free reads, a node can validate an operation's read preference in the command layer and
+perform a state transition before the read succeeds, as reads are not killed on step up or step down.
+This can result in a newly-stepped down secondary servicing a `primary` read preference, or a
+newly-stepped up primary servicing a `secondary` read preference.
 
 Commands can define whether or not they can run on a secondary by overriding the
-`[secondaryAllowed](https://github.com/10gen/mongo/blob/r7.1.0/src/mongo/db/commands.h#L502-L509)`
+[`secondaryAllowed`](https://github.com/mongodb/mongo/blob/r7.1.0/src/mongo/db/commands.h#L502-L509)
 function. If a secondary node receives an operation it cannot service, it will either fail with a
 `NotWritablePrimary` error if the command is designated as primary-only, or a `NotPrimaryNoSecondaryOk`
 error if the command can be serviced by a secondary but the operation’s`$readPreference` specifies
