@@ -23,3 +23,10 @@ leak:glob64
 leak:mongo::transport::AsioReactor::run()
 leak:mongo::transport::AsioReactor::drain()
 leak:UnitTest_SuiteNameTaskExecutorCursorFixtureTestNamePinnedExecutorDestroyedOnUnderlying
+
+# Allocations from this function in libresolv are stored in thread-locals.
+# Threads that are not joined by the time the leak-detector runs (like those spawned by ASIO) may
+# still have pointers to these allocated objects but LSAN isn't able to identify them and add them
+# to do the root-set, resulting in false-positive leak reports.
+# TODO SERVER-65936: Re-evaluate if this is needed with a clean shutdown that joins all threads.
+leak:__res_context_send
