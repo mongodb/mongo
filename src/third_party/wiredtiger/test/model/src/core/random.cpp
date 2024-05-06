@@ -70,4 +70,14 @@ random::next_index(size_t length)
     return (size_t)__wt_random(&_random_state) % length;
 }
 
+/*
+ * random::next_uint64 --
+ *     Get the next integer.
+ */
+uint64_t
+random::next_uint64() noexcept
+{
+    return (((uint64_t)__wt_random(&_random_state)) << 32) | __wt_random(&_random_state);
+}
+
 } /* namespace model */
