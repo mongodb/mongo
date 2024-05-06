@@ -106,7 +106,7 @@ test_checkpoint(void)
     model::kv_checkpoint_ptr ckpt1 = database.create_checkpoint("ckpt1");
 
     /* Set the stable timestamp and create an unnamed checkpoint. */
-    database.set_stable_timestamp(15);
+    testutil_check(database.set_stable_timestamp(15));
     model::kv_checkpoint_ptr ckpt = database.create_checkpoint();
 
     /* Add more data. */
@@ -134,7 +134,7 @@ test_checkpoint(void)
     testutil_check(table->insert(txn1, key4, value4));
     testutil_check(table->insert(txn2, key5, value5));
     txn1->commit(40);
-    database.set_stable_timestamp(40);
+    testutil_check(database.set_stable_timestamp(40));
     model::kv_checkpoint_ptr ckpt2 = database.create_checkpoint("ckpt2");
     testutil_assert(table->get(ckpt2, key3) == value3);
     testutil_assert(table->get(ckpt2, key4) == value4);
@@ -157,14 +157,14 @@ test_checkpoint(void)
     txn2->prepare(55);
     txn1->commit(60, 60);
     txn2->commit(60, 65);
-    database.set_stable_timestamp(60);
+    testutil_check(database.set_stable_timestamp(60));
     model::kv_checkpoint_ptr ckpt3 = database.create_checkpoint("ckpt3");
     testutil_assert(table->get(ckpt3, key1) == value4);
     testutil_assert(table->get(ckpt3, key2) == value2); /* The old value. */
     testutil_assert(table->get(ckpt3, key3) == value3);
 
-    /* Test moving the stable timestamp backwards - this should fail silently. */
-    database.set_stable_timestamp(50);
+    /* Test moving the stable timestamp backwards - this should fail. */
+    testutil_assert(database.set_stable_timestamp(50) == EINVAL);
     testutil_assert(database.stable_timestamp() == 60);
     model::kv_checkpoint_ptr ckpt4 = database.create_checkpoint("ckpt4");
     testutil_assert(table->get(ckpt4, key1) == value4);
@@ -172,7 +172,7 @@ test_checkpoint(void)
     testutil_assert(table->get(ckpt4, key3) == value3);
 
     /* Test illegal update behaviors. */
-    database.set_stable_timestamp(60);
+    testutil_check(database.set_stable_timestamp(60));
     txn1 = database.begin_transaction();
     testutil_check(table->insert(txn1, key1, value1));
     model_testutil_assert_exception(txn1->prepare(60), model::wiredtiger_abort_exception);
@@ -181,7 +181,7 @@ test_checkpoint(void)
     txn1 = database.begin_transaction();
     testutil_check(table->insert(txn1, key1, value1));
     txn1->prepare(62);
-    database.set_stable_timestamp(62);
+    testutil_check(database.set_stable_timestamp(62));
     model_testutil_assert_exception(txn1->commit(60, 62), model::wiredtiger_abort_exception);
     txn1->rollback();
 
@@ -284,10 +284,8 @@ test_checkpoint_wt(void)
     wt_model_ckpt_assert(table, uri, "ckpt3", key2);
     wt_model_ckpt_assert(table, uri, "ckpt3", key3);
 
-    /*
-     * Test assigning the stable timestamp the same value again - this should not have any effect.
-     */
-    wt_model_set_stable_timestamp_both(60);
+    /* Test moving the stable timestamp backwards - this should fail. */
+    wt_model_set_stable_timestamp_both(50);
     testutil_assert(database.stable_timestamp() == wt_get_stable_timestamp(conn));
     wt_model_ckpt_create_both("ckpt4");
     wt_model_ckpt_assert(table, uri, "ckpt4", key1);
@@ -525,7 +523,7 @@ test_checkpoint_logged(void)
     model::kv_checkpoint_ptr ckpt1 = database.create_checkpoint("ckpt1");
 
     /* Set the stable timestamp and create an unnamed checkpoint. */
-    database.set_stable_timestamp(15);
+    testutil_check(database.set_stable_timestamp(15));
     model::kv_checkpoint_ptr ckpt = database.create_checkpoint();
 
     /* Add more data. */
@@ -553,7 +551,7 @@ test_checkpoint_logged(void)
     testutil_check(table->insert(txn1, key4, value4));
     testutil_check(table->insert(txn2, key5, value5));
     txn1->commit(40);
-    database.set_stable_timestamp(40);
+    testutil_check(database.set_stable_timestamp(40));
     model::kv_checkpoint_ptr ckpt2 = database.create_checkpoint("ckpt2");
     testutil_assert(table->get(ckpt2, key3) == value3);
     testutil_assert(table->get(ckpt2, key4) == value4);

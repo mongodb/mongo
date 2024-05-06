@@ -111,7 +111,7 @@ test_rts(void)
     txn1->commit(20);
 
     /* Set the stable timestamp, do RTS, and verify. */
-    database.set_stable_timestamp(15);
+    testutil_check(database.set_stable_timestamp(15));
     database.rollback_to_stable();
     testutil_assert(table->get(key1) == value1);
     testutil_assert(table->get(key2) == model::NONE);
@@ -223,7 +223,7 @@ test_rts_crash_wt(void)
     txn1->commit(30);
 
     /* Set the stable timestamp, rollback to stable, crash, and verify. */
-    database.set_stable_timestamp(20);
+    testutil_check(database.set_stable_timestamp(20));
     database.rollback_to_stable();
     database.crash();
     testutil_assert(database.stable_timestamp() == 20);
@@ -307,7 +307,7 @@ test_restart_wt1(void)
     txn1->commit(20);
 
     /* Set the stable timestamp, restart, and verify. */
-    database.set_stable_timestamp(15);
+    testutil_check(database.set_stable_timestamp(15));
     database.restart();
     testutil_assert(database.stable_timestamp() == 15);
     testutil_assert(table->get(key1) == value1);
@@ -393,7 +393,7 @@ test_restart_wt2(void)
     txn1->commit(20);
 
     /* Create an unnamed checkpoint, restart, and verify. */
-    database.set_stable_timestamp(15);
+    testutil_check(database.set_stable_timestamp(15));
     database.create_checkpoint();
     database.restart();
     testutil_assert(database.stable_timestamp() == 15);
@@ -491,7 +491,7 @@ test_restart_wt3(void)
     txn2->prepare(14);
 
     /* Create an unnamed checkpoint, restart, and verify. */
-    database.set_stable_timestamp(15);
+    testutil_check(database.set_stable_timestamp(15));
     database.create_checkpoint();
     database.restart();
     testutil_assert(database.stable_timestamp() == 15);
@@ -598,7 +598,7 @@ test_crash_wt1(void)
     txn1->commit(20);
 
     /* Set the stable timestamp, crash, and verify. */
-    database.set_stable_timestamp(15);
+    testutil_check(database.set_stable_timestamp(15));
     database.crash();
     testutil_assert(database.stable_timestamp() == model::k_timestamp_none);
     testutil_assert(table->get(key1) == model::NONE);
@@ -667,9 +667,9 @@ test_crash_wt2(void)
     txn1->commit(20);
 
     /* Create an unnamed checkpoint, crash, and verify. */
-    database.set_stable_timestamp(15);
+    testutil_check(database.set_stable_timestamp(15));
     database.create_checkpoint();
-    database.set_stable_timestamp(25);
+    testutil_check(database.set_stable_timestamp(25));
     database.crash();
     testutil_assert(database.stable_timestamp() == 15);
     testutil_assert(table->get(key1) == value1);
@@ -761,7 +761,7 @@ test_crash_wt3(void)
     txn2->prepare(14);
 
     /* Create an unnamed checkpoint, crash, and verify. */
-    database.set_stable_timestamp(15);
+    testutil_check(database.set_stable_timestamp(15));
     database.create_checkpoint();
     database.crash();
     testutil_assert(database.stable_timestamp() == 15);
@@ -871,7 +871,7 @@ test_logged_wt(void)
     testutil_check(table->insert(txn2, key4, value4));
 
     /* Create an unnamed checkpoint, crash, and verify. */
-    database.set_stable_timestamp(15);
+    testutil_check(database.set_stable_timestamp(15));
     database.create_checkpoint();
     database.crash();
     testutil_assert(table->get(key1) == value1);

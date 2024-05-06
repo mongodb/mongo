@@ -236,8 +236,7 @@ protected:
     int
     do_operation(const operation::set_oldest_timestamp &op)
     {
-        _database.set_oldest_timestamp(op.oldest_timestamp);
-        return 0;
+        return _database.set_oldest_timestamp(op.oldest_timestamp);
     }
 
     /*
@@ -247,8 +246,7 @@ protected:
     int
     do_operation(const operation::set_stable_timestamp &op)
     {
-        _database.set_stable_timestamp(op.stable_timestamp);
-        return 0;
+        return _database.set_stable_timestamp(op.stable_timestamp);
     }
 
     /*
