@@ -243,9 +243,7 @@ TEST(TypeCheckerTest, FoldTraverseF) {
                                                       Constant::int32(8))),
                                    Constant::boolean(false)));
     TypeSignature signature = TypeChecker{}.typeCheck(tree1);
-    ASSERT_EQ(
-        signature.typesMask,
-        getTypeSignature(sbe::value::TypeTags::Boolean, sbe::value::TypeTags::Nothing).typesMask);
+    ASSERT_EQ(signature.typesMask, TypeSignature::kAnyScalarType.typesMask);
     // Inject the information that the slot contains a number (and not an array).
     TypeChecker checker;
     checker.bind(getABTVariableName(1), TypeSignature::kNumericType);
@@ -267,7 +265,7 @@ TEST(TypeCheckerTest, FoldTraverseF) {
                                    Constant::boolean(false)));
     signature = TypeChecker{}.typeCheck(tree2);
 
-    ASSERT_EQ(signature.typesMask, getTypeSignature(sbe::value::TypeTags::Boolean).typesMask);
+    ASSERT_EQ(signature.typesMask, TypeSignature::kAnyScalarType.typesMask);
 
     // Run it on a constant number.
     auto tree3 =
@@ -298,8 +296,7 @@ TEST(TypeCheckerTest, FoldTraverseP) {
                                                       Constant::int32(90))),
                                    Constant::int32(0)));
     TypeSignature signature = TypeChecker{}.typeCheck(tree1);
-    ASSERT_EQ(signature.typesMask,
-              TypeSignature::kArrayType.include(TypeSignature::kAnyScalarType).typesMask);
+    ASSERT_EQ(signature.typesMask, TypeSignature::kAnyScalarType.typesMask);
     // Inject the information that the slot contains a number (and not an array).
     TypeChecker checker;
     checker.bind(getABTVariableName(1), TypeSignature::kNumericType);
@@ -321,7 +318,7 @@ TEST(TypeCheckerTest, FoldTraverseP) {
                                    Constant::int32(0)));
     signature = TypeChecker{}.typeCheck(tree2);
 
-    ASSERT_EQ(signature.typesMask, TypeSignature::kArrayType.typesMask);
+    ASSERT_EQ(signature.typesMask, TypeSignature::kAnyScalarType.typesMask);
 
     // Run it on a constant number.
     auto tree3 =

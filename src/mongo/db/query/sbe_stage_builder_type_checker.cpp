@@ -379,10 +379,8 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
         // items of unknown type.
         op.nodes()[1].visit(*this, false);
 
-        // Return the declared type of the traverse function.
-        return op.name() == "traverseF"s
-            ? TypeSignature::kBooleanType.include(argType.intersect(TypeSignature::kNothingType))
-            : TypeSignature::kArrayType.include(argType);
+        // Nothing can be inferred about the return type of traverseF()/traverseP() in this case.
+        return TypeSignature::kAnyScalarType;
     }
     std::vector<TypeSignature> argTypes;
     argTypes.reserve(arity);
