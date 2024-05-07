@@ -39,6 +39,15 @@ export let parseUtil = (function(db, coll, stageName, options = {}) {
             }),
             ErrorCodes.TypeMismatch,
             "BSON field '$densify.partitionByFields' is the wrong type 'string', expected type 'array'");
+
+        // 'partitionByFields' contains the field that is being desified.
+        assert.commandFailedWithCode(
+            run({
+                [stageName]:
+                    {field: "a", partitionByFields: ["a"], range: {step: 1.0, bounds: "full"}}
+            }),
+            8993000,
+            "BSON field '$densify.partitionByFields' contains the field that is being desified");
         assert.commandFailedWithCode(
             run({
                 [stageName]: {
