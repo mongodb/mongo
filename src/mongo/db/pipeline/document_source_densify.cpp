@@ -171,8 +171,13 @@ list<intrusive_ptr<DocumentSource>> createFromBsonInternal(
     list<FieldPath> partitions;
     if (spec.getPartitionByFields()) {
         auto partitionFields = (*spec.getPartitionByFields());
-        for (auto& partitionField : partitionFields)
+        for (auto& partitionField : partitionFields) {
+            uassert(8993000,
+                    str::stream() << DocumentSourceInternalDensify::kPartitionByFieldsFieldName
+                                  << " cannot include field that is being densified",
+                    spec.getField() != partitionField);
             partitions.push_back(FieldPath(partitionField));
+        }
     }
 
     FieldPath field = FieldPath(spec.getField());
