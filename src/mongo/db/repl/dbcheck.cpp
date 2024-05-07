@@ -561,7 +561,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
 
     LOGV2_DEBUG(7844904,
                 3,
-                "Finished hashing one batch in hashe≠",
+                "Finished hashing one batch in hasher",
                 "firstKeyString"_attr =
                     key_string::rehydrateKey(indexDescriptor->keyPattern(), batchStartBson),
                 "lastKeyString"_attr =
