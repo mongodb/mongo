@@ -35,7 +35,7 @@
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <cstdint>
-#include <set>
+#include <span>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
@@ -112,7 +112,7 @@ public:
      * Same as the above, but for multiple namespaces.
      */
     void record(OperationContext* opCtx,
-                const std::set<NamespaceString>& nssSet,
+                std::span<const NamespaceString> nssSet,
                 LogicalOp logicalOp,
                 LockType lockType,
                 long long micros,

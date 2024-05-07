@@ -279,7 +279,7 @@ AutoStatsTracker::~AutoStatsTracker() {
     auto curOp = CurOp::get(_opCtx);
     Top::get(_opCtx->getServiceContext())
         .record(_opCtx,
-                _nssSet,
+                std::span<const NamespaceString>{_nssSet.begin(), _nssSet.end()},
                 curOp->getLogicalOp(),
                 _lockType,
                 durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
