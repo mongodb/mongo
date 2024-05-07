@@ -76,6 +76,8 @@ function sendAndCheckReads({rst, db, cmd, minRate, maxRate, burstCount}) {
         return ((readsPending == 0) && (readsSent === readsResolved));
     }, "Did not resolve all requests within time limit", 10000);
 
+    assert.eq(readsSucceeded, readsSent);
+
     assert.soon(() => {
         // The number of mirrored reads processed across all secondaries.
         let readsProcessedAsSecondaryTotal = 0;
@@ -87,7 +89,8 @@ function sendAndCheckReads({rst, db, cmd, minRate, maxRate, burstCount}) {
                       tojson({processedAsSecondary: processedAsSecondary}));
             readsProcessedAsSecondaryTotal += processedAsSecondary;
         }
-        return readsProcessedAsSecondaryTotal == readsSucceeded && readsSucceeded == readsSent;
+        return readsProcessedAsSecondaryTotal == readsSucceeded &&
+            readsProcessedAsSecondaryTotal == readsSent;
     }, "Read metrics across secondaries did not converge to expected results", 10000);
 
     jsTestLog("Verifying primary statistics: " +
