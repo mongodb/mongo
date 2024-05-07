@@ -13,12 +13,9 @@
  *   # Running shardCollection instead of createCollection returns different error types which are
  *   # not expected by the test
  *   assumes_unsharded_collection,
- *   # TODO SERVER-89827 re-enable upgrade/downgrade
- *   cannot_run_during_upgrade_downgrade,
  *
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const tsOptions = {
@@ -50,12 +47,13 @@ function createFailed(collName, tsOptions, errorCode) {
     }
 }
 
-// TODO SERVER-77915 remove this helper. Now a non-tracked bucket timeseries creation should behave
-// the same as the tracked one executed by the coordinator.
-function isCollectionTracked(collName) {
-    let coll = db.getCollection(collName);
-    return FixtureHelpers.isTracked(coll) &&
-        FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation");
+function createWorkedOrFailedWithCode(collName, tsOptions, errorCode) {
+    if (Object.keys(tsOptions).length === 0) {
+        assert.commandWorkedOrFailedWithCode(db.createCollection(collName), errorCode);
+    } else {
+        let res = db.createCollection(collName, {timeseries: tsOptions});
+        assert.commandWorkedOrFailedWithCode(res, errorCode);
+    }
 }
 
 function runTest(testCase, minRequiredVersion = null) {
@@ -96,8 +94,11 @@ db.dropDatabase()
     jsTest.log("Case collection: standard / collection: bucket timeseries.");
     runTest(() => {
         createWorked(kColl);
-        if (isCollectionTracked(kColl)) {
-            createFailed(kBucket, tsOptions, ErrorCodes.NamespaceExists);
+        if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+            // TODO SERVER-87189 Replace this with commandFailed. Now we always pass from the
+            // coordinator to create a collection which will prevent from using a bucket nss if the
+            // main nss already exists.
+            createWorkedOrFailedWithCode(kBucket, tsOptions, ErrorCodes.NamespaceExists);
         } else {
             // TODO SERVER-85855 creating bucket timeseries for a collection already created should
             // fail.
@@ -153,8 +154,11 @@ db.dropDatabase()
     jsTest.log("Case collection: bucket timeseries / collection: standard.");
     runTest(() => {
         createWorked(kBucket, tsOptions)
-        if (isCollectionTracked(kBucket)) {
-            createFailed(kColl, {}, ErrorCodes.NamespaceExists);
+        if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+            // TODO SERVER-87189 Replace this with commandFailed. Now we always pass from the
+            // coordinator to create a collection which will prevent from using the main namespace
+            // if a bucket nss already exists.
+            createWorkedOrFailedWithCode(kColl, {}, ErrorCodes.NamespaceExists);
         }
         else {
             // TODO SERVER-85855 creating a normal collection with an already created bucket
