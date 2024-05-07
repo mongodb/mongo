@@ -8,7 +8,7 @@
  */
 load("jstests/libs/analyze_plan.js");  // for getWinningPlan.
 
-const coll = db[jsTestName()];
+const coll = db.explain_skip;
 coll.drop();
 
 assert.commandWorked(coll.insert({a: 1, b: 1}));
