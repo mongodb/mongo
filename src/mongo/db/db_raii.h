@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <absl/container/inlined_vector.h>
-#include <boost/container/flat_set.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <memory>
@@ -108,10 +106,7 @@ private:
     OperationContext* _opCtx;
     Top::LockType _lockType;
     const LogMode _logMode;
-    boost::container::flat_set<NamespaceString,
-                               std::less<NamespaceString>,
-                               absl::InlinedVector<NamespaceString, 1>>
-        _nssSet;
+    std::set<NamespaceString> _nssSet;
 };
 
 /**

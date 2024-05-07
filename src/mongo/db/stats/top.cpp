@@ -151,7 +151,7 @@ void Top::record(OperationContext* opCtx,
 }
 
 void Top::record(OperationContext* opCtx,
-                 std::span<const NamespaceString> nssSet,
+                 const std::set<NamespaceString>& nssSet,
                  LogicalOp logicalOp,
                  LockType lockType,
                  long long micros,
