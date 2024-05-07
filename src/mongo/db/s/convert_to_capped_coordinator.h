@@ -45,6 +45,7 @@ public:
     ConvertToCappedCoordinator(ShardingDDLCoordinatorService* service,
                                const BSONObj& initialStateDoc)
         : RecoverableShardingDDLCoordinator(service, "ConvertToCappedCoordinator", initialStateDoc),
+          _request(_doc.getShardsvrConvertToCappedRequest()),
           _critSecReason(BSON("convertToCapped" << NamespaceStringUtil::serialize(
                                   nss(), SerializationContext::stateDefault()))){};
 
@@ -52,20 +53,21 @@ public:
         const auto otherDoc = ConvertToCappedCoordinatorDocument::parse(
             IDLParserContext("ConvertToCappedCoordinatorDocument"), doc);
 
+        const auto& selfReq = _request.toBSON();
+        const auto& otherReq = otherDoc.getShardsvrConvertToCappedRequest().toBSON();
+
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Another convertToCapped is already running for the same "
                                  "namespace with size set to "
-                              << _doc.getSize(),
-                SimpleBSONObjComparator::kInstance.evaluate(
-                    _doc.getShardsvrConvertToCappedRequest().toBSON() ==
-                    otherDoc.getShardsvrConvertToCappedRequest().toBSON()));
+                              << _request.getSize(),
+                SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
     };
 
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override {
         cmdInfoBuilder->append(
             "convertToCapped",
             NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault()));
-        cmdInfoBuilder->appendElements(_doc.getShardsvrConvertToCappedRequest().toBSON());
+        cmdInfoBuilder->appendElements(_request.toBSON());
     };
 
 protected:
@@ -102,6 +104,8 @@ private:
         OperationContext* opCtx,
         const OperationSessionInfo& osi,
         const std::shared_ptr<executor::TaskExecutor>& executor);
+
+    const mongo::ShardsvrConvertToCappedRequest _request;
 
     const BSONObj _critSecReason;
 };
