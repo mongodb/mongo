@@ -255,6 +255,30 @@ buildvariants:
         distros:
           - ubuntu2204-large
 
+  - name: enterprise-ubuntu2204-jepsen
+    display_name: Jepsen Tests on Enterprise Ubuntu 22.04
+    tags: ["bazel_check"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubuntu2204-small
+    stepback: false
+    expansions:
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=ubuntu2204
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      scons_cache_scope: shared
+      large_distro_name: ubuntu2204-large
+      compile_variant: enterprise-ubuntu2204-64
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - ubuntu2204-large
+      - name: .jepsen_docker
+        distros:
+          - ubuntu2204-large
+
   - name: enterprise-ubuntu2004-arm64
     display_name: Enterprise Ubuntu 20.04 arm64
     tags: []
