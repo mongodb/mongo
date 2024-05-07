@@ -31,6 +31,7 @@
 
 #include <functional>
 
+#include "mongo/util/processinfo.h"
 #include "mongo/util/tracking_allocator.h"
 
 namespace mongo {
@@ -126,7 +127,7 @@ public:
     }
 
 private:
-    TrackingAllocatorStats _stats;
+    TrackingAllocatorStats _stats{ProcessInfo::getNumLogicalCores() * 2};
 };
 
 }  // namespace mongo
