@@ -47,22 +47,38 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace allocator_aware {
 
+template <class Allocator>
 class UniqueBuffer;
 /**
  * A mutable, ref-counted buffer.
  */
+template <class Allocator = std::allocator<void>>
 class SharedBuffer {
 public:
+    static_assert(std::is_void_v<typename Allocator::value_type>);
+
+    using ByteAllocator =
+        typename std::allocator_traits<Allocator>::template rebind_alloc<std::byte>;
+
     SharedBuffer() = default;
-    explicit SharedBuffer(UniqueBuffer&& uniqueBuf);
+
+    explicit SharedBuffer(const Allocator& allocator) : _allocator(allocator) {}
+
+    explicit SharedBuffer(size_t size, const Allocator& allocator = {}) : _allocator(allocator) {
+        *this =
+            takeOwnership(ByteAllocator{_allocator}.allocate(kHolderSize + size), size, _allocator);
+    }
+
+    explicit SharedBuffer(UniqueBuffer<Allocator>&& uniqueBuf);
 
     void swap(SharedBuffer& other) {
         _holder.swap(other._holder);
     }
 
-    static SharedBuffer allocate(size_t bytes) {
-        return takeOwnership(mongoMalloc(kHolderSize + bytes), bytes);
+    static SharedBuffer allocate(size_t bytes, const Allocator& allocator = {}) {
+        return SharedBuffer{bytes, allocator};
     }
 
     /**
@@ -76,12 +92,18 @@ public:
     void realloc(size_t size) {
         invariant(!_holder || !_holder->isShared());
 
-        const size_t realSize = size + kHolderSize;
-        void* newPtr = mongoRealloc(_holder.get(), realSize);
+        void* newPtr = ByteAllocator{_allocator}.allocate(kHolderSize + size);
+        if (_holder) {
+            void* oldPtr = _holder.get();
+            auto oldCapacity = static_cast<size_t>(_holder->_capacity);
+            std::memcpy(newPtr, oldPtr, kHolderSize + std::min(size, oldCapacity));
+            ByteAllocator{_allocator}.deallocate(reinterpret_cast<std::byte*>(oldPtr),
+                                                 kHolderSize + oldCapacity);
+        }
 
         // Get newPtr into _holder with a ref-count of 1 without touching the current pointee of
         // _holder which is now invalid.
-        auto tmp = SharedBuffer::takeOwnership(newPtr, size);
+        auto tmp = SharedBuffer::takeOwnership(newPtr, size, _allocator);
         _holder.detach();
         _holder = std::move(tmp._holder);
     }
@@ -127,11 +149,19 @@ public:
         return _holder ? _holder->_capacity : 0;
     }
 
+    Allocator allocator() const {
+        return _allocator;
+    }
+
 private:
     class Holder {
     public:
-        explicit Holder(unsigned initial, size_t capacity)
-            : _refCount(initial), _capacity(capacity) {
+        using HolderAllocator =
+            typename std::allocator_traits<Allocator>::template rebind_alloc<Holder>;
+        using HolderAllocatorTraits = std::allocator_traits<HolderAllocator>;
+
+        explicit Holder(unsigned initial, size_t capacity, const Allocator& allocator)
+            : _allocator(allocator), _refCount(initial), _capacity(capacity) {
             invariant(capacity == _capacity);
         }
 
@@ -142,10 +172,12 @@ private:
 
         friend void intrusive_ptr_release(Holder* h) {
             if (h->_refCount.subtractAndFetch(1) == 0) {
-                // We placement new'ed a Holder in takeOwnership above,
-                // so we must destroy the object here.
-                h->~Holder();
-                free(h);
+                ByteAllocator byteAllocator{h->_allocator};
+                HolderAllocator holderAllocator{h->_allocator};
+                auto capacity = h->_capacity;
+
+                HolderAllocatorTraits::destroy(holderAllocator, h);
+                byteAllocator.deallocate(reinterpret_cast<std::byte*>(h), kHolderSize + capacity);
             }
         }
 
@@ -161,11 +193,13 @@ private:
             return _refCount.load() > 1;
         }
 
+        MONGO_COMPILER_NO_UNIQUE_ADDRESS Allocator _allocator;
         AtomicWord<unsigned> _refCount;
         uint32_t _capacity;
     };
 
-    explicit SharedBuffer(Holder* holder) : _holder(holder, /*add_ref=*/false) {
+    explicit SharedBuffer(Holder* holder, const Allocator& allocator)
+        : _allocator(allocator), _holder(holder, /*add_ref=*/false) {
         // NOTE: The 'false' above is because we have already initialized the Holder with a
         // refcount of '1' in takeOwnership below. This avoids an atomic increment.
     }
@@ -177,14 +211,21 @@ private:
      * This class will call free(holderPrefixedData), so it must have been allocated in a way
      * that makes that valid.
      */
-    static SharedBuffer takeOwnership(void* holderPrefixedData, size_t capacity) {
+    static SharedBuffer takeOwnership(void* holderPrefixedData,
+                                      size_t capacity,
+                                      const Allocator& allocator) {
         // Initialize the refcount to 1 so we don't need to increment it in the constructor
         // (see private Holder* constructor above).
-        //
-        // TODO: Should dassert alignment of holderPrefixedData here if possible.
-        return SharedBuffer(new (holderPrefixedData) Holder(1U, capacity));
+        typename Holder::HolderAllocator holderAllocator{allocator};
+        Holder::HolderAllocatorTraits::construct(holderAllocator,
+                                                 reinterpret_cast<Holder*>(holderPrefixedData),
+                                                 1U,
+                                                 capacity,
+                                                 allocator);
+        return SharedBuffer(reinterpret_cast<Holder*>(holderPrefixedData), allocator);
     }
 
+    MONGO_COMPILER_NO_UNIQUE_ADDRESS Allocator _allocator;
     boost::intrusive_ptr<Holder> _holder;
 
 public:
@@ -192,10 +233,11 @@ public:
     static constexpr size_t kHolderSize = sizeof(Holder);
 };
 
-MONGO_STATIC_ASSERT(std::is_nothrow_move_constructible_v<SharedBuffer>);
-MONGO_STATIC_ASSERT(std::is_nothrow_move_assignable_v<SharedBuffer>);
+MONGO_STATIC_ASSERT(std::is_nothrow_move_constructible_v<SharedBuffer<>>);
+MONGO_STATIC_ASSERT(std::is_nothrow_move_assignable_v<SharedBuffer<>>);
 
-inline void swap(SharedBuffer& one, SharedBuffer& two) {
+template <class Allocator>
+inline void swap(SharedBuffer<Allocator>& one, SharedBuffer<Allocator>& two) {
     one.swap(two);
 }
 
@@ -204,10 +246,11 @@ inline void swap(SharedBuffer& one, SharedBuffer& two) {
  *
  * Use SharedBuffer to allocate since allocating a const buffer is useless.
  */
+template <class Allocator = std::allocator<void>>
 class ConstSharedBuffer {
 public:
     ConstSharedBuffer() = default;
-    /*implicit*/ ConstSharedBuffer(SharedBuffer source) : _buffer(std::move(source)) {}
+    /*implicit*/ ConstSharedBuffer(SharedBuffer<Allocator> source) : _buffer(std::move(source)) {}
 
     void swap(ConstSharedBuffer& other) {
         _buffer.swap(other._buffer);
@@ -229,23 +272,28 @@ public:
         return _buffer.capacity();
     }
 
+    Allocator allocator() const {
+        return _buffer.allocator();
+    }
+
     /**
      * Converts to a mutable SharedBuffer.
      * This is only legal to call if you have exclusive access to the underlying buffer.
      */
-    SharedBuffer constCast() && {
+    SharedBuffer<Allocator> constCast() && {
         invariant(!isShared());
         return std::move(_buffer);
     }
 
     // The buffer holder size for 'ConstSharedBuffer' is the same as the one for 'SharedBuffer'
-    static constexpr size_t kHolderSize = SharedBuffer::kHolderSize;
+    static constexpr size_t kHolderSize = SharedBuffer<Allocator>::kHolderSize;
 
 private:
-    SharedBuffer _buffer;
+    SharedBuffer<Allocator> _buffer;
 };
 
-inline void swap(ConstSharedBuffer& one, ConstSharedBuffer& two) {
+template <class Allocator>
+inline void swap(ConstSharedBuffer<Allocator>& one, ConstSharedBuffer<Allocator>& two) {
     one.swap(two);
 }
 
@@ -258,27 +306,39 @@ inline void swap(ConstSharedBuffer& one, ConstSharedBuffer& two) {
  *
  * When converting to SharedBuffer, the entire prefix region is turned into a Holder.
  */
+template <class Allocator = std::allocator<void>>
 class UniqueBuffer {
 public:
-    static UniqueBuffer allocate(uint32_t sz) {
-        return UniqueBuffer(mongoMalloc(SharedBuffer::kHolderSize + sz), sz);
+    using ByteAllocator = typename SharedBuffer<Allocator>::ByteAllocator;
+
+    static UniqueBuffer allocate(uint32_t sz, const Allocator& allocator = {}) {
+        return UniqueBuffer{sz, allocator};
     }
 
     /**
      * Given memory which was released from a UniqueBuffer using the release() method,
      * returns a UniqueBuffer owning that memory.
      */
-    static UniqueBuffer reclaim(char* data) {
-        return UniqueBuffer(data - SharedBuffer::kHolderSize);
+    static UniqueBuffer reclaim(char* data, const Allocator& allocator = {}) {
+        return UniqueBuffer(data - SharedBuffer<Allocator>::kHolderSize, allocator);
     }
 
     UniqueBuffer() = default;
+    explicit UniqueBuffer(const Allocator& allocator) : _allocator(allocator) {}
+    explicit UniqueBuffer(uint32_t size, const Allocator& allocator = {}) : _allocator(allocator) {
+        *this = UniqueBuffer{
+            ByteAllocator{_allocator}.allocate(SharedBuffer<Allocator>::kHolderSize + size),
+            size,
+            allocator};
+    }
     UniqueBuffer(const UniqueBuffer&) = delete;
     UniqueBuffer(UniqueBuffer&& other) : _data(other._data) {
         other._data = nullptr;
     }
     ~UniqueBuffer() {
-        free(_data);
+        if (_data)
+            ByteAllocator{_allocator}.deallocate(_data,
+                                                 SharedBuffer<Allocator>::kHolderSize + capacity());
     }
 
     UniqueBuffer& operator=(const UniqueBuffer&) = delete;
@@ -294,13 +354,21 @@ public:
     }
 
     void realloc(uint32_t size) {
-        size_t realSize = size + SharedBuffer::kHolderSize;
-        _data = reinterpret_cast<char*>(mongoRealloc(_data, realSize));
-        DataView(_data).write<uint32_t>(size);
+        void* newPtr = ByteAllocator{_allocator}.allocate(kHolderSize + size);
+        if (_data) {
+            void* oldPtr = _data;
+            auto oldCapacity = static_cast<uint32_t>(capacity());
+            std::memcpy(newPtr, oldPtr, kHolderSize + std::min(size, oldCapacity));
+            ByteAllocator{_allocator}.deallocate(reinterpret_cast<std::byte*>(oldPtr),
+                                                 kHolderSize + oldCapacity);
+        }
+        _data = reinterpret_cast<std::byte*>(newPtr);
+        DataView(reinterpret_cast<char*>(_data)).write<uint32_t>(size);
     }
 
     char* get() const {
-        return _data ? _data + SharedBuffer::kHolderSize : nullptr;
+        return reinterpret_cast<char*>(_data ? _data + SharedBuffer<Allocator>::kHolderSize
+                                             : nullptr);
     }
 
     explicit operator bool() const {
@@ -308,7 +376,11 @@ public:
     }
 
     size_t capacity() const {
-        return _data ? ConstDataView(_data).read<uint32_t>() : 0;
+        return _data ? ConstDataView(reinterpret_cast<char*>(_data)).read<uint32_t>() : 0;
+    }
+
+    Allocator allocator() const {
+        return _allocator;
     }
 
     /**
@@ -318,27 +390,39 @@ public:
     char* release() {
         auto ret = _data;
         _data = nullptr;
-        return ret + SharedBuffer::kHolderSize;
+        return reinterpret_cast<char*>(ret + SharedBuffer<Allocator>::kHolderSize);
     }
 
     // The buffer holder size for 'UniqueBuffer' is the same as the one for 'SharedBuffer'
-    static constexpr size_t kHolderSize = SharedBuffer::kHolderSize;
+    static constexpr size_t kHolderSize = SharedBuffer<Allocator>::kHolderSize;
 
 private:
+    template <class>
     friend class SharedBuffer;
 
     // Assumes the size has already been initialized.
-    UniqueBuffer(void* buffer) : _data(static_cast<char*>(buffer)) {}
+    UniqueBuffer(void* buffer, const Allocator& allocator)
+        : _allocator(allocator), _data(static_cast<std::byte*>(buffer)) {}
 
-    UniqueBuffer(void* buffer, uint32_t sz) : _data(static_cast<char*>(buffer)) {
-        DataView(_data).write<uint32_t>(sz);
+    UniqueBuffer(void* buffer, uint32_t sz, const Allocator& allocator)
+        : _allocator(allocator), _data(static_cast<std::byte*>(buffer)) {
+        DataView(reinterpret_cast<char*>(_data)).write<uint32_t>(sz);
     }
 
-    char* _data = nullptr;
+    MONGO_COMPILER_NO_UNIQUE_ADDRESS Allocator _allocator;
+    std::byte* _data = nullptr;
 };
 
-inline SharedBuffer::SharedBuffer(UniqueBuffer&& other) {
-    *this = takeOwnership(other._data, other.capacity());
+template <class Allocator>
+inline SharedBuffer<Allocator>::SharedBuffer(UniqueBuffer<Allocator>&& other) {
+    *this = takeOwnership(other._data, other.capacity(), _allocator);
     other._data = nullptr;
 }
+
+}  // namespace allocator_aware
+
+using SharedBuffer = allocator_aware::SharedBuffer<>;
+using ConstSharedBuffer = allocator_aware::ConstSharedBuffer<>;
+using UniqueBuffer = allocator_aware::UniqueBuffer<>;
+
 }  // namespace mongo
