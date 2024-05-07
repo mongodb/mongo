@@ -143,7 +143,7 @@ ReplicationCoordinatorImpl::ElectionState::_startVoteRequester(WithLock lk,
                                                                int primaryIndex) {
     _voteRequester.reset(new VoteRequester);
     return _voteRequester->start(_replExecutor,
-                                 _repl->_rsConfig,
+                                 _repl->_rsConfig.getConfig(lk),
                                  _repl->_selfIndex,
                                  term,
                                  dryRun,
@@ -207,7 +207,7 @@ void ReplicationCoordinatorImpl::ElectionState::start(WithLock lk, StartElection
     }
     _electionDryRunFinishedEvent = dryRunFinishedEvent;
 
-    invariant(_repl->_rsConfig.getMemberAt(_repl->_selfIndex).isElectable());
+    invariant(_repl->_rsConfig.getConfig(lk).getMemberAt(_repl->_selfIndex).isElectable());
     const auto lastWrittenOpTime = _repl->_getMyLastWrittenOpTime_inlock();
     const auto lastAppliedOpTime = _repl->_getMyLastAppliedOpTime_inlock();
 
@@ -300,7 +300,7 @@ void ReplicationCoordinatorImpl::ElectionState::_processDryRunResult(
 void ReplicationCoordinatorImpl::ElectionState::_startRealElection(WithLock lk,
                                                                    long long newTerm,
                                                                    StartElectionReasonEnum reason) {
-    const auto& rsConfig = _repl->_rsConfig;
+    const auto& rsConfig = _repl->_rsConfig.getConfig(lk);
     const auto selfIndex = _repl->_selfIndex;
 
     const Date_t now = _replExecutor->now();
@@ -332,7 +332,7 @@ void ReplicationCoordinatorImpl::ElectionState::_startRealElection(WithLock lk,
     LoseElectionDryRunGuardV1 lossGuard(_repl);
 
     TopologyCoordinator::UpdateTermResult updateTermResult;
-    _repl->_updateTerm_inlock(newTerm, &updateTermResult);
+    _repl->_updateTerm_inlock(lk, newTerm, &updateTermResult);
     // This is the only valid result from this term update. If we are here, then we are not a
     // primary, so a stepdown is not possible. We have also not yet learned of a higher term from
     // someone else: seeing an update in the topology coordinator mid-election requires releasing
