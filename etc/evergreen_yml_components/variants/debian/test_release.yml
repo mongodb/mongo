@@ -2,30 +2,6 @@
 # rapid release (7.1, 7.2 etc.) and LTS release (7.0, 6.0 etc.) branch projects
 
 buildvariants:
-- name: enterprise-debian10-64
-  display_name: Jepsen Tests on Enterprise Debian 10
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  run_on:
-  - debian10-test
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=debian10
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    scons_cache_scope: shared
-    large_distro_name: debian10-build
-    compile_variant: enterprise-debian10-64
-  tasks:
-  - name: compile_and_archive_dist_test_TG
-    distros:
-    - debian10-build
-  - name: .jepsen_docker
-    distros:
-    - debian10-large
-
 - name: debian11
   display_name: Debian 11
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.

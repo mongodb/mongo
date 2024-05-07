@@ -9,7 +9,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 # actually run the tests
 start_time=$(date +%s)
 
-# Previously, we use the "--test-count 30" option to repeat the Jepen test 30 times.
+# Previously, we use the "--test-count 30" option to repeat the Jepsen test 30 times.
 # However, to ensure the preservation of all the mongod and mongos logs for each failed test,
 # we have implemented a for loop to iterate the test 30 times.
 for i in {1..30}; do
@@ -17,11 +17,19 @@ for i in {1..30}; do
 
   sudo docker exec jepsen-control bash --login -c "\
   cd /jepsen/mongodb && \
-  lein run test-all -w list-append -n n1 -n n2 -n n3 -n n4 -n n5 -n n6 -n n7 -n n8 -n n9 -r 1000 \
-  --concurrency 3n --time-limit 240 --max-writes-per-key 128 \
-  --read-concern majority --write-concern majority \
-  --txn-read-concern snapshot --txn-write-concern majority \
-  --nemesis-interval 1 --nemesis partition --test-count 1" | tee jepsen_test_${i}.log
+  lein run test-all -w list-append \
+  -n n1 -n n2 -n n3 -n n4 -n n5 -n n6 -n n7 -n n8 -n n9 \
+  -r 1000 \
+  --concurrency 3n \
+  --time-limit 120 \
+  --max-writes-per-key 128 \
+  --read-concern majority \
+  --write-concern majority \
+  --txn-read-concern snapshot \
+  --txn-write-concern majority \
+  --nemesis-interval 1 \
+  --nemesis partition \
+  --test-count 1" | tee jepsen_test_${i}.log
 
   cd ../../
 
@@ -39,15 +47,15 @@ for i in {1..30}; do
   #
   last_five_lines=$(tail -n 5 "jepsen/docker/jepsen_test_${i}.log")
 
-  # Check if the "1 successes" string is in the last eight lines
+  # Check if the "1 successes" string is in the last five lines
   if echo "$last_five_lines" | grep -q "1 successes"; then
-    echo "Test is successful, mongod and mongos logs are not needed"
+    echo "Test is successful, no additional logs will be spared."
   else
-    echo "Test is not successful, save mongod and mongos logs for uploading"
+    echo "Test is not successful. Sparing mongod and mongos logs into 'src/jepsen-mongodb/mongodlogs/' and 'src/jepsen-mongodb/mongoslogs/' directories."
 
     # copy mongod logs
     mkdir -p src/jepsen-mongodb/mongodlogs/test_${i}
-    loop 9 docker containers
+    # loop 9 docker containers
     for n in {1..9}; do
       sudo docker cp jepsen-n${n}:/var/log/mongodb/mongod.log src/jepsen-mongodb/mongodlogs/test_${i}/jepson-n${n}-mongod.log
     done
