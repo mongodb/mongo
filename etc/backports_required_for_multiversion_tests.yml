@@ -345,8 +345,6 @@ last-continuous:
     ticket: SERVER-82717
   - test_file: jstests/core/timeseries/timeseries_project.js
     ticket: SERVER-87987
-  - test_file: jstests/core/query/bittest.js
-    ticket: SERVER-88173
   - test_file: jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
     ticket: SERVER-79049
   - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
@@ -744,8 +742,6 @@ last-lts:
     ticket: SERVER-82717
   - test_file: jstests/core/timeseries/timeseries_project.js
     ticket: SERVER-87987
-  - test_file: jstests/core/query/bittest.js
-    ticket: SERVER-88173
   - test_file: jstests/core/command_let_variables_expressions.js
     ticket: SERVER-89268
   - test_file: jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
