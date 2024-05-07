@@ -36,7 +36,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/aligned.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/shared_buffer.h"
 
 namespace mongo {
@@ -47,10 +46,7 @@ namespace mongo {
  */
 class TrackingAllocatorStats {
 public:
-    // The counter will be partitioned based on the number of available cores.
-    TrackingAllocatorStats()
-        : _numPartitions(ProcessInfo::getNumLogicalCores() * 2), _bytesAllocated(_numPartitions) {}
-    TrackingAllocatorStats(size_t numPartitions)
+    explicit TrackingAllocatorStats(size_t numPartitions)
         : _numPartitions(numPartitions), _bytesAllocated(_numPartitions) {}
 
     void bytesAllocated(size_t n) {
@@ -70,8 +66,7 @@ public:
         }
 
         // After summing the memory usage, we should not have a negative number.
-        invariant(sum >= 0,
-                  str::stream() << "Tracking allocator memory usage was negative " << sum);
+        invariant(sum >= 0, std::to_string(sum));
         return static_cast<uint64_t>(sum);
     }
 
