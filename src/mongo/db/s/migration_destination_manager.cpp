@@ -908,7 +908,8 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     const NamespaceString& nss,
     const ShardId& fromShardId,
     const boost::optional<CollectionRoutingInfo>& cri,
-    boost::optional<Timestamp> afterClusterTime) {
+    boost::optional<Timestamp> afterClusterTime,
+    bool expandSimpleCollation) {
     auto fromShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromShardId));
 
@@ -938,15 +939,22 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     for (auto&& spec : indexes.docs) {
         if (spec[IndexDescriptor::kClusteredFieldName]) {
             // The 'clustered' index is implicitly created upon clustered collection creation.
-        } else {
-            donorIndexSpecs.push_back(spec);
-            if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName]) {
-                if (indexNameElem.type() == BSONType::String &&
-                    indexNameElem.valueStringData() == "_id_"_sd) {
-                    donorIdIndexSpec = spec;
-                }
-            }
+            continue;
         }
+
+        if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName];
+            indexNameElem.type() == BSONType::String &&
+            indexNameElem.valueStringData() == "_id_"_sd) {
+            // The _id index always uses the collection's default collation and so there is no need
+            // to add the collation field to attempt to disambiguate.
+            donorIdIndexSpec = spec;
+        } else if (expandSimpleCollation && !spec[IndexDescriptor::kCollationFieldName]) {
+            spec = BSONObjBuilder(std::move(spec))
+                       .append(IndexDescriptor::kCollationFieldName, CollationSpec::kSimpleSpec)
+                       .obj();
+        }
+
+        donorIndexSpecs.push_back(spec);
     }
 
     return {donorIndexSpecs, donorIdIndexSpec};
