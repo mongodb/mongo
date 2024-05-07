@@ -120,6 +120,8 @@ env.Library(
         '$BUILD_DIR/mongo/util/latch_analyzer'
         if get_option('use-diagnostic-latches') == 'on' else [],
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler'
+        if get_option('use-tracing-profiler') == 'on' else [],
         '$BUILD_DIR/mongo/util/version_impl',
     ],
 )

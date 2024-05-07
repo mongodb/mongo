@@ -54,6 +54,7 @@ config_header_substs = (
     ('@mongo_config_altivec_vec_vbpermq_output_index@',
      'MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
     ('@mongo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
+    ('@mongo_config_use_tracing_profiler@', 'MONGO_CONFIG_USE_TRACING_PROFILER'),
     ('@mongo_config_have_execinfo_backtrace@', 'MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
     ('@mongo_config_have_explicit_bzero@', 'MONGO_CONFIG_HAVE_EXPLICIT_BZERO'),
     ('@mongo_config_have_fips_mode_set@', 'MONGO_CONFIG_HAVE_FIPS_MODE_SET'),

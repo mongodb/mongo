@@ -1,0 +1,95 @@
+Profiler metrics:
+{
+    "spans": [
+        {
+            "id": 1,
+            "name": "doZ1",
+            "parentId": 0,
+            "totalNanos": 9000000000,
+            "netNanos": 6750000000,
+            "exclusiveNanos": 2250000000,
+            "count": 100
+        },
+        {
+            "id": 2,
+            "name": "doY1",
+            "parentId": 1,
+            "totalNanos": 3000000000,
+            "netNanos": 2250000000,
+            "exclusiveNanos": 1500000000,
+            "count": 100
+        },
+        {
+            "id": 3,
+            "name": "doX",
+            "parentId": 2,
+            "totalNanos": 1000000000,
+            "netNanos": 750000000,
+            "exclusiveNanos": 750000000,
+            "count": 100
+        },
+        {
+            "id": 4,
+            "name": "doY2",
+            "parentId": 1,
+            "totalNanos": 3000000000,
+            "netNanos": 2250000000,
+            "exclusiveNanos": 1500000000,
+            "count": 100
+        },
+        {
+            "id": 5,
+            "name": "doX",
+            "parentId": 4,
+            "totalNanos": 1000000000,
+            "netNanos": 750000000,
+            "exclusiveNanos": 750000000,
+            "count": 100
+        },
+        {
+            "id": 6,
+            "name": "doZ2",
+            "parentId": 0,
+            "totalNanos": 9000000000,
+            "netNanos": 6750000000,
+            "exclusiveNanos": 2250000000,
+            "count": 100
+        },
+        {
+            "id": 7,
+            "name": "doY1",
+            "parentId": 6,
+            "totalNanos": 3000000000,
+            "netNanos": 2250000000,
+            "exclusiveNanos": 1500000000,
+            "count": 100
+        },
+        {
+            "id": 8,
+            "name": "doX",
+            "parentId": 7,
+            "totalNanos": 1000000000,
+            "netNanos": 750000000,
+            "exclusiveNanos": 750000000,
+            "count": 100
+        },
+        {
+            "id": 9,
+            "name": "doY2",
+            "parentId": 6,
+            "totalNanos": 3000000000,
+            "netNanos": 2250000000,
+            "exclusiveNanos": 1500000000,
+            "count": 100
+        },
+        {
+            "id": 10,
+            "name": "doX",
+            "parentId": 9,
+            "totalNanos": 1000000000,
+            "netNanos": 750000000,
+            "exclusiveNanos": 750000000,
+            "count": 100
+        }
+    ]
+}

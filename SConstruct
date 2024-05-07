@@ -479,6 +479,14 @@ add_option(
     type='choice',
 )
 
+add_option(
+    'use-tracing-profiler',
+    choices=['on', 'off'],
+    default='off',
+    help='Enable tracing profiler statistic collection',
+    type='choice',
+)
+
 # Most of the "use-system-*" options follow a simple form.
 for pack in [
     (
@@ -5311,6 +5319,9 @@ def doConfigure(myenv):
 
     if get_option('use-diagnostic-latches') == 'off':
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_USE_RAW_LATCHES")
+
+    if get_option('use-tracing-profiler') == "on":
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_USE_TRACING_PROFILER")
 
     if (conf.CheckCXXHeader("execinfo.h")
             and conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>')

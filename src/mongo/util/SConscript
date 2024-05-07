@@ -84,6 +84,7 @@ env.SConscript(
         'immutable',
         'net',
         'options_parser',
+        'tracing_profiler',
         'version',
     ],
     exports=[

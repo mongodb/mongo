@@ -115,3 +115,6 @@
 
 // Defined if using the tcmalloc-gperf memory allocator
 @mongo_config_tcmalloc_gperf@
+
+// Defined if using tracing profiler stats collection
+@mongo_config_use_tracing_profiler@

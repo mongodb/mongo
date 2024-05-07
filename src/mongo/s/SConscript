@@ -486,6 +486,8 @@ env.Library(
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         '$BUILD_DIR/mongo/util/testing_options',
+        '$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler'
+        if get_option('use-tracing-profiler') == 'on' else [],
         '$BUILD_DIR/mongo/util/version_impl',
         'commands/cluster_commands',
         'commands/cluster_commands_common',
@@ -545,6 +547,8 @@ env.Library(
         if get_option('use-diagnostic-latches') == 'on' else [],
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
         '$BUILD_DIR/mongo/util/signal_handlers',
+        '$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler'
+        if get_option('use-tracing-profiler') == 'on' else [],
         'client/sharding_client',
         'commands/cluster_commands',
         'commands/cluster_commands_common',

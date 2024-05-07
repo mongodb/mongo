@@ -941,6 +941,8 @@ env.Library(
         if get_option('use-diagnostic-latches') == 'on' else [],
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/progress_meter',
+        '$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler'
+        if get_option('use-tracing-profiler') == 'on' else [],
         'admission/ticketholder_manager',
         'audit',
         'auth/auth',
@@ -2515,6 +2517,8 @@ env.Library(
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
         '$BUILD_DIR/mongo/util/pin_code_segments' if env.TargetOSIs('linux') else [],
         '$BUILD_DIR/mongo/util/testing_options',
+        '$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler'
+        if get_option('use-tracing-profiler') == 'on' else [],
         '$BUILD_DIR/mongo/util/version_impl',
         '$BUILD_DIR/mongo/watchdog/watchdog_mongod',
         '$BUILD_DIR/third_party/shim_snappy',
@@ -2639,6 +2643,8 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
         '$BUILD_DIR/mongo/util/signal_handlers',
+        '$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler'
+        if get_option('use-tracing-profiler') == 'on' else [],
         '$BUILD_DIR/mongo/watchdog/watchdog_mongod',
         'admission/execution_control',
         'auth/auth_op_observer',
