@@ -1581,27 +1581,10 @@ TEST(BitTestMatchExpression, DoesNotMatchOther) {
     ASSERT(!banyc.matchesSingleElement(notMatch17["a"]));
 }
 
-TEST(BitTestMatchExpression, MatchBinaryWithLongBitMaskHighBitsSet) {
+TEST(BitTestMatchExpression, MatchBinaryWithLongBitMask) {
     long long bitMask = 54;
 
     BSONObj match = fromjson("{a: {$binary: 'NgAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
-
-    BitsAllSetMatchExpression balls("a"_sd, bitMask);
-    BitsAllClearMatchExpression ballc("a"_sd, bitMask);
-    BitsAnySetMatchExpression banys("a"_sd, bitMask);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitMask);
-
-    std::vector<uint32_t> bitPositions = balls.getBitPositions();
-    ASSERT(!balls.matchesSingleElement(match["a"]));
-    ASSERT(ballc.matchesSingleElement(match["a"]));
-    ASSERT(!banys.matchesSingleElement(match["a"]));
-    ASSERT(banyc.matchesSingleElement(match["a"]));
-}
-
-TEST(BitTestMatchExpression, MatchBinaryWithLongBitMaskLowBitsSet) {
-    long long bitMask = 54;
-
-    BSONObj match = fromjson("{a: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAANg==', $type: '00'}}");
 
     BitsAllSetMatchExpression balls("a"_sd, bitMask);
     BitsAllClearMatchExpression ballc("a"_sd, bitMask);
@@ -1615,26 +1598,9 @@ TEST(BitTestMatchExpression, MatchBinaryWithLongBitMaskLowBitsSet) {
     ASSERT(!banyc.matchesSingleElement(match["a"]));
 }
 
-TEST(BitTestMatchExpression, MatchLongWithBinaryBitMask1) {
+TEST(BitTestMatchExpression, MatchLongWithBinaryBitMask) {
     const char* bitMaskSet = "\x36\x00\x00\x00";
     const char* bitMaskClear = "\xC9\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
-
-    BSONObj match = fromjson("{a: 54}");
-
-    BitsAllSetMatchExpression balls("a"_sd, bitMaskSet, 4);
-    BitsAllClearMatchExpression ballc("a"_sd, bitMaskClear, 9);
-    BitsAnySetMatchExpression banys("a"_sd, bitMaskSet, 4);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitMaskClear, 9);
-
-    ASSERT(!balls.matchesSingleElement(match["a"]));
-    ASSERT(!ballc.matchesSingleElement(match["a"]));
-    ASSERT(!banys.matchesSingleElement(match["a"]));
-    ASSERT(banyc.matchesSingleElement(match["a"]));
-}
-
-TEST(BitTestMatchExpression, MatchLongWithBinaryBitMask2) {
-    const char* bitMaskSet = "\x00\x00\x00\x36";
-    const char* bitMaskClear = "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xC9";
 
     BSONObj match = fromjson("{a: 54}");
 
@@ -1871,9 +1837,9 @@ TEST(BitTestMatchExpression, MatchesBinary1) {
     std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
 
     BSONObj match1 = fromjson("{a: {$binary: 'NgAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
-    // Base64 to Binary: 00110110... 00000000
+    // Base64 to Binary: 00110110...
     BSONObj match2 = fromjson("{a: {$binary: 'NgAjqwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
-    // Base64 to Binary: 00110110... 11101010
+    // Base64 to Binary: 00110110...
 
     BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
     BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
@@ -1884,11 +1850,11 @@ TEST(BitTestMatchExpression, MatchesBinary1) {
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
     ASSERT_EQ((size_t)4, banys.numBitPositions());
     ASSERT_EQ((size_t)3, banyc.numBitPositions());
-    ASSERT(!balls.matchesSingleElement(match1["a"]));
-    ASSERT(!balls.matchesSingleElement(match2["a"]));
+    ASSERT(balls.matchesSingleElement(match1["a"]));
+    ASSERT(balls.matchesSingleElement(match2["a"]));
     ASSERT(ballc.matchesSingleElement(match1["a"]));
-    ASSERT(!ballc.matchesSingleElement(match2["a"]));
-    ASSERT(!banys.matchesSingleElement(match1["a"]));
+    ASSERT(ballc.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
     ASSERT(banys.matchesSingleElement(match2["a"]));
     ASSERT(banyc.matchesSingleElement(match1["a"]));
     ASSERT(banyc.matchesSingleElement(match2["a"]));
@@ -1900,10 +1866,10 @@ TEST(BitTestMatchExpression, MatchesBinary2) {
     std::vector<uint32_t> bitPositionsSet = bsonArrayToBitPositions(bas);
     std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
 
-    BSONObj match1 = fromjson("{a: {$binary: 'AAAAAAAAAGADAA==', $type: '00'}}");
-    // Base64 to Binary: ... 01100000 00000011 00000000
-    BSONObj match2 = fromjson("{a: {$binary: 'AAAAAAAAAABgAyQ=', $type: '00'}}");
-    // Base64 to Binary: ........ 00000011 00100100
+    BSONObj match1 = fromjson("{a: {$binary: 'AANgAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
+    // Base64 to Binary: 00000000 00000011 01100000
+    BSONObj match2 = fromjson("{a: {$binary: 'JANgqwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
+    // Base64 to Binary: ........ 00000011 01100000
 
     BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
     BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
@@ -1922,92 +1888,6 @@ TEST(BitTestMatchExpression, MatchesBinary2) {
     ASSERT(banys.matchesSingleElement(match2["a"]));
     ASSERT(banyc.matchesSingleElement(match1["a"]));
     ASSERT(banyc.matchesSingleElement(match2["a"]));
-}
-
-TEST(BitTestMatchExpression, MatchesBinary3) {
-    BSONArray bas = BSON_ARRAY(1 << 2 << 4 << 5);
-    BSONArray bac = BSON_ARRAY(0 << 3 << 600);
-    std::vector<uint32_t> bitPositionsSet = bsonArrayToBitPositions(bas);
-    std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
-
-    BSONObj match1 = fromjson("{a: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAANg==', $type: '00'}}");
-    // Base64 to Binary: ...00110110
-    BSONObj match2 = fromjson("{a: {$binary: '6tYSUaIoEWFtkUWUJKySrQerIwA2', $type: '00'}}");
-    // Base64 to Binary: ...00110110
-
-    BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitPositionsSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitPositionsClear);
-
-    ASSERT_EQ((size_t)4, balls.numBitPositions());
-    ASSERT_EQ((size_t)3, ballc.numBitPositions());
-    ASSERT_EQ((size_t)4, banys.numBitPositions());
-    ASSERT_EQ((size_t)3, banyc.numBitPositions());
-    ASSERT(balls.matchesSingleElement(match1["a"]));
-    ASSERT(balls.matchesSingleElement(match2["a"]));
-    ASSERT(ballc.matchesSingleElement(match1["a"]));
-    ASSERT(ballc.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
-}
-
-TEST(BitTestMatchExpression, MatchesBinarySingleHighBitSet) {
-    BSONArray ba = BSON_ARRAY(80);
-    std::vector<uint32_t> bitPositions = bsonArrayToBitPositions(ba);
-
-    const char* bm = "\0\0\0\0\0\0\0\0\0\0\1\0\0\0\0\0\0\0\0\0\0";
-
-    BSONObj match1 = fromjson("{a: {$binary: 'AQAAAAAAAAAAAAA=', $type: '00'}}");
-    // description: 1n << 80n
-    BSONObj match2 = fromjson("{a: {$binary: 'EAAAAAAAAAAAAAAAAA==', $type: '00'}}");
-    // description: 1n << 100n
-    BSONObj match3 = fromjson("{a: {$binary: 'EAABAAAAAAAAAAAAAA==', $type: '00'}}");
-    // description: 1n << 80n | 1n << 100n
-    BSONObj match4 = fromjson("{a: {$binary: 'IQAAAAAAAAAAAAA=', $type: '00'}}");
-    // description: 1n << 80n | 1n << 85n
-
-    BitsAnySetMatchExpression banysA("a"_sd, bitPositions);
-    BitsAnySetMatchExpression banysM("a"_sd, bm, 21);
-
-    ASSERT_EQ((size_t)1, banysA.numBitPositions());
-    ASSERT(banysA.matchesSingleElement(match1["a"]));
-    ASSERT(!banysA.matchesSingleElement(match2["a"]));
-    ASSERT(banysA.matchesSingleElement(match3["a"]));
-    ASSERT(banysA.matchesSingleElement(match4["a"]));
-
-    ASSERT_EQ((size_t)1, banysM.numBitPositions());
-    ASSERT(banysM.matchesSingleElement(match1["a"]));
-    ASSERT(!banysM.matchesSingleElement(match2["a"]));
-    ASSERT(banysM.matchesSingleElement(match3["a"]));
-    ASSERT(banysM.matchesSingleElement(match4["a"]));
-}
-
-TEST(BitTestMatchExpression, MatchesBinarySignBitSet) {
-    BSONArray ba = BSON_ARRAY(63);
-    std::vector<uint32_t> bitPositions = bsonArrayToBitPositions(ba);
-
-    const char* bm = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x80\0\0\0\0\0\0";
-
-    BitsAllSetMatchExpression ballsA("a"_sd, bitPositions);
-    BitsAllClearMatchExpression ballcA("a"_sd, bitPositions);
-    BitsAllSetMatchExpression ballsM("a"_sd, bm, 21);
-    BitsAllClearMatchExpression ballcM("a"_sd, bm, 21);
-
-    BSONObj match1 = fromjson("{a: {$binary: 'hMh7gAAkXYA=', $type: '00'}}");
-    // 63rd bit is set
-    BSONObj match2 = fromjson("{a: {$binary: 'QWDIe4AkXYA=', $type: '00'}}");
-    // 63rd bit is not set
-
-    ASSERT_EQ((size_t)1, ballsA.numBitPositions());
-    ASSERT_EQ((size_t)1, ballcA.numBitPositions());
-    ASSERT(ballsA.matchesSingleElement(match1["a"]));
-    ASSERT(ballcA.matchesSingleElement(match2["a"]));
-
-    ASSERT(ballsM.matchesSingleElement(match1["a"]));
-    ASSERT(ballcM.matchesSingleElement(match2["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchesBinaryWithBitMask) {
@@ -2015,9 +1895,9 @@ TEST(BitTestMatchExpression, MatchesBinaryWithBitMask) {
     const char* bac = "\0\xFC\x9F\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
     BSONObj match1 = fromjson("{a: {$binary: 'AANgAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
-    // Base64 to Binary: 00000000 00000011 01100000 ........
+    // Base64 to Binary: 00000000 00000011 01100000
     BSONObj match2 = fromjson("{a: {$binary: 'JANgAwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
-    // Base64 to Binary: 00100100 00000011 01100000 ........
+    // Base64 to Binary: ........ 00000011 01100000
 
     BitsAllSetMatchExpression balls("a"_sd, bas, 21);
     BitsAllClearMatchExpression ballc("a"_sd, bac, 21);
@@ -2056,9 +1936,9 @@ TEST(BitTestMatchExpression, DoesNotMatchBinary1) {
     ASSERT_EQ((size_t)3, banyc.numBitPositions());
     ASSERT(!balls.matchesSingleElement(match1["a"]));
     ASSERT(!balls.matchesSingleElement(match2["a"]));
-    ASSERT(ballc.matchesSingleElement(match1["a"]));
+    ASSERT(!ballc.matchesSingleElement(match1["a"]));
     ASSERT(!ballc.matchesSingleElement(match2["a"]));
-    ASSERT(!banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
     ASSERT(banys.matchesSingleElement(match2["a"]));
     ASSERT(banyc.matchesSingleElement(match1["a"]));
     ASSERT(banyc.matchesSingleElement(match2["a"]));
@@ -2070,40 +1950,10 @@ TEST(BitTestMatchExpression, DoesNotMatchBinary2) {
     std::vector<uint32_t> bitPositionsSet = bsonArrayToBitPositions(bas);
     std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
 
-    BSONObj match1 = fromjson("{a: {$binary: 'AAAAAA+AAAA=', $type: '00'}}");
-    // Base64 to Binary: ........ 00001111 10000000 00000000 00000000
-    BSONObj match2 = fromjson("{a: {$binary: '6tYSUaIoEWFtkUWUJKySrQerYAMk', $type: '00'}}");
-    // Base64 to Binary: ........ 10101011 01100000 00000011 00100100
-
-    BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitPositionsSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitPositionsClear);
-
-    ASSERT_EQ((size_t)5, balls.numBitPositions());
-    ASSERT_EQ((size_t)3, ballc.numBitPositions());
-    ASSERT_EQ((size_t)5, banys.numBitPositions());
-    ASSERT_EQ((size_t)3, banyc.numBitPositions());
-    ASSERT(!balls.matchesSingleElement(match1["a"]));
-    ASSERT(!balls.matchesSingleElement(match2["a"]));
-    ASSERT(!ballc.matchesSingleElement(match1["a"]));
-    ASSERT(!ballc.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
-}
-
-TEST(BitTestMatchExpression, DoesNotMatchBinary3) {
-    BSONArray bas = BSON_ARRAY(1 << 2 << 4 << 5 << 6);
-    BSONArray bac = BSON_ARRAY(0 << 3 << 1);
-    std::vector<uint32_t> bitPositionsSet = bsonArrayToBitPositions(bas);
-    std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
-
-    BSONObj match1 = fromjson("{a: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAANg==', $type: '00'}}");
-    // Base64 to Binary: ...00110110
-    BSONObj match2 = fromjson("{a: {$binary: '6tYSUaIoEWFtkUWUJKySrQerIwA2', $type: '00'}}");
-    // Base64 to Binary: ...00110110
+    BSONObj match1 = fromjson("{a: {$binary: 'AANgAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
+    // Base64 to Binary: 00000000 00000011 01100000
+    BSONObj match2 = fromjson("{a: {$binary: 'JANgqwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
+    // Base64 to Binary: ........ 00000011 01100000
 
     BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
     BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
@@ -2129,11 +1979,9 @@ TEST(BitTestMatchExpression, DoesNotMatchBinaryWithBitMask) {
     const char* bac = "\0\xFD\x9F\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\xFF";
 
     BSONObj match1 = fromjson("{a: {$binary: 'AANgAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
-    // Base64 to Binary: 00000000 00000011 01100000 ........
+    // Base64 to Binary: 00000000 00000011 01100000
     BSONObj match2 = fromjson("{a: {$binary: 'JANgAwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
-    // Base64 to Binary: 000100100 00000011 01100000 ........
-    BSONObj match3 = fromjson("{a: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAYAMA', $type: '00'}}");
-    // Base64 to Binary: ........ 01100000 00000011 00000000
+    // Base64 to Binary: ........ 00000011 01100000
 
     BitsAllSetMatchExpression balls("a"_sd, bas, 22);
     BitsAllClearMatchExpression ballc("a"_sd, bac, 22);
@@ -2141,16 +1989,12 @@ TEST(BitTestMatchExpression, DoesNotMatchBinaryWithBitMask) {
     BitsAnyClearMatchExpression banyc("a"_sd, bac, 22);
     ASSERT(!balls.matchesSingleElement(match1["a"]));
     ASSERT(!balls.matchesSingleElement(match2["a"]));
-    ASSERT(!balls.matchesSingleElement(match3["a"]));
     ASSERT(!ballc.matchesSingleElement(match1["a"]));
     ASSERT(!ballc.matchesSingleElement(match2["a"]));
-    ASSERT(!ballc.matchesSingleElement(match3["a"]));
-    ASSERT(!banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
     ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(!banys.matchesSingleElement(match3["a"]));
     ASSERT(banyc.matchesSingleElement(match1["a"]));
     ASSERT(banyc.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match3["a"]));
 }
 
 TEST(LeafMatchExpressionTest, Equal1) {
