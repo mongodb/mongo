@@ -121,3 +121,7 @@ patch_aliases:
     description: "Runs bazel build system tests"
     variant_tags: ["bazel_check"]
     task: ".*"
+  - alias: search
+    description: "Runs all $search, $vectorSearch tests"
+    variant: ".*"
+    task: "^.*search*"
