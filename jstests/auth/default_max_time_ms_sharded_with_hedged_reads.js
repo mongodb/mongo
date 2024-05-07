@@ -52,7 +52,7 @@ let st = new ShardingTest({
         }
     }],
     shards: 1,
-    config: {nodes: 1},
+    config: 2,
     other: {keyFile: 'jstests/libs/key1'},
     rs: {nodes: 2, setParameter: {logComponentVerbosity: tojson({command: {verbosity: 1}})}}
 });

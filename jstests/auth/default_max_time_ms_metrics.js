@@ -44,6 +44,7 @@ function runTests(conn, directConn) {
     adminDB.createUser({user: 'regularUser', pwd: 'password', roles: ["readWriteAnyDatabase"]});
     // Prepare a user through the direct connection to the shard for getting serverStatus.
     if (directConn) {
+        assert.eq(1, directConn.getDB("local").auth("__system", "foopdedoop"));
         directConn.getDB("admin").createUser(
             {user: "directUser", pwd: "password", roles: ["root"]});
         const directDB = new Mongo(directConn.host).getDB('admin');
