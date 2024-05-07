@@ -246,7 +246,7 @@ components:
     local_directory_path: src/third_party/tomcrypt-1.18.2
     team_owner: "Security"
 
-  libunwind:
+  libunwind/libunwind:
     homepage_url: http://www.nongnu.org/libunwind/
     open_hub_url: https://www.openhub.net/p/p_w_d10376
     release_monitoring_id: 1748
