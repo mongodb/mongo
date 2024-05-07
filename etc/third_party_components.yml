@@ -336,7 +336,7 @@ components:
     team_owner: "Service Architecture"
     upgrade_suppression: TODO SERVER-75761
 
-  extras:
+  testing-cabal/extras:
     homepage_url: https://github.com/testing-cabal/extras
     open_hub_url: https://www.openhub.net/p/550227
     release_monitoring_id: 13192
