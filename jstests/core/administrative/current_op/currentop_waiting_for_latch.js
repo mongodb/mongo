@@ -8,6 +8,7 @@
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   no_selinux,
+ *   multiversion_incompatible,
  *   requires_latch_analyzer
  * ]
  */
