@@ -1039,8 +1039,10 @@ DB.prototype.printSecondaryReplicationInfo = function() {
     }
 };
 
+// Checking the server buildinfo requires the client to be authenticated
 DB.prototype.serverBuildInfo = function() {
-    return this.getSiblingDB("admin")._runCommandWithoutApiStrict({buildinfo: 1});
+    return assert.commandWorked(
+        this.getSiblingDB("admin")._runCommandWithoutApiStrict({buildinfo: 1}));
 };
 
 // Used to trim entries from the metrics.commands that have never been executed
@@ -1091,10 +1093,12 @@ DB.prototype.serverCmdLineOpts = function() {
     return this._adminCommand("getCmdLineOpts");
 };
 
+// Throws if client connection is not authenticated.
 DB.prototype.version = function() {
     return this.serverBuildInfo().version;
 };
 
+// Throws if client connection is not authenticated.
 DB.prototype.serverBits = function() {
     return this.serverBuildInfo().bits;
 };

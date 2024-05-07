@@ -422,6 +422,10 @@ globalThis.connect = function(url, user, pass, apiParameters) {
         if (serverVersion.slice(0, 3) != shellVersion.slice(0, 3)) {
             chatty("WARNING: shell and server versions do not match");
         }
+    } catch (e) {
+        if (e.code == ErrorCodes.Unauthorized) {
+            chatty("WARNING: shell could not get the server version: " + e.message);
+        }
     } finally {
         TestData = originalTestData;
     }

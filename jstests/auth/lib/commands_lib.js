@@ -7102,7 +7102,7 @@ export const authCommandsLib = {
           // Only enterprise knows of this aggregation stage.
           skipTest:
               (conn) =>
-                  !conn.getDB("admin").runCommand({buildInfo: 1}).modules.includes("enterprise"),
+                  !getBuildInfo().modules.includes("enterprise"),
           testcases: [{
               runOnDb: adminDbName,
               roles: roles_hostManager,

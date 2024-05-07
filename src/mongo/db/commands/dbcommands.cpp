@@ -803,7 +803,7 @@ public:
     }
 
     bool requiresAuth() const final {
-        return false;
+        return true;
     }
 
     bool adminOnly() const final {
@@ -818,9 +818,12 @@ public:
         return false;
     }
 
-    Status checkAuthForOperation(OperationContext*,
+    Status checkAuthForOperation(OperationContext* opCtx,
                                  const DatabaseName&,
                                  const BSONObj&) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        uassert(ErrorCodes::Unauthorized, "Unauthorized", as->isAuthenticated());
+
         return Status::OK();
     }
 
