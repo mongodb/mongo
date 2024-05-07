@@ -4176,7 +4176,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCError) {
     // Since we got an n=1 reply we are done.
     op.finishExecutingWriteWithoutShardKeyWithId();
     ASSERT(op.isFinished());
-    ASSERT(op.shouldStopCurrentRound());
     ASSERT_EQ(updateOp.getWriteState(), WriteOpState_Completed);
 
     auto replies = op.generateReplyInfo();
@@ -4488,7 +4487,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCError)
     // Since we got an n=1 reply we are done.
     op.finishExecutingWriteWithoutShardKeyWithId();
     ASSERT(op.isFinished());
-    ASSERT(op.shouldStopCurrentRound());
     ASSERT_EQ(updateOp.getWriteState(), WriteOpState_Completed);
 
     auto replies = op.generateReplyInfo();

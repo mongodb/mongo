@@ -22,44 +22,56 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(coll, {x: 1}, [
     {min: {x: 0}, max: {x: MaxKey}, shard: st.shard1.shardName},
 ]);
 
-// Write two documents.
-assert.commandWorked(coll.insert({x: -1, _id: -1}));
-assert.commandWorked(coll.insert({x: 1, _id: 1}));
+const performOps =
+    function(ordered, numRetryCount) {
+    jsTest.log("Perform write with ordered: " + ordered);
+    // Write two documents.
+    assert.commandWorked(coll.insert({x: -1, _id: -1}));
+    assert.commandWorked(coll.insert({x: 1, _id: 1}));
 
-assert.neq(st.s1.getDB(jsTestName()).coll.findOne({x: -1, _id: -1}));
+    assert.neq(st.s1.getDB(jsTestName()).coll.findOne({x: -1, _id: -1}));
 
-// Move chunk from shard0 to shard1.
-assert.commandWorked(
-    db.adminCommand({moveChunk: coll.getFullName(), find: {x: -1}, to: st.shard1.shardName}));
+    // Move chunk from shard0 to shard1.
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {x: -1}, to: st.shard1.shardName}));
 
-// This update via mongos1 should trigger a StaleConfigError as mongos1 is not aware of moved chunk.
-const session = st.s1.startSession({retryWrites: true});
-const sessionColl = session.getDatabase(db.getName()).getCollection(db.coll.getName());
-let res = sessionColl.bulkWrite(
-    [
-        {updateOne: {"filter": {_id: -1}, "update": {$inc: {counter: 1}}}},
-        {updateOne: {"filter": {_id: 1}, "update": {$inc: {counter: 1}}}},
-        {updateOne: {"filter": {_id: 2}, "update": {$inc: {counter: 1}}}},
-    ],
-    {ordered: false});
+    // This update via mongos1 should trigger a StaleConfigError as mongos1 is not aware of moved
+    // chunk.
+    const session = st.s1.startSession({retryWrites: true});
+    const sessionColl = session.getDatabase(db.getName()).getCollection(db.coll.getName());
+    let res = sessionColl.bulkWrite(
+        [
+            {updateOne: {"filter": {_id: -1}, "update": {$inc: {counter: 1}}}},
+            {updateOne: {"filter": {_id: 1}, "update": {$inc: {counter: 1}}}},
+            {updateOne: {"filter": {_id: 2}, "update": {$inc: {counter: 1}}}},
+        ],
+        {ordered: ordered});
 
-assert.eq(res.matchedCount, 2);
-let mongosServerStatus =
-    assert.commandWorked(st.s1.getDB(jsTestName()).adminCommand({serverStatus: 1}));
-assert.eq(3, mongosServerStatus.metrics.query.updateOneWithoutShardKeyWithIdRetryCount);
-assert.commandWorked(
-    db.adminCommand({moveChunk: coll.getFullName(), find: {x: -1}, to: st.shard0.shardName}));
+    assert.eq(res.matchedCount, 2);
+    let mongosServerStatus =
+        assert.commandWorked(st.s1.getDB(jsTestName()).adminCommand({serverStatus: 1}));
+    assert.eq(numRetryCount,
+              mongosServerStatus.metrics.query.updateOneWithoutShardKeyWithIdRetryCount);
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {x: -1}, to: st.shard0.shardName}));
 
-res = sessionColl.bulkWrite(
-    [
-        {deleteOne: {"filter": {_id: -1}}},
-        {deleteOne: {"filter": {_id: 1}}},
-        {deleteOne: {"filter": {_id: 2}}},
-    ],
-    {ordered: false});
-assert.eq(res.deletedCount, 2);
-mongosServerStatus =
-    assert.commandWorked(st.s1.getDB(jsTestName()).adminCommand({serverStatus: 1}));
-assert.eq(3, mongosServerStatus.metrics.query.deleteOneWithoutShardKeyWithIdRetryCount);
-session.endSession();
+    res = sessionColl.bulkWrite(
+        [
+            {deleteOne: {"filter": {_id: -1}}},
+            {deleteOne: {"filter": {_id: 1}}},
+            {deleteOne: {"filter": {_id: 2}}},
+        ],
+        {ordered: ordered});
+    assert.eq(res.deletedCount, 2);
+    mongosServerStatus =
+        assert.commandWorked(st.s1.getDB(jsTestName()).adminCommand({serverStatus: 1}));
+    assert.eq(numRetryCount,
+              mongosServerStatus.metrics.query.deleteOneWithoutShardKeyWithIdRetryCount);
+    session.endSession();
+}
+
+// Test batched ops with ordered: true and ordered: false.
+performOps(false, 3);
+performOps(true, 4);
+
 st.stop();

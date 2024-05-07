@@ -689,7 +689,7 @@ void executeWriteWithoutShardKey(
     }
 }
 
-void executeNonTargetedSingleWriteWithoutShardKeyWithId(
+void executeNonTargetedWriteWithoutShardKeyWithId(
     OperationContext* opCtx,
     const std::vector<std::unique_ptr<NSTargeter>>& targeters,
     TargetedBatchMap& childBatches,
@@ -783,7 +783,7 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
                 executeWriteWithoutShardKey(
                     opCtx, targeters, childBatches, bulkWriteOp, errorsPerNamespace);
             } else if (targetStatus.getValue() == WriteType::WithoutShardKeyWithId) {
-                executeNonTargetedSingleWriteWithoutShardKeyWithId(
+                executeNonTargetedWriteWithoutShardKeyWithId(
                     opCtx, targeters, childBatches, bulkWriteOp, errorsPerNamespace);
             } else if (targetStatus.getValue() == WriteType::MultiWriteBlockingMigrations) {
                 coordinateMultiUpdate(opCtx, childBatches, bulkWriteOp);
@@ -1805,7 +1805,6 @@ void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId() {
             if (targeterHasStaleShardResponse()) {
                 if (writeOp.getWriteState() != WriteOpState_Ready) {
                     writeOp.resetWriteToReady();
-                    _shouldStopCurrentRound = false;
                 }
             } else if (writeOp.getWriteState() != WriteOpState_Error) {
                 auto nVal = response.getNModified() + response.getNDeleted();
@@ -1834,6 +1833,10 @@ void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId() {
         }
         _deferredWCErrors = boost::none;
     }
+
+    // Setting _shouldStopCurrentRound to false here allows for the processing of any pending
+    // writeOps. The decision to stop retrying for the current writeOp is made before this point.
+    _shouldStopCurrentRound = false;
 }
 
 int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {
