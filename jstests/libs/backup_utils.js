@@ -80,7 +80,9 @@ export function getBackupCursorMetadata(backupCursor) {
 export function copyBackupCursorFiles(
     backupCursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback) {
     resetDbpath(destinationDirectory);
-    mkdir(destinationDirectory + "/journal");
+    let separator = _isWindows() ? '\\' : '/';
+    // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
+    mkdir(destinationDirectory + separator + "journal");
 
     let copyThread = copyBackupCursorExtendFiles(
         backupCursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback);
@@ -98,6 +100,7 @@ export function copyBackupCursorExtendFiles(
         _copyFiles(files, dbpath, destinationDirectory, _copyFileHelper);
     }
 
+    // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
     jsTestLog({
         msg: "Destination",
         destination: destinationDirectory,
@@ -141,6 +144,9 @@ export function _copyFileHelper(absoluteFilePath, sourceDbPath, destinationDirec
     let separator = '/';
     if (_isWindows()) {
         separator = '\\';
+        // Convert dbpath which may contain directoryperdb/wiredTigerDirectoryForIndexes
+        // subdirectory in POSIX style.
+        absoluteFilePath = absoluteFilePath.replace(/[\/]/g, separator);
     }
     let lastChar = sourceDbPath[sourceDbPath.length - 1];
     if (lastChar !== '/' && lastChar !== '\\') {
@@ -208,6 +214,7 @@ export class MagicRestoreUtils {
         assert.commandWorked(this.backupSource.adminCommand({fsync: 1}));
 
         resetDbpath(this.backupDbPath);
+        // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
         mkdir(this.backupDbPath + "/journal");
 
         // Open a backup cursor on the checkpoint.
