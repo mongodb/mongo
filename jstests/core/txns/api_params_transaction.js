@@ -9,9 +9,7 @@
  * ]
  */
 
-import {
-    retryOnceOnTransientAndRestartTxnOnMongos
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = jsTestName();
 const collName = "test";
@@ -64,16 +62,20 @@ for (const txnInitiatingParams of apiParamCombos) {
                 }
             }
 
-            session.startTransaction();
-            retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
-                assert.commandWorked(sessionDb.runCommand(addApiParams(
-                    {insert: collName, documents: [{}, {}, {}]}, txnInitiatingParams)));
+            withRetryOnTransientTxnError(
+                () => {
+                    session.startTransaction();
+                    assert.commandWorked(sessionDb.runCommand(addApiParams(
+                        {insert: collName, documents: [{}, {}, {}]}, txnInitiatingParams)));
 
-                /*
-                 * Check "insert" with API params in a transaction.
-                 */
-                checkCommand(sessionDb, {insert: collName, documents: [{}]});
-            }, {});
+                    /*
+                     * Check "insert" with API params in a transaction.
+                     */
+                    checkCommand(sessionDb, {insert: collName, documents: [{}]});
+                },
+                () => {
+                    session.abortTransaction_forTesting();
+                });
 
             /*
              * Check "commitTransaction" or "abortTransaction".
