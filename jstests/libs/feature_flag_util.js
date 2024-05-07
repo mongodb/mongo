@@ -32,9 +32,8 @@ export var FeatureFlagUtil = (function() {
         let conn;
         const setConn = (db) => {
             if (FixtureHelpers.isMongos(db)) {
-                const primaries = FixtureHelpers.getPrimaries(db);
-                assert.gt(primaries.length, 0, "Expected at least one primary");
-                conn = primaries[0];
+                // For sharded cluster get a connection to the first replicaset
+                conn = new Mongo(FixtureHelpers.getAllReplicas(db)[0].getURL());
             } else {
                 conn = db;
             }
