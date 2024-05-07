@@ -53,8 +53,7 @@ std::unique_ptr<PlanYieldPolicyRemoteCursor> PlanYieldPolicyRemoteCursor::make(
     }
 
     auto yieldPolicy = std::unique_ptr<PlanYieldPolicyRemoteCursor>(new PlanYieldPolicyRemoteCursor(
-        opCtx, policy, yieldable, std::make_unique<YieldPolicyCallbacksImpl>(nss)));
-    yieldPolicy->registerPlanExecutor(exec);
+        opCtx, policy, yieldable, std::make_unique<YieldPolicyCallbacksImpl>(nss), exec));
     return yieldPolicy;
 }
 
@@ -62,14 +61,16 @@ PlanYieldPolicyRemoteCursor::PlanYieldPolicyRemoteCursor(
     OperationContext* opCtx,
     PlanYieldPolicy::YieldPolicy policy,
     std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
-    std::unique_ptr<YieldPolicyCallbacks> callbacks)
+    std::unique_ptr<YieldPolicyCallbacks> callbacks,
+    PlanExecutor* exec)
     : PlanYieldPolicy(opCtx,
                       policy,
                       opCtx->getServiceContext()->getFastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()},
                       yieldable,
-                      std::move(callbacks)) {}
+                      std::move(callbacks)),
+      _exec(exec) {}
 
 void PlanYieldPolicyRemoteCursor::saveState(OperationContext* opCtx) {
     if (_exec) {
