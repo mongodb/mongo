@@ -94,9 +94,9 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     remove_set_parameter_if_before_version(suite_set_parameters, "queryAnalysisWriterIntervalSecs",
                                            bin_version, "7.0.0")
     remove_set_parameter_if_before_version(suite_set_parameters, "internalQueryStatsRateLimit",
-                                           bin_version, "7.0.6")
+                                           bin_version, "7.0")
     remove_set_parameter_if_before_version(
-        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.0.6")
+        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.0")
     _apply_set_parameters(args, suite_set_parameters)
     mongod_options.pop("set_parameters")
 
@@ -127,9 +127,9 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     remove_set_parameter_if_before_version(
         suite_set_parameters, "queryAnalysisSamplerConfigurationRefreshSecs", bin_version, "7.0.0")
     remove_set_parameter_if_before_version(suite_set_parameters, "internalQueryStatsRateLimit",
-                                           bin_version, "7.0.6")
+                                           bin_version, "7.0")
     remove_set_parameter_if_before_version(
-        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.0.6")
+        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.0")
     _apply_set_parameters(args, suite_set_parameters)
     mongos_options.pop("set_parameters")
 

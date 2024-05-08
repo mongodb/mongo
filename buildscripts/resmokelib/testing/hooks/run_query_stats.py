@@ -35,10 +35,13 @@ class RunQueryStats(Hook):
         """Verify a $queryStats call has all the right properties."""
         try:
             with self.client.admin.aggregate([{"$queryStats": querystats_spec}]) as cursor:
+                nreturned = 0
                 for operation in cursor:
                     assert "key" in operation
                     assert "metrics" in operation
                     assert "asOf" in operation
+                    nreturned += 1
+                self.logger.info("Found %d query stats entries.", nreturned)
         except pymongo.errors.OperationFailure as err:
             if self.allow_feature_not_supported and err.code in QUERY_STATS_NOT_ENABLED_CODES:
                 self.logger.info("Encountered an error while running $queryStats. "
@@ -50,6 +53,13 @@ class RunQueryStats(Hook):
         self.verify_query_stats({})
         self.verify_query_stats(
             {"transformIdentifiers": {"algorithm": "hmac-sha-256", "hmacKey": self.hmac_key}})
+
+        # Log the number of evictions we encountered.
+        server_status = self.client.admin.command({"serverStatus": 1})
+        num_evicted_entries = server_status["metrics"]["queryStats"]["numEvicted"]
+        if num_evicted_entries > 0:
+            self.logger.info("Evicted %d query stats entries during test execution.",
+                             num_evicted_entries)
 
     def before_test(self, test, test_report):
         try:
