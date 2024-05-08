@@ -61,9 +61,6 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
 
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 namespace mongo {
 
 void FallbackOpObserver::onInserts(OperationContext* opCtx,
@@ -162,40 +159,6 @@ void FallbackOpObserver::onUpdate(OperationContext* opCtx,
     }
 }
 
-
-namespace {
-void onDeleteView(OperationContext* opCtx,
-                  const NamespaceString& viewNamespace,
-                  const BSONObj& doc) {
-    auto catalog = CollectionCatalog::get(opCtx);
-    try {
-        auto targetCollectionStr = doc["_id"].checkAndGetStringData();
-        NamespaceString targetNamespace = NamespaceStringUtil::deserialize(
-            viewNamespace.tenantId(), targetCollectionStr, SerializationContext::stateDefault());
-
-        // TODO: SERVER-83496 Some tests use apply_ops with invalid namespaces or wrong parameters,
-        // which produce errors in the collection acquisition
-
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "Drop on invalid view: "
-                              << targetNamespace.toStringForResourceId(),
-                targetNamespace.isValid());
-
-        Status status = catalog->dropView(opCtx, targetNamespace);
-        if (!status.isOK()) {
-            LOGV2_WARNING(7861503,
-                          "Failed to remove view from the system catalog",
-                          "view"_attr = targetNamespace.toStringForErrorMsg());
-            iasserted(ErrorCodes::InternalError, "Failed to remove view from catalog");
-        }
-    } catch (const DBException&) {
-        // If a previous operation left the view catalog in an invalid state, we refresh
-        // the catalog
-        catalog->reloadViews(opCtx, viewNamespace.dbName());
-    }
-}
-}  // namespace
-
 void FallbackOpObserver::onDelete(OperationContext* opCtx,
                                   const CollectionPtr& coll,
                                   StmtId stmtId,
@@ -212,7 +175,7 @@ void FallbackOpObserver::onDelete(OperationContext* opCtx,
     if (nss.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (nss.isSystemDotViews()) {
-        onDeleteView(opCtx, nss, doc);
+        CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
                (inBatchedWrite || !opAccumulator->opTime.writeOpTime.isNull())) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
