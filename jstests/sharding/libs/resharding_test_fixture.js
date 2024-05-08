@@ -37,6 +37,7 @@ export var ReshardingTest = class {
         configShard: configShard = false,
         wiredTigerConcurrentWriteTransactions: wiredTigerConcurrentWriteTransactions = undefined,
         reshardingOplogBatchTaskCount: reshardingOplogBatchTaskCount = undefined,
+        ttlMonitorSleepSecs: ttlMonitorSleepSecs = undefined,
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -69,6 +70,7 @@ export var ReshardingTest = class {
         this._configShard = configShard || jsTestOptions().configShard;
         this._wiredTigerConcurrentWriteTransactions = wiredTigerConcurrentWriteTransactions;
         this._reshardingOplogBatchTaskCount = reshardingOplogBatchTaskCount;
+        this._ttlMonitorSleepSecs = ttlMonitorSleepSecs;
         /** @private */
         this._opType = "reshardCollection";
 
@@ -197,6 +199,10 @@ export var ReshardingTest = class {
         if (this._reshardingOplogBatchTaskCount !== undefined) {
             rsOptions.setParameter.reshardingOplogBatchTaskCount =
                 this._reshardingOplogBatchTaskCount;
+        }
+
+        if (this._ttlMonitorSleepSecs !== undefined) {
+            rsOptions.setParameter.ttlMonitorSleepSecs = this._ttlMonitorSleepSecs;
         }
 
         this._st = new ShardingTest({
