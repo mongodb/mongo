@@ -1925,6 +1925,12 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
                            args.op.additiveMetrics.executionTime.value_or(Microseconds{0})));
     });
 
+    addIfNeeded("workingMillis", [](auto field, auto args, auto& b) {
+        b.appendNumber(field,
+                       durationCount<Milliseconds>(
+                           args.op.additiveMetrics.clusterWorkingTime.value_or(Milliseconds{0})));
+    });
+
     addIfNeeded("planSummary", [](auto field, auto args, auto& b) {
         if (!args.curop.getPlanSummary().empty()) {
             b.append(field, args.curop.getPlanSummary());
