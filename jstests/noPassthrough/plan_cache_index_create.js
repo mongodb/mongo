@@ -121,6 +121,9 @@ function runTest({rst, readDB, writeDB}) {
     // Drop the newly created index and confirm that the plan cache has been cleared.
     assert.commandWorked(
         writeDB.runCommand({dropIndexes: collName, index: {x: 1}, writeConcern: {w: "majority"}}));
+
+    rst.awaitReplication();
+
     assertDoesNotHaveCachedPlan(readColl, filter);
 
     //
