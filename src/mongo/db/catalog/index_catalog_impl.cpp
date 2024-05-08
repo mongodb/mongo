@@ -1349,8 +1349,8 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
     // Drop the ident if it exists. The storage engine will return OK if the ident is not found.
     auto engine = opCtx->getServiceContext()->getStorageEngine();
     const std::string ident = released->getIdent();
-    Status status =
-        engine->getEngine()->dropIdent(shard_role_details::getRecoveryUnit(opCtx), ident);
+    Status status = engine->getEngine()->dropIdentSynchronous(
+        shard_role_details::getRecoveryUnit(opCtx), ident);
     if (!status.isOK()) {
         return status;
     }
