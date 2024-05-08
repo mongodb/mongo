@@ -77,8 +77,8 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromDefaultStartingSi
 
 TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromCustomStartingSize) {
     MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
-        MongotTaskExecutorCursorGetMoreStrategy(
-            /*preFetchNextBatch*/ true, /*calcDocsNeededFn*/ nullptr, /*startingBatchSize*/ 3);
+        MongotTaskExecutorCursorGetMoreStrategy(/*calcDocsNeededFn*/ nullptr,
+                                                /*startingBatchSize*/ 3);
 
     // Check that GetMoreStrategy is properly initialized with our specified startingBatchSize
     // value.
@@ -109,11 +109,9 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromCustomStartingSiz
 }
 
 TEST_F(MongotCursorHelpersTest, BatchSizeGrowthPausesAndResumes) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagSearchBatchSizeTuning",
-                                                               true);
     MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
-        MongotTaskExecutorCursorGetMoreStrategy(
-            /*preFetchNextBatch*/ true, /*calcDocsNeededFn*/ nullptr, /*startingBatchSize*/ 10);
+        MongotTaskExecutorCursorGetMoreStrategy(/*calcDocsNeededFn*/ nullptr,
+                                                /*startingBatchSize*/ 10);
 
     // Check that GetMoreStrategy is properly initialized with our specified startingBatchSize
     // value.
@@ -184,7 +182,7 @@ DEATH_TEST_F(MongotCursorHelpersTest,
     };
 
     // Fails when we pass a calcDocsNeededFn and default batchSize.
-    MongotTaskExecutorCursorGetMoreStrategy(/*preFetchNextBatch*/ true, calcDocsNeededFn);
+    MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy(calcDocsNeededFn);
 }
 DEATH_TEST_F(MongotCursorHelpersTest,
              GetMoreRequestCannotUseNonDefaultBatchSizeWithDocsRequested,
@@ -193,9 +191,8 @@ DEATH_TEST_F(MongotCursorHelpersTest,
         return 10;
     };
 
-    // Fails when we pass a calcDocsNeededFn and default batchSize.
-    MongotTaskExecutorCursorGetMoreStrategy(
-        /*preFetchNextBatch*/ true, calcDocsNeededFn, /*initialBatchSize*/ 10);
+    // Fails when we pass a calcDocsNeededFn and non-default batchSize.
+    MongotTaskExecutorCursorGetMoreStrategy(calcDocsNeededFn, /*initialBatchSize*/ 10);
 }
 
 }  // namespace

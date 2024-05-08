@@ -37,12 +37,14 @@ namespace mongo {
 namespace executor {
 
 MongotTaskExecutorCursorGetMoreStrategy::MongotTaskExecutorCursorGetMoreStrategy(
-    bool preFetchNextBatch,
     std::function<boost::optional<long long>()> calcDocsNeededFn,
-    boost::optional<long long> startingBatchSize)
-    : _preFetchNextBatch(preFetchNextBatch),
-      _calcDocsNeededFn(calcDocsNeededFn),
+    boost::optional<long long> startingBatchSize,
+    DocsNeededBounds minDocsNeededBounds,
+    DocsNeededBounds maxDocsNeededBounds)
+    : _calcDocsNeededFn(calcDocsNeededFn),
       _currentBatchSize(startingBatchSize),
+      _minDocsNeededBounds(minDocsNeededBounds),
+      _maxDocsNeededBounds(maxDocsNeededBounds),
       _batchSizeHistory({}) {
     if (startingBatchSize.has_value()) {
         _batchSizeHistory.emplace_back(*startingBatchSize);
@@ -91,6 +93,21 @@ long long MongotTaskExecutorCursorGetMoreStrategy::_getNextBatchSize(
     }
     _batchSizeHistory.emplace_back(*_currentBatchSize);
     return *_currentBatchSize;
+}
+
+bool MongotTaskExecutorCursorGetMoreStrategy::shouldPrefetch() const {
+    // If we aren't sending batchSize to mongot, then we prefetch the next batch, unless we have a
+    // discrete maximum bounds used to set docsRequested. When docsRequested is set, we
+    // optimistically assume that we will only need a single batch and attempt to avoid doing
+    // unnecessary work on mongot. If $idLookup filters out enough documents such that we are not
+    // able to satisfy the limit, then we will fetch the next batch syncronously on the subsequent
+    // 'getNext()' call.
+    if (!_currentBatchSize.has_value()) {
+        return !std::holds_alternative<long long>(_maxDocsNeededBounds);
+    }
+
+    // TODO SERVER-86739 Enable pre-fetching for queries that use batchSize tuning.
+    return false;
 }
 
 }  // namespace executor

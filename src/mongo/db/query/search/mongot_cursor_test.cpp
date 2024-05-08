@@ -99,22 +99,28 @@ public:
     std::unique_ptr<TaskExecutorCursor> makeMongotCursor(
         RemoteCommandRequest rcr,
         std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
-        bool preFetchNextBatch = true,
-        boost::optional<long long> startingBatchSize = boost::none) {
+        boost::optional<long long> startingBatchSize = boost::none,
+        DocsNeededBounds minDocsNeededBounds = docs_needed_bounds::Unknown(),
+        DocsNeededBounds maxDocsNeededBounds = docs_needed_bounds::Unknown()) {
         std::unique_ptr<MongotTaskExecutorCursorGetMoreStrategy> mongotGetMoreStrategy;
 
         // If calcDocsNeededFn is provided, that enables use of the docsRequested option. Otherwise,
         // enable use of batchSize option.
         if (calcDocsNeededFn != nullptr) {
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(
-                preFetchNextBatch, calcDocsNeededFn, /*startingBatchSize*/ boost::none);
+                calcDocsNeededFn,
+                /*startingBatchSize*/ boost::none,
+                minDocsNeededBounds,
+                maxDocsNeededBounds);
         } else if (startingBatchSize.has_value()) {
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(
-                preFetchNextBatch, /*calcDocsNeededFn*/ nullptr, startingBatchSize);
+                /*calcDocsNeededFn*/ nullptr,
+                startingBatchSize,
+                minDocsNeededBounds,
+                maxDocsNeededBounds);
         } else {
             // Use the default startingBatchSize.
-            mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(
-                preFetchNextBatch, /*calcDocsNeededFn*/ nullptr);
+            mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>();
         }
         return Base::makeTec(rcr, {std::move(mongotGetMoreStrategy)});
     }
@@ -144,7 +150,11 @@ public:
             auto calcDocsNeededFn = []() {
                 return 10;
             };
-            auto tec = makeMongotCursor(rcr, calcDocsNeededFn, /*preFetchNextBatch*/ false);
+            auto tec = makeMongotCursor(rcr,
+                                        calcDocsNeededFn,
+                                        /*startingBatchSize*/ boost::none,
+                                        /*minDocsNeededBounds*/ 10,
+                                        /*maxDocsNeededBounds*/ 10);
 
             // Mock the response for the first batch.
             scheduleSuccessfulCursorResponse(
@@ -154,8 +164,7 @@ public:
             ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
             ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
 
-            // Assert that the TaskExecutorCursor has not requested a GetMore. This enforces that
-            // 'preFetchNextBatch' works as expected.
+            // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
             ASSERT_FALSE(hasReadyRequests());
 
             // As soon as 'getNext()' is invoked, the TaskExecutorCursor will try to send a GetMore
@@ -217,8 +226,11 @@ public:
                 docsRequested -= 20;
                 return docsRequested;
             };
-            auto tec = makeMongotCursor(rcr, calcDocsNeededFn, /*preFetchNextBatch*/ false);
-
+            auto tec = makeMongotCursor(rcr,
+                                        calcDocsNeededFn,
+                                        /*startingBatchSize*/ boost::none,
+                                        /*minDocsNeededBounds*/ 50,
+                                        /*maxDocsNeededBounds*/ 100);
             // Mock the response for the first batch.
             scheduleSuccessfulCursorResponse(
                 "firstBatch", 1, 2, cursorId, /*expectedPrefetch*/ false);
@@ -227,8 +239,7 @@ public:
             ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
             ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
 
-            // Assert that the TaskExecutorCursor has not requested a GetMore. This enforces that
-            // 'preFetchNextBatch' works as expected.
+            // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
             ASSERT_FALSE(hasReadyRequests());
 
             // Schedule another batch, where docsRequested should be set to 50 - 20 = 30;
@@ -280,8 +291,7 @@ public:
                                      opCtx.get());
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
-            auto tec =
-                makeMongotCursor(rcr, /*calcDocsNeededFn*/ nullptr, /*preFetchNextBatch*/ false);
+            auto tec = makeMongotCursor(rcr);
 
             // Mock the response for the first batch.
             scheduleSuccessfulCursorResponse(
@@ -292,8 +302,7 @@ public:
                 ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
             }
 
-            // Assert that the TaskExecutorCursor has not requested a GetMore. This enforces that
-            // 'preFetchNextBatch' works as expected.
+            // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
             ASSERT_FALSE(hasReadyRequests());
 
             // Schedule another batch, where the batchSize should have exponentially increased from
@@ -352,7 +361,6 @@ public:
             // NetworkInterfaceMock.
             auto tec = makeMongotCursor(rcr,
                                         /*calcDocsNeededFn*/ nullptr,
-                                        /*preFetchNextBatch*/ false,
                                         /*startingBatchSize*/ 3);
             // Mock the response for the first batch.
             scheduleSuccessfulCursorResponse(
@@ -363,8 +371,7 @@ public:
                 ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
             }
 
-            // Assert that the TaskExecutorCursor has not requested a GetMore. This enforces that
-            // 'preFetchNextBatch' works as expected.
+            // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
             ASSERT_FALSE(hasReadyRequests());
 
             // Schedule another batch, where the batchSize should have exponentially increased from
@@ -410,9 +417,6 @@ public:
     }
 
     void BatchSizePausesGrowthWhenBatchNotFilledTest() {
-        RAIIServerParameterControllerForTest featureFlagController(
-            "featureFlagSearchBatchSizeTuning", true);
-
         // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
         // throughout the test.
         unittest::threadAssertionMonitoredTest([&](auto& monitor) {
@@ -426,7 +430,6 @@ public:
             // NetworkInterfaceMock.
             auto tec = makeMongotCursor(rcr,
                                         /*calcDocsNeededFn*/ nullptr,
-                                        /*preFetchNextBatch*/ false,
                                         /*startingBatchSize*/ 20);
             // Mock the response for the first batch, which only returns 15 documents, rather than
             // the requested 20.
@@ -438,8 +441,7 @@ public:
                 ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
             }
 
-            // Assert that the TaskExecutorCursor has not requested a GetMore. This enforces that
-            // 'preFetchNextBatch' works as expected.
+            // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
             ASSERT_FALSE(hasReadyRequests());
 
             // Schedule another batch, where the batchSize should remain at 20 since the previous
@@ -483,9 +485,6 @@ public:
     }
 
     void BatchSizeGrowthPausesThenResumesTest() {
-        RAIIServerParameterControllerForTest featureFlagController(
-            "featureFlagSearchBatchSizeTuning", true);
-
         // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
         // throughout the test.
         unittest::threadAssertionMonitoredTest([&](auto& monitor) {
@@ -499,7 +498,6 @@ public:
             // NetworkInterfaceMock.
             auto tec = makeMongotCursor(rcr,
                                         /*calcDocsNeededFn*/ nullptr,
-                                        /*preFetchNextBatch*/ false,
                                         /*startingBatchSize*/ 5);
             // Mock the response for the first batch, which fulfills the requested batchSize of 5.
             scheduleSuccessfulCursorResponse(
@@ -510,8 +508,7 @@ public:
                 ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
             }
 
-            // Assert that the TaskExecutorCursor has not requested a GetMore. This enforces that
-            // 'preFetchNextBatch' works as expected.
+            // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
             ASSERT_FALSE(hasReadyRequests());
 
             // Schedule another batch, where the batchSize requested has doubled to 10, but it will

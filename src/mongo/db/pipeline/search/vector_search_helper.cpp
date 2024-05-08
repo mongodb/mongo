@@ -64,11 +64,14 @@ std::unique_ptr<executor::TaskExecutorCursor> establishVectorSearchCursor(
     // everything to fit into one batch, since we give mongot the exact upper bound initially - we
     // will only see multiple batches if this upper bound doesn't fit in 16MB. This should be a rare
     // enough case that it shouldn't overwhelm mongot to pre-fetch.
+    auto getMoreStrategy = std::make_unique<executor::DefaultTaskExecutorCursorGetMoreStrategy>(
+        /*batchSize*/ boost::none,
+        /*preFetchNextBatch*/ true);
     auto cursors = mongot_cursor::establishCursors(
         expCtx,
         getRemoteCommandRequestForVectorSearchQuery(expCtx, request),
         taskExecutor,
-        true /* preFetchNextBatch */);
+        std::move(getMoreStrategy));
     // Should always have one results cursor.
     tassert(7828000, "Expected exactly one cursor from mongot", cursors.size() == 1);
     return std::move(cursors.front());

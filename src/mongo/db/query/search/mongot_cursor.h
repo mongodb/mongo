@@ -76,10 +76,8 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const executor::RemoteCommandRequest& command,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
-    bool preFetchNextBatch,
-    std::function<boost::optional<long long>()> calcDocsNeededFn = nullptr,
-    std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr,
-    boost::optional<long long> batchSize = boost::none);
+    std::unique_ptr<executor::TaskExecutorCursorGetMoreStrategy> getMoreStrategy,
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr);
 
 /**
  * Run the given search query against mongot and build one cursor object for each
