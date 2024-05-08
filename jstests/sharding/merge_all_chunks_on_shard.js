@@ -54,10 +54,13 @@ function setOnCurrentShardSince(mongoS, coll, extraQuery, refTimestamp, offsetIn
 }
 
 /* Set jumbo flag to true */
-function setJumboFlag(configDB, coll, chunkQuery) {
-    const collUuid = configDB.collections.findOne({_id: coll.getFullName()}).uuid;
+function setJumboFlag(mongoS, coll, chunkQuery) {
+    // Use 'retryWrites' when writing to the configsvr because they are not automatically retried.
+    const mongosSession = mongoS.startSession({retryWrites: true});
+    const sessionConfigDB = mongosSession.getDatabase('config');
+    const collUuid = sessionConfigDB.collections.findOne({_id: coll.getFullName()}).uuid;
     const query = Object.assign({uuid: collUuid}, chunkQuery);
-    assert.commandWorked(configDB.chunks.update(query, {$set: {jumbo: true}}));
+    assert.commandWorked(sessionConfigDB.chunks.update(query, {$set: {jumbo: true}}));
 }
 
 function setHistoryWindowInSecs(st, valueInSeconds) {
@@ -318,8 +321,8 @@ function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
 
     // Set jumbo flag to a couple of chunks
     // Setting a chunks as jumbo must prevent it from being merged
-    setJumboFlag(configDB, coll, {min: {x: 3}});
-    setJumboFlag(configDB, coll, {min: {x: 8}});
+    setJumboFlag(st.s, coll, {min: {x: 3}});
+    setJumboFlag(st.s, coll, {min: {x: 8}});
 
     // Try to merge all mergeable chunks on shard0
     assert.commandWorked(
