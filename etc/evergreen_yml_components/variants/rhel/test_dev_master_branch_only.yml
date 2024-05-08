@@ -483,30 +483,6 @@ buildvariants:
     # If we decide we need this task we can add it to its own variant that depends on archive_dist_test_debug
     # - name: generate_buildid_to_debug_symbols_mapping
 
-  - name: &enterprise-rhel-80-64-mongot-integration enterprise-rhel-80-64-mongot-integration
-    display_name: "Enterprise RHEL 8.0 Mongot Integration"
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-    run_on:
-      - rhel80-medium
-    tags: []
-    expansions:
-      scons_cache_scope: shared
-      scons_cache_mode: all
-      compile_variant: *enterprise-rhel-80-64-mongot-integration
-      has_packages: false
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel80
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --link-model=dynamic
-        --use-diagnostic-latches=on
-        --build-mongot
-    depends_on: []
-    tasks:
-      - name: search_end_to_end_sharded_cluster
-      - name: search_end_to_end_single_node
-
   - <<: *enterprise-rhel-79-64-bit-template
     name: &hot_backups-rhel-79-64-bit hot_backups-rhel-79-64-bit
     display_name: "hot_backups RHEL 7.9"
