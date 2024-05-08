@@ -31,6 +31,7 @@ executor:
         featureFlagRouterPort: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         queryAnalysisWriterIntervalSecs: 1
+        reshardingMinimumOperationDurationMillis: 0
         roleGraphInvalidationIsFatal: 1
         skipDroppingHashedShardKeyIndex: true
     num_mongos: 2
