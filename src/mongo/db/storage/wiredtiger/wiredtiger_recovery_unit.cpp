@@ -500,6 +500,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     invariant(!_isCommittingOrAborting(),
               str::stream() << "commit or rollback handler reopened transaction: "
                             << toString(_getState()));
+
+    ensureSnapshot();
     _ensureSession();
 
     // Only start a timer for transaction's lifetime if we're going to log it.

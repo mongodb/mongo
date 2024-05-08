@@ -112,6 +112,8 @@ class RecoveryUnit {
     RecoveryUnit& operator=(const RecoveryUnit&) = delete;
 
 public:
+    virtual ~RecoveryUnit() = default;
+
     /**
      * A Snapshot is a decorable type whose lifetime is tied to the the lifetime of a
      * snapshot within the RecoveryUnit. Snapshots hold no storage engine state and are to
@@ -138,14 +140,18 @@ public:
     };
 
     /**
-     * Returns the current snapshot on this RecoveryUnit. Will be destructed and re-constructed when
-     * the storage engine snapshot is closed via calls to abandonSnapshot, commitUnitOfWork, or
-     * abortUnitOfWork.
+     * Returns the current Snapshot on this RecoveryUnit, constructing one if none exists yet.
+     * Otherwise, a Snapshot is guaranteed to be constructed when the storage engine snapshot is
+     * opened. Will be destructed when the storage engine snapshot is closed via calls to
+     * abandonSnapshot, commitUnitOfWork, or abortUnitOfWork.
      *
      * Note that the RecoveryUnit does not make any guarantees that this reference remains valid
      * except for the lifetime of the Snapshot.
      */
     Snapshot& getSnapshot() {
+        if (!_snapshot.is_initialized()) {
+            ensureSnapshot();
+        }
         return _snapshot.get();
     }
 
@@ -164,7 +170,6 @@ public:
 
     void commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp);
     void abortRegisteredChanges();
-    virtual ~RecoveryUnit();
 
     /**
      * Marks the beginning of a unit of work. Each call must be matched with exactly one call to
@@ -352,8 +357,8 @@ public:
      *
      * This is unrelated to Timestamp which must be globally comparable.
      */
-    SnapshotId getSnapshotId() const {
-        return _snapshot->getId();
+    SnapshotId getSnapshotId() {
+        return getSnapshot().getId();
     }
 
     /**
@@ -855,7 +860,7 @@ public:
     virtual void setCacheMaxWaitTimeout(Milliseconds) {}
 
 protected:
-    RecoveryUnit();
+    RecoveryUnit() = default;
 
     /**
      * Returns the current state.
@@ -909,10 +914,19 @@ protected:
 
     DataCorruptionDetectionMode _dataCorruptionDetectionMode = DataCorruptionDetectionMode::kThrow;
 
-private:
-    // Sets the snapshot associated with this RecoveryUnit to a new globally unique id number.
-    void assignNextSnapshot();
+    /**
+     * Creates a new globally-unique Snapshot, if one does not exst.
+     */
+    void ensureSnapshot();
 
+    /**
+     * Destructs the current snapshot.
+     */
+    void resetSnapshot() {
+        _snapshot.reset();
+    }
+
+private:
     virtual void doBeginUnitOfWork() = 0;
     virtual void doAbandonSnapshot() = 0;
     virtual void doCommitUnitOfWork() = 0;
@@ -926,8 +940,7 @@ private:
     Changes _changes;
     Changes _changesForCatalogVisibility;
     Changes _changesForTwoPhaseDrop;
-    // The Snapshot is always initialized by the RecoveryUnit constructor. We use an optional to
-    // simplify destructing and re-constructing the Snapshot in-place.
+    // Is constructed lazily when accessed or when an underlying storage snapshot is opened.
     boost::optional<Snapshot> _snapshot;
     State _state = State::kInactive;
     OperationContext* _opCtx = nullptr;
