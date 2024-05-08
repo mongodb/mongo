@@ -41,9 +41,10 @@ export const $config = (function() {
             // If we allow multiple threads to interact with the same collection the document insert
             // performed at the end could potentially create an uncapped collection if another
             // thread just dropped the collection.
-            if (this.tid <= this.collectionCount) {
+            const collNumber = this.tid % this.threadCount;
+            if (collNumber < this.collectionCount) {
                 const localDb = db.getSiblingDB("local");
-                const myCollName = createCollName(this.prefix, this.tid);
+                const myCollName = createCollName(this.prefix, collNumber);
                 localDb.runCommand({drop: myCollName});
                 localDb.createCollection(myCollName, options);
                 localDb[myCollName].insert({x: 1});
