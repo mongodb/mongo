@@ -7,6 +7,12 @@
  * ]
  */
 
+// Because we restart nodes in standalone mode, it's possible for fast count, which doesn't
+// discriminate between majority committed data and locally committed data, and the true count,
+// which only includes majority committed data on standalones, to diverge. Therefore skip
+// validating fast count.
+TestData.skipEnforceFastCountOnValidate = true;
+
 const s =
     new ShardingTest({name: "runRestore", shards: 2, mongos: 1, config: 1, other: {chunkSize: 1}});
 
