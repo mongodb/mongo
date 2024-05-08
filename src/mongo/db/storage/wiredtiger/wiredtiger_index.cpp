@@ -887,8 +887,9 @@ public:
         // _previousKeyString.isEmpty() is only true on the first call to addKey().
         invariant(_previousKeyString.isEmpty() || cmp > 0);
 
-        RecordId id =
-            key_string::decodeRecordIdLongAtEnd(newKeyString.getBuffer(), newKeyString.getSize());
+        RecordId id;
+        auto sizeWithoutRecordId = key_string::sizeWithoutRecordIdLongAtEnd(
+            newKeyString.getBuffer(), newKeyString.getSize(), &id);
         key_string::TypeBits typeBits = newKeyString.getTypeBits();
 
         key_string::Builder value(_idx->getKeyStringVersion());
@@ -899,8 +900,6 @@ public:
             value.appendTypeBits(typeBits);
         }
 
-        auto sizeWithoutRecordId = key_string::sizeWithoutRecordIdLongAtEnd(
-            newKeyString.getBuffer(), newKeyString.getSize());
         WiredTigerItem keyItem(newKeyString.getBuffer(), sizeWithoutRecordId);
         WiredTigerItem valueItem(value.getBuffer(), value.getSize());
 
@@ -1636,12 +1635,11 @@ Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
                                   IncludeDuplicateRecordId includeDuplicateRecordId) {
     invariant(KeyFormat::Long == _rsKeyFormat);
     invariant(!dupsAllowed);
-    const RecordId id =
-        key_string::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId id;
+    auto sizeWithoutRecordId =
+        key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize(), &id);
     invariant(id.isValid());
 
-    auto sizeWithoutRecordId =
-        key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
 
     key_string::Builder value(getKeyStringVersion(), id);
@@ -1688,8 +1686,9 @@ Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
 Status WiredTigerIndexUnique::_insertOldFormatKey(OperationContext* opCtx,
                                                   WT_CURSOR* c,
                                                   const key_string::Value& keyString) {
-    const RecordId id =
-        key_string::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId id;
+    auto sizeWithoutRecordId =
+        key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize(), &id);
     invariant(id.isValid());
 
     LOGV2_DEBUG(8596201,
@@ -1702,8 +1701,6 @@ Status WiredTigerIndexUnique::_insertOldFormatKey(OperationContext* opCtx,
                 "keyPattern"_attr = _keyPattern,
                 "collectionUUID"_attr = _collectionUUID);
 
-    auto sizeWithoutRecordId =
-        key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
 
     key_string::Builder value(getKeyStringVersion(), id);
@@ -1797,12 +1794,11 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
                                  const key_string::Value& keyString,
                                  bool dupsAllowed) {
     invariant(KeyFormat::Long == _rsKeyFormat);
-    const RecordId id =
-        key_string::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId id;
+    auto sizeWithoutRecordId =
+        key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize(), &id);
     invariant(id.isValid());
 
-    auto sizeWithoutRecordId =
-        key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
     setKey(c, keyItem.Get());
 
@@ -1929,12 +1925,11 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
     // entries are written in the old format, let alone during temporary phases of the server when
     // duplicates are allowed.
 
-    const RecordId id =
-        key_string::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId id;
+    auto sizeWithoutRecordId =
+        key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize(), &id);
     invariant(id.isValid());
 
-    auto sizeWithoutRecordId =
-        key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
     setKey(c, keyItem.Get());
 
