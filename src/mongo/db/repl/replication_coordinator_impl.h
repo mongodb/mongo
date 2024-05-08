@@ -868,6 +868,8 @@ private:
     struct Waiter {
         Promise<void> promise;
         boost::optional<WriteConcernOptions> writeConcern;
+        // A flag to mark this waiter abandoned which allows early clean-up for the waiter.
+        AtomicWord<bool> givenUp{false};
         explicit Waiter(Promise<void> p, boost::optional<WriteConcernOptions> w = boost::none)
             : promise(std::move(p)), writeConcern(w) {}
     };
@@ -882,8 +884,8 @@ private:
         // Adds waiter into the list.
         void add_inlock(const OpTime& opTime, SharedWaiterHandle waiter);
         // Adds a waiter into the list and returns the future of the waiter's promise.
-        SharedSemiFuture<void> add_inlock(const OpTime& opTime,
-                                          boost::optional<WriteConcernOptions> w = boost::none);
+        std::pair<SharedSemiFuture<void>, SharedWaiterHandle> add_inlock(
+            const OpTime& opTime, boost::optional<WriteConcernOptions> w = boost::none);
         // Returns whether waiter is found and removed.
         bool remove_inlock(SharedWaiterHandle waiter);
         // Signals all waiters whose opTime is <= the given opTime (if any) that satisfy the
@@ -1173,9 +1175,8 @@ private:
      * Helper method for awaitReplication to register a waiter in _replicationWaiterList with the
      * given opTime and writeConcern. Called while holding _mutex.
      */
-    SharedSemiFuture<void> _startWaitingForReplication(WithLock lock,
-                                                       const OpTime& opTime,
-                                                       const WriteConcernOptions& writeConcern);
+    std::pair<SharedSemiFuture<void>, SharedWaiterHandle> _startWaitingForReplication(
+        WithLock lock, const OpTime& opTime, const WriteConcernOptions& writeConcern);
 
     /**
      * Returns an object with all of the information this node knows about the replica set's

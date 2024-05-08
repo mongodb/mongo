@@ -1356,12 +1356,13 @@ TEST_F(ReplCoordTest, NodeReturnsWriteConcernFailedWhenAWriteConcernTimesOutBefo
 
     OpTimeWithTermOne time1(100, 1);
     OpTimeWithTermOne time2(100, 2);
+    OpTimeWithTermOne time3(100, 3);
 
     WriteConcernOptions writeConcern;
     writeConcern.wDeadline = getNet()->now() + Milliseconds(50);
     writeConcern.w = 2;
 
-    // 2 nodes waiting for time2
+    // 1 waiter waiting for 2 nodes to reach time2 with timeout.
     awaiter.setOpTime(time2);
     awaiter.setWriteConcern(writeConcern);
     awaiter.start();
@@ -1375,6 +1376,16 @@ TEST_F(ReplCoordTest, NodeReturnsWriteConcernFailedWhenAWriteConcernTimesOutBefo
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
     awaiter.reset();
+
+    // Test that the waiter is still in the waiter list as we only clean up abandoned waiters
+    // lazily.
+    ASSERT_EQ(replicationWaiterListMetric.get(), 1);
+
+    // Advance local node to time3 and this should trigger the lazy cleanup.
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time3, Date_t() + Seconds(110));
+
+    // Test that the waiter list is now empty.
+    ASSERT_EQ(replicationWaiterListMetric.get(), 0);
 }
 
 TEST_F(ReplCoordTest,
