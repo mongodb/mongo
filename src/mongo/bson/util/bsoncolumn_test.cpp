@@ -59,6 +59,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/tracking_context.h"
 
 namespace mongo::bsoncolumn {
 namespace {

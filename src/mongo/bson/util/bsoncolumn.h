@@ -145,7 +145,7 @@ public:
         }
 
     private:
-        template <class BufBuilderType, class BSONObjType, class Allocator>
+        template <class Allocator>
         friend class BSONColumnBuilder;
 
         // Initialize sub-object interleaving from current control byte position. Must be on a
