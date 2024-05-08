@@ -399,7 +399,7 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
 }
 
 Status _dropCollection(OperationContext* opCtx,
-                       const NamespaceString& nss,
+                       const NamespaceString& collectionName,
                        const boost::optional<UUID>& expectedUUID,
                        DropReply* reply,
                        DropCollectionSystemCollectionMode systemCollectionMode,
@@ -407,35 +407,25 @@ Status _dropCollection(OperationContext* opCtx,
                        boost::optional<UUID> dropIfUUIDNotMatching = boost::none) {
 
     try {
-        return writeConflictRetry(opCtx, "drop", nss, [&] {
+        return writeConflictRetry(opCtx, "drop", collectionName, [&] {
             // If a change collection is to be dropped, that is, the change streams are being
             // disabled for a tenant, acquire exclusive tenant lock.
-            AutoGetDb autoDb(
-                opCtx,
-                nss.dbName(),
-                MODE_IX /* database lock mode*/,
-                boost::make_optional(nss.tenantId() && nss.isChangeCollection(), MODE_X));
+            AutoGetDb autoDb(opCtx,
+                             collectionName.dbName(),
+                             MODE_IX /* database lock mode*/,
+                             boost::make_optional(collectionName.tenantId() &&
+                                                      collectionName.isChangeCollection(),
+                                                  MODE_X));
             auto db = autoDb.getDb();
             if (!db) {
                 return expectedUUID
-                    ? Status{CollectionUUIDMismatchInfo(
-                                 nss.dbName(), *expectedUUID, nss.coll().toString(), boost::none),
+                    ? Status{CollectionUUIDMismatchInfo(collectionName.dbName(),
+                                                        *expectedUUID,
+                                                        collectionName.coll().toString(),
+                                                        boost::none),
                              "Database does not exist"}
                     : Status::OK();
             }
-
-            // We rewrite drop of time-series buckets collection to drop of time-series view
-            // collection. This ensures that such drop will delete both collections.
-            const auto collectionName = [&]() {
-                if (nss.isTimeseriesBucketsCollection()) {
-                    auto bucketsColl =
-                        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-                    if (bucketsColl && bucketsColl->getTimeseriesOptions()) {
-                        return nss.getTimeseriesViewNamespace();
-                    }
-                }
-                return nss;
-            }();
 
             if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName)) {
                 return _abortIndexBuildsAndDrop(
@@ -518,9 +508,7 @@ Status _dropCollection(OperationContext* opCtx,
                 // Timeseries bucket collection may exist even without the view. If that is the case
                 // delete it.
                 auto bucketsNs = collectionName.makeTimeseriesBucketsNamespace();
-                auto bucketsColl =
-                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, bucketsNs);
-                if (bucketsColl && bucketsColl->getTimeseriesOptions()) {
+                if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, bucketsNs)) {
                     return dropTimeseries(bucketsNs, false);
                 }
 
@@ -555,7 +543,7 @@ Status _dropCollection(OperationContext* opCtx,
         // Any unhandled namespace not found errors should be converted into success. Unless the
         // caller specified a UUID and expects the collection to exist.
         try {
-            checkCollectionUUIDMismatch(opCtx, nss, CollectionPtr(), expectedUUID);
+            checkCollectionUUIDMismatch(opCtx, collectionName, CollectionPtr(), expectedUUID);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
@@ -580,7 +568,13 @@ Status dropCollection(OperationContext* opCtx,
         hangDropCollectionBeforeLockAcquisition.pauseWhileSet();
     }
 
-    return _dropCollection(opCtx, nss, expectedUUID, reply, systemCollectionMode, fromMigrate);
+    // We rewrite drop of time-series buckets collection to drop of time-series view collection.
+    // This ensures that such drop will delete both collections.
+    const auto collectionName =
+        nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss;
+
+    return _dropCollection(
+        opCtx, collectionName, expectedUUID, reply, systemCollectionMode, fromMigrate);
 }
 
 Status dropCollection(OperationContext* opCtx,
