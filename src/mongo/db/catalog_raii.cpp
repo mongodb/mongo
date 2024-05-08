@@ -150,7 +150,9 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
       }()) {
     // Check if this operation is a direct connection and if it is authorized to be one after
     // acquiring the lock.
-    direct_connection_util::checkDirectShardOperationAllowed(opCtx, dbName);
+    if (!options.skipDirectConnectionChecks) {
+        direct_connection_util::checkDirectShardOperationAllowed(opCtx, NamespaceString(dbName));
+    }
 
     // The 'primary' database must be version checked for sharding.
     DatabaseShardingState::assertMatchingDbVersion(opCtx, _dbName);
@@ -197,6 +199,8 @@ AutoGetDb AutoGetDb::createForAutoGetCollection(
         dbLockOptions.skipRSTLLock = canSkipRSTLLock(nsOrUUID);
         dbLockOptions.skipFlowControlTicket = canSkipFlowControlTicket(nsOrUUID);
     }
+    // Skip checking direct connections for the database and only do so in AutoGetCollection
+    dbLockOptions.skipDirectConnectionChecks = true;
 
     return AutoGetDb(opCtx,
                      nsOrUUID.dbName(),
@@ -343,7 +347,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
     // Recheck if this operation is a direct connection and if it is authorized to be one after
     // acquiring the collection locks.
-    direct_connection_util::checkDirectShardOperationAllowed(opCtx, _resolvedNss.dbName());
+    direct_connection_util::checkDirectShardOperationAllowed(opCtx, _resolvedNss);
 
     verifyDbAndCollection(
         opCtx, modeColl, nsOrUUID, _resolvedNss, _coll.get(), _autoDb.getDb(), verifyWriteEligible);

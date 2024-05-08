@@ -160,6 +160,7 @@ public:
     struct GlobalLockSkipOptions {
         bool skipFlowControlTicket = false;
         bool skipRSTLLock = false;
+        bool skipDirectConnectionChecks = false;
     };
 
     /**
