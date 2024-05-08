@@ -59,6 +59,9 @@ for (let i = 0; i < numDocs; i++) {
             configureFailPoint(secondaryDb, "skipIndexNewRecords", {skipIdIndex: false});
     }
     assert.commandWorked(primaryDb[collName].insert({_id: i, a: i}));
+    // We need to wait the insert to be applied on secondary to make sure there is exactly one index
+    // skipped.
+    rst.awaitReplication();
     if (skipIndexingFp) {
         skipIndexingFp.off();
         skipIndexingFp = null;
