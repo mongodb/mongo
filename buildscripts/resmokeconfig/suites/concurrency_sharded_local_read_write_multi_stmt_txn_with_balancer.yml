@@ -149,6 +149,7 @@ executor:
         queryAnalysisWriterIntervalSecs: 1
         defaultConfigCommandTimeoutMS: 90000
         skipDroppingHashedShardKeyIndex: true
+        reshardingMinimumOperationDurationMillis: 0
         failpoint.overrideDDLLockTimeout:
           mode: alwaysOn
           data:
