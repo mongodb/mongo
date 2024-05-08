@@ -42,9 +42,9 @@
 #include "mongo/util/str.h"
 
 namespace mongo::catalog_helper {
-namespace {
 MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
 
+namespace {
 /**
  * Defines sorting order for NamespaceStrings based on what their ResourceId would be for locking.
  */
@@ -109,9 +109,4 @@ void acquireCollectionLocksInResourceIdOrder(
         }
     } while (temp != verifyTemp);
 }
-
-void setAutoGetCollectionWaitFailpointExecute(std::function<void(const BSONObj&)> callback) {
-    setAutoGetCollectionWait.execute(callback);
-}
-
 }  // namespace mongo::catalog_helper

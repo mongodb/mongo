@@ -68,6 +68,6 @@ public:
                                           OperationContext* opCtx,
                                           const std::string& failpointMsg,
                                           const std::function<void()>& whileWaiting = nullptr,
-                                          boost::optional<NamespaceString> nss = boost::none);
+                                          const NamespaceString& nss = {});
 };
 }  // namespace mongo
