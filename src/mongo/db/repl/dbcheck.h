@@ -139,13 +139,6 @@ struct ReadSourceWithTimestamp {
 };
 
 /**
- * Helper that takes in a keystring with a recordId appended at the end, and returns the size
- * of the keystring itself (without recordId appended).
- */
-size_t getKeyStringSizeWithoutRecordId(const Collection* collection,
-                                       const key_string::Value& keyString);
-
-/**
  * Helper for converting a keystring to its BSON format. Converting a keystring to BSON will remove
  * the RecordId, as BSON objects cannot store the RecordId. As a result, if you then convert the
  * BSON back to keystring format, that keystring will not have a RecordId.

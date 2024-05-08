@@ -772,7 +772,9 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
     const char* binKey = operation["key"].binData(keyLen);
     BufReader reader(binKey, keyLen);
     const key_string::Value keyString =
-        key_string::Value::deserialize(reader, getSortedDataInterface()->getKeyStringVersion());
+        key_string::Value::deserialize(reader,
+                                       getSortedDataInterface()->getKeyStringVersion(),
+                                       getSortedDataInterface()->rsKeyFormat());
 
     const KeyStringSet keySet{keyString};
     if (opType == IndexBuildInterceptor::Op::kInsert) {
@@ -1079,7 +1081,9 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::Sorter::Settings
 SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
     return std::pair<key_string::Value::SorterDeserializeSettings,
                      mongo::NullValue::SorterDeserializeSettings>(
-        {_iam->getSortedDataInterface()->getKeyStringVersion()}, {});
+        {_iam->getSortedDataInterface()->getKeyStringVersion(),
+         _iam->getSortedDataInterface()->rsKeyFormat()},
+        {});
 }
 
 SortedDataIndexAccessMethod::BulkBuilderImpl::Sorter*

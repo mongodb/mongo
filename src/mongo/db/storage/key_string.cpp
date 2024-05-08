@@ -655,9 +655,11 @@ template <class BufferT>
 void BuilderBase<BufferT>::appendRecordId(const RecordId& loc) {
     _doneAppending();
     _transition(BuildState::kAppendedRecordID);
+    int32_t beforeAppend = _buffer().len();
     loc.withFormat([](RecordId::Null n) { invariant(false); },
                    [&](int64_t rid) { _appendRecordIdLong(rid); },
                    [&](const char* str, int size) { _appendRecordIdStr(str, size); });
+    _ridSize = _buffer().len() - beforeAppend;
 }
 
 template <class BufferT>
@@ -2740,7 +2742,7 @@ int Value::computeElementCount(Ordering ord) const {
         if (ctype == kLess || ctype == kGreater || ctype == kEnd) {
             return count;
         }
-        filterKeyFromKeyString(ctype, &reader, invert, _version);
+        filterKeyFromKeyString(ctype, &reader, invert, getVersion());
         ++count;
     }
     return count;
@@ -3027,7 +3029,7 @@ void appendToBSONArray(const char* buf, int len, BSONArrayBuilder* builder, Vers
 void Value::serializeWithoutRecordIdLong(BufBuilder& buf) const {
     dassert(decodeRecordIdLongAtEnd(_buffer.get(), _ksSize).isValid());
 
-    const int32_t sizeWithoutRecordId = sizeWithoutRecordIdLongAtEnd(_buffer.get(), _ksSize);
+    const int32_t sizeWithoutRecordId = getSizeWithoutRecordId();
     buf.appendNum(sizeWithoutRecordId);                 // Serialize size of KeyString
     buf.appendBuf(_buffer.get(), sizeWithoutRecordId);  // Serialize KeyString
     buf.appendBuf(_buffer.get() + _ksSize, _buffer.size() - _ksSize);  // Serialize TypeBits
@@ -3036,10 +3038,46 @@ void Value::serializeWithoutRecordIdLong(BufBuilder& buf) const {
 void Value::serializeWithoutRecordIdStr(BufBuilder& buf) const {
     dassert(decodeRecordIdStrAtEnd(_buffer.get(), _ksSize).isValid());
 
-    const int32_t sizeWithoutRecordId = sizeWithoutRecordIdStrAtEnd(_buffer.get(), _ksSize);
+    const int32_t sizeWithoutRecordId = getSizeWithoutRecordId();
     buf.appendNum(sizeWithoutRecordId);                 // Serialize size of KeyString
     buf.appendBuf(_buffer.get(), sizeWithoutRecordId);  // Serialize KeyString
     buf.appendBuf(_buffer.get() + _ksSize, _buffer.size() - _ksSize);  // Serialize TypeBits
+}
+
+Value Value::deserialize(BufReader& buf,
+                         key_string::Version version,
+                         boost::optional<KeyFormat> ridFormat) {
+    const int32_t sizeOfKeystring = buf.read<LittleEndian<int32_t>>();
+    const void* keystringPtr = buf.skip(sizeOfKeystring);
+
+    BufBuilder newBuf;
+    newBuf.appendBuf(keystringPtr, sizeOfKeystring);
+
+    // We have to decode the RecordId because we don't serialize that information.
+    const auto ridOffset = [&] {
+        if (!ridFormat) {
+            return sizeOfKeystring;
+        } else if (KeyFormat::Long == *ridFormat) {
+            return sizeWithoutRecordIdLongAtEnd(keystringPtr, sizeOfKeystring);
+        } else if (KeyFormat::String == *ridFormat) {
+            return sizeWithoutRecordIdStrAtEnd(keystringPtr, sizeOfKeystring);
+        }
+        MONGO_UNREACHABLE;
+    }();
+
+    auto typeBits = TypeBits::fromBuffer(version, &buf);  // advances the buf
+    if (typeBits.isAllZeros()) {
+        newBuf.appendChar(0);
+    } else {
+        newBuf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
+    }
+    // Note: this variable is needed to make sure that no method is called on 'newBuf'
+    // after a call on its 'release' method.
+    const size_t newBufLen = newBuf.len();
+    return {version,
+            sizeOfKeystring,
+            sizeOfKeystring - ridOffset,
+            SharedBufferFragment(newBuf.release(), newBufLen)};
 }
 
 size_t Value::getApproximateSize() const {
@@ -3062,6 +3100,7 @@ Value Value::makeValue(Version version, StringData ks, StringData rid, StringDat
     invariant(bufSize == static_cast<unsigned long>(buf.len()));
     return {version,
             static_cast<int32_t>(ks.size() + rid.size()),
+            static_cast<int32_t>(rid.size()),
             SharedBufferFragment(buf.release(), bufSize)};
 }
 

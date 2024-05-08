@@ -41,8 +41,7 @@ key_string::Value makeKeyString(key_string::Version version,
                                 Ordering ordering,
                                 BSONObj bsonKey,
                                 RecordId& rid) {
-    key_string::Builder builder(version, bsonKey, ordering);
-    builder.appendRecordId(rid);
+    key_string::Builder builder(version, bsonKey, ordering, rid);
     return builder.getValueCopy();
 }
 
@@ -74,6 +73,20 @@ TEST(SortedDataInterface, SortedDataKeyValueViewTest) {
         ASSERT_EQ(&rid, view.getRecordId());
         ASSERT_EQ(*view.getRecordId(),
                   key_string::decodeRecordIdStrAtEnd(value.getBuffer(), value.getSize()));
+
+        // Round trip the Value through a View and compare
+        auto view2 = SortedDataKeyValueView::fromValue(value);
+        ASSERT_EQ(view.getKeyStringOriginalView().size(), view2.getKeyStringOriginalView().size());
+        ASSERT_EQ(view.getKeyStringWithoutRecordIdView().size(),
+                  view2.getKeyStringWithoutRecordIdView().size());
+        ASSERT_EQ(view.getTypeBitsView().size(), view2.getTypeBitsView().size());
+        ASSERT_EQ(view.getRecordIdView().size(), view2.getRecordIdView().size());
+
+        auto value2 = view2.getValueCopy();
+        ASSERT_EQ(value.compare(value2), 0);
+        ASSERT_EQ(view.getKeyStringOriginalView().size(), value2.getSize());
+        ASSERT_EQ(view.getKeyStringWithoutRecordIdView().size(), value2.getSizeWithoutRecordId());
+        ASSERT_EQ(view.getRecordIdView().size(), value2.getRecordIdSize());
     }
 }
 

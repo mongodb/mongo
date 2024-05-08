@@ -450,20 +450,6 @@ void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
     }
 }
 
-size_t getKeyStringSizeWithoutRecordId(const Collection* collection,
-                                       const key_string::Value& keyString) {
-    switch (collection->getRecordStore()->keyFormat()) {
-        case KeyFormat::Long:
-            return key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(),
-                                                            keyString.getSize());
-
-        case KeyFormat::String:
-            return key_string::sizeWithoutRecordIdStrAtEnd(keyString.getBuffer(),
-                                                           keyString.getSize());
-    }
-    MONGO_UNREACHABLE;
-}
-
 BSONObj _keyStringToBsonSafeHelper(const key_string::Value& keyString, const Ordering& ordering) {
     return key_string::toBsonSafe(
         keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
@@ -527,8 +513,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                         key_string::rehydrateKey(indexDescriptor->keyPattern(), keyStringBson),
                     "indexName"_attr = indexName);
         // Append the keystring to the hash without the recordId at end.
-        size_t sizeWithoutRecordId =
-            getKeyStringSizeWithoutRecordId(collection, currKeyStringWithRecordId);
+        size_t sizeWithoutRecordId = currKeyStringWithRecordId.getSizeWithoutRecordId();
 
         _bytesSeen += sizeWithoutRecordId;
         _countKeysSeen += 1;

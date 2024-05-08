@@ -591,9 +591,7 @@ StatusWith<bool> WiredTigerIndex::_checkDups(OperationContext* opCtx,
     int ret;
     // A prefix key is KeyString of index key. It is the component of the index entry that
     // should be unique.
-    auto sizeWithoutRecordId = (_rsKeyFormat == KeyFormat::Long)
-        ? key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize())
-        : key_string::sizeWithoutRecordIdStrAtEnd(keyString.getBuffer(), keyString.getSize());
+    auto sizeWithoutRecordId = keyString.getSizeWithoutRecordId();
     WiredTigerItem prefixKeyItem(keyString.getBuffer(), sizeWithoutRecordId);
 
     // First phase inserts the prefix key to prohibit concurrent insertions of same key
@@ -1600,8 +1598,9 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
     WT_ITEM item;
     if (ret == 0) {
         getKey(c, &item, &ResourceConsumption::MetricsCollector::get(opCtx));
-        return std::memcmp(
-                   prefixKey.getBuffer(), item.data, std::min(prefixKey.getSize(), item.size)) == 0;
+        return std::memcmp(prefixKey.getBuffer(),
+                           item.data,
+                           std::min(static_cast<size_t>(prefixKey.getSize()), item.size)) == 0;
     }
 
     // Make sure that next call did not fail due to any other error but not found. In case of

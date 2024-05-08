@@ -413,11 +413,21 @@ private:
 class Value {
 
 public:
-    Value() : _version(Version::kLatestVersion), _ksSize(0) {}
+    Value()
+        : _versionAndRidSize(_encodeVersionAndRidSize(Version::kLatestVersion, 0)), _ksSize(0) {}
 
-    Value(Version version, int32_t ksSize, SharedBufferFragment buffer)
-        : _version(version), _ksSize(ksSize), _buffer(std::move(buffer)) {
-        invariant(ksSize >= 0);
+    Value(Version version,
+          // The size of the KeyString including the RecordId part (if present)
+          int32_t ksSize,
+          // The size of the RecordId part, if the size is known;
+          // or 0, if the RecordId is not present.
+          int32_t ridSize,
+          SharedBufferFragment buffer)
+        : _versionAndRidSize(_encodeVersionAndRidSize(version, ridSize)),
+          _ksSize(ksSize),
+          _buffer(std::move(buffer)) {
+        invariant(ridSize >= 0);
+        invariant(ksSize >= ridSize);
         invariant(ksSize <= static_cast<int32_t>(_buffer.size()));
     }
 
@@ -426,7 +436,7 @@ public:
 
     // Use a copy-and-swap, which prevents unnecessary allocation and deallocations.
     Value& operator=(Value copy) noexcept {
-        _version = copy._version;
+        _versionAndRidSize = copy._versionAndRidSize;
         _ksSize = copy._ksSize;
         std::swap(_buffer, copy._buffer);
         return *this;
@@ -456,8 +466,18 @@ public:
     int compareWithoutDiscriminator(const Value& other) const;
 
     // Returns the size of the stored KeyString.
-    size_t getSize() const {
+    int32_t getSize() const {
         return _ksSize;
+    }
+
+    // Returns the size of the RecordId part if present, or 0 otherwise.
+    int32_t getRecordIdSize() const {
+        return static_cast<int32_t>(_versionAndRidSize & ~(1 << 31));
+    }
+
+    // Returns the size of the KeyString without RecordId.
+    int32_t getSizeWithoutRecordId() const {
+        return _ksSize - getRecordIdSize();
     }
 
     // Returns whether the size of the stored KeyString is 0.
@@ -473,7 +493,7 @@ public:
     TypeBits getTypeBits() const {
         const char* buf = _buffer.get() + _ksSize;
         BufReader reader(buf, _buffer.size() - _ksSize);
-        return TypeBits::fromBuffer(_version, &reader);
+        return TypeBits::fromBuffer(getVersion(), &reader);
     }
 
     StringData getTypeBitsView() const {
@@ -507,29 +527,18 @@ public:
     void serializeWithoutRecordIdStr(BufBuilder& buf) const;
 
     // Deserialize the Value from a serialized format.
-    static Value deserialize(BufReader& buf, key_string::Version version) {
-        const int32_t sizeOfKeystring = buf.read<LittleEndian<int32_t>>();
-        const void* keystringPtr = buf.skip(sizeOfKeystring);
-
-        BufBuilder newBuf;
-        newBuf.appendBuf(keystringPtr, sizeOfKeystring);
-
-        auto typeBits = TypeBits::fromBuffer(version, &buf);  // advances the buf
-        if (typeBits.isAllZeros()) {
-            newBuf.appendChar(0);
-        } else {
-            newBuf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
-        }
-        // Note: this variable is needed to make sure that no method is called on 'newBuf'
-        // after a call on its 'release' method.
-        const size_t newBufLen = newBuf.len();
-        return {version, sizeOfKeystring, SharedBufferFragment(newBuf.release(), newBufLen)};
-    }
+    // The caller must pass an ridFormat the indicates the RecordId encoding format, or boost::none
+    // if not present.
+    static Value deserialize(BufReader& buf,
+                             key_string::Version version,
+                             boost::optional<KeyFormat> ridFormat);
 
     /// Members for Sorter
     struct SorterDeserializeSettings {
-        SorterDeserializeSettings(Version version) : keyStringVersion(version) {}
+        SorterDeserializeSettings(Version version, boost::optional<KeyFormat> ridFormat)
+            : keyStringVersion(version), ridFormat(ridFormat) {}
         Version keyStringVersion;
+        boost::optional<KeyFormat> ridFormat;
     };
 
     void serializeForSorter(BufBuilder& buf) const {
@@ -537,7 +546,7 @@ public:
     }
 
     static Value deserializeForSorter(BufReader& buf, const SorterDeserializeSettings& settings) {
-        return deserialize(buf, settings.keyStringVersion);
+        return deserialize(buf, settings.keyStringVersion, settings.ridFormat);
     }
 
     // It is illegal to call this function on a value that is backed by a buffer that is shared
@@ -556,7 +565,7 @@ public:
     void makeOwned() {}
 
     Version getVersion() const {
-        return _version;
+        return (_versionAndRidSize & (1 << 31)) ? Version::V1 : Version::V0;
     }
 
     size_t getApproximateSize() const;
@@ -564,11 +573,23 @@ public:
     int computeElementCount(Ordering ord) const;
 
 private:
-    Version _version;
+    static_assert(Version::kLatestVersion == Version::V1);
+    uint32_t _encodeVersionAndRidSize(Version version, int32_t ridSize) {
+        uint32_t versionBit = (version == Version::V1) ? 1 << 31 : 0;
+        return versionBit | ridSize;
+    }
+
+    // To keep this struct small, the high bit is the encoded version.
+    // The lower 31 bits store the size of the encoded RecordId.
+    // (RidSize == 0) indicates that there is no RecordId.
+    uint32_t _versionAndRidSize;
+
     // _ksSize is the total length that the KeyString takes up in the buffer.
     int32_t _ksSize;
     SharedBufferFragment _buffer;
 };
+
+static_assert(sizeof(Value) == 32);
 
 enum class Discriminator {
     kInclusive,  // Anything to be stored in an index must use this.
@@ -665,7 +686,8 @@ public:
         // Note: this variable is needed to make sure that no method is called on 'newBuf'
         // after a call on its 'release' method.
         const size_t newBufLen = newBuf.len();
-        return {version, _buffer().len(), SharedBufferFragment(newBuf.release(), newBufLen)};
+        return {
+            version, _buffer().len(), _ridSize, SharedBufferFragment(newBuf.release(), newBufLen)};
     }
 
     void appendRecordId(const RecordId& loc);
@@ -924,6 +946,7 @@ protected:
         static_cast<BuilderT*>(this)->_reinstantiateBufferIfNeeded();
     }
 
+    int32_t _ridSize = 0;
     TypeBits _typeBits;
     BuildState _state;
     int _elemCount;
@@ -984,7 +1007,7 @@ public:
         // Note: this variable is needed to make sure that no method is called on '_bufferBuilder'
         // after a call on its 'release' method.
         const size_t bufLen = _bufferBuilder.len();
-        return {version, ksSize, SharedBufferFragment(_bufferBuilder.release(), bufLen)};
+        return {version, ksSize, _ridSize, SharedBufferFragment(_bufferBuilder.release(), bufLen)};
     }
 
 protected:
@@ -1017,7 +1040,7 @@ public:
     Value release() {
         int32_t ksSize = _appendTypeBits();
         _transition(BuildState::kReleased);
-        return {version, ksSize, _bufferBuilder.done()};
+        return {version, ksSize, _ridSize, _bufferBuilder.done()};
     }
 
 public:
@@ -1225,7 +1248,7 @@ int Value::compareWithoutRecordIdLong(const T& other) const {
     return key_string::compare(
         getBuffer(),
         other.getBuffer(),
-        !isEmpty() ? sizeWithoutRecordIdLongAtEnd(getBuffer(), getSize()) : 0,
+        !isEmpty() ? getSizeWithoutRecordId() : 0,
         !other.isEmpty() ? sizeWithoutRecordIdLongAtEnd(other.getBuffer(), other.getSize()) : 0);
 }
 
@@ -1234,7 +1257,7 @@ int Value::compareWithoutRecordIdStr(const T& other) const {
     return key_string::compare(
         getBuffer(),
         other.getBuffer(),
-        !isEmpty() ? sizeWithoutRecordIdStrAtEnd(getBuffer(), getSize()) : 0,
+        !isEmpty() ? getSizeWithoutRecordId() : 0,
         !other.isEmpty() ? sizeWithoutRecordIdStrAtEnd(other.getBuffer(), other.getSize()) : 0);
 }
 

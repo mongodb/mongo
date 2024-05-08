@@ -31,19 +31,13 @@
 
 namespace mongo::sbe::value {
 
-KeyStringEntry::KeyStringEntry(const SortedDataKeyValueView& view)
-    : _key(view.getKeyStringWithoutRecordIdView()),
-      _typeBits(view.getTypeBitsView()),
-      _rid(view.getRecordIdView()),
-      _version(view.getVersion()) {}
+KeyStringEntry::KeyStringEntry(const SortedDataKeyValueView& view) {
+    _initFromView(view);
+}
 
-KeyStringEntry::KeyStringEntry(const key_string::Value& value, size_t ridSize) : _value(value) {
-    _key = {_value->getBuffer(), _value->getSize() - ridSize};
-    _typeBits = _value->getTypeBitsView();
-    if (ridSize != 0) {
-        _rid = {_value->getBuffer() + _key.size(), ridSize};
-    }
-    _version = _value->getVersion();
+KeyStringEntry::KeyStringEntry(const key_string::Value& value) : _value(value) {
+    auto view = SortedDataKeyValueView::fromValue(*_value);
+    _initFromView(view);
 }
 
 KeyStringEntry& KeyStringEntry::operator=(KeyStringEntry&& other) noexcept {
@@ -57,7 +51,7 @@ KeyStringEntry& KeyStringEntry::operator=(KeyStringEntry&& other) noexcept {
 
 std::unique_ptr<KeyStringEntry> KeyStringEntry::makeCopy() const {
     return std::make_unique<KeyStringEntry>(
-        key_string::Value::makeValue(_version, _key, _rid, _typeBits), _rid.size());
+        key_string::Value::makeValue(_version, _key, _rid, _typeBits));
 }
 
 void KeyStringEntry::serialize(BufBuilder& buf) const {
@@ -76,5 +70,12 @@ KeyStringEntry* KeyStringEntry::deserialize(BufReader& buf) {
     auto typeBits = buf.readBytes(buf.read<StringData::size_type>());
     auto rid = buf.readBytes(buf.read<StringData::size_type>());
     return new KeyStringEntry{key_string::Value::makeValue(version, key, rid, typeBits)};
+}
+
+void KeyStringEntry::_initFromView(const SortedDataKeyValueView& view) {
+    _key = view.getKeyStringWithoutRecordIdView();
+    _typeBits = view.getTypeBitsView();
+    _rid = view.getRecordIdView();
+    _version = view.getVersion();
 }
 }  // namespace mongo::sbe::value

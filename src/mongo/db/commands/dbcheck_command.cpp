@@ -616,7 +616,7 @@ void DbChecker::doCollection(OperationContext* opCtx) {
 key_string::Value DbChecker::_stripRecordIdFromKeyString(const key_string::Value& keyString,
                                                          const key_string::Version& version,
                                                          const Collection* collection) {
-    const size_t keyStringSize = getKeyStringSizeWithoutRecordId(collection, keyString);
+    const size_t keyStringSize = keyString.getSizeWithoutRecordId();
     key_string::Builder keyStringBuilder(version);
     keyStringBuilder.resetFromBuffer(keyString.getBuffer(), keyStringSize);
     return keyStringBuilder.getValueCopy();

@@ -671,7 +671,7 @@ key_string::Value makeKeyStringWithoutRecordId(const key_string::Value& keyStrin
     auto buffer = bufBuilder.release();
 
     BufReader bufReader(buffer.get(), builderSize);
-    return key_string::Value::deserialize(bufReader, version);
+    return key_string::Value::deserialize(bufReader, version, boost::none /* ridFormat */);
 }
 
 // Verify calling validate() on a collection with old (pre-4.2) keys in a WT unique index.

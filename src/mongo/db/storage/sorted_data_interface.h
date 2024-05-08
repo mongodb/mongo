@@ -467,7 +467,7 @@ public:
           _tbSize(typeBitsSize),
           _version(version),
           _id(id) {
-        invariant(ksSize > 0 && ridSize > 0 && typeBitsSize >= 0);
+        invariant(ksSize > 0 && ridSize >= 0 && typeBitsSize >= 0);
         _ksOriginalSize = isRecordIdAtEndOfKeyString ? (ksSize + ridSize) : ksSize;
     }
 
@@ -508,6 +508,14 @@ public:
         return _ksOriginalSize > _ksSize;
     }
 
+    /**
+     * Return the cached RecordId pointer that was passed to this view's constructor.
+     *
+     * A nullptr only means the pointer was not cached, but the RecordId may still be present,
+     * as long as the original key_string::Value has a RecordId at the end. In this case, the
+     * RecordId buffer can be obtained through getRecordIdView(), and then be decoded as long
+     * or binary string depending on its key format.
+     */
     const RecordId* getRecordId() const {
         return _id;
     }
@@ -518,6 +526,22 @@ public:
     key_string::Value getValueCopy() const {
         return key_string::Value::makeValue(
             _version, getKeyStringWithoutRecordIdView(), getRecordIdView(), getTypeBitsView());
+    }
+
+    /**
+     * Returns an unowned view of the provided Value. Remains valid as long as this Value is
+     * valid.
+     */
+    static SortedDataKeyValueView fromValue(const key_string::Value& value) {
+        auto typeBits = value.getTypeBitsView();
+        return {value.getBuffer(),                                  /* ksData */
+                value.getSizeWithoutRecordId(),                     /* ksSize */
+                value.getBuffer() + value.getSizeWithoutRecordId(), /* ridData */
+                value.getRecordIdSize(),                            /* ridSize */
+                typeBits.data(),                                    /* typeBitsData */
+                static_cast<int32_t>(typeBits.size()),              /* typeBitsSize */
+                value.getVersion(),
+                value.getRecordIdSize() > 0 /* isRecordIdAtEndOfKeyString */};
     }
 
     bool isEmpty() const {

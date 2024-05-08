@@ -40,8 +40,7 @@ public:
 
     explicit KeyStringEntry(const SortedDataKeyValueView& view);
 
-    // Caller needs to provide the ridSize if input keyString is appended with RecordId.
-    explicit KeyStringEntry(const key_string::Value& value, size_t ridSize = 0);
+    explicit KeyStringEntry(const key_string::Value& value);
 
     KeyStringEntry& operator=(KeyStringEntry&& other) noexcept;
 
@@ -107,5 +106,7 @@ private:
     StringData _rid;
     key_string::Version _version;
     boost::optional<key_string::Value> _value;  // none means unowned view.
+
+    void _initFromView(const SortedDataKeyValueView& view);
 };
 }  // namespace mongo::sbe::value

@@ -860,19 +860,15 @@ TEST_F(KeyStringBuilderTest, ReasonableSize) {
 
     // Test the dynamic memory usage reported to the sorter.
     key_string::Value value1 = stackBuilder.getValueCopy();
-    ASSERT_LTE(sizeof(value1), 32);
     ASSERT_LTE(value1.memUsageForSorter(), 34);
 
     key_string::Value value2 = heapBuilder.getValueCopy();
-    ASSERT_LTE(sizeof(value2), 32);
     ASSERT_LTE(value2.memUsageForSorter(), 34);
 
     key_string::Value value3 = heapBuilder.release();
-    ASSERT_LTE(sizeof(value3), 32);
     ASSERT_LTE(value3.memUsageForSorter(), 64);
 
     key_string::Value value4 = pooledBuilder.getValueCopy();
-    ASSERT_LTE(sizeof(value4), 32);
     // This is safe because we are operating on a copy of the value and it is not shared elsewhere.
     ASSERT_LTE(value4.memUsageForSorter(), 34);
     // We should still be using the initially-allocated size.
@@ -881,7 +877,6 @@ TEST_F(KeyStringBuilderTest, ReasonableSize) {
     // For values created with the pooledBuilder, it is invalid to call memUsageForSorter(). Instead
     // we look at the mem usage of the builder itself.
     key_string::Value value5 = pooledBuilder.release();
-    ASSERT_LTE(sizeof(value5), 32);
     ASSERT_LTE(fragmentBuilder.memUsage(), 64);
 }
 
@@ -1047,6 +1042,44 @@ TEST_F(KeyStringBuilderTest, AllTypesRoundtrip) {
             BSONObj o = b.obj();
             ROUNDTRIP(version, o);
         }
+    }
+}
+
+TEST_F(KeyStringBuilderTest, SerializeDeserialize) {
+    BSONObj doc = BSON("a" << 1 << "b" << 2.0);
+    // Round trip through serialize and deserialize
+    {
+        auto noRid = key_string::Builder(version, doc, ALL_ASCENDING).getValueCopy();
+        BufBuilder buf;
+        noRid.serialize(buf);
+        BufReader reader(buf.buf(), buf.len());
+        auto value = key_string::Value::deserialize(reader, version, boost::none);
+        ASSERT_EQ(noRid.compare(value), 0);
+        ASSERT_EQ(noRid.getRecordIdSize(), 0);
+        ASSERT_EQ(value.getRecordIdSize(), 0);
+    }
+
+    {
+        auto longRid = key_string::Builder(version, doc, ALL_ASCENDING, RecordId(1)).getValueCopy();
+        BufBuilder buf;
+        longRid.serialize(buf);
+        BufReader reader(buf.buf(), buf.len());
+        auto value = key_string::Value::deserialize(reader, version, KeyFormat::Long);
+        ASSERT_EQ(longRid.compare(value), 0);
+        ASSERT_GT(longRid.getRecordIdSize(), 1);
+        ASSERT_EQ(longRid.getRecordIdSize(), value.getRecordIdSize());
+    }
+
+    {
+        auto strRid =
+            key_string::Builder(version, doc, ALL_ASCENDING, RecordId("test", 5)).getValueCopy();
+        BufBuilder buf;
+        strRid.serialize(buf);
+        BufReader reader(buf.buf(), buf.len());
+        auto value = key_string::Value::deserialize(reader, version, KeyFormat::String);
+        ASSERT_EQ(strRid.compare(value), 0);
+        ASSERT_GT(strRid.getRecordIdSize(), 5);
+        ASSERT_EQ(strRid.getRecordIdSize(), value.getRecordIdSize());
     }
 }
 

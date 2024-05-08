@@ -156,7 +156,8 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx,
         resolved++;
 
         BufReader reader(record->data.data(), record->data.size());
-        auto key = key_string::Value::deserialize(reader, index->getKeyStringVersion());
+        auto key = key_string::Value::deserialize(
+            reader, index->getKeyStringVersion(), boost::none /* RecordId format */);
 
         auto status = index->dupKeyCheck(opCtx, key);
         if (!status.isOK())
