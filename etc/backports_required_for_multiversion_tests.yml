@@ -149,8 +149,6 @@ last-continuous:
     ticket: SERVER-86419
   - test_file: jstests/core/query/internal_strip_invalid_assignment.js
     ticket: SERVER-82717
-  - test_file: jstests/core/query/bittest.js
-    ticket: SERVER-88173
   - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
     ticket: SERVER-86253
   - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
@@ -368,8 +366,6 @@ last-lts:
     ticket: SERVER-86419
   - test_file: jstests/core/query/internal_strip_invalid_assignment.js
     ticket: SERVER-82717
-  - test_file: jstests/core/query/bittest.js
-    ticket: SERVER-88173
   - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
     ticket: SERVER-86253
   - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
