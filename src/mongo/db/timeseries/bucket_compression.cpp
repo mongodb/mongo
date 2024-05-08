@@ -283,7 +283,8 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
         };
 
         BSONObjBuilder dataBuilder = builder.subobjStart(kBucketDataFieldName);
-        UntrackedBufBuilder columnBuffer;  // Reusable buffer to avoid extra allocs per column.
+        // Reusable buffer to avoid extra allocs per column.
+        allocator_aware::BufBuilder columnBuffer;
 
         // Add compressed time field first
         {
