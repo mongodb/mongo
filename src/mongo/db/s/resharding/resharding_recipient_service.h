@@ -323,7 +323,7 @@ private:
     CancellationToken _initAbortSource(const CancellationToken& stepdownToken);
 
     // Get indexesToBuild and indexesBuilt from the index catalog, then save them in _metrics
-    void _fetchBuildIndexMetrics();
+    void _fetchBuildIndexMetrics(OperationContext* opCtx);
 
 
     // The primary-only service instance corresponding to the recipient instance. Not owned.
