@@ -390,10 +390,14 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     BSONObj command = BSON("a" << 3);
 
     // Set dummy 'ns' and 'command'.
-    curop->setGenericOpRequestDetails(NamespaceString::createNamespaceString_forTest("myDb.coll"),
-                                      nullptr,
-                                      command,
-                                      NetworkOp::dbQuery);
+    {
+        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        curop->setGenericOpRequestDetails_inlock(
+            NamespaceString::createNamespaceString_forTest("myDb.coll"),
+            nullptr,
+            command,
+            NetworkOp::dbQuery);
+    }
 
     BSONObjBuilder builder;
     od.append(opCtx.get(), ls, {}, builder);
@@ -504,11 +508,14 @@ TEST(CurOpTest, CheckNSAgainstSerializationContext) {
     BSONObj command = BSON("a" << 3);
 
     // Set dummy 'ns' and 'command'.
-    curop->setGenericOpRequestDetails(
-        NamespaceString::createNamespaceString_forTest(tid, "testDb.coll"),
-        nullptr,
-        command,
-        NetworkOp::dbQuery);
+    {
+        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        curop->setGenericOpRequestDetails_inlock(
+            NamespaceString::createNamespaceString_forTest(tid, "testDb.coll"),
+            nullptr,
+            command,
+            NetworkOp::dbQuery);
+    }
 
     // Test expectPrefix field.
     for (bool expectPrefix : {false, true}) {

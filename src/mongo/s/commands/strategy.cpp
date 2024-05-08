@@ -568,7 +568,10 @@ void ParseAndRunCommand::_parseCommand() {
                           : _invocation->ns());
 
     // Fill out all currentOp details.
-    CurOp::get(opCtx)->setGenericOpRequestDetails(nss, command, request.body, _opType);
+    {
+        stdx::lock_guard<Client> lk(*client);
+        CurOp::get(opCtx)->setGenericOpRequestDetails_inlock(nss, command, request.body, _opType);
+    }
 
     _osi = initializeOperationSessionInfo(opCtx,
                                           request.getValidatedTenantId(),

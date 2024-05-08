@@ -914,10 +914,13 @@ private:
                     // with the namespace of the collection being modified.
                     CurOp collModCurOp;
                     collModCurOp.push(opCtx);
-                    collModCurOp.setGenericOpRequestDetails(collection->ns(),
-                                                            curop->getCommand(),
-                                                            collModCmd.toBSON({}),
-                                                            NetworkOp::dbMsg);
+                    {
+                        stdx::lock_guard<Client> lk(*opCtx->getClient());
+                        collModCurOp.setGenericOpRequestDetails_inlock(collection->ns(),
+                                                                       curop->getCommand(),
+                                                                       collModCmd.toBSON({}),
+                                                                       NetworkOp::dbMsg);
+                    }
 
                     BSONObjBuilder unusedBuilder;
                     uassertStatusOK(processCollModCommand(

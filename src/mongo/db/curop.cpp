@@ -377,10 +377,10 @@ CurOp::~CurOp() {
     invariant(!_stack || this == _stack->pop());
 }
 
-void CurOp::setGenericOpRequestDetails(NamespaceString nss,
-                                       const Command* command,
-                                       BSONObj cmdObj,
-                                       NetworkOp op) {
+void CurOp::setGenericOpRequestDetails_inlock(NamespaceString nss,
+                                              const Command* command,
+                                              BSONObj cmdObj,
+                                              NetworkOp op) {
     // Set the _isCommand flags based on network op only. For legacy writes on mongoS, we
     // resolve them to OpMsgRequests and then pass them into the Commands path, so having a
     // valid Command* here does not guarantee that the op was issued from the client using a
@@ -388,7 +388,6 @@ void CurOp::setGenericOpRequestDetails(NamespaceString nss,
     const bool isCommand = (op == dbMsg || (op == dbQuery && nss.isCommand()));
     auto logicalOp = (command ? command->getLogicalOp() : networkOpToLogicalOp(op));
 
-    stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
     _isCommand = _debug.iscommand = isCommand;
     _logicalOp = _debug.logicalOp = logicalOp;
     _networkOp = _debug.networkOp = op;

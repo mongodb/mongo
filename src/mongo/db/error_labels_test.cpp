@@ -134,7 +134,8 @@ public:
     ErrorLabelBuilderTest() : _opCtx(makeOperationContext()) {}
 
     void setCommand(BSONObj cmdObj) const {
-        CurOp::get(opCtx())->setGenericOpRequestDetails(
+        stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
+        CurOp::get(opCtx())->setGenericOpRequestDetails_inlock(
             _testNss, nullptr, cmdObj, NetworkOp::dbMsg);
     }
 
