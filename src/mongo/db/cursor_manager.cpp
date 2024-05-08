@@ -152,6 +152,11 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
                 // Advance the iterator first since erasing from the lockedPartition will
                 // invalidate any references to it.
                 ++it;
+                LOGV2_DEBUG(8928410,
+                            2,
+                            "Deregistering timed out cursor",
+                            "cursorId"_attr = cursor->cursorid(),
+                            "idleSince"_attr = cursor->getLastUseDate());
                 removeCursorFromMap(lockedPartition, cursor);
             } else {
                 ++it;
@@ -206,6 +211,11 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     if (cursor->getExecutor()->isMarkedAsKilled()) {
         // This cursor was killed while it was idle.
         Status error = cursor->getExecutor()->getKillStatus();
+        LOGV2_DEBUG(8928403,
+                    2,
+                    "Cursor was killed while it was idle",
+                    "cursorId"_attr = cursor->cursorid(),
+                    "killStatus"_attr = error);
         deregisterAndDestroyCursor(std::move(lockedPartition),
                                    opCtx,
                                    std::unique_ptr<ClientCursor, ClientCursor::Deleter>(cursor));
@@ -244,6 +254,7 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
         }
     }
 
+    LOGV2_DEBUG(8928404, 2, "Pinning cursor", "cursorId"_attr = cursor->cursorid());
     auto pin = ClientCursorPin(opCtx, cursor, this);
     pin.unstashResourcesOntoOperationContext();
     return StatusWith(std::move(pin));
@@ -275,9 +286,18 @@ void CursorManager::unpin(OperationContext* opCtx,
               "error"_attr = interruptStatus);
         return deregisterAndDestroyCursor(std::move(partition), opCtx, std::move(cursor));
     } else if (!interruptStatus.isOK()) {
+        LOGV2_DEBUG(8928402,
+                    2,
+                    "Marking executor as killed",
+                    "cursorId"_attr = cursor->cursorid(),
+                    "error"_attr = interruptStatus);
         cursor->getExecutor()->markAsKilled(interruptStatus);
     }
 
+    LOGV2_DEBUG(8928405,
+                2,
+                "No kill pending, keeping the cursor in cursorMap",
+                "cursorId"_attr = cursor->cursorid());
     // The cursor will stay around in '_cursorMap', so release the unique pointer to avoid deleting
     // it. Cast to void to explicitly ignore the return value.
     (void)cursor.release();
@@ -403,11 +423,11 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
         }
     }
 
+    LOGV2_DEBUG(8928407, 2, "Registered cursor", "cursorId"_attr = unownedCursor->cursorid());
     // Restores the maxTimeMS provided in the cursor generating command in the case it used
     // maxTimeMSOpOnly. This way the pinned cursor will have the leftover time consistent with the
     // maxTimeMS.
     opCtx->restoreMaxTimeMS();
-
     return ClientCursorPin(opCtx, unownedCursor, this);
 }
 
@@ -429,6 +449,7 @@ void CursorManager::deregisterAndDestroyCursor(
     Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>::OnePartition&& lk,
     OperationContext* opCtx,
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
+    LOGV2_DEBUG(8928408, 2, "Deregistering cursor", "cursorId"_attr = cursor->cursorid());
     // Restrict the scope of the lock so we can destroy the cursor without holding any cursor
     // manager mutexes.
     {
@@ -440,6 +461,7 @@ void CursorManager::deregisterAndDestroyCursor(
 
 void CursorManager::_destroyCursor(OperationContext* opCtx,
                                    std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
+    LOGV2_DEBUG(8928406, 2, "Destroying cursor", "cursorId"_attr = cursor->cursorid());
     // Dispose of the cursor without holding any cursor manager mutexes. Disposal of a cursor can
     // require taking lock manager locks, which we want to avoid while holding a mutex. If we did
     // so, any caller of a CursorManager method which already held a lock manager lock could induce
@@ -466,6 +488,10 @@ Status CursorManager::killCursor(OperationContext* opCtx, CursorId id) {
                 lk, cursor->_operationUsingCursor, ErrorCodes::CursorKilled);
         }
 
+        LOGV2_DEBUG(8928409,
+                    2,
+                    "Killed operation using cursor, marking cursor as killPending",
+                    "cursorId"_attr = cursor->cursorid());
         // Mark that the cursor has been killed on the cursor object itself as well, as other errors
         // e.g. MaxTimeMSExpired may override the CursorKilled status.
         cursor->setKillPending(true);

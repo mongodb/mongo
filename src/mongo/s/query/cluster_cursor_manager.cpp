@@ -320,6 +320,11 @@ void ClusterCursorManager::killOperationUsingCursor(WithLock, CursorEntry* entry
     invariant(entry->getOperationUsingCursor());
     // Interrupt any operation currently using the cursor.
     OperationContext* opUsingCursor = entry->getOperationUsingCursor();
+    LOGV2_DEBUG(8928412,
+                2,
+                "Killing operation using cursor",
+                "operationId"_attr = opUsingCursor->getOpID());
+
     ClientLock lk(opUsingCursor->getClient());
     opUsingCursor->getServiceContext()->killOperation(lk, opUsingCursor, ErrorCodes::CursorKilled);
 
@@ -345,7 +350,6 @@ Status ClusterCursorManager::killCursor(OperationContext* opCtx, CursorId cursor
         killOperationUsingCursor(lk, entry);
         return Status::OK();
     }
-
     // No one is using the cursor, so we destroy it.
     detachAndKillCursor(std::move(lk), opCtx, cursorId);
 
@@ -357,6 +361,7 @@ Status ClusterCursorManager::killCursor(OperationContext* opCtx, CursorId cursor
 void ClusterCursorManager::detachAndKillCursor(stdx::unique_lock<Latch> lk,
                                                OperationContext* opCtx,
                                                CursorId cursorId) {
+    LOGV2_DEBUG(8928411, 2, "Detaching and killing cursor", "cursorId"_attr = cursorId);
     auto detachedCursorGuard = _detachCursor(lk, opCtx, cursorId);
     invariant(detachedCursorGuard.getStatus());
 
@@ -415,6 +420,8 @@ std::size_t ClusterCursorManager::killCursorsSatisfying(
         }
 
         ++nKilled;
+
+        LOGV2_DEBUG(8928413, 2, "Killing cursor", "cursorId"_attr = cursorId);
 
         if (entry.getOperationUsingCursor()) {
             // Mark the OperationContext using the cursor as killed, and move on.

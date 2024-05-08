@@ -30,6 +30,10 @@ const dbName = "test";
 const collName = jsTestName();
 const coll = st.s.getCollection(dbName + "." + collName);
 
+// Increase log verbosity to better diagnose failures where 'assertNoIdleCursors' timeouts.
+st.s.getDB("admin").setLogLevel(3);
+st.shard0.getDB("admin").setLogLevel(3);
+
 // Insert some data (1000 simple documents) into the collection.
 assert.commandWorked(coll.insert(Array.from({length: 1000}, _ => ({a: 1}))));
 

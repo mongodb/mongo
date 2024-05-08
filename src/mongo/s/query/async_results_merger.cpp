@@ -973,7 +973,24 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock lk, OperationContext* opC
             request.timeout = executor::RemoteCommandRequestBase::kNoTimeout;
 
             // Send kill request; discard callback handle, if any, or failure report, if not.
-            _executor->scheduleRemoteCommand(request, [](auto const&) {}).getStatus().ignore();
+            _executor
+                ->scheduleRemoteCommand(request,
+                                        [host = remote.getTargetHost()](auto const& args) {
+                                            if (args.response.isOK()) {
+                                                LOGV2_DEBUG(8928416,
+                                                            2,
+                                                            "killCursors succeeded",
+                                                            "remoteHost"_attr = host.toString());
+                                            } else {
+                                                LOGV2_DEBUG(8928417,
+                                                            2,
+                                                            "killCursors failed",
+                                                            "remoteHost"_attr = host.toString(),
+                                                            "error"_attr = args.response);
+                                            }
+                                        })
+                .getStatus()
+                .ignore();
         }
     }
 }
