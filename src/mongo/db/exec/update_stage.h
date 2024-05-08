@@ -100,6 +100,65 @@ private:
     UpdateStageParams();
 };
 
+class ShardingChecksForUpdate {
+public:
+    ShardingChecksForUpdate(const CollectionAcquisition& collAcq,
+                            OptionalBool allowShardKeyUpdatesWithoutFullKey,
+                            bool isMulti,
+                            CanonicalQuery* cq)
+        : _collAcq(collAcq),
+          _allowShardKeyUpdatesWithoutFullShardKeyInQuery(allowShardKeyUpdatesWithoutFullKey),
+          _isMulti(isMulti),
+          _canonicalQuery(cq){};
+
+    /**
+     * Performs checks on whether the existing or new shard key fields would change the owning
+     * shard, including whether the owning shard under the current key pattern would change as a
+     * result of the update, or if the destined recipient under the new shard key pattern from
+     * resharding would change as a result of the update.
+     *
+     * Throws if the updated document does not have all of the shard key fields or no longer belongs
+     * to this shard.
+     *
+     * Accepting a 'newObjCopy' parameter is a performance enhancement for updates which weren't
+     * performed in-place to avoid rendering a full copy of the updated document multiple times.
+     */
+    void checkUpdateChangesShardKeyFields(OperationContext* opCtx,
+                                          const mutablebson::Document& newDoc,
+                                          const boost::optional<BSONObj>& newObjCopy,
+                                          const Snapshotted<BSONObj>& oldObj);
+
+private:
+    /**
+     * Checks that the updated doc has all required shard key fields and throws if it does not.
+     *
+     * Also checks if the updated doc still belongs to this node and throws if it does not. If the
+     * doc no longer belongs to this shard, this means that one or more shard key field values have
+     * been updated to a value belonging to a chunk that is not owned by this shard. We cannot apply
+     * this update atomically.
+     */
+    void checkUpdateChangesExistingShardKey(OperationContext* opCtx,
+                                            const mutablebson::Document& newDoc,
+                                            const BSONObj& newObj,
+                                            const Snapshotted<BSONObj>& oldObj);
+
+    void checkUpdateChangesReshardingKey(OperationContext* opCtx,
+                                         const ShardingWriteRouter& shardingWriteRouter,
+                                         const BSONObj& newObj,
+                                         const Snapshotted<BSONObj>& oldObj);
+
+    void _checkRestrictionsOnUpdatingShardKeyAreNotViolated(
+        OperationContext* opCtx,
+        const ScopedCollectionDescription& collDesc,
+        const FieldRefSet& shardKeyPaths);
+
+
+    const CollectionAcquisition& _collAcq;
+    const OptionalBool _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
+    const bool _isMulti;
+    const CanonicalQuery* _canonicalQuery; /* can be nullptr */
+};
+
 /**
  * Execution stage responsible for updates to documents. If the prior or newly-updated version of
  * the document was requested to be returned, then ADVANCED is returned after updating a document.
@@ -169,6 +228,12 @@ protected:
 
 private:
     /**
+     * Stores 'idToRetry' in '_idRetrying' so the update can be retried during the next call to
+     * doWork(). Sets 'out' to WorkingSet::INVALID_ID.
+     */
+    void prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
+
+    /**
      * Computes the result of applying mods to the document 'oldObj' at RecordId 'recordId' in
      * memory, then commits these changes to the database. Returns a possibly unowned copy
      * of the newly-updated version of the document.
@@ -176,42 +241,6 @@ private:
     BSONObj transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                                RecordId& recordId,
                                bool writeOnOrphan);
-
-    /**
-     * Stores 'idToRetry' in '_idRetrying' so the update can be retried during the next call to
-     * doWork(). Sets 'out' to WorkingSet::INVALID_ID.
-     */
-    void prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
-
-    /**
-     * Performs checks on whether the existing or new shard key fields would change the owning
-     * shard, including whether the owning shard under the current key pattern would change as a
-     * result of the update, or if the destined recipient under the new shard key pattern from
-     * resharding would change as a result of the update.
-     *
-     * Throws if the updated document does not have all of the shard key fields or no longer belongs
-     * to this shard.
-     *
-     * Accepting a 'newObjCopy' parameter is a performance enhancement for updates which weren't
-     * performed in-place to avoid rendering a full copy of the updated document multiple times.
-     */
-    void checkUpdateChangesShardKeyFields(const boost::optional<BSONObj>& newObjCopy,
-                                          const Snapshotted<BSONObj>& oldObj);
-
-    /**
-     * Checks that the updated doc has all required shard key fields and throws if it does not.
-     *
-     * Also checks if the updated doc still belongs to this node and throws if it does not. If the
-     * doc no longer belongs to this shard, this means that one or more shard key field values have
-     * been updated to a value belonging to a chunk that is not owned by this shard. We cannot apply
-     * this update atomically.
-     */
-    void checkUpdateChangesExistingShardKey(const BSONObj& newObj,
-                                            const Snapshotted<BSONObj>& oldObj);
-
-    void checkUpdateChangesReshardingKey(const ShardingWriteRouter& shardingWriteRouter,
-                                         const BSONObj& newObj,
-                                         const Snapshotted<BSONObj>& oldObj);
 
     // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
     WorkingSetID _idRetrying;
