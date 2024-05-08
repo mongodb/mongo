@@ -89,9 +89,9 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
         mongod_options["port"] = network.PortAllocator.next_fixture_port(job_num)
     suite_set_parameters = mongod_options.get("set_parameters", {})
     remove_set_parameter_if_before_version(suite_set_parameters, "internalQueryStatsRateLimit",
-                                           bin_version, "6.0.15")
+                                           bin_version, "6.0")
     remove_set_parameter_if_before_version(
-        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "6.0.15")
+        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "6.0")
     _apply_set_parameters(args, suite_set_parameters)
     mongod_options.pop("set_parameters")
 
@@ -119,9 +119,9 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
         mongos_options["port"] = network.PortAllocator.next_fixture_port(job_num)
     suite_set_parameters = mongos_options.get("set_parameters", {})
     remove_set_parameter_if_before_version(suite_set_parameters, "internalQueryStatsRateLimit",
-                                           bin_version, "6.0.15")
+                                           bin_version, "6.0")
     remove_set_parameter_if_before_version(
-        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "6.0.15")
+        suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "6.0")
     _apply_set_parameters(args, suite_set_parameters)
     mongos_options.pop("set_parameters")
 
