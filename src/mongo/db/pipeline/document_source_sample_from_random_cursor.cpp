@@ -70,7 +70,7 @@ DocumentSourceSampleFromRandomCursor::DocumentSourceSampleFromRandomCursor(
     : DocumentSource(kStageName, pExpCtx),
       _size(size),
       _idField(std::move(idField)),
-      _seenDocs(pExpCtx->getValueComparator().makeUnorderedValueSet()),
+      _seenDocs(pExpCtx->getValueComparator().makeFlatUnorderedValueSet()),
       _nDocsInColl(nDocsInCollection) {}
 
 const char* DocumentSourceSampleFromRandomCursor::getSourceName() const {

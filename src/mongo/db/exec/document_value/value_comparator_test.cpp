@@ -257,7 +257,7 @@ TEST(ValueComparatorTest, ValueHasherRespectsCollatorWithNestedArrays) {
 TEST(ValueComparatorTest, UnorderedSetOfValueRespectsCollation) {
     CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
     ValueComparator valueCmp(&toLowerCollator);
-    auto set = valueCmp.makeUnorderedValueSet();
+    auto set = valueCmp.makeFlatUnorderedValueSet();
     ASSERT_TRUE(set.insert(Value("foo"_sd)).second);
     ASSERT_FALSE(set.insert(Value("FOO"_sd)).second);
     ASSERT_TRUE(set.insert(Value("FOOz"_sd)).second);

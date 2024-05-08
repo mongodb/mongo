@@ -105,7 +105,7 @@ private:
 
     // Keeps track of the documents that have been returned, since a random cursor is allowed to
     // return duplicates.
-    ValueUnorderedSet _seenDocs;
+    ValueFlatUnorderedSet _seenDocs;
 
     // The approximate number of documents in the collection (includes orphans).
     const long long _nDocsInColl;

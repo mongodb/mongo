@@ -94,12 +94,12 @@ Value AccumulatorAddToSet::getValue(bool toBeMerged) {
 AccumulatorAddToSet::AccumulatorAddToSet(ExpressionContext* const expCtx,
                                          boost::optional<int> maxMemoryUsageBytes)
     : AccumulatorState(expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxAddToSetBytes.load())),
-      _set(expCtx->getValueComparator().makeUnorderedValueSet()) {
+      _set(expCtx->getValueComparator().makeFlatUnorderedValueSet()) {
     _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorAddToSet::reset() {
-    _set = getExpressionContext()->getValueComparator().makeUnorderedValueSet();
+    _set = getExpressionContext()->getValueComparator().makeFlatUnorderedValueSet();
     _memUsageTracker.set(sizeof(*this));
 }
 

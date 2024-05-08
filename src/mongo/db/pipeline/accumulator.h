@@ -217,7 +217,7 @@ public:
     }
 
 private:
-    ValueUnorderedSet _set;
+    ValueFlatUnorderedSet _set;
 };
 
 class AccumulatorFirst final : public AccumulatorState {

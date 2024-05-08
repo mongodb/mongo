@@ -58,7 +58,7 @@ using std::vector;
 const ValueComparator kDefaultValueComparator{};
 
 TEST(VisitAllValuesAtPathTest, NestedObjectWithScalarValue) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -69,7 +69,7 @@ TEST(VisitAllValuesAtPathTest, NestedObjectWithScalarValue) {
 }
 
 TEST(VisitAllValuesAtPathTest, NestedObjectWithEmptyArrayValue) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -79,7 +79,7 @@ TEST(VisitAllValuesAtPathTest, NestedObjectWithEmptyArrayValue) {
 }
 
 TEST(VisitAllValuesAtPathTest, NestedObjectWithSingletonArrayValue) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -90,7 +90,7 @@ TEST(VisitAllValuesAtPathTest, NestedObjectWithSingletonArrayValue) {
 }
 
 TEST(VisitAllValuesAtPathTest, NestedObjectWithArrayValue) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -103,7 +103,7 @@ TEST(VisitAllValuesAtPathTest, NestedObjectWithArrayValue) {
 }
 
 TEST(VisitAllValuesAtPathTest, ObjectWithArrayOfSubobjectsWithScalarValue) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -117,7 +117,7 @@ TEST(VisitAllValuesAtPathTest, ObjectWithArrayOfSubobjectsWithScalarValue) {
 }
 
 TEST(VisitAllValuesAtPathTest, ObjectWithArrayOfSubobjectsWithArrayValues) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -133,7 +133,7 @@ TEST(VisitAllValuesAtPathTest, ObjectWithArrayOfSubobjectsWithArrayValues) {
 }
 
 TEST(VisitAllValuesAtPathTest, ObjectWithTwoDimensionalArrayOfSubobjects) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -143,7 +143,7 @@ TEST(VisitAllValuesAtPathTest, ObjectWithTwoDimensionalArrayOfSubobjects) {
 }
 
 TEST(VisitAllValuesAtPathTest, ObjectWithDiverseStructure) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -163,7 +163,7 @@ TEST(VisitAllValuesAtPathTest, ObjectWithDiverseStructure) {
 }
 
 TEST(VisitAllValuesAtPathTest, AcceptsNumericFieldNames) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -174,7 +174,7 @@ TEST(VisitAllValuesAtPathTest, AcceptsNumericFieldNames) {
 }
 
 TEST(VisitAllValuesAtPathTest, UsesNumericFieldNameToExtractElementFromArray) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -185,7 +185,7 @@ TEST(VisitAllValuesAtPathTest, UsesNumericFieldNameToExtractElementFromArray) {
 }
 
 TEST(VisitAllValuesAtPathTest, TreatsNegativeIndexAsFieldName) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -196,7 +196,7 @@ TEST(VisitAllValuesAtPathTest, TreatsNegativeIndexAsFieldName) {
 }
 
 TEST(VisitAllValuesAtPathTest, ExtractsNoValuesFromOutOfBoundsIndex) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -206,7 +206,7 @@ TEST(VisitAllValuesAtPathTest, ExtractsNoValuesFromOutOfBoundsIndex) {
 }
 
 TEST(VisitAllValuesAtPathTest, DoesNotTreatHexStringAsIndexSpecification) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -217,7 +217,7 @@ TEST(VisitAllValuesAtPathTest, DoesNotTreatHexStringAsIndexSpecification) {
 }
 
 TEST(VisitAllValuesAtPathTest, DoesNotAcceptLeadingPlusAsArrayIndex) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -228,7 +228,7 @@ TEST(VisitAllValuesAtPathTest, DoesNotAcceptLeadingPlusAsArrayIndex) {
 }
 
 TEST(VisitAllValuesAtPathTest, DoesNotAcceptTrailingCharactersForArrayIndex) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -239,7 +239,7 @@ TEST(VisitAllValuesAtPathTest, DoesNotAcceptTrailingCharactersForArrayIndex) {
 }
 
 TEST(VisitAllValuesAtPathTest, DoesNotAcceptNonDigitsForArrayIndex) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -251,7 +251,7 @@ TEST(VisitAllValuesAtPathTest, DoesNotAcceptNonDigitsForArrayIndex) {
 
 TEST(VisitAllValuesAtPathTest,
      DoesExtractNestedValuesFromWithinArraysTraversedWithPositionalPaths) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -262,7 +262,7 @@ TEST(VisitAllValuesAtPathTest,
 }
 
 TEST(VisitAllValuesAtPathTest, DoesExpandMultiplePositionalPathSpecifications) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -273,7 +273,7 @@ TEST(VisitAllValuesAtPathTest, DoesExpandMultiplePositionalPathSpecifications) {
 }
 
 TEST(VisitAllValuesAtPathTest, DoesAcceptNumericInitialField) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -284,7 +284,7 @@ TEST(VisitAllValuesAtPathTest, DoesAcceptNumericInitialField) {
 }
 
 TEST(VisitAllValuesAtPathTest, DoesExpandArrayFoundAfterPositionalSpecification) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -296,7 +296,7 @@ TEST(VisitAllValuesAtPathTest, DoesExpandArrayFoundAfterPositionalSpecification)
 }
 
 TEST(VisitAllValuesAtPathTest, DoesNotAddMissingValueToResults) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -306,7 +306,7 @@ TEST(VisitAllValuesAtPathTest, DoesNotAddMissingValueToResults) {
 }
 
 TEST(VisitAllValuesAtPathTest, DoesNotAddMissingValueWithinArrayToResults) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
@@ -318,7 +318,7 @@ TEST(VisitAllValuesAtPathTest, DoesNotAddMissingValueWithinArrayToResults) {
 }
 
 TEST(VisitAllValuesAtPathTest, StrictNumericFields) {
-    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto values = kDefaultValueComparator.makeFlatUnorderedValueSet();
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
