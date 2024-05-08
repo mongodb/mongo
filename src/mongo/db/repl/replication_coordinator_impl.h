@@ -882,25 +882,25 @@ private:
         WaiterList(Atomic64Metric& waiterCountMetric);
 
         // Adds waiter into the list.
-        void add_inlock(const OpTime& opTime, SharedWaiterHandle waiter);
+        void add(WithLock lk, const OpTime& opTime, SharedWaiterHandle waiter);
         // Adds a waiter into the list and returns the future of the waiter's promise.
-        std::pair<SharedSemiFuture<void>, SharedWaiterHandle> add_inlock(
-            const OpTime& opTime, boost::optional<WriteConcernOptions> w = boost::none);
+        std::pair<SharedSemiFuture<void>, SharedWaiterHandle> add(
+            WithLock lk,
+            const OpTime& opTime,
+            boost::optional<WriteConcernOptions> w = boost::none);
         // Returns whether waiter is found and removed.
-        bool remove_inlock(SharedWaiterHandle waiter);
+        bool remove(WithLock lk, SharedWaiterHandle waiter);
         // Signals all waiters whose opTime is <= the given opTime (if any) that satisfy the
         // condition in func.
         template <typename Func>
-        void setValueIf_inlock(WithLock lk,
-                               Func&& func,
-                               boost::optional<OpTime> opTime = boost::none);
+        void setValueIf(WithLock lk, Func&& func, boost::optional<OpTime> opTime = boost::none);
         // Signals all waiters from the list and fulfills promises with OK status.
-        void setValueAll_inlock();
+        void setValueAll(WithLock lk);
         // Signals all waiters from the list and fulfills promises with Error status.
-        void setErrorAll_inlock(Status status);
+        void setErrorAll(WithLock lk, Status status);
 
     private:
-        void _updateMetric_inlock();
+        void _updateMetric(WithLock);
 
         // Waiters sorted by OpTime.
         std::multimap<OpTime, SharedWaiterHandle> _waiters;
@@ -938,13 +938,13 @@ private:
     public:
         CatchupState(ReplicationCoordinatorImpl* repl) : _repl(repl) {}
         // start() can only be called once.
-        void start_inlock(WithLock lk);
+        void start(WithLock lk);
         // Reset the state itself to destruct the state.
-        void abort_inlock(PrimaryCatchUpConclusionReason reason);
+        void abort(WithLock lk, PrimaryCatchUpConclusionReason reason);
         // Heartbeat calls this function to update the target optime.
-        void signalHeartbeatUpdate_inlock();
+        void signalHeartbeatUpdate(WithLock lk);
         // Increment the counter for the number of ops applied during catchup.
-        void incrementNumCatchUpOps_inlock(long numOps);
+        void incrementNumCatchUpOps(WithLock lk, long numOps);
 
     private:
         ReplicationCoordinatorImpl* _repl;  // Not owned.
@@ -1123,7 +1123,7 @@ private:
     /**
      * Returns the _writeConcernMajorityJournalDefault of our current _rsConfig.
      */
-    bool getWriteConcernMajorityShouldJournal_inlock(WithLock lk) const;
+    bool getWriteConcernMajorityShouldJournal(WithLock lk) const;
 
     /**
      * Returns the write concerns used by oplog commitment check and config replication check.
@@ -1134,7 +1134,7 @@ private:
     /**
      * Returns the OpTime of the current committed snapshot, if one exists.
      */
-    OpTime _getCurrentCommittedSnapshotOpTime_inlock() const;
+    OpTime _getCurrentCommittedSnapshotOpTime(WithLock lk) const;
 
     /**
      *  Verifies that ReadConcernArgs match node's readConcern.
@@ -1190,9 +1190,9 @@ private:
      * If the writeConcern is 'majority', also waits for _currentCommittedSnapshot to be newer than
      * minSnapshot.
      */
-    bool _doneWaitingForReplication_inlock(WithLock lk,
-                                           const OpTime& opTime,
-                                           const WriteConcernOptions& writeConcern);
+    bool _doneWaitingForReplication(WithLock lk,
+                                    const OpTime& opTime,
+                                    const WriteConcernOptions& writeConcern);
 
     /**
      *  Returns whether or not "members" list contains at least 'numNodes'.
@@ -1209,22 +1209,22 @@ private:
         const ReplSetTagPattern& tagPattern,
         const std::vector<mongo::HostAndPort>& members) const;
 
-    Status _checkIfWriteConcernCanBeSatisfied_inlock(WithLock lk,
-                                                     const WriteConcernOptions& writeConcern) const;
+    Status _checkIfWriteConcernCanBeSatisfied(WithLock,
+                                              const WriteConcernOptions& writeConcern) const;
 
     Status _checkIfCommitQuorumCanBeSatisfied(WithLock,
                                               const CommitQuorumOptions& commitQuorum) const;
 
-    int _getMyId_inlock(WithLock lk) const;
+    int _getMyId(WithLock lk) const;
 
-    OpTime _getMyLastWrittenOpTime_inlock() const;
-    OpTimeAndWallTime _getMyLastWrittenOpTimeAndWallTime_inlock() const;
+    OpTime _getMyLastWrittenOpTime(WithLock) const;
+    OpTimeAndWallTime _getMyLastWrittenOpTimeAndWallTime(WithLock) const;
 
-    OpTime _getMyLastAppliedOpTime_inlock() const;
-    OpTimeAndWallTime _getMyLastAppliedOpTimeAndWallTime_inlock() const;
+    OpTime _getMyLastAppliedOpTime(WithLock) const;
+    OpTimeAndWallTime _getMyLastAppliedOpTimeAndWallTime(WithLock) const;
 
-    OpTime _getMyLastDurableOpTime_inlock() const;
-    OpTimeAndWallTime _getMyLastDurableOpTimeAndWallTime_inlock() const;
+    OpTime _getMyLastDurableOpTime(WithLock) const;
+    OpTimeAndWallTime _getMyLastDurableOpTimeAndWallTime(WithLock) const;
 
     /**
      * Helper method for updating our tracking of the last optime applied by a given node.
@@ -1255,7 +1255,7 @@ private:
      * When prioritized is set to true, the reporter will try to schedule an updatePosition request
      * even there is already one in flight.
      */
-    void _reportUpstream_inlock(stdx::unique_lock<Latch> lock, bool prioritized);
+    void _reportUpstream(stdx::unique_lock<Latch> lock, bool prioritized);
 
     /**
      * Helpers to set the last written, applied and durable OpTime.
@@ -1279,9 +1279,10 @@ private:
     /**
      * Schedules a heartbeat using this node's "replSetName" to be sent to "target" at "when".
      */
-    void _scheduleHeartbeatToTarget_inlock(const HostAndPort& target,
-                                           Date_t when,
-                                           std::string replSetName);
+    void _scheduleHeartbeatToTarget(WithLock lk,
+                                    const HostAndPort& target,
+                                    Date_t when,
+                                    std::string replSetName);
 
     /**
      * Processes each heartbeat response using this node's "replSetName".
@@ -1291,54 +1292,54 @@ private:
     void _handleHeartbeatResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
                                   const std::string& replSetName);
 
-    void _trackHeartbeatHandle_inlock(
-        const StatusWith<executor::TaskExecutor::CallbackHandle>& handle,
-        HeartbeatState hbState,
-        const HostAndPort& target);
+    void _trackHeartbeatHandle(WithLock,
+                               const StatusWith<executor::TaskExecutor::CallbackHandle>& handle,
+                               HeartbeatState hbState,
+                               const HostAndPort& target);
 
-    void _untrackHeartbeatHandle_inlock(const executor::TaskExecutor::CallbackHandle& handle);
+    void _untrackHeartbeatHandle(WithLock, const executor::TaskExecutor::CallbackHandle& handle);
 
     /*
      * Return a randomized offset amount that is scaled in proportion to the size of the
      * _electionTimeoutPeriod. Used to add randomization to an election timeout.
      */
-    Milliseconds _getRandomizedElectionOffset_inlock(WithLock lk);
+    Milliseconds _getRandomizedElectionOffset(WithLock lk);
 
     /*
      * Return the upper bound of the offset amount returned by _getRandomizedElectionOffset
      * This is actually off by one, that is, the election offset is in the half-open range
      * [0, electionOffsetUpperBound)
      */
-    long long _getElectionOffsetUpperBound_inlock(WithLock lk);
+    long long _getElectionOffsetUpperBound(WithLock lk);
 
     /**
      * Starts a heartbeat for each member in the current config.  Called while holding _mutex.
      */
-    void _startHeartbeats_inlock(WithLock lk);
+    void _startHeartbeats(WithLock lk);
 
     /**
      * Cancels all heartbeats.  Called while holding replCoord _mutex.
      */
-    void _cancelHeartbeats_inlock();
+    void _cancelHeartbeats(WithLock);
 
     /**
      * Cancels all heartbeats that have been scheduled but not yet sent out, then reschedules them
      * at the current time immediately using this node's "replSetName". Called while holding
      * replCoord _mutex.
      */
-    void _restartScheduledHeartbeats_inlock(const std::string& replSetName);
+    void _restartScheduledHeartbeats(WithLock lk, const std::string& replSetName);
 
     /**
      * Asynchronously sends a heartbeat to "target" using this node's "replSetName".
      *
-     * Scheduled by _scheduleHeartbeatToTarget_inlock.
+     * Scheduled by _scheduleHeartbeatToTarget.
      */
     void _doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData,
                             const HostAndPort& target,
                             const std::string& replSetName);
 
 
-    MemberState _getMemberState_inlock() const;
+    MemberState _getMemberState(WithLock) const;
 
     /**
      * Helper method for setting this node to a specific follower mode.
@@ -1413,7 +1414,7 @@ private:
     /**
      * Changes _rsConfigState to newState, and notify any waiters.
      */
-    void _setConfigState_inlock(ConfigState newState);
+    void _setConfigState(WithLock, ConfigState newState);
 
     /**
      * Returns the string representation of the config state.
@@ -1568,7 +1569,7 @@ private:
      *
      * Requires "lock" to own _mutex, and returns the same unique_lock.
      */
-    stdx::unique_lock<Latch> _handleHeartbeatResponseAction_inlock(
+    stdx::unique_lock<Latch> _handleHeartbeatResponseAction(
         const HeartbeatResponseAction& action,
         const StatusWith<ReplSetHeartbeatResponse>& responseStatus,
         stdx::unique_lock<Latch> lock);
@@ -1599,9 +1600,9 @@ private:
     void _updateLastCommittedOpTimeAndWallTime(WithLock lk);
 
     /** Terms only increase, so if an incoming term is less than or equal to our
-     * current term (_termShadow), there is no need to take the mutex and call _updateTerm_inlock.
+     * current term (_termShadow), there is no need to take the mutex and call _updateTerm.
      * Since _termShadow may be lagged, this may return true when the term does not need to be
-     * updated, which is harmless because _updateTerm_inlock will do nothing in that case.
+     * updated, which is harmless because _updateTerm will do nothing in that case.
      */
     bool _needToUpdateTerm(long long term);
 
@@ -1612,10 +1613,9 @@ private:
      * Returns the finish event if it does not finish in this function, for example,
      * due to stepdown, otherwise the returned EventHandle is invalid.
      */
-    EventHandle _updateTerm_inlock(
-        WithLock lk,
-        long long term,
-        TopologyCoordinator::UpdateTermResult* updateTermResult = nullptr);
+    EventHandle _updateTerm(WithLock lk,
+                            long long term,
+                            TopologyCoordinator::UpdateTermResult* updateTermResult = nullptr);
 
     /**
      * Callback that processes the ReplSetMetadata returned from a command run against another
@@ -1626,8 +1626,7 @@ private:
      *
      * Returns the finish event which is invalid if the process has already finished.
      */
-    EventHandle _processReplSetMetadata_inlock(WithLock lk,
-                                               const rpc::ReplSetMetadata& replMetadata);
+    EventHandle _processReplSetMetadata(WithLock lk, const rpc::ReplSetMetadata& replMetadata);
 
     /**
      * Blesses a snapshot to be used for new committed reads.
@@ -1649,7 +1648,7 @@ private:
     /**
      * Clears the current committed snapshot.
      */
-    void _clearCommittedSnapshot_inlock();
+    void _clearCommittedSnapshot(WithLock);
 
     /**
      * Bottom half of _scheduleNextLivenessUpdate.
@@ -1657,7 +1656,7 @@ private:
      * If reschedule is true, will recompute the liveness update even if a timeout is
      * already pending.
      */
-    void _scheduleNextLivenessUpdate_inlock(WithLock lk, bool reschedule);
+    void _scheduleNextLivenessUpdate(WithLock, bool reschedule);
 
     /**
      * Callback which marks downed nodes as down, triggers a stepdown if a majority of nodes are no
@@ -1670,23 +1669,23 @@ private:
      * schedule a new one.
      * Returns immediately otherwise.
      */
-    void _rescheduleLivenessUpdate_inlock(WithLock lk, int updatedMemberId);
+    void _rescheduleLivenessUpdate(WithLock, int updatedMemberId);
 
     /**
      * Cancels all outstanding _priorityTakeover callbacks.
      */
-    void _cancelPriorityTakeover_inlock();
+    void _cancelPriorityTakeover(WithLock);
 
     /**
      * Cancels all outstanding _catchupTakeover callbacks.
      */
-    void _cancelCatchupTakeover_inlock();
+    void _cancelCatchupTakeover(WithLock);
 
     /**
      * Cancels the current _handleElectionTimeout callback and reschedules a new callback.
      * Returns immediately otherwise.
      */
-    void _cancelAndRescheduleElectionTimeout_inlock(WithLock lk);
+    void _cancelAndRescheduleElectionTimeout(WithLock lk);
 
     /**
      * Callback which starts an election if this node is electable and using protocolVersion 1.
@@ -1718,7 +1717,7 @@ private:
     /**
      * Finish catch-up mode and start drain mode.
      */
-    void _enterDrainMode_inlock();
+    void _enterDrainMode(WithLock);
 
     /**
      * Enter drain mode which does not result in a primary stepup. Returns a future which becomes
@@ -1774,7 +1773,7 @@ private:
     /**
      * Returns a pseudorandom number no less than 0 and less than limit (which must be positive).
      */
-    int64_t _nextRandomInt64_inlock(int64_t limit);
+    int64_t _nextRandomInt64(WithLock, int64_t limit);
 
     /**
      * This is called by a primary when they become aware that a node has completed initial sync.
@@ -1792,7 +1791,7 @@ private:
     /*
      * Calculates and returns the read preference for the node.
      */
-    ReadPreference _getSyncSourceReadPreference(WithLock) const;
+    ReadPreference _getSyncSourceReadPreference(WithLock lk) const;
 
     /*
      * Performs the replica set reconfig procedure. Certain consensus safety checks are omitted when

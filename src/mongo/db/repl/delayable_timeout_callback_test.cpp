@@ -30,6 +30,7 @@
 #include "mongo/db/repl/delayable_timeout_callback.h"
 
 #include <memory>
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -75,6 +76,7 @@ protected:
 
 
 protected:
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("DelayableTimeoutCallbackBaseTest::_mutex");
     boost::optional<T> _delayableTimeoutCallback;
     executor::NetworkInterfaceMock* _net;
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -98,7 +100,7 @@ void DelayableTimeoutCallbackBaseTest<
         [this](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
             this->callback(cbData);
         },
-        [](int64_t limit) {
+        [](WithLock, int64_t limit) {
             static int64_t notVeryRandom = 0;
             notVeryRandom += 10;
             return notVeryRandom % limit;
@@ -308,8 +310,9 @@ TEST_F(DelayableTimeoutCallbackWithJitterTest, DelayUntilWithJitter) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());
 
-    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(_net->now() + Seconds(10),
-                                                              Milliseconds(100)));
+    stdx::lock_guard lk(_mutex);
+    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(
+        lk, _net->now() + Seconds(10), Milliseconds(100)));
 
     ASSERT_TRUE(_delayableTimeoutCallback->isActive());
     // Our "random" generator is just 10,20,30,...
@@ -317,30 +320,30 @@ TEST_F(DelayableTimeoutCallbackWithJitterTest, DelayUntilWithJitter) {
     ASSERT_EQ(0, callbackRan);
 
     // Setting it again in the same time shouldn't change jitter.
-    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(_net->now() + Seconds(10),
-                                                              Milliseconds(100)));
+    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(
+        lk, _net->now() + Seconds(10), Milliseconds(100)));
     ASSERT_EQ(_net->now() + Milliseconds(10010), _delayableTimeoutCallback->getNextCall());
     ASSERT_EQ(0, callbackRan);
 
     // Move forward less than the max jitter shouldn't change jitter.
     for (int i = 0; i < 3; i++) {
         _net->runUntil(_net->now() + Milliseconds(25));
-        ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(_net->now() + Seconds(10),
-                                                                  Milliseconds(100)));
+        ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(
+            lk, _net->now() + Seconds(10), Milliseconds(100)));
         ASSERT_EQ(_net->now() + Milliseconds(10010), _delayableTimeoutCallback->getNextCall());
         ASSERT_EQ(0, callbackRan);
     }
 
     // Move forward to the max jitter should recalculate jitter.
     _net->runUntil(_net->now() + Milliseconds(25));
-    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(_net->now() + Seconds(10),
-                                                              Milliseconds(100)));
+    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(
+        lk, _net->now() + Seconds(10), Milliseconds(100)));
     ASSERT_EQ(_net->now() + Milliseconds(10020), _delayableTimeoutCallback->getNextCall());
     ASSERT_EQ(0, callbackRan);
 
     // Setting max jitter to less than actual jitter should recalculate jitter.
-    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(_net->now() + Seconds(10),
-                                                              Milliseconds(19)));
+    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(
+        lk, _net->now() + Seconds(10), Milliseconds(19)));
     // Jitter value will be 30 % 19 = 11
     ASSERT_EQ(_net->now() + Milliseconds(10011), _delayableTimeoutCallback->getNextCall());
     ASSERT_EQ(0, callbackRan);
@@ -355,8 +358,10 @@ TEST_F(DelayableTimeoutCallbackWithJitterTest, DelayUntilWithZeroJitter) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());
 
+    stdx::lock_guard lk(_mutex);
+
     ASSERT_OK(
-        _delayableTimeoutCallback->delayUntilWithJitter(_net->now() + Seconds(10), Seconds(0)));
+        _delayableTimeoutCallback->delayUntilWithJitter(lk, _net->now() + Seconds(10), Seconds(0)));
 
     ASSERT_TRUE(_delayableTimeoutCallback->isActive());
     ASSERT_EQ(_net->now() + Milliseconds(10000), _delayableTimeoutCallback->getNextCall());

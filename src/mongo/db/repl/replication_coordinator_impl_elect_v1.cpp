@@ -208,8 +208,8 @@ void ReplicationCoordinatorImpl::ElectionState::start(WithLock lk, StartElection
     _electionDryRunFinishedEvent = dryRunFinishedEvent;
 
     invariant(_repl->_rsConfig.getConfig(lk).getMemberAt(_repl->_selfIndex).isElectable());
-    const auto lastWrittenOpTime = _repl->_getMyLastWrittenOpTime_inlock();
-    const auto lastAppliedOpTime = _repl->_getMyLastAppliedOpTime_inlock();
+    const auto lastWrittenOpTime = _repl->_getMyLastWrittenOpTime(lk);
+    const auto lastAppliedOpTime = _repl->_getMyLastAppliedOpTime(lk);
 
     if (lastWrittenOpTime == OpTime() || lastAppliedOpTime == OpTime()) {
         LOGV2(21436,
@@ -332,7 +332,7 @@ void ReplicationCoordinatorImpl::ElectionState::_startRealElection(WithLock lk,
     LoseElectionDryRunGuardV1 lossGuard(_repl);
 
     TopologyCoordinator::UpdateTermResult updateTermResult;
-    _repl->_updateTerm_inlock(lk, newTerm, &updateTermResult);
+    _repl->_updateTerm(lk, newTerm, &updateTermResult);
     // This is the only valid result from this term update. If we are here, then we are not a
     // primary, so a stepdown is not possible. We have also not yet learned of a higher term from
     // someone else: seeing an update in the topology coordinator mid-election requires releasing
@@ -415,8 +415,8 @@ void ReplicationCoordinatorImpl::ElectionState::_writeLastVoteForMyElection(
 
 void ReplicationCoordinatorImpl::ElectionState::_requestVotesForRealElection(
     WithLock lk, long long newTerm, StartElectionReasonEnum reason) {
-    const auto lastWrittenOpTime = _repl->_getMyLastWrittenOpTime_inlock();
-    const auto lastAppliedOpTime = _repl->_getMyLastAppliedOpTime_inlock();
+    const auto lastWrittenOpTime = _repl->_getMyLastWrittenOpTime(lk);
+    const auto lastAppliedOpTime = _repl->_getMyLastAppliedOpTime(lk);
 
     StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh =
         _startVoteRequester(lk, newTerm, false, lastWrittenOpTime, lastAppliedOpTime, -1);

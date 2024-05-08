@@ -182,7 +182,8 @@ Status DelayableTimeoutCallbackWithJitter::delayUntil(Date_t when) {
     return _delayUntil(lk, when);
 }
 
-Status DelayableTimeoutCallbackWithJitter::delayUntilWithJitter(Date_t when,
+Status DelayableTimeoutCallbackWithJitter::delayUntilWithJitter(WithLock,
+                                                                Date_t when,
                                                                 Milliseconds jitterUpperBound) {
     if (jitterUpperBound == Milliseconds::zero())
         return delayUntil(when);
@@ -192,7 +193,8 @@ Status DelayableTimeoutCallbackWithJitter::delayUntilWithJitter(Date_t when,
     if (_lastRandomizationTime == Date_t() || elapsed < Milliseconds::zero() ||
         elapsed >= jitterUpperBound || jitterUpperBound < _currentJitter) {
         _lastRandomizationTime = now;
-        _currentJitter = Milliseconds(_randomSource(durationCount<Milliseconds>(jitterUpperBound)));
+        _currentJitter =
+            Milliseconds(_randomSource(lk, durationCount<Milliseconds>(jitterUpperBound)));
     }
     return _delayUntil(lk, when + _currentJitter);
 }

@@ -140,7 +140,7 @@ private:
  */
 class DelayableTimeoutCallbackWithJitter : public DelayableTimeoutCallback {
 public:
-    using RandomSource = std::function<int64_t(int64_t)>;
+    using RandomSource = std::function<int64_t(WithLock, int64_t)>;
 
     DelayableTimeoutCallbackWithJitter(executor::TaskExecutor* executor,
                                        executor::TaskExecutor::CallbackFn callback,
@@ -151,7 +151,7 @@ public:
 
     Status scheduleAt(Date_t when);
     Status delayUntil(Date_t when);
-    Status delayUntilWithJitter(Date_t when, Milliseconds maxJitter);
+    Status delayUntilWithJitter(WithLock, Date_t when, Milliseconds maxJitter);
 
 private:
     void _resetRandomization(WithLock);
