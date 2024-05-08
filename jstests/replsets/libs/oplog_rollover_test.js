@@ -64,7 +64,21 @@ export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless =
     function numInsertOplogEntry(oplog) {
         print(`Oplog times for ${oplog.getMongo().host}: ${
             tojsononeline(oplog.find().projection({ts: 1, t: 1, op: 1, ns: 1}).toArray())}`);
-        return oplog.find({op: "i", "ns": "test.foo"}).itcount();
+        let result;
+        assert.soon(() => {
+            try {
+                result = oplog.find({op: "i", "ns": "test.foo"}).itcount();
+                return true;
+            } catch (e) {
+                if (e.code !== ErrorCodes.CappedPositionLost) {
+                    throw e;
+                }
+                // If we get a CappedPositionLost here, it means the oplog collection is being
+                // truncated so we return false and retry.
+                return false;
+            }
+        }, "Timeout finding the number of insert oplog entry");
+        return result;
     }
 
     // Insert the first document.
