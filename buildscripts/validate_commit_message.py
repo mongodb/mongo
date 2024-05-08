@@ -28,107 +28,14 @@
 #
 """Validate that the commit message is ok."""
 import argparse
-import os
 import re
-import subprocess
 import sys
 import logging
 
 LOGGER = logging.getLogger(__name__)
 
-COMMON_PUBLIC_PATTERN = r'''
-    ((?P<revert>Revert)\s+[\"\']?)?                         # Revert (optional)
-    ((?P<ticket>(?:EVG|SERVER|WT)-[0-9]+)[\"\']?\s*)               # ticket identifier
-    (?P<body>(?:(?!\(cherry\spicked\sfrom).)*)?             # To also capture the body
-    (?P<backport>\(cherry\spicked\sfrom.*)?                 # back port (optional)
-    '''
-"""Common Public pattern format."""
-
-COMMON_10GENREPO_COMMIT_QUEUE_PATTERN = r' ^\'(?P<repo>10gen/mongo)\'\s.*commit\squeue\smerge.*SERVER-[0-9]+'
-"""Common commit queue format."""
-
-COMMON_LINT_PATTERN = r'(?P<lint>Fix\slint)'
-"""Common Lint pattern format."""
-
-COMMON_IMPORT_PATTERN = r'(?P<imported>Import\s(wiredtiger|tools):\s.*)'
-"""Common Import pattern format."""
-
-COMMON_REVERT_IMPORT_PATTERN = r'Revert\s+[\"\']?(?P<imported>Import\s(wiredtiger|tools):\s.*)'
-"""Common revert Import pattern format."""
-
-COMMON_PRIVATE_PATTERN = r'''
-    ((?P<revert>Revert)\s+[\"\']?)?                                     # Revert (optional)
-    ((?P<ticket>[A-Z]+-[0-9]+)[\"\']?\s*)                               # ticket identifier
-    (?P<body>(?:(?!('\s(into\s'(([^/]+))/(([^:]+)):(([^']+))'))).)*)?   # To also capture the body
-'''
-"""Common Private pattern format."""
-
 STATUS_OK = 0
 STATUS_ERROR = 1
-
-GIT_SHOW_COMMAND = ["git", "show", "-1", "-s", "--format=%s"]
-
-
-def new_patch_description(pattern: str) -> str:
-    """
-    Wrap the pattern to conform to the new commit queue patch description format.
-
-    Add the commit queue prefix and suffix to the pattern. The format looks like:
-
-    Commit Queue Merge: '<commit message>' into '<owner>/<repo>:<branch>'
-
-    :param pattern: The pattern to wrap.
-    :return: A pattern to match the new format for the patch description.
-    """
-    return (r"""^((?P<commitqueue>Commit\sQueue\sMerge:)\s')"""
-            f'{pattern}'
-            # r"""('\s(?P<into>into\s'((?P<owner>[^/]+))/((?P<repo>[^:]+)):((?P<branch>[^']+))'))"""
-            )
-
-
-def old_patch_description(pattern: str) -> str:
-    """
-    Wrap the pattern to conform to the new commit queue patch description format.
-
-    Just add a start anchor. The format looks like:
-
-    <commit message>
-
-    :param pattern: The pattern to wrap.
-    :return: A pattern to match the old format for the patch description.
-    """
-    return r'^' f'{pattern}'
-
-
-# NOTE: re.VERBOSE is for visibility / debugging. As such significant white space must be
-# escaped (e.g ' ' to \s).
-VALID_PATTERNS = [
-    re.compile(new_patch_description(COMMON_PUBLIC_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(old_patch_description(COMMON_PUBLIC_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(
-        new_patch_description(COMMON_10GENREPO_COMMIT_QUEUE_PATTERN),
-        re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(
-        old_patch_description(COMMON_10GENREPO_COMMIT_QUEUE_PATTERN),
-        re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(new_patch_description(COMMON_LINT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(old_patch_description(COMMON_LINT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(new_patch_description(COMMON_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(old_patch_description(COMMON_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(
-        new_patch_description(COMMON_REVERT_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(
-        old_patch_description(COMMON_REVERT_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-]
-"""valid public patterns."""
-
-PRIVATE_PATTERNS = [
-    re.compile(
-        new_patch_description(COMMON_PRIVATE_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(
-        old_patch_description(COMMON_PRIVATE_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-]
-"""private patterns."""
 
 
 def main(argv=None):
@@ -145,20 +52,21 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if not args.message:
-        print('Validating last git commit message')
-        result = subprocess.check_output(GIT_SHOW_COMMAND)
-        message = result.decode('utf-8')
-    else:
-        message = " ".join(args.message)
+        LOGGER.error("Must specify non-empty value for --message")
+        return STATUS_ERROR
+    message = " ".join(args.message)
 
-    if any(valid_pattern.match(message) for valid_pattern in VALID_PATTERNS):
+    # Valid values look like:
+    # 1. SERVER-\d+
+    # 2. Revert "SERVER-\d+
+    # 3. Import wiredtiger
+    # 4. Revert "Import wiredtiger
+    valid_pattern = re.compile(r'(Revert ")?(SERVER-[0-9]+|Import wiredtiger)')
+
+    if valid_pattern.match(message):
         return STATUS_OK
     else:
-        if any(private_pattern.match(message) for private_pattern in PRIVATE_PATTERNS):
-            error_type = "Found a reference to a private project"
-        else:
-            error_type = "Found a commit without a ticket"
-        LOGGER.error(f"{error_type}\n{message}")  # pylint: disable=logging-fstring-interpolation
+        LOGGER.error(f"Found a commit without a ticket\n{message}")  # pylint: disable=logging-fstring-interpolation
         return STATUS_ERROR
 
 
