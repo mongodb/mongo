@@ -3,7 +3,6 @@
  * tenantId is unsupported (i.e. '', 'admin', 'local' or 'config') or if there is no recipient node.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_persistence,

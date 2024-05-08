@@ -2,7 +2,6 @@
  * Tests that forgetShardSplit command doesn't hang if failover occurs while it is being processed.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
