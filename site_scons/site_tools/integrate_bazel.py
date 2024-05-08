@@ -1,3 +1,5 @@
+import copy
+from enum import Enum
 import errno
 import getpass
 import hashlib
@@ -17,6 +19,7 @@ from typing import List, Dict, Set, Tuple, Any
 import urllib.request
 import requests
 from retry import retry
+from retry.api import retry_call
 import sys
 from buildscripts.install_bazel import install_bazel
 import atexit
@@ -25,6 +28,12 @@ import SCons
 
 import mongo.platform as mongo_platform
 import mongo.generators as mongo_generators
+
+# Disable retries locally
+_LOCAL_MAX_RETRY_ATTEMPTS = 1
+
+# Enable up to 3 attempts in
+_CI_MAX_RETRY_ATTEMPTS = 3
 
 _SUPPORTED_PLATFORM_MATRIX = [
     "linux:arm64:gcc",
@@ -115,6 +124,8 @@ class Globals:
 
     bazel_fetch_thread = None
 
+    max_retry_attempts: int = _LOCAL_MAX_RETRY_ATTEMPTS
+
     @staticmethod
     def bazel_output(scons_node):
         return Globals.scons2bazel_targets[str(scons_node).replace("\\", "/")]['bazel_output']
@@ -166,7 +177,6 @@ total_queries = 0
 
 def bazel_query_func(env: SCons.Environment.Environment, query_command_args: List[str],
                      query_name: str = "query"):
-
     bazel_debug(f"Running query: {' '.join(query_command_args)}")
     global total_query_time, total_queries
     start_time = time.time()
@@ -178,7 +188,7 @@ def bazel_query_func(env: SCons.Environment.Environment, query_command_args: Lis
         "--remote_executor=", "--remote_cache=", '--bes_backend=', '--bes_results_url='
     ]
     results = subprocess.run([Globals.bazel_executable] + query_command_args, capture_output=True,
-                             text=True, cwd=env.Dir('#').abspath,
+                             text=True, check=True, cwd=env.Dir('#').abspath,
                              env={**os.environ.copy(), **Globals.bazel_env_variables})
     delta = time.time() - start_time
     bazel_debug(f"Spent {delta} seconds running {query_name}")
@@ -216,10 +226,71 @@ def ninja_bazel_builder(env: SCons.Environment.Environment, _dup_env: SCons.Envi
     }
 
 
+def write_bazel_build_output(line: str) -> None:
+    if Globals.waiting_on_bazel_flag:
+        if Globals.bazel_thread_terminal_output is not None:
+            Globals.bazel_thread_terminal_output.seek(0)
+            sys.stdout.write(Globals.bazel_thread_terminal_output.read())
+            Globals.bazel_thread_terminal_output = None
+        sys.stdout.write(line)
+    else:
+        Globals.bazel_thread_terminal_output.write(line)
+
+
+def perform_tty_bazel_build(bazel_cmd: str) -> None:
+    # Importing pty will throw on certain platforms, the calling code must catch this exception
+    # and fallback to perform_non_tty_bazel_build.
+    import pty
+
+    parent_fd, child_fd = pty.openpty()  # provide tty
+    bazel_proc = subprocess.Popen(bazel_cmd, stdin=child_fd, stdout=child_fd,
+                                  stderr=subprocess.STDOUT,
+                                  env={**os.environ.copy(), **Globals.bazel_env_variables})
+
+    os.close(child_fd)
+    try:
+        # This loop will terminate with an EOF or EOI when the process ends.
+        while True:
+            try:
+                data = os.read(parent_fd, 512)
+            except OSError as e:
+                if e.errno != errno.EIO:
+                    raise
+                break  # EIO means EOF on some systems
+            else:
+                if not data:  # EOF
+                    break
+
+            write_bazel_build_output(data.decode())
+    finally:
+        os.close(parent_fd)
+        if bazel_proc.poll() is None:
+            bazel_proc.kill()
+        bazel_proc.wait()
+
+    if bazel_proc.returncode != 0:
+        raise subprocess.CalledProcessError(bazel_proc.returncode, bazel_cmd, "", "")
+
+
+def perform_non_tty_bazel_build(bazel_cmd: str) -> None:
+    bazel_proc = subprocess.Popen(bazel_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  env={**os.environ.copy(),
+                                       **Globals.bazel_env_variables}, text=True)
+    # This loop will terminate when the process ends.
+    while True:
+        line = bazel_proc.stdout.readline()
+        if not line:
+            break
+        write_bazel_build_output(line)
+
+    stdout, stderr = bazel_proc.communicate()
+
+    if bazel_proc.returncode != 0:
+        raise subprocess.CalledProcessError(bazel_proc.returncode, bazel_cmd, stdout, stderr)
+
+
 def bazel_build_thread_func(env, log_dir: str, verbose: bool) -> None:
     """This thread runs the bazel build up front."""
-
-    done_with_temp = False
 
     if verbose:
         extra_args = []
@@ -237,82 +308,29 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool) -> None:
     print("Starting bazel build thread...")
 
     try:
-        import pty
-        parent_fd, child_fd = pty.openpty()  # provide tty
-        bazel_proc = subprocess.Popen(bazel_cmd, stdin=child_fd, stdout=child_fd,
-                                      stderr=subprocess.STDOUT,
-                                      env={**os.environ.copy(), **Globals.bazel_env_variables})
-
-        os.close(child_fd)
+        tty_import_fail = False
         try:
-            while True:
-                try:
-                    data = os.read(parent_fd, 512)
-                except OSError as e:
-                    if e.errno != errno.EIO:
-                        raise
-                    break  # EIO means EOF on some systems
-                else:
-                    if not data:  # EOF
-                        break
+            retry_call(perform_tty_bazel_build, [bazel_cmd], tries=Globals.max_retry_attempts,
+                       exceptions=(subprocess.CalledProcessError, ))
+        except ImportError:
+            # Run the actual build outside of the except clause to avoid confusion in the stack trace,
+            # otherwise, build failures on platforms that don't support tty will be displayed as import errors.
+            tty_import_fail = True
+            pass
 
-                    if Globals.waiting_on_bazel_flag:
-                        if not done_with_temp:
-                            done_with_temp = True
-                            Globals.bazel_thread_terminal_output.seek(0)
-                            sys.stdout.write(Globals.bazel_thread_terminal_output.read())
-                            Globals.bazel_thread_terminal_output = None
-                        sys.stdout.write(data.decode())
-                    else:
-                        Globals.bazel_thread_terminal_output.write(data.decode())
-        finally:
-            os.close(parent_fd)
-            if bazel_proc.poll() is None:
-                bazel_proc.kill()
-            bazel_proc.wait()
+        if tty_import_fail:
+            retry_call(perform_non_tty_bazel_build, [bazel_cmd], tries=Globals.max_retry_attempts,
+                       exceptions=(subprocess.CalledProcessError, ))
+    except subprocess.CalledProcessError as ex:
+        print("ERROR: Bazel build failed:")
 
-            if bazel_proc.returncode != 0:
-                print("ERROR: Bazel build failed:")
-                stdout = ""
+        if Globals.bazel_thread_terminal_output is not None:
+            Globals.bazel_thread_terminal_output.seek(0)
+            ex.output += Globals.bazel_thread_terminal_output.read()
+            Globals.bazel_thread_terminal_output = None
+            print(ex.output)
 
-                if not done_with_temp:
-                    Globals.bazel_thread_terminal_output.seek(0)
-                    stdout += Globals.bazel_thread_terminal_output.read()
-                    Globals.bazel_thread_terminal_output = None
-                    print(stdout)
-
-                raise subprocess.CalledProcessError(bazel_proc.returncode, bazel_cmd, stdout, "")
-
-    except ImportError:
-        bazel_proc = subprocess.Popen(bazel_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                      env={**os.environ.copy(),
-                                           **Globals.bazel_env_variables}, text=True)
-        while True:
-            line = bazel_proc.stdout.readline()
-            if not line:
-                break
-            if Globals.waiting_on_bazel_flag:
-                if not done_with_temp:
-                    done_with_temp = True
-                    Globals.bazel_thread_terminal_output.seek(0)
-                    sys.stdout.write(Globals.bazel_thread_terminal_output.read())
-                    Globals.bazel_thread_terminal_output = None
-                sys.stdout.write(line)
-            else:
-                Globals.bazel_thread_terminal_output.write(line)
-
-        stdout, stderr = bazel_proc.communicate()
-
-        if bazel_proc.returncode != 0:
-            print("ERROR: Bazel build failed:")
-
-            if not done_with_temp:
-                Globals.bazel_thread_terminal_output.seek(0)
-                stdout += Globals.bazel_thread_terminal_output.read()
-                Globals.bazel_thread_terminal_output = None
-                print(stdout)
-
-            raise subprocess.CalledProcessError(bazel_proc.returncode, bazel_cmd, stdout, stderr)
+        raise ex
 
 
 def create_bazel_builder(builder: SCons.Builder.Builder) -> SCons.Builder.Builder:
@@ -531,14 +549,17 @@ def auto_install_bazel(env, libdep, shlib_suffix):
         bazel_query = ["cquery"] + env['BAZEL_FLAGS_STR'] + [
             f"kind('extract_debuginfo', deps(@{bazel_target}))", "--output=files"
         ]
-        query_results = env.RunBazelQuery(bazel_query)
-        if query_results.returncode == 0:
-            env.AddBazelDepsCache(bazel_target, query_results)
-        else:
+        try:
+            query_results = retry_call(env.RunBazelQuery, [bazel_query.copy()],
+                                       tries=Globals.max_retry_attempts,
+                                       exceptions=(subprocess.CalledProcessError, ))
+        except subprocess.CalledProcessError as ex:
             print("ERROR: bazel libdeps query failed:")
-            print(query_results)
+            print(ex)
             print("\n\n*** Please ask about this in #ask-devprod-build channel. ***\n")
             sys.exit(1)
+
+        env.AddBazelDepsCache(bazel_target, query_results)
 
     for line in query_results.stdout.splitlines():
         # We are only interested in installing shared libs and their debug files
@@ -750,6 +771,9 @@ def generate(env: SCons.Environment.Environment) -> None:
     if normalized_os == "macos" and evergreen_tmp_dir:
         bazel_internal_flags.append(f"--sandbox_writable_path={evergreen_tmp_dir}")
 
+    Globals.max_retry_attempts = _CI_MAX_RETRY_ATTEMPTS if os.environ.get(
+        "CI") is not None else _LOCAL_MAX_RETRY_ATTEMPTS
+
     Globals.bazel_fetch_thread.join()
     Globals.bazel_base_build_command = [
         os.path.abspath(Globals.bazel_executable),
@@ -810,11 +834,14 @@ def generate(env: SCons.Environment.Environment) -> None:
     cmd = ["aquery"] + env['BAZEL_FLAGS_STR'] + [
         'mnemonic("StripDebuginfo|ExtractDebuginfo|Symlink|IdlcGenerator", (outputs("bazel-out/.*/bin/src/.*", deps(@//src/...))))'
     ]
-    results = bazel_query_func(env, cmd, "discover ThinTargets")
 
-    if results.returncode != 0:
+    try:
+        results = retry_call(bazel_query_func, [env, cmd.copy(), "discover ThinTargets"],
+                             tries=Globals.max_retry_attempts,
+                             exceptions=(subprocess.CalledProcessError, ))
+    except subprocess.CalledProcessError as ex:
         print("ERROR: bazel thin targets query failed:")
-        print(results)
+        print(ex)
         print("Please ask about this in #ask-devprod-build slack channel.")
         sys.exit(1)
 
