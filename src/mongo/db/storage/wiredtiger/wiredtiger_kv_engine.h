@@ -304,6 +304,10 @@ public:
                      StringData ident,
                      const StorageEngine::DropIdentCallback& onDrop = nullptr) override;
 
+    Status dropIdentSynchronous(RecoveryUnit* ru,
+                                StringData ident,
+                                const StorageEngine::DropIdentCallback& onDrop = nullptr) override;
+
     void dropIdentForImport(OperationContext* opCtx, StringData ident) override;
 
     void alterIdentMetadata(OperationContext* opCtx,
@@ -485,6 +489,11 @@ private:
                                               const std::string& requestingServiceName,
                                               Timestamp requestedTimestamp,
                                               bool roundUpIfTooOld);
+
+    Status _dropIdent(RecoveryUnit* ru,
+                      StringData ident,
+                      const char* config,
+                      const StorageEngine::DropIdentCallback& onDrop = nullptr);
 
 public:
     void unpinOldestTimestamp(const std::string& requestingServiceName) override;
