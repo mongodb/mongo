@@ -187,21 +187,25 @@ function runTest(lengthLimit, mongosConfig = {}, mongodConfig = {}) {
     st.stop();
 }
 
+function expectedPipelineLimit(database) {
+    const buildInfo = assert.commandWorked(database.adminCommand("buildInfo"));
+    const isDebug = buildInfo.debug;
+    const isS390X =
+        "buildEnvironment" in buildInfo ? buildInfo.buildEnvironment.distarch == "s390x" : false;
+    return isDebug ? 200 : (isS390X ? 700 : 1000);
+}
+
 // This is a sanity check to make sure that the default value is correct. If the limit is changed,
 // it will break for users and this check catches that.
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
-let buildInfo = assert.commandWorked(st.s0.getDB("test").adminCommand("buildInfo"));
 let pipelineLimit =
     assert.commandWorked(st.s0.adminCommand({"getParameter": 1, "internalPipelineLengthLimit": 1}));
-let expectedPipelineLimit = buildInfo.debug ? 200 : 1000;
-assert.eq(expectedPipelineLimit, pipelineLimit["internalPipelineLengthLimit"]);
+assert.eq(expectedPipelineLimit(st.s0.getDB("test")), pipelineLimit["internalPipelineLengthLimit"]);
 
 const shardPrimary = st.rs0.getPrimary().getDB("test");
-buildInfo = assert.commandWorked(shardPrimary.adminCommand("buildInfo"));
-expectedPipelineLimit = buildInfo.debug ? 200 : 1000;
 pipelineLimit = assert.commandWorked(
     shardPrimary.adminCommand({"getParameter": 1, "internalPipelineLengthLimit": 1}));
-assert.eq(expectedPipelineLimit, pipelineLimit["internalPipelineLengthLimit"]);
+assert.eq(expectedPipelineLimit(shardPrimary), pipelineLimit["internalPipelineLengthLimit"]);
 st.stop();
 
 // Test with modified pipeline length limit.

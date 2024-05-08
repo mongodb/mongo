@@ -39,6 +39,8 @@ namespace mongo {
  * Returns the default value of the 'internalPipelineLengthLimit' query knob.
  */
 constexpr int defaultInternalPipelineLengthLimit() {
+    // If you change this function please update the 'expectedPipelineLimit()' function in
+    // pipeline_length_limit.js accordingly.
     if constexpr (kDebugBuild) {
         return 200;
     }
