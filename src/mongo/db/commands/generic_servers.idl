@@ -64,8 +64,7 @@ structs:
             cpuAddrSize: int
             memSizeMB: long
             memLimitMB: long
-            numLogicalCores: int
-            numCoresAvailableToProcess: int
+            numCores: int
             numPhysicalCores: int
             numCpuSockets: int
             cpuArch: string

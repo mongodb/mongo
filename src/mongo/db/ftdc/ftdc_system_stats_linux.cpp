@@ -107,13 +107,7 @@ public:
 
             // Include the number of cpus to simplify client calculations
             ProcessInfo p;
-            subObjBuilder.append("num_logical_cores", static_cast<int>(p.getNumLogicalCores()));
-            const auto num_cores_avlbl_to_process = p.getNumCoresAvailableToProcess();
-            // Adding the num cores available to process only if API is successful ie. value >=0
-            if (num_cores_avlbl_to_process >= 0) {
-                subObjBuilder.append("num_cores_available_to_process",
-                                     static_cast<int>(num_cores_avlbl_to_process));
-            }
+            subObjBuilder.append("num_cpus", static_cast<int>(p.getNumAvailableCores()));
 
             processStatusErrors(
                 procparser::parseProcStatFile("/proc/stat"_sd, kCpuKeys, &subObjBuilder),

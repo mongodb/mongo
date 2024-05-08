@@ -52,11 +52,11 @@ TEST(ProcessInfo, GetNumAvailableCores) {
     defined(_WIN32)
     unsigned long numAvailCores = ProcessInfo::getNumAvailableCores();
     ASSERT_GREATER_THAN(numAvailCores, 0u);
-    ASSERT_LESS_THAN_OR_EQUALS(numAvailCores, ProcessInfo::getNumLogicalCores());
+    ASSERT_LESS_THAN_OR_EQUALS(numAvailCores, ProcessInfo::getNumCores());
 #endif
 }
 
 TEST(ProcessInfo, GetNumCoresReturnsNonZeroNumberOfProcessors) {
-    ASSERT_GREATER_THAN(ProcessInfo::getNumLogicalCores(), 0u);
+    ASSERT_GREATER_THAN(ProcessInfo::getNumCores(), 0u);
 }
 }  // namespace mongo_test
