@@ -3,10 +3,14 @@
  * server.
  */
 
+import {getPython3Binary} from "jstests/libs/python.js"
 import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 requireSSLProvider('windows', function() {
     if (_isWindows()) {
+        assert.eq(0,
+                  runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
+
         // SChannel backed follows Windows rules and only trusts Root in LocalMachine
         runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\trusted-ca.pem");
         // Import a pfx file since it contains both a cert and private key and is easy to import

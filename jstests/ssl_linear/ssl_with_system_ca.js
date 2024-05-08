@@ -5,6 +5,8 @@
 // To install trusted-ca.pem for local testing on OSX, invoke the following at a console:
 //   security add-trusted-cert -d jstests/libs/trusted-ca.pem
 
+import {getPython3Binary} from "jstests/libs/python.js"
+
 const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 jsTest.log("HOST_TYPE = " + HOST_TYPE);
 
@@ -15,6 +17,8 @@ if (HOST_TYPE == "macOS") {
     assert.eq(0, exitCode, 'Check for proper installation of Trusted CA on MacOS host');
 }
 if (HOST_TYPE == "windows") {
+    assert.eq(0, runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
+
     // OpenSSL backed imports Root CA and intermediate CA
     runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\trusted-ca.pem");
 
