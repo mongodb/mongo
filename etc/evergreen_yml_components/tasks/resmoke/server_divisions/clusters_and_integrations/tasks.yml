@@ -280,7 +280,7 @@ tasks:
     name: concurrency_embedded_router_causal_consistency_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "incompatible_debug_mode",
         "concurrency",
@@ -297,7 +297,7 @@ tasks:
     name: concurrency_embedded_router_causal_consistency_and_balancer_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "incompatible_debug_mode",
         "concurrency",
@@ -315,7 +315,7 @@ tasks:
     name: concurrency_embedded_router_clusterwide_ops_add_remove_shards_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "incompatible_debug_mode",
         "concurrency",
@@ -334,7 +334,7 @@ tasks:
     name: concurrency_embedded_router_local_read_write_multi_stmt_txn_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "incompatible_debug_mode",
         "concurrency",
@@ -351,7 +351,7 @@ tasks:
     name: concurrency_embedded_router_local_read_write_multi_stmt_txn_with_balancer_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "incompatible_debug_mode",
         "concurrency",
@@ -368,7 +368,7 @@ tasks:
     name: concurrency_embedded_router_multi_stmt_txn_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "incompatible_debug_mode",
         "concurrency",
@@ -385,7 +385,7 @@ tasks:
     name: concurrency_embedded_router_multi_stmt_txn_with_balancer_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "incompatible_debug_mode",
         "concurrency",
@@ -402,7 +402,7 @@ tasks:
     name: concurrency_embedded_router_replication_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "incompatible_debug_mode",
         "concurrency",
@@ -419,7 +419,12 @@ tasks:
 
   - <<: *gen_task_template
     name: concurrency_embedded_router_replication_bulk_write_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default", "bulk_write"]
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "bulk_write",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -430,7 +435,7 @@ tasks:
     name: concurrency_embedded_router_replication_no_txns_with_balancer_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "concurrency",
         "no_txns",
@@ -449,7 +454,7 @@ tasks:
     name: concurrency_embedded_router_replication_with_balancer_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "incompatible_mac",
         "incompatible_ppc",
@@ -469,13 +474,13 @@ tasks:
 
   - <<: *gen_task_template
     name: embedded_router_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: embedded_router_jscore_passthrough_with_config_shard_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 
@@ -483,7 +488,7 @@ tasks:
     name: embedded_router_jscore_passthrough_with_balancer_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "sharding",
         "jscore",
@@ -494,31 +499,31 @@ tasks:
 
   - <<: *gen_task_template
     name: aggregation_embedded_router_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: embedded_router_jscore_txns_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: embedded_router_jscore_txns_with_config_shard_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: embedded_router_sharded_collections_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: embedded_router_sharded_collections_jscore_txns_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 
@@ -526,7 +531,7 @@ tasks:
     name: aggregation_sharded_collections_embedded_router_jscore_passthrough_gen
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "requires_all_feature_flags",
       ]
@@ -535,7 +540,7 @@ tasks:
 
   - <<: *gen_task_template
     name: embedded_router_sharded_collections_jscore_txns_with_config_shard_gen
-    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 
