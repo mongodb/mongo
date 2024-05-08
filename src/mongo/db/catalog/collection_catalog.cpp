@@ -952,11 +952,17 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
         ViewsForDatabase writable{viewsForDb};
         writable.remove(opCtx, systemViews, viewName);
 
-        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-        uncommittedCatalogUpdates.removeView(viewName);
-        uncommittedCatalogUpdates.replaceViewsForDatabase(viewName.dbName(), std::move(writable));
+        // Reload the view catalog with the changes applied.
+        result = writable.reload(opCtx, systemViews);
+        if (result.isOK()) {
+            auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+            uncommittedCatalogUpdates.removeView(viewName);
+            uncommittedCatalogUpdates.replaceViewsForDatabase(viewName.dbName(),
+                                                              std::move(writable));
 
-        PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
+            PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx,
+                                                                    uncommittedCatalogUpdates);
+        }
     }
 
     return result;
