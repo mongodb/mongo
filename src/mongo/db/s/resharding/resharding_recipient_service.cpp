@@ -645,8 +645,10 @@ boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::repo
         stdx::lock_guard lk(_mutex);
         return _recipientCtx.getState();
     }();
+    auto opCtx = cc().getOperationContext();
+    invariant(opCtx);
     if (state == RecipientStateEnum::kBuildingIndex) {
-        _fetchBuildIndexMetrics();
+        _fetchBuildIndexMetrics(opCtx);
     }
     return _metrics->reportForCurrentOp();
 }
@@ -1587,11 +1589,8 @@ CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortS
     return _abortSource->token();
 }
 
-void ReshardingRecipientService::RecipientStateMachine::_fetchBuildIndexMetrics() {
-    auto opCtx = cc().getOperationContext();
-    if (!opCtx) {
-        opCtx = cc().makeOperationContext().get();
-    }
+void ReshardingRecipientService::RecipientStateMachine::_fetchBuildIndexMetrics(
+    OperationContext* opCtx) {
     AutoGetCollection tempReshardingColl(opCtx, _metadata.getTempReshardingNss(), MODE_IS);
     auto indexCatalog = tempReshardingColl->getIndexCatalog();
     invariant(indexCatalog,
