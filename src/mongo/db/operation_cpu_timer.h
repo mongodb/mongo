@@ -34,6 +34,7 @@
 #include <memory>
 
 #include "mongo/util/duration.h"
+#include "mongo/util/inline_memory.h"
 
 namespace mongo {
 
@@ -72,7 +73,7 @@ private:
 
     // List of active timers on this OperationContext. When an OperationCPUTimer is constructed, it
     // will add itself to this list and remove itself on destruction.
-    std::list<OperationCPUTimer*> _timers;
+    inline_memory::List<OperationCPUTimer*, 1> _timers;
 };
 
 /**

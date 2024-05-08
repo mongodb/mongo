@@ -60,7 +60,7 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
                                                       OperationContext* opCtx,
                                                       const std::string& failpointMsg,
                                                       const std::function<void()>& whileWaiting,
-                                                      boost::optional<NamespaceString> nss) {
+                                                      const NamespaceString& nss) {
     invariant(failPoint);
     failPoint->executeIf(
         [&](const BSONObj& data) {
@@ -91,10 +91,7 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
         },
         [&](const BSONObj& data) {
             const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
-            if (nss && !fpNss.isEmpty() && fpNss != nss.value()) {
-                return false;
-            }
-            return true;
+            return nss.isEmpty() || fpNss.isEmpty() || fpNss == nss;
         });
 }
 }  // namespace mongo

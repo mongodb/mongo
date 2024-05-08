@@ -98,9 +98,9 @@ bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, siz
     return fitsInBatch(bytesBuffered, nextDoc.objsize());
 }
 
-void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx,
-                                             const CanonicalQuery& cq,
-                                             FailPoint* fp) {
+void FindCommon::_waitInFindBeforeMakingBatchImpl(OperationContext* opCtx,
+                                                  const CanonicalQuery& cq,
+                                                  FailPoint* fp) {
     auto whileWaitingFunc = [&, hasLogged = false]() mutable {
         if (!std::exchange(hasLogged, true)) {
             LOGV2(20908,

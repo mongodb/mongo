@@ -217,7 +217,11 @@ public:
      */
     static void waitInFindBeforeMakingBatch(OperationContext* opCtx,
                                             const CanonicalQuery& cq,
-                                            FailPoint* fp);
+                                            FailPoint* fp) {
+        if (MONGO_unlikely(fp->shouldFail())) {
+            _waitInFindBeforeMakingBatchImpl(opCtx, cq, fp);
+        }
+    }
 
     /**
      * Computes an initial preallocation size for the GetMore reply buffer based on its
@@ -252,6 +256,11 @@ public:
         std::size_t _numberOfDocuments{0};
         std::size_t _bsonArraySizeInBytes{0};
     };
+
+private:
+    static void _waitInFindBeforeMakingBatchImpl(OperationContext* opCtx,
+                                                 const CanonicalQuery& cq,
+                                                 FailPoint* fp);
 };
 
 }  // namespace mongo

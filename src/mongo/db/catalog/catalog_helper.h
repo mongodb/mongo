@@ -60,9 +60,14 @@ void acquireCollectionLocksInResourceIdOrder(
     std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsEnd,
     std::vector<CollectionNamespaceOrUUIDLock>* collLocks);
 
+extern FailPoint setAutoGetCollectionWait;
+
 /**
  * Executes the provided callback on the 'setAutoGetCollectionWait' FailPoint.
  */
-void setAutoGetCollectionWaitFailpointExecute(std::function<void(const BSONObj&)> callback);
+static void setAutoGetCollectionWaitFailpointExecute(
+    const std::function<void(const BSONObj&)>& callback) {
+    setAutoGetCollectionWait.execute(callback);
+}
 
 }  // namespace mongo::catalog_helper
