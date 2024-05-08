@@ -895,7 +895,6 @@ buildvariants:
       - name: big_update_10k
       - name: mixed_workloads_genny_rate_limited_high_value
       - name: load_test_high_value
-      - name: majority_reads10_k_threads_high_value
       - name: large_indexed_ins_high_value
       - name: expressive_queries_high_value
       - name: time_series_sort_high_value
@@ -1622,7 +1621,6 @@ buildvariants:
       - name: tpcc_majority
       - name: linkbench2
       - name: mixed_workloads_genny_rate_limited_high_value
-      - name: majority_reads10_k_threads_high_value
       - name: bestbuy_agg
       - name: large_indexed_ins_high_value
       - name: expressive_queries_high_value
@@ -1693,7 +1691,6 @@ buildvariants:
       - name: tpcc_majority
       - name: linkbench2
       - name: mixed_workloads_genny_rate_limited_high_value
-      - name: majority_reads10_k_threads_high_value
       - name: bestbuy_agg
       - name: large_indexed_ins_high_value
       - name: expressive_queries_high_value
@@ -1866,8 +1863,6 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: load_test_high_value
         cron: *high-value-workload-cron
-      - name: majority_reads10_k_threads_high_value
-        cron: *high-value-workload-cron
       - name: large_indexed_ins_high_value
         cron: *high-value-workload-cron
       - name: expressive_queries_high_value
@@ -1959,8 +1954,6 @@ buildvariants:
       - name: mixed_workloads_genny_rate_limited_high_value
         cron: *high-value-workload-cron
       - name: load_test_high_value
-        cron: *high-value-workload-cron
-      - name: majority_reads10_k_threads_high_value
         cron: *high-value-workload-cron
       - name: large_indexed_ins_high_value
         cron: *high-value-workload-cron

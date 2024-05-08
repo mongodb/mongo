@@ -734,14 +734,6 @@ tasks:
           test_control: load_test
           auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/LoadTest.yml
 
-  - name: majority_reads10_k_threads_high_value
-    priority: 5
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: majority_reads10_k_threads
-          auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/MajorityReads10KThreads.yml
-
   - name: large_indexed_ins_high_value
     priority: 5
     commands:
