@@ -279,12 +279,14 @@ void ReplicationCoordinatorImpl::WaiterList::add_inlock(const OpTime& opTime,
     _updateMetric_inlock();
 }
 
-SharedSemiFuture<void> ReplicationCoordinatorImpl::WaiterList::add_inlock(
-    const OpTime& opTime, boost::optional<WriteConcernOptions> wc) {
+std::pair<SharedSemiFuture<void>, ReplicationCoordinatorImpl::SharedWaiterHandle>
+ReplicationCoordinatorImpl::WaiterList::add_inlock(const OpTime& opTime,
+                                                   boost::optional<WriteConcernOptions> wc) {
     auto pf = makePromiseFuture<void>();
-    _waiters.emplace(opTime, std::make_shared<Waiter>(std::move(pf.promise), std::move(wc)));
+    auto waiter = std::make_shared<Waiter>(std::move(pf.promise), std::move(wc));
+    _waiters.emplace(opTime, waiter);
     _updateMetric_inlock();
-    return std::move(pf.future);
+    return std::make_pair(std::move(pf.future), waiter);
 }
 
 bool ReplicationCoordinatorImpl::WaiterList::remove_inlock(SharedWaiterHandle waiter) {
@@ -305,7 +307,12 @@ void ReplicationCoordinatorImpl::WaiterList::setValueIf_inlock(WithLock lk,
     for (auto it = _waiters.begin(); it != _waiters.end() && (!opTime || it->first <= *opTime);) {
         const auto& waiter = it->second;
         try {
-            if (func(lk, it->first, waiter)) {
+            if (waiter->givenUp.loadRelaxed()) {
+                // Waiter has given up and so we can fulfill the promise prematurely in order to
+                // clean up the WaiterList faster.
+                waiter->promise.setError({ErrorCodes::CallbackCanceled, "Waiter has given up"});
+                it = _waiters.erase(it);
+            } else if (func(lk, it->first, waiter)) {
                 waiter->promise.emplaceValue();
                 it = _waiters.erase(it);
             } else {
@@ -1917,7 +1924,7 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
             }
 
             // We just need to wait for the opTime to catch up to what we need (not majority RC).
-            auto future =
+            auto [future, waiter] =
                 (waitForLastApplied ? _lastAppliedOpTimeWaiterList.add_inlock(targetOpTime)
                                     : _lastWrittenOpTimeWaiterList.add_inlock(targetOpTime));
 
@@ -1929,9 +1936,19 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
                         "deadline"_attr = deadline.value_or(opCtx->getDeadline()));
 
             lock.unlock();
+
             auto waitStatus = futureGetNoThrowWithDeadline(
                 opCtx, future, deadline.value_or(Date_t::max()), opCtx->getTimeoutError());
+
             if (!waitStatus.isOK()) {
+                // Technically, we don't have to mark the waiter given up even if we give up the
+                // wait before the future is ready. This is because
+                // _lastAppliedOpTimeWaiterList/_lastWrittenOpTimeWaiterList will always fulfill and
+                // clean up waiters as time moves forward. But we still do it here for completeness.
+                if (!future.isReady()) {
+                    invariant(!waiter->givenUp.swap(true));
+                }
+
                 lock.lock();
                 return waitStatus.withContext(
                     str::stream() << "Error waiting for optime " << targetOpTime.toString()
@@ -2357,14 +2374,22 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
     const auto opCtxDeadline = opCtx->getDeadline();
     const auto timeoutError = opCtx->getTimeoutError();
 
-    auto future = [&] {
+    auto [future, waiter] = [&] {
         stdx::lock_guard lock(_mutex);
         WriteConcernOptions fixedWriteConcern =
             _populateUnsetWriteConcernOptionsSyncMode(lock, writeConcern);
 
         return _startWaitingForReplication(lock, opTime, fixedWriteConcern);
     }();
+
     auto status = futureGetNoThrowWithDeadline(opCtx, future, wTimeoutDate, timeoutError);
+
+    // Mark the waiter given up if this waiter errors before the future is ready. This is so that
+    // unsatisfied but abandoned waiters can be cleaned up lazily in the next _wakeReadyWaiters
+    // pass.
+    if (!status.isOK() && !future.isReady() && waiter) {
+        invariant(!waiter->givenUp.swap(true));
+    }
 
     // If we get a timeout error and the opCtx deadline is >= the writeConcern wtimeout, then we
     // know the timeout was due to wtimeout (not opCtx deadline) and thus we return
@@ -2399,7 +2424,7 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::awaitReplicationAsyncNoWTimeo
     invariant(fixedWriteConcern.wDeadline == Date_t::max());
     invariant(fixedWriteConcern.wTimeout == WriteConcernOptions::kNoTimeout);
 
-    return _startWaitingForReplication(lg, opTime, fixedWriteConcern);
+    return _startWaitingForReplication(lg, opTime, fixedWriteConcern).first;
 }
 
 BSONObj ReplicationCoordinatorImpl::_getReplicationProgress(WithLock wl) const {
@@ -2420,22 +2445,25 @@ BSONObj ReplicationCoordinatorImpl::_getReplicationProgress(WithLock wl) const {
     return progress.obj();
 }
 
-SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
-    WithLock wl, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+std::pair<SharedSemiFuture<void>, ReplicationCoordinatorImpl::SharedWaiterHandle>
+ReplicationCoordinatorImpl::_startWaitingForReplication(WithLock wl,
+                                                        const OpTime& opTime,
+                                                        const WriteConcernOptions& writeConcern) {
 
     const auto isReplSet = _settings.isReplSet();
 
     if (!isReplSet) {
         // no replication check needed (validated above)
-        return Future<void>::makeReady();
+        return std::make_pair(Future<void>::makeReady(), nullptr);
     }
     if (opTime.isNull()) {
         // If waiting for the empty optime, always say it's been replicated.
-        return Future<void>::makeReady();
+        return std::make_pair(Future<void>::makeReady(), nullptr);
     }
     if (_inShutdown) {
-        return Future<void>::makeReady(
-            Status{ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
+        return std::make_pair(Future<void>::makeReady(Status{ErrorCodes::ShutdownInProgress,
+                                                             "Replication is being shut down"}),
+                              nullptr);
     }
 
     auto checkForStepDown = [&]() -> Status {
@@ -2463,7 +2491,7 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
 
     Status stepdownStatus = checkForStepDown();
     if (!stepdownStatus.isOK()) {
-        return Future<void>::makeReady(stepdownStatus);
+        return std::make_pair(Future<void>::makeReady(stepdownStatus), nullptr);
     }
 
     // Check if the given write concern is satisfiable before we add ourself to
@@ -2471,15 +2499,15 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
     // notified. See _setCurrentRSConfig.
     auto satisfiableStatus = _checkIfWriteConcernCanBeSatisfied_inlock(wl, writeConcern);
     if (!satisfiableStatus.isOK()) {
-        return Future<void>::makeReady(satisfiableStatus);
+        return std::make_pair(Future<void>::makeReady(satisfiableStatus), nullptr);
     }
 
     try {
         if (_doneWaitingForReplication_inlock(wl, opTime, writeConcern)) {
-            return Future<void>::makeReady();
+            return std::make_pair(Future<void>::makeReady(), nullptr);
         }
     } catch (const DBException& e) {
-        return Future<void>::makeReady(e.toStatus());
+        return std::make_pair(Future<void>::makeReady(e.toStatus()), nullptr);
     }
 
     if (!writeConcern.needToWaitForOtherNodes() &&
@@ -3196,11 +3224,21 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         // current term. Also see TopologyCoordinator::isSafeToStepDown.
         invariant(lastAppliedOpTime.getTerm() == currentTerm);
 
-        auto future = _replicationWaiterList.add_inlock(lastAppliedOpTime, waiterWriteConcern);
-
+        auto [future, waiter] =
+            _replicationWaiterList.add_inlock(lastAppliedOpTime, waiterWriteConcern);
         lk.unlock();
+
+
         auto status = futureGetNoThrowWithDeadline(
             opCtx, future, std::min(stepDownUntil, waitUntil), ErrorCodes::ExceededTimeLimit);
+
+        // Mark the waiter given up if this waiter times out before the future is ready. This is so
+        // that unsatisfied but abandoned waiters can be cleaned up lazily in the next
+        // _wakeReadyWaiters pass.
+        if (!status.isOK() && !future.isReady()) {
+            invariant(!waiter->givenUp.swap(true));
+        }
+
         lk.lock();
 
         // We ignore the case where runWithDeadline returns timeoutError because in that case
