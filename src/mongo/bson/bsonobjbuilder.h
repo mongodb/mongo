@@ -60,6 +60,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/tracking_allocator.h"
 
 namespace mongo {
 
@@ -85,10 +86,10 @@ class BSONObjBuilderBase {
     BSONObjBuilderBase& operator=(const BSONObjBuilderBase<Derived, B>&) = delete;
 
 public:
-    BSONObjBuilderBase() : BSONObjBuilderBase(kDefaultSize) {}
-
     /** @param initsize this is just a hint as to the final size of the object */
-    BSONObjBuilderBase(int initsize) : _b(_buf), _buf(initsize) {
+    template <typename... BuilderArgs>
+    BSONObjBuilderBase(int initsize = kDefaultSize, BuilderArgs&&... args)
+        : _b(_buf), _buf(initsize, std::forward<BuilderArgs>(args)...) {
         // Skip over space for the object length. The length is filled in by _done.
         _b.skip(sizeof(int));
 
@@ -100,7 +101,9 @@ public:
      *  This is for more efficient adding of subobjects/arrays. See docs for subobjStart for
      *  example.
      */
-    BSONObjBuilderBase(B& baseBuilder) : _b(baseBuilder), _buf(0), _offset(baseBuilder.len()) {
+    template <typename... BuilderArgs>
+    BSONObjBuilderBase(B& baseBuilder, BuilderArgs&&... args)
+        : _b(baseBuilder), _buf(0, std::forward<BuilderArgs>(args)...), _offset(baseBuilder.len()) {
         // Skip over space for the object length, which is filled in by _done. We don't need a
         // holder since we are a sub-builder, and some parent builder has already made the
         // reservation.
@@ -114,16 +117,23 @@ public:
     // building in to an existing BufBuilder that has already been built in to. Use with caution.
     struct ResumeBuildingTag {};
 
-    BSONObjBuilderBase(ResumeBuildingTag, B& existingBuilder, std::size_t offset = 0)
-        : _b(existingBuilder), _buf(0), _offset(offset) {
+    template <typename... BuilderArgs>
+    BSONObjBuilderBase(ResumeBuildingTag,
+                       B& existingBuilder,
+                       std::size_t offset = 0,
+                       BuilderArgs&&... args)
+        : _b(existingBuilder), _buf(0, std::forward<BuilderArgs>(args)...), _offset(offset) {
         invariant(_b.len() - offset >= BSONObj::kMinBSONLength);
         _b.setlen(_b.len() - 1);  // get rid of the previous EOO.
         // Reserve space for our EOO.
         _b.reserveBytes(1);
     }
 
-    BSONObjBuilderBase(const BSONSizeTracker& tracker)
-        : _b(_buf), _buf(tracker.getSize()), _tracker(const_cast<BSONSizeTracker*>(&tracker)) {
+    template <typename... BuilderArgs>
+    BSONObjBuilderBase(const BSONSizeTracker& tracker, BuilderArgs&&... args)
+        : _b(_buf),
+          _buf(tracker.getSize(), std::forward<BuilderArgs>(args)...),
+          _tracker(const_cast<BSONSizeTracker*>(&tracker)) {
         // See the comments in the first constructor for details.
         _b.skip(sizeof(int));
 
@@ -658,7 +668,9 @@ protected:
 
     // Initializes the builder without allocating any space. Only used by subclasses.
     struct InitEmptyTag {};
-    BSONObjBuilderBase(InitEmptyTag) : _b(_buf), _buf(0) {}
+    template <typename... BuilderArgs>
+    BSONObjBuilderBase(InitEmptyTag, BuilderArgs&&... args)
+        : _b(_buf), _buf(0, std::forward<BuilderArgs>(args)...) {}
 
     // Intentionally non-virtual.
     ~BSONObjBuilderBase() {
@@ -839,6 +851,44 @@ private:
 
     BSONObjBuilderValueStream _s;
 };
+
+namespace allocator_aware {
+// The following forward declaration exists to enable the extern declaration, which must come before
+// the use of the matching instantiation of the base class of allocator_aware::BSONObjBuilder. Do
+// not remove or re-order these lines w.r.t BSONObjBuilderBase or allocator_aware::BSONObjBuilder
+// without being sure that you are not undoing the advantages of the extern template declaration.
+template <class>
+class BSONObjBuilder;
+}  // namespace allocator_aware
+
+extern template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<std::allocator<void>>,
+                                         allocator_aware::BufBuilder<std::allocator<void>>>;
+extern template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<TrackingAllocator<void>>,
+                                         allocator_aware::BufBuilder<TrackingAllocator<void>>>;
+
+namespace allocator_aware {
+template <class Allocator = std::allocator<void>>
+class BSONObjBuilder : public BSONObjBuilderBase<BSONObjBuilder<Allocator>, BufBuilder<Allocator>> {
+    using Super = BSONObjBuilderBase<BSONObjBuilder<Allocator>, BufBuilder<Allocator>>;
+    friend Super;
+
+public:
+    BSONObjBuilder() = default;
+
+    explicit BSONObjBuilder(const Allocator& allocator) : Super(Super::kDefaultSize, allocator) {}
+
+    explicit BSONObjBuilder(BufBuilder<Allocator>& builder) : Super(builder, builder.allocator()) {}
+
+    ~BSONObjBuilder() {
+        Super::_destruct();
+    }
+
+private:
+    void doDone() {}
+
+    void doResetToEmpty() {}
+};
+}  // namespace allocator_aware
 
 // The following forward declaration exists to enable the extern
 // declaration, which must come before the use of the matching
