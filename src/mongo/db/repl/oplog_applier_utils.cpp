@@ -501,27 +501,6 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                     }
                 }
 
-                boost::optional<CollectionOrViewAcquisition> viewAcquisition;
-                if (nss.isSystemDotViews() && opType == OpTypeEnum::kDelete) {
-                    try {
-                        // In addition to the system.views, obtain the lock of the view that we are
-                        // going to change
-                        NamespaceString targetNamespace = NamespaceStringUtil::deserialize(
-                            nss.tenantId(),
-                            op->getIdElement().checkAndGetStringData(),
-                            SerializationContext::stateDefault());
-
-                        CollectionOrViewAcquisitionRequest request =
-                            CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                opCtx, targetNamespace, AcquisitionPrerequisites::kWrite);
-                        viewAcquisition.emplace(acquireCollectionOrView(opCtx, request, MODE_IX));
-                    } catch (DBException&) {
-                        LOGV2(7861502,
-                              "Acquiring lock on invalid view",
-                              "view"_attr = op->getIdElement());
-                    }
-                }
-
                 invariant(coll);
                 uassert(ErrorCodes::NamespaceNotFound,
                         str::stream()

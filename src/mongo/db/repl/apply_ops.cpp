@@ -82,38 +82,6 @@ namespace {
 // If enabled, causes loop in _applyOps() to hang after applying current operation.
 MONGO_FAIL_POINT_DEFINE(applyOpsPauseBetweenOperations);
 
-
-void lockView(OperationContext* opCtx,
-              const NamespaceString& viewNamespace,
-              const BSONObj& opObj,
-              boost::optional<Lock::CollectionLock>& result) {
-
-    try {
-        StringData targetId = opObj["o"]["_id"].checkAndGetStringData();
-
-        // Some tests require operating with invalid names.
-        uassert(ErrorCodes::InvalidIdField,
-                str::stream() << "Failed lock acquisition of view. Invalid view name:" << targetId,
-                NamespaceString::validCollectionName(targetId));
-
-        NamespaceString targetNamespace = NamespaceStringUtil::deserialize(
-            viewNamespace.tenantId(), targetId, SerializationContext::stateDefault());
-
-        uassert(ErrorCodes::InvalidIdField,
-                str::stream() << "Failed lock acquisition of view. Invalid view name:" << targetId,
-                targetNamespace.isValid());
-        result.emplace(
-            opCtx, targetNamespace, fixLockModeForSystemDotViewsChanges(targetNamespace, MODE_IX));
-    } catch (...) {
-        // TODO: SERVER-83496 Current tests assume that we do not validate the lock acquisition at
-        // this stage, and stop the execution. Instead, the test expects to modify system.views. We
-        // intentionally do not return error and we let the execution continue without the lock.
-        // This behavior should be probably deprecated once the tests use a specific test mechanism
-        // to inject errors in the catalog
-        LOGV2(7861501, "View does not exist", "view"_attr = opObj);
-    }
-}
-
 Status _applyOps(OperationContext* opCtx,
                  const ApplyOpsCommandInfo& info,
                  const DatabaseName& dbName,
@@ -210,11 +178,6 @@ Status _applyOps(OperationContext* opCtx,
                                       << "cannot apply insert or update operation on a "
                                          "non-existent namespace "
                                       << nss.toStringForErrorMsg() << ": " << mongo::redact(opObj));
-                    }
-
-                    boost::optional<Lock::CollectionLock> viewLock;
-                    if (nss.isSystemDotViews() && *opType == 'd') {
-                        lockView(opCtx, nss, opObj, viewLock);
                     }
 
                     OldClientContext ctx(opCtx, nss);
