@@ -155,6 +155,9 @@ selector:
     # collection to be killed.
     - requires_getmore
 
+    # TODO SERVER-90239 Enable time series tests.
+    - requires_timeseries
+
 executor:
   archive:
     hooks:

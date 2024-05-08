@@ -192,6 +192,9 @@ selector:
     # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
     - assumes_balancer_off
 
+    # TODO SERVER-90239 Enable time series tests.
+    - requires_timeseries
+
 executor:
   archive:
     hooks:
