@@ -277,6 +277,7 @@ components:
     release_monitoring_id: 16838
     local_directory_path: src/third_party/mozjs
     team_owner: "Query"
+    upgrade_suppression: TODO SERVER-90310
 
   nlohmann.json.decomposed:
     homepage_url: https://github.com/nlohmann/json
