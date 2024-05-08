@@ -33,7 +33,7 @@
 #include <map>
 #include <set>
 
-#include <absl/container/node_hash_map.h>
+#include <absl/container/flat_hash_set.h>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -169,11 +169,11 @@ public:
     }
 
     /**
-     * Construct an empty unordered set of Values whose equivalence classes are given by this
+     * Construct an empty flat unordered set of Values whose equivalence classes are given by this
      * comparator. This comparator must outlive the returned set.
      */
-    stdx::unordered_set<Value, Hasher, EqualTo> makeUnorderedValueSet() const {
-        return stdx::unordered_set<Value, Hasher, EqualTo>(0, Hasher(this), EqualTo(this));
+    absl::flat_hash_set<Value, Hasher, EqualTo> makeFlatUnorderedValueSet() const {
+        return absl::flat_hash_set<Value, Hasher, EqualTo>(0, Hasher(this), EqualTo(this));
     }
 
     /**
@@ -214,8 +214,8 @@ private:
 using ValueSet = std::set<Value, ValueComparator::LessThan>;
 using ValueMultiset = std::multiset<Value, ValueComparator::LessThan>;
 
-using ValueUnorderedSet =
-    stdx::unordered_set<Value, ValueComparator::Hasher, ValueComparator::EqualTo>;
+using ValueFlatUnorderedSet =
+    absl::flat_hash_set<Value, ValueComparator::Hasher, ValueComparator::EqualTo>;
 
 template <typename T>
 using ValueMap = std::map<Value, T, ValueComparator::LessThan>;

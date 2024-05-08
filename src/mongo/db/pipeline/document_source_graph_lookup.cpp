@@ -307,7 +307,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
         auto cached = pExpCtx->getDocumentComparator().makeUnorderedDocumentSet();
         auto matchStage = makeMatchStageFromFrontier(&cached);
 
-        ValueUnorderedSet queried = pExpCtx->getValueComparator().makeUnorderedValueSet();
+        ValueFlatUnorderedSet queried = pExpCtx->getValueComparator().makeFlatUnorderedValueSet();
         _frontier.swap(queried);
         _frontierUsageBytes = 0;
 
@@ -437,7 +437,7 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(Document result, long lo
 }
 
 void DocumentSourceGraphLookUp::addToCache(const Document& result,
-                                           const ValueUnorderedSet& queried) {
+                                           const ValueFlatUnorderedSet& queried) {
     document_path_support::visitAllValuesAtPath(
         result, _connectToField, [this, &queried, &result](const Value& connectToValue) {
             // It is possible that 'connectToValue' is a single value, but was not queried for. For
@@ -712,7 +712,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _additionalFilter(additionalFilter),
       _depthField(depthField),
       _maxDepth(maxDepth),
-      _frontier(pExpCtx->getValueComparator().makeUnorderedValueSet()),
+      _frontier(pExpCtx->getValueComparator().makeFlatUnorderedValueSet()),
       _visited(ValueComparator::kInstance.makeUnorderedValueMap<Document>()),
       _cache(pExpCtx->getValueComparator()),
       _unwind(unwindSrc),
@@ -749,7 +749,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
           original._fromExpCtx->copyWith(original.pExpCtx->getResolvedNamespace(_from).ns,
                                          original.pExpCtx->getResolvedNamespace(_from).uuid)),
       _fromPipeline(original._fromPipeline),
-      _frontier(pExpCtx->getValueComparator().makeUnorderedValueSet()),
+      _frontier(pExpCtx->getValueComparator().makeFlatUnorderedValueSet()),
       _visited(ValueComparator::kInstance.makeUnorderedValueMap<Document>()),
       _cache(pExpCtx->getValueComparator()),
       _variables(original._variables),

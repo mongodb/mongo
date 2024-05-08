@@ -259,7 +259,7 @@ private:
      * Updates '_cache' with 'result' appropriately, given that 'result' was retrieved when querying
      * for 'queried'.
      */
-    void addToCache(const Document& result, const ValueUnorderedSet& queried);
+    void addToCache(const Document& result, const ValueFlatUnorderedSet& queried);
 
     /**
      * Assert that '_visited' and '_frontier' have not exceeded the maximum meory usage, and then
@@ -304,7 +304,7 @@ private:
     size_t _frontierUsageBytes = 0;
 
     // Only used during the breadth-first search, tracks the set of values on the current frontier.
-    ValueUnorderedSet _frontier;
+    ValueFlatUnorderedSet _frontier;
 
     // Tracks nodes that have been discovered for a given input. Keys are the '_id' value of the
     // document from the foreign collection, value is the document itself.  The keys are compared
