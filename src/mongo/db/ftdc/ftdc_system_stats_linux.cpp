@@ -69,6 +69,7 @@ static const std::vector<StringData> kMemKeys{
     "Inactive(anon)"_sd,
     "Active(file)"_sd,
     "Inactive(file)"_sd,
+    "AnonHugePages"_sd,
 };
 
 static const std::vector<StringData> kNetstatKeys{
@@ -87,6 +88,11 @@ static const std::vector<StringData> kVMKeys{
     "pgmajfault"_sd,
     "pswpin"_sd,
     "pswpout"_sd,
+    "nr_anon_transparent_hugepages"_sd,
+    "thp_fault_alloc"_sd,
+    "thp_collapse_alloc"_sd,
+    "thp_fault_fallback"_sd,
+    "thp_swpout"_sd,
 };
 
 // Keys the system stats collector wants to collect out of the /proc/net/sockstat file.
