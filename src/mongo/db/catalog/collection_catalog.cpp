@@ -46,7 +46,6 @@
 #include <exception>
 #include <list>
 #include <mutex>
-#include <type_traits>
 
 #include "collection_catalog.h"
 
@@ -64,10 +63,8 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -76,7 +73,6 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
@@ -108,10 +104,33 @@ const SharedCollectionDecorations::Decoration<AtomicWord<bool>>
 namespace {
 constexpr auto kNumDurableCatalogScansDueToMissingMapping = "numScansDueToMissingMapping"_sd;
 
-struct LatestCollectionCatalog {
-    std::shared_ptr<CollectionCatalog> catalog = std::make_shared<CollectionCatalog>();
+class LatestCollectionCatalog {
+public:
+    std::shared_ptr<CollectionCatalog> load() const {
+        std::lock_guard lk(_mutex);
+        return _catalog;
+    }
+
+    bool compareAndSet(const std::shared_ptr<CollectionCatalog>& oldCatalog,
+                       std::shared_ptr<CollectionCatalog>&& newCatalog) {
+        std::lock_guard lk(_mutex);
+        if (oldCatalog != _catalog)
+            return false;
+        _catalog = std::move(newCatalog);
+        return true;
+    }
+
+    void store(std::shared_ptr<CollectionCatalog>&& newCatalog) {
+        std::lock_guard lk(_mutex);
+        _catalog = std::move(newCatalog);
+    }
+
+private:
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("LatestCollectionCatalog::_mutex");
+    // TODO SERVER-56428: Replace with std::atomic<std::shared_ptr> when supported in our toolchain
+    std::shared_ptr<CollectionCatalog> _catalog = std::make_shared<CollectionCatalog>();
 };
-const ServiceContext::Decoration<LatestCollectionCatalog> getCatalog =
+const ServiceContext::Decoration<LatestCollectionCatalog> getCatalogStore =
     ServiceContext::declareDecoration<LatestCollectionCatalog>();
 
 // Catalog instance for batched write when ongoing. The atomic bool is used to determine if a
@@ -635,7 +654,7 @@ bool CollectionCatalog::Range::empty() const {
 }
 
 std::shared_ptr<const CollectionCatalog> CollectionCatalog::latest(ServiceContext* svcCtx) {
-    return atomic_load(&getCatalog(svcCtx).catalog);
+    return getCatalogStore(svcCtx).load();
 }
 
 std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(OperationContext* opCtx) {
@@ -742,9 +761,9 @@ void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
     std::list<JobEntry> completed;
     std::exception_ptr myException;
 
-    auto& storage = getCatalog(svcCtx);
+    auto& storage = getCatalogStore(svcCtx);
     // hold onto base so if we need to delete it we can do it outside of the lock
-    auto base = atomic_load(&storage.catalog);
+    auto base = storage.load();
     // copy the collection catalog, this could be expensive, but we will only have one pending
     // collection in flight at a given time
     auto clone = std::make_shared<CollectionCatalog>(*base);
@@ -768,7 +787,7 @@ void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
         stdx::lock_guard lock(mutex);
         if (queue.empty()) {
             // Queue is empty, store catalog and relinquish responsibility of being worker thread
-            atomic_store(&storage.catalog, std::move(clone));
+            storage.store(std::move(clone));
             workerExists = false;
             break;
         }
@@ -2508,9 +2527,9 @@ BatchedCollectionCatalogWriter::BatchedCollectionCatalogWriter(OperationContext*
     invariant(!batchedCatalogWriteInstance);
     invariant(batchedCatalogClonedCollections.empty());
 
-    auto& storage = getCatalog(_opCtx->getServiceContext());
+    auto& storage = getCatalogStore(_opCtx->getServiceContext());
     // hold onto base so if we need to delete it we can do it outside of the lock
-    _base = atomic_load(&storage.catalog);
+    _base = storage.load();
     // copy the collection catalog, this could be expensive, store it for future writes during this
     // batcher
     batchedCatalogWriteInstance = std::make_shared<CollectionCatalog>(*_base);
@@ -2523,9 +2542,8 @@ BatchedCollectionCatalogWriter::~BatchedCollectionCatalogWriter() {
 
     // Publish out batched instance, validate that no other writers have been able to write during
     // the batcher.
-    auto& storage = getCatalog(_opCtx->getServiceContext());
-    invariant(
-        atomic_compare_exchange_strong(&storage.catalog, &_base, batchedCatalogWriteInstance));
+    invariant(getCatalogStore(_opCtx->getServiceContext())
+                  .compareAndSet(_base, std::move(batchedCatalogWriteInstance)));
 
     // Clear out batched pointer so no more attempts of batching are made
     ongoingBatchedWrite.store(false);
