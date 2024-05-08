@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <concepts>
 #include <utility>
 #include <variant>
 
@@ -40,6 +39,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/express/express_plan.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -125,9 +125,8 @@ public:
 static std::pair<PlanProgress, BSONObj> iterateAndExpectDocument(
     OperationContext* opCtx, auto& iterator, PlanProgress continuationReturnValue = Ready()) {
     boost::optional<BSONObj> producedObj;
-    auto result = iterator.consumeOne(
-        opCtx,
-        [&](const CollectionPtr& collectionFromIterator, RecordId, Snapshotted<BSONObj> obj) {
+    auto result =
+        iterator.consumeOne(opCtx, [&](const CollectionPtr*, RecordId, Snapshotted<BSONObj> obj) {
             ASSERT(!bool(producedObj));
             producedObj.emplace(std::move(obj.value()));
             return std::move(continuationReturnValue);
@@ -140,7 +139,7 @@ static std::pair<PlanProgress, BSONObj> iterateAndExpectDocument(
 // not produce an output document).
 static PlanProgress iterateButExpectNoDocument(OperationContext* opCtx, auto& iterator) {
     return iterator.consumeOne(
-        opCtx, [](const CollectionPtr&, RecordId, Snapshotted<BSONObj>) -> PlanProgress {
+        opCtx, [](const CollectionPtr*, RecordId, Snapshotted<BSONObj>) -> PlanProgress {
             MONGO_UNREACHABLE;
         });
 }
@@ -151,7 +150,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithMatchingQuery) {
     const CollectionPtr& collectionPtr = *collection;
 
     IteratorStats iteratorStats;
-    IdLookupViaIndex iterator(fromjson("{_id: 2}"));
+    IdLookupViaIndex<const CollectionPtr*> iterator(fromjson("{_id: 2}"));
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
@@ -168,7 +167,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT_EQ(iteratorStats.indexName(), "_id_");
-    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), fromjson("{_id: 1}"));
+    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ _id: 1 }");
 }
 
 TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
@@ -177,7 +176,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
     const CollectionPtr& collectionPtr = *collection;
 
     IteratorStats iteratorStats;
-    IdLookupViaIndex iterator(fromjson("{_id: 4}"));
+    IdLookupViaIndex<const CollectionPtr*> iterator(fromjson("{_id: 4}"));
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
@@ -191,7 +190,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT_EQ(iteratorStats.indexName(), "_id_");
-    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), fromjson("{_id: 1}"));
+    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ _id: 1 }");
 }
 
 TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
@@ -200,7 +199,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
     const CollectionPtr& collectionPtr = *collection;
 
     IteratorStats iteratorStats;
-    IdLookupOnClusteredCollection iterator(fromjson("{_id: 2}"));
+    IdLookupOnClusteredCollection<const CollectionPtr*> iterator(fromjson("{_id: 2}"));
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
@@ -217,7 +216,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT(iteratorStats.indexName().empty());
-    ASSERT(iteratorStats.indexKeyPattern().isEmpty());
+    ASSERT(iteratorStats.indexKeyPattern().empty());
 }
 
 TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
@@ -226,7 +225,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
     const CollectionPtr& collectionPtr = *collection;
 
     IteratorStats iteratorStats;
-    IdLookupOnClusteredCollection iterator(fromjson("{_id: 4}"));
+    IdLookupOnClusteredCollection<const CollectionPtr*> iterator(fromjson("{_id: 4}"));
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
@@ -240,7 +239,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT(iteratorStats.indexName().empty());
-    ASSERT(iteratorStats.indexKeyPattern().isEmpty());
+    ASSERT(iteratorStats.indexKeyPattern().empty());
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
@@ -256,10 +255,10 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
     IteratorStats iteratorStats;
     auto filter = fromjson("{a: 5}");
     CollatorInterface* collator = nullptr;
-    LookupViaUserIndex iterator(filter.firstElement(),
-                                indexDescriptor->getEntry()->getIdent(),
-                                indexName.toString(),
-                                collator);
+    LookupViaUserIndex<const CollectionPtr*> iterator(filter.firstElement(),
+                                                      indexDescriptor->getEntry()->getIdent(),
+                                                      indexName.toString(),
+                                                      collator);
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
@@ -276,7 +275,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
-    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), fromjson("{a: 1}"));
+    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1 }");
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
@@ -296,10 +295,10 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
 
     IteratorStats iteratorStats;
     auto filter = fromjson("{a: 'iii'}");
-    LookupViaUserIndex iterator(filter.firstElement(),
-                                indexDescriptor->getEntry()->getIdent(),
-                                indexName.toString(),
-                                collator);
+    LookupViaUserIndex<const CollectionPtr*> iterator(filter.firstElement(),
+                                                      indexDescriptor->getEntry()->getIdent(),
+                                                      indexName.toString(),
+                                                      collator);
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
@@ -316,7 +315,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
-    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), fromjson("{a: 1}"));
+    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1 }");
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
@@ -332,10 +331,10 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     IteratorStats iteratorStats;
     auto filter = fromjson("{a: 7}");
     CollatorInterface* collator = nullptr;
-    LookupViaUserIndex iterator(filter.firstElement(),
-                                indexDescriptor->getEntry()->getIdent(),
-                                indexName.toString(),
-                                collator);
+    LookupViaUserIndex<const CollectionPtr*> iterator(filter.firstElement(),
+                                                      indexDescriptor->getEntry()->getIdent(),
+                                                      indexName.toString(),
+                                                      collator);
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
@@ -349,7 +348,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
-    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), fromjson("{a: 1}"));
+    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1 }");
 }
 }  // namespace
 }  // namespace mongo::express

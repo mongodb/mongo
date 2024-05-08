@@ -1294,6 +1294,10 @@ if (!isClustered) {
     explainRes = coll.explain("executionStats").update({_id: "foo"}, {$set: {other: 99}});
     assert.commandWorked(explainRes);
     planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    if (planStage == null) {
+        // post 8.0 EXPRESS handles update-by-id
+        planStage = getPlanStage(explainRes.executionStats.executionStages, "EXPRESS_UPDATE");
+    }
     assert.neq(null, planStage);
 }
 
@@ -1330,6 +1334,10 @@ if (!isClustered) {
     });
     assert.commandWorked(explainRes);
     planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    if (planStage == null) {
+        // post 8.0 EXPRESS handles update-by-id
+        planStage = getPlanStage(explainRes.executionStats.executionStages, "EXPRESS_UPDATE");
+    }
     assert.neq(null, planStage);
 
     // Update on _id should not use idhack stage when query collation does not match collection
@@ -1342,6 +1350,10 @@ if (!isClustered) {
     });
     assert.commandWorked(explainRes);
     planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    if (planStage == null) {
+        // post 8.0 EXPRESS handles update-by-id
+        planStage = getPlanStage(explainRes.executionStats.executionStages, "EXPRESS_UPDATE");
+    }
     assert.eq(null, planStage);
 }
 

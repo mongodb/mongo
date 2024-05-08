@@ -54,7 +54,12 @@ function runTest(testCase, usingClusteredIndex) {
             assert.eq(
                 profileDoc.execStats.inputStage.inputStage.stage, "CLUSTERED_IXSCAN", profileDoc);
         } else {
-            assert.eq(profileDoc.execStats.inputStage.stage, "CLUSTERED_IXSCAN", profileDoc);
+            if (!profileDoc.execStats.inputStage) {
+                // for queries that use express, there is no inputStage
+                assert.eq(profileDoc.execStats.stage, "EXPRESS_UPDATE", profileDoc);
+            } else {
+                assert.eq(profileDoc.execStats.inputStage.stage, "CLUSTERED_IXSCAN", profileDoc);
+            }
         }
     } else {
         // The two phase write protocol will include the original query and collation for updates
@@ -69,7 +74,12 @@ function runTest(testCase, usingClusteredIndex) {
             assert.eq(
                 profileDoc.execStats.inputStage.inputStage.inputStage.stage, "IXSCAN", profileDoc);
         } else {
-            assert.eq(profileDoc.execStats.inputStage.stage, "IDHACK", profileDoc);
+            if (!profileDoc.execStats.inputStage) {
+                // for queries that use express, there is no inputStage
+                assert.eq(profileDoc.execStats.stage, "EXPRESS_UPDATE", profileDoc);
+            } else {
+                assert.eq(profileDoc.execStats.inputStage.stage, "IDHACK", profileDoc);
+            }
         }
     }
 

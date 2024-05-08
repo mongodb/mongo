@@ -754,7 +754,8 @@ export function isIdhack(db, root) {
  */
 export function isExpress(db, root) {
     return planHasStage(db, root, "EXPRESS_IXSCAN") ||
-        planHasStage(db, root, "EXPRESS_CLUSTERED_IXSCAN");
+        planHasStage(db, root, "EXPRESS_CLUSTERED_IXSCAN") ||
+        planHasStage(db, root, "EXPRESS_UPDATE");
 }
 
 /**

@@ -108,6 +108,14 @@ public:
     }
 
     /**
+     * Returns a string representation of this BSONObj keypattern.
+     */
+    static std::string toString(const BSONObj& keyPattern) {
+        StringBuilder sb;
+        return addToStringBuilder(sb, keyPattern).str();
+    }
+
+    /**
      * Writes to 'sb' a string representation of this KeyPattern.
      */
     friend StringBuilder& operator<<(StringBuilder& sb, const KeyPattern& keyPattern);
@@ -144,6 +152,7 @@ public:
     size_t getApproximateSize() const;
 
 private:
+    static StringBuilder& addToStringBuilder(StringBuilder& sb, const BSONObj& pattern);
     BSONObj _pattern;
 };
 

@@ -1787,14 +1787,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
         return UpdateStageParams::DocumentCounter{};
     }();
 
-    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    UpdateStageParams updateStageParams(request, driver, opDebug, std::move(documentCounter));
 
     // If the collection doesn't exist, then return a PlanExecutor for a no-op EOF plan. We have
     // should have already enforced upstream that in this case either the upsert flag is false, or
     // we are an explain. If the collection doesn't exist, we're not an explain, and the upsert flag
     // is true, we expect the caller to have created the collection already.
     if (!coll.exists()) {
+        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         LOGV2_DEBUG(20929,
                     2,
                     "Collection does not exist. Using EOF stage",
@@ -1816,25 +1815,35 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             // to create a CanonicalQuery.
             const BSONObj& unparsedQuery = request->getQuery();
 
-            const IndexDescriptor* descriptor =
-                collectionPtr->getIndexCatalog()->findIdIndex(opCtx);
-
             const bool hasCollectionDefaultCollation = CollatorInterface::collatorsMatch(
                 expCtx->getCollator(), collectionPtr->getDefaultCollator());
 
-            if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-                request->getProj().isEmpty() && hasCollectionDefaultCollation) {
-                LOGV2_DEBUG(20930, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
+            if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) && request->getProj().isEmpty() &&
+                hasCollectionDefaultCollation) {
 
-                // Working set 'ws' is discarded. InternalPlanner::updateWithIdHack() makes its own
-                // WorkingSet.
-                fastPathQueryCounters.incrementIdHackQueryCounter();
-                return InternalPlanner::updateWithIdHack(opCtx,
-                                                         coll,
-                                                         updateStageParams,
-                                                         descriptor,
-                                                         unparsedQuery["_id"].wrap(),
-                                                         policy);
+                if (!request->isUpsert() &&
+                    (!nss.isLocalDB() || collectionPtr->getIndexCatalog()->findIdIndex(opCtx))) {
+                    // Upserts not supported in express for now.
+                    // Collections in local db not guaranteed to have an _id index.
+                    LOGV2_DEBUG(83759, 2, "Using Express", "query"_attr = redact(unparsedQuery));
+                    return makeExpressExecutorForUpdate(
+                        opCtx, coll, parsedUpdate, false /* return owned BSON */);
+
+                } else if (const IndexDescriptor* descriptor =
+                               collectionPtr->getIndexCatalog()->findIdIndex(opCtx);
+                           descriptor) {
+                    LOGV2_DEBUG(20930, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
+                    UpdateStageParams updateStageParams(
+                        request, driver, opDebug, std::move(documentCounter));
+
+                    fastPathQueryCounters.incrementIdHackQueryCounter();
+                    return InternalPlanner::updateWithIdHack(opCtx,
+                                                             coll,
+                                                             updateStageParams,
+                                                             descriptor,
+                                                             unparsedQuery["_id"].wrap(),
+                                                             policy);
+                }
             }
         }
 
@@ -1847,6 +1856,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     }
 
     // This is the regular path for when we have a CanonicalQuery.
+    UpdateStageParams updateStageParams(request, driver, opDebug, std::move(documentCounter));
+    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     std::unique_ptr<CanonicalQuery> cq(parsedUpdate->releaseParsedQuery());
 
     uassert(ErrorCodes::InternalErrorNotSupported,

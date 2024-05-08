@@ -65,4 +65,4 @@ assert.commandFailedWithCode(db.runCommand({
     ordered: true,
     updates: [{q: {_id: objectId}, u: {$set: {x: largerThanMaxString}}}]
 }),
-                             17419);
+                             8375908);

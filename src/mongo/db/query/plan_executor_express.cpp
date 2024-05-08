@@ -30,6 +30,7 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 #include <memory>
+#include <type_traits>
 #include <utility>
 #include <variant>
 
@@ -37,6 +38,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/express/express_plan.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -47,6 +49,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/cursor_response_gen.h"
@@ -58,19 +61,103 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/assert_util.h"
 
+
 namespace mongo {
 namespace {
+class DoNotRecoverPolicy final : public express::ExceptionRecoveryPolicy {
+public:
+    express::PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::WriteConflict>& exception) const override {
+        exception.addContext("Internal retry explicitly disabled for query"_sd);
+        throw exception;
+    }
+
+    express::PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::TemporarilyUnavailable>& exception) const override {
+        exception.addContext("Internal retry explicitly disabled for query"_sd);
+        throw exception;
+    }
+
+    express::PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::TransactionTooLargeForCache>& exception) const override {
+        exception.addContext("Internal retry explicitly disabled for query"_sd);
+        throw exception;
+    }
+
+    express::PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::StaleConfig>& exception) const override {
+        exception.addContext("Internal retry explicitly disabled for query"_sd);
+        throw exception;
+    }
+};
+
+static const DoNotRecoverPolicy doNotRecoverPolicy;
+
+class BaseRecoveryPolicy : public express::ExceptionRecoveryPolicy {
+public:
+    using express::ExceptionRecoveryPolicy::recoverIfPossible;
+
+    express::PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::WriteConflict>& exception) const override {
+        // Ask the executor to retry with a more up-to-date snapshot.
+        return express::WaitingForYield();
+    }
+
+    express::PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::TemporarilyUnavailable>& exception) const override {
+        return express::WaitingForBackoff();
+    }
+
+    express::PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::TransactionTooLargeForCache>&) const override = 0;
+
+    express::PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::StaleConfig>& exception) const override {
+        return express::WaitingForCondition(std::move(*exception->getCriticalSectionSignal()));
+    }
+};
+
+class RecoveryPolicyForPrimary : public BaseRecoveryPolicy {
+public:
+    using BaseRecoveryPolicy::recoverIfPossible;
+
+    express::PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::TransactionTooLargeForCache>& exception) const override {
+        // Primaries do not recover from TransactionTooLargeForCache when processing writes. This is
+        // a query fatal error.
+        throw exception;
+    }
+};
+
+static const RecoveryPolicyForPrimary recoveryPolicyForPrimary;
+
+class RecoveryPolicyForSecondary : public BaseRecoveryPolicy {
+public:
+    using BaseRecoveryPolicy::recoverIfPossible;
+
+    express::PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::TransactionTooLargeForCache>& exception) const override {
+        // When applying a write on a secondary, we assume that the write already succeeded on the
+        // primary and will eventually succeed here as well if we keep trying.
+        return express::WaitingForYield();
+    }
+};
+
+static const RecoveryPolicyForPrimary recoveryPolicyForSecondary;
+
 template <class Plan>
 class PlanExecutorExpress final : public PlanExecutor {
 public:
     PlanExecutorExpress(OperationContext* opCtx,
                         std::unique_ptr<CanonicalQuery> cq,
-                        VariantCollectionPtrOrAcquisition coll,
+                        typename Plan::CollectionType coll,
                         Plan plan,
+                        const express::ExceptionRecoveryPolicy* recoveryPolicy,
                         bool returnOwnedBson);
 
     CanonicalQuery* getCanonicalQuery() const override {
@@ -98,8 +185,7 @@ public:
     }
 
     void restoreState(const RestoreContext& context) override {
-        _coll = context.collection();
-        _plan.restoreResources(_opCtx, &_coll.getCollectionPtr());
+        _plan.restoreResources(_opCtx, context.collection());
     }
 
     void detachFromOperationContext() override {
@@ -128,11 +214,18 @@ public:
     }
 
     UpdateResult executeUpdate() override {
-        MONGO_UNREACHABLE_TASSERT(8375803);
+        BSONObj obj;
+        getNext(&obj, nullptr);
+        return getUpdateResult();
     }
 
     UpdateResult getUpdateResult() const override {
-        MONGO_UNREACHABLE_TASSERT(8375804);
+        return {_writeOperationStats.docsUpdated() > 0, /* existing */
+                _writeOperationStats.isModUpdate(),     /* is a $mod update */
+                _writeOperationStats.docsUpdated(),     /* numDocsModified */
+                _writeOperationStats.docsMatched(),     /* numDocsMatched */
+                BSONObj::kEmptyObject,                  /* upserted Doc */
+                _writeOperationStats.containsDotsAndDollarsField()};
     }
 
     long long executeDelete() override {
@@ -210,7 +303,7 @@ public:
     }
 
     bool usesCollectionAcquisitions() const override {
-        return _coll.isAcquisition();
+        return std::is_same_v<std::decay<typename Plan::CollectionType>, CollectionAcquisition>;
     }
 
     const Plan& getPlan() const {
@@ -218,17 +311,31 @@ public:
     }
 
 private:
-    void readyPlanExecution(express::Ready);
-    void readyPlanExecution(express::Exhausted);
+    void readyPlanExecution(express::Ready,
+                            size_t& numUnavailabilityYieldsSinceLastSuccess,
+                            size_t& numWriteConflictYieldsSinceLastSuccess);
+    void readyPlanExecution(express::WaitingForYield,
+                            size_t& numUnavailabilityYieldsSinceLastSuccess,
+                            size_t& numWriteConflictYieldsSinceLastSuccess);
+    void readyPlanExecution(express::WaitingForBackoff,
+                            size_t& numUnavailabilityYieldsSinceLastSuccess,
+                            size_t& numWriteConflictYieldsSinceLastSuccess);
+    void readyPlanExecution(express::WaitingForCondition result,
+                            size_t& numUnavailabilityYieldsSinceLastSuccess,
+                            size_t& numWriteConflictYieldsSinceLastSuccess);
+    void readyPlanExecution(express::Exhausted,
+                            size_t& numUnavailabilityYieldsSinceLastSuccess,
+                            size_t& numWriteConflictYieldsSinceLastSuccess);
 
     OperationContext* _opCtx;
     std::unique_ptr<CanonicalQuery> _cq;
     NamespaceString _nss;  // Copied from _cq.
-    VariantCollectionPtrOrAcquisition _coll;
 
     mongo::CommonStats _commonStats;
     express::PlanStats _planStats;
     express::IteratorStats _iteratorStats;
+    express::WriteOperationStats _writeOperationStats;
+
     bool _isDisposed{false};
     Status _killStatus = Status::OK();
 
@@ -247,25 +354,31 @@ private:
 };
 
 template <class Plan>
-PlanExecutorExpress<Plan>::PlanExecutorExpress(OperationContext* opCtx,
-                                               std::unique_ptr<CanonicalQuery> cq,
-                                               VariantCollectionPtrOrAcquisition coll,
-                                               Plan plan,
-                                               bool returnOwnedBson)
+PlanExecutorExpress<Plan>::PlanExecutorExpress(
+    OperationContext* opCtx,
+    std::unique_ptr<CanonicalQuery> cq,
+    typename Plan::CollectionType collection,
+    Plan plan,
+    const express::ExceptionRecoveryPolicy* recoveryPolicy,
+    bool returnOwnedBson)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
-      _nss(_cq->nss()),
-      _coll(coll),
+      _nss(express::accessCollection(collection).ns()),
       _commonStats("EXPRESS"),
-      _planExplainer(&_commonStats, &_planStats, &_iteratorStats),
+      _planExplainer(&_commonStats, &_planStats, &_iteratorStats, &_writeOperationStats),
       _plan(std::move(plan)),
       _mustReturnOwnedBson(returnOwnedBson) {
-    _plan.open(_opCtx, &coll.getCollectionPtr(), &_planStats, &_iteratorStats);
+    _plan.open(
+        _opCtx, collection, recoveryPolicy, &_planStats, &_iteratorStats, &_writeOperationStats);
 }
 
 template <class Plan>
 PlanExecutor::ExecState PlanExecutorExpress<Plan>::getNext(BSONObj* out, RecordId* dlOut) {
     bool haveOutput = false;
+    size_t numUnavailabilityYieldsSinceLastSuccess = 0;
+    size_t numWriteConflictYieldsSinceLastSuccess = 0;
+
+    checkFailPointPlanExecAlwaysFails();
 
     express::PlanProgress progress((express::Ready()));
     while (!haveOutput) {
@@ -287,29 +400,87 @@ PlanExecutor::ExecState PlanExecutorExpress<Plan>::getNext(BSONObj* out, RecordI
             return express::Ready();
         });
 
-        std::visit([&, this](auto result) { this->readyPlanExecution(std::move(result)); },
-                   std::move(progress));
+        std::visit(
+            [&, this](auto result) {
+                this->readyPlanExecution(std::move(result),
+                                         numUnavailabilityYieldsSinceLastSuccess,
+                                         numWriteConflictYieldsSinceLastSuccess);
+            },
+            std::move(progress));
     }
 
     return ExecState::ADVANCED;
 }
 
 template <class Plan>
-void PlanExecutorExpress<Plan>::readyPlanExecution(express::Ready) {
+void PlanExecutorExpress<Plan>::readyPlanExecution(express::Ready,
+                                                   size_t& numUnavailabilityYieldsSinceLastSuccess,
+                                                   size_t& numWriteConflictYieldsSinceLastSuccess) {
     // Born ready B).
+    numUnavailabilityYieldsSinceLastSuccess = 0;
+    numWriteConflictYieldsSinceLastSuccess = 0;
 }
 
 template <class Plan>
-void PlanExecutorExpress<Plan>::readyPlanExecution(express::Exhausted) {
-    // No execution to get ready for.
+void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForYield,
+                                                   size_t& numUnavailabilityYieldsSinceLastSuccess,
+                                                   size_t& numWriteConflictYieldsSinceLastSuccess) {
+    logWriteConflictAndBackoff(numWriteConflictYieldsSinceLastSuccess++,
+                               "plan execution",
+                               "write contention during express execution"_sd,
+                               NamespaceStringOrUUID(_nss));
+
+    // TODO: Is this the desired behavior?
+    _plan.temporarilyReleaseResourcesAndYield(_opCtx, []() {
+        // No-op.
+    });
 }
 
-template <class IteratorChoice>
+template <class Plan>
+void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForBackoff,
+                                                   size_t& numUnavailabilityYieldsSinceLastSuccess,
+                                                   size_t& numWriteConflictYieldsSinceLastSuccess) {
+    handleTemporarilyUnavailableException(
+        _opCtx,
+        numUnavailabilityYieldsSinceLastSuccess++,
+        "plan executor",
+        NamespaceStringOrUUID(_nss),
+        ExceptionFor<ErrorCodes::TemporarilyUnavailable>(Status(
+            ErrorCodes::TemporarilyUnavailable, "resource contention during express execution"_sd)),
+        numWriteConflictYieldsSinceLastSuccess);
+
+    // TODO: Is this the desired behavior?
+    _plan.temporarilyReleaseResourcesAndYield(_opCtx, []() {
+        // No-op.
+    });
+}
+
+template <class Plan>
+void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForCondition result,
+                                                   size_t& numUnavailabilityYieldsSinceLastSuccess,
+                                                   size_t& numWriteConflictYieldsSinceLastSuccess) {
+    _plan.temporarilyReleaseResourcesAndYield(_opCtx, [this, &result]() {
+        OperationShardingState::waitForCriticalSectionToComplete(this->_opCtx, result.waitSignal())
+            .ignore();
+    });
+}
+
+template <class Plan>
+void PlanExecutorExpress<Plan>::readyPlanExecution(express::Exhausted,
+                                                   size_t& numUnavailabilityYieldsSinceLastSuccess,
+                                                   size_t& numWriteConflictYieldsSinceLastSuccess) {
+    // No execution to get ready for.
+    numUnavailabilityYieldsSinceLastSuccess = 0;
+    numWriteConflictYieldsSinceLastSuccess = 0;
+}
+
+template <class IteratorChoice, class WriteOperationChoice>
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
     OperationContext* opCtx,
     IteratorChoice iterator,
+    WriteOperationChoice writeOperation,
     std::unique_ptr<CanonicalQuery> cq,
-    VariantCollectionPtrOrAcquisition coll,
+    typename IteratorChoice::CollectionTypeChoice coll,
     boost::optional<ScopedCollectionFilter> collectionFilter,
     bool returnOwnedBson) {
     using ShardFilterForRead = std::variant<express::NoShardFilter, ScopedCollectionFilter>;
@@ -321,7 +492,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
 
     using Projection = std::variant<express::IdentityProjection, const projection_ast::Projection*>;
     Projection projection((express::IdentityProjection()));
-    if (cq->getProj() != nullptr) {
+    if (cq && cq->getProj() != nullptr) {
         projection = cq->getProj();
     }
 
@@ -330,11 +501,17 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
     return std::visit(
         [&](auto& chosenShardFilter,
             auto& chosenProjection) -> std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> {
-            auto plan = express::ExpressPlan(
-                std::move(iterator), std::move(chosenShardFilter), std::move(chosenProjection));
+            auto plan = express::ExpressPlan(std::move(iterator),
+                                             std::move(writeOperation),
+                                             std::move(chosenShardFilter),
+                                             std::move(chosenProjection));
 
-            return {new PlanExecutorExpress(
-                        opCtx, std::move(cq), coll, std::move(plan), returnOwnedBson),
+            return {new PlanExecutorExpress(opCtx,
+                                            std::move(cq),
+                                            coll,
+                                            std::move(plan),
+                                            &doNotRecoverPolicy,
+                                            returnOwnedBson),
                     PlanExecutor::Deleter(opCtx)};
         },
         shardFilter,
@@ -348,13 +525,19 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
     VariantCollectionPtrOrAcquisition coll,
     boost::optional<ScopedCollectionFilter> collectionFilter,
     bool returnOwnedBson) {
-    const BSONObj& queryFilter = cq->getQueryObj();
-    return makeExpressExecutor(opCtx,
-                               express::IdLookupViaIndex(queryFilter),
-                               std::move(cq),
-                               coll,
-                               std::move(collectionFilter),
-                               returnOwnedBson);
+    return std::visit(
+        [&](auto collectionAlternative) {
+            const BSONObj& queryFilter = cq->getQueryObj();
+            return makeExpressExecutor(
+                opCtx,
+                express::IdLookupViaIndex<decltype(collectionAlternative)>(queryFilter),
+                express::NoWriteOperation(),
+                std::move(cq),
+                collectionAlternative,
+                std::move(collectionFilter),
+                returnOwnedBson);
+        },
+        coll.get());
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByClusteredId(
@@ -363,13 +546,20 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
     VariantCollectionPtrOrAcquisition coll,
     boost::optional<ScopedCollectionFilter> collectionFilter,
     bool returnOwnedBson) {
-    const BSONObj& queryFilter = cq->getQueryObj();
-    return makeExpressExecutor(opCtx,
-                               express::IdLookupOnClusteredCollection(queryFilter),
-                               std::move(cq),
-                               coll,
-                               std::move(collectionFilter),
-                               returnOwnedBson);
+    return std::visit(
+        [&](auto collectionAlternative) {
+            const BSONObj& queryFilter = cq->getQueryObj();
+            return makeExpressExecutor(
+                opCtx,
+                express::IdLookupOnClusteredCollection<decltype(collectionAlternative)>(
+                    queryFilter),
+                express::NoWriteOperation(),
+                std::move(cq),
+                collectionAlternative,
+                std::move(collectionFilter),
+                returnOwnedBson);
+        },
+        coll.get());
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByUserIndex(
@@ -389,18 +579,104 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
                         index.toString()),
             indexDescriptor);
 
-    const CollatorInterface* collator = cq->getCollator();
-    BSONElement queryFilter =
-        static_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression())->getData();
-    return makeExpressExecutor(opCtx,
-                               express::LookupViaUserIndex(queryFilter,
-                                                           indexDescriptor->getEntry()->getIdent(),
-                                                           index.identifier.catalogName,
-                                                           collator),
-                               std::move(cq),
-                               coll,
-                               std::move(collectionFilter),
-                               returnOwnedBson);
+    return std::visit(
+        [&](auto collectionAlternative) {
+            const CollatorInterface* collator = cq->getCollator();
+            BSONElement queryFilter =
+                static_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression())
+                    ->getData();
+            return makeExpressExecutor(opCtx,
+                                       express::LookupViaUserIndex<decltype(collectionAlternative)>(
+                                           queryFilter,
+                                           indexDescriptor->getEntry()->getIdent(),
+                                           index.identifier.catalogName,
+                                           collator),
+                                       express::NoWriteOperation(),
+                                       std::move(cq),
+                                       collectionAlternative,
+                                       std::move(collectionFilter),
+                                       returnOwnedBson);
+        },
+        coll.get());
+}
+
+
+/**
+ * Determine appropriate recovery policy for write operations in express based on the
+ * PlanYieldPolicy from the request. Applies appropriate overrides for multi-statement transactions,
+ * failpoints, replication etc.
+ */
+const express::ExceptionRecoveryPolicy* getExpressRecoveryPolicy(
+    OperationContext* opCtx, PlanYieldPolicy::YieldPolicy requestedPolicy) {
+
+    auto policyWithOverride =
+        PlanYieldPolicy::getPolicyOverrideForOperation(opCtx, requestedPolicy);
+    if (policyWithOverride == PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY ||
+        policyWithOverride == PlanYieldPolicy::YieldPolicy::YIELD_MANUAL ||
+        MONGO_unlikely(skipWriteConflictRetries.shouldFail())) {
+        return &doNotRecoverPolicy;
+    } else if (opCtx->writesAreReplicated()) {
+        return &recoveryPolicyForPrimary;
+    } else {
+        return &recoveryPolicyForSecondary;
+    }
+}
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdate(
+    OperationContext* opCtx,
+    CollectionAcquisition collection,
+    ParsedUpdate* parsedUpdate,
+    bool returnOwnedBson) {
+
+    const UpdateRequest* request = parsedUpdate->getRequest();
+
+    using Iterator = std::variant<express::IdLookupViaIndex<CollectionAcquisition>,
+                                  express::IdLookupOnClusteredCollection<CollectionAcquisition>>;
+    auto iterator = [&]() -> Iterator {
+        bool isClusteredOnId =
+            clustered_util::isClusteredOnId(collection.getCollectionPtr()->getClusteredInfo());
+        if (isClusteredOnId) {
+            return express::IdLookupOnClusteredCollection<CollectionAcquisition>(
+                request->getQuery());
+        } else {
+            return express::IdLookupViaIndex<CollectionAcquisition>(request->getQuery());
+        }
+    }();
+
+    bool isUserInitiatedWrite = opCtx->writesAreReplicated() &&
+        !(request->isFromOplogApplication() ||
+          parsedUpdate->getDriver()->type() == UpdateDriver::UpdateType::kDelta ||
+          request->source() == OperationSource::kFromMigrate);
+
+    auto writeOperation =
+        express::UpdateOperation(parsedUpdate->getDriver(), isUserInitiatedWrite, request);
+
+    using ShardFilter = std::variant<express::NoShardFilter, write_stage_common::PreWriteFilter>;
+    auto shardFilter = [&]() -> ShardFilter {
+        if (request->getIsExplain()) {
+            return ShardFilter{express::NoShardFilter()};
+        } else {
+            return ShardFilter{write_stage_common::PreWriteFilter(opCtx, collection.nss())};
+        }
+    }();
+
+    fastPathQueryCounters.incrementExpressQueryCounter();
+    auto recoveryPolicy = getExpressRecoveryPolicy(opCtx, parsedUpdate->yieldPolicy());
+
+    return std::visit(
+        [&](auto chosenIterator,
+            auto chosenShardFilter) -> std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> {
+            auto plan = express::ExpressPlan(std::move(chosenIterator),
+                                             std::move(writeOperation),
+                                             std::move(chosenShardFilter),
+                                             express::IdentityProjection());
+            return {
+                new PlanExecutorExpress(
+                    opCtx, nullptr, collection, std::move(plan), recoveryPolicy, returnOwnedBson),
+                PlanExecutor::Deleter(opCtx)};
+        },
+        std::move(iterator),
+        std::move(shardFilter));
 }
 
 boost::optional<IndexEntry> getIndexForExpressEquality(const CanonicalQuery& cq,

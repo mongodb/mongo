@@ -61,8 +61,13 @@ TimeseriesTest.run((insert) => {
             }
         }));
 
-        assert(dates[5], getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
-        assert(dates[5], getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
+        if (getPlanStage(expl, "CLUSTERED_IXSCAN") == undefined) {
+            // post 8.0, EXPRESS will handle update-by-id
+            assert(getPlanStage(expl, "EXPRESS_UPDATE"));
+        } else {
+            assert(dates[5], getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
+            assert(dates[5], getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
+        }
     })();
 
     (function testLTE() {

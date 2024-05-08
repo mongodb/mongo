@@ -54,7 +54,7 @@ public:
         return _indexName;
     }
 
-    const BSONObj& indexKeyPattern() const {
+    const std::string& indexKeyPattern() const {
         return _indexKeyPattern;
     }
 
@@ -70,11 +70,11 @@ public:
         _numDocumentsFetched += amount;
     }
 
-    void setIndexName(const std::string indexName) {
+    void setIndexName(const std::string& indexName) {
         _indexName = indexName;
     }
 
-    void setIndexKeyPattern(const BSONObj& indexKeyPattern) {
+    void setIndexKeyPattern(const std::string& indexKeyPattern) {
         _indexKeyPattern = indexKeyPattern;
     }
 
@@ -87,8 +87,7 @@ public:
     }
 
     void appendDataAccessStats(BSONObjBuilder& builder) const {
-        builder.append("stage"_sd, _stageName);
-        if (!_indexKeyPattern.isEmpty()) {
+        if (!_indexKeyPattern.empty()) {
             builder.append("keyPattern"_sd, _indexKeyPattern);
         }
         if (!_indexName.empty()) {
@@ -101,7 +100,7 @@ private:
     size_t _numKeysExamined{0};
     size_t _numDocumentsFetched{0};
     std::string _indexName;
-    BSONObj _indexKeyPattern;
+    std::string _indexKeyPattern;
 };
 
 class PlanStats {
@@ -117,6 +116,62 @@ public:
 private:
     size_t _numResults{0};
 };
+
+class WriteOperationStats {
+public:
+    const std::string& stageName() const {
+        return _stageName;
+    }
+
+    void setStageName(std::string stageName) {
+        _stageName = std::move(stageName);
+    }
+
+    size_t docsUpdated() const {
+        return _docsUpdated;
+    }
+
+    size_t docsMatched() const {
+        return _docsMatched;
+    }
+
+    bool isModUpdate() const {
+        return _isModUpdate;
+    }
+
+    void incDocsUpdated(size_t numDocs) {
+        _docsUpdated += numDocs;
+    }
+
+    void incUpdatedStats(size_t numDocsMatched) {
+        _docsMatched += numDocsMatched;
+    };
+
+    void setIsModUpdate(bool val) {
+        _isModUpdate = val;
+    }
+
+    void populateExecStats(BSONObjBuilder& bob) const {
+        bob.appendNumber("nWouldModify", static_cast<long long>(docsUpdated()));
+        bob.appendNumber("nWouldUpsert", 0LL);
+    }
+
+    bool containsDotsAndDollarsField() const {
+        return _containsDotsAndDollarsField;
+    }
+
+    void setContainsDotsAndDollarsField(bool val) {
+        _containsDotsAndDollarsField = val;
+    }
+
+private:
+    std::string _stageName;
+    size_t _docsMatched{0};
+    size_t _docsUpdated{0};
+    bool _isModUpdate{false};
+    bool _containsDotsAndDollarsField{false};
+};
+
 }  // namespace express
 
 /**
@@ -129,8 +184,12 @@ class PlanExplainerExpress final : public PlanExplainer {
 public:
     PlanExplainerExpress(const mongo::CommonStats* stats,
                          const express::PlanStats* planStats,
-                         const express::IteratorStats* iteratorStats)
-        : _stats(stats), _planStats(planStats), _iteratorStats(iteratorStats) {}
+                         const express::IteratorStats* iteratorStats,
+                         const express::WriteOperationStats* writeOperationStats)
+        : _stats(stats),
+          _planStats(planStats),
+          _iteratorStats(iteratorStats),
+          _writeOperationStats(writeOperationStats) {}
 
     const ExplainVersion& getVersion() const override {
         static const ExplainVersion kExplainVersion = "1";
@@ -164,5 +223,6 @@ private:
     const mongo::CommonStats* _stats;
     const express::PlanStats* _planStats;
     const express::IteratorStats* _iteratorStats;
+    const express::WriteOperationStats* _writeOperationStats;
 };
 }  // namespace mongo

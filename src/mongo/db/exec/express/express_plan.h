@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+#include <type_traits>
 #include <utility>
 #include <variant>
 
@@ -37,25 +39,37 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/projection.h"
+#include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/plan_explainer_express.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/update/update_driver.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/db/update/update_util.h"
+
 
 namespace mongo {
 namespace express {
@@ -84,6 +98,42 @@ public:
 };
 
 /**
+ * Execution did not make forward progress, possibly because of a write conflict, and the caller
+ * should yield, back off as necessary, and try again.
+ */
+class WaitingForYield {
+public:
+    static constexpr bool indicatesSuccessfulProgress = false;
+};
+
+/**
+ * Execution did not make forward progress because of a 'TemporarilyUnavailable' exception. The
+ * caller should yield, back off as necessary, and try again.
+ */
+class WaitingForBackoff {
+public:
+    static constexpr bool indicatesSuccessfulProgress = false;
+};
+
+/**
+ * Execution did not make forward progress because it is blocked on a condition. The caller should
+ * yield, wait for the condition to signal, and try again.
+ */
+class WaitingForCondition {
+public:
+    WaitingForCondition(SharedSemiFuture<void> waitSignal) : _waitSignal(std::move(waitSignal)) {}
+
+    const SharedSemiFuture<void>& waitSignal() const {
+        return _waitSignal;
+    }
+
+    static constexpr bool indicatesSuccessfulProgress = false;
+
+private:
+    SharedSemiFuture<void> _waitSignal;
+};
+
+/**
  * Execution completed successfully, and there is no remaining work. Note that execution can
  * return 'Exhausted' when it produces its last document.
  *
@@ -95,39 +145,261 @@ public:
     static constexpr bool indicatesSuccessfulProgress = true;
 };
 
-using PlanProgress = std::variant<Ready, Exhausted>;
+using PlanProgress =
+    std::variant<Ready, WaitingForYield, WaitingForBackoff, WaitingForCondition, Exhausted>;
 
 inline bool isSuccessfulResult(const PlanProgress& result) {
     return std::visit([](const auto& value) { return value.indicatesSuccessfulProgress; }, result);
 }
 
 /**
+ * When a read or write operation generates a possibly recoverable exception (e.g.,
+ * WriteConflictException), an 'ExpressPlan' forwards it to its 'ExceptionRecoveryPolicy' to provide
+ * a 'PlanProgress' result that will ultimately communicate to the executor what it should do before
+ * trying to resume execution. If execution should terminate, the policy can rethrow the exception,
+ * which makes it a query-fatal error.
+ */
+class ExceptionRecoveryPolicy {
+public:
+    virtual PlanProgress recoverIfPossible(ExceptionFor<ErrorCodes::WriteConflict>&) const = 0;
+    virtual PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::TemporarilyUnavailable>&) const = 0;
+    virtual PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::TransactionTooLargeForCache>&) const = 0;
+    virtual express::PlanProgress recoverIfPossible(
+        ExceptionFor<ErrorCodes::StaleConfig>& exception) const = 0;
+};
+
+/**
+ * An adapter that converts T to boost::optional<T> iff T is not default constructible. This
+ * transform is useful for the "iterator" classes, which need to store a CollectionType object as a
+ * member but don't initialize it until a call to the open() function. When CollectionType is not
+ * default constructible, the iterator can store a boost::optional<CollectionType> that stores
+ * boost::none until it gets initialized by the open() function.
+ */
+template <class T>
+struct WrapInOptionalIfNeeded {
+    using type = boost::optional<T>;
+};
+
+template <class T>
+requires(std::is_default_constructible_v<T>) struct WrapInOptionalIfNeeded<T> {
+    using type = T;
+};
+
+/**
+ * The overloads below provide ways for the iterator classes to interact with a CollectionType
+ * object that may be either a CollectionAcquisition or a CollectionPtr.
+ *
+ * TODO SERVER-76397: Once all PlanExecutors use CollectionAcquisition exclusively, these adapaters
+ * won't be necessary.
+ */
+inline const CollectionAcquisition& unwrapCollection(
+    const boost::optional<CollectionAcquisition>& collectionAcquisition) {
+    tassert(8375913,
+            "Access to invalided plan: plan is not yet open or is yielded",
+            collectionAcquisition.has_value());
+    return *collectionAcquisition;
+}
+
+inline const CollectionPtr* unwrapCollection(const CollectionPtr* collectionPtr) {
+    tassert(8375912,
+            "Access to invalided plan: plan is not yet open or is yielded",
+            collectionPtr != nullptr);
+    return collectionPtr;
+}
+
+inline const Collection& accessCollection(const CollectionPtr* collectionPtr) {
+    return *collectionPtr->get();
+}
+
+inline const Collection& accessCollection(const CollectionAcquisition& collectionAcquisition) {
+    return *collectionAcquisition.getCollectionPtr().get();
+}
+
+inline const CollectionPtr& accessCollectionPtr(const CollectionPtr* collectionPtr) {
+    return *collectionPtr;
+}
+
+inline const CollectionPtr& accessCollectionPtr(
+    const CollectionAcquisition& collectionAcquisition) {
+    return collectionAcquisition.getCollectionPtr();
+}
+
+inline void prepareForCollectionInvalidation(CollectionPtr const*& referenceToCollectionPtr) {
+    // Any caller holding a raw pointer to a CollectionPtr should destroy that pointer before any
+    // operation that can invalidate it in order to avoid the bad practice of storing a dangling
+    // pointer.
+    referenceToCollectionPtr = nullptr;
+}
+
+inline void prepareForCollectionInvalidation(const boost::optional<CollectionAcquisition>&) {
+    // When collection resources are released, an associated CollectionAcquisition that was valid
+    // before the release becomes valid again after the collection is restored, so it is safe to
+    // leave the CollectionAcquisition as is.
+}
+
+inline void restoreInvalidatedCollection(CollectionPtr const*& referenceToCollectionPtr,
+                                         const CollectionPtr* restoredCollectionPtr) {
+    referenceToCollectionPtr = restoredCollectionPtr;
+}
+
+inline void restoreInvalidatedCollection(const boost::optional<CollectionAcquisition>&,
+                                         const CollectionPtr* restoredCollectionPtr) {
+    // No further action is needed to restore a CollectionAcquisition after its associated
+    // collection is restored.
+}
+
+template <class Callable>
+void temporarilyYieldCollection(OperationContext* opCtx,
+                                const CollectionPtr* collection,
+                                Callable whileYieldedCallback) {
+
+    tassert(8375910,
+            "Cannot yield inside a write unit of work",
+            !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+
+    collection->yield();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+    opCtx->checkForInterrupt();
+
+    Locker* locker = shard_role_details::getLocker(opCtx);
+    Locker::LockSnapshot lockSnapshot;
+    locker->saveLockStateAndUnlock(&lockSnapshot);
+
+    // All PlanExecutor resources are now free.
+    CurOp::get(opCtx)->yielded();  // Count the yield in the operation's metrics.
+    whileYieldedCallback();  // Perform any work that we intended to do while resources are yielded.
+
+    // Keep trying to recover the yielded resources until we succeed or encounter an
+    // unrecoverable error.
+    for (int attempt = 1; true; ++attempt) {
+        try {
+            locker->restoreLockState(opCtx, lockSnapshot);
+            collection->restore();
+
+            return;
+        } catch (const StorageUnavailableException& exception) {
+            CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+            logWriteConflictAndBackoff(attempt,
+                                       "query yield"_sd,
+                                       exception.reason(),
+                                       NamespaceStringOrUUID(NamespaceString::kEmpty));
+        }
+    }
+}
+
+template <class Callable>
+void temporarilyYieldCollection(OperationContext* opCtx,
+                                const CollectionAcquisition& acquisition,
+                                Callable whileYieldedCallback) {
+
+    tassert(8375911,
+            "Cannot yield inside a write unit of work",
+            !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+    opCtx->checkForInterrupt();
+
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
+    ScopeGuard yieldFailedScopeGuard(
+        [&] { yieldedTransactionResources.transitionTransactionResourcesToFailedState(opCtx); });
+
+    // All PlanExecutor resources are now free.
+    CurOp::get(opCtx)->yielded();  // Count the yield in the operation's metrics.
+    whileYieldedCallback();  // Perform any work that we intended to do while resources are yielded.
+
+    yieldFailedScopeGuard.dismiss();
+
+    restoreTransactionResourcesToOperationContext(opCtx, std::move(yieldedTransactionResources));
+}
+
+/**
+ * Execute the 'writeFunction' callback and then, if it succeeded, execute the 'continuation'
+ * function, returning its result. If 'writeFunction' throws an exception that is covered by the
+ * 'exceptionRecoveryPolicy' recovery function, instead return the 'PlanProgress' result from the
+ * recovery function, without executing the continuation.
+ */
+template <class WriteFunction, class Continuation>
+PlanProgress recoverFromNonFatalWriteException(
+    OperationContext* opCtx,
+    const ExceptionRecoveryPolicy& exceptionRecoveryPolicy,
+    StringData operationName,
+    WriteFunction writeFunction,
+    Continuation continuation) {
+    try {
+        writeFunction();
+    } catch (ExceptionFor<ErrorCodes::WriteConflict>& exception) {
+        CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+        return exceptionRecoveryPolicy.recoverIfPossible(exception);
+    } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable>& exception) {
+        if (opCtx->inMultiDocumentTransaction()) {
+            convertToWCEAndRethrow(opCtx, operationName, exception);
+        }
+        return exceptionRecoveryPolicy.recoverIfPossible(exception);
+    } catch (ExceptionFor<ErrorCodes::TransactionTooLargeForCache>& exception) {
+        return exceptionRecoveryPolicy.recoverIfPossible(exception);
+    } catch (ExceptionFor<ErrorCodes::StaleConfig>& exception) {
+        if (ShardVersion::isPlacementVersionIgnored(exception->getVersionReceived()) &&
+            exception->getCriticalSectionSignal()) {
+            // When the 'StaleConfig' exception is the result of an ongoing critical section (and
+            // the placement version is IGNORED), we may attempt to resume query execution with a
+            // newer shard configuration after the critical section is finished.
+            return exceptionRecoveryPolicy.recoverIfPossible(exception);
+        }
+
+        // All other 'StaleConfig' exceptions are query fatal errors intended to propagate to the
+        // mongos that issued the write and that is responsible for retrying it.
+        throw;
+    }
+
+    return continuation();
+}
+
+/**
  * A document iterator that uses a collection's _id index to iterate over documents in a collection
  * that match a simple equality predicate on their _id field. The _id index is required to be
  * unique, so the iterator will produce at most one document.
+ *
+ * The iterator owns the resources associated with the collection it iterates.
+ *
+ * TODO SERVER-76397: The CollectionType template parameter allows the iterator to hold collection
+ * resources as either a <const CollectionPtr*> or a <const CollectionAcquisition>. Once
+ * PlanExecutors use CollectionAcquisition exclusively, this parameter will no longer need to be
+ * templated.
  */
+template <class CollectionType>
 class IdLookupViaIndex {
 public:
+    using CollectionTypeChoice = CollectionType;
+
     IdLookupViaIndex(const BSONObj& queryFilter) : _queryFilter(queryFilter) {}
 
-    void open(OperationContext* opCtx, const CollectionPtr* collection, IteratorStats* stats) {
-        _collection = collection;
-        _indexCatalogEntry = IdLookupViaIndex::getIndexCatalogEntryForIdIndex(opCtx, *collection);
+    void open(OperationContext* opCtx, CollectionType collection, IteratorStats* stats) {
+        _indexCatalogEntry =
+            IdLookupViaIndex::getIndexCatalogEntryForIdIndex(opCtx, accessCollection(collection));
+        _collection = std::move(collection);
 
         _stats = stats;
         _stats->setStageName("EXPRESS_IXSCAN");
         _stats->setIndexName("_id_");
-        _stats->setIndexKeyPattern(BSON("_id" << 1));
+        _stats->setIndexKeyPattern("{ _id: 1 }");
     }
 
     template <class Continuation>
     PlanProgress consumeOne(OperationContext* opCtx, Continuation continuation) {
+        const auto& collection = unwrapCollection(_collection);
+
         if (_exhausted) {
             return Exhausted();
         }
 
+        tassert(8375902,
+                "Id lookup query filter must contain a single field",
+                _queryFilter.nFields() == 1);
         auto rid = _indexCatalogEntry->accessMethod()->asSortedData()->findSingle(
-            opCtx, *_collection, _indexCatalogEntry, _queryFilter["_id"].wrap());
+            opCtx, accessCollectionPtr(collection), _indexCatalogEntry, _queryFilter);
         if (rid.isNull()) {
             _exhausted = true;
             return Exhausted();
@@ -135,20 +407,20 @@ public:
         _stats->incNumKeysExamined(1);
 
         Snapshotted<BSONObj> obj;
-        bool found = (*_collection)->findDoc(opCtx, rid, &obj);
+        bool found = accessCollection(collection).findDoc(opCtx, rid, &obj);
         if (!found) {
             logRecordNotFound(opCtx,
                               rid,
                               _queryFilter,
                               _indexCatalogEntry->descriptor()->keyPattern(),
-                              _collection->get()->ns());
+                              accessCollection(collection).ns());
             _exhausted = true;
             return Exhausted();
         }
 
         _stats->incNumDocumentsFetched(1);
 
-        auto progress = continuation(*_collection, std::move(rid), std::move(obj));
+        auto progress = continuation(collection, std::move(rid), std::move(obj));
 
         // Only advance the iterator if the continuation completely processed its item, as indicated
         // by its return value.
@@ -165,19 +437,29 @@ public:
     };
 
     void releaseResources() {
-        _collection = nullptr;
+        prepareForCollectionInvalidation(_collection);
         _indexCatalogEntry = nullptr;
     }
 
     void restoreResources(OperationContext* opCtx, const CollectionPtr* collection) {
-        _collection = collection;
-        _indexCatalogEntry = IdLookupViaIndex::getIndexCatalogEntryForIdIndex(opCtx, *collection);
+        restoreInvalidatedCollection(_collection, collection);
+        _indexCatalogEntry =
+            IdLookupViaIndex::getIndexCatalogEntryForIdIndex(opCtx, *collection->get());
+    }
+
+    template <class Callable>
+    void temporarilyReleaseResourcesAndYield(OperationContext* opCtx,
+                                             Callable whileYieldedCallback) {
+        const auto& collection = unwrapCollection(_collection);
+        releaseResources();
+        temporarilyYieldCollection(opCtx, collection, std::move(whileYieldedCallback));
+        restoreResources(opCtx, &accessCollectionPtr(collection));
     }
 
 private:
-    static const IndexCatalogEntry* getIndexCatalogEntryForIdIndex(
-        OperationContext* opCtx, const CollectionPtr& collection) {
-        const IndexCatalog* catalog = collection->getIndexCatalog();
+    static const IndexCatalogEntry* getIndexCatalogEntryForIdIndex(OperationContext* opCtx,
+                                                                   const Collection& collection) {
+        const IndexCatalog* catalog = collection.getIndexCatalog();
         const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
         tassert(8884401, "Missing _id index on non-clustered collection", desc);
 
@@ -186,7 +468,7 @@ private:
 
     BSONObj _queryFilter;  // Unowned BSON.
 
-    const CollectionPtr* _collection{nullptr};             // Unowned.
+    typename WrapInOptionalIfNeeded<CollectionType>::type _collection;
     const IndexCatalogEntry* _indexCatalogEntry{nullptr};  // Unowned.
 
     bool _exhausted{false};
@@ -198,35 +480,47 @@ private:
  * A document iterator for collections clustered by the _id field that directly iterates documents
  * matching a simple equality predicate on their _id field. The _id field is required to be unique,
  * so the iterator will produce at most one document.
+ *
+ * The iterator owns the resources associated with the collection it iterates.
+ *
+ * TODO SERVER-76397: The CollectionType template parameter allows the iterator to hold collection
+ * resources as either a <const CollectionPtr*> or a <const CollectionAcquisition>. Once
+ * PlanExecutors use CollectionAcquisition exclusively, this class will no longer need to be
+ * templated.
  */
+template <class CollectionType>
 class IdLookupOnClusteredCollection {
 public:
+    using CollectionTypeChoice = CollectionType;
+
     IdLookupOnClusteredCollection(const BSONObj& queryFilter) : _queryFilter(queryFilter) {}
 
-    void open(OperationContext* opCtx, const CollectionPtr* collection, IteratorStats* stats) {
-        _collection = collection;
+    void open(OperationContext* opCtx, CollectionType collection, IteratorStats* stats) {
+        _collection = std::move(collection);
         _stats = stats;
         _stats->setStageName("EXPRESS_CLUSTERED_IXSCAN");
     }
 
     template <class Continuation>
     PlanProgress consumeOne(OperationContext* opCtx, Continuation continuation) {
+        const auto& collection = unwrapCollection(_collection);
+
         if (_exhausted) {
             return Exhausted();
         }
 
         auto rid = record_id_helpers::keyForObj(IndexBoundsBuilder::objFromElement(
-            _queryFilter["_id"], (*_collection)->getDefaultCollator()));
+            _queryFilter["_id"], accessCollection(collection).getDefaultCollator()));
 
         Snapshotted<BSONObj> obj;
-        bool found = (*_collection)->findDoc(opCtx, rid, &obj);
+        bool found = accessCollection(collection).findDoc(opCtx, rid, &obj);
         if (!found) {
             _exhausted = true;
             return Exhausted();
         }
         _stats->incNumDocumentsFetched(1);
 
-        auto progress = continuation(*_collection, std::move(rid), std::move(obj));
+        auto progress = continuation(collection, std::move(rid), std::move(obj));
 
         // Only advance the iterator if the continuation completely processed its item, as indicated
         // by its return value.
@@ -243,25 +537,50 @@ public:
     };
 
     void releaseResources() {
-        _collection = nullptr;
+        prepareForCollectionInvalidation(_collection);
     }
 
     void restoreResources(OperationContext* opCtx, const CollectionPtr* collection) {
-        _collection = collection;
+        restoreInvalidatedCollection(_collection, collection);
+    }
+
+    template <class Callable>
+    void temporarilyReleaseResourcesAndYield(OperationContext* opCtx,
+                                             Callable whileYieldedCallback) {
+        const auto& collection = unwrapCollection(_collection);
+        releaseResources();
+        temporarilyYieldCollection(opCtx, collection, std::move(whileYieldedCallback));
+        restoreResources(opCtx, &accessCollectionPtr(collection));
     }
 
 private:
     BSONObj _queryFilter;  // Unowned BSON.
 
-    const CollectionPtr* _collection{nullptr};
+    typename WrapInOptionalIfNeeded<CollectionType>::type _collection;
 
     bool _exhausted{false};
 
     IteratorStats* _stats{nullptr};
 };
 
+/**
+ * A document iterator that uses an arbitrary index to iterate over documents in a collection that
+ * match a simple equality predicate on the first field in the index key pattern. There is no
+ * uniqueness requirement for the queried field, and this iterator can produce multiple matching
+ * documents.
+ *
+ * The iterator owns the resources associated with the collection it iterates.
+ *
+ * TODO SERVER-76397: The CollectionType template parameter allows the iterator to hold collection
+ * resources as either a <const CollectionPtr*> or a <const CollectionAcquisition>. Once
+ * PlanExecutors use CollectionAcquisition exclusively, this class will no longer need to be
+ * templated.
+ */
+template <class CollectionType>
 class LookupViaUserIndex {
 public:
+    using CollectionTypeChoice = CollectionType;
+
     LookupViaUserIndex(const BSONElement& filterValue,
                        std::string indexIdent,
                        std::string indexName,
@@ -271,19 +590,22 @@ public:
           _indexName(std::move(indexName)),
           _collator(collator) {}
 
-    void open(OperationContext* opCtx, const CollectionPtr* collection, IteratorStats* stats) {
-        _collection = collection;
+    void open(OperationContext* opCtx, CollectionType collection, IteratorStats* stats) {
         _indexCatalogEntry = LookupViaUserIndex::getIndexCatalogEntryForUserIndex(
-            opCtx, *collection, _indexIdent, _indexName);
+            opCtx, accessCollection(collection), _indexIdent, _indexName);
+        _collection = std::move(collection);
 
         _stats = stats;
         _stats->setStageName("EXPRESS_IXSCAN");
         _stats->setIndexName(_indexName);
-        _stats->setIndexKeyPattern(_indexCatalogEntry->descriptor()->keyPattern());
+        _stats->setIndexKeyPattern(
+            KeyPattern::toString(_indexCatalogEntry->descriptor()->keyPattern()));
     }
 
     template <class Continuation>
     PlanProgress consumeOne(OperationContext* opCtx, Continuation continuation) {
+        const auto& collection = unwrapCollection(_collection);
+
         if (_exhausted) {
             return Exhausted();
         }
@@ -328,7 +650,7 @@ public:
         tassert(8884402, "Index entry with null record id", rid && !rid->isNull());
 
         Snapshotted<BSONObj> obj;
-        bool found = (*_collection)->findDoc(opCtx, *rid, &obj);
+        bool found = accessCollection(collection).findDoc(opCtx, *rid, &obj);
         if (!found) {
             const auto& keyPattern = _indexCatalogEntry->descriptor()->keyPattern();
             auto dehydratedKp = key_string::toBson(keyEntry.getKeyStringWithoutRecordIdView(),
@@ -340,13 +662,13 @@ public:
                               *rid,
                               IndexKeyEntry::rehydrateKey(keyPattern, dehydratedKp),
                               keyPattern,
-                              _collection->get()->ns());
+                              accessCollection(collection).ns());
             return Ready();
         }
 
         _stats->incNumDocumentsFetched(1);
 
-        auto progress = continuation(*_collection, *rid, std::move(obj));
+        auto progress = continuation(collection, *rid, std::move(obj));
 
         // Only advance the iterator if the continuation completely processed its item, as indicated
         // by its return value.
@@ -363,23 +685,31 @@ public:
     };
 
     void releaseResources() {
-        _collection = nullptr;
+        prepareForCollectionInvalidation(_collection);
         _indexCatalogEntry = nullptr;
     }
 
     void restoreResources(OperationContext* opCtx, const CollectionPtr* collection) {
-        _collection = collection;
+        restoreInvalidatedCollection(_collection, collection);
         _indexCatalogEntry = LookupViaUserIndex::getIndexCatalogEntryForUserIndex(
-            opCtx, *collection, _indexIdent, _indexName);
+            opCtx, *collection->get(), _indexIdent, _indexName);
+    }
+
+    template <class Callable>
+    void temporarilyReleaseResourcesAndYield(OperationContext* opCtx,
+                                             Callable whileYieldedCallback) {
+        const auto& collection = unwrapCollection(_collection);
+        releaseResources();
+        temporarilyYieldCollection(opCtx, collection, std::move(whileYieldedCallback));
+        restoreResources(opCtx, &accessCollectionPtr(collection));
     }
 
 private:
-    static const IndexCatalogEntry* getIndexCatalogEntryForUserIndex(
-        OperationContext* opCtx,
-        const CollectionPtr& collection,
-        const std::string& indexIdent,
-        const std::string& indexName) {
-        const IndexCatalog* catalog = collection->getIndexCatalog();
+    static const IndexCatalogEntry* getIndexCatalogEntryForUserIndex(OperationContext* opCtx,
+                                                                     const Collection& collection,
+                                                                     const std::string& indexIdent,
+                                                                     const std::string& indexName) {
+        const IndexCatalog* catalog = collection.getIndexCatalog();
         const IndexDescriptor* desc = catalog->findIndexByIdent(opCtx, indexIdent);
         uassert(ErrorCodes::QueryPlanKilled,
                 fmt::format("query plan killed :: index {} dropped", indexName),
@@ -392,7 +722,7 @@ private:
     const std::string _indexIdent;
     const std::string _indexName;
 
-    const CollectionPtr* _collection{nullptr};             // Unowned.
+    typename WrapInOptionalIfNeeded<CollectionType>::type _collection;
     const IndexCatalogEntry* _indexCatalogEntry{nullptr};  // Unowned.
 
     const CollatorInterface* _collator;  // Owned by the query's ExpressionContext.
@@ -408,6 +738,7 @@ template <class Continuation>
 PlanProgress applyShardFilter(NoShardFilter&,
                               const Snapshotted<BSONObj>&,
                               const NamespaceString&,
+                              StringData,
                               Continuation continuation) {
     bool shouldWriteToOrphan = false;
     return continuation(shouldWriteToOrphan);
@@ -417,6 +748,7 @@ template <class Continuation>
 PlanProgress applyShardFilter(ScopedCollectionFilter& collectionFilter,
                               const Snapshotted<BSONObj>& obj,
                               const NamespaceString&,
+                              StringData,
                               Continuation continuation) {
     bool accepted = [&]() {
         if (!collectionFilter.isSharded()) {
@@ -435,6 +767,326 @@ PlanProgress applyShardFilter(ScopedCollectionFilter& collectionFilter,
         return Ready();
     }
 }
+
+void releaseShardFilterResources(ScopedCollectionFilter&);
+void restoreShardFilterResources(ScopedCollectionFilter&);
+
+void releaseShardFilterResources(NoShardFilter&);
+void restoreShardFilterResources(NoShardFilter&);
+
+void releaseShardFilterResources(write_stage_common::PreWriteFilter& preWriteFilter);
+void restoreShardFilterResources(write_stage_common::PreWriteFilter& preWriteFilter);
+
+template <class Continuation>
+PlanProgress applyShardFilter(write_stage_common::PreWriteFilter& preWriteFilter,
+                              const Snapshotted<BSONObj>& obj,
+                              const NamespaceString& nss,
+                              StringData operationName,
+                              Continuation continuation) {
+    boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
+    auto [filterStatus, shouldWriteToOrphan] =
+        preWriteFilter.checkIfNotWritable(Document(obj.value()),
+                                          operationName,
+                                          nss,
+                                          [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
+                                              criticalSectionSignal =
+                                                  ex->getCriticalSectionSignal();
+                                          });
+
+    if (!filterStatus) {
+        return continuation(shouldWriteToOrphan);
+    } else if (*filterStatus == PlanStage::NEED_TIME) {
+        // Reject this document but indicate that we have made progress on plan execution.
+        return Ready();
+    } else if (*filterStatus == PlanStage::NEED_YIELD) {
+        if (criticalSectionSignal) {
+            return WaitingForCondition(std::move(*criticalSectionSignal));
+        } else {
+            return WaitingForYield();
+        }
+    } else {
+        MONGO_UNREACHABLE_TASSERT(8375900);
+    }
+}
+
+const char idFieldName[] = "_id";
+const FieldRef idFieldRef(idFieldName);
+
+class UpdateOperation {
+public:
+    static constexpr StringData name = "update"_sd;
+
+    UpdateOperation(UpdateDriver* updateDriver,
+                    bool isUserInitiatedWrite,
+                    const UpdateRequest* request)
+        : _updateDriver(updateDriver),
+          _returnDocs(request->getReturnDocs()),
+          _stmtIds(request->getStmtIds()),
+          _allowShardKeyUpdatesWithoutFullShardKeyInQuery(
+              request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery()),
+          _isUserInitiatedWrite(isUserInitiatedWrite),
+          _isExplain(request->getIsExplain()),
+          _isMulti(request->isMulti()),
+          _source(request->source()),
+          _sampleId(request->getSampleId()) {
+
+        tassert(8375904, "Upserts not supported in Express.", !request->isUpsert());
+    }
+
+    void open(WriteOperationStats* stats) {
+        _stats = stats;
+        _stats->setIsModUpdate(_updateDriver->type() == UpdateDriver::UpdateType::kOperator);
+        _stats->setStageName("EXPRESS_UPDATE");
+    }
+
+    template <class Continuation>
+    PlanProgress write(OperationContext* opCtx,
+                       const CollectionAcquisition& collection,
+                       const ExceptionRecoveryPolicy& exceptionRecoveryPolicy,
+                       const RecordId& rid,
+                       Snapshotted<BSONObj> obj,
+                       bool shouldWriteToOrphan,
+                       Continuation continuation) {
+        // This should be impossible, because an ExpressPlan does not release a snapshot from the
+        // time it reads a record id to the time it has finished all operations on the associated
+        // document.
+        tassert(8375903,
+                "Cannot update document that is not from the current snapshot",
+                shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId() == obj.snapshotId());
+
+        BSONObj newObj;
+        return recoverFromNonFatalWriteException(
+            opCtx,
+            exceptionRecoveryPolicy,
+            UpdateOperation::name,
+            [&]() {
+                newObj = updateById(opCtx, collection, obj, rid, shouldWriteToOrphan);
+                if (_returnDocs == UpdateRequest::ReturnDocOption::RETURN_OLD) {
+                    newObj = obj.value();
+                }
+                _stats->setContainsDotsAndDollarsField(
+                    _updateDriver->containsDotsAndDollarsField());
+            },
+            [&]() -> PlanProgress {
+                // This continuation gets called after the write operation succeeds.
+                size_t numDocsMatched = 1;
+                _stats->incUpdatedStats(numDocsMatched);
+
+                if (_returnDocs == UpdateRequest::ReturnDocOption::RETURN_NONE) {
+                    return Ready{};
+                } else {
+                    return continuation(std::move(newObj));
+                }
+            });
+    }
+
+    BSONObj updateById(OperationContext* opCtx,
+                       const CollectionAcquisition& collection,
+                       const Snapshotted<BSONObj>& oldObj,
+                       const RecordId& rid,
+                       bool shouldWriteToOrphan) const {
+        BSONObj logObj;
+        bool docWasModified = false;
+        FieldRefSet immutablePaths;
+        Status status = Status::OK();
+
+        mutablebson::Document doc(oldObj.value(),
+                                  (collection.getCollectionPtr()->updateWithDamagesSupported()
+                                       ? mutablebson::Document::kInPlaceEnabled
+                                       : mutablebson::Document::kInPlaceDisabled));
+        mutablebson::DamageVector damages;
+
+
+        if (_isUserInitiatedWrite) {
+            const auto& collDesc = collection.getShardingDescription();
+            if (collDesc.isSharded() && !OperationShardingState::isComingFromRouter(opCtx)) {
+                immutablePaths.fillFrom(collDesc.getKeyPatternFields());
+            }
+            immutablePaths.keepShortest(&idFieldRef);
+        }
+
+        // positional updates would not be simple _id queries, so match details should never be
+        // needed.
+        tassert(8375905,
+                "Positional updates not allowed in Express",
+                !_updateDriver->needMatchDetails());
+
+        status = _updateDriver->update(opCtx,
+                                       StringData(),
+                                       &doc,
+                                       _isUserInitiatedWrite,
+                                       immutablePaths,
+                                       false, /* isUpsert */
+                                       &logObj,
+                                       &docWasModified);
+        uassertStatusOK(status);
+
+        // Skip adding _id field if the collection is capped (since capped collection documents can
+        // neither grow nor shrink).
+        const auto createIdField = !collection.getCollectionPtr()->isCapped();
+        // Ensure _id is first if it exists, and generate a new OID if appropriate.
+        update::ensureIdFieldIsFirst(&doc, createIdField);
+
+        const char* source = nullptr;
+        const bool inPlace = doc.getInPlaceUpdates(&damages, &source);
+
+        if (inPlace && damages.empty()) {
+            // A modifier didn't notice that it was really a no-op during its 'prepare' phase. That
+            // represents a missed optimization, but we still shouldn't do any real work. Toggle
+            // 'docWasModified' to 'false'.
+            //
+            // Currently, an example of this is '{ $push : { x : {$each: [], $sort: 1} } }' when the
+            // 'x' array exists and is already sorted.
+            docWasModified = false;
+        }
+
+        if (!docWasModified) {
+            return oldObj.value();
+        }
+
+        // Prepare to modify the document
+        CollectionUpdateArgs args{oldObj.value()};
+        args.update = logObj;
+        if (_isUserInitiatedWrite) {
+            const auto& collDesc = collection.getShardingDescription();
+            args.criteria = collDesc.extractDocumentKey(oldObj.value());
+        } else {
+            const auto docId = oldObj.value()["_id"_sd];
+            args.criteria = docId ? docId.wrap() : oldObj.value();
+        }
+        uassert(8375909,
+                "Multi-update operations require all documents to have an '_id' field",
+                !_isMulti || args.criteria.hasField("_id"_sd));
+
+        args.source = shouldWriteToOrphan ? OperationSource::kFromMigrate : _source;
+        args.stmtIds = _stmtIds;
+        args.sampleId = _sampleId;
+
+        if (_returnDocs == UpdateRequest::ReturnDocOption::RETURN_NEW) {
+            args.storeDocOption = CollectionUpdateArgs::StoreDocOption::PostImage;
+        } else if (_returnDocs == UpdateRequest::ReturnDocOption::RETURN_OLD) {
+            args.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
+        } else {
+            args.storeDocOption = CollectionUpdateArgs::StoreDocOption::None;
+        }
+
+        args.mustCheckExistenceForInsertOperations =
+            _updateDriver->getUpdateExecutor()->getCheckExistenceForDiffInsertOperations();
+
+        args.retryableWrite = write_stage_common::isRetryableWrite(opCtx);
+
+        BSONObj newObj = doc.getObject();
+
+        if (inPlace) {
+            if (!_isExplain) {
+                if (_isUserInitiatedWrite) {
+                    ShardingChecksForUpdate scfu(collection,
+                                                 _allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                                                 _isMulti,
+                                                 nullptr);
+                    scfu.checkUpdateChangesShardKeyFields(opCtx, doc, boost::none, oldObj);
+                }
+
+                auto diff = update_oplog_entry::extractDiffFromOplogEntry(logObj);
+                WriteUnitOfWork wunit(opCtx);
+                bool indexesAffected = false;
+                newObj = uassertStatusOK(collection_internal::updateDocumentWithDamages(
+                    opCtx,
+                    collection.getCollectionPtr(),
+                    rid,
+                    oldObj,
+                    source,
+                    damages,
+                    diff.has_value() ? &*diff : collection_internal::kUpdateAllIndexes,
+                    &indexesAffected,
+                    &CurOp::get(opCtx)->debug(),
+                    &args));
+
+                tassert(8375906,
+                        "Old and new snapshot ids must not change after update",
+                        oldObj.snapshotId() ==
+                            shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
+                wunit.commit();
+            }
+            _stats->incDocsUpdated(1);  // explains are also treated as though they wrote
+        } else {
+            newObj = doc.getObject();
+            if (!DocumentValidationSettings::get(opCtx).isInternalValidationDisabled()) {
+                uassert(8375908,
+                        str::stream() << "Resulting document after update is larger than "
+                                      << BSONObjMaxUserSize,
+                        newObj.objsize() <= BSONObjMaxUserSize);
+            }
+
+            if (!_isExplain) {
+                if (_isUserInitiatedWrite) {
+                    ShardingChecksForUpdate scfu(collection,
+                                                 _allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                                                 _isMulti,
+                                                 nullptr);
+                    scfu.checkUpdateChangesShardKeyFields(opCtx, doc, newObj, oldObj);
+                }
+
+                bool indexesAffected = false;
+                auto diff = update_oplog_entry::extractDiffFromOplogEntry(logObj);
+                WriteUnitOfWork wunit(opCtx);
+                collection_internal::updateDocument(
+                    opCtx,
+                    collection.getCollectionPtr(),
+                    rid,
+                    oldObj,
+                    newObj,
+                    diff.has_value() ? &*diff : collection_internal::kUpdateAllIndexes,
+                    &indexesAffected,
+                    &CurOp::get(opCtx)->debug(),
+                    &args);
+                tassert(8375907,
+                        "Old and new snapshot ids must not change after update",
+                        oldObj.snapshotId() ==
+                            shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
+                wunit.commit();
+            }
+            _stats->incDocsUpdated(1);  // explains are also treated as though they wrote
+        }
+
+        // The general-purpose update stage tracks records ids of all updated documents so that it
+        // can avoid the Halloween problem, but that is not necessary for this stage, because it
+        // never writes more than one document.
+
+        return newObj;
+    }
+
+private:
+    UpdateDriver* _updateDriver;
+    const UpdateRequest::ReturnDocOption _returnDocs;
+    const std::vector<StmtId> _stmtIds;
+    const OptionalBool _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
+    const bool _isUserInitiatedWrite;
+    const bool _isExplain;
+    const bool _isMulti;
+    const OperationSource _source;
+    const boost::optional<UUID> _sampleId;
+
+    WriteOperationStats* _stats;
+};
+class NoWriteOperation {
+public:
+    static constexpr StringData name = "nowriteop"_sd;
+
+    void open(WriteOperationStats*) {}
+
+    template <class Continuation, class CollectionType>
+    PlanProgress write(OperationContext*,
+                       const CollectionType&,
+                       const ExceptionRecoveryPolicy& exceptionRecoveryPolicy,
+                       const RecordId&,
+                       Snapshotted<BSONObj> obj,
+                       bool,
+                       Continuation continuation) {
+        // Great job writing everyone! Let's grab an early lunch.
+        return continuation(std::move(obj.value()));
+    }
+};
 
 class IdentityProjection {};
 
@@ -466,41 +1118,66 @@ auto applyProjection(const projection_ast::Projection* projection,
  * Each stage has multiple implementations which are specified as template parameters. Optional
  * stages can be disabled by specifying a no-op implementation.
  */
-template <class IteratorChoice, class ShardFilterChoice, class ProjectionChoice>
+template <class IteratorChoice,
+          class WriteOperationChoice,
+          class ShardFilterChoice,
+          class ProjectionChoice>
 class ExpressPlan {
 public:
-    ExpressPlan(IteratorChoice iterator, ShardFilterChoice shardFilter, ProjectionChoice projection)
+    using CollectionType = typename IteratorChoice::CollectionTypeChoice;
+
+    ExpressPlan(IteratorChoice iterator,
+                WriteOperationChoice writeOperation,
+                ShardFilterChoice shardFilter,
+                ProjectionChoice projection)
         : _iterator(std::move(iterator)),
+          _writeOperation(std::move(writeOperation)),
           _shardFilter(std::move(shardFilter)),
           _projection(std::move(projection)) {}
 
     void open(OperationContext* opCtx,
-              const CollectionPtr* collection,
+              CollectionType collection,
+              const ExceptionRecoveryPolicy* exceptionRecoveryPolicy,
               PlanStats* planStats,
-              IteratorStats* iteratorStats) {
+              IteratorStats* iteratorStats,
+              WriteOperationStats* writeOperationStats) {
         _planStats = planStats;
         _iterator.open(opCtx, collection, iteratorStats);
+        _exceptionRecoveryPolicy = exceptionRecoveryPolicy;
+        _writeOperation.open(writeOperationStats);
     }
 
     template <class Continuation>
     PlanProgress proceed(OperationContext* opCtx, Continuation continuation) {
         return _iterator.consumeOne(
-            opCtx, [&](const CollectionPtr& collection, RecordId rid, Snapshotted<BSONObj> obj) {
+            opCtx, [&](const auto& collection, RecordId rid, Snapshotted<BSONObj> obj) {
                 // Continue execution with one (rid, obj) pair from the iterator.
-                return applyShardFilter(  //
+                return applyShardFilter(
                     _shardFilter,
                     obj,
-                    collection->ns(),
+                    accessCollection(collection).ns(),
+                    _writeOperation.name,
                     [&](bool shouldWriteToOrphan) {
                         // Continue execution when the document is accepted by the filter.
-                        return applyProjection(  //
-                            _projection,
-                            std::move(obj.value()),
-                            [&](BSONObj projectionResult) {
-                                // Continue execution with the result of applying the
-                                // projection.
-                                _planStats->incNumResults(1);
-                                return continuation(std::move(rid), std::move(projectionResult));
+                        return _writeOperation.write(
+                            opCtx,
+                            collection,
+                            *_exceptionRecoveryPolicy,
+                            rid,
+                            std::move(obj),
+                            shouldWriteToOrphan,
+                            [&](BSONObj outObj) {
+                                // Continue execution after the write
+                                // operation succeeds.
+                                return applyProjection(
+                                    _projection, std::move(outObj), [&](BSONObj projectionResult) {
+                                        // Continue execution with the
+                                        // result of applying the
+                                        // projection.
+                                        _planStats->incNumResults(1);
+                                        return continuation(std::move(rid),
+                                                            std::move(projectionResult));
+                                    });
                             });
                     });
             });
@@ -508,10 +1185,20 @@ public:
 
     void releaseResources() {
         _iterator.releaseResources();
+        releaseShardFilterResources(_shardFilter);
     }
 
     void restoreResources(OperationContext* opCtx, const CollectionPtr* collection) {
         _iterator.restoreResources(opCtx, collection);
+        restoreShardFilterResources(_shardFilter);
+    }
+
+    template <class Callable>
+    void temporarilyReleaseResourcesAndYield(OperationContext* opCtx,
+                                             Callable whileYieldedCallback) {
+        releaseShardFilterResources(_shardFilter);
+        _iterator.temporarilyReleaseResourcesAndYield(opCtx, std::move(whileYieldedCallback));
+        restoreShardFilterResources(_shardFilter);
     }
 
     bool exhausted() const {
@@ -520,8 +1207,10 @@ public:
 
 private:
     IteratorChoice _iterator;
+    WriteOperationChoice _writeOperation;
     ShardFilterChoice _shardFilter;
     ProjectionChoice _projection;
+    const ExceptionRecoveryPolicy* _exceptionRecoveryPolicy{nullptr};
 
     PlanStats* _planStats{nullptr};
 };
