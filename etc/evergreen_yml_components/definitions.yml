@@ -2513,6 +2513,12 @@ functions:
       args:
       - "./src/evergreen/external_auth_oidc_teardown.sh"
 
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/sasl_windows_cyrussasl_teardown.sh"
+
   "do scons setup":
   - command: manifest.load
   - *f_expansions_write

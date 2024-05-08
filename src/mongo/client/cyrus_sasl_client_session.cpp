@@ -124,6 +124,28 @@ int saslClientLogSwallow(void* context, int priority, const char* message) noexc
 }
 
 /**
+ * Implements the Cyrus SASL default_verifyfile_cb interface registered in the
+ * Cyrus SASL library to verify, and then accept or reject, the loading of
+ * plugin libraries from the target directory.
+ *
+ * On Windows environments, disable loading of plugin files.
+ */
+int saslClientVerifyPluginFile(void*, const char*, sasl_verify_type_t type) {
+
+    if (type != SASL_VRFY_PLUGIN) {
+        return SASL_OK;
+    }
+
+#ifdef _WIN32
+    return SASL_CONTINUE;  // A non-SASL_OK response indicates to Cyrus SASL that it
+                           // should not load a file. This effectively disables
+                           // loading plugins from path on Windows.
+#else
+    return SASL_OK;
+#endif
+}
+
+/**
  * Initializes the client half of the SASL library, but is effectively a no-op if the client
  * application has already done it.
  *
@@ -139,6 +161,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
 (InitializerContext* context) {
     static sasl_callback_t saslClientGlobalCallbacks[] = {
         {SASL_CB_LOG, SaslCallbackFn(saslClientLogSwallow), nullptr /* context */},
+        {SASL_CB_VERIFYFILE, SaslCallbackFn(saslClientVerifyPluginFile), nullptr /*context*/},
         {SASL_CB_LIST_END}};
 
     // If the client application has previously called sasl_client_init(), the callbacks passed
