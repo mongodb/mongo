@@ -708,6 +708,33 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsMultipleOperationKeys) {
     ASSERT(cursors.find(cursor2) != cursors.end());
 }
 
+TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsSameOperationKey) {
+    auto opKey = UUID::gen();
+
+    auto opCtx = _queryServiceContext->makeOperationContext();
+    opCtx->setOperationKey(opKey);
+    auto cursor1 = makeCursor(opCtx.get()).getCursor()->cursorid();
+    auto cursor2 = makeCursor(opCtx.get()).getCursor()->cursorid();
+
+    // Retrieve cursors for operation key - should be both cursors.
+    auto cursors = useCursorManager()->getCursorsForOpKeys({opKey});
+    ASSERT_EQ(cursors.size(), size_t(2));
+    ASSERT(cursors.find(cursor1) != cursors.end());
+    ASSERT(cursors.find(cursor2) != cursors.end());
+
+    // Now delete first one. The other should remain.
+    ASSERT_OK(useCursorManager()->killCursor(opCtx.get(), cursor1));
+    cursors = useCursorManager()->getCursorsForOpKeys({opKey});
+    ASSERT_EQ(cursors.size(), size_t(1));
+    ASSERT(cursors.find(cursor1) == cursors.end());
+    ASSERT(cursors.find(cursor2) != cursors.end());
+
+    // Now delete the other. None should remain.
+    ASSERT_OK(useCursorManager()->killCursor(opCtx.get(), cursor2));
+    cursors = useCursorManager()->getCursorsForOpKeys({opKey});
+    ASSERT_EQ(cursors.size(), size_t(0));
+}
+
 TEST_F(CursorManagerTestCustomOpCtx, TimedOutCursorShouldNotBeReturnedForOpKeyLookup) {
     auto opKey = UUID::gen();
     auto opCtx = _queryServiceContext->makeOperationContext();
