@@ -48,7 +48,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/simple8b_builder.h"
 #include "mongo/platform/int128.h"
-#include "mongo/util/tracking_allocator.h"
 
 namespace mongo {
 namespace bsoncolumn {
@@ -537,8 +536,5 @@ private:
 
     int _numInterleavedStartWritten = 0;
 };
-
-// TODO (SERVER-87887): Remove typedef.
-using TrackedBSONColumnBuilder = BSONColumnBuilder<TrackingAllocator<void>>;
 
 }  // namespace mongo

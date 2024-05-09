@@ -54,6 +54,7 @@
 #include "mongo/bson/util/simple8b_type_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/tracking_allocator.h"
 
 namespace mongo {
 using namespace bsoncolumn;

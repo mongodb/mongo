@@ -81,8 +81,8 @@ public:
         // platforms/implementations so we cannot check the exact memory usage in an platform
         // independent way. But we make sure that the memory usage is 0 when all these are torn down
         // to ensure there's no memory tracking leaks after moving.
-        TrackedBSONColumnBuilder moveContructBuilder{std::move(cb)};
-        TrackedBSONColumnBuilder moveAssignBuilder{
+        BSONColumnBuilder<TrackingAllocator<void>> moveContructBuilder{std::move(cb)};
+        BSONColumnBuilder<TrackingAllocator<void>> moveAssignBuilder{
             trackingContextChecker.trackingContext.makeAllocator<void>()};
         moveAssignBuilder = std::move(moveContructBuilder);
     }
@@ -1074,9 +1074,10 @@ protected:
         TrackingContext trackingContext;
     };
 
-    // Needs to be defined first so it is destroyed after TrackedBSONColumnBuilder
+    // Needs to be defined first so it is destroyed after BSONColumnBuilder
     TrackingContextChecker trackingContextChecker;
-    TrackedBSONColumnBuilder cb{trackingContextChecker.trackingContext.makeAllocator<void>()};
+    BSONColumnBuilder<TrackingAllocator<void>> cb{
+        trackingContextChecker.trackingContext.makeAllocator<void>()};
 
 private:
     std::forward_list<BSONObj> _elementMemory;

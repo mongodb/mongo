@@ -91,7 +91,8 @@ struct BucketDocument {
  *     d(ata):   BinData    // Binary data to copy to existing BSONColumn
  * }
  */
-BSONObj makeBSONColumnDocDiff(const TrackedBSONColumnBuilder::BinaryDiff& binaryDiff);
+BSONObj makeBSONColumnDocDiff(
+    const BSONColumnBuilder<TrackingAllocator<void>>::BinaryDiff& binaryDiff);
 
 /**
  * Returns the document for writing a new bucket with a write batch.

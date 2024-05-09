@@ -70,8 +70,8 @@ public:
      * Calls BSONColumnBuilder::intermediate() for all builders. Updates the compressed size both
      * internally as well as the one passed in.
      */
-    std::vector<std::pair<StringData, TrackedBSONColumnBuilder::BinaryDiff>> intermediate(
-        int32_t& compressedSizeDelta);
+    std::vector<std::pair<StringData, BSONColumnBuilder<TrackingAllocator<void>>::BinaryDiff>>
+    intermediate(int32_t& compressedSizeDelta);
 
     /**
      * Returns the timestamp of the last measurement in the time column.
@@ -89,10 +89,12 @@ private:
      */
     void _fillSkipsInMissingFields(const std::set<StringData>& fieldsSeen);
 
-    void _insertNewKey(StringData key, const BSONElement& elem, TrackedBSONColumnBuilder builder);
+    void _insertNewKey(StringData key,
+                       const BSONElement& elem,
+                       BSONColumnBuilder<TrackingAllocator<void>> builder);
 
     std::reference_wrapper<TrackingContext> _trackingContext;
-    TrackedStringMap<TrackedBSONColumnBuilder> _builders;
+    TrackedStringMap<BSONColumnBuilder<TrackingAllocator<void>>> _builders;
     size_t _measurementCount{0};
 
     // The size of the compressed binary data across all builders since the last call to

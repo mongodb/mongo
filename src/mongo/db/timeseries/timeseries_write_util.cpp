@@ -748,7 +748,9 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
 BSONObj makeTimeseriesInsertCompressedBucketDocument(
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
     const BSONObj& metadata,
-    const std::vector<std::pair<StringData, TrackedBSONColumnBuilder::BinaryDiff>>& intermediates) {
+    const std::vector<
+        std::pair<StringData, BSONColumnBuilder<TrackingAllocator<void>>::BinaryDiff>>&
+        intermediates) {
     BSONObjBuilder insertBuilder;
     insertBuilder.append(kBucketIdFieldName, batch->bucketHandle.bucketId.oid);
 
@@ -835,7 +837,8 @@ void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
             bucketsColl->getTimeseriesOptions());
 }
 
-BSONObj makeBSONColumnDocDiff(const TrackedBSONColumnBuilder::BinaryDiff& binaryDiff) {
+BSONObj makeBSONColumnDocDiff(
+    const BSONColumnBuilder<TrackingAllocator<void>>::BinaryDiff& binaryDiff) {
     return BSON(
         "o" << binaryDiff.offset() << "d"
             << BSONBinData(binaryDiff.data(), binaryDiff.size(), BinDataType::BinDataGeneral));
