@@ -126,7 +126,11 @@ void WatchdogPeriodicThread::shutdown() {
 
     thread.join();
 
-    _state = State::kDone;
+    {
+        stdx::lock_guard<Latch> lock(_mutex);
+        invariant(_state == State::kShutdownRequested);
+        _state = State::kDone;
+    }
 }
 
 void WatchdogPeriodicThread::setPeriod(Milliseconds period) {
@@ -422,7 +426,11 @@ void WatchdogMonitor::shutdown() {
 
     _watchdogCheckThread.shutdown();
 
-    _state = State::kDone;
+    {
+        stdx::lock_guard<Latch> lock(_mutex);
+        invariant(_state == State::kShutdownRequested);
+        _state = State::kDone;
+    }
 }
 
 std::int64_t WatchdogMonitor::getCheckGeneration() {
