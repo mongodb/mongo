@@ -36,69 +36,6 @@
 
 namespace mongo {
 
-template <class T>
-class Tracked {
-public:
-    Tracked(TrackingAllocatorStats& stats, T obj) : _stats(stats), _obj(std::move(obj)) {
-        _stats.get().bytesAllocated(_obj.allocated());
-    }
-
-    Tracked(T obj, TrackingAllocator<void> allocator)
-        : Tracked(allocator.getStats(), std::move(obj)) {}
-
-    Tracked(Tracked& other) = delete;
-    Tracked(Tracked&& other) : _stats(other._stats), _obj(std::move(other._obj)) {
-        invariant(other._obj.allocated() == 0);
-    }
-
-    Tracked& operator=(Tracked& other) = delete;
-    Tracked& operator=(Tracked&& other) {
-        if (&other == this) {
-            return *this;
-        }
-
-        _stats.get().bytesDeallocated(_obj.allocated());
-        _stats = other._stats;
-        _obj = std::move(other._obj);
-        invariant(other._obj.allocated() == 0);
-
-        return *this;
-    }
-
-    ~Tracked() {
-        _stats.get().bytesDeallocated(_obj.allocated());
-    }
-
-    T& get() {
-        return _obj;
-    }
-
-    const T& get() const {
-        return _obj;
-    }
-
-private:
-    std::reference_wrapper<TrackingAllocatorStats> _stats;
-    T _obj;
-};
-
-template <class T>
-class Untracked {
-public:
-    Untracked(T obj, std::allocator<void> = {}) : _obj(std::move(obj)) {}
-
-    T& get() {
-        return _obj;
-    }
-
-    const T& get() const {
-        return _obj;
-    }
-
-private:
-    T _obj;
-};
-
 /**
  * A TrackingContext is a factory style class that constructs TrackingAllocator objects under a
  * single instance of TrackingAllocatorStats and provides access to these stats.
@@ -107,11 +44,6 @@ class TrackingContext {
 public:
     TrackingContext() = default;
     ~TrackingContext() = default;
-
-    template <class T>
-    Tracked<T> makeTracked(T obj) {
-        return {_stats, std::move(obj)};
-    }
 
     template <class T>
     TrackingAllocator<T> makeAllocator() {
