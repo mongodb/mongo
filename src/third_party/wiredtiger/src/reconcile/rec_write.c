@@ -165,13 +165,13 @@ __reconcile_post_wrapup(
 
     /* Update statistics. */
     WT_STAT_CONN_INCR(session, rec_pages);
-    WT_STAT_DATA_INCR(session, rec_pages);
+    WT_STAT_DSRC_INCR(session, rec_pages);
     if (LF_ISSET(WT_REC_EVICT))
-        WT_STAT_CONN_DATA_INCR(session, rec_pages_eviction);
+        WT_STAT_CONN_DSRC_INCR(session, rec_pages_eviction);
     if (r->cache_write_hs)
-        WT_STAT_CONN_DATA_INCR(session, cache_write_hs);
+        WT_STAT_CONN_DSRC_INCR(session, cache_write_hs);
     if (r->cache_write_restore)
-        WT_STAT_CONN_DATA_INCR(session, cache_write_restore);
+        WT_STAT_CONN_DSRC_INCR(session, cache_write_restore);
     if (!WT_IS_HS(btree->dhandle)) {
         if (r->rec_page_cell_with_txn_id)
             WT_STAT_CONN_INCR(session, rec_pages_with_txn);
@@ -300,7 +300,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
         if (F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
             F_SET(session->txn, WT_TXN_REFRESH_SNAPSHOT);
 
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_no_progress);
+        WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_no_progress);
         ret = __wt_set_return(session, EBUSY);
     }
     addr = ref->addr;
@@ -1334,7 +1334,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ITEM *key,
     for (cnt = 1; len > 0; ++cnt, --len, ++pa, ++pb)
         if (*pa != *pb) {
             if (size != cnt) {
-                WT_STAT_DATA_INCRV(session, rec_suffix_compression, size - cnt);
+                WT_STAT_DSRC_INCRV(session, rec_suffix_compression, size - cnt);
                 size = cnt;
             }
             break;
@@ -2054,7 +2054,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk
      * unless we're the checkpoint thread. Big pages take a lot of writes, avoid wasting work.
      */
     if (!last_block && WT_BTREE_SYNCING(btree) && !WT_SESSION_BTREE_SYNC(session)) {
-        WT_STAT_CONN_DATA_INCR(
+        WT_STAT_CONN_DSRC_INCR(
           session, cache_eviction_blocked_multi_block_reconcilation_during_checkpoint);
         return (__wt_set_return(session, EBUSY));
     }
@@ -2503,7 +2503,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
     switch (r->multi_next) {
     case 0: /* Page delete */
-        WT_STAT_CONN_DATA_INCR(session, rec_page_delete);
+        WT_STAT_CONN_DSRC_INCR(session, rec_page_delete);
 
         /*
          * If this is the root page, we need to create a sync point. For a page to be empty, it has
@@ -2563,9 +2563,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         break;
     default: /* Page split */
         if (WT_PAGE_IS_INTERNAL(page))
-            WT_STAT_DATA_INCR(session, rec_multiblock_internal);
+            WT_STAT_DSRC_INCR(session, rec_multiblock_internal);
         else
-            WT_STAT_DATA_INCR(session, rec_multiblock_leaf);
+            WT_STAT_DSRC_INCR(session, rec_multiblock_leaf);
 
         /* Optionally display the actual split keys in verbose mode. */
         if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_SPLIT, WT_VERBOSE_DEBUG_2))
@@ -2821,7 +2821,7 @@ __wt_rec_hs_clear_on_tombstone(
         return (EBUSY);
 
     WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
-    WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
+    WT_STAT_DSRC_INCR(session, cache_hs_key_truncate_onpage_removal);
 
     return (0);
 }

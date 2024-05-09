@@ -436,7 +436,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
           "Out of order history store updates detected");
 
         if (hs_stop_durable_ts < newer_hs_durable_ts)
-            WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_stop_older_than_newer_start);
+            WT_STAT_CONN_DSRC_INCR(session, txn_rts_hs_stop_older_than_newer_start);
 
         /*
          * Validate the timestamps in the key and the cell are same. This must be validated only
@@ -854,9 +854,9 @@ __rts_btree_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
              * on-disk value is actually stable.
              */
             if (unpack.type == WT_CELL_DEL)
-                WT_STAT_CONN_DATA_INCR(session, txn_rts_delete_rle_skipped);
+                WT_STAT_CONN_DSRC_INCR(session, txn_rts_delete_rle_skipped);
             else if (stable_updates_count == rle)
-                WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
+                WT_STAT_CONN_DSRC_INCR(session, txn_rts_stable_rle_skipped);
             else {
                 j = 0;
                 if (inshead != NULL) {
@@ -871,7 +871,7 @@ __rts_btree_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
                             /* We can stop right away if the on-disk version is stable. */
                             if (is_ondisk_stable) {
                                 if (rle > 1)
-                                    WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
+                                    WT_STAT_CONN_DSRC_INCR(session, txn_rts_stable_rle_skipped);
                                 goto stop;
                             }
                             j++;
@@ -889,7 +889,7 @@ __rts_btree_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
                     /* We can stop right away if the on-disk version is stable. */
                     if (is_ondisk_stable) {
                         if (rle > 1)
-                            WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
+                            WT_STAT_CONN_DSRC_INCR(session, txn_rts_stable_rle_skipped);
                         goto stop;
                     }
                     j++;

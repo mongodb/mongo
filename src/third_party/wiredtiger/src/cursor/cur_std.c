@@ -751,7 +751,7 @@ __wt_cursor_cache(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
 
     (void)__wt_atomic_sub32(&S2C(session)->open_cursor_count, 1);
     WT_STAT_CONN_INCR_ATOMIC(session, cursor_cached_count);
-    WT_STAT_DATA_DECR(session, cursor_open_count);
+    WT_STAT_DSRC_DECR(session, cursor_open_count);
     F_SET(cursor, WT_CURSTD_CACHED);
 
     /* Document the flags cleared, and set by this function */
@@ -781,7 +781,7 @@ __wt_cursor_reopen(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     }
     (void)__wt_atomic_add32(&S2C(session)->open_cursor_count, 1);
     WT_STAT_CONN_DECR_ATOMIC(session, cursor_cached_count);
-    WT_STAT_DATA_INCR(session, cursor_open_count);
+    WT_STAT_DSRC_INCR(session, cursor_open_count);
 
     bucket = cursor->uri_hash & (S2C(session)->hash_size - 1);
     TAILQ_REMOVE(&session->cursor_cache[bucket], cursor, q);
@@ -820,7 +820,7 @@ __wt_cursor_cache_release(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool *rel
      * caching fails, we'll decrement the statistics after reopening the cursor (and getting the
      * data handle back).
      */
-    WT_STAT_CONN_DATA_INCR(session, cursor_cache);
+    WT_STAT_CONN_DSRC_INCR(session, cursor_cache);
     WT_ERR(cursor->cache(cursor));
     WT_ASSERT(session, F_ISSET(cursor, WT_CURSTD_CACHED));
     *released = true;
@@ -834,7 +834,7 @@ __wt_cursor_cache_release(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool *rel
 err:
         WT_TRET(cursor->reopen(cursor, false));
         WT_ASSERT(session, !F_ISSET(cursor, WT_CURSTD_CACHED));
-        WT_STAT_CONN_DATA_DECR(session, cursor_cache);
+        WT_STAT_CONN_DSRC_DECR(session, cursor_cache);
     }
 
     return (ret);
@@ -1118,7 +1118,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
         TAILQ_REMOVE(&session->cursors, cursor, q);
 
         (void)__wt_atomic_sub32(&S2C(session)->open_cursor_count, 1);
-        WT_STAT_DATA_DECR(session, cursor_open_count);
+        WT_STAT_DSRC_DECR(session, cursor_open_count);
     }
     __wt_buf_free(session, &cursor->key);
     __wt_buf_free(session, &cursor->value);
@@ -1582,7 +1582,7 @@ __wt_cursor_init(
     /* WT_CURSTD_OPEN */
     F_SET(cursor, WT_CURSTD_OPEN);
     (void)__wt_atomic_add32(&S2C(session)->open_cursor_count, 1);
-    WT_STAT_DATA_INCR(session, cursor_open_count);
+    WT_STAT_DSRC_INCR(session, cursor_open_count);
 
     *cursorp = (cdump != NULL) ? cdump : cursor;
     return (0);

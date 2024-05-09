@@ -102,7 +102,7 @@ __wt_cursor_bound_reset(WT_CURSOR *cursor)
 
     /* Clear bounds if they are set. */
     if (WT_CURSOR_BOUNDS_SET(cursor)) {
-        WT_STAT_CONN_DATA_INCR(session, cursor_bounds_reset);
+        WT_STAT_CONN_DSRC_INCR(session, cursor_bounds_reset);
         /* Clear upper bound, and free the buffer. */
         F_CLR(cursor, WT_CURSTD_BOUND_UPPER | WT_CURSTD_BOUND_UPPER_INCLUSIVE);
         __wt_buf_free(session, &cursor->upper_bound);

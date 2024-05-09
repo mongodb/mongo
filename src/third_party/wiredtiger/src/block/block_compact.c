@@ -87,13 +87,13 @@ __wt_block_compact_get_progress_stats(
     block = bm->block;
     *pages_reviewedp = block->compact_pages_reviewed;
 
-    WT_STAT_DATA_SET(
+    WT_STAT_DSRC_SET(
       session, btree_compact_bytes_rewritten_expected, block->compact_bytes_rewritten_expected);
-    WT_STAT_DATA_SET(session, btree_compact_pages_reviewed, block->compact_pages_reviewed);
-    WT_STAT_DATA_SET(session, btree_compact_pages_rewritten, block->compact_pages_rewritten);
-    WT_STAT_DATA_SET(
+    WT_STAT_DSRC_SET(session, btree_compact_pages_reviewed, block->compact_pages_reviewed);
+    WT_STAT_DSRC_SET(session, btree_compact_pages_rewritten, block->compact_pages_rewritten);
+    WT_STAT_DSRC_SET(
       session, btree_compact_pages_rewritten_expected, block->compact_pages_rewritten_expected);
-    WT_STAT_DATA_SET(session, btree_compact_pages_skipped, block->compact_pages_skipped);
+    WT_STAT_DSRC_SET(session, btree_compact_pages_skipped, block->compact_pages_skipped);
 }
 
 /*

@@ -321,7 +321,7 @@ __wt_compact(WT_SESSION_IMPL *session)
     bm = S2BT(session)->bm;
     ref = NULL;
 
-    WT_STAT_DATA_INCR(session, session_compact);
+    WT_STAT_DSRC_INCR(session, session_compact);
 
     /*
      * Check if compaction might be useful (the API layer will quit trying to compact the data
@@ -330,7 +330,7 @@ __wt_compact(WT_SESSION_IMPL *session)
     WT_RET(bm->compact_skip(bm, session, &skip));
     if (skip) {
         WT_STAT_CONN_INCR(session, session_table_compact_skipped);
-        WT_STAT_DATA_INCR(session, btree_compact_skipped);
+        WT_STAT_DSRC_INCR(session, btree_compact_skipped);
 
         /*
          * Print the "skipping compaction" message only if this is the first time we are working on

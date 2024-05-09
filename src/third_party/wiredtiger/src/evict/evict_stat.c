@@ -92,28 +92,28 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
         }
     }
 
-    WT_STAT_DATA_SET(
+    WT_STAT_DSRC_SET(
       session, cache_state_gen_avg_gap, visited_count == 0 ? 0 : gen_gap_sum / visited_count);
-    WT_STAT_DATA_SET(session, cache_state_avg_unvisited_age,
+    WT_STAT_DSRC_SET(session, cache_state_avg_unvisited_age,
       unvisited_count == 0 ? 0 : unvisited_age_gap_sum / unvisited_count);
-    WT_STAT_DATA_SET(session, cache_state_avg_visited_age,
+    WT_STAT_DSRC_SET(session, cache_state_avg_visited_age,
       visited_count == 0 ? 0 : visited_age_gap_sum / visited_count);
-    WT_STAT_DATA_SET(session, cache_state_avg_written_size,
+    WT_STAT_DSRC_SET(session, cache_state_avg_written_size,
       written_size_cnt == 0 ? 0 : written_size_sum / written_size_cnt);
-    WT_STAT_DATA_SET(session, cache_state_gen_max_gap, gen_gap_max);
-    WT_STAT_DATA_SET(session, cache_state_max_pagesize, max_pagesize);
-    WT_STAT_DATA_SET(session, cache_state_min_written_size, min_written_size);
-    WT_STAT_DATA_SET(session, cache_state_memory, num_memory);
-    WT_STAT_DATA_SET(session, cache_state_queued, num_queued);
-    WT_STAT_DATA_SET(session, cache_state_not_queueable, num_not_queueable);
-    WT_STAT_DATA_SET(session, cache_state_pages, walk_count);
-    WT_STAT_DATA_SET(session, cache_state_pages_clean, pages_clean);
-    WT_STAT_DATA_SET(session, cache_state_pages_dirty, pages_dirty);
-    WT_STAT_DATA_SET(session, cache_state_pages_internal, pages_internal);
-    WT_STAT_DATA_SET(session, cache_state_pages_leaf, pages_leaf);
-    WT_STAT_DATA_SET(session, cache_state_refs_skipped, walk_count - seen_count);
-    WT_STAT_DATA_SET(session, cache_state_smaller_alloc_size, num_smaller_allocsz);
-    WT_STAT_DATA_SET(session, cache_state_unvisited_count, unvisited_count);
+    WT_STAT_DSRC_SET(session, cache_state_gen_max_gap, gen_gap_max);
+    WT_STAT_DSRC_SET(session, cache_state_max_pagesize, max_pagesize);
+    WT_STAT_DSRC_SET(session, cache_state_min_written_size, min_written_size);
+    WT_STAT_DSRC_SET(session, cache_state_memory, num_memory);
+    WT_STAT_DSRC_SET(session, cache_state_queued, num_queued);
+    WT_STAT_DSRC_SET(session, cache_state_not_queueable, num_not_queueable);
+    WT_STAT_DSRC_SET(session, cache_state_pages, walk_count);
+    WT_STAT_DSRC_SET(session, cache_state_pages_clean, pages_clean);
+    WT_STAT_DSRC_SET(session, cache_state_pages_dirty, pages_dirty);
+    WT_STAT_DSRC_SET(session, cache_state_pages_internal, pages_internal);
+    WT_STAT_DSRC_SET(session, cache_state_pages_leaf, pages_leaf);
+    WT_STAT_DSRC_SET(session, cache_state_refs_skipped, walk_count - seen_count);
+    WT_STAT_DSRC_SET(session, cache_state_smaller_alloc_size, num_smaller_allocsz);
+    WT_STAT_DSRC_SET(session, cache_state_unvisited_count, unvisited_count);
 }
 
 /*
@@ -131,13 +131,13 @@ __wt_curstat_cache_walk(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     /* Set statistics that don't require walking the cache. */
-    WT_STAT_DATA_SET(
+    WT_STAT_DSRC_SET(
       session, cache_state_gen_current, __wt_atomic_load64(&conn->cache->evict_pass_gen));
 
     /* Root page statistics */
     root_idx = WT_INTL_INDEX_GET_SAFE(btree->root.page);
-    WT_STAT_DATA_SET(session, cache_state_root_entries, root_idx->entries);
-    WT_STAT_DATA_SET(session, cache_state_root_size, btree->root.page->memory_footprint);
+    WT_STAT_DSRC_SET(session, cache_state_root_entries, root_idx->entries);
+    WT_STAT_DSRC_SET(session, cache_state_root_size, btree->root.page->memory_footprint);
 
     __evict_stat_walk(session);
 }

@@ -20,7 +20,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
     u_int i;
 
     WT_RET(__wt_schema_get_table(session, uri, strlen(uri), false, 0, &table));
-    WT_STAT_DATA_INCR(session, cursor_truncate);
+    WT_STAT_DSRC_INCR(session, cursor_truncate);
 
     /* Truncate the column groups. */
     for (i = 0; i < WT_COLGROUPS(table); i++)
@@ -47,7 +47,7 @@ __truncate_tiered(WT_SESSION_IMPL *session, const char *uri)
 
     WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
 
-    WT_STAT_DATA_INCR(session, cursor_truncate);
+    WT_STAT_DSRC_INCR(session, cursor_truncate);
 
     WT_WITHOUT_DHANDLE(session, ret = __wt_session_range_truncate(session, uri, NULL, NULL));
     WT_ERR(ret);
@@ -75,7 +75,7 @@ __truncate_dsrc(WT_SESSION_IMPL *session, const char *uri)
     while ((ret = cursor->next(cursor)) == 0)
         WT_ERR(cursor->remove(cursor));
     WT_ERR_NOTFOUND_OK(ret, false);
-    WT_STAT_DATA_INCR(session, cursor_truncate);
+    WT_STAT_DSRC_INCR(session, cursor_truncate);
 
 err:
     WT_TRET(cursor->close(cursor));

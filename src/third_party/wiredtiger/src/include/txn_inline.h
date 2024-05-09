@@ -1169,7 +1169,7 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
              * exist. That solution needs further exploration.
              */
             if (prepare_state == WT_PREPARE_RESOLVED)
-                WT_STAT_CONN_DATA_INCR(session, txn_read_race_prepare_commit);
+                WT_STAT_CONN_DSRC_INCR(session, txn_read_race_prepare_commit);
             continue;
         }
 
@@ -1377,7 +1377,7 @@ retry:
             prepare_retry = false;
             /* Clean out any stale value before performing the retry. */
             __wt_upd_value_clear(cbt->upd_value);
-            WT_STAT_CONN_DATA_INCR(session, txn_read_race_prepare_update);
+            WT_STAT_CONN_DSRC_INCR(session, txn_read_race_prepare_update);
 
             /*
              * When a prepared update/insert is rollback or committed, retrying it again should fix
@@ -1707,7 +1707,7 @@ __txn_modify_block(
             __wt_verbose_debug1(session, WT_VERB_TRANSACTION, "%s", (const char *)buf->data);
         }
 
-        WT_STAT_CONN_DATA_INCR(session, txn_update_conflict);
+        WT_STAT_CONN_DSRC_INCR(session, txn_update_conflict);
         ret = __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_CONFLICT);
     }
 

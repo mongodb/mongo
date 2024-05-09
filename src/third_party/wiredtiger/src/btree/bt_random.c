@@ -362,7 +362,7 @@ __random_root_inmem_ref(
     WT_ASSERT(session, __wt_ref_is_root(current));
 
     WT_STAT_CONN_INCR(session, cache_eviction_random_sample_inmem_root);
-    WT_STAT_DATA_INCR(session, cache_eviction_random_sample_inmem_root);
+    WT_STAT_DSRC_INCR(session, cache_eviction_random_sample_inmem_root);
 
     WT_INTL_FOREACH_BEGIN (session, current->page, ref)
         if (WT_REF_GET_STATE(ref) == WT_REF_MEM) {
@@ -530,7 +530,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
     if (btree->type != BTREE_ROW)
         WT_RET_MSG(session, ENOTSUP, "WT_CURSOR.next_random only supported by row-store tables");
 
-    WT_STAT_CONN_DATA_INCR(session, cursor_next);
+    WT_STAT_CONN_DSRC_INCR(session, cursor_next);
 
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 

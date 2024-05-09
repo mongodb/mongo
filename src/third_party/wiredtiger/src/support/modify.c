@@ -115,9 +115,9 @@ __wt_modify_pack(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries, WT_ITEM **
     /*
      * Update statistics. This is the common path called by WT_CURSOR::modify implementations.
      */
-    WT_STAT_CONN_DATA_INCR(session, cursor_modify);
-    WT_STAT_CONN_DATA_INCRV(session, cursor_modify_bytes, cursor->value.size);
-    WT_STAT_CONN_DATA_INCRV(session, cursor_modify_bytes_touch, diffsz);
+    WT_STAT_CONN_DSRC_INCR(session, cursor_modify);
+    WT_STAT_CONN_DSRC_INCRV(session, cursor_modify_bytes, cursor->value.size);
+    WT_STAT_CONN_DSRC_INCRV(session, cursor_modify_bytes_touch, diffsz);
 
     return (0);
 }

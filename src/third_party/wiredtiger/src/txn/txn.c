@@ -2482,7 +2482,7 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
     stats = conn->stats;
     checkpoint_pinned = __wt_atomic_loadv64(&txn_global->checkpoint_txn_shared.pinned_id);
 
-    WT_STAT_SET(session, stats, txn_pinned_range,
+    WT_STATP_CONN_SET(session, stats, txn_pinned_range,
       __wt_atomic_loadv64(&txn_global->current) - __wt_atomic_loadv64(&txn_global->oldest_id));
 
     checkpoint_timestamp = txn_global->checkpoint_timestamp;
@@ -2490,44 +2490,45 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
     pinned_timestamp = txn_global->pinned_timestamp;
     if (checkpoint_timestamp != WT_TS_NONE && checkpoint_timestamp < pinned_timestamp)
         pinned_timestamp = checkpoint_timestamp;
-    WT_STAT_SET(session, stats, txn_pinned_timestamp, durable_timestamp - pinned_timestamp);
-    WT_STAT_SET(
+    WT_STATP_CONN_SET(session, stats, txn_pinned_timestamp, durable_timestamp - pinned_timestamp);
+    WT_STATP_CONN_SET(
       session, stats, txn_pinned_timestamp_checkpoint, durable_timestamp - checkpoint_timestamp);
-    WT_STAT_SET(session, stats, txn_pinned_timestamp_oldest,
+    WT_STATP_CONN_SET(session, stats, txn_pinned_timestamp_oldest,
       durable_timestamp - txn_global->oldest_timestamp);
 
     __wt_txn_get_pinned_timestamp(session, &oldest_active_read_timestamp, 0);
     if (oldest_active_read_timestamp == 0) {
-        WT_STAT_SET(session, stats, txn_timestamp_oldest_active_read, 0);
-        WT_STAT_SET(session, stats, txn_pinned_timestamp_reader, 0);
+        WT_STATP_CONN_SET(session, stats, txn_timestamp_oldest_active_read, 0);
+        WT_STATP_CONN_SET(session, stats, txn_pinned_timestamp_reader, 0);
     } else {
-        WT_STAT_SET(session, stats, txn_timestamp_oldest_active_read, oldest_active_read_timestamp);
-        WT_STAT_SET(session, stats, txn_pinned_timestamp_reader,
+        WT_STATP_CONN_SET(
+          session, stats, txn_timestamp_oldest_active_read, oldest_active_read_timestamp);
+        WT_STATP_CONN_SET(session, stats, txn_pinned_timestamp_reader,
           durable_timestamp - oldest_active_read_timestamp);
     }
 
-    WT_STAT_SET(session, stats, txn_pinned_checkpoint_range,
+    WT_STATP_CONN_SET(session, stats, txn_pinned_checkpoint_range,
       checkpoint_pinned == WT_TXN_NONE ?
         0 :
         __wt_atomic_loadv64(&txn_global->current) - checkpoint_pinned);
 
-    WT_STAT_SET(session, stats, checkpoint_scrub_max, conn->ckpt_scrub_max);
+    WT_STATP_CONN_SET(session, stats, checkpoint_scrub_max, conn->ckpt_scrub_max);
     if (conn->ckpt_scrub_min != UINT64_MAX)
-        WT_STAT_SET(session, stats, checkpoint_scrub_min, conn->ckpt_scrub_min);
-    WT_STAT_SET(session, stats, checkpoint_scrub_recent, conn->ckpt_scrub_recent);
-    WT_STAT_SET(session, stats, checkpoint_scrub_total, conn->ckpt_scrub_total);
+        WT_STATP_CONN_SET(session, stats, checkpoint_scrub_min, conn->ckpt_scrub_min);
+    WT_STATP_CONN_SET(session, stats, checkpoint_scrub_recent, conn->ckpt_scrub_recent);
+    WT_STATP_CONN_SET(session, stats, checkpoint_scrub_total, conn->ckpt_scrub_total);
 
-    WT_STAT_SET(session, stats, checkpoint_prep_max, conn->ckpt_prep_max);
+    WT_STATP_CONN_SET(session, stats, checkpoint_prep_max, conn->ckpt_prep_max);
     if (conn->ckpt_prep_min != UINT64_MAX)
-        WT_STAT_SET(session, stats, checkpoint_prep_min, conn->ckpt_prep_min);
-    WT_STAT_SET(session, stats, checkpoint_prep_recent, conn->ckpt_prep_recent);
-    WT_STAT_SET(session, stats, checkpoint_prep_total, conn->ckpt_prep_total);
+        WT_STATP_CONN_SET(session, stats, checkpoint_prep_min, conn->ckpt_prep_min);
+    WT_STATP_CONN_SET(session, stats, checkpoint_prep_recent, conn->ckpt_prep_recent);
+    WT_STATP_CONN_SET(session, stats, checkpoint_prep_total, conn->ckpt_prep_total);
 
-    WT_STAT_SET(session, stats, checkpoint_time_max, conn->ckpt_time_max);
+    WT_STATP_CONN_SET(session, stats, checkpoint_time_max, conn->ckpt_time_max);
     if (conn->ckpt_time_min != UINT64_MAX)
-        WT_STAT_SET(session, stats, checkpoint_time_min, conn->ckpt_time_min);
-    WT_STAT_SET(session, stats, checkpoint_time_recent, conn->ckpt_time_recent);
-    WT_STAT_SET(session, stats, checkpoint_time_total, conn->ckpt_time_total);
+        WT_STATP_CONN_SET(session, stats, checkpoint_time_min, conn->ckpt_time_min);
+    WT_STATP_CONN_SET(session, stats, checkpoint_time_recent, conn->ckpt_time_recent);
+    WT_STATP_CONN_SET(session, stats, checkpoint_time_total, conn->ckpt_time_total);
 }
 
 /*

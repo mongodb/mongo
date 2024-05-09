@@ -79,9 +79,9 @@
 #define WT_RTS_STAT_CONN_DATA_INCR(session, stat)           \
     do {                                                    \
         if (!S2C(session)->rts->dryrun)                     \
-            WT_STAT_CONN_DATA_INCR(session, stat);          \
+            WT_STAT_CONN_DSRC_INCR(session, stat);          \
         else                                                \
-            WT_STAT_CONN_DATA_INCR(session, stat##_dryrun); \
+            WT_STAT_CONN_DSRC_INCR(session, stat##_dryrun); \
     } while (0)
 
 /*

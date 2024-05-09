@@ -748,7 +748,7 @@ __curfile_reopen_int(WT_CURSOR *cursor)
         cursor->key_format = btree->key_format;
         cursor->value_format = btree->value_format;
 
-        WT_STAT_CONN_DATA_INCR(session, cursor_reopen);
+        WT_STAT_CONN_DSRC_INCR(session, cursor_reopen);
     }
     return (ret);
 }
@@ -1069,7 +1069,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
 
     WT_ERR(__wt_cursor_init(cursor, cursor->internal_uri, owner, cfg, cursorp));
 
-    WT_STAT_CONN_DATA_INCR(session, cursor_create);
+    WT_STAT_CONN_DSRC_INCR(session, cursor_create);
 
     if (0) {
 err:

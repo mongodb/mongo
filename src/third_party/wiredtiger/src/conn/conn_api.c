@@ -2720,7 +2720,8 @@ wiredtiger_dummy_session_init(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_
     __wt_event_handler_set(session, event_handler);
 
     /* Statistics */
-    session->stat_bucket = 0;
+    session->stat_conn_bucket = 0;
+    session->stat_dsrc_bucket = 0;
 
     /*
      * Set the default session's strerror method. If one of the extensions being loaded reports an

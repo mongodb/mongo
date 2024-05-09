@@ -482,7 +482,7 @@ __curhs_prev_visible(WT_SESSION_IMPL *session, WT_CURSOR_HS *hs_cursor)
          * might have later stop times and we might need to return one of them.
          */
         if (__wt_txn_tw_stop_visible_all(session, &cbt->upd_value->tw)) {
-            WT_STAT_CONN_DATA_INCR(session, cursor_prev_hs_tombstone);
+            WT_STAT_CONN_DSRC_INCR(session, cursor_prev_hs_tombstone);
             continue;
         }
 
@@ -585,7 +585,7 @@ __curhs_next_visible(WT_SESSION_IMPL *session, WT_CURSOR_HS *hs_cursor)
          * might have later stop times and we might need to return one of them.
          */
         if (__wt_txn_tw_stop_visible_all(session, &cbt->upd_value->tw)) {
-            WT_STAT_CONN_DATA_INCR(session, cursor_next_hs_tombstone);
+            WT_STAT_CONN_DSRC_INCR(session, cursor_next_hs_tombstone);
             continue;
         }
 
@@ -665,7 +665,7 @@ __curhs_search_near_helper(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool bef
         if (cmp > 0) {
             while ((ret = cursor->prev(cursor)) == 0) {
                 WT_STAT_CONN_INCR(session, cursor_skip_hs_cur_position);
-                WT_STAT_DATA_INCR(session, cursor_skip_hs_cur_position);
+                WT_STAT_DSRC_INCR(session, cursor_skip_hs_cur_position);
                 WT_ERR(__wt_compare(session, NULL, &cursor->key, srch_key, &cmp));
                 /*
                  * Exit if we have found a key that is smaller than or equal to the specified key.
@@ -682,7 +682,7 @@ __curhs_search_near_helper(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool bef
         if (cmp < 0) {
             while ((ret = cursor->next(cursor)) == 0) {
                 WT_STAT_CONN_INCR(session, cursor_skip_hs_cur_position);
-                WT_STAT_DATA_INCR(session, cursor_skip_hs_cur_position);
+                WT_STAT_DSRC_INCR(session, cursor_skip_hs_cur_position);
                 WT_ERR(__wt_compare(session, NULL, &cursor->key, srch_key, &cmp));
                 /* Exit if we have found a key that is larger than or equal to the specified key. */
                 if (cmp >= 0)
@@ -1187,7 +1187,7 @@ __curhs_range_truncate(WT_TRUNCATE_INFO *trunc_info)
     start_file_cursor = ((WT_CURSOR_HS *)trunc_info->start)->file_cursor;
     stop_file_cursor = NULL;
 
-    WT_STAT_DATA_INCR(session, cursor_truncate);
+    WT_STAT_DSRC_INCR(session, cursor_truncate);
 
     WT_ASSERT(session, F_ISSET(start_file_cursor, WT_CURSTD_KEY_INT));
     WT_RET(__wt_cursor_localkey(start_file_cursor));

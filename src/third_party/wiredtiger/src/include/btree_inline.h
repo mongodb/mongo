@@ -1798,7 +1798,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
             if (++count < WT_MAX_SPLIT_COUNT)
                 continue;
 
-            WT_STAT_CONN_DATA_INCR(session, cache_inmem_splittable);
+            WT_STAT_CONN_DSRC_INCR(session, cache_inmem_splittable);
             return (true);
         }
 
@@ -1827,7 +1827,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
          */
         mem_split_threshold = (size_t)WT_MIN(btree->maxleafpage, btree->splitmempage);
         if (count > WT_MIN_SPLIT_COUNT && size > mem_split_threshold) {
-            WT_STAT_CONN_DATA_INCR(session, cache_inmem_splittable);
+            WT_STAT_CONN_DSRC_INCR(session, cache_inmem_splittable);
             return (true);
         }
     }
@@ -1915,7 +1915,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * transaction commits.
      */
     if (mod->inst_updates != NULL) {
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_uncommitted_truncate);
+        WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_uncommitted_truncate);
         return (false);
     }
 
@@ -1928,7 +1928,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      */
     if (__wt_btree_syncing_by_other_session(session) &&
       F_ISSET_ATOMIC_16(ref->home, WT_PAGE_INTL_OVERFLOW_KEYS)) {
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_overflow_keys);
+        WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_overflow_keys);
         return (false);
     }
 
@@ -1951,7 +1951,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * internal page already written in the checkpoint, leaving the checkpoint inconsistent.
      */
     if (modified && __wt_btree_syncing_by_other_session(session)) {
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_checkpoint);
+        WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_checkpoint);
         return (false);
     }
 
@@ -1969,14 +1969,14 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) &&
       !F_ISSET(session->dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_EXCLUSIVE) &&
       __wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen)) {
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_internal_page_split);
+        WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_internal_page_split);
         return (false);
     }
 
     /* If the metadata page is clean but has modifications that appear too new to evict, skip it. */
     if (WT_IS_METADATA(S2BT(session)->dhandle) && !modified &&
       !__wt_txn_visible_all(session, mod->rec_max_txn, mod->rec_max_timestamp)) {
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_recently_modified);
+        WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_recently_modified);
         return (false);
     }
 

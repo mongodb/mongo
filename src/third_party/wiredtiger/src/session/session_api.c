@@ -2664,10 +2664,14 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      * Cache the offset of this session's statistics bucket. It's important we pass the correct
      * session to the hash define here or we'll calculate the stat bucket with the wrong session id.
      */
-    session_ret->stat_bucket = WT_STATS_SLOT_ID(session_ret);
+    session_ret->stat_conn_bucket = WT_STATS_CONN_SLOT_ID(session_ret);
+    session_ret->stat_dsrc_bucket = WT_STATS_DSRC_SLOT_ID(session_ret);
 
     /* Safety check to make sure we're doing the right thing. */
-    WT_ASSERT(session, session_ret->stat_bucket == session_ret->id % WT_COUNTER_SLOTS);
+    WT_ASSERT(
+      session, session_ret->stat_conn_bucket == session_ret->id % WT_STAT_CONN_COUNTER_SLOTS);
+    WT_ASSERT(
+      session, session_ret->stat_dsrc_bucket == session_ret->id % WT_STAT_DSRC_COUNTER_SLOTS);
 
     /* Allocate the buffer for operation tracking */
     if (F_ISSET(conn, WT_CONN_OPTRACK)) {

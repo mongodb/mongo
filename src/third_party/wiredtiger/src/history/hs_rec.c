@@ -52,7 +52,7 @@ __hs_verbose_cache_stats(WT_SESSION_IMPL *session, WT_BTREE *btree)
           "Page reconciliation triggered history store write: file ID %" PRIu32
           ". Current history store file size: %" PRId64
           ", cache dirty: %2.3f%% , cache use: %2.3f%%",
-          btree_id, WT_STAT_READ(conn->stats, cache_hs_ondisk), pct_dirty, pct_full);
+          btree_id, WT_STAT_CONN_READ(conn->stats, cache_hs_ondisk), pct_dirty, pct_full);
     }
 
     /* Never skip updating the tracked generation */
@@ -548,7 +548,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
             WT_ERR(
               __wt_hs_delete_key(session, hs_cursor, btree->id, key, false, error_on_ts_ordering));
 
-            WT_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate);
+            WT_STAT_CONN_DSRC_INCR(session, cache_hs_key_truncate);
 
             /* Reset the update without a timestamp if it is the last update in the chain. */
             if (oldest_upd == no_ts_upd)
@@ -753,11 +753,11 @@ err:
     WT_TRET(hs_cursor->close(hs_cursor));
 
     /* Update the statistics. */
-    WT_STAT_CONN_DATA_INCRV(session, cache_hs_insert, insert_cnt);
-    WT_STAT_CONN_DATA_INCRV(session, cache_hs_insert_full_update, cache_hs_insert_full_update);
-    WT_STAT_CONN_DATA_INCRV(
+    WT_STAT_CONN_DSRC_INCRV(session, cache_hs_insert, insert_cnt);
+    WT_STAT_CONN_DSRC_INCRV(session, cache_hs_insert_full_update, cache_hs_insert_full_update);
+    WT_STAT_CONN_DSRC_INCRV(
       session, cache_hs_insert_reverse_modify, cache_hs_insert_reverse_modify);
-    WT_STAT_CONN_DATA_INCRV(session, cache_hs_write_squash, cache_hs_write_squash);
+    WT_STAT_CONN_DSRC_INCRV(session, cache_hs_write_squash, cache_hs_write_squash);
 
     return (ret);
 }
@@ -1069,10 +1069,10 @@ err:
     if (hs_insert_cursor != NULL)
         hs_insert_cursor->close(hs_insert_cursor);
 
-    WT_STAT_CONN_DATA_INCRV(
+    WT_STAT_CONN_DSRC_INCRV(
       session, cache_hs_order_lose_durable_timestamp, cache_hs_order_lose_durable_timestamp);
-    WT_STAT_CONN_DATA_INCRV(session, cache_hs_order_reinsert, cache_hs_order_reinsert);
-    WT_STAT_CONN_DATA_INCRV(session, cache_hs_order_remove, cache_hs_order_remove);
+    WT_STAT_CONN_DSRC_INCRV(session, cache_hs_order_reinsert, cache_hs_order_reinsert);
+    WT_STAT_CONN_DSRC_INCRV(session, cache_hs_order_remove, cache_hs_order_remove);
 
     return (ret);
 }

@@ -163,7 +163,7 @@ __wt_rec_dictionary_lookup(
           __wt_cell_pack_value_match((WT_CELL *)((uint8_t *)r->cur_ptr->image.mem + dp->offset),
             &val->cell, val->buf.data, &match));
         if (match) {
-            WT_STAT_DATA_INCR(session, rec_dictionary);
+            WT_STAT_DSRC_INCR(session, rec_dictionary);
             *dpp = dp;
             return (0);
         }

@@ -548,7 +548,7 @@ struct __wt_connection_impl {
     uint64_t
       rec_maximum_image_build_milliseconds; /* Maximum milliseconds building disk image took. */
     uint64_t rec_maximum_milliseconds;      /* Maximum milliseconds reconciliation took. */
-    WT_CONNECTION_STATS *stats[WT_COUNTER_SLOTS];
+    WT_CONNECTION_STATS *stats[WT_STAT_CONN_COUNTER_SLOTS];
     WT_CONNECTION_STATS *stat_array;
 
     WT_CAPACITY capacity;              /* Capacity structure */

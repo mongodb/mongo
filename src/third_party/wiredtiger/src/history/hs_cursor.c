@@ -75,7 +75,7 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
     txn_shared = WT_SESSION_TXN_SHARED(session);
     upd_found = false;
 
-    WT_STAT_CONN_DATA_INCR(session, cursor_search_hs);
+    WT_STAT_CONN_DSRC_INCR(session, cursor_search_hs);
 
     /* Row-store key is as passed to us, create the column-store key as needed. */
     WT_ASSERT(
@@ -198,7 +198,7 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
             WT_ERR(__wt_modify_apply_item(session, value_format, hs_value, mod_upd->data));
             __wt_free_update_list(session, &mod_upd);
         }
-        WT_STAT_CONN_DATA_INCR(session, cache_hs_read_squash);
+        WT_STAT_CONN_DSRC_INCR(session, cache_hs_read_squash);
     }
 
     /*
@@ -229,10 +229,10 @@ err:
 
     if (ret == 0) {
         if (upd_found)
-            WT_STAT_CONN_DATA_INCR(session, cache_hs_read);
+            WT_STAT_CONN_DSRC_INCR(session, cache_hs_read);
         else {
             upd_value->type = WT_UPDATE_INVALID;
-            WT_STAT_CONN_DATA_INCR(session, cache_hs_read_miss);
+            WT_STAT_CONN_DSRC_INCR(session, cache_hs_read_miss);
         }
     }
 

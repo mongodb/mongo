@@ -139,7 +139,7 @@ __rec_cell_build_leaf_key(
                 pfx = r->key_pfx_last;
 
             if (pfx != 0)
-                WT_STAT_DATA_INCRV(session, rec_prefix_compression, pfx);
+                WT_STAT_DSRC_INCRV(session, rec_prefix_compression, pfx);
         }
 
         /* Copy the non-prefix bytes into the key buffer. */
@@ -154,7 +154,7 @@ __rec_cell_build_leaf_key(
          * compressed.
          */
         if (pfx == 0) {
-            WT_STAT_CONN_DATA_INCR(session, rec_overflow_key_leaf);
+            WT_STAT_CONN_DSRC_INCR(session, rec_overflow_key_leaf);
 
             *is_ovflp = true;
             return (__wt_rec_cell_build_ovfl(session, r, key, WT_CELL_KEY_OVFL, NULL, 0));

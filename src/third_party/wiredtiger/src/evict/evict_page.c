@@ -41,7 +41,7 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
     if (__wt_hazard_check(session, ref, NULL) == NULL)
         return (0);
 
-    WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_hazard);
+    WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_hazard);
     return (__wt_set_return(session, EBUSY));
 }
 
@@ -135,9 +135,9 @@ __evict_stats_update(WT_SESSION_IMPL *session, uint8_t flags)
         }
 
         if (LF_ISSET(WT_EVICT_STATS_CLEAN))
-            WT_STAT_CONN_DATA_INCR(session, cache_eviction_clean);
+            WT_STAT_CONN_DSRC_INCR(session, cache_eviction_clean);
         else
-            WT_STAT_CONN_DATA_INCR(session, cache_eviction_dirty);
+            WT_STAT_CONN_DSRC_INCR(session, cache_eviction_dirty);
 
         /* Count page evictions in parallel with checkpoint. */
         if (__wt_atomic_loadvbool(&conn->txn_global.checkpoint_running))
@@ -150,7 +150,7 @@ __evict_stats_update(WT_SESSION_IMPL *session, uint8_t flags)
             WT_STAT_CONN_INCRV(session, cache_eviction_force_fail_time, eviction_time);
         }
 
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_fail);
+        WT_STAT_CONN_DSRC_INCR(session, cache_eviction_fail);
     }
     if (!session->evict_timeline.reentry_hs_eviction) {
         eviction_time_milliseconds = eviction_time / WT_THOUSAND;
@@ -285,7 +285,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
 
     /* Count evictions of internal pages during normal operation. */
     if (!closing && F_ISSET(ref, WT_REF_FLAG_INTERNAL))
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_internal);
+        WT_STAT_CONN_DSRC_INCR(session, cache_eviction_internal);
 
     /*
      * Track the largest page size seen at eviction, it tells us something about our ability to
@@ -379,10 +379,10 @@ __evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
          */
         if (ndeleted > pindex->entries / 10 && pindex->entries > 1) {
             if (S2BT(session)->type == BTREE_COL_VAR && ref == pindex->index[0])
-                WT_STAT_CONN_DATA_INCR(session, cache_reverse_splits_skipped_vlcs);
+                WT_STAT_CONN_DSRC_INCR(session, cache_reverse_splits_skipped_vlcs);
             else {
                 if ((ret = __wt_split_reverse(session, ref)) == 0) {
-                    WT_STAT_CONN_DATA_INCR(session, cache_reverse_splits);
+                    WT_STAT_CONN_DSRC_INCR(session, cache_reverse_splits);
                     return (0);
                 }
                 WT_RET_BUSY_OK(ret);

@@ -93,7 +93,7 @@ __sync_obsolete_inmem_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
         /* Mark the obsolete page to evict soon. */
         __wt_page_evict_soon(session, ref);
-        WT_STAT_CONN_DATA_INCR(session, checkpoint_cleanup_pages_evict);
+        WT_STAT_CONN_DSRC_INCR(session, checkpoint_cleanup_pages_evict);
     }
 
     __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP,
@@ -118,7 +118,7 @@ __sync_obsolete_deleted_cleanup(WT_SESSION_IMPL *session, WT_REF *ref)
         WT_RET(__wt_page_parent_modify_set(session, ref, false));
         __wt_verbose_debug2(session, WT_VERB_CHECKPOINT_CLEANUP,
           "%p: marking obsolete deleted page parent dirty", (void *)ref);
-        WT_STAT_CONN_DATA_INCR(session, checkpoint_cleanup_pages_removed);
+        WT_STAT_CONN_DSRC_INCR(session, checkpoint_cleanup_pages_removed);
     } else
         __wt_verbose_debug2(
           session, WT_VERB_CHECKPOINT_CLEANUP, "%p: skipping deleted page", (void *)ref);
@@ -174,7 +174,7 @@ __sync_obsolete_disk_cleanup(WT_SESSION_IMPL *session, WT_REF *ref, bool *ref_de
         __wt_verbose_debug2(session, WT_VERB_CHECKPOINT_CLEANUP,
           "%p: marking obsolete disk page parent dirty", (void *)ref);
         *ref_deleted = true;
-        WT_STAT_CONN_DATA_INCR(session, checkpoint_cleanup_pages_removed);
+        WT_STAT_CONN_DSRC_INCR(session, checkpoint_cleanup_pages_removed);
         return (0);
     }
 
@@ -288,7 +288,7 @@ __checkpoint_cleanup_obsolete_cleanup(WT_SESSION_IMPL *session, WT_REF *parent)
         WT_RET(__sync_obsolete_cleanup_one(session, ref));
     }
 
-    WT_STAT_CONN_DATA_INCRV(session, checkpoint_cleanup_pages_visited, pindex->entries);
+    WT_STAT_CONN_DSRC_INCRV(session, checkpoint_cleanup_pages_visited, pindex->entries);
 
     return (0);
 }
@@ -372,7 +372,7 @@ __checkpoint_cleanup_page_skip(
           !F_ISSET(S2BT(session), WT_BTREE_LOGGED)))) {
         __wt_verbose_debug2(
           session, WT_VERB_CHECKPOINT_CLEANUP, "%p: page walk skipped", (void *)ref);
-        WT_STAT_CONN_DATA_INCR(session, checkpoint_cleanup_pages_walk_skipped);
+        WT_STAT_CONN_DSRC_INCR(session, checkpoint_cleanup_pages_walk_skipped);
         *skipp = true;
     }
     return (0);

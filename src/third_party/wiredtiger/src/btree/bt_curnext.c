@@ -181,7 +181,7 @@ restart_read:
          */
         if ((ret = __wt_btcur_bounds_early_exit(session, cbt, true, key_out_of_boundsp)) ==
           WT_NOTFOUND)
-            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_next_early_exit);
+            WT_STAT_CONN_DSRC_INCR(session, cursor_bounds_next_early_exit);
         WT_RET(ret);
 
         WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
@@ -263,7 +263,7 @@ restart_read:
          */
         if ((ret = __wt_btcur_bounds_early_exit(session, cbt, true, key_out_of_boundsp)) ==
           WT_NOTFOUND)
-            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_next_early_exit);
+            WT_STAT_CONN_DSRC_INCR(session, cursor_bounds_next_early_exit);
         WT_RET(ret);
 
         /* Find the matching WT_COL slot. */
@@ -455,7 +455,7 @@ restart_read_insert:
              */
             if ((ret = __wt_btcur_bounds_early_exit(session, cbt, true, key_out_of_boundsp)) ==
               WT_NOTFOUND)
-                WT_STAT_CONN_DATA_INCR(session, cursor_bounds_next_early_exit);
+                WT_STAT_CONN_DSRC_INCR(session, cursor_bounds_next_early_exit);
             WT_RET(ret);
 
             WT_RET(__wt_txn_read_upd_list(session, cbt, ins->upd));
@@ -507,7 +507,7 @@ restart_read_page:
          */
         if ((ret = __wt_btcur_bounds_early_exit(session, cbt, true, key_out_of_boundsp)) ==
           WT_NOTFOUND)
-            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_next_early_exit);
+            WT_STAT_CONN_DSRC_INCR(session, cursor_bounds_next_early_exit);
         WT_RET(ret);
 
         /*
@@ -787,7 +787,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
     walk_skip_stats.total_inmem_del_pages_skipped = 0;
     WT_NOT_READ(time_start, 0);
 
-    WT_STAT_CONN_DATA_INCR(session, cursor_next);
+    WT_STAT_CONN_DSRC_INCR(session, cursor_next);
 
     flags = WT_READ_NO_SPLIT | WT_READ_SKIP_INTL; /* tree walk flags */
     if (truncating)
@@ -938,17 +938,17 @@ done:
 err:
     if (total_skipped != 0) {
         if (total_skipped < 100)
-            WT_STAT_CONN_DATA_INCR(session, cursor_next_skip_lt_100);
+            WT_STAT_CONN_DSRC_INCR(session, cursor_next_skip_lt_100);
         else
-            WT_STAT_CONN_DATA_INCR(session, cursor_next_skip_ge_100);
+            WT_STAT_CONN_DSRC_INCR(session, cursor_next_skip_ge_100);
     }
 
-    WT_STAT_CONN_DATA_INCRV(session, cursor_next_skip_total, total_skipped);
+    WT_STAT_CONN_DSRC_INCRV(session, cursor_next_skip_total, total_skipped);
     if (walk_skip_stats.total_del_pages_skipped != 0)
-        WT_STAT_CONN_DATA_INCRV(
+        WT_STAT_CONN_DSRC_INCRV(
           session, cursor_tree_walk_del_page_skip, walk_skip_stats.total_del_pages_skipped);
     if (walk_skip_stats.total_inmem_del_pages_skipped != 0)
-        WT_STAT_CONN_DATA_INCRV(session, cursor_tree_walk_inmem_del_page_skip,
+        WT_STAT_CONN_DSRC_INCRV(session, cursor_tree_walk_inmem_del_page_skip,
           walk_skip_stats.total_inmem_del_pages_skipped);
 
     /*
