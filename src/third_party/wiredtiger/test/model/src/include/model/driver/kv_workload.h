@@ -1008,6 +1008,29 @@ public:
     }
 
     /*
+     * kv_workload::assert_timestamps --
+     *     Assert that all timestamps in the entire workload are assigned correctly. Throw an
+     *     exception on error.
+     */
+    void assert_timestamps();
+
+    /*
+     * kv_workload::verify_timestamps --
+     *     Verify that all timestamps in the entire workload are assigned correctly; just return
+     *     true or false instead of throwing an exception.
+     */
+    bool
+    verify_timestamps()
+    {
+        try {
+            assert_timestamps();
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    /*
      * kv_workload::run --
      *     Run the workload in the model. Return the return codes of the workload operations.
      */
@@ -1019,6 +1042,14 @@ public:
      */
     std::vector<int> run_in_wiredtiger(const char *home, const char *connection_config = nullptr,
       const char *table_config = nullptr) const;
+
+protected:
+    /*
+     * kv_workload::assert_timestamps --
+     *     Assert that the timestamps are assigned correctly. Call this function one sequence at a
+     *     time.
+     */
+    void assert_timestamps(const operation::any &op, timestamp_t &oldest, timestamp_t &stable);
 
 private:
     std::deque<kv_workload_operation> _operations;

@@ -235,86 +235,6 @@ kv_workload_generator::sequence_traversal::complete_one(sequence_state *s)
 }
 
 /*
- * kv_workload_generator::assert_timestamps --
- *     Assert that the timestamps are assigned correctly. Call this function one sequence at a time.
- */
-void
-kv_workload_generator::assert_timestamps(const kv_workload_sequence &sequence,
-  const operation::any &op, timestamp_t &oldest, timestamp_t &stable)
-{
-    if (std::holds_alternative<operation::set_stable_timestamp>(op)) {
-        timestamp_t t = std::get<operation::set_stable_timestamp>(op).stable_timestamp;
-        if (t < stable) {
-            std::ostringstream err;
-            err << "The stable timestamp went backwards: " << stable << " -> " << t << " (sequence "
-                << sequence.seq_no() << ")" << std::endl;
-            throw model_exception(err.str());
-        }
-        if (t < oldest && oldest != k_timestamp_none) {
-            std::ostringstream err;
-            err << "The stable timestamp must not be smaller than the oldest timestamp: " << t
-                << " < " << oldest << " (sequence " << sequence.seq_no() << ")" << std::endl;
-            throw model_exception(err.str());
-        }
-        stable = t;
-    }
-
-    if (std::holds_alternative<operation::set_oldest_timestamp>(op)) {
-        timestamp_t t = std::get<operation::set_oldest_timestamp>(op).oldest_timestamp;
-        if (t < oldest) {
-            std::ostringstream err;
-            err << "The oldest timestamp went backwards: " << oldest << " -> " << t << " (sequence "
-                << sequence.seq_no() << ")" << std::endl;
-            throw model_exception(err.str());
-        }
-        if (t > stable && stable != k_timestamp_none) {
-            std::ostringstream err;
-            err << "The oldest timestamp must not be later than the stable timestamp: " << t
-                << " > " << stable << " (sequence " << sequence.seq_no() << ")" << std::endl;
-            throw model_exception(err.str());
-        }
-        oldest = t;
-    }
-
-    if (std::holds_alternative<operation::prepare_transaction>(op)) {
-        timestamp_t t = std::get<operation::prepare_transaction>(op).prepare_timestamp;
-        if (t < stable) {
-            std::ostringstream err;
-            err << "Prepare timestamp is before the stable timestamp: " << t << " < " << stable
-                << " (sequence " << sequence.seq_no() << ")" << std::endl;
-            throw model_exception(err.str());
-        }
-    }
-
-    if (std::holds_alternative<operation::set_commit_timestamp>(op)) {
-        timestamp_t t = std::get<operation::set_commit_timestamp>(op).commit_timestamp;
-        if (t < stable) {
-            std::ostringstream err;
-            err << "Commit timestamp is before the stable timestamp: " << t << " < " << stable
-                << " (sequence " << sequence.seq_no() << ")" << std::endl;
-            throw model_exception(err.str());
-        }
-    }
-
-    if (std::holds_alternative<operation::commit_transaction>(op)) {
-        timestamp_t t = std::get<operation::commit_transaction>(op).commit_timestamp;
-        if (t < stable) {
-            std::ostringstream err;
-            err << "Commit timestamp is before the stable timestamp: " << t << " < " << stable
-                << " (sequence " << sequence.seq_no() << ")" << std::endl;
-            throw model_exception(err.str());
-        }
-        t = std::get<operation::commit_transaction>(op).durable_timestamp;
-        if (t < stable && t != k_timestamp_none) {
-            std::ostringstream err;
-            err << "Durable timestamp is before the stable timestamp: " << t << " < " << stable
-                << " (sequence " << sequence.seq_no() << ")" << std::endl;
-            throw model_exception(err.str());
-        }
-    }
-}
-
-/*
  * kv_workload_generator::assign_timestamps --
  *     Assign timestamps to operations in a sequence.
  */
@@ -363,14 +283,13 @@ kv_workload_generator::assign_timestamps(kv_workload_sequence &sequence, timesta
                 std::get<operation::commit_transaction>(*op).durable_timestamp =
                   std::min((timestamp_t)x, last);
             }
-        }
-        if (std::holds_alternative<operation::prepare_transaction>(*op))
+        } else if (std::holds_alternative<operation::prepare_transaction>(*op))
             std::get<operation::prepare_transaction>(*op).prepare_timestamp = t;
-        if (std::holds_alternative<operation::set_commit_timestamp>(*op))
+        else if (std::holds_alternative<operation::set_commit_timestamp>(*op))
             std::get<operation::set_commit_timestamp>(*op).commit_timestamp = t;
-        if (std::holds_alternative<operation::set_oldest_timestamp>(*op))
+        else if (std::holds_alternative<operation::set_oldest_timestamp>(*op))
             std::get<operation::set_oldest_timestamp>(*op).oldest_timestamp = oldest = t;
-        if (std::holds_alternative<operation::set_stable_timestamp>(*op))
+        else if (std::holds_alternative<operation::set_stable_timestamp>(*op))
             std::get<operation::set_stable_timestamp>(*op).stable_timestamp = stable = t;
     }
 }
@@ -712,10 +631,6 @@ kv_workload_generator::run()
      * traversing the sequences in dependency order, and at each step, choosing one runnable
      * operation at random.
      */
-    ckpt_oldest = k_timestamp_none;
-    ckpt_stable = k_timestamp_none;
-    oldest = k_timestamp_none;
-    stable = k_timestamp_none;
     for (sequence_traversal t(_sequences); t.has_more();) {
         const std::deque<sequence_state *> &runnable = t.runnable();
 
@@ -729,22 +644,6 @@ kv_workload_generator::run()
         const operation::any &op = (*s->sequence)[s->next_operation_index++];
         _workload << kv_workload_operation(op, s->sequence->seq_no());
 
-        /* Validate that we filled in the timestamps in the correct order. */
-        assert_timestamps(*s->sequence, op, oldest, stable);
-        if (std::holds_alternative<operation::checkpoint>(op) ||
-          std::holds_alternative<operation::restart>(op) ||
-          std::holds_alternative<operation::rollback_to_stable>(op)) {
-            ckpt_oldest = oldest;
-            ckpt_stable = stable;
-            if (ckpt_stable == k_timestamp_none)
-                ckpt_oldest = k_timestamp_none;
-        }
-        if (std::holds_alternative<operation::crash>(op) ||
-          std::holds_alternative<operation::restart>(op)) {
-            oldest = ckpt_oldest;
-            stable = ckpt_stable;
-        }
-
         /* If the operation resulted in a database crash or restart, stop all started sequences. */
         if (std::holds_alternative<operation::crash>(op) ||
           std::holds_alternative<operation::restart>(op)) {
@@ -756,6 +655,9 @@ kv_workload_generator::run()
         if (s->next_operation_index >= s->sequence->size())
             t.complete_one(s);
     }
+
+    /* Validate that we filled in the timestamps in the correct order. */
+    _workload.assert_timestamps();
 }
 
 /*
