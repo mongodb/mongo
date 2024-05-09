@@ -143,14 +143,14 @@ assert.soon(
 jsTestLog("Wait for no available read tickets");
 assert.soon(() => {
     let stats = db.runCommand({serverStatus: 1});
-    jsTestLog(stats.admission.execution);
-    return stats.admission.execution.read.available == 0;
+    jsTestLog(stats.queues.execution);
+    return stats.queues.execution.read.available == 0;
 }, "Expected to have no available read tickets.");
 
 // 7) Hold stepDown so that we know that upon release, it will need a read ticket ~immediately.
 let stats = assert.commandWorked(db.runCommand({serverStatus: 1}));
 jsTestLog(stats.locks);
-jsTestLog(stats.admission.execution);
+jsTestLog(stats.queues.execution);
 
 stats = db.adminCommand({
     configureFailPoint: 'stepdownHangBeforeRSTLEnqueue',
@@ -202,8 +202,8 @@ jsTestLog("Hold tickets again so that we can verify that there are competing rea
 assert.commandWorked(db.adminCommand({configureFailPoint: 'hangTicketRelease', mode: 'alwaysOn'}));
 assert.soon(() => {
     let stats = db.runCommand({serverStatus: 1});
-    jsTestLog(stats.admission.execution);
-    return stats.admission.execution.read.available == 0;
+    jsTestLog(stats.queues.execution);
+    return stats.queues.execution.read.available == 0;
 }, "Expected to have no available read tickets.");
 
 jsTestLog("Allow stepDown to proceed");

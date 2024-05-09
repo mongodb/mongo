@@ -1372,17 +1372,6 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
-    if (gFeatureFlagLogSlowOpsBasedOnTimeWorking.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        // workingMillis should always be present for any operation
-        pAttrs->add("workingMillis", workingTimeMillis.count());
-    }
-
-    // durationMillis should always be present for any operation
-    pAttrs->add(
-        "durationMillis",
-        durationCount<Milliseconds>(additiveMetrics.executionTime.value_or(Microseconds{0})));
-
     // (Ignore FCV check): This feature flag is not FCV gated (shouldBeFCVGated is false)
     if (gFeatureFlagIngressAdmissionControl.isEnabledAndIgnoreFCVUnsafe()) {
         BSONObjBuilder queuesBuilder;
@@ -1397,6 +1386,17 @@ void OpDebug::report(OperationContext* opCtx,
 
         pAttrs->add("queues", queuesBuilder.obj());
     }
+
+    if (gFeatureFlagLogSlowOpsBasedOnTimeWorking.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // workingMillis should always be present for any operation
+        pAttrs->add("workingMillis", workingTimeMillis.count());
+    }
+
+    // durationMillis should always be present for any operation
+    pAttrs->add(
+        "durationMillis",
+        durationCount<Milliseconds>(additiveMetrics.executionTime.value_or(Microseconds{0})));
 }
 
 void OpDebug::reportStorageStats(logv2::DynamicAttributes* pAttrs) const {

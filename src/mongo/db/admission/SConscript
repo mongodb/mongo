@@ -97,9 +97,9 @@ env.Library(
 )
 
 env.Library(
-    target='admission_server_status_section',
+    target='queues_server_status_section',
     source=[
-        'admission_server_status_section.cpp',
+        'queues_server_status_section.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',

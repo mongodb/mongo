@@ -2522,7 +2522,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/version_impl',
         '$BUILD_DIR/mongo/watchdog/watchdog_mongod',
         '$BUILD_DIR/third_party/shim_snappy',
-        'admission/admission_server_status_section',
+        'admission/queues_server_status_section',
         'auth/auth_op_observer',
         'auth/authserver',
         'bson/dotted_path_support',
