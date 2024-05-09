@@ -16,6 +16,8 @@
  * ]
  */
 
+const nDocs = 8;
+
 function sortViolationsArray(arr) {
     // Sorting unsorted arrays of unsorted arrays -- Sort subarrays, then sort main array by first
     // key of subarray.
@@ -33,6 +35,32 @@ function sortViolationsArray(arr) {
     });
 }
 
+function countMatchingViolations(idsResult, idsExpected) {
+    let matches = 0;
+    let j = 0;
+    // idsResult and idsExpected must be ordered. Also, idsExpected.length >= idsResult.length (a
+    // previous assertion is already implicitly checking this). This loop is counting the number of
+    // elements of the intersection of both arrays.
+    for (let i = 0; i < idsExpected.length; i++) {
+        if (bsonWoCompare(idsExpected[i], idsResult[j]) == 0) {
+            matches++;
+            j++;
+        }
+    }
+    return matches;
+}
+
+function tojsonWithTruncatedIds(ids) {
+    return tojson(ids.map(obj => {
+        let ret = {...obj};
+        ret.ids = [];
+        for (let i = 0; i < obj.ids.length; ++i) {
+            ret.ids[i] = "..." + obj.ids[i].substr(obj.ids[i].length - 8, 8);
+        }
+        return ret;
+    }));
+}
+
 // Checks that the violations match what we expect.
 function assertFailedWithViolations(result, expectedViolations, sizeLimitViolation) {
     assert.commandFailedWithCode(result, ErrorCodes.CannotConvertIndexToUnique);
@@ -47,11 +75,22 @@ function assertFailedWithViolations(result, expectedViolations, sizeLimitViolati
             "Cannot convert the index to unique. Please resolve conflicting documents before " +
                 "running collMod again.");
     }
-    assert.eq(bsonWoCompare(sortViolationsArray(result.violations),
-                            sortViolationsArray(expectedViolations)),
-              0,
-              "result violations " + result.violations + " does not match expected violations " +
-                  expectedViolations);
+    sortViolationsArray(result.violations);
+
+    assert.eq(result.violations.length, 1);
+    assert.eq(expectedViolations.length, 1);
+
+    let idsResult = result.violations[0].ids;
+    let idsExpected = expectedViolations[0].ids;
+
+    // One less violation will be reported because the last violation is over 8MB limit.
+    assert.eq(idsResult.length, nDocs - 1);
+
+    assert.eq(countMatchingViolations(idsResult, idsExpected),
+              nDocs - 1,
+              "result violations " + tojsonWithTruncatedIds(result.violations) + " do not match " +
+                  (nDocs - 1) + " of the expected violations " +
+                  tojsonWithTruncatedIds(expectedViolations));
 }
 
 const collName = 'collmod_convert_to_unique_violations_size_limit';
@@ -65,15 +104,10 @@ assert.commandWorked(coll.createIndex({a: 1}));
 // Inserts 8 duplicate documents with 1MB large _id to exceed the 8MB size limit.
 let ids = [];
 let id;
-const nDocs = 8;
 for (let i = 0; i < nDocs; ++i) {
     id = "x".repeat(1024 * 1024) + i;
     assert.commandWorked(coll.insert({_id: id, a: 1}));
-
-    // Only first 7 violations will be reported because 8th violation is over 8MB limit.
-    if (i < nDocs - 1) {
-        ids[i] = id;
-    }
+    ids[i] = id;
 }
 
 // Sets 'prepareUnique' before converting the index to unique.
