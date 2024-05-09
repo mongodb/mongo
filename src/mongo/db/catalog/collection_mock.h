@@ -491,10 +491,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void sanitizeCollectionOptions(OperationContext* opCtx) override {
-        MONGO_UNREACHABLE;
-    }
-
     bool needsCappedLock() const override {
         MONGO_UNREACHABLE;
     }

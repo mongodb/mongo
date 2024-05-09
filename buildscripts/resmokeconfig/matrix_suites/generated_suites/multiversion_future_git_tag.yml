@@ -31,5 +31,4 @@ selector:
   - jstests/multiVersion/**/*.js
   - src/mongo/db/modules/*/jstests/hot_backups/multiVersion/*.js
   - src/mongo/db/modules/*/jstests/audit/multiVersion/*.js
-  - src/mongo/db/modules/*/jstests/encryptdb/multiVersion/*.js
 test_kind: js_test
