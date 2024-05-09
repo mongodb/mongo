@@ -6,6 +6,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
+ *   incompatible_with_windows_tls,
  * ]
  */
 
