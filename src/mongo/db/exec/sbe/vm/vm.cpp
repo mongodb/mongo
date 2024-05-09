@@ -3654,10 +3654,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestPosition(
             // If position to test is longer than the data to test against, zero-extend.
             isBitSet = false;
         } else {
-            // Convert 'bitPosition' to 'currentByte' and 'currentBit'. Note that bit positions are
-            // 0-based starting at the right-most bit in 'binData'.
-            int currentByte = binData[(binDataSize - (bitPosition / 8)) - 1];
-            int currentBit = bitPosition % 8;
+            // Convert the bit position to a byte position within a byte. Note that byte positions
+            // start at position 0 in the document's value BinData array representation, and bit
+            // positions start at the least significant bit.
+            auto byteIdx = bitPosition / 8;
+            auto currentBit = bitPosition % 8;
+            auto currentByte = binData[byteIdx];
 
             isBitSet = currentByte & (1 << currentBit);
         }
