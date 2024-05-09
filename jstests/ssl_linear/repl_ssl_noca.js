@@ -7,7 +7,11 @@
 // TODO BUILD-17503 Remove this tag
 // @tags: [incompatible_with_macos]
 
+load('jstests/libs/python.js');
+
 if (_isWindows()) {
+    assert.eq(0, runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
+
     // OpenSSL backed imports Root CA and intermediate CA
     runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\ca.pem");
 
