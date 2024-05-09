@@ -600,12 +600,12 @@ public:
      * Fills out CurOp and OpDebug with basic info common to all commands. We require the NetworkOp
      * in order to distinguish which protocol delivered this request, e.g. OP_QUERY or OP_MSG. This
      * is set early in the request processing backend and does not typically need to be called
-     * thereafter. Locks the client as needed to apply the specified settings.
+     * thereafter. It is necessary to hold the Client lock while this method executes.
      */
-    void setGenericOpRequestDetails(NamespaceString nss,
-                                    const Command* command,
-                                    BSONObj cmdObj,
-                                    NetworkOp op);
+    void setGenericOpRequestDetails_inlock(NamespaceString nss,
+                                           const Command* command,
+                                           BSONObj cmdObj,
+                                           NetworkOp op);
 
     /**
      * Sets metrics collected at the end of an operation onto curOp's OpDebug instance. Note that
