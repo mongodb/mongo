@@ -1197,6 +1197,12 @@ void OpDebug::report(OperationContext* opCtx,
     pAttrs->add("durationMillis", durationCount<Milliseconds>(executionTime));
 }
 
+void OpDebug::reportStorageStats(logv2::DynamicAttributes* pAttrs) const {
+    if (storageStats) {
+        pAttrs->add("storage", storageStats->toBSON());
+    }
+}
+
 #define OPDEBUG_APPEND_NUMBER2(b, x, y) \
     if (y != -1)                        \
     (b).appendNumber(x, (y))

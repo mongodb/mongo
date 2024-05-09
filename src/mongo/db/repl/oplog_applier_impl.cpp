@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/apply_ops.h"
@@ -102,6 +103,11 @@ Status finishAndLogApply(OperationContext* opCtx,
             }
 
             attrs.add("duration", Milliseconds(opDuration));
+
+            // Obtain storage specific statistics and log them if they exist.
+            CurOp::get(opCtx)->debug().storageStats =
+                opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
+            CurOp::get(opCtx)->debug().reportStorageStats(&attrs);
 
             LOGV2(51801, "Applied op", attrs);
         }
