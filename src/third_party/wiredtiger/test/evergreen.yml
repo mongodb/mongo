@@ -3811,6 +3811,7 @@ tasks:
         vars:
           CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Coverage
           CODE_COVERAGE_FLAGS: -DCODE_COVERAGE_MEASUREMENT=1 -DINLINE_FUNCTIONS_INSTEAD_OF_MACROS=1
+          HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=0
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build/test/model/tools"
