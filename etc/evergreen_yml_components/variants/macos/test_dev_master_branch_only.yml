@@ -17,8 +17,8 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
         --enableEnterpriseTests=off
+      compiling_for_test: true
       push_path: osx
-      push_bucket: downloads.mongodb.org
       push_name: macos
       push_arch: x86_64
       compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
@@ -46,8 +46,8 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
         --enableEnterpriseTests=off
+      compiling_for_test: true
       push_path: osx
-      push_bucket: downloads.mongodb.org
       push_name: macos
       push_arch: arm64
       compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
