@@ -8,6 +8,8 @@
 //    not_allowed_with_signed_security_token,
 //   # Transactions aborted upon fcv upgrade or downgrade; cluster parameters use internal txns.
 //    uses_transactions,
+//   # SERVER-90248 fixed in 8.1
+//    requires_fcv_81
 //   ]
 
 import {
@@ -91,3 +93,17 @@ assert.commandFailed(conn.getDB("config").clusterParameters.insert({
     foo: 'bar',
     clusterParameterTime: {"$timestamp": {t: 0, i: 0}}
 }));
+
+// Assert that the results of getClusterParameter: '*' match the expected format, and that they are
+// consistent with individual gets.
+{
+    const allParameters =
+        assert.commandWorked(adminDB.runCommand({getClusterParameter: '*'})).clusterParameters;
+    jsTest.log(allParameters);
+    for (const param of allParameters) {
+        assert(param.hasOwnProperty("_id"),
+               'Entry in {getClusterParameter: "*"} result is missing _id key:\n' + tojson(param));
+        const name = param["_id"];
+        checkGetClusterParameterMatch(conn, name, param);
+    }
+}
