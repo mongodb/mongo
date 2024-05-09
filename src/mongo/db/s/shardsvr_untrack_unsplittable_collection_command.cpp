@@ -72,7 +72,6 @@ public:
 
             const auto& nss = ns();
 
-            // TODO SERVER-86309: add FCV region block.
             auto coordinatorDoc = UntrackUnsplittableCollectionCoordinatorDocument();
             coordinatorDoc.setShardingDDLCoordinatorMetadata(
                 {{nss, DDLCoordinatorTypeEnum::kUntrackUnsplittableCollection}});
