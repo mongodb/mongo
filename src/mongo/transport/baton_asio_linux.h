@@ -113,7 +113,10 @@ class TransportLayerASIO::BatonASIO : public NetworkingBaton {
                     break;
                 }
 
-                invariant(errno == EINTR);
+                const auto savedErrno = errno;
+                invariant(savedErrno == EINTR,
+                          str::stream() << "evenfd write on fd:" << fd
+                                        << " failed with errno:" << savedErrno);
             }
         }
 
@@ -125,7 +128,10 @@ class TransportLayerASIO::BatonASIO : public NetworkingBaton {
                     break;
                 }
 
-                invariant(errno == EINTR);
+                const auto savedErrno = errno;
+                invariant(savedErrno == EINTR,
+                          str::stream()
+                              << "evenfd read on fd:" << fd << " failed with errno:" << savedErrno);
             }
         }
 
