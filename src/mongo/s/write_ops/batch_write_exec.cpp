@@ -104,6 +104,25 @@ bool hasTransientTransactionError(const BatchedCommandResponse& response) {
 // applies when no writes are occurring and metadata is not changing on reload.
 const int kMaxRoundsWithoutProgress(5);
 
+/**
+ * Provides the write concern with which child batches have to be internally submitted.
+ */
+boost::optional<WriteConcernOptions> getWriteConcernForChildBatch(OperationContext* opCtx) {
+    // Per-operation write concern is not supported in transactions.
+    if (TransactionRouter::get(opCtx)) {
+        return boost::none;
+    }
+
+    // Retrieve the WC specified by the remote client; in case of "fire and forget" request, the WC
+    // needs to be upgraded to "w: 1" for the sharding protocol to correctly handle internal
+    // writeErrors.
+    auto wc = opCtx->getWriteConcern();
+    if (!wc.requiresWriteAcknowledgement()) {
+        wc.w = 1;
+    }
+
+    return wc;
+}
 }  // namespace
 
 void BatchWriteExec::executeBatch(OperationContext* opCtx,
@@ -195,6 +214,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
             //
 
             std::vector<AsyncRequestsSender::Request> requests;
+            const auto wcSettingForChildBatch = getWriteConcernForChildBatch(opCtx);
 
             // Get as many batches as we can at once
             for (auto&& childBatch : childBatches) {
@@ -217,6 +237,10 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     BSONObjBuilder requestBuilder;
                     shardBatchRequest.serialize(&requestBuilder);
                     logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &requestBuilder);
+                    if (wcSettingForChildBatch) {
+                        requestBuilder.append(WriteConcernOptions::kWriteConcernField,
+                                              wcSettingForChildBatch->toBSON());
+                    }
 
                     return requestBuilder.obj();
                 }();

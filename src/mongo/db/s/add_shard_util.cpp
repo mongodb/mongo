@@ -73,7 +73,6 @@ BSONObj createShardIdentityUpsertForAddShard(const AddShard& addShardCmd) {
 
         return updateOp;
     }());
-    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
     return request.toBSON();
 }

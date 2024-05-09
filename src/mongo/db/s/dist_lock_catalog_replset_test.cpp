@@ -1234,8 +1234,6 @@ TEST_F(DistLockCatalogReplSetTest, BasicUnlockAll) {
         const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
         const auto commandRequest(BatchedCommandRequest::parseUpdate(opMsgRequest));
 
-        ASSERT_BSONOBJ_EQ(BSON("w" << 1 << "wtimeout" << 0), commandRequest.getWriteConcern());
-
         const auto& updateOp = commandRequest.getUpdateRequest();
         ASSERT_EQUALS(LocksType::ConfigNS, updateOp.getNamespace());
 

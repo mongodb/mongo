@@ -377,38 +377,15 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* opCtx,
         }()});
         return updateOp;
     }());
-    request.setWriteConcern(kLocalWriteConcern.toBSON());
-
-    BSONObj cmdObj = request.toBSON();
 
     auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
-    auto response = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        _locksNS.db().toString(),
-        cmdObj,
-        Shard::kDefaultConfigCommandTimeout,
-        Shard::RetryPolicy::kIdempotent);
+    auto batchResponse =
+        shardRegistry->getConfigShard()->runBatchWriteCommand(opCtx,
+                                                              Shard::kDefaultConfigCommandTimeout,
+                                                              request,
+                                                              kLocalWriteConcern,
+                                                              Shard::RetryPolicy::kIdempotent);
 
-    if (!response.isOK()) {
-        return response.getStatus();
-    }
-    if (!response.getValue().commandStatus.isOK()) {
-        return response.getValue().commandStatus;
-    }
-    if (!response.getValue().writeConcernStatus.isOK()) {
-        return response.getValue().writeConcernStatus;
-    }
-
-    BatchedCommandResponse batchResponse;
-    std::string errmsg;
-    if (!batchResponse.parseBSON(response.getValue().response, &errmsg)) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream()
-                          << "Failed to parse config server response to batch request for "
-                             "unlocking existing distributed locks"
-                          << causedBy(errmsg));
-    }
     return batchResponse.toStatus();
 }
 

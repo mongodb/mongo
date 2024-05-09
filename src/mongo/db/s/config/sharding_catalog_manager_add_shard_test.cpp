@@ -460,11 +460,7 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
                                 << shardName << "clusterId" << _clusterId
                                 << "configsvrConnectionString"
                                 << replicationCoordinator()->getConfigConnectionString().toString())
-                        << "multi" << false << "upsert" << true))
-             << "writeConcern"
-             << BSON("w"
-                     << "majority"
-                     << "wtimeout" << 60000));
+                        << "multi" << false << "upsert" << true)));
     auto addShardCmd = add_shard_util::createAddShardCmd(operationContext(), shardName);
     auto actualBSON = add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
     ASSERT_BSONOBJ_EQ(expectedBSON, actualBSON);

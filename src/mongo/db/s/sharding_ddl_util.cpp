@@ -77,11 +77,14 @@ void updateTags(OperationContext* opCtx,
         }()});
         return updateOp;
     }());
-    request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto response = configShard->runBatchWriteCommand(
-        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+    auto response =
+        configShard->runBatchWriteCommand(opCtx,
+                                          Milliseconds::max(),
+                                          request,
+                                          writeConcern,
+                                          Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
 
     uassertStatusOK(response.toStatus());
 }
@@ -105,11 +108,13 @@ void deleteChunks(OperationContext* opCtx,
         return deleteOp;
     }());
 
-    request.setWriteConcern(writeConcern.toBSON());
-
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto response = configShard->runBatchWriteCommand(
-        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+    auto response =
+        configShard->runBatchWriteCommand(opCtx,
+                                          Milliseconds::max(),
+                                          request,
+                                          writeConcern,
+                                          Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
 
     uassertStatusOK(response.toStatus());
 }
@@ -336,11 +341,13 @@ void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
         return deleteOp;
     }());
 
-    request.setWriteConcern(writeConcern.toBSON());
-
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto response = configShard->runBatchWriteCommand(
-        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+    auto response =
+        configShard->runBatchWriteCommand(opCtx,
+                                          Milliseconds::max(),
+                                          request,
+                                          writeConcern,
+                                          Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
 
     uassertStatusOK(response.toStatus());
 }

@@ -164,13 +164,23 @@ Status KeysCollectionClientDirect::_insert(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const BSONObj& doc,
                                            const WriteConcernOptions& writeConcern) {
-    BatchedCommandRequest request([&] {
+    BatchedCommandRequest batchRequest([&] {
         write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments({doc});
         return insertOp;
     }());
-    request.setWriteConcern(writeConcern.toBSON());
-    const BSONObj cmdObj = request.toBSON();
+
+    // A request dispatched through a local client is served within the same thread that submits it
+    // (so that the opCtx needs to be used as the vehicle to pass the WC to the ServiceEntryPoint).
+    const auto originalWC = opCtx->getWriteConcern();
+    ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
+    opCtx->setWriteConcern(writeConcern);
+
+    const BSONObj cmdObj = [&] {
+        BSONObjBuilder cmdObjBuilder;
+        batchRequest.serialize(&cmdObjBuilder);
+        return cmdObjBuilder.obj();
+    }();
 
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
         // Note: write commands can only be issued against a primary.

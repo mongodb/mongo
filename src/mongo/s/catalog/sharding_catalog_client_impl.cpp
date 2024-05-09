@@ -102,37 +102,6 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->setStatus(status);
 }
 
-void sendRetryableWriteBatchRequestToConfig(OperationContext* opCtx,
-                                            const NamespaceString& nss,
-                                            std::vector<BSONObj>& docs,
-                                            TxnNumber txnNumber,
-                                            const WriteConcernOptions& writeConcern) {
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
-    BatchedCommandRequest request([&] {
-        write_ops::InsertCommandRequest insertOp(nss);
-        insertOp.setDocuments(docs);
-        return insertOp;
-    }());
-    request.setWriteConcern(writeConcern.toBSON());
-
-    BSONObj cmdObj = request.toBSON();
-    BSONObjBuilder bob(cmdObj);
-    bob.append(OperationSessionInfo::kTxnNumberFieldName, txnNumber);
-
-    BatchedCommandResponse batchResponse;
-    auto response = configShard->runCommand(opCtx,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            nss.db().toString(),
-                                            bob.obj(),
-                                            Shard::kDefaultConfigCommandTimeout,
-                                            Shard::RetryPolicy::kIdempotent);
-
-    auto writeStatus = Shard::CommandResponse::processBatchWriteResponse(response, &batchResponse);
-
-    uassertStatusOK(batchResponse.toStatus());
-    uassertStatusOK(writeStatus);
-}
 
 AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opCtx,
                                                            const NamespaceString& nss,
@@ -1042,12 +1011,14 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
         insertOp.setDocuments({doc});
         return insertOp;
     }());
-    request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
-        auto response = configShard->runBatchWriteCommand(
-            opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kNoRetry);
+        auto response = configShard->runBatchWriteCommand(opCtx,
+                                                          Shard::kDefaultConfigCommandTimeout,
+                                                          request,
+                                                          writeConcern,
+                                                          Shard::RetryPolicy::kNoRetry);
 
         Status status = response.toStatus();
 
@@ -1102,49 +1073,6 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-void ShardingCatalogClientImpl::insertConfigDocumentsAsRetryableWrite(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    std::vector<BSONObj> docs,
-    const WriteConcernOptions& writeConcern) {
-    invariant(nss.db() == NamespaceString::kAdminDb || nss.db() == NamespaceString::kConfigDb);
-
-    AlternativeSessionRegion asr(opCtx);
-    TxnNumber currentTxnNumber = 0;
-
-    std::vector<BSONObj> workingBatch;
-    size_t workingBatchItemSize = 0;
-    int workingBatchDocSize = 0;
-
-    while (!docs.empty()) {
-        BSONObj toAdd = docs.back();
-        docs.pop_back();
-
-        const int docSizePlusOverhead =
-            toAdd.objsize() + write_ops::kRetryableAndTxnBatchWriteBSONSizeOverhead;
-        // Check if pushing this object will exceed the batch size limit or the max object size
-        if ((workingBatchItemSize + 1 > write_ops::kMaxWriteBatchSize) ||
-            (workingBatchDocSize + docSizePlusOverhead > BSONObjMaxUserSize)) {
-            sendRetryableWriteBatchRequestToConfig(
-                asr.opCtx(), nss, workingBatch, currentTxnNumber, writeConcern);
-            ++currentTxnNumber;
-
-            workingBatch.clear();
-            workingBatchItemSize = 0;
-            workingBatchDocSize = 0;
-        }
-
-        workingBatch.push_back(toAdd);
-        ++workingBatchItemSize;
-        workingBatchDocSize += docSizePlusOverhead;
-    }
-
-    if (!workingBatch.empty()) {
-        sendRetryableWriteBatchRequestToConfig(
-            asr.opCtx(), nss, workingBatch, currentTxnNumber, writeConcern);
-    }
-}
-
 StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -1189,11 +1117,10 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
         }()});
         return updateOp;
     }());
-    request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto response = configShard->runBatchWriteCommand(
-        opCtx, maxTimeMs, request, Shard::RetryPolicy::kIdempotent);
+        opCtx, maxTimeMs, request, writeConcern, Shard::RetryPolicy::kIdempotent);
 
     Status status = response.toStatus();
     if (!status.isOK()) {
@@ -1225,11 +1152,13 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
         }()});
         return deleteOp;
     }());
-    request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto response = configShard->runBatchWriteCommand(
-        opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
+    auto response = configShard->runBatchWriteCommand(opCtx,
+                                                      Shard::kDefaultConfigCommandTimeout,
+                                                      request,
+                                                      writeConcern,
+                                                      Shard::RetryPolicy::kIdempotent);
     return response.toStatus();
 }
 

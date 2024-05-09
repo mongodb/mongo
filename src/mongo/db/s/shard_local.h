@@ -81,6 +81,12 @@ public:
         std::function<bool(const std::vector<BSONObj>& batch,
                            const boost::optional<BSONObj>& postBatchResumeToken)> callback);
 
+    BatchedCommandResponse runBatchWriteCommand(OperationContext* opCtx,
+                                                Milliseconds maxTimeMS,
+                                                const BatchedCommandRequest& batchRequest,
+                                                const WriteConcernOptions& writeConcern,
+                                                RetryPolicy retryPolicy) final;
+
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& unused,

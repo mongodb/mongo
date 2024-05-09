@@ -38,8 +38,6 @@
 namespace mongo {
 namespace {
 
-const auto kWriteConcern = "writeConcern"_sd;
-
 template <class T>
 BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request) {
     auto batchRequest = BatchedCommandRequest{T::parse(request)};
@@ -51,16 +49,6 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
             batchRequest.setDbVersion(DatabaseVersion(request.body));
         }
         batchRequest.setShardVersion(shardVersion);
-    }
-
-    auto writeConcernField = request.body[kWriteConcern];
-    if (!writeConcernField.eoo()) {
-        auto wcObj = writeConcernField.Obj();
-        // Client write concerns without 'w' fields should be filled with the default write concern,
-        // which should be populated later to the operation context during the command setup phase.
-        if (wcObj.hasElement("w")) {
-            batchRequest.setWriteConcern(wcObj);
-        }
     }
 
     // The 'isTimeseriesNamespace' is an internal parameter used for communication between mongos
@@ -178,19 +166,6 @@ const boost::optional<BSONObj>& BatchedCommandRequest::getLet() const {
     return _visit(Visitor{});
 };
 
-bool BatchedCommandRequest::requiresWriteAcknowledgement() const {
-    if (!hasWriteConcern()) {
-        return true;
-    }
-
-    BSONObj writeConcern = getWriteConcern();
-    BSONElement wElem = writeConcern["w"];
-    if (!wElem.isNumber() || wElem.Number() != 0) {
-        return true;
-    }
-
-    return false;
-}
 
 const write_ops::WriteCommandRequestBase& BatchedCommandRequest::getWriteCommandRequestBase()
     const {
@@ -210,10 +185,6 @@ void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
 
     if (_dbVersion) {
         builder->append("databaseVersion", _dbVersion->toBSON());
-    }
-
-    if (_writeConcern) {
-        builder->append(kWriteConcern, *_writeConcern);
     }
 }
 

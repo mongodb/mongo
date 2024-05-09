@@ -334,16 +334,14 @@ void insertCollectionEntry(OperationContext* opCtx,
 
     BatchedCommandRequest insertRequest(
         write_ops::InsertCommandRequest(CollectionType::ConfigNS, {coll.toBSON()}));
-    insertRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
-
-    const BSONObj cmdObj = insertRequest.toBSON().addFields(osi.toBSON());
+    const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(insertRequest.toBSON());
 
     BatchedCommandResponse unusedResponse;
     uassertStatusOK(Shard::CommandResponse::processBatchWriteResponse(
         configShard->runCommand(opCtx,
                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                 CollectionType::ConfigNS.db().toString(),
-                                cmdObj,
+                                cmdObj.addFields(osi.toBSON()),
                                 Shard::kDefaultConfigCommandTimeout,
                                 Shard::RetryPolicy::kIdempotent),
         &unusedResponse));
