@@ -61,7 +61,7 @@ pipx = "1.4.3"
 poetry = "1.5.1"
 
 [tool.poetry.group.evergreen.dependencies]
-click = "^7.1.2"
+click = "^8.1.7"
 inject = "^5"
 GitPython = "^3.1.7"
 pydantic = "*"
