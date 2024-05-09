@@ -298,6 +298,9 @@ class TestRunner(Subcommand):
     def _log_local_resmoke_invocation(self):
         """Log local resmoke invocation example."""
 
+        if config.FUZZ_MONGOD_CONFIGS or config.FUZZ_MONGOS_CONFIGS:
+            self._resmoke_logger.info("configFuzzSeed: \n%s", str(config.CONFIG_FUZZ_SEED))
+
         # Do not log local args if this is not being ran in evergreen
         if not config.EVERGREEN_TASK_ID:
             print("Skipping local invocation because evergreen task id was not provided.")
