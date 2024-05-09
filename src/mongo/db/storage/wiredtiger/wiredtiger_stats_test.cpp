@@ -29,11 +29,14 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include <memory>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
 namespace mongo {
 namespace {
@@ -176,6 +179,13 @@ TEST_F(WiredTigerStatsTest, EmptySession) {
     // Read and write statistics should be empty. Check "data" field does not exist. "wait" fields
     // such as the schemaLock might have some value.
     auto statsBson = WiredTigerStats{_session}.toBSON();
+
+    {
+        BSONObjBuilder bob;
+        ASSERT_OK(WiredTigerUtil::exportTableToBSON(_session, "statistics:", "", &bob));
+        LOGV2(9032000, "Connection statistics", "stats"_attr = bob.obj());
+    }
+
     ASSERT_FALSE(statsBson.hasField("data")) << statsBson;
 }
 
