@@ -51,6 +51,7 @@
 #include "mongo/unittest/matcher_core.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -94,6 +95,8 @@ TEST_F(ConnectionPoolTest, ConnectionPoolHistogramStats) {
     executor::ConnectionPoolStats stats{};
 
     ScopedDbConnection conn(host);
+    auto connTime = globalConnPool.getPoolHostConnTime_forTest(host, 0).count();
+
     ASSERT_TRUE(conn.ok());
     globalConnPool.appendConnectionStats(&stats);
 
@@ -107,7 +110,17 @@ TEST_F(ConnectionPoolTest, ConnectionPoolHistogramStats) {
 
         return expected;
     };
-    ASSERT_THAT(histogram, AnyOf(Eq(makeExpected(2)), Eq(makeExpected(3)), Eq(makeExpected(4))));
+
+    const auto pos = [&]() -> size_t {
+        using namespace executor::details;
+        if (connTime >= kMaxPartitionSize) {
+            return histogram.size() - 1;
+        } else if (connTime < kStartSize) {
+            return 0;
+        }
+        return ((connTime - kStartSize) / kPartitionStepSize) + 1;
+    }();
+    ASSERT_EQ(histogram, makeExpected(pos));
 }
 }  // namespace
 }  // namespace mongo

@@ -67,6 +67,7 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 #if __has_feature(address_sanitizer)
 #include <sanitizer/lsan_interface.h>
@@ -477,6 +478,15 @@ DBClientBase* DBConnectionPool::get(const MongoURI& uri, double socketTimeout) {
     };
 
     return Detail::get(this, uri.toString(), socketTimeout, connect);
+}
+
+Milliseconds DBConnectionPool::getPoolHostConnTime_forTest(const std::string& host,
+                                                           double timeout) const {
+    if (TestingProctor::instance().isEnabled()) {
+        stdx::lock_guard<Latch> L(_mutex);
+        return _pools.find(PoolKey(host, timeout))->second._connTime;
+    }
+    return Milliseconds();
 }
 
 int DBConnectionPool::getNumAvailableConns(const string& host, double socketTimeout) const {

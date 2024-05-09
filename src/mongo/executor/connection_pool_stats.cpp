@@ -198,7 +198,8 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
 namespace {
 std::vector<Milliseconds> makePartitions() {
     std::vector<Milliseconds> result;
-    for (int64_t ms = 0; ms <= 1000; ms += 50) {
+    for (int64_t ms = details::kStartSize; ms <= details::kMaxPartitionSize;
+         ms += details::kPartitionStepSize) {
         result.push_back(Milliseconds(ms));
     }
     return result;
