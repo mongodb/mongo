@@ -40,7 +40,8 @@ namespace mongo::timeseries::bucket_catalog {
 
 MeasurementMap::MeasurementMap(TrackingContext& trackingContext)
     : _trackingContext(trackingContext),
-      _builders(makeTrackedStringMap<TrackedBSONColumnBuilder>(_trackingContext)) {}
+      _builders(
+          makeTrackedStringMap<BSONColumnBuilder<TrackingAllocator<void>>>(_trackingContext)) {}
 
 void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
                                   size_t numMeasurements) {
@@ -54,7 +55,7 @@ void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
 
         _compressedSize += binLength;
         _builders.emplace(make_tracked_string(_trackingContext, key.data(), key.size()),
-                          TrackedBSONColumnBuilder(
+                          BSONColumnBuilder<TrackingAllocator<void>>(
                               binData, binLength, _trackingContext.get().makeAllocator<void>()));
     }
     _measurementCount = numMeasurements;
@@ -63,7 +64,8 @@ void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
             int binLength = 0;
             const char* binData = columnValue.binData(binLength);
             TrackingContext trackingContext;
-            TrackedBSONColumnBuilder builderToCompareTo{trackingContext.makeAllocator<void>()};
+            BSONColumnBuilder<TrackingAllocator<void>> builderToCompareTo{
+                trackingContext.makeAllocator<void>()};
             BSONColumn c(binData, binLength);
             for (auto&& elem : c) {
                 builderToCompareTo.append(elem);
@@ -83,12 +85,13 @@ void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
     }
 }
 
-std::vector<std::pair<StringData, TrackedBSONColumnBuilder::BinaryDiff>>
+std::vector<std::pair<StringData, BSONColumnBuilder<TrackingAllocator<void>>::BinaryDiff>>
 MeasurementMap::intermediate(int32_t& compressedSizeDelta) {
     int32_t previousCompressedSize = _compressedSize;
     _compressedSize = 0;
 
-    std::vector<std::pair<StringData, TrackedBSONColumnBuilder::BinaryDiff>> intermediates;
+    std::vector<std::pair<StringData, BSONColumnBuilder<TrackingAllocator<void>>::BinaryDiff>>
+        intermediates;
     for (auto& entry : _builders) {
         auto& builder = entry.second;
         auto diff = builder.intermediate();
@@ -104,7 +107,7 @@ MeasurementMap::intermediate(int32_t& compressedSizeDelta) {
 
 void MeasurementMap::_insertNewKey(StringData key,
                                    const BSONElement& elem,
-                                   TrackedBSONColumnBuilder builder) {
+                                   BSONColumnBuilder<TrackingAllocator<void>> builder) {
     builder.append(elem);
     _builders.try_emplace(make_tracked_string(_trackingContext, key.data(), key.size()),
                           std::move(builder));
@@ -130,7 +133,8 @@ void MeasurementMap::insertOne(const std::vector<BSONElement>& oneMeasurementDat
 
         auto builderIt = _builders.find(key);
         if (builderIt == _builders.end()) {
-            TrackedBSONColumnBuilder columnBuilder{_trackingContext.get().makeAllocator<void>()};
+            BSONColumnBuilder<TrackingAllocator<void>> columnBuilder{
+                _trackingContext.get().makeAllocator<void>()};
             for (size_t i = 0; i < _measurementCount; ++i) {
                 columnBuilder.skip();
             }
