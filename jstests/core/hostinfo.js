@@ -32,7 +32,7 @@ if (hostinfo.os.type != "") {
     assert.neq(hostinfo.system.currentTime, "" || null, "Missing Current Time");
     assert.neq(hostinfo.system.cpuAddrSize, "" || null || 0, "Missing CPU Address Size");
     assert.neq(hostinfo.system.memSizeMB, "" || null, "Missing Memory Size");
-    assert.neq(hostinfo.system.numLogicalCores, "" || null || 0, "Missing Number of Logical Cores");
+    assert.neq(hostinfo.system.numCores, "" || null || 0, "Missing Number of Logical Cores");
     // Check that numCoresAvailableToProcess != -1 as that indicates syscall failure.
     assert.neq(hostinfo.system.numCoresAvailableToProcess,
                "" || null || -1,

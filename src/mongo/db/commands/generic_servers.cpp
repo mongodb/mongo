@@ -189,7 +189,7 @@ HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext* opCtx) {
     system.setCpuAddrSize(static_cast<int>(p.getAddrSize()));
     system.setMemSizeMB(static_cast<long>(p.getSystemMemSizeMB()));
     system.setMemLimitMB(static_cast<long>(p.getMemSizeMB()));
-    system.setNumLogicalCores(static_cast<int>(p.getNumLogicalCores()));
+    system.setNumCores(static_cast<int>(p.getNumLogicalCores()));
     const auto num_cores_avl_to_process = p.getNumCoresAvailableToProcess();
     // Adding the num cores available to process only if API returns successfully ie. value >=0
     if (num_cores_avl_to_process >= 0) {
