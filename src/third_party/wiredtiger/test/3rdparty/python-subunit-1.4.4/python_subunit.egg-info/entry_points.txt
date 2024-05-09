@@ -1,0 +1,15 @@
+[console_scripts]
+subunit-1to2 = subunit.filter_scripts.subunit_1to2:main
+subunit-2to1 = subunit.filter_scripts.subunit_2to1:main
+subunit-filter = subunit.filter_scripts.subunit_filter:main
+subunit-ls = subunit.filter_scripts.subunit_ls:main
+subunit-notify = subunit.filter_scripts.subunit_notify:main
+subunit-output = subunit.filter_scripts.subunit_output:main
+subunit-stats = subunit.filter_scripts.subunit_stats:main
+subunit-tags = subunit.filter_scripts.subunit_tags:main
+subunit2csv = subunit.filter_scripts.subunit2csv:main
+subunit2disk = subunit.filter_scripts.subunit2disk:main
+subunit2gtk = subunit.filter_scripts.subunit2gtk:main
+subunit2junitxml = subunit.filter_scripts.subunit2junitxml:main
+subunit2pyunit = subunit.filter_scripts.subunit2pyunit:main
+tap2subunit = subunit.filter_scripts.tap2subunit:main

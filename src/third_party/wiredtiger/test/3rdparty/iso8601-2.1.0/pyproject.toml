@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "iso8601"
+version = "2.1.0"
+description = "Simple module to parse ISO 8601 dates"
+authors = ["Michael Twomey <mick@twomeylee.name>"]
+license = "MIT"
+readme = "README.rst"
+homepage = "https://github.com/micktwomey/pyiso8601"
+repository = "https://github.com/micktwomey/pyiso8601"
+documentation = "https://pyiso8601.readthedocs.io/en/latest/"
+
+[tool.poetry.dependencies]
+python = ">=3.7,<4.0"
+
+[tool.poetry.group.dev.dependencies]
+mypy = "*"
+black = "*"
+pytest = "*"
+hypothesis = "*"
+pytz = "*"
+pre-commit = "*"
+nox = "*"
+Sphinx = "*"
+changelog-manager = "*"
+ruff = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
