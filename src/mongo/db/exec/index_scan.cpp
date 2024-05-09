@@ -131,12 +131,14 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
         _endKey = _bounds.endKey;
         _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
 
-        key_string::Value keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+        key_string::Builder builder(
+            indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion());
+        auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
             _startKey,
-            indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
             indexAccessMethod()->getSortedDataInterface()->getOrdering(),
             _forward,
-            _startKeyInclusive);
+            _startKeyInclusive,
+            builder);
         return _indexCursor->seek(keyStringForSeek);
     } else {
         // For single intervals, we can use an optimized scan which checks against the position
@@ -146,23 +148,25 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
                 _bounds, &_startKey, &_startKeyInclusive, &_endKey, &_endKeyInclusive)) {
             _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
 
+            key_string::Builder builder(
+                indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion());
             auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
                 _startKey,
-                indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
                 indexAccessMethod()->getSortedDataInterface()->getOrdering(),
                 _forward,
-                _startKeyInclusive);
+                _startKeyInclusive,
+                builder);
             return _indexCursor->seek(keyStringForSeek);
         } else {
             _checker.reset(new IndexBoundsChecker(&_bounds, _keyPattern, _direction));
 
             if (!_checker->getStartSeekPoint(&_seekPoint))
                 return boost::none;
-            return _indexCursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                _seekPoint,
+            key_string::Builder builder(
                 indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
-                indexAccessMethod()->getSortedDataInterface()->getOrdering(),
-                _forward));
+                indexAccessMethod()->getSortedDataInterface()->getOrdering());
+            return _indexCursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                _seekPoint, _forward, builder));
         }
     }
 }
@@ -182,14 +186,15 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
                 case GETTING_NEXT:
                     kv = _indexCursor->next();
                     break;
-                case NEED_SEEK:
+                case NEED_SEEK: {
                     ++_specificStats.seeks;
-                    kv = _indexCursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                        _seekPoint,
+                    key_string::Builder builder(
                         indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
-                        indexAccessMethod()->getSortedDataInterface()->getOrdering(),
-                        _forward));
+                        indexAccessMethod()->getSortedDataInterface()->getOrdering());
+                    kv = _indexCursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                        _seekPoint, _forward, builder));
                     break;
+                }
                 case HIT_END:
                     _priority.reset();
                     return PlanStage::IS_EOF;

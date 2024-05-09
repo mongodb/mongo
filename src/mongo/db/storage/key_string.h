@@ -690,6 +690,23 @@ public:
             version, _buffer().len(), _ridSize, SharedBufferFragment(newBuf.release(), newBufLen)};
     }
 
+    /**
+     * Ends the build state and returns the buffer held by the builder.
+     * The buffer holds the KeyString with no RecordId or TypeBits encoded, suitable to pass into
+     * SortedDataInterface::seek().
+     * Caller must only use the returned buffer within the lifetime of the builder.
+     *
+     * If 'discriminator' is specified, then it overrides the previously set _discriminator.
+     */
+    StringData finishAndGetBuffer(boost::optional<Discriminator> discriminator = boost::none) {
+        invariant(_state == BuildState::kAppendingBSONElements || _state == BuildState::kEndAdded);
+        if (discriminator) {
+            _discriminator = *discriminator;
+        }
+        _doneAppending();
+        return {_buffer().buf(), static_cast<StringData::size_type>(_buffer().len())};
+    }
+
     void appendRecordId(const RecordId& loc);
     void appendTypeBits(const TypeBits& bits);
 

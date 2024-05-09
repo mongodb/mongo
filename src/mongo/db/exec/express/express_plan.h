@@ -632,12 +632,14 @@ public:
         auto sortedAccessMethod = _indexCatalogEntry->accessMethod()->asSortedData();
         auto indexCursor = sortedAccessMethod->newCursor(opCtx, true /* forward */);
         indexCursor->setEndPosition(endKey, true /* endKeyInclusive */);
+        key_string::Builder builder(
+            sortedAccessMethod->getSortedDataInterface()->getKeyStringVersion());
         auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
             startKey,
-            sortedAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
             sortedAccessMethod->getSortedDataInterface()->getOrdering(),
             true /* forward */,
-            true /* startKeyInclusive */);
+            true /* startKeyInclusive */,
+            builder);
 
         auto keyEntry = indexCursor->seekForKeyValueView(keyStringForSeek);
         if (keyEntry.isEmpty()) {

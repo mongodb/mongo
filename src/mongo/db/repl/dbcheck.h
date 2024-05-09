@@ -144,6 +144,7 @@ struct ReadSourceWithTimestamp {
  * BSON back to keystring format, that keystring will not have a RecordId.
  */
 BSONObj _keyStringToBsonSafeHelper(const key_string::Value& keyString, const Ordering& ordering);
+BSONObj _builderToBsonSafeHelper(const key_string::Builder& builder, const Ordering& ordering);
 
 /**
  * DbCheckAcquisition is a helper class to acquire locks and set RecoveryUnit state for the dbCheck

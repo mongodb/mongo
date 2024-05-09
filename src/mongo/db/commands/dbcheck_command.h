@@ -184,12 +184,12 @@ public:
 
 private:
     /**
-     * Helper that takes in a keystring WITH a RecordId appended at the end, and returns a new
-     * keystring that is identical except without the RecordId appended at the end.
+     * Helper that takes in a keystring WITH a RecordId appended at the end, and returns its
+     * owned buffer without the RecordId appended at the end.
      */
-    key_string::Value _stripRecordIdFromKeyString(const key_string::Value& keyString,
-                                                  const key_string::Version& version,
-                                                  const Collection* collection);
+    StringData _stripRecordIdFromKeyString(const key_string::Value& keyString,
+                                           const key_string::Version& version,
+                                           const Collection* collection);
 
     /**
      * Runs the secondary extra index keys check

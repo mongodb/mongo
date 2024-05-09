@@ -155,8 +155,9 @@ protected:
         // Obtain a cursor over the index, and confirm that the keys are present in order.
         auto indexCursor = getIndexCursor(collection.getCollection(), indexName);
 
-        key_string::Value keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-            BSONObj(), key_string::Version::V1, Ordering::make(BSONObj()), true, true);
+        key_string::Builder builder(key_string::Version::V1);
+        auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+            BSONObj(), Ordering::make(BSONObj()), true, true, builder);
 
         auto indexKey = indexCursor->seek(keyStringForSeek);
         try {

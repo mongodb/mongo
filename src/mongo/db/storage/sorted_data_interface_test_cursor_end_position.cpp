@@ -67,8 +67,9 @@ void testSetEndPosition_Next_Forward(bool unique, bool inclusive) {
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(key3, inclusive);
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-              IndexKeyEntry(key1, loc1));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+        IndexKeyEntry(key1, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
     if (inclusive) {
         ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
@@ -114,8 +115,9 @@ void testSetEndPosition_Next_Reverse(bool unique, bool inclusive) {
     auto cursor = sorted->newCursor(opCtx.get(), false);
     cursor->setEndPosition(key3, inclusive);
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key5, false, true)),
-              IndexKeyEntry(key5, loc1));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key5, false, true).finishAndGetBuffer()),
+        IndexKeyEntry(key5, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key4, loc1));
     if (inclusive) {
         if (!unique) {
@@ -158,23 +160,33 @@ void testSetEndPosition_Seek_Forward(bool unique, bool inclusive) {
     cursor->setEndPosition(key3, inclusive);
 
     // Directly seeking past end is considered out of range.
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key4, true, inclusive)), boost::none);
+    ASSERT_EQ(cursor->seek(
+                  makeKeyStringForSeek(sorted.get(), key4, true, inclusive).finishAndGetBuffer()),
+              boost::none);
 
     // Seeking to key3 directly or indirectly is only returned if endPosition is inclusive.
     auto maybeKey3 = inclusive ? boost::make_optional(IndexKeyEntry(key3, loc1)) : boost::none;
 
     // direct
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, inclusive)), maybeKey3);
+    ASSERT_EQ(cursor->seek(
+                  makeKeyStringForSeek(sorted.get(), key3, true, inclusive).finishAndGetBuffer()),
+              maybeKey3);
 
     // indirect
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, inclusive)), maybeKey3);
+    ASSERT_EQ(cursor->seek(
+                  makeKeyStringForSeek(sorted.get(), key2, true, inclusive).finishAndGetBuffer()),
+              maybeKey3);
 
     cursor->saveUnpositioned();
     removeFromIndex(opCtx.get(), sorted.get(), {{key3, loc1}});
     cursor->restore();
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, inclusive)), boost::none);
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, inclusive)), boost::none);
+    ASSERT_EQ(cursor->seek(
+                  makeKeyStringForSeek(sorted.get(), key2, true, inclusive).finishAndGetBuffer()),
+              boost::none);
+    ASSERT_EQ(cursor->seek(
+                  makeKeyStringForSeek(sorted.get(), key3, true, inclusive).finishAndGetBuffer()),
+              boost::none);
 }
 TEST(SortedDataInterface, SetEndPosition_Seek_Forward_Unique_Inclusive) {
     testSetEndPosition_Seek_Forward(true, true);
@@ -207,24 +219,33 @@ void testSetEndPosition_Seek_Reverse(bool unique, bool inclusive) {
     cursor->setEndPosition(key2, inclusive);
 
     // Directly seeking past end is considered out of range.
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, false, inclusive)),
+    ASSERT_EQ(cursor->seek(
+                  makeKeyStringForSeek(sorted.get(), key1, false, inclusive).finishAndGetBuffer()),
               boost::none);
 
     // Seeking to key2 directly or indirectly is only returned if endPosition is inclusive.
     auto maybeKey2 = inclusive ? boost::make_optional(IndexKeyEntry(key2, loc1)) : boost::none;
 
     // direct
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, false, inclusive)), maybeKey2);
+    ASSERT_EQ(cursor->seek(
+                  makeKeyStringForSeek(sorted.get(), key2, false, inclusive).finishAndGetBuffer()),
+              maybeKey2);
 
     // indirect
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, false, true)), maybeKey2);
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key3, false, true).finishAndGetBuffer()),
+        maybeKey2);
 
     cursor->saveUnpositioned();
     removeFromIndex(opCtx.get(), sorted.get(), {{key2, loc1}});
     cursor->restore();
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, false, true)), boost::none);
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, false, true)), boost::none);
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key3, false, true).finishAndGetBuffer()),
+        boost::none);
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key2, false, true).finishAndGetBuffer()),
+        boost::none);
 }
 TEST(SortedDataInterface, SetEndPosition_Seek_Reverse_Unique_Inclusive) {
     testSetEndPosition_Seek_Reverse(true, true);
@@ -257,8 +278,9 @@ void testSetEndPosition_Restore_Forward(bool unique) {
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(key3, false);  // Should never see key3 or key4.
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-              IndexKeyEntry(key1, loc1));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+        IndexKeyEntry(key1, loc1));
 
     cursor->save();
     cursor->restore();
@@ -300,8 +322,9 @@ void testSetEndPosition_Restore_Reverse(bool unique) {
     auto cursor = sorted->newCursor(opCtx.get(), false);
     cursor->setEndPosition(key2, false);  // Should never see key1 or key2.
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key4, false, true)),
-              IndexKeyEntry(key4, loc1));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key4, false, true).finishAndGetBuffer()),
+        IndexKeyEntry(key4, loc1));
 
     cursor->save();
     cursor->restore();
@@ -346,8 +369,9 @@ void testSetEndPosition_RestoreEndCursor_Forward(bool unique) {
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(key2, true);
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-              IndexKeyEntry(key1, loc1));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+        IndexKeyEntry(key1, loc1));
 
     // A potential source of bugs is not restoring end cursor with saveUnpositioned().
     cursor->saveUnpositioned();
@@ -359,8 +383,9 @@ void testSetEndPosition_RestoreEndCursor_Forward(bool unique) {
                   });
     cursor->restore();
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-              IndexKeyEntry(key1, loc1));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+        IndexKeyEntry(key1, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
     ASSERT_EQ(cursor->next(), boost::none);
 }
@@ -386,8 +411,9 @@ void testSetEndPosition_RestoreEndCursor_Reverse(bool unique) {
     auto cursor = sorted->newCursor(opCtx.get(), false);
     cursor->setEndPosition(key3, true);
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key4, false, true)),
-              IndexKeyEntry(key4, loc1));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key4, false, true).finishAndGetBuffer()),
+        IndexKeyEntry(key4, loc1));
 
     cursor->saveUnpositioned();
     insertToIndex(opCtx.get(),
@@ -398,8 +424,9 @@ void testSetEndPosition_RestoreEndCursor_Reverse(bool unique) {
                   });
     cursor->restore();  // must restore end cursor even with saveUnpositioned().
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key4, false, true)),
-              IndexKeyEntry(key4, loc1));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key4, false, true).finishAndGetBuffer()),
+        IndexKeyEntry(key4, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
     ASSERT_EQ(cursor->next(), boost::none);
 }
@@ -428,8 +455,9 @@ void testSetEndPosition_Empty_Forward(bool unique, bool inclusive) {
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(BSONObj(), inclusive);
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-              IndexKeyEntry(key1, loc1));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+        IndexKeyEntry(key1, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
     ASSERT_EQ(cursor->next(), boost::none);
@@ -463,8 +491,9 @@ void testSetEndPosition_Empty_Reverse(bool unique, bool inclusive) {
     auto cursor = sorted->newCursor(opCtx.get(), false);
     cursor->setEndPosition(BSONObj(), inclusive);
 
-    ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, false, true)),
-              IndexKeyEntry(key3, loc1));
+    ASSERT_EQ(
+        cursor->seek(makeKeyStringForSeek(sorted.get(), key3, false, true).finishAndGetBuffer()),
+        IndexKeyEntry(key3, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key1, loc1));
     ASSERT_EQ(cursor->next(), boost::none);
@@ -498,24 +527,29 @@ void testSetEndPosition_Character_Limits(bool unique, bool inclusive) {
     cursor->setEndPosition(key7, inclusive);
 
     if (inclusive) {
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key7, true, true)),
-                  IndexKeyEntry(key7, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key7, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key7, loc1));
         ASSERT_EQ(cursor->next(), boost::none);
     } else {
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key7, true, true)), boost::none);
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key7, true, true).finishAndGetBuffer()),
+            boost::none);
     }
 
     cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(key8, inclusive);
 
     if (inclusive) {
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key7, true, true)),
-                  IndexKeyEntry(key7, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key7, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key7, loc1));
         ASSERT_EQ(cursor->next(), IndexKeyEntry(key8, loc1));
         ASSERT_EQ(cursor->next(), boost::none);
     } else {
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key7, true, true)),
-                  IndexKeyEntry(key7, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key7, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key7, loc1));
         ASSERT_EQ(cursor->next(), boost::none);
     }
 }

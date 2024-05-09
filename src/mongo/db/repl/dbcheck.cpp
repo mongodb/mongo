@@ -455,6 +455,11 @@ BSONObj _keyStringToBsonSafeHelper(const key_string::Value& keyString, const Ord
         keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
 }
 
+BSONObj _builderToBsonSafeHelper(const key_string::Builder& builder, const Ordering& ordering) {
+    return key_string::toBsonSafe(
+        builder.getBuffer(), builder.getSize(), ordering, builder.getTypeBits());
+}
+
 Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                                                  const Collection* collection,
                                                  const BSONObj& batchStartBson,
@@ -500,7 +505,9 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
     // Note that seekForKeyString/nextKeyString always return a keyString with RecordId appended,
     // regardless of what format the index has.
     for (auto currEntryWithRecordId =
-             indexCursor->seekForKeyString(opCtx, batchStartWithoutRecordId);
+             indexCursor->seekForKeyString(opCtx,
+                                           StringData(batchStartWithoutRecordId.getBuffer(),
+                                                      batchStartWithoutRecordId.getSize()));
          currEntryWithRecordId;
          currEntryWithRecordId = indexCursor->nextKeyString(opCtx)) {
         iassert(opCtx->checkForInterruptNoAssert());
@@ -616,7 +623,8 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
 
             // seekForKeyString returns the closest key string if the exact keystring does not
             // exist.
-            auto ksEntry = cursor->seekForKeyString(opCtx, key);
+            auto ksEntry =
+                cursor->seekForKeyString(opCtx, StringData(key.getBuffer(), key.getSize()));
             // Dbcheck will access every index for each document, and we aim for the count to
             // represent the storage accesses. Therefore, we increment the number of keys seen.
             _countKeysSeen++;

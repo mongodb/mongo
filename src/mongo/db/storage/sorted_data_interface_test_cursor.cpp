@@ -68,7 +68,8 @@ TEST(SortedDataInterface, CursorIsEOFWhenEmpty) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT(!cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true)));
+        ASSERT(!cursor->seek(
+            makeKeyStringForSeek(sorted.get(), BSONObj(), true, true).finishAndGetBuffer()));
         // Cursor at EOF should remain at EOF when advanced
         ASSERT(!cursor->next());
     }
@@ -91,7 +92,8 @@ TEST(SortedDataInterface, CursorIsEOFWhenEmptyReversed) {
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
 
-        ASSERT(!cursor->seek(makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true)));
+        ASSERT(!cursor->seek(
+            makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true).finishAndGetBuffer()));
 
         // Cursor at EOF should remain at EOF when advanced
         ASSERT(!cursor->next());
@@ -452,7 +454,8 @@ void testBoundaries(IndexType type, bool forward, bool inclusive) {
         auto endKey = BSON("" << endVal);
         cursor->setEndPosition(endKey, inclusive);
 
-        auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), startKey, forward, inclusive));
+        auto entry = cursor->seek(
+            makeKeyStringForSeek(sorted.get(), startKey, forward, inclusive).finishAndGetBuffer());
 
         // Check that the cursor returns the expected values in range.
         int step = forward ? 1 : -1;

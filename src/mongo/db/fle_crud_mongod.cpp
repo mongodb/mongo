@@ -318,11 +318,10 @@ private:
                                key_string::Discriminator::kInclusive);
 
         kb.appendBinData(BSONBinData(block.data(), block.size(), BinDataGeneral));
-        key_string::Value id(kb.getValueCopy());
 
         incrementRead();
 
-        auto loc = _indexCursor->seekExact(id);
+        auto loc = _indexCursor->seekExact(kb.finishAndGetBuffer());
         if (!loc) {
             return boost::none;
         }

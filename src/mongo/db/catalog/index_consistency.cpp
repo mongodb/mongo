@@ -763,7 +763,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
 
     key_string::Builder firstKeyStringBuilder(
         version, BSONObj(), indexInfo.ord, key_string::Discriminator::kExclusiveBefore);
-    const key_string::Value firstKeyString = firstKeyStringBuilder.getValueCopy();
+    StringData firstKeyString = firstKeyStringBuilder.finishAndGetBuffer();
     boost::optional<KeyStringEntry> prevIndexKeyStringEntry;
 
     // Ensure that this index has an open index cursor.
@@ -777,6 +777,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
         indexEntry = indexCursor->seekForKeyString(opCtx, firstKeyString);
     } catch (const DBException& ex) {
         if (TestingProctor::instance().isEnabled() && ex.code() != ErrorCodes::WriteConflict) {
+            const key_string::Value firstKeyString = firstKeyStringBuilder.getValueCopy();
             LOGV2_FATAL(5318400,
                         "Error seeking to first key",
                         "error"_attr = ex.toString(),

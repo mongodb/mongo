@@ -291,32 +291,39 @@ public:
         /**
          * Seeks to the provided keyString and returns the KeyStringEntry.
          * The provided keyString has discriminator information encoded.
+         * The keyString should not have RecordId or TypeBits encoded, which is guaranteed if
+         * obtained from BuilderBase::finishAndGetBuffer().
          */
-        virtual boost::optional<KeyStringEntry> seekForKeyString(
-            const key_string::Value& keyString) = 0;
+        virtual boost::optional<KeyStringEntry> seekForKeyString(StringData keyString) = 0;
 
         /**
          * Seeks to the provided keyString and returns the SortedDataKeyValueView.
          * The provided keyString has discriminator information encoded.
+         * The keyString should not have RecordId or TypeBits encoded, which is guaranteed if
+         * obtained from BuilderBase::finishAndGetBuffer().
+         *
          * Returns unowned data, which is invalidated upon calling a next() or seek()
          * variant, a save(), or when the cursor is destructed.
          */
-        virtual SortedDataKeyValueView seekForKeyValueView(const key_string::Value& keyString) = 0;
+        virtual SortedDataKeyValueView seekForKeyValueView(StringData keyString) = 0;
 
         /**
          * Seeks to the provided keyString and returns the IndexKeyEntry.
          * The provided keyString has discriminator information encoded.
+         * The keyString should not have RecordId or TypeBits encoded, which is guaranteed if
+         * obtained from BuilderBase::finishAndGetBuffer().
          */
         virtual boost::optional<IndexKeyEntry> seek(
-            const key_string::Value& keyString,
-            KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
+            StringData keyString, KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
 
         /**
          * Seeks to the provided keyString and returns the RecordId of the matching key, or
          * boost::none if one does not exist.
-         * The provided key must always have a kInclusive discriminator.
+         * The provided keyString must always have a kInclusive discriminator.
+         * The keyString should not have RecordId or TypeBits encoded, which is guaranteed if
+         * obtained from BuilderBase::finishAndGetBuffer().
          */
-        virtual boost::optional<RecordId> seekExact(const key_string::Value& keyString) = 0;
+        virtual boost::optional<RecordId> seekExact(StringData keyString) = 0;
 
         //
         // Saving and restoring state

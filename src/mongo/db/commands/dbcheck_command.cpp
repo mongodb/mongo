@@ -613,13 +613,11 @@ void DbChecker::doCollection(OperationContext* opCtx) {
 }
 
 
-key_string::Value DbChecker::_stripRecordIdFromKeyString(const key_string::Value& keyString,
-                                                         const key_string::Version& version,
-                                                         const Collection* collection) {
+StringData DbChecker::_stripRecordIdFromKeyString(const key_string::Value& keyString,
+                                                  const key_string::Version& version,
+                                                  const Collection* collection) {
     const size_t keyStringSize = keyString.getSizeWithoutRecordId();
-    key_string::Builder keyStringBuilder(version);
-    keyStringBuilder.resetFromBuffer(keyString.getBuffer(), keyStringSize);
-    return keyStringBuilder.getValueCopy();
+    return {keyString.getBuffer(), keyStringSize};
 }
 
 void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
@@ -1140,15 +1138,14 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
 
     BSONObj snapshotFirstKeyStringBsonRehydrated = BSONObj();
     boost::optional<KeyStringEntry> currIndexKeyWithRecordId = boost::none;
-    // Create keystring to seek without recordId. This is because if the index
-    // is an older format unique index, the keystring will not have the recordId appended, so we
-    // need to seek for the keystring without the recordId.
-    key_string::Value snapshotFirstKeyWithoutRecordId;
 
     // If we're in the middle of an index check, snapshotFirstKeyWithRecordId should be set.
     // Strip the recordId and seek.
     if (snapshotFirstKeyWithRecordId.is_initialized()) {
-        snapshotFirstKeyWithoutRecordId = _stripRecordIdFromKeyString(
+        // Create keystring to seek without recordId. This is because if the index
+        // is an older format unique index, the keystring will not have the recordId appended, so we
+        // need to seek for the keystring without the recordId.
+        auto snapshotFirstKeyWithoutRecordId = _stripRecordIdFromKeyString(
             snapshotFirstKeyWithRecordId.get(), version, collection.get());
         snapshotFirstKeyStringBsonRehydrated = key_string::rehydrateKey(
             index->keyPattern(),
@@ -1168,10 +1165,9 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
             key_string::Builder keyStringBuilder(version);
             keyStringBuilder.resetToKey(_info.start, ordering);
 
-            snapshotFirstKeyWithoutRecordId = keyStringBuilder.getValueCopy();
+            auto snapshotFirstKeyWithoutRecordId = keyStringBuilder.finishAndGetBuffer();
             snapshotFirstKeyStringBsonRehydrated = key_string::rehydrateKey(
-                index->keyPattern(),
-                _keyStringToBsonSafeHelper(snapshotFirstKeyWithoutRecordId, ordering));
+                index->keyPattern(), _builderToBsonSafeHelper(keyStringBuilder, ordering));
 
             // seek for snapshotFirstKeyWithoutRecordId.
             // Note that seekForKeyString always returns a keyString with RecordId appended,
@@ -1439,9 +1435,10 @@ bool DbChecker::_shouldEndCatalogSnapshotOrBatch(
         // key we just checked), we need update it to the next distinct one. We make a keystring to
         // search with kExclusiveAfter so that seekForKeyString will seek to the next distinct
         // keyString after the current one.
+        key_string::Builder builder(version);
         auto keyStringForSeekWithoutRecordId =
             IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-                currKeyStringBson, version, ordering, true /*isForward*/, false /*inclusive*/);
+                currKeyStringBson, ordering, true /*isForward*/, false /*inclusive*/, builder);
 
 
         // Check to make sure there are still more distinct keys in the index.

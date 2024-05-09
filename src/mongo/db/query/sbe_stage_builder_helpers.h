@@ -1298,15 +1298,18 @@ makeKeyStringPair(const BSONObj& lowKey,
     // index scan. The logic for computing a "discriminator" for an "end" key is reversed, which
     // is why we use 'makeKeyStringFromBSONKey()' to manually specify the discriminator for the
     // end key.
-    return {
-        std::make_unique<key_string::Value>(IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-            lowKey, version, ordering, forward, lowKeyInclusive)),
-        std::make_unique<key_string::Value>(IndexEntryComparison::makeKeyStringFromBSONKey(
-            highKey,
-            version,
-            ordering,
-            forward != highKeyInclusive ? key_string::Discriminator::kExclusiveBefore
-                                        : key_string::Discriminator::kExclusiveAfter))};
+    key_string::Builder lowBuilder(version);
+    IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+        lowKey, ordering, forward, lowKeyInclusive, lowBuilder);
+    key_string::Builder highBuilder(version);
+    IndexEntryComparison::makeKeyStringFromBSONKey(highKey,
+                                                   ordering,
+                                                   forward != highKeyInclusive
+                                                       ? key_string::Discriminator::kExclusiveBefore
+                                                       : key_string::Discriminator::kExclusiveAfter,
+                                                   highBuilder);
+    return {std::make_unique<key_string::Value>(lowBuilder.getValueCopy()),
+            std::make_unique<key_string::Value>(highBuilder.getValueCopy())};
 }
 
 /**
