@@ -5486,6 +5486,8 @@ buildvariants:
   expansions:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=MSan
+    # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
+    posix_configure_flags: -DENABLE_LZ4=0 -DENABLE_SNAPPY=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0
     # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
     # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
