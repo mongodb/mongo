@@ -648,7 +648,7 @@ boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::repo
     auto opCtx = cc().getOperationContext();
     invariant(opCtx);
     if (state == RecipientStateEnum::kBuildingIndex) {
-        _fetchBuildIndexMetrics(opCtx);
+        _tryFetchBuildIndexMetrics(opCtx);
     }
     return _metrics->reportForCurrentOp();
 }
@@ -1589,15 +1589,24 @@ CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortS
     return _abortSource->token();
 }
 
-void ReshardingRecipientService::RecipientStateMachine::_fetchBuildIndexMetrics(
+void ReshardingRecipientService::RecipientStateMachine::_tryFetchBuildIndexMetrics(
     OperationContext* opCtx) {
-    AutoGetCollection tempReshardingColl(opCtx, _metadata.getTempReshardingNss(), MODE_IS);
-    auto indexCatalog = tempReshardingColl->getIndexCatalog();
-    invariant(indexCatalog,
-              str::stream() << "Collection is missing index catalog: "
-                            << _metadata.getTempReshardingNss().toStringForErrorMsg());
-    _metrics->setIndexesToBuild(indexCatalog->numIndexesTotal());
-    _metrics->setIndexesBuilt(indexCatalog->numIndexesReady());
+    try {
+        AutoGetCollection tempReshardingColl(opCtx, _metadata.getTempReshardingNss(), MODE_IS);
+        auto indexCatalog = tempReshardingColl->getIndexCatalog();
+        invariant(indexCatalog,
+                  str::stream() << "Collection is missing index catalog: "
+                                << _metadata.getTempReshardingNss().toStringForErrorMsg());
+        _metrics->setIndexesToBuild(indexCatalog->numIndexesTotal());
+        _metrics->setIndexesBuilt(indexCatalog->numIndexesReady());
+    } catch (const DBException& e) {
+        if (!opCtx->checkForInterruptNoAssert().isOK()) {
+            // If the $currentOp operation itself was killed, don't bother logging the warning.
+            return;
+        }
+        LOGV2_WARNING(
+            9037600, "Unable to fetch index build metrics", "reason"_attr = redact(e.toStatus()));
+    }
 }
 
 void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancelled) {
