@@ -1937,5 +1937,17 @@ export function blockProcessingTestCases(timeFieldName,
             ],
             usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
+        {
+            name: "GroupByWithComplexIdExpr",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {
+                    $group: {
+                        _id: {$lt: [29336, {$mod: ["$b", 1.0]}]},
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
     ];
 }
