@@ -152,6 +152,8 @@
 
 namespace mongo {
 namespace {
+// Ticks for server-side Javascript deprecation log messages.
+Rarely _samplerFunctionJs, _samplerWhereClause;
 
 MONGO_FAIL_POINT_DEFINE(allowExternalReadsForReverseOplogScanRule);
 
@@ -231,6 +233,21 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
         if (parsedRequest->findCommandRequest->getIncludeQueryStatsMetrics()) {
             CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested = true;
         }
+    }
+
+    // Check for server-side javascript usage after parsing is complete and the flags have been set
+    // on the expression context.
+    if (expCtx->hasServerSideJs.where && _samplerWhereClause.tick()) {
+        LOGV2_WARNING(8996500,
+                      "$where is deprecated. For more information, see "
+                      "https://www.mongodb.com/docs/manual/reference/operator/query/where/");
+    }
+
+    if (expCtx->hasServerSideJs.function && _samplerFunctionJs.tick()) {
+        LOGV2_WARNING(
+            8996501,
+            "$function is deprecated. For more information, see "
+            "https://www.mongodb.com/docs/manual/reference/operator/aggregation/function/");
     }
 
     // TODO: SERVER-73632 Remove feature flag for PM-635.

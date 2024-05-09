@@ -76,6 +76,7 @@ Value ExpressionFunction::serialize(const SerializationOptions& options) const {
 boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* const expCtx,
                                                            BSONElement expr,
                                                            const VariablesParseState& vps) {
+    expCtx->hasServerSideJs.function = true;
 
     uassert(4660800,
             str::stream() << kExpressionName << " cannot be used inside a validator.",
