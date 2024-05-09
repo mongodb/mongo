@@ -14,18 +14,6 @@ env.Benchmark(
     ],
 )
 
-env.Library(
-    target='stdx',
-    source=[
-        'set_terminate_internals.cpp',
-    ],
-    LIBDEPS=[
-        # Ideally, there should be no linking dependencies upon any other libraries, for `libstdx`.
-        # This library is a shim filling in for deficiencies in various standard library
-        # implementations.  There should never be any link-time dependencies into mongo internals.
-    ],
-)
-
 env.CppUnitTest(
     target='stdx_test',
     source=[

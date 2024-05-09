@@ -1,0 +1,19 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# Ideally, there should be no linking dependencies upon any other libraries, for `libstdx`.
+# This library is a shim filling in for deficiencies in various standard library
+# implementations.  There should never be any link-time dependencies into mongo internals.
+mongo_cc_library(
+    name = "stdx",
+    srcs = [
+        "set_terminate_internals.cpp",
+    ],
+    hdrs = select({
+        "@platforms//os:windows": [
+            "exception.h",
+        ],
+        "//conditions:default": [],
+    }),
+)
