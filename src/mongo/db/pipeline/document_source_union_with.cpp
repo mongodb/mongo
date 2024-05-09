@@ -108,12 +108,6 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         globalOpCounters.gotNestedAggregate();
     }
     _pipeline->getContext()->inUnionWith = true;
-
-    // If this pipeline is being run as part of explain, then cache a copy to use later during
-    // serialization.
-    if (expCtx->explain >= ExplainOptions::Verbosity::kExecStats) {
-        _cachedPipeline = _pipeline->getSources();
-    }
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
@@ -330,11 +324,7 @@ Pipeline::SourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
         _pipeline->addFinalSource(nextStage->clone(_pipeline->getContext()));
         // Apply the same rewrite to the cached pipeline if available.
         if (pExpCtx->explain >= ExplainOptions::Verbosity::kExecStats) {
-            auto cloneForExplain = nextStage->clone(_pipeline->getContext());
-            if (!_cachedPipeline.empty()) {
-                cloneForExplain->setSource(_cachedPipeline.back().get());
-            }
-            _cachedPipeline.push_back(std::move(cloneForExplain));
+            _pushedDownStages.push_back(nextStage->serialize().getDocument().toBson());
         }
         auto newStageItr = container->insert(itr, std::move(nextStage));
         container->erase(std::next(itr));
@@ -368,6 +358,7 @@ void DocumentSourceUnionWith::doDispose() {
         if (!_pipeline->getContext()->explain) {
             _pipeline->dispose(pExpCtx->opCtx);
             _userPipeline.clear();
+            _pushedDownStages.clear();
             _pipeline.reset();
         }
     }
@@ -390,10 +381,18 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             pipeCopy = Pipeline::create(_pipeline->getSources(), _pipeline->getContext()).release();
         } else if (*opts.verbosity >= ExplainOptions::Verbosity::kExecStats &&
                    _executionState > ExecutionProgress::kIteratingSource) {
+            std::vector<BSONObj> recoveredPipeline;
             // We've either exhausted the sub-pipeline or at least started iterating it. Use the
-            // cached pipeline to get the explain output since the '_pipeline' may have been
-            // modified for any optimizations or pushdowns into the initial $cursor stage.
-            pipeCopy = Pipeline::create(_cachedPipeline, _pipeline->getContext()).release();
+            // cached user pipeline and pushed down stages to get the explain output since the
+            // '_pipeline' may have been modified for any optimizations or pushdowns into the
+            // initial $cursor stage.
+            recoveredPipeline.reserve(_userPipeline.size() + _pushedDownStages.size());
+            std::move(
+                _userPipeline.begin(), _userPipeline.end(), std::back_inserter(recoveredPipeline));
+            std::move(_pushedDownStages.begin(),
+                      _pushedDownStages.end(),
+                      std::back_inserter(recoveredPipeline));
+            pipeCopy = Pipeline::parse(recoveredPipeline, _pipeline->getContext()).release();
         } else {
             // The plan does not require reading from the sub-pipeline, so just include the
             // serialization in the explain output.

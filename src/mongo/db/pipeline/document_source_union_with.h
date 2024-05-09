@@ -235,12 +235,15 @@ private:
         const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e);
 
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
-    Pipeline::SourceContainer _cachedPipeline;
     // The original, unresolved namespace to union.
     NamespaceString _userNss;
     // The aggregation pipeline defined with the user request, prior to optimization and view
     // resolution.
     std::vector<BSONObj> _userPipeline;
+    // Match and/or project stages after a $unionWith can be pushed down into the $unionWith (and
+    // the head of the pipeline). If we're doing an explain with execution stats, we will need
+    // copies of these stages as they may be pushed down to the find layer.
+    std::vector<BSONObj> _pushedDownStages;
     ExecutionProgress _executionState = ExecutionProgress::kIteratingSource;
     UnionWithStats _stats;
 };
