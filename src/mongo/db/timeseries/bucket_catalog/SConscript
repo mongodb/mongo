@@ -43,7 +43,6 @@ env.CppUnitTest(
     source=[
         'bucket_catalog_helpers_test.cpp',
         'bucket_catalog_test.cpp',
-        'bucket_metadata_test.cpp',
         'bucket_state_registry_test.cpp',
         'minmax_test.cpp',
         'measurement_map_test.cpp',

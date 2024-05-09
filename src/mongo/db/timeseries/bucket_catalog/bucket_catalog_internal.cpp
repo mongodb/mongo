@@ -192,6 +192,7 @@ StripeNumber getStripeNumber(const BucketKey& key, size_t numberOfStripes) {
 }
 
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
+    TrackingContext& trackingContext,
     const UUID& collectionUUID,
     const StringDataComparator* comparator,
     const TimeseriesOptions& options,
@@ -218,7 +219,8 @@ StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
     auto key =
-        BucketKey{collectionUUID, BucketMetadata{metadata, comparator, options.getMetaField()}};
+        BucketKey{collectionUUID,
+                  BucketMetadata{trackingContext, metadata, comparator, options.getMetaField()}};
 
     return {std::make_pair(std::move(key), time)};
 }
@@ -574,7 +576,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
     }
 
     // Now actually mark this bucket as open.
-    stripe.openBucketsByKey[key.cloneAsUntracked()].emplace(unownedBucket);
+    stripe.openBucketsByKey[key].emplace(unownedBucket);
     stats.incNumBucketsReopened();
 
     catalog.numberOfActiveBuckets.fetchAndAdd(1);
@@ -760,8 +762,8 @@ void removeBucket(
     markBucketNotIdle(stripe, stripeLock, bucket);
 
     // If the bucket was rolled over, then there may be a different open bucket for this metadata.
-    auto openIt = stripe.openBucketsByKey.find(
-        {bucket.bucketId.collectionUUID, bucket.key.metadata.cloneAsUntracked()});
+    auto openIt =
+        stripe.openBucketsByKey.find({bucket.bucketId.collectionUUID, bucket.key.metadata});
     if (openIt != stripe.openBucketsByKey.end()) {
         auto& openSet = openIt->second;
         auto bucketIt = openSet.find(&bucket);
@@ -912,12 +914,11 @@ InsertResult getReopeningContext(OperationContext* opCtx,
         }
 
         return ReopeningContext{
-            catalog, stripe, stripeLock, info.key.cloneAsUntracked(), catalogEra, archived.value()};
+            catalog, stripe, stripeLock, info.key, catalogEra, archived.value()};
     }
 
     if (allowQueryBasedReopening == AllowQueryBasedReopening::kDisallow) {
-        return ReopeningContext{
-            catalog, stripe, stripeLock, info.key.cloneAsUntracked(), catalogEra, {}};
+        return ReopeningContext{catalog, stripe, stripeLock, info.key, catalogEra, {}};
     }
 
     // Synchronize concurrent disk accesses. An outstanding reopening request or prepared batch for
@@ -946,7 +947,7 @@ InsertResult getReopeningContext(OperationContext* opCtx,
     return ReopeningContext{catalog,
                             stripe,
                             stripeLock,
-                            info.key.cloneAsUntracked(),
+                            info.key,
                             catalogEra,
                             generateReopeningPipeline(opCtx,
                                                       time,
@@ -1151,7 +1152,7 @@ Bucket& allocateBucket(OperationContext* opCtx,
             make_unique_tracked<Bucket>(catalog.trackingContext,
                                         catalog.trackingContext,
                                         bucketId,
-                                        info.key.cloneAsTracked(catalog.trackingContext),
+                                        info.key,
                                         info.options.getTimeField(),
                                         roundedTime,
                                         catalog.bucketStateRegistry));
@@ -1165,13 +1166,13 @@ Bucket& allocateBucket(OperationContext* opCtx,
             inserted);
 
     Bucket* bucket = it->second.get();
-    stripe.openBucketsByKey[info.key.cloneAsUntracked()].emplace(bucket);
+    stripe.openBucketsByKey[info.key].emplace(bucket);
 
     auto status = initializeBucketState(catalog.bucketStateRegistry, bucket->bucketId);
     if (!status.isOK()) {
         // Don't track the memory usage for the bucket keys in this data structure because it is
         // already being tracked by the Bucket itself.
-        stripe.openBucketsByKey[info.key.cloneAsUntracked()].erase(bucket);
+        stripe.openBucketsByKey[info.key].erase(bucket);
         stripe.openBucketsById.erase(it);
         throwWriteConflictException(status.reason());
     }

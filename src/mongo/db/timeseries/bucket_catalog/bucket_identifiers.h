@@ -73,9 +73,6 @@ struct BucketKey {
     BucketKey() = delete;
     BucketKey(const UUID& collectionUUID, BucketMetadata meta);
 
-    BucketKey cloneAsUntracked() const;
-    BucketKey cloneAsTracked(TrackingContext&) const;
-
     UUID collectionUUID;
     BucketMetadata metadata;
     Hash hash;
@@ -91,9 +88,6 @@ struct BucketKey {
     friend H AbslHashValue(H h, const BucketKey& key) {
         return H::combine(std::move(h), key.collectionUUID, key.metadata);
     }
-
-private:
-    BucketKey(const UUID& collectionUUID, BucketMetadata, Hash);
 };
 
 /**

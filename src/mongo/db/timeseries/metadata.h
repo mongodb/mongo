@@ -43,8 +43,9 @@ namespace mongo::timeseries::metadata {
  * value will be added to 'builder' with the specified field name; otherwise it will be added with
  * its original field name.
  */
+template <class Allocator>
 void normalize(const BSONElement& elem,
-               BSONObjBuilder& builder,
+               allocator_aware::BSONObjBuilder<Allocator>& builder,
                boost::optional<StringData> as = boost::none);
 
 }  // namespace mongo::timeseries::metadata

@@ -168,7 +168,7 @@ std::shared_ptr<WriteBatch> activeBatch(TrackingContext& trackingContext,
                               std::make_shared<WriteBatch>(
                                   trackingContext,
                                   BucketHandle{bucket.bucketId, stripe},
-                                  bucket.key.cloneAsUntracked(),
+                                  bucket.key,
                                   opId,
                                   stats,
                                   StringData{bucket.timeField.data(), bucket.timeField.size()}))
