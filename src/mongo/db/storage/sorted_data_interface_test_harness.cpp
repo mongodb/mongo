@@ -96,6 +96,11 @@ key_string::Value makeKeyString(SortedDataInterface* sorted,
     return builder.getValueCopy();
 }
 
+key_string::Builder makeKeyStringForSeek(SortedDataInterface* sorted, BSONObj bsonKey) {
+    key_string::Builder builder(sorted->getKeyStringVersion(), bsonKey, sorted->getOrdering());
+    return builder;
+}
+
 key_string::Builder makeKeyStringForSeek(SortedDataInterface* sorted,
                                          BSONObj bsonKey,
                                          bool isForward,

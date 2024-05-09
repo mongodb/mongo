@@ -119,7 +119,7 @@ public:
      * This will not accept a KeyString with a Discriminator other than kInclusive.
      */
     virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
-                                              const key_string::Value& keyString) const = 0;
+                                              StringData keyString) const = 0;
 
     /**
      * Return ErrorCodes::DuplicateKey if there is more than one occurence of 'KeyString' in this

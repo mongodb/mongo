@@ -530,8 +530,8 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
                                                  const CollectionPtr& collection,
                                                  const IndexCatalogEntry* entry,
                                                  const BSONObj& requestedKey) const {
-    // Generate the key for this index.
-    key_string::Value actualKey = [&]() {
+    boost::optional<RecordId> loc = [&]() {
+        // Generate the key for this index.
         if (entry->getCollator()) {
             // For performance, call get keys only if there is a non-simple collation.
             SharedBufferFragmentBuilder pooledBuilder(
@@ -553,17 +553,25 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
                     multikeyPaths,
                     boost::none /* loc */);
             invariant(keys->size() == 1);
-            return *keys->begin();
+            const key_string::Value& actualKey = *keys->begin();
+            dassert(key_string::decodeDiscriminator(actualKey.getBuffer(),
+                                                    actualKey.getSize(),
+                                                    getSortedDataInterface()->getOrdering(),
+                                                    actualKey.getTypeBits()) ==
+                    key_string::Discriminator::kInclusive);
+            return _newInterface->findLoc(
+                opCtx,
+                StringData(actualKey.getBuffer(),
+                           static_cast<StringData::size_type>(actualKey.getSize())));
         } else {
-            key_string::HeapBuilder requestedKeyString(
-                getSortedDataInterface()->getKeyStringVersion(),
-                requestedKey,
-                getSortedDataInterface()->getOrdering());
-            return requestedKeyString.release();
+            key_string::Builder requestedKeyString(getSortedDataInterface()->getKeyStringVersion(),
+                                                   requestedKey,
+                                                   getSortedDataInterface()->getOrdering());
+            return _newInterface->findLoc(opCtx, requestedKeyString.finishAndGetBuffer());
         }
     }();
 
-    if (auto loc = _newInterface->findLoc(opCtx, actualKey)) {
+    if (loc) {
         dassert(!loc->isNull());
         return std::move(*loc);
     }
