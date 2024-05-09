@@ -189,7 +189,12 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
     return _withShardVersionRetry(opCtx, nss, reason, [&] {
         auto cri = getTrackedCollectionRoutingInfo(opCtx, nss);
         return MigrationDestinationManager::getCollectionIndexes(
-            opCtx, nss, cri.cm.getMinKeyShardIdWithSimpleCollation(), cri, afterClusterTime);
+            opCtx,
+            nss,
+            cri.cm.getMinKeyShardIdWithSimpleCollation(),
+            cri,
+            afterClusterTime,
+            /*normalizeMissingCollation=*/true);
     });
 }
 

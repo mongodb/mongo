@@ -118,6 +118,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/index_version.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
@@ -908,7 +909,8 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     const NamespaceString& nss,
     const ShardId& fromShardId,
     const boost::optional<CollectionRoutingInfo>& cri,
-    boost::optional<Timestamp> afterClusterTime) {
+    boost::optional<Timestamp> afterClusterTime,
+    bool expandSimpleCollation) {
     auto fromShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromShardId));
 
@@ -928,6 +930,10 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
         cmd = cmd.addFields(makeLocalReadConcernWithAfterClusterTime(*afterClusterTime));
     }
 
+    expandSimpleCollation = expandSimpleCollation &&
+        resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
     // Get indexes by calling listIndexes against the donor.
     auto indexes = uassertStatusOK(
         fromShard->runExhaustiveCursorCommand(opCtx,
@@ -938,15 +944,22 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     for (auto&& spec : indexes.docs) {
         if (spec[IndexDescriptor::kClusteredFieldName]) {
             // The 'clustered' index is implicitly created upon clustered collection creation.
-        } else {
-            donorIndexSpecs.push_back(spec);
-            if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName]) {
-                if (indexNameElem.type() == BSONType::String &&
-                    indexNameElem.valueStringData() == "_id_"_sd) {
-                    donorIdIndexSpec = spec;
-                }
-            }
+            continue;
         }
+
+        if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName];
+            indexNameElem.type() == BSONType::String &&
+            indexNameElem.valueStringData() == "_id_"_sd) {
+            // The _id index always uses the collection's default collation and so there is no need
+            // to add the collation field to attempt to disambiguate.
+            donorIdIndexSpec = spec;
+        } else if (expandSimpleCollation && !spec[IndexDescriptor::kCollationFieldName]) {
+            spec = BSONObjBuilder(std::move(spec))
+                       .append(IndexDescriptor::kCollationFieldName, CollationSpec::kSimpleSpec)
+                       .obj();
+        }
+
+        donorIndexSpecs.push_back(spec);
     }
 
     return {donorIndexSpecs, donorIdIndexSpec};

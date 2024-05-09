@@ -27,8 +27,15 @@ const timeseriesCollection = reshardingTest.createUnshardedCollection({
     primaryShardName: st.shard0.shardName,
     collOptions: {
         timeseries: timeseriesInfo,
+        collation: {locale: "en_US", strength: 2},
     }
 });
+
+const idxName = "myIndex";
+assert.commandWorked(timeseriesCollection.createIndex(
+    {'meta.x': 1}, {name: idxName, collation: {locale: "simple"}}));
+const preReshardingIndexSpec =
+    timeseriesCollection.getIndexes().filter(idx => idx.name === idxName);
 
 // Insert some docs
 assert.commandWorked(timeseriesCollection.insert([
@@ -53,5 +60,9 @@ assert.eq(timeseriesCollDocPostResharding.unsplittable, true);
 assert.eq(4, st.rs2.getPrimary().getCollection(bucketNss).countDocuments({}));
 assert.eq(0, st.rs0.getPrimary().getCollection(bucketNss).countDocuments({}));
 assert.eq(4, st.s0.getCollection(ns).countDocuments({}));
+
+const postReshardingIndexSpec =
+    timeseriesCollection.getIndexes().filter(idx => idx.name === idxName);
+assert.eq(preReshardingIndexSpec, postReshardingIndexSpec);
 
 reshardingTest.teardown();
