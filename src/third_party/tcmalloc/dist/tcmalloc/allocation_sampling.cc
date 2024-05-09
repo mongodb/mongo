@@ -168,6 +168,7 @@ sized_ptr_t SampleifyAllocation(Static& state, size_t requested_size,
         requested_size, stack_trace.requested_alignment, num_pages,
         stack_trace);
     if (alloc_with_status.status == Profile::Sample::GuardedStatus::Guarded) {
+      TC_CHECK(false, "Mongo check: Allocated from GuardedPageAllocator despite it not being enabled.");
       TC_ASSERT(!IsNormalMemory(alloc_with_status.alloc));
       const PageId p = PageIdContaining(alloc_with_status.alloc);
       PageHeapSpinLockHolder l;
@@ -215,6 +216,9 @@ sized_ptr_t SampleifyAllocation(Static& state, size_t requested_size,
 
   // A span must be provided or created by this point.
   TC_ASSERT_NE(span, nullptr);
+  
+  // Mongo check: the span cannot be inside the GuardedPageAllocator, because we do not enable it.
+  TC_CHECK(!tc_globals.guardedpage_allocator().PointerIsMine(span->start_address()));
 
   stack_trace.sampled_alloc_handle =
       state.sampled_alloc_handle_generator.fetch_add(

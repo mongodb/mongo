@@ -6,7 +6,7 @@ IFS=$'\n\t'
 
 set -vx
 
-LIB_GIT_REVISION=mongo-20240411
+LIB_GIT_REVISION=mongo-20240509
 LIB_GIT_REPO=git@github.com:mongodb-forks/tcmalloc.git
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/tcmalloc
