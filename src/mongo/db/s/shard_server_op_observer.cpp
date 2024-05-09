@@ -853,14 +853,7 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
                                       const BSONObj& collModCmd,
                                       const CollectionOptions& oldCollOptions,
                                       boost::optional<IndexCollModInfo> indexInfo) {
-    // An empty collMod contains only the top-level "collMod": <collection> field. Empty collMods
-    // are sometimes used for FCV upgrades that modify the catalog in a compatible way with existing
-    // data users. These modifications do not change the underlying data assumptions and are
-    // otherwise a no-op since an empty collMod won't change anything.
-    bool emptyCollMod = collModCmd.nFields() <= 1;
-    if (!emptyCollMod) {
-        abortOngoingMigrationIfNeeded(opCtx, nss);
-    }
+    abortOngoingMigrationIfNeeded(opCtx, nss);
 };
 
 void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,

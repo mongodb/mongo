@@ -859,11 +859,6 @@ private:
             _upgradeConfigSettingsSchema(opCtx, requestedVersion);
             _initializePlacementHistory(opCtx, requestedVersion);
         }
-
-        // TODO SERVER-80490: Remove this once 8.0 is released.
-        // Sanitizes the wiredTiger.creationString option from the durable catalog. Removes the
-        // encryption config options since they are ephemeral in nature.
-        _sanitizeCreationConfigString(opCtx, requestedVersion);
     }
 
     void _upgradeConfigSettingsSchema(
@@ -883,73 +878,6 @@ private:
         if (feature_flags::gPlacementHistoryPostFCV3.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
                 requestedVersion, originalVersion)) {
             ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
-        }
-    }
-
-    // TODO SERVER-80490: Remove this method once 8.0 is released.
-    void _sanitizeCreationConfigString(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        // We bypass the UserWritesBlock mode here in order to not see errors arising from the
-        // block. The user already has permission to run FCV at this point and the writes performed
-        // here aren't modifying any user data with the exception of fixing up the collection
-        // metadata.
-        auto originalValue = WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled();
-        ON_BLOCK_EXIT([&] { WriteBlockBypass::get(opCtx).set(originalValue); });
-        WriteBlockBypass::get(opCtx).set(true);
-
-        auto curop = CurOp::get(opCtx);
-        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-            Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-            catalog::forEachCollectionFromDb(
-                opCtx,
-                dbName,
-                MODE_X,
-                [&](const Collection* collection) {
-                    NamespaceStringOrUUID nsOrUUID(dbName, collection->uuid());
-                    CollMod collModCmd(collection->ns());
-
-                    // Nested CurOp for collMod. Namespace should ideally be
-                    // the command namespace for 'dbName' but collMod internally
-                    // overrides the CurOp namespace (through OldClientContext)
-                    // with the namespace of the collection being modified.
-                    CurOp collModCurOp;
-                    collModCurOp.push(opCtx);
-                    {
-                        stdx::lock_guard<Client> lk(*opCtx->getClient());
-                        collModCurOp.setGenericOpRequestDetails_inlock(collection->ns(),
-                                                                       curop->getCommand(),
-                                                                       collModCmd.toBSON({}),
-                                                                       NetworkOp::dbMsg);
-                    }
-
-                    BSONObjBuilder unusedBuilder;
-                    uassertStatusOK(processCollModCommand(
-                        opCtx, nsOrUUID, collModCmd, nullptr, &unusedBuilder));
-
-                    try {
-                        // Logs the collMod statistics if it took longer than the server
-                        // parameter `slowMs` to complete.
-                        collModCurOp.completeAndLogOperation(
-                            {MONGO_LOGV2_DEFAULT_COMPONENT, toLogService(opCtx->getService())},
-                            CollectionCatalog::get(opCtx)
-                                ->getDatabaseProfileSettings(dbName)
-                                .filter);
-                    } catch (const DBException& e) {
-                        LOGV2_WARNING(8592500,
-                                      "unable to log collMod operation during setFCV upgrade",
-                                      "dbName"_attr = dbName,
-                                      "error"_attr = e);
-                    }
-                    return true;
-                },
-                [&](const Collection* coll) {
-                    // Performing sanitisation on node local collections is unnecessary since by
-                    // definition they can use configuration specific to this node.
-                    //
-                    // We also only focus on normal collections that are created by the user.
-                    const auto ns = coll->ns();
-                    return ns.isReplicated() && ns.isNormalCollection() && !ns.isOnInternalDb();
-                });
         }
     }
 

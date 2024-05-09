@@ -465,10 +465,6 @@ public:
         return _coll->isMetadataEqual(otherMetadata);
     }
 
-    void sanitizeCollectionOptions(OperationContext* opCtx) override {
-        MONGO_UNREACHABLE;
-    }
-
     bool needsCappedLock() const override {
         return _coll->needsCappedLock();
     }

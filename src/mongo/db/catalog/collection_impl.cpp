@@ -1928,15 +1928,6 @@ bool CollectionImpl::isMetadataEqual(const BSONObj& otherMetadata) const {
     return !_metadata->toBSON().woCompare(otherMetadata);
 }
 
-void CollectionImpl::sanitizeCollectionOptions(OperationContext* opCtx) {
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
-        const auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        const auto& storageEngineOptions = md.options.storageEngine;
-        md.options.storageEngine =
-            storageEngine->getSanitizedStorageOptionsForSecondaryReplication(storageEngineOptions);
-    });
-}
-
 template <typename Func>
 void CollectionImpl::_writeMetadata(OperationContext* opCtx, Func func) {
     // Even though we are holding an exclusive lock on the Collection there may be an ongoing

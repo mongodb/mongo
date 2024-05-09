@@ -1046,26 +1046,15 @@ Status _collModInternal(OperationContext* opCtx,
             }
         }
 
-        // We perform an empty collMod command during an FCV upgrade to perform sanitization of the
-        // WT creation string.
-        // (Generic FCV reference): This FCV check happens whenever we upgrade to the latest
-        // version.
-        // TODO SERVER-80490: remove this check when 8.0 becomes the next LTS release.
-        const auto version =
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-        if (cmrNew.numModifications == 0 &&
-            (version == multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest ||
-             version == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest)) {
-            writableColl->sanitizeCollectionOptions(opCtx);
-        }
-
         // We involve an empty collMod command during a setFCV downgrade to clean timeseries
         // bucketing parameters in the catalog. So if the FCV is in downgrading or downgraded stage,
         // remove time-series bucketing parameters flag, as nodes older than 7.1 cannot understand
         // this flag.
         // (Generic FCV reference): This FCV check should exist across LTS binary versions.
         // TODO SERVER-80003 remove special version handling when LTS becomes 8.0.
-        if (cmrNew.numModifications == 0 && coll->timeseriesBucketingParametersHaveChanged() &&
+        if (const auto version =
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+            cmrNew.numModifications == 0 && coll->timeseriesBucketingParametersHaveChanged() &&
             version == multiversion::GenericFCV::kDowngradingFromLatestToLastLTS) {
             writableColl->setTimeseriesBucketingParametersChanged(opCtx, boost::none);
         }

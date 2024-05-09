@@ -439,11 +439,6 @@ public:
         return false;
     }
 
-    void sanitizeCollectionOptions(OperationContext* opCtx) final {
-        unimplementedTasserted();
-    }
-
-
     bool needsCappedLock() const final {
         unimplementedTasserted();
         return false;
