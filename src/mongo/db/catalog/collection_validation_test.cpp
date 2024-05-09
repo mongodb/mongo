@@ -716,7 +716,8 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
         ASSERT_FALSE(sortedDataInterface->isEmpty(opCtx)) << "index a_1 should not be empty";
 
         // Check key in index for only document.
-        auto firstKeyString = makeFirstKeyString(*sortedDataInterface);
+        auto first = makeFirstKeyString(*sortedDataInterface);
+        auto firstKeyString = StringData(first.getBuffer(), first.getSize());
         key_string::Value keyStringWithRecordId;
         {
             auto cursor = sortedDataInterface->newCursor(opCtx);

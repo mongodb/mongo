@@ -91,7 +91,7 @@ TEST(SortedDataInterface, KeyFormatStringInsertDuplicates) {
     auto ksSeek = makeKeyStringForSeek(sorted.get(), key1, true, true);
     {
         auto cursor = sorted->newCursor(opCtx.get());
-        auto entry = cursor->seek(ksSeek);
+        auto entry = cursor->seek(ksSeek.finishAndGetBuffer());
         ASSERT(entry);
         ASSERT_EQ(*entry, IndexKeyEntry(key1, rid1));
 
@@ -106,7 +106,7 @@ TEST(SortedDataInterface, KeyFormatStringInsertDuplicates) {
 
     {
         auto cursor = sorted->newCursor(opCtx.get());
-        auto entry = cursor->seekForKeyString(ksSeek);
+        auto entry = cursor->seekForKeyString(ksSeek.finishAndGetBuffer());
         ASSERT(entry);
         ASSERT_EQ(entry->loc, rid1);
         auto ks1 = makeKeyString(sorted.get(), key1, rid1);
@@ -181,7 +181,7 @@ TEST(SortedDataInterface, KeyFormatStringUniqueInsertRemoveDuplicates) {
     auto ksSeek = makeKeyStringForSeek(sorted.get(), key1, true, true);
     {
         auto cursor = sorted->newCursor(opCtx.get());
-        auto entry = cursor->seek(ksSeek);
+        auto entry = cursor->seek(ksSeek.finishAndGetBuffer());
         ASSERT(entry);
         ASSERT_EQ(*entry, IndexKeyEntry(key1, rid3));
 
@@ -195,7 +195,7 @@ TEST(SortedDataInterface, KeyFormatStringUniqueInsertRemoveDuplicates) {
 
     {
         auto cursor = sorted->newCursor(opCtx.get());
-        auto entry = cursor->seekForKeyString(ksSeek);
+        auto entry = cursor->seekForKeyString(ksSeek.finishAndGetBuffer());
         ASSERT(entry);
         ASSERT_EQ(entry->loc, rid3);
         auto ks1 = makeKeyString(sorted.get(), key1, rid3);
@@ -252,7 +252,7 @@ TEST(SortedDataInterface, KeyFormatStringSetEndPosition) {
         auto ksSeek = makeKeyStringForSeek(sorted.get(), key1, true, true);
         auto cursor = sorted->newCursor(opCtx.get());
         cursor->setEndPosition(key1, true /* inclusive */);
-        auto entry = cursor->seek(ksSeek);
+        auto entry = cursor->seek(ksSeek.finishAndGetBuffer());
         ASSERT(entry);
         ASSERT_EQ(*entry, IndexKeyEntry(key1, rid1));
         ASSERT_FALSE(cursor->next());
@@ -263,7 +263,7 @@ TEST(SortedDataInterface, KeyFormatStringSetEndPosition) {
         auto ksSeek = makeKeyStringForSeek(sorted.get(), key1, true, true);
         auto cursor = sorted->newCursor(opCtx.get());
         cursor->setEndPosition(key2, true /* inclusive */);
-        auto entry = cursor->seek(ksSeek);
+        auto entry = cursor->seek(ksSeek.finishAndGetBuffer());
         ASSERT(entry);
         entry = cursor->next();
         ASSERT(entry);
@@ -276,7 +276,7 @@ TEST(SortedDataInterface, KeyFormatStringSetEndPosition) {
         auto ksSeek = makeKeyStringForSeek(sorted.get(), key2, true, true);
         auto cursor = sorted->newCursor(opCtx.get());
         cursor->setEndPosition(key3, false /* inclusive */);
-        auto entry = cursor->seek(ksSeek);
+        auto entry = cursor->seek(ksSeek.finishAndGetBuffer());
         ASSERT(entry);
         ASSERT_EQ(*entry, IndexKeyEntry(key2, rid2));
         ASSERT_FALSE(cursor->next());

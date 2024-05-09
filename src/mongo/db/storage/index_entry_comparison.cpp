@@ -118,13 +118,12 @@ int IndexEntryComparison::compare(const IndexKeyEntry& lhs, const IndexKeyEntry&
     return lhs.loc.compare(rhs.loc);  // is supposed to ignore ordering
 }
 
-key_string::Value IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-    const IndexSeekPoint& seekPoint, key_string::Version version, Ordering ord, bool isForward) {
+StringData IndexEntryComparison::makeKeyStringFromSeekPointForSeek(const IndexSeekPoint& seekPoint,
+                                                                   bool isForward,
+                                                                   key_string::Builder& builder) {
     const bool inclusive = seekPoint.firstExclusive < 0;
     const auto discriminator = isForward == inclusive ? key_string::Discriminator::kExclusiveBefore
                                                       : key_string::Discriminator::kExclusiveAfter;
-
-    key_string::Builder builder(version, ord, discriminator);
 
     // Appends keyPrefix elements to the builder.
     if (seekPoint.prefixLen > 0) {
@@ -144,29 +143,29 @@ key_string::Value IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
         invariant(seekPoint.keySuffix[i]);
         builder.appendBSONElement(*seekPoint.keySuffix[i]);
     }
-    return builder.getValueCopy();
+
+    return builder.finishAndGetBuffer(discriminator);
 }
 
-key_string::Value IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
-                                                                        key_string::Version version,
-                                                                        Ordering ord,
-                                                                        bool isForward,
-                                                                        bool inclusive) {
+StringData IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
+                                                                 Ordering ord,
+                                                                 bool isForward,
+                                                                 bool inclusive,
+                                                                 key_string::Builder& builder) {
     return makeKeyStringFromBSONKey(bsonKey,
-                                    version,
                                     ord,
                                     isForward == inclusive
                                         ? key_string::Discriminator::kExclusiveBefore
-                                        : key_string::Discriminator::kExclusiveAfter);
+                                        : key_string::Discriminator::kExclusiveAfter,
+                                    builder);
 }
 
-key_string::Value IndexEntryComparison::makeKeyStringFromBSONKey(
-    const BSONObj& bsonKey,
-    key_string::Version version,
-    Ordering ord,
-    key_string::Discriminator discrim) {
-    key_string::Builder builder(version, bsonKey, ord, discrim);
-    return builder.getValueCopy();
+StringData IndexEntryComparison::makeKeyStringFromBSONKey(const BSONObj& bsonKey,
+                                                          Ordering ord,
+                                                          key_string::Discriminator discrim,
+                                                          key_string::Builder& builder) {
+    builder.resetToKey(bsonKey, ord, discrim);
+    return builder.finishAndGetBuffer();
 }
 
 Status buildDupKeyErrorStatus(const BSONObj& key,

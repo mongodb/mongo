@@ -190,12 +190,10 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
             }
 
             std::set<FieldRef> multikeyPaths{};
+            key_string::Builder builder(wam->getSortedDataInterface()->getKeyStringVersion(),
+                                        wam->getSortedDataInterface()->getOrdering());
             auto entry = cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                seekPoint,
-                wam->getSortedDataInterface()->getKeyStringVersion(),
-                wam->getSortedDataInterface()->getOrdering(),
-                kForward));
-
+                seekPoint, kForward, builder));
 
             ++stats->numSeeks;
             while (entry) {
@@ -207,16 +205,16 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
                         entry = cursor->next();
                         break;
 
-                    case IndexBoundsChecker::MUST_ADVANCE:
+                    case IndexBoundsChecker::MUST_ADVANCE: {
                         ++stats->numSeeks;
+                        key_string::Builder builder(
+                            wam->getSortedDataInterface()->getKeyStringVersion(),
+                            wam->getSortedDataInterface()->getOrdering());
                         entry =
                             cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                                seekPoint,
-                                wam->getSortedDataInterface()->getKeyStringVersion(),
-                                wam->getSortedDataInterface()->getOrdering(),
-                                kForward));
-
+                                seekPoint, kForward, builder));
                         break;
+                    }
 
                     case IndexBoundsChecker::DONE:
                         entry = boost::none;
@@ -406,12 +404,13 @@ std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
             constexpr bool inclusive = true;
             cursor->setEndPosition(metadataKeyRangeEnd, inclusive);
 
+            key_string::Builder builder(wam->getSortedDataInterface()->getKeyStringVersion());
             auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
                 metadataKeyRangeBegin,
-                wam->getSortedDataInterface()->getKeyStringVersion(),
                 wam->getSortedDataInterface()->getOrdering(),
                 true, /* forward */
-                inclusive);
+                inclusive,
+                builder);
             auto entry = cursor->seek(keyStringForSeek);
             ++stats->numSeeks;
 

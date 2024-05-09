@@ -83,7 +83,8 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
         auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
 
         auto cursor = sdi->newCursor(opCtx.get());
-        auto res = cursor->seek(makeKeyStringForSeek(sdi.get(), BSONObj(), true, true));
+        auto res = cursor->seek(
+            makeKeyStringForSeek(sdi.get(), BSONObj(), true, true).finishAndGetBuffer());
         ASSERT(res);
 
         ASSERT_TRUE(ru->isActive());
@@ -135,7 +136,7 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
         bool forward = true;
         bool inclusive = true;
         auto seekKs = makeKeyStringForSeek(sdi.get(), BSON("" << 1), forward, inclusive);
-        ASSERT(cursor->seek(seekKs));
+        ASSERT(cursor->seek(seekKs.finishAndGetBuffer()));
         ASSERT_TRUE(ru->isActive());
 
         // Committing a WriteUnitOfWork will end the current transaction.
@@ -146,7 +147,7 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
 
         // If a cursor is used after a WUOW commits, it should implicitly start a new
         // transaction.
-        ASSERT(cursor->seek(seekKs));
+        ASSERT(cursor->seek(seekKs.finishAndGetBuffer()));
         ASSERT_TRUE(ru->isActive());
     }
 }
@@ -193,7 +194,7 @@ TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
         bool forward = true;
         bool inclusive = true;
         auto seekKs = makeKeyStringForSeek(sdi.get(), BSON("" << 1), forward, inclusive);
-        auto record = cursor->seek(seekKs);
+        auto record = cursor->seek(seekKs.finishAndGetBuffer());
         ASSERT(record);
         ASSERT_EQ(RecordId(1), record->loc);
 
@@ -238,7 +239,7 @@ TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
 
         auto cur = sdi->newCursor(opCtx.get());
         auto seekKs = makeKeyStringForSeek(sdi.get(), BSON("" << 1), true, true);
-        auto result = cur->seek(seekKs);
+        auto result = cur->seek(seekKs.finishAndGetBuffer());
         ASSERT(result);
         ASSERT_EQ(result->loc, RecordId(1));
     }

@@ -213,7 +213,8 @@ public:
     int compare(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
 
     /**
-     * Encodes the SeekPoint into a KeyString object suitable to pass in to seek().
+     * Given a KeyString Builder reference, encodes the SeekPoint into the builder and returns its
+     * owned buffer suitable to pass in to seek().
      *
      * A KeyString is used for seeking an iterator to a position in a sorted index. The difference
      * between a query KeyString and the KeyStrings inserted into indexes is that a query KeyString
@@ -227,18 +228,16 @@ public:
      * then the field at the corresponding index is marked as exclusive and any subsequent fields
      * are ignored.
      *
-     * Returned objects are for use in lookups only and should never be inserted into the
-     * database, as their format may change. The only reason this is the same type as the
-     * entries in an index is to support storage engines that require comparators that take
-     * arguments of the same type.
+     * Returned buffers are for use in lookups only and should never be inserted into the
+     * database, as their format may change.
      */
-    static key_string::Value makeKeyStringFromSeekPointForSeek(const IndexSeekPoint& seekPoint,
-                                                               key_string::Version version,
-                                                               Ordering ord,
-                                                               bool isForward);
+    static StringData makeKeyStringFromSeekPointForSeek(const IndexSeekPoint& seekPoint,
+                                                        bool isForward,
+                                                        key_string::Builder& builder);
 
     /**
-     * Encodes the BSON Key into a KeyString object to pass in to SortedDataInterface::seek().
+     * Given a KeyString Builder reference, encodes the BSON Key into the builder and returns its
+     * owned buffer to pass in to SortedDataInterface::seek().
      *
      * `isForward` and `inclusive` together decide which discriminator we will put into the
      * KeyString. This logic is closely related to how WiredTiger uses its API
@@ -262,24 +261,24 @@ public:
      * (which is less than bsonKey). WT's search_near() could land either on the previous key or the
      * bsonKey. WT will selectively call prev() if it's on bsonKey.
      */
-    static key_string::Value makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
-                                                             key_string::Version version,
-                                                             Ordering ord,
-                                                             bool isForward,
-                                                             bool inclusive);
+    static StringData makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
+                                                      Ordering ord,
+                                                      bool isForward,
+                                                      bool inclusive,
+                                                      key_string::Builder& builder);
 
     /**
-     * Encodes the BSON Key into a KeyString object to pass in to SortedDataInterface::seek()
-     * or SortedDataInterface::setEndPosition().
+     * Given a KeyString Builder reference, encodes the BSON Key into the builder and returns its
+     * owned buffer to pass in to SortedDataInterface::seek().
      *
      * This funcition is similar to IndexEntryComparison::makeKeyStringFromBSONKeyForSeek()
      * but allows you to pick your own key_string::Discriminator based on wether or not the
      * resulting KeyString is for the start key or end key of a seek.
      */
-    static key_string::Value makeKeyStringFromBSONKey(const BSONObj& bsonKey,
-                                                      key_string::Version version,
-                                                      Ordering ord,
-                                                      key_string::Discriminator discrim);
+    static StringData makeKeyStringFromBSONKey(const BSONObj& bsonKey,
+                                               Ordering ord,
+                                               key_string::Discriminator discrim,
+                                               key_string::Builder& builder);
 
 private:
     // Ordering is used in comparison() to compare BSONElements

@@ -639,7 +639,8 @@ size_t SimpleIndexScanStage::estimateCompileTimeSize() const {
 }
 
 SortedDataKeyValueView SimpleIndexScanStage::seek() {
-    return _cursor->seekForKeyValueView(getSeekKeyLow());
+    auto& query = getSeekKeyLow();
+    return _cursor->seekForKeyValueView(StringData(query.getBuffer(), query.getSize()));
 }
 
 bool SimpleIndexScanStage::validateKey(const SortedDataKeyValueView& key) {
@@ -752,8 +753,9 @@ size_t GenericIndexScanStage::estimateCompileTimeSize() const {
 }
 
 SortedDataKeyValueView GenericIndexScanStage::seek() {
-    return _cursor->seekForKeyValueView(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-        _seekPoint, _params.version, _params.ord, _forward));
+    key_string::Builder builder(_params.version, _params.ord);
+    return _cursor->seekForKeyValueView(
+        IndexEntryComparison::makeKeyStringFromSeekPointForSeek(_seekPoint, _forward, builder));
 }
 
 bool GenericIndexScanStage::validateKey(const SortedDataKeyValueView& key) {

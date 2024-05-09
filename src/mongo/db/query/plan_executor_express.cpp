@@ -273,12 +273,14 @@ RecordId PlanExecutorExpress::getRIDForPoint(const BSONElement& val) const {
     // Now seek to the first matching key in the index.
     auto indexCursor = sortedAccessMethod->newCursor(_opCtx, true /* forward */);
     indexCursor->setEndPosition(endKey, true /* endKeyInclusive */);
+    key_string::Builder builder(
+        sortedAccessMethod->getSortedDataInterface()->getKeyStringVersion());
     auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
         startKey,
-        sortedAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
         sortedAccessMethod->getSortedDataInterface()->getOrdering(),
         true /* forward */,
-        true /* startKeyInclusive */);
+        true /* startKeyInclusive */,
+        builder);
     auto kv =
         indexCursor->seek(keyStringForSeek, SortedDataInterface::Cursor::KeyInclusion::kExclude);
     if (!kv) {

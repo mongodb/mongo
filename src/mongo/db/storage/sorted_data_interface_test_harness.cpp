@@ -96,10 +96,10 @@ key_string::Value makeKeyString(SortedDataInterface* sorted,
     return builder.getValueCopy();
 }
 
-key_string::Value makeKeyStringForSeek(SortedDataInterface* sorted,
-                                       BSONObj bsonKey,
-                                       bool isForward,
-                                       bool inclusive) {
+key_string::Builder makeKeyStringForSeek(SortedDataInterface* sorted,
+                                         BSONObj bsonKey,
+                                         bool isForward,
+                                         bool inclusive) {
     BSONObj finalKey = BSONObj::stripFieldNames(bsonKey);
     key_string::Builder builder(sorted->getKeyStringVersion(),
                                 finalKey,
@@ -107,7 +107,7 @@ key_string::Value makeKeyStringForSeek(SortedDataInterface* sorted,
                                 isForward == inclusive
                                     ? key_string::Discriminator::kExclusiveBefore
                                     : key_string::Discriminator::kExclusiveAfter);
-    return builder.getValueCopy();
+    return builder;
 }
 
 void registerSortedDataInterfaceHarnessHelperFactory(

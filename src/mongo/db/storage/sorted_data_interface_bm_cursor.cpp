@@ -99,7 +99,7 @@ struct Fixture {
     ServiceContext::UniqueOperationContext opCtx;
     Lock::GlobalLock globalLock;
     std::unique_ptr<SortedDataInterface::Cursor> cursor;
-    key_string::Value firstKey;
+    key_string::Builder firstKey;
     size_t itemsProcessed = 0;
 };
 
@@ -112,7 +112,7 @@ void BM_SDIAdvance(benchmark::State& state,
     Fixture fix(uniqueness, direction, 100'000, keyFormat);
 
     for (auto _ : state) {
-        fix.cursor->seek(fix.firstKey);
+        fix.cursor->seek(fix.firstKey.finishAndGetBuffer());
         for (int i = 1; i < fix.nToInsert; i++)
             fix.cursor->next(keyInclusion);
         fix.itemsProcessed += fix.nToInsert;
@@ -128,7 +128,7 @@ void BM_SDISeek(benchmark::State& state,
 
     Fixture fix(uniqueness, direction, 100'000, KeyFormat::Long);
     for (auto _ : state) {
-        fix.cursor->seek(fix.firstKey, keyInclusion);
+        fix.cursor->seek(fix.firstKey.finishAndGetBuffer(), keyInclusion);
         fix.itemsProcessed += 1;
     }
     state.SetItemsProcessed(fix.itemsProcessed);
@@ -139,7 +139,7 @@ void BM_SDISaveRestore(benchmark::State& state, Direction direction, Uniqueness 
     Fixture fix(uniqueness, direction, 100'000, KeyFormat::Long);
 
     for (auto _ : state) {
-        fix.cursor->seek(fix.firstKey);
+        fix.cursor->seek(fix.firstKey.finishAndGetBuffer());
         fix.cursor->save();
         fix.cursor->restore();
         fix.itemsProcessed += 1;
@@ -157,7 +157,7 @@ void BM_SDIAdvanceWithEnd(benchmark::State& state,
     for (auto _ : state) {
         BSONObj lastKey = BSON("" << (direction == kForward ? fix.nToInsert : 1));
         fix.cursor->setEndPosition(lastKey, /*inclusive*/ true);
-        fix.cursor->seek(fix.firstKey);
+        fix.cursor->seek(fix.firstKey.finishAndGetBuffer());
         for (int i = 1; i < fix.nToInsert; i++)
             fix.cursor->next(kRecordId);
         fix.itemsProcessed += fix.nToInsert;

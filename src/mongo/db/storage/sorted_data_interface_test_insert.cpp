@@ -81,8 +81,9 @@ TEST(SortedDataInterface, Insert) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-                  IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key1, loc1));
     }
 }
 
@@ -115,8 +116,9 @@ TEST(SortedDataInterface, InsertKeyString) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-                  IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key1, loc1));
     }
 }
 
@@ -277,8 +279,9 @@ TEST(SortedDataInterface, InsertSameKey) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-                  IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key1, loc1));
     }
 
     {
@@ -298,8 +301,9 @@ TEST(SortedDataInterface, InsertSameKey) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-                  IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key1, loc1));
     }
 }
 
@@ -339,8 +343,9 @@ TEST(SortedDataInterface, InsertSameKeyString) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-                  IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key1, loc1));
     }
 
     {
@@ -359,8 +364,9 @@ TEST(SortedDataInterface, InsertSameKeyString) {
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-                  IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key1, loc1));
     }
 }
 
@@ -422,8 +428,10 @@ void testInsertSameKeyWithDupsAllowed(const RecordId locs[3]) {
 
             const std::unique_ptr<SortedDataInterface::Cursor> cursor(
                 sorted->newCursor(opCtx.get()));
-            ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-                      IndexKeyEntry(key1, locs[keeper]));
+            ASSERT_EQ(
+                cursor->seek(
+                    makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+                IndexKeyEntry(key1, locs[keeper]));
         }
     }
 }
@@ -467,10 +475,12 @@ TEST(SortedDataInterface, InsertMultiple) {
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-                  IndexKeyEntry(key1, loc1));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true)),
-                  IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key2, loc2));
     }
 
     {
@@ -489,12 +499,15 @@ TEST(SortedDataInterface, InsertMultiple) {
         ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-                  IndexKeyEntry(key1, loc1));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true)),
-                  IndexKeyEntry(key2, loc2));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, true)),
-                  IndexKeyEntry(key3, loc3));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key3, loc3));
     }
 }
 
@@ -533,10 +546,12 @@ TEST(SortedDataInterface, InsertMultipleKeyStrings) {
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-                  IndexKeyEntry(key1, loc1));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true)),
-                  IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key2, loc2));
     }
 
     {
@@ -555,12 +570,15 @@ TEST(SortedDataInterface, InsertMultipleKeyStrings) {
         ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true)),
-                  IndexKeyEntry(key1, loc1));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true)),
-                  IndexKeyEntry(key2, loc2));
-        ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, true)),
-                  IndexKeyEntry(key3, loc3));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key1, loc1));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key2, loc2));
+        ASSERT_EQ(
+            cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, true).finishAndGetBuffer()),
+            IndexKeyEntry(key3, loc3));
     }
 }
 
@@ -601,17 +619,25 @@ TEST(SortedDataInterface, InsertAndSeekKeyString) {
 
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
 
-        auto ksEntry1 = cursor->seekForKeyString(keyString1WithoutRecordId);
+        auto ksEntry1 = cursor->seekForKeyString(
+            {keyString1WithoutRecordId.getBuffer(),
+             static_cast<StringData::size_type>(keyString1WithoutRecordId.getSize())});
         ASSERT_EQUALS(ksEntry1->keyString.compare(keyString1), 0);
         ASSERT_EQUALS(ksEntry1->keyString.compare(keyString2), -1);
-        auto kvEntry1 = cursor->seekForKeyValueView(keyString1WithoutRecordId);
+        auto kvEntry1 = cursor->seekForKeyValueView(
+            {keyString1WithoutRecordId.getBuffer(),
+             static_cast<StringData::size_type>(keyString1WithoutRecordId.getSize())});
         ASSERT(!kvEntry1.isEmpty());
         ASSERT_EQUALS(ksEntry1->keyString.compare(kvEntry1.getValueCopy()), 0);
 
-        auto ksEntry2 = cursor->seekForKeyString(keyString2WithoutRecordId);
+        auto ksEntry2 = cursor->seekForKeyString(
+            {keyString2WithoutRecordId.getBuffer(),
+             static_cast<StringData::size_type>(keyString2WithoutRecordId.getSize())});
         ASSERT_EQUALS(ksEntry2->keyString.compare(keyString2), 0);
         ASSERT_EQUALS(ksEntry2->keyString.compare(keyString1), 1);
-        auto kvEntry2 = cursor->seekForKeyValueView(keyString2WithoutRecordId);
+        auto kvEntry2 = cursor->seekForKeyValueView(
+            {keyString2WithoutRecordId.getBuffer(),
+             static_cast<StringData::size_type>(keyString2WithoutRecordId.getSize())});
         ASSERT(!kvEntry2.isEmpty());
         ASSERT_EQUALS(ksEntry2->keyString.compare(kvEntry2.getValueCopy()), 0);
     }
