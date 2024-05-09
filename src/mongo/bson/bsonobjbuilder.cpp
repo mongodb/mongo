@@ -240,6 +240,10 @@ template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<std::allocator
 template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<TrackingAllocator<void>>,
                                   allocator_aware::BufBuilder<TrackingAllocator<void>>>;
 template class BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder>;
+template class BSONArrayBuilderBase<allocator_aware::BSONArrayBuilder<std::allocator<void>>,
+                                    allocator_aware::BSONObjBuilder<std::allocator<void>>>;
+template class BSONArrayBuilderBase<allocator_aware::BSONArrayBuilder<TrackingAllocator<void>>,
+                                    allocator_aware::BSONObjBuilder<TrackingAllocator<void>>>;
 template class BSONArrayBuilderBase<UniqueBSONArrayBuilder, UniqueBSONObjBuilder>;
 
 }  // namespace mongo

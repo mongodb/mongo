@@ -968,8 +968,12 @@ private:
 template <class Derived, class BSONObjBuilderType>
 class BSONArrayBuilderBase {
 public:
-    BSONArrayBuilderBase() {}
-    BSONArrayBuilderBase(int initialSize) : _b(initialSize) {}
+    template <typename... BuilderArgs>
+    BSONArrayBuilderBase(BuilderArgs&&... args) : _b(std::forward<BuilderArgs>(args)...) {}
+
+    template <typename... BuilderArgs>
+    BSONArrayBuilderBase(int initialSize, BuilderArgs&&... args)
+        : _b(initialSize, std::forward<BuilderArgs>(args)...) {}
 
     template <typename T>
     Derived& append(const T& x) {
@@ -1107,17 +1111,6 @@ public:
         return _b.bb();
     }
 
-    /**
-     * destructive - ownership moves to returned BSONArray
-     * @return owned BSONArray
-     */
-    BSONArray arr() {
-        return BSONArray(_b.obj());
-    }
-    BSONObj obj() {
-        return _b.obj();
-    }
-
 protected:
     template <class BufBuilderType>
     BSONArrayBuilderBase(BufBuilderType& builder) : _b(builder) {}
@@ -1145,7 +1138,44 @@ public:
     using BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder>::BSONArrayBuilderBase;
     BSONArrayBuilder(BufBuilder& bufBuilder)
         : BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder>(bufBuilder) {}
+
+    /**
+     * destructive - ownership moves to returned BSONArray
+     * @return owned BSONArray
+     */
+    BSONArray arr() {
+        return BSONArray(_b.obj());
+    }
+    BSONObj obj() {
+        return _b.obj();
+    }
 };
+
+namespace allocator_aware {
+// The following forward declaration exists to enable the extern declaration, which must come before
+// the use of the matching instantiation of the base class of allocator_aware::BSONArrayBuilder. Do
+// not remove or re-order these lines w.r.t BSONArrayBuilderBase or
+// allocator_aware::BSONArrayBuilder without being sure that you are not undoing the advantages of
+// the extern template declaration.
+template <class>
+class BSONArrayBuilder;
+}  // namespace allocator_aware
+
+extern template class BSONArrayBuilderBase<allocator_aware::BSONArrayBuilder<std::allocator<void>>,
+                                           allocator_aware::BSONObjBuilder<std::allocator<void>>>;
+extern template class BSONArrayBuilderBase<
+    allocator_aware::BSONArrayBuilder<TrackingAllocator<void>>,
+    allocator_aware::BSONObjBuilder<TrackingAllocator<void>>>;
+
+namespace allocator_aware {
+template <class Allocator>
+class BSONArrayBuilder
+    : public BSONArrayBuilderBase<BSONArrayBuilder<Allocator>, BSONObjBuilder<Allocator>> {
+public:
+    BSONArrayBuilder(BufBuilder<Allocator>& bufBuilder)
+        : BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder<Allocator>>(bufBuilder) {}
+};
+}  // namespace allocator_aware
 
 // The following extern template declaration must come after the
 // forward delaration of UniqueBSONArrayBuilder above, and before the
@@ -1167,6 +1197,17 @@ public:
     using BSONArrayBuilderBase<UniqueBSONArrayBuilder, UniqueBSONObjBuilder>::BSONArrayBuilderBase;
     UniqueBSONArrayBuilder(UniqueBufBuilder& bufBuilder)
         : BSONArrayBuilderBase<UniqueBSONArrayBuilder, UniqueBSONObjBuilder>(bufBuilder) {}
+
+    /**
+     * destructive - ownership moves to returned BSONArray
+     * @return owned BSONArray
+     */
+    BSONArray arr() {
+        return BSONArray(_b.obj());
+    }
+    BSONObj obj() {
+        return _b.obj();
+    }
 };
 
 template <class Derived, class B>
