@@ -174,7 +174,7 @@ assert.commandFailedWithCode(result, ErrorCodes.CommandNotSupportedOnView);
 //  Confirm getShardVersion command fails.
 //
 assert.commandFailedWithCode(db.adminCommand({getShardVersion: view.getFullName()}),
-                             [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound]);
+                             ErrorCodes.NamespaceNotSharded);
 
 //
 // Confirm that the comment parameter on a find command is retained when rewritten as an

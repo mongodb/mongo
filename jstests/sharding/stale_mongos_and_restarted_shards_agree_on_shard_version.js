@@ -33,16 +33,16 @@ st.enableSharding(kDatabaseName, st.shard1.shardName);
 function setupCollectionForTest(collName) {
     const ns = kDatabaseName + '.' + collName;
     assert.commandFailedWithCode(st.s0.adminCommand({getShardVersion: ns}),
-                                 [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound]);
+                                 ErrorCodes.NamespaceNotSharded);
     assert.commandFailedWithCode(st.s1.adminCommand({getShardVersion: ns}),
-                                 [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound]);
+                                 ErrorCodes.NamespaceNotSharded);
     st.shardCollection(ns, {Key: 1});
 
     st.s0.adminCommand({split: ns, middle: {Key: 0}});
     st.s0.adminCommand({moveChunk: ns, find: {Key: -1}, to: shard0Name});
     st.s0.adminCommand({moveChunk: ns, find: {Key: 0}, to: shard1Name});
     assert.commandFailedWithCode(st.s1.adminCommand({getShardVersion: ns}),
-                                 [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound]);
+                                 ErrorCodes.NamespaceNotSharded);
 
     // This document will go to shard 0
     assert.commandWorked(
