@@ -1216,7 +1216,16 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExten
             return swDatabase.getStatus();
         }
 
-        roles.emplace(swRole.getValue(), swDatabase.getValue());
+        // Catch errors resulting from conversion of swDatabase to a DatabaseName.
+        try {
+            RoleName rn(swRole.getValue(), swDatabase.getValue());
+            roles.emplace(std::move(rn));
+        } catch (DBException& e) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream()
+                              << "Failed to parse RoleName from (\"" << swRole.getValue()
+                              << "\", \"" << swDatabase.getValue() << "): " << e.toString());
+        }
     }
 
     return roles;
