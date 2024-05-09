@@ -695,7 +695,7 @@ unlikely to complete and are disruptive for concurrent operations.
 
 # Read Operations
 
-External reads via the find, count, distint, aggregation and mapReduce cmds do not take collection
+External reads via the find, count, distinct, aggregation, and mapReduce cmds do not take collection
 MODE_IS locks (mapReduce does continue to take MODE_IX collection locks for writes). Internal
 operations continue to take collection locks. Lock-free reads (only take the global lock in MODE_IS)
 achieve this by establishing consistent in-memory and storage engine on-disk state at the start of
