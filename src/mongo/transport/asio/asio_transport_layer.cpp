@@ -88,15 +88,11 @@ namespace transport {
 
 namespace {
 
-using TcpKeepaliveOption = SocketOption<SOL_SOCKET, SO_KEEPALIVE>;
+using ReuseAddrOption = SocketOption<SOL_SOCKET, SO_REUSEADDR>;
+using IPV6OnlyOption = SocketOption<IPPROTO_IPV6, IPV6_V6ONLY>;
+
 #ifdef __linux__
 using TcpInfoOption = SocketOption<IPPROTO_TCP, TCP_INFO, tcp_info>;
-using TcpKeepaliveCountOption = SocketOption<IPPROTO_TCP, TCP_KEEPCNT>;
-using TcpKeepaliveIdleSecsOption = SocketOption<IPPROTO_TCP, TCP_KEEPIDLE>;
-using TcpKeepaliveIntervalSecsOption = SocketOption<IPPROTO_TCP, TCP_KEEPINTVL>;
-#ifdef TCP_USER_TIMEOUT
-using TcpUserTimeoutMillisOption = SocketOption<IPPROTO_TCP, TCP_USER_TIMEOUT, unsigned>;
-#endif
 #endif  // __linux__
 
 const Seconds kSessionShutdownTimeout{10};
@@ -592,10 +588,7 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
             5270701, 2, "Connecting to peer using transient SSL connection", "peer"_attr = peer);
     }
 
-    std::error_code ec;
-    AsioSession::GenericSocket sock(*_egressReactor);
     WrappedResolver resolver(*_egressReactor);
-
     Date_t timeBefore = Date_t::now();
     auto swEndpoints = resolver.resolve(peer, _listenerOptions.enableIPv6);
     Date_t timeAfter = Date_t::now();
@@ -1069,10 +1062,8 @@ Status AsioTransportLayer::setup() {
 
             throw;
         }
-        setSocketOption(acceptor,
-                        GenericAcceptor::reuse_address(true),
-                        "acceptor reuse address",
-                        logv2::LogSeverity::Info());
+        setSocketOption(
+            acceptor, ReuseAddrOption(true), "acceptor reuse address", logv2::LogSeverity::Info());
 
         std::error_code ec;
 
@@ -1082,7 +1073,7 @@ Status AsioTransportLayer::setup() {
         }
         if (addr.family() == AF_INET6) {
             setSocketOption(
-                acceptor, asio::ip::v6_only(true), "acceptor v6 only", logv2::LogSeverity::Info());
+                acceptor, IPV6OnlyOption(true), "acceptor v6 only", logv2::LogSeverity::Info());
         }
 
         acceptor.non_blocking(true, ec);

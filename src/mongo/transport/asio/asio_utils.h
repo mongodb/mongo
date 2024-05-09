@@ -57,6 +57,8 @@ namespace mongo::transport {
  * Can be value-initializd with a `T`. A reference to the payload is available
  * using the dereferencing operators.
  *
+ * Provides a `toBSON` method for logging purposes.
+ *
  * Models Asio GettableSocketOption and SettableSocketOption.
  * https://www.boost.org/doc/libs/1_80_0/doc/html/boost_asio/reference/GettableSocketOption.html
  * https://www.boost.org/doc/libs/1_80_0/doc/html/boost_asio/reference/SettableSocketOption.html
@@ -114,6 +116,14 @@ public:
         return &**this;
     }
 
+    BSONObj toBSON() const {
+        return BSONObjBuilder{}
+            .append("level", optLevel)
+            .append("name", optName)
+            .append("data", hexdump(&**this, sizeof(_data)))
+            .obj();
+    }
+
 private:
     T _data{};
 };
@@ -130,6 +140,16 @@ inline HostAndPort endpointToHostAndPort(const asio::generic::stream_protocol::e
 
 Status errorCodeToStatus(const std::error_code& ec);
 Status errorCodeToStatus(const std::error_code& ec, StringData context);
+
+/**
+ * Wrappers around asio socket's `local_endpoint` and `remote_endpoint` methods (which in turn wrap
+ * `getsockname` and `getpeername`) with error logging. These functions re-throw any exception
+ * coming from the underlying socket method, but they produce log messages indicating the error.
+ */
+asio::generic::stream_protocol::endpoint getLocalEndpoint(
+    asio::generic::stream_protocol::socket& sock, StringData errorLogNote, logv2::LogSeverity sev);
+asio::generic::stream_protocol::endpoint getRemoteEndpoint(
+    asio::generic::stream_protocol::socket& sock, StringData errorLogNote, logv2::LogSeverity sev);
 
 /**
  * The ASIO implementation of poll (i.e. socket.wait()) cannot poll for a mask of events, and
@@ -183,7 +203,7 @@ boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(const asio::const_b
  * This is in the .cpp file just to keep LOGV2 out of this header.
  */
 void failedSetSocketOption(const std::system_error& ex,
-                           StringData note,
+                           StringData errorLogNote,
                            BSONObj optionDescription,
                            logv2::LogSeverity errorLogSeverity);
 
@@ -191,13 +211,15 @@ void failedSetSocketOption(const std::system_error& ex,
  * Calls Asio `socket.set_option(opt)` with better failure diagnostics.
  * To be used instead of Asio `socket.set_option``, because errors are hard to diagnose.
  * Emits a log message about what option was attempted and what went wrong with
- * it. The `note` string should uniquely identify the source of the call.
+ * it. The `errorLogNote` string should uniquely identify the source of the call, and the type of
+ * `opt` should model asio's `SettableSocketOption` and expose a `toBSON()` method. The
+ * `SocketOption` template meets these requirements.
  *
  * Two overloads are provided matching the Asio `socket.set_option` overloads, with an additional
  * parameter to indicate the level at which the failure diagnostics should logged.
  *
- *     setSocketOption(socket, opt, note, errorLogSeverity)
- *     setSocketOption(socket, opt, note, errorLogSeverity, ec)
+ *     setSocketOption(socket, opt, errorLogNote, errorLogSeverity)
+ *     setSocketOption(socket, opt, errorLogNote, errorLogSeverity, ec)
  *
  * If an `ec` is provided, errors are reported by mutating it.
  * Otherwise, the Asio `std::system_error` exception is rethrown.
@@ -205,27 +227,12 @@ void failedSetSocketOption(const std::system_error& ex,
 template <typename Socket, typename Option>
 void setSocketOption(Socket& socket,
                      const Option& opt,
-                     StringData note,
+                     StringData errorLogNote,
                      logv2::LogSeverity errorLogSeverity) {
     try {
         socket.set_option(opt);
     } catch (const std::system_error& ex) {
-        BSONObj optionDescription = [&opt, p = socket.local_endpoint().protocol()] {
-            return BSONObjBuilder{}
-                .append("level", opt.level(p))
-                .append("name", opt.name(p))
-                .append("data", hexdump(opt.data(p), opt.size(p)))
-                .obj();
-        }();
-        auto&& p = socket.local_endpoint().protocol();
-        failedSetSocketOption(ex,
-                              note,
-                              BSONObjBuilder{}
-                                  .append("level", opt.level(p))
-                                  .append("name", opt.name(p))
-                                  .append("data", hexdump(opt.data(p), opt.size(p)))
-                                  .obj(),
-                              errorLogSeverity);
+        failedSetSocketOption(ex, errorLogNote, opt.toBSON(), errorLogSeverity);
         throw;
     }
 }
@@ -233,11 +240,11 @@ void setSocketOption(Socket& socket,
 template <typename Socket, typename Option>
 void setSocketOption(Socket& socket,
                      const Option& opt,
-                     StringData note,
+                     StringData errorLogNote,
                      logv2::LogSeverity errorLogSeverity,
                      std::error_code& ec) {
     try {
-        setSocketOption(socket, opt, note, errorLogSeverity);
+        setSocketOption(socket, opt, errorLogNote, errorLogSeverity);
     } catch (const std::system_error& ex) {
         ec = ex.code();
     }

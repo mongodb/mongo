@@ -98,6 +98,43 @@ timeval toTimeval(Dur dur) {
     return tv;
 }
 
+BSONObj errorDescription(const std::system_error& ex) {
+    return BSONObjBuilder{}
+        .append("what", ex.what())
+        .append("message", ex.code().message())
+        .append("category", ex.code().category().name())
+        .append("value", ex.code().value())
+        .obj();
+}
+
+asio::generic::stream_protocol::endpoint getLocalEndpoint(
+    asio::generic::stream_protocol::socket& sock, StringData errorLogNote, logv2::LogSeverity sev) {
+    try {
+        return sock.local_endpoint();
+    } catch (const std::system_error& ex) {
+        LOGV2_DEBUG(6819700,
+                    sev.toInt(),
+                    "Asio socket.local_endpoint failed with std::system_error",
+                    "note"_attr = errorLogNote,
+                    "error"_attr = errorDescription(ex));
+        throw;
+    }
+}
+
+asio::generic::stream_protocol::endpoint getRemoteEndpoint(
+    asio::generic::stream_protocol::socket& sock, StringData errorLogNote, logv2::LogSeverity sev) {
+    try {
+        return sock.remote_endpoint();
+    } catch (const std::system_error& ex) {
+        LOGV2_DEBUG(6819701,
+                    sev.toInt(),
+                    "Asio socket.remote_endpoint failed with std::system_error",
+                    "note"_attr = errorLogNote,
+                    "error"_attr = errorDescription(ex));
+        throw;
+    }
+}
+
 StatusWith<unsigned> pollASIOSocket(asio::generic::stream_protocol::socket& socket,
                                     unsigned mask,
                                     Milliseconds timeout) {
@@ -318,20 +355,15 @@ boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(const asio::const_b
 #endif
 
 void failedSetSocketOption(const std::system_error& ex,
-                           StringData note,
+                           StringData errorLogNote,
                            BSONObj optionDescription,
                            logv2::LogSeverity errorLogSeverity) {
     LOGV2_DEBUG(5693100,
                 errorLogSeverity.toInt(),
                 "Asio socket.set_option failed with std::system_error",
-                "note"_attr = note,
+                "note"_attr = errorLogNote,
                 "option"_attr = optionDescription,
-                "error"_attr = BSONObjBuilder{}
-                                   .append("what", ex.what())
-                                   .append("message", ex.code().message())
-                                   .append("category", ex.code().category().name())
-                                   .append("value", ex.code().value())
-                                   .obj());
+                "error"_attr = errorDescription(ex));
 }
 
 }  // namespace mongo::transport
