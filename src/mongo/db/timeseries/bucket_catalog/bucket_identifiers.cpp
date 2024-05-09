@@ -39,17 +39,6 @@ BucketId::BucketId(const UUID& u, const OID& o)
 BucketKey::BucketKey(const UUID& u, BucketMetadata m)
     : collectionUUID(u), metadata(std::move(m)), hash(absl::Hash<BucketKey>{}(*this)) {}
 
-BucketKey::BucketKey(const UUID& u, BucketMetadata m, Hash h)
-    : collectionUUID(u), metadata(std::move(m)), hash(h) {}
-
-BucketKey BucketKey::cloneAsUntracked() const {
-    return {collectionUUID, metadata.cloneAsUntracked(), hash};
-}
-
-BucketKey BucketKey::cloneAsTracked(TrackingContext& trackingContext) const {
-    return {collectionUUID, metadata.cloneAsTracked(trackingContext), hash};
-}
-
 std::size_t BucketHasher::operator()(const BucketKey& key) const {
     return key.hash;
 }

@@ -114,9 +114,10 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
 
     boost::optional<BSONObj> normalizedMetadata;
     if (metadata.ok()) {
-        BSONObjBuilder builder;
+        allocator_aware::BSONObjBuilder builder;
         metadata::normalize(metadata, builder, kBucketMetaFieldName);
-        normalizedMetadata = builder.obj();
+        builder.doneFast();
+        normalizedMetadata = BSONObj{builder.bb().release()};
     }
 
     auto controlMinTimePath = kControlMinFieldNamePrefix.toString() + options.getTimeField();

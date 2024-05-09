@@ -890,9 +890,9 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
                            const UUID& collectionUUID,
                            const TimeseriesOptions& options,
                            const StringDataComparator* comparator) {
-    std::vector<write_ops::InsertCommandRequest> insertOps;
+    TrackingContext trackingContext;
     auto res = uassertStatusOK(bucket_catalog::internal::extractBucketingParameters(
-        collectionUUID, comparator, options, measurements[0]));
+        trackingContext, collectionUUID, comparator, options, measurements[0]));
     auto time = res.second;
     auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
     BucketDocument bucketDoc = makeNewDocumentForWrite(

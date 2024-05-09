@@ -60,7 +60,7 @@ boost::optional<OID> initializeRequest(BucketCatalog& catalog,
         // Track the memory usage for the bucket keys in this data structure because these buckets
         // are not open yet which means they are not already being tracked.
         std::tie(it, inserted) = stripe.outstandingReopeningRequests.try_emplace(
-            key.cloneAsTracked(catalog.trackingContext),
+            key,
             make_tracked_inlined_vector<shared_tracked_ptr<ReopeningRequest>,
                                         Stripe::kInlinedVectorSize>(catalog.trackingContext));
         invariant(inserted);

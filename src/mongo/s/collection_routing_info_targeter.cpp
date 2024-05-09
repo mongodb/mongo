@@ -335,7 +335,7 @@ BSONObj CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
     const BSONObj& doc,
     const ShardKeyPattern& pattern,
     const TimeseriesOptions& timeseriesOptions) {
-    BSONObjBuilder builder;
+    allocator_aware::BSONObjBuilder builder;
 
     auto timeField = timeseriesOptions.getTimeField();
     auto timeElement = doc.getField(timeField);
@@ -346,9 +346,10 @@ BSONObj CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
     auto roundedTimeValue =
         timeseries::roundTimestampToGranularity(timeElement.date(), timeseriesOptions);
     {
-        BSONObjBuilder controlBuilder{builder.subobjStart(timeseries::kBucketControlFieldName)};
+        allocator_aware::BSONObjBuilder controlBuilder{
+            builder.subobjStart(timeseries::kBucketControlFieldName)};
         {
-            BSONObjBuilder minBuilder{
+            allocator_aware::BSONObjBuilder minBuilder{
                 controlBuilder.subobjStart(timeseries::kBucketControlMinFieldName)};
             minBuilder.append(timeField, roundedTimeValue);
         }
@@ -360,7 +361,7 @@ BSONObj CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
         }
     }
 
-    auto docWithShardKey = builder.obj();
+    auto docWithShardKey = builder.done();
     return pattern.extractShardKeyFromDoc(docWithShardKey);
 }
 

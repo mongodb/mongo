@@ -100,8 +100,7 @@ protected:
     using CatalogTestFixture::setUp;
 
     std::shared_ptr<bucket_catalog::WriteBatch> generateBatch(
-        const UUID& uuid,
-        bucket_catalog::BucketMetadata bucketMetadata = {{}, nullptr, boost::none}) {
+        const UUID& uuid, bucket_catalog::BucketMetadata bucketMetadata) {
         OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);
         bucket_catalog::BucketId bucketId(uuid, oid);
         std::uint8_t stripe = 0;
@@ -117,8 +116,14 @@ protected:
             kTimeseriesOptions.getTimeField());
     }
 
-private:
+    std::shared_ptr<bucket_catalog::WriteBatch> generateBatch(const UUID& uuid) {
+        return generateBatch(uuid, {_trackingContext, {}, nullptr, boost::none});
+    }
+
+protected:
     TrackingContext _trackingContext;
+
+private:
     bucket_catalog::ExecutionStats _globalStats;
 };
 
@@ -434,8 +439,9 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
                     "b":{"0":1,"1":2,"2":3}}})");
 
     // Builds a write batch for an update and sets the decompressed field of the batch.
-    auto batch =
-        generateBatch(UUID::gen(), {uncompressedPreImage.getField("meta"), nullptr, boost::none});
+    auto batch = generateBatch(
+        UUID::gen(),
+        {_trackingContext, uncompressedPreImage.getField("meta"), nullptr, boost::none});
     const std::vector<BSONObj> measurements = {
         fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"meta":{"tag":1},"a":0,"b":0})"),
         fromjson(R"({"time":{"$date":"2022-06-06T15:34:34.000Z"},"meta":{"tag":1},"a":4,"b":4})"),
@@ -1071,7 +1077,8 @@ TEST_F(TimeseriesWriteUtilTest, SortMeasurementsOnTimeField) {
         fromjson(R"({"time":{"$date":"2022-06-07T15:34:30.000Z"},"meta":{"tag":1},"a":2,"b":2})"),
         fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"meta":{"tag":1},"a":3,"b":3})")};
 
-    auto batch = generateBatch(UUID::gen(), {metaField.getField("meta"), nullptr, boost::none});
+    auto batch = generateBatch(
+        UUID::gen(), {_trackingContext, metaField.getField("meta"), nullptr, boost::none});
     batch->measurements = {measurements.begin(), measurements.end()};
     batch->min = fromjson(R"({"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1})");
     batch->max = fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3})");

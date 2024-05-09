@@ -707,7 +707,8 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
                                                             const StringDataComparator* comparator,
                                                             const TimeseriesOptions& options,
                                                             const BSONObj& doc) {
-    auto res = internal::extractBucketingParameters(collectionUUID, comparator, options, doc);
+    auto res = internal::extractBucketingParameters(
+        catalog.trackingContext, collectionUUID, comparator, options, doc);
     if (!res.isOK()) {
         return res.getStatus();
     }
