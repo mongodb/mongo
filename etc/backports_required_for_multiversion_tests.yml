@@ -87,6 +87,8 @@ last-continuous:
       ticket: SERVER-86674
     - test_file: jstests/sharding/resharding_default_collation.js
       ticket: SERVER-89744
+    - test_file: jstests/sharding/move_chunk_deferred_lookup.js
+      ticket: SERVER-89859
   suites: null
 last-lts:
   all:
@@ -156,4 +158,6 @@ last-lts:
       ticket: SERVER-86674
     - test_file: jstests/sharding/resharding_default_collation.js
       ticket: SERVER-89744
+    - test_file: jstests/sharding/move_chunk_deferred_lookup.js
+      ticket: SERVER-89859
   suites: null
