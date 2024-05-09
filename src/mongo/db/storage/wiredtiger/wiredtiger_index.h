@@ -157,8 +157,7 @@ public:
                  const key_string::Value& keyString,
                  bool dupsAllowed) override;
 
-    boost::optional<RecordId> findLoc(OperationContext* opCtx,
-                                      const key_string::Value& keyString) const override;
+    boost::optional<RecordId> findLoc(OperationContext* opCtx, StringData keyString) const override;
 
     IndexValidateResults validate(OperationContext* opCtx, bool full) const override;
 

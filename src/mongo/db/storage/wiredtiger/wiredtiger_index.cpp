@@ -358,14 +358,9 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
     _unindex(opCtx, c, keyString, dupsAllowed);
 }
 
-boost::optional<RecordId> WiredTigerIndex::findLoc(OperationContext* opCtx,
-                                                   const key_string::Value& key) const {
-    dassert(key_string::decodeDiscriminator(
-                key.getBuffer(), key.getSize(), _ordering, key.getTypeBits()) ==
-            key_string::Discriminator::kInclusive);
-
+boost::optional<RecordId> WiredTigerIndex::findLoc(OperationContext* opCtx, StringData key) const {
     auto cursor = newCursor(opCtx);
-    return cursor->seekExact(StringData(key.getBuffer(), key.getSize()));
+    return cursor->seekExact(key);
 }
 
 IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool full) const {

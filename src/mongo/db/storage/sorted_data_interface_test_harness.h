@@ -125,6 +125,8 @@ key_string::Value makeKeyString(SortedDataInterface* sorted,
                                 BSONObj bsonKey,
                                 const boost::optional<RecordId>& rid = boost::none);
 
+key_string::Builder makeKeyStringForSeek(SortedDataInterface* sorted, BSONObj bsonKey);
+
 key_string::Builder makeKeyStringForSeek(SortedDataInterface* sorted,
                                          BSONObj bsonKey,
                                          bool isForward,

@@ -260,7 +260,7 @@ public:
     }
 
     boost::optional<RecordId> findLoc(OperationContext* opCtx,
-                                      const key_string::Value& keyString) const override {
+                                      StringData keyString) const override {
         return boost::none;
     }
 

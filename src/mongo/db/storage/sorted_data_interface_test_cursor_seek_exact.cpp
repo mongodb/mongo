@@ -66,7 +66,8 @@ void testFindLoc_Hit(IndexType type) {
                   },
                   /* dupsAllowed*/ false);
 
-    auto loc = sorted->findLoc(opCtx.get(), makeKeyString(sorted.get(), key2));
+    auto loc =
+        sorted->findLoc(opCtx.get(), makeKeyStringForSeek(sorted.get(), key2).finishAndGetBuffer());
     ASSERT_EQ(loc, loc1);
 }
 
@@ -104,7 +105,9 @@ void testFindLoc_Miss(IndexType type) {
                   },
                   /* dupsAllowed*/ false);
 
-    ASSERT_EQ(sorted->findLoc(opCtx.get(), makeKeyString(sorted.get(), key2)), boost::none);
+    ASSERT_EQ(
+        sorted->findLoc(opCtx.get(), makeKeyStringForSeek(sorted.get(), key2).finishAndGetBuffer()),
+        boost::none);
 }
 
 TEST(SortedDataInterface, SeekExact_Miss_Unique) {

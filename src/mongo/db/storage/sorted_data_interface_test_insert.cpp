@@ -654,9 +654,6 @@ TEST(SortedDataInterface, InsertAndSeekExactKeyString) {
     auto keyString1 = makeKeyString(sorted.get(), key1, loc1);
     auto keyString2 = makeKeyString(sorted.get(), key2, loc2);
 
-    auto keyString1WithoutRecordId = makeKeyString(sorted.get(), key1);
-    auto keyString2WithoutRecordId = makeKeyString(sorted.get(), key2);
-
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT(sorted->isEmpty(opCtx.get()));
@@ -678,8 +675,12 @@ TEST(SortedDataInterface, InsertAndSeekExactKeyString) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
 
-        ASSERT_EQ(loc1, sorted->findLoc(opCtx.get(), keyString1WithoutRecordId));
-        ASSERT_EQ(loc2, sorted->findLoc(opCtx.get(), keyString2WithoutRecordId));
+        ASSERT_EQ(loc1,
+                  sorted->findLoc(opCtx.get(),
+                                  makeKeyStringForSeek(sorted.get(), key1).finishAndGetBuffer()));
+        ASSERT_EQ(loc2,
+                  sorted->findLoc(opCtx.get(),
+                                  makeKeyStringForSeek(sorted.get(), key2).finishAndGetBuffer()));
     }
 }
 
