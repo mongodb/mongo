@@ -192,9 +192,11 @@ __wt_rts_history_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t rollback_ti
     size_t i;
     char *config;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
+    bool release_dhandle;
 
     config = NULL;
     conn = S2C(session);
+    release_dhandle = false;
 
     WT_RET(__wt_metadata_search(session, WT_HS_URI, &config));
 
@@ -220,6 +222,7 @@ __wt_rts_history_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t rollback_ti
     }
     max_durable_ts = WT_MAX(newest_stop_ts, newest_stop_durable_ts);
     WT_ERR(__wt_session_get_dhandle(session, WT_HS_URI, NULL, NULL, 0));
+    release_dhandle = true;
 
     /*
      * The rollback operation should be skipped if there is no stable timestamp. Otherwise, it
@@ -254,7 +257,7 @@ __wt_rts_history_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t rollback_ti
         for (i = 0; conn->partial_backup_remove_ids[i] != 0; ++i)
             WT_ERR(__wt_rts_history_btree_hs_truncate(session, conn->partial_backup_remove_ids[i]));
 err:
-    if (session->dhandle != NULL)
+    if (release_dhandle)
         WT_TRET(__wt_session_release_dhandle(session));
     __wt_free(session, config);
     return (ret);
