@@ -145,6 +145,13 @@ function validateCollectionsThread(validatorFunc, host) {
             return {ok: 1};
         }
 
+        // Skip node using FCBIS since FCBIS could mess up fast count.
+        if (conn.adminCommand({getParameter: 1, initialSyncMethod: 1}).initialSyncMethod ===
+            "fileCopyBased") {
+            print('Skipping collection validation on node using FCBIS ' + host);
+            return {ok: 1};
+        }
+
         let requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
         if (requiredFCV) {
             requiredFCV = new Function(
