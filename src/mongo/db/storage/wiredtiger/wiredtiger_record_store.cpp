@@ -46,6 +46,7 @@
 #include <mutex>
 #include <utility>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonelement.h"
@@ -937,7 +938,7 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
     // The top-level locks were freed, so also release any potential low-level (storage engine)
     // locks that might be held.
     WiredTigerRecoveryUnit* recoveryUnit =
-        (WiredTigerRecoveryUnit*)shard_role_details::getRecoveryUnit(opCtx);
+        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx));
     recoveryUnit->abandonSnapshot();
     recoveryUnit->beginIdle();
 
