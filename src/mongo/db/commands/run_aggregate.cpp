@@ -182,6 +182,8 @@ using NamespaceStringSet = stdx::unordered_set<NamespaceString>;
 Counter64& allowDiskUseFalseCounter = *MetricBuilder<Counter64>{"query.allowDiskUseFalse"};
 
 namespace {
+// Ticks for server-side Javascript deprecation log messages.
+Rarely _samplerAccumulatorJs, _samplerFunctionJs;
 
 MONGO_FAIL_POINT_DEFINE(hangAfterCreatingAggregationPlan);
 MONGO_FAIL_POINT_DEFINE(hangAfterAcquiringCollectionCatalog);
@@ -1488,6 +1490,20 @@ Status _runAggregate(OperationContext* opCtx,
                                                resolvedView,
                                                origRequest);
         expCtx = pipeline->getContext();
+
+        if (expCtx->hasServerSideJs.accumulator && _samplerAccumulatorJs.tick()) {
+            LOGV2_WARNING(
+                8996502,
+                "$accumulator is deprecated. For more information, see "
+                "https://www.mongodb.com/docs/manual/reference/operator/aggregation/accumulator/");
+        }
+
+        if (expCtx->hasServerSideJs.function && _samplerFunctionJs.tick()) {
+            LOGV2_WARNING(
+                8996503,
+                "$function is deprecated. For more information, see "
+                "https://www.mongodb.com/docs/manual/reference/operator/aggregation/function/");
+        }
 
         // Only allow the use of runtime constants when from Mongos is true.
         uassert(463840,

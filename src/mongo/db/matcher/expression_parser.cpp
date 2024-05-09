@@ -177,7 +177,6 @@ enum class DocumentParseLevel {
 };
 
 namespace {
-
 // Forward declarations.
 
 Status parseSub(boost::optional<StringData> name,
@@ -494,6 +493,7 @@ StatusWithMatchExpression parseWhere(StringData name,
                                      const ExtensionsCallback* extensionsCallback,
                                      MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                                      DocumentParseLevel currentLevel) {
+    expCtx->hasServerSideJs.where = true;
     if ((allowedFeatures & MatchExpressionParser::AllowedFeatures::kJavascript) == 0u) {
         return {Status(ErrorCodes::BadValue, "$where is not allowed in this context")};
     }

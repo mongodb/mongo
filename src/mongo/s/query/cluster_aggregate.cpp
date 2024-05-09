@@ -110,6 +110,8 @@ constexpr unsigned ClusterAggregate::kMaxViewRetries;
 using sharded_agg_helpers::PipelineDataSource;
 
 namespace {
+// Ticks for server-side Javascript deprecation log messages.
+Rarely _samplerAccumulatorJs, _samplerFunctionJs;
 
 // "Resolve" involved namespaces into a map. We won't try to execute anything on a mongos, but we
 // still have to populate this map so that any $lookups, etc. will be able to have a resolved view
@@ -684,14 +686,33 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
     }();
 
+    if (status.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
+        // Increment counters and set flags even in case of failed aggregate commands.
+        // But for views on a sharded cluster, aggregation runs twice. First execution fails
+        // because the namespace is a view, and then it is re-run with resolved view pipeline
+        // and namespace.
+        liteParsedPipeline.tickGlobalStageCounters();
+
+        if (expCtx->hasServerSideJs.accumulator && _samplerAccumulatorJs.tick()) {
+            LOGV2_WARNING(
+                8996506,
+                "$accumulator is deprecated. For more information, see "
+                "https://www.mongodb.com/docs/manual/reference/operator/aggregation/accumulator/");
+        }
+
+        if (expCtx->hasServerSideJs.function && _samplerFunctionJs.tick()) {
+            LOGV2_WARNING(
+                8996507,
+                "$function is deprecated. For more information, see "
+                "https://www.mongodb.com/docs/manual/reference/operator/aggregation/function/");
+        }
+    }
 
     if (status.isOK()) {
         updateHostsTargetedMetrics(opCtx,
                                    namespaces.executionNss,
                                    cri ? boost::make_optional(cri->cm) : boost::none,
                                    involvedNamespaces);
-        // Report usage statistics for each stage in the pipeline.
-        liteParsedPipeline.tickGlobalStageCounters();
         // Add 'command' object to explain output.
         if (expCtx->explain) {
             explain_common::appendIfRoom(
@@ -699,13 +720,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             collectQueryStatsMongos(opCtx,
                                     std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
         }
-    } else if (status.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
-        // Increment counters even in case of failed aggregate commands.
-        // But for views on a sharded cluster, aggregation runs twice. First execution fails
-        // because the namespace is a view, and then it is re-run with resolved view pipeline
-        // and namespace.
-        liteParsedPipeline.tickGlobalStageCounters();
     }
+
     return status;
 }
 

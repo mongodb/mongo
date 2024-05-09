@@ -652,6 +652,14 @@ public:
     // are ineligible will still not be cached.
     bool forcePlanCache = false;
 
+    // Keep track of the server-side Javascript operators used in the query. These flags will be set
+    // at parse time if applicable.
+    struct {
+        bool accumulator = false;
+        bool function = false;
+        bool where = false;
+    } hasServerSideJs;
+
     // Returns true if we've received a TemporarilyUnavailableException.
     bool getTemporarilyUnavailableException() {
         return _gotTemporarilyUnavailableException;

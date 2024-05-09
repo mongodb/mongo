@@ -269,6 +269,7 @@ Document AccumulatorJs::serialize(boost::intrusive_ptr<Expression> initializer,
 AccumulationExpression AccumulatorJs::parse(ExpressionContext* const expCtx,
                                             BSONElement elem,
                                             VariablesParseState vps) {
+    expCtx->hasServerSideJs.accumulator = true;
     /*
      * {$accumulator: {
      *   init: <code>,
