@@ -26,7 +26,7 @@ const runTest = function(deprioritize) {
     assert.commandWorked(coll.createIndexes([{a: 1}, {a: -1}]));
 
     const numLowPriority = function() {
-        return db.serverStatus().admission.execution.read.lowPriority.finishedProcessing;
+        return db.serverStatus().queues.execution.read.lowPriority.finishedProcessing;
     };
 
     const testCoveredScanDeprioritized = function(direction) {

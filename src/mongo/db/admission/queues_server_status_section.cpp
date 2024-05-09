@@ -68,7 +68,7 @@ public:
 };
 
 auto& admissionSection =
-    *ServerStatusSectionBuilder<AdmissionServerStatusSection>("admission").forShard();
+    *ServerStatusSectionBuilder<AdmissionServerStatusSection>("queues").forShard();
 
 }  // namespace
 }  // namespace admission
