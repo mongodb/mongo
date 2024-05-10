@@ -28,7 +28,7 @@ const timeseriesOpts = {
 
 // TODO SERVER-89999: remove once the feature flag version becomes last LTS
 const simpleBucketCollectionsDisallowed =
-    FeatureFlagUtil.isEnabled(db, "DisallowBucketCollectionWithoutTimeseriesOptions")
+    FeatureFlagUtil.isPresentAndEnabled(db, "DisallowBucketCollectionWithoutTimeseriesOptions")
 
 function setupEnv() {
     db.dropDatabase();
@@ -107,8 +107,16 @@ function runTests(targetDbName) {
                 "Renaming a bucket collection without timeseries options to a normal collection works");
             setupEnv();
             assert.commandWorked(db.createCollection(bucketsCollName));
-            assert.commandWorked(db.adminCommand(
-                {renameCollection: `${dbName}.${bucketsCollName}`, to: `${targetDbName}.newColl`}));
+            const res = db.adminCommand(
+                {renameCollection: `${dbName}.${bucketsCollName}`, to: `${targetDbName}.newColl`});
+            if (FixtureHelpers.isMongos(db)) {
+                // simpleBucketCollectionsDisallowed is false, thus it means we are in a
+                // multiversion suite. The sharding DDL coordinator in old binaries (< v8.0) does
+                // not allow to rename a simple bucket collection to a normal collection.
+                assert.commandWorkedOrFailedWithCode(res, [ErrorCodes.IllegalOperation]);
+            } else {
+                assert.commandWorked(res);
+            }
         }
         {
             jsTest.log(
