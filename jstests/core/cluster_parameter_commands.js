@@ -94,7 +94,7 @@ assert.commandFailed(conn.getDB("config").clusterParameters.insert({
     clusterParameterTime: {"$timestamp": {t: 0, i: 0}}
 }));
 
-// Assert that the results of getClusterParameter: '*' match the expected format, and that they are
+// Assert that the results of getClusterParameter: '*' all have an _id element, and that they are
 // consistent with individual gets.
 {
     const allParameters =
