@@ -177,23 +177,30 @@ total_queries = 0
 
 def bazel_query_func(env: SCons.Environment.Environment, query_command_args: List[str],
                      query_name: str = "query"):
-    bazel_debug(f"Running query: {' '.join(query_command_args)}")
+    full_command = [Globals.bazel_executable] + query_command_args
     global total_query_time, total_queries
     start_time = time.time()
     # these args prune the graph we need to search through a bit since we only care about our
     # specific library target dependencies
-    query_command_args += ['--implicit_deps=False', '--tool_deps=False', '--include_aspects=False']
+    full_command += ['--implicit_deps=False', '--tool_deps=False', '--include_aspects=False']
     # prevent remote connection and invocations since we just want to query the graph
-    query_command_args += [
+    full_command += [
         "--remote_executor=", "--remote_cache=", '--bes_backend=', '--bes_results_url='
     ]
-    results = subprocess.run([Globals.bazel_executable] + query_command_args, capture_output=True,
-                             text=True, check=True, cwd=env.Dir('#').abspath,
+    bazel_debug(f"Running query: {' '.join(full_command)}")
+    results = subprocess.run(full_command, capture_output=True, text=True, cwd=env.Dir('#').abspath,
                              env={**os.environ.copy(), **Globals.bazel_env_variables})
     delta = time.time() - start_time
     bazel_debug(f"Spent {delta} seconds running {query_name}")
     total_query_time += delta
     total_queries += 1
+
+    # Manually throw the error instead of using subprocess.run(... check=True) to print out stdout and stderr.
+    if results.returncode != 0:
+        print(results.stdout)
+        print(results.stderr)
+        raise subprocess.CalledProcessError(results.returncode, full_command, results.stdout,
+                                            results.stderr)
     return results
 
 
