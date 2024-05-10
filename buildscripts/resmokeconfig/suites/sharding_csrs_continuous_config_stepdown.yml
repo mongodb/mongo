@@ -250,7 +250,9 @@ selector:
     # Test runs commands on a config shard and does not expect config shard failover.
     - jstests/sharding/clone_catalog_data.js
 
-    # Test runs command on a config shard and does not shutdown safely upon transitioning to a dedicated config server.
+    # These tests run command on a config shard and does not shutdown safely upon transitioning to a
+    # dedicated config server.
+    - jstests/sharding/change_streams_with_config_transitions.js
     - jstests/sharding/fsync_lock_unlock.js
 
     # Expect the configureQueryAnalyzer command to execute without config server stepdown.
