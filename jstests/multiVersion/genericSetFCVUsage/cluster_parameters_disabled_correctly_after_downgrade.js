@@ -5,7 +5,8 @@
 // Note: Enabling new feature flags which aren't yet default-enabled will break this test,
 // because such feature flags do not have a minimum FCV set and therefore will not be
 // disabled when lowering the FCV, causing an incompatibility.
-// @tags: [all_feature_flags_incompatible]
+// Multiversion incompatible in 7.3 because 7.2 has inconsistencies with parameter format.
+// @tags: [all_feature_flags_incompatible, multiversion_incompatible]
 
 // Ignore test parameters because they are not required to be consistent across versions.
 const ignoredParams = [

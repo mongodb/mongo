@@ -10,6 +10,7 @@
  */
 import {
     setupSharded,
+    testGetClusterParameterStar,
     testInvalidClusterParameterCommands,
     testValidClusterParameterCommands,
 } from "jstests/libs/cluster_server_parameter_utils.js";
@@ -35,5 +36,8 @@ testInvalidClusterParameterCommands(st);
 // Then, ensure that set/getClusterParameter set and retrieve the expected values on mongos
 // and the majority of nodes on all replica sets in the cluster.
 testValidClusterParameterCommands(st);
+
+// Ensure that getClusterParameter: "*" works as expected.
+testGetClusterParameterStar(st);
 
 st.stop();
