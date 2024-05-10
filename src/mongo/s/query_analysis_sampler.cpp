@@ -114,7 +114,7 @@ StatusWith<std::vector<CollectionQueryAnalyzerConfiguration>> executeRefreshComm
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,
-            cmd.toBSON({}),
+            cmd.toBSON(),
             Shard::RetryPolicy::kIdempotent);
         if (auto status = Shard::CommandResponse::getEffectiveStatus(swResponse); !status.isOK()) {
             return status;
@@ -122,7 +122,7 @@ StatusWith<std::vector<CollectionQueryAnalyzerConfiguration>> executeRefreshComm
         resObj = swResponse.getValue().response;
     } else if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         resObj = QueryAnalysisClient::get(opCtx).executeCommandOnPrimary(
-            opCtx, DatabaseName::kAdmin, cmd.toBSON({}), [&](const BSONObj& resObj) {});
+            opCtx, DatabaseName::kAdmin, cmd.toBSON(), [&](const BSONObj& resObj) {});
         if (auto status = getStatusFromCommandResult(resObj); !status.isOK()) {
             return status;
         }

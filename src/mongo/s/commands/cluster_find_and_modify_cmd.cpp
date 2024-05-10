@@ -225,8 +225,8 @@ void handleWouldChangeOwningShardErrorNonTransaction(
 
     auto swCommitResult = txn.runNoThrow(
         opCtx,
-        [cmdObj = request.toBSON({}), sharedBlock](const txn_api::TransactionClient& txnClient,
-                                                   ExecutorPtr txnExec) {
+        [cmdObj = request.toBSON(), sharedBlock](const txn_api::TransactionClient& txnClient,
+                                                 ExecutorPtr txnExec) {
             return txnClient.runCommand(sharedBlock->nss.dbName(), cmdObj)
                 .thenRunOn(txnExec)
                 .then([sharedBlock](auto res) {
@@ -1025,7 +1025,7 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
     auto clusterQueryWithoutShardKeyExplainRes = [&] {
         ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(cmdObjForPassthrough);
         const auto explainClusterQueryWithoutShardKeyCmd =
-            ClusterExplain::wrapAsExplain(clusterQueryWithoutShardKeyCommand.toBSON({}), verbosity);
+            ClusterExplain::wrapAsExplain(clusterQueryWithoutShardKeyCommand.toBSON(), verbosity);
         auto opMsg = OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
                                                  nss.dbName(),
                                                  explainClusterQueryWithoutShardKeyCmd);
@@ -1041,7 +1041,7 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
             clusterQueryWithoutShardKeyExplainRes.getStringField("targetShardId").toString(),
             write_without_shard_key::targetDocForExplain);
         const auto explainClusterWriteWithoutShardKeyCmd =
-            ClusterExplain::wrapAsExplain(clusterWriteWithoutShardKeyCommand.toBSON({}), verbosity);
+            ClusterExplain::wrapAsExplain(clusterWriteWithoutShardKeyCommand.toBSON(), verbosity);
         auto opMsg = OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
                                                  nss.dbName(),
                                                  explainClusterWriteWithoutShardKeyCmd);

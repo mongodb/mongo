@@ -144,7 +144,7 @@ public:
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(configCmd.toBSON({}),
+                CommandHelpers::appendMajorityWriteConcern(configCmd.toBSON(),
                                                            opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));
 

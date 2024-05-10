@@ -321,7 +321,7 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
             ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(sharedBlock->cmdObj);
 
             auto queryRes = txnClient.runCommandSync(sharedBlock->nss.dbName(),
-                                                     clusterQueryWithoutShardKeyCommand.toBSON({}));
+                                                     clusterQueryWithoutShardKeyCommand.toBSON());
 
             uassertStatusOK(getStatusFromCommandResult(queryRes));
 

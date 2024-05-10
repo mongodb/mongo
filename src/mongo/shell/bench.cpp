@@ -283,7 +283,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
         BSONObj getMoreCommandResult;
         runCommandWithSession(conn,
                               dbName,
-                              getMoreRequest.toBSON({}),
+                              getMoreRequest.toBSON(),
                               // read command with txnNumber implies performing reads in a
                               // multi-statement transaction
                               txnNumber ? kMultiStatementTransactionOption : kNoOptions,
@@ -1153,7 +1153,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     runCommandWithSession(
                         conn,
                         DatabaseName::createDatabaseName_forTest(this->tenantId, this->ns),
-                        getMoreRequest.toBSON({}),
+                        getMoreRequest.toBSON(),
                         kNoOptions,
                         lsid,
                         &getMoreCommandResult);

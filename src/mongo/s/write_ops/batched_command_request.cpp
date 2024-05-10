@@ -224,7 +224,7 @@ void BatchedCommandRequest::setWriteCommandRequestBase(
 }
 
 void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
-    _visit([&](auto&& op) { op.serialize({}, builder); });
+    _visit([&](auto&& op) { op.serialize(builder); });
     if (_shardVersion) {
         _shardVersion->serialize(ShardVersion::kShardVersionField, builder);
     }

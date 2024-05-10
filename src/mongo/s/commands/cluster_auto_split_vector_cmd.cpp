@@ -71,7 +71,7 @@ public:
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
             BSONObj filteredCmdObj =
-                CommandHelpers::filterCommandRequestForPassthrough(req.toBSON({}));
+                CommandHelpers::filterCommandRequestForPassthrough(req.toBSON());
 
             // autoSplitVector is allowed to run on a sharded cluster only if the range requested
             // belongs to one shard. We target the shard owning the input min chunk and we let the

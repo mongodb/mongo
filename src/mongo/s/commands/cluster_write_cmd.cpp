@@ -501,7 +501,7 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
                 ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(
                     ClusterExplain::wrapAsExplain(req.toBSON(), verbosity));
                 const auto explainClusterQueryWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
-                    clusterQueryWithoutShardKeyCommand.toBSON({}), verbosity);
+                    clusterQueryWithoutShardKeyCommand.toBSON(), verbosity);
                 auto opMsg = OpMsgRequestBuilder::create(
                     vts, nss.dbName(), explainClusterQueryWithoutShardKeyCmd);
                 return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
@@ -517,7 +517,7 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
                         .toString(),
                     write_without_shard_key::targetDocForExplain);
                 const auto explainClusterWriteWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
-                    clusterWriteWithoutShardKeyCommand.toBSON({}), verbosity);
+                    clusterWriteWithoutShardKeyCommand.toBSON(), verbosity);
 
                 auto opMsg = OpMsgRequestBuilder::create(
                     vts, nss.dbName(), explainClusterWriteWithoutShardKeyCmd);

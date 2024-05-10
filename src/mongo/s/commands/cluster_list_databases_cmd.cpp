@@ -137,7 +137,7 @@ public:
 
             // { filter: matchExpression }.
             auto filteredCmd = applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON({})));
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()));
 
             for (const ShardId& shardId : shardIds) {
                 auto shardStatus = shardRegistry->getShard(opCtx, shardId);

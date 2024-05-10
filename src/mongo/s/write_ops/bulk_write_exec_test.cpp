@@ -1792,7 +1792,7 @@ TEST_F(BulkWriteOpTest, TestGetBaseChildBatchCommandSizeEstimate) {
     nsEntry.setIsTimeseriesNamespace(true);
 
     BSONObjBuilder builder;
-    request.serialize(BSONObj(), &builder);
+    request.serialize(&builder);
     // Add writeConcern and lsid/txnNumber if applicable.
     logical_session_id_helpers::serializeLsidAndTxnNumber(_opCtx, &builder);
     builder.append(WriteConcernOptions::kWriteConcernField, _opCtx->getWriteConcern().toBSON());

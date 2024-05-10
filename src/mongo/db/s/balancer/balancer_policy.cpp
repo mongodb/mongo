@@ -965,7 +965,7 @@ NamespaceStringToShardDataSizeMap getStatsForBalancing(
 
     ShardsvrGetStatsForBalancing req{namespacesWithUUIDsForStatsRequest};
     req.setScaleFactor(1);
-    const auto reqObj = req.toBSON({});
+    const auto reqObj = req.toBSON();
 
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto responsesFromShards = sharding_util::sendCommandToShards(

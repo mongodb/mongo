@@ -119,7 +119,7 @@ bool isCollectionCappedWithRequestedSize(OperationContext* opCtx,
                             opCtx,
                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                             nss.dbName(),
-                            listCollections.toBSON({}),
+                            listCollections.toBSON(),
                             Seconds(30)))
             .docs;
 

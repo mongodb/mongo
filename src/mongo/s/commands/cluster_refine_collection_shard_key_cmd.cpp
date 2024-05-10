@@ -99,8 +99,8 @@ public:
                 opCtx,
                 nss.dbName(),
                 dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(
-                    refineCollectionShardKeyCommand.toBSON({}), opCtx->getWriteConcern()),
+                CommandHelpers::appendMajorityWriteConcern(refineCollectionShardKeyCommand.toBSON(),
+                                                           opCtx->getWriteConcern()),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kIdempotent);
 

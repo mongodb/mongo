@@ -186,7 +186,7 @@ std::unique_ptr<DBClientCursor> DBDirectClient::find(FindCommandRequest findRequ
 
 write_ops::FindAndModifyCommandReply DBDirectClient::findAndModify(
     const write_ops::FindAndModifyCommandRequest& findAndModify) {
-    auto request = findAndModify.serialize({});
+    auto request = findAndModify.serialize();
     request.validatedTenancyScope = _createInnerRequestVTS(findAndModify.getDbName().tenantId());
     auto response = runCommand(std::move(request));
     return FindAndModifyOp::parseResponse(response->getCommandReply());
@@ -194,7 +194,7 @@ write_ops::FindAndModifyCommandReply DBDirectClient::findAndModify(
 
 write_ops::InsertCommandReply DBDirectClient::insert(
     const write_ops::InsertCommandRequest& insert) {
-    auto request = insert.serialize({});
+    auto request = insert.serialize();
     request.validatedTenancyScope = _createInnerRequestVTS(insert.getDbName().tenantId());
     auto response = runCommand(request);
     return InsertOp::parseResponse(response->getCommandReply());
@@ -202,7 +202,7 @@ write_ops::InsertCommandReply DBDirectClient::insert(
 
 write_ops::UpdateCommandReply DBDirectClient::update(
     const write_ops::UpdateCommandRequest& update) {
-    auto request = update.serialize({});
+    auto request = update.serialize();
     request.validatedTenancyScope = _createInnerRequestVTS(update.getDbName().tenantId());
 
     auto response = runCommand(request);
@@ -211,7 +211,7 @@ write_ops::UpdateCommandReply DBDirectClient::update(
 
 write_ops::DeleteCommandReply DBDirectClient::remove(
     const write_ops::DeleteCommandRequest& remove) {
-    auto request = remove.serialize({});
+    auto request = remove.serialize();
     request.validatedTenancyScope = _createInnerRequestVTS(remove.getDbName().tenantId());
 
     auto response = runCommand(request);

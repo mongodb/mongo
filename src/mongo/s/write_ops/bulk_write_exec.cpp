@@ -128,7 +128,7 @@ void executeChildBatches(OperationContext* opCtx,
 
             // Transform the request into a sendable BSON.
             BSONObjBuilder builder;
-            bulkReq.serialize(BSONObj(), &builder);
+            bulkReq.serialize(&builder);
 
             logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
             if (!TransactionRouter::get(opCtx)) {
@@ -546,7 +546,7 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
                 4,
                 "Processing bulk write response for retryable timeseries update",
                 "opIdx"_attr = opIdx,
-                "singleUpdateRequest"_attr = redact(singleUpdateRequest.toBSON({})),
+                "singleUpdateRequest"_attr = redact(singleUpdateRequest.toBSON()),
                 "replyItem"_attr = replyItem,
                 "wcError"_attr = wcError.toString());
 
@@ -618,7 +618,7 @@ void executeWriteWithoutShardKey(
                           .buildBulkCommandRequest(targeters,
                                                    *targetedWriteBatch,
                                                    allowShardKeyUpdatesWithoutFullShardKeyInQuery)
-                          .toBSON({});
+                          .toBSON();
 
         auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
             opCtx, targeter->getNS(), std::move(cmdObj));
@@ -737,7 +737,7 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
     LOGV2_DEBUG(7263700,
                 4,
                 "Starting execution of a bulkWrite",
-                "clientRequest"_attr = redact(clientRequest.toBSON({})));
+                "clientRequest"_attr = redact(clientRequest.toBSON()));
 
     BulkWriteOp bulkWriteOp(opCtx, clientRequest);
 
@@ -1881,7 +1881,7 @@ int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {
     }
 
     BSONObjBuilder builder;
-    request.serialize(BSONObj(), &builder);
+    request.serialize(&builder);
     // Add writeConcern and lsid/txnNumber to ensure we save space for them.
     logical_session_id_helpers::serializeLsidAndTxnNumber(_opCtx, &builder);
     builder.append(WriteConcernOptions::kWriteConcernField, _opCtx->getWriteConcern().toBSON());

@@ -179,7 +179,7 @@ public:
                             sharding_util::sendCommandToShardsWithVersion(
                                 opCtx,
                                 nss.dbName(),
-                                validateRequest.toBSON({}),
+                                validateRequest.toBSON(),
                                 shardsIdsVec,
                                 Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
                                 uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss)),
@@ -205,7 +205,7 @@ public:
                             false /* updatedToHandleTimeseriesIndex */);
                     });
             }
-            LOGV2(21922, "CMD: refineCollectionShardKey", "request"_attr = request().toBSON({}));
+            LOGV2(21922, "CMD: refineCollectionShardKey", "request"_attr = request().toBSON());
 
             ShardingCatalogManager::get(opCtx)->refineCollectionShardKeyDEPRECATED(
                 opCtx, nss, newShardKeyPattern);

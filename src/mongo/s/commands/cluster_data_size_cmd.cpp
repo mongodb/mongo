@@ -107,9 +107,7 @@ public:
                 nss,
                 cri,
                 applyReadWriteConcern(
-                    opCtx,
-                    this,
-                    CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON({}))),
+                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON())),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
                 {} /*query*/,

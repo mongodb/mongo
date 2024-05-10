@@ -121,7 +121,7 @@ protected:
             _opCtx.get(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             nss.dbName(),
-            findAndModifyRequest.toBSON({}),
+            findAndModifyRequest.toBSON(),
             Shard::RetryPolicy::kNoRetry);
     }
     /**

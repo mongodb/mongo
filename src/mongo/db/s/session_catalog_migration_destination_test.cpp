@@ -278,7 +278,7 @@ public:
             insertRequest.setWriteCommandRequestBase(cmdBase);
 
             BSONObjBuilder insertBuilder;
-            insertRequest.serialize({}, &insertBuilder);
+            insertRequest.serialize(&insertBuilder);
             sessionInfo.serialize(&insertBuilder);
 
             Client::initThread("test-insert-thread", getGlobalServiceContext()->getService());

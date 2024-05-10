@@ -199,7 +199,7 @@ BSONObj appendDB(const BSONObj& obj, StringData dbName) {
 
 template <typename T>
 BSONObj serializeCmd(const T& cmd) {
-    auto reply = cmd.serialize({});
+    auto reply = cmd.serialize();
     return reply.body;
 }
 
@@ -2590,7 +2590,7 @@ TEST(IDLCommand, TestConcatentateWithDb) {
             NamespaceString::createNamespaceString_forTest("db.coll1"));
         one_new.setField1(3);
         one_new.setField2("five");
-        one_new.serialize(BSONObj(), &builder);
+        one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDocWithoutDb, serializedDoc);
@@ -2748,7 +2748,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
             NamespaceString::createNamespaceString_forTest("db.coll1"));
         one_new.setField1(3);
         one_new.setField2("five");
-        one_new.serialize(BSONObj(), &builder);
+        one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDocWithoutDb, serializedDoc);
@@ -2831,7 +2831,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
             DatabaseName::createDatabaseName_forTest(boost::none, "db"), uuid));
         one_new.setField1(3);
         one_new.setField2("five");
-        one_new.serialize(BSONObj(), &builder);
+        one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDocWithoutDb, serializedDoc);
@@ -2967,7 +2967,7 @@ TEST(IDLCommand, TestIgnore) {
     // Positive: Test we can roundtrip from the just parsed document
     {
         BSONObjBuilder builder;
-        testStruct.serialize(BSONObj(), &builder);
+        testStruct.serialize(&builder);
         auto loopbackDoc = builder.obj();
 
         ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
@@ -3107,7 +3107,7 @@ TEST(IDLDocSequence, TestBasic) {
     // Positive: Test we can roundtrip just the body from the just parsed document
     {
         BSONObjBuilder builder;
-        testStruct.serialize(BSONObj(), &builder);
+        testStruct.serialize(&builder);
 
         auto testTempDocWithoutDB = testTempDoc.removeField("$db");
 
@@ -3957,7 +3957,7 @@ TEST(IDLTypeCommand, TestString) {
         CommandTypeStringCommand one_new("foo");
         one_new.setField1(3);
         one_new.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "db"));
-        one_new.serialize(BSONObj(), &builder);
+        one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDocWithoutDb, serializedDoc);
@@ -4094,7 +4094,7 @@ TEST(IDLTypeCommand, TestUnderscoreCommand) {
         WellNamedCommand one_new("foo");
         one_new.setField1(3);
         one_new.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "db"));
-        one_new.serialize(BSONObj(), &builder);
+        one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDocWithoutDb, serializedDoc);

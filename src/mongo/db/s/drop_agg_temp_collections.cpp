@@ -57,7 +57,7 @@ void dropTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
                 opCtx,
                 nss.dbName(),
                 cdb,
-                CommandHelpers::appendMajorityWriteConcern(shardsvrDropCollection.toBSON({})),
+                CommandHelpers::appendMajorityWriteConcern(shardsvrDropCollection.toBSON()),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kIdempotent);
 

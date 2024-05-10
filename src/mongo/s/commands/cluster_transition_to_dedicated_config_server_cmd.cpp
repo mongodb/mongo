@@ -114,7 +114,7 @@ public:
             DatabaseName::kAdmin,
             CommandHelpers::appendMajorityWriteConcern(
                 CommandHelpers::appendGenericCommandArgs(
-                    cmdObj, transitionToDedicatedConfigServer.toBSON({})),
+                    cmdObj, transitionToDedicatedConfigServer.toBSON()),
                 opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent);
 

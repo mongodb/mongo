@@ -453,7 +453,7 @@ public:
                 lsidBuilder.doneFast();
                 cmdObj = getMoreRequest.toBSON(cmdObjWithLsidBuilder.done());
             } else {
-                cmdObj = getMoreRequest.toBSON({});
+                cmdObj = getMoreRequest.toBSON();
             }
 
             const HostAndPort& cursorHost = cursor->getHostAndPort();

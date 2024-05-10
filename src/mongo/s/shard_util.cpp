@@ -171,7 +171,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
         nss.dbName(),
-        req.toBSON({}),
+        req.toBSON(),
         Shard::RetryPolicy::kIdempotent);
 
     auto status = Shard::CommandResponse::getEffectiveStatus(cmdStatus);

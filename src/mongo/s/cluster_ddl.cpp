@@ -137,7 +137,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             DatabaseName::kAdmin,
-            CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
+            CommandHelpers::appendMajorityWriteConcern(request.toBSON()),
             Shard::RetryPolicy::kIdempotent));
 
         uassertStatusOK(txnRouterResourceYielder->unyieldNoThrow(opCtx));
@@ -190,7 +190,7 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
     }
 
     BSONObjBuilder builder;
-    request.serialize({}, &builder);
+    request.serialize(&builder);
 
     auto rc = repl::ReadConcernArgs::get(opCtx);
     rc.appendInfo(&builder);

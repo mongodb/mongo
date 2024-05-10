@@ -178,7 +178,7 @@ public:
             // Send a request to all shards that are primaries for at least one database
             const auto shardOpKey = UUID::gen();
             BSONObjBuilder shardRequestBob;
-            shardsvrRequest.serialize(BSONObj(), &shardRequestBob);
+            shardsvrRequest.serialize(&shardRequestBob);
             appendOpKey(shardOpKey, &shardRequestBob);
             auto shardRequestWithOpKey = shardRequestBob.obj();
 
@@ -193,7 +193,7 @@ public:
             configsvrRequest.setCursor(request().getCursor());
 
             BSONObjBuilder configRequestBob;
-            configsvrRequest.serialize(BSONObj(), &configRequestBob);
+            configsvrRequest.serialize(&configRequestBob);
             appendOpKey(configOpKey, &configRequestBob);
             requests.emplace_back(ShardId::kConfigServerId, configRequestBob.obj());
 
@@ -221,7 +221,7 @@ public:
             shardsvrRequest.setCommonFields(request().getCommonFields());
             shardsvrRequest.setCursor(request().getCursor());
             // Attach db and shard version;
-            auto cmdObj = appendDbVersionIfPresent(shardsvrRequest.toBSON({}), dbInfo);
+            auto cmdObj = appendDbVersionIfPresent(shardsvrRequest.toBSON(), dbInfo);
             if (!dbInfo->getVersion().isFixed())
                 cmdObj = appendShardVersion(std::move(cmdObj), ShardVersion::UNSHARDED());
             return _establishCursors(opCtx, nss, {{dbInfo->getPrimary(), std::move(cmdObj)}});

@@ -167,7 +167,7 @@ public:
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 fromNss.dbName(),
                 CommandHelpers::appendMajorityWriteConcern(
-                    appendDbVersionIfPresent(renameCollRequest.toBSON({}), dbInfo->getVersion())),
+                    appendDbVersionIfPresent(renameCollRequest.toBSON(), dbInfo->getVersion())),
                 Shard::RetryPolicy::kNoRetry));
 
             uassertStatusOK(cmdResponse.commandStatus);

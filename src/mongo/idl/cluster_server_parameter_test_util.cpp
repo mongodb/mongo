@@ -115,7 +115,7 @@ void remove(const boost::optional<TenantId>& tenantId) {
                     entry.setMulti(true);
                     return entry;
                 }()});
-                return deleteOp.toBSON({});
+                return deleteOp.toBSON();
             }());
 
         auto res = DBDirectClient(opCtx).runCommand(opMsgRequest)->getCommandReply();

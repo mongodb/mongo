@@ -81,7 +81,7 @@ public:
         const auto commandResponse = _client.runCommand([&] {
             write_ops::InsertCommandRequest insertOp(nss);
             insertOp.setDocuments({doc});
-            return insertOp.serialize({});
+            return insertOp.serialize();
         }());
 
         auto status = getStatusFromWriteCommandReply(commandResponse->getCommandReply());

@@ -311,7 +311,7 @@ public:
             const auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
             BSONObjBuilder participantRequestBob;
-            participantRequest.serialize(BSONObj(), &participantRequestBob);
+            participantRequest.serialize(&participantRequestBob);
             appendOpKey(shardOpKey, &participantRequestBob);
             auto participantRequestWithOpKey = participantRequestBob.obj();
 
@@ -327,7 +327,7 @@ public:
             participantRequest.setCursor(request().getCursor());
 
             BSONObjBuilder configRequestBob;
-            configRequest.serialize(BSONObj(), &configRequestBob);
+            configRequest.serialize(&configRequestBob);
             appendOpKey(configOpKey, &configRequestBob);
             requests.emplace_back(ShardId::kConfigServerId, configRequestBob.obj());
 
@@ -385,7 +385,7 @@ public:
                 opCtx->getWriteConcern(),
                 repl::ReadConcernArgs::get(opCtx),
                 ReadPreferenceSetting::get(opCtx),
-                request().toBSON({}),
+                request().toBSON(),
                 {Privilege(ResourcePattern::forClusterResource(nss.tenantId()),
                            ActionType::internal)}};
 

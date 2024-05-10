@@ -70,7 +70,7 @@ void validateRequest(const BulkWriteCommandRequest& req, bool isRouter) {
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "May not specify both stmtId and stmtIds in bulkWrite command. Got "
                           << BSON("stmtId" << *req.getStmtId() << "stmtIds" << *req.getStmtIds())
-                          << ". BulkWrite command: " << req.toBSON({}),
+                          << ". BulkWrite command: " << req.toBSON(),
             !(req.getStmtId() && req.getStmtIds()));
 
     if (const auto& stmtIds = req.getStmtIds()) {
@@ -79,7 +79,7 @@ void validateRequest(const BulkWriteCommandRequest& req, bool isRouter) {
             str::stream() << "Number of statement ids must match the number of batch entries. Got "
                           << stmtIds->size() << " statement ids but " << ops.size()
                           << " operations. Statement ids: " << BSON("stmtIds" << *stmtIds)
-                          << ". BulkWrite command: " << req.toBSON({}),
+                          << ". BulkWrite command: " << req.toBSON(),
             stmtIds->size() == ops.size());
     }
 

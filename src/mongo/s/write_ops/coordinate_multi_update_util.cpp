@@ -72,9 +72,9 @@ auto getOpAsBson(const BatchItemRef& op) {
 auto getRequestBson(const BatchedCommandRequest& clientRequest) {
     switch (clientRequest.getBatchType()) {
         case BatchedCommandRequest::BatchType_Update:
-            return clientRequest.getUpdateRequest().toBSON({});
+            return clientRequest.getUpdateRequest().toBSON();
         case BatchedCommandRequest::BatchType_Delete:
-            return clientRequest.getDeleteRequest().toBSON({});
+            return clientRequest.getDeleteRequest().toBSON();
         default:
             MONGO_UNREACHABLE;
     }
@@ -102,7 +102,7 @@ BSONObj makeCommandForOp(BatchWriteOp& batchOp,
 
 BSONObj makeCommandForOp(bulk_write_exec::BulkWriteOp& bulkWriteOp,
                          const BulkWriteCRUDOp& bulkCrudOp) {
-    return bulkWriteOp.getClientRequest().toBSON({}).addField(
+    return bulkWriteOp.getClientRequest().toBSON().addField(
         BSON("ops" << BSON_ARRAY(bulkCrudOp.toBSON())).firstElement());
 }
 
@@ -121,7 +121,7 @@ BSONObj executeCoordinateMultiUpdate(OperationContext* opCtx,
         opCtx,
         DatabaseName::kAdmin,
         dbInfo,
-        CommandHelpers::appendMajorityWriteConcern(coordinateCommand.toBSON({}),
+        CommandHelpers::appendMajorityWriteConcern(coordinateCommand.toBSON(),
                                                    opCtx->getWriteConcern()),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         Shard::RetryPolicy::kIdempotent);

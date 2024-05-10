@@ -83,7 +83,7 @@ public:
 
             ShardsvrCreateCollection shardsvrCollRequest(nss);
             auto svrRequest = ShardsvrCreateCollectionRequest::parse(
-                IDLParserContext("createUnsplittableCollection"), req.toBSON({}));
+                IDLParserContext("createUnsplittableCollection"), req.toBSON());
             svrRequest.setShardKey(BSON("_id" << 1));
             svrRequest.setUnsplittable(true);
             svrRequest.setDataShard(req.getDataShard());

@@ -462,7 +462,7 @@ protected:
         ASSERT(parsedQueryDoc.getCmdName() == cmdName);
         auto parsedCmd = CommandRequestType::parse(IDLParserContext("QueryAnalysisWriterTest"),
                                                    parsedQueryDoc.getCmd());
-        ASSERT_BSONOBJ_EQ(parsedCmd.toBSON({}), expectedCmd.toBSON({}));
+        ASSERT_BSONOBJ_EQ(parsedCmd.toBSON(), expectedCmd.toBSON());
     }
 
     /*

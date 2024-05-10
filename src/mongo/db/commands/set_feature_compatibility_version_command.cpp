@@ -185,7 +185,7 @@ void deletePersistedDefaultRWConcernDocument(OperationContext* opCtx) {
             entry.setMulti(false);
             return entry;
         }()});
-        return deleteOp.serialize({});
+        return deleteOp.serialize();
     }());
     uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
 }
@@ -231,7 +231,7 @@ void deleteShardingStateRecoveryDoc(OperationContext* opCtx) {
                 entry.setMulti(false);
                 return entry;
             }()});
-        return deleteOp.serialize({});
+        return deleteOp.serialize();
     }());
     uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
 }
@@ -1128,7 +1128,7 @@ private:
         requestPhase.setPhase(phase);
         requestPhase.setChangeTimestamp(changeTimestamp);
         uassertStatusOK(ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-            opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase.toBSON({}))));
+            opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase.toBSON())));
     }
 
     // This helper function is for any uasserts for users to clean up user collections. Uasserts for

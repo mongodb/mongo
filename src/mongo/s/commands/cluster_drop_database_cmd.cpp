@@ -113,7 +113,7 @@ public:
                     opCtx,
                     dbName,
                     dbInfo,
-                    CommandHelpers::appendMajorityWriteConcern(dropDatabaseCommand.toBSON({}),
+                    CommandHelpers::appendMajorityWriteConcern(dropDatabaseCommand.toBSON(),
                                                                opCtx->getWriteConcern()),
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                     Shard::RetryPolicy::kIdempotent);

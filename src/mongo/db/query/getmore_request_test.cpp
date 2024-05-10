@@ -97,7 +97,7 @@ TEST(GetMoreRequestTest, ShouldParseAllKnownOptions) {
 
 TEST(GetMoreRequestTest, toBSONMissingOptionalFields) {
     GetMoreCommandRequest request = createGetMoreCommandRequest("testcoll", 123);
-    BSONObj requestObj = request.toBSON({});
+    BSONObj requestObj = request.toBSON();
     BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection"
                                              << "testcoll");
     ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
@@ -106,7 +106,7 @@ TEST(GetMoreRequestTest, toBSONMissingOptionalFields) {
 TEST(GetMoreRequestTest, toBSONNoMissingFields) {
     GetMoreCommandRequest request =
         createGetMoreCommandRequest("testcoll", 123, 99, 789, 1, repl::OpTime(Timestamp(0, 10), 2));
-    BSONObj requestObj = request.toBSON({});
+    BSONObj requestObj = request.toBSON();
     BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection"
                                              << "testcoll"
                                              << "batchSize" << 99 << "maxTimeMS" << 789 << "term"

@@ -118,7 +118,7 @@ public:
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             DatabaseName::kAdmin,
             CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendGenericCommandArgs(cmdObj, configsvrRequest.toBSON({})),
+                CommandHelpers::appendGenericCommandArgs(cmdObj, configsvrRequest.toBSON()),
                 opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);

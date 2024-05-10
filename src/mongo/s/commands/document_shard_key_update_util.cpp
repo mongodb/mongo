@@ -319,14 +319,14 @@ BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx) {
 
 BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss, const BSONObj& updatePreImage) {
     auto deleteOp = createShardKeyDeleteOp(nss, updatePreImage);
-    return deleteOp.toBSON({});
+    return deleteOp.toBSON();
 }
 
 BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss,
                                       const BSONObj& updatePostImage,
                                       bool fleCrudProcessed) {
     auto insertOp = createShardKeyInsertOp(nss, updatePostImage, fleCrudProcessed);
-    return insertOp.toBSON({});
+    return insertOp.toBSON();
 }
 
 SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txnClient,

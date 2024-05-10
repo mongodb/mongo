@@ -362,7 +362,7 @@ public:
             }
 
             if (auto timeseries = cmd.getTimeseries()) {
-                for (auto&& option : cmd.toBSON({})) {
+                for (auto&& option : cmd.toBSON()) {
                     auto fieldName = option.fieldNameStringData();
 
                     if (fieldName == CreateCommand::kCommandName) {

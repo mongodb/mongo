@@ -73,8 +73,7 @@ public:
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}),
-                                                           opCtx->getWriteConcern()),
+                CommandHelpers::appendMajorityWriteConcern(cmd.toBSON(), opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(response.commandStatus);
             uassertStatusOK(response.writeConcernStatus);

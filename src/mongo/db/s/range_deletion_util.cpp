@@ -532,7 +532,7 @@ void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUI
             return entry;
         }()});
 
-        return deleteOp.serialize({});
+        return deleteOp.serialize();
     }());
 
     const auto commandReply = commandResponse->getCommandReply();

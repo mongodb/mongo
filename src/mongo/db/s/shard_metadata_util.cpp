@@ -266,7 +266,7 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
                 entry.setUpsert(upsert);
                 return entry;
             }()});
-            return updateOp.serialize({});
+            return updateOp.serialize();
         }());
         uassertStatusOK(getStatusFromWriteCommandResponse(commandResponse->getCommandReply()));
 
@@ -310,7 +310,7 @@ Status updateShardDatabasesEntry(OperationContext* opCtx,
                 entry.setUpsert(upsert);
                 return entry;
             }()});
-            return updateOp.serialize({});
+            return updateOp.serialize();
         }());
         uassertStatusOK(getStatusFromWriteCommandResponse(commandResponse->getCommandReply()));
 
@@ -470,7 +470,7 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
                 entry.setMulti(true);
                 return entry;
             }()});
-            return deleteOp.serialize({});
+            return deleteOp.serialize();
         }());
         uassertStatusOK(
             getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply()));
@@ -526,7 +526,7 @@ Status deleteDatabasesEntry(OperationContext* opCtx, const DatabaseName& dbName)
                 entry.setMulti(false);
                 return entry;
             }()});
-            return deleteOp.serialize({});
+            return deleteOp.serialize();
         }());
         uassertStatusOK(
             getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply()));

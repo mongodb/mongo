@@ -94,7 +94,7 @@ public:
                 opCtx,
                 kPrimaryOnlyReadPreference,
                 DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(cmdToSend.toBSON({}),
+                CommandHelpers::appendMajorityWriteConcern(cmdToSend.toBSON(),
                                                            opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent);
 

@@ -95,7 +95,7 @@ Status insertDatabaseEntryForBackwardCompatibility(OperationContext* opCtx,
 
         write_ops::InsertCommandRequest insertOp(NamespaceString::kShardConfigDatabasesNamespace);
         insertOp.setDocuments({dbMetadata.toBSON()});
-        return insertOp.serialize({});
+        return insertOp.serialize();
     }());
 
     auto commandStatus = getStatusFromWriteCommandReply(commandResponse->getCommandReply());

@@ -114,7 +114,7 @@ protected:
                 entry.setMulti(false);
                 return entry;
             }()});
-            return deleteOp.toBSON({});
+            return deleteOp.toBSON();
         }();
 
         DBDirectClient client(opCtx);
@@ -135,7 +135,7 @@ protected:
                 entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
                 return entry;
             }()});
-            return updateOp.toBSON({});
+            return updateOp.toBSON();
         }();
 
         DBDirectClient client(opCtx);

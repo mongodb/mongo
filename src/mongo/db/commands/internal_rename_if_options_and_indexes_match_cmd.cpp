@@ -104,7 +104,7 @@ public:
 
                 // _shardsvrRenameCollecion requires majority write concern.
                 const auto cmd = CommandHelpers::appendMajorityWriteConcern(
-                    shardsvrRenameCollectionRequest.toBSON({}));
+                    shardsvrRenameCollectionRequest.toBSON());
 
                 DBDirectClient client(opCtx);
                 BSONObj cmdResult;

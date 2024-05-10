@@ -199,8 +199,7 @@ void validateTTLOptions(OperationContext* opCtx,
                         const Collection* coll,
                         const CreateIndexesCommand& cmd) {
     if (MONGO_unlikely(skipTTLIndexValidationOnCreateIndex.shouldFail())) {
-        LOGV2(
-            6909101, "Skipping TTL index validation due to failpoint", "cmd"_attr = cmd.toBSON({}));
+        LOGV2(6909101, "Skipping TTL index validation due to failpoint", "cmd"_attr = cmd.toBSON());
         return;
     }
 
@@ -602,7 +601,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
           "collectionUUID"_attr = *collectionUUID,
           "indexes"_attr = specs.size(),
           "firstIndex"_attr = specs[0][IndexDescriptor::kIndexNameFieldName],
-          "command"_attr = cmd.toBSON({}));
+          "command"_attr = cmd.toBSON());
     hangCreateIndexesBeforeStartingIndexBuild.pauseWhileSet(opCtx);
 
     bool shouldContinueInBackground = false;

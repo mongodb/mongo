@@ -81,7 +81,7 @@ std::unique_ptr<CollMod> makeTimeseriesBucketsCollModCommand(OperationContext* o
 
         uassert(ErrorCodes::IndexNotFound,
                 str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
-                              << " Command request: " << redact(origCmd.toBSON({})),
+                              << " Command request: " << redact(origCmd.toBSON()),
                 bucketsIndexSpecWithStatus.isOK());
 
         index->setKeyPattern(std::move(bucketsIndexSpecWithStatus.getValue()));

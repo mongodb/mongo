@@ -743,7 +743,7 @@ StatusWith<std::vector<CollectionType>> ShardingCatalogManager::_getCollListFrom
             std::make_unique<Fetcher>(_executorForAddShard.get(),
                                       host,
                                       dbName,
-                                      listCollections.toBSON({}),
+                                      listCollections.toBSON(),
                                       fetcherCallback,
                                       BSONObj() /* metadata tracking, only used for shards */,
                                       maxTimeMS /* command network timeout */,
@@ -805,7 +805,7 @@ Status ShardingCatalogManager::updateClusterCardinalityParameter(OperationContex
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         DatabaseName::kAdmin,
-        configsvrSetClusterParameter.toBSON({}),
+        configsvrSetClusterParameter.toBSON(),
         Shard::RetryPolicy::kIdempotent);
 
     return Shard::CommandResponse::getEffectiveStatus(cmdResponse);
@@ -991,7 +991,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         // Use the _addShard command to add the shard, which in turn inserts a shardIdentity
         // document into the shard and triggers sharding state initialization.
-        auto addShardStatus = runCmdOnNewShard(addShardCmd.toBSON({}));
+        auto addShardStatus = runCmdOnNewShard(addShardCmd.toBSON());
         if (!addShardStatus.isOK()) {
             return addShardStatus;
         }
@@ -1231,7 +1231,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             ShardsvrJoinMigrations shardsvrJoinMigrations;
             shardsvrJoinMigrations.setDbName(DatabaseName::kAdmin);
             const auto result = client.runCommand(
-                DatabaseName::kAdmin, shardsvrJoinMigrations.toBSON({}), resultInfo);
+                DatabaseName::kAdmin, shardsvrJoinMigrations.toBSON(), resultInfo);
             uassert(8955101,
                     "Failed to await ongoing migrations before removing catalog shard",
                     result);
@@ -1463,7 +1463,7 @@ void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationConte
             _runCommandForAddShard(opCtx,
                                    targeter,
                                    NamespaceString::kUserWritesCriticalSectionsNamespace.dbName(),
-                                   CommandHelpers::appendMajorityWriteConcern(deleteOp.toBSON({})));
+                                   CommandHelpers::appendMajorityWriteConcern(deleteOp.toBSON()));
         uassertStatusOK(swCommandResponse.getStatus());
         uassertStatusOK(getStatusFromWriteCommandReply(swCommandResponse.getValue().response));
     }
@@ -1485,7 +1485,7 @@ void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationConte
             shardsvrSetUserWriteBlockModeCmd.setPhase(phase);
 
             return CommandHelpers::appendMajorityWriteConcern(
-                shardsvrSetUserWriteBlockModeCmd.toBSON({}));
+                shardsvrSetUserWriteBlockModeCmd.toBSON());
         };
 
         if (doc.getBlockNewUserShardedDDL()) {
@@ -1560,7 +1560,7 @@ std::unique_ptr<Fetcher> ShardingCatalogManager::_createFetcher(
     return std::make_unique<Fetcher>(_executorForAddShard.get(),
                                      host,
                                      nss.dbName(),
-                                     findCommand.toBSON({}),
+                                     findCommand.toBSON(),
                                      fetcherCallback,
                                      BSONObj(), /* metadata tracking, only used for shards */
                                      maxTimeMS, /* command network timeout */
@@ -1716,7 +1716,7 @@ void ShardingCatalogManager::_removeAllClusterParametersFromShard(OperationConte
             _runCommandForAddShard(opCtx,
                                    targeter.get(),
                                    nss.dbName(),
-                                   CommandHelpers::appendMajorityWriteConcern(deleteOp.toBSON({})));
+                                   CommandHelpers::appendMajorityWriteConcern(deleteOp.toBSON()));
         uassertStatusOK(swCommandResponse.getStatus());
         uassertStatusOK(getStatusFromWriteCommandReply(swCommandResponse.getValue().response));
     }
@@ -1748,7 +1748,7 @@ void ShardingCatalogManager::_pushClusterParametersToNewShard(
                 opCtx,
                 targeter.get(),
                 dbName,
-                CommandHelpers::appendMajorityWriteConcern(setClusterParamsCmd.toBSON({})));
+                CommandHelpers::appendMajorityWriteConcern(setClusterParamsCmd.toBSON()));
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
         }
     }

@@ -422,7 +422,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // multi-batch result for an aggregation request.
-    verifyExplainAggCommand(client, swAggReq.getValue().toBSON({}));
+    verifyExplainAggCommand(client, swAggReq.getValue().toBSON());
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
@@ -482,7 +482,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, swAggReq.getValue().toBSON({}));
+    verifyExplainAggCommand(client, swAggReq.getValue().toBSON());
 }
 
 TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
@@ -610,7 +610,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggR
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, swAggReq.getValue().toBSON({}));
+    verifyExplainAggCommand(client, swAggReq.getValue().toBSON());
 }
 
 TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
@@ -715,7 +715,7 @@ TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, swAggReq.getValue().toBSON({}));
+    verifyExplainAggCommand(client, swAggReq.getValue().toBSON());
 }
 
 TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
@@ -825,7 +825,7 @@ TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, swAggReq.getValue().toBSON({}));
+    verifyExplainAggCommand(client, swAggReq.getValue().toBSON());
 }
 }  // namespace
 }  // namespace mongo

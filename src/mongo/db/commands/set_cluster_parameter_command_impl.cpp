@@ -133,7 +133,7 @@ void setClusterParameterImplRouter(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         DatabaseName::kAdmin,
-        configsvrSetClusterParameter.toBSON({}),
+        configsvrSetClusterParameter.toBSON(),
         Shard::RetryPolicy::kIdempotent));
 
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));

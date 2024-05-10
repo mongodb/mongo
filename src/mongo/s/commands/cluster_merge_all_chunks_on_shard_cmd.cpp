@@ -99,7 +99,7 @@ public:
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 DatabaseName::kAdmin,
-                shardSvrMergeAllChunksOnShard.toBSON({}),
+                shardSvrMergeAllChunksOnShard.toBSON(),
                 Shard::RetryPolicy::kIdempotent);
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swCommandResponse));

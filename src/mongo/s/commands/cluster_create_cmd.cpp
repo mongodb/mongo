@@ -110,7 +110,7 @@ public:
             auto nss = cmd.getNamespace();
             ShardsvrCreateCollection shardsvrCollCommand(nss);
 
-            auto cmdObj = cmd.toBSON({});
+            auto cmdObj = cmd.toBSON();
             // Creating the ShardsvrCreateCollectionRequest by parsing the {create..} bsonObj
             // guaratees to propagate the apiVersion and apiStrict paramers. Note that
             // shardsvrCreateCollection as internal command will skip the apiVersionCheck.

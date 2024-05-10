@@ -359,7 +359,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     hasTimeSeriesBucketingUpdate(_request)) {
                     ConfigsvrCollMod request(_collInfo->nsForTargeting, _request);
                     const auto cmdObj =
-                        CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
+                        CommandHelpers::appendMajorityWriteConcern(request.toBSON());
 
                     const auto& configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
                     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(

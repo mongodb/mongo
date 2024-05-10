@@ -415,7 +415,7 @@ public:
                  opCtx->getWriteConcern(),
                  repl::ReadConcernArgs::get(opCtx),
                  ReadPreferenceSetting::get(opCtx),
-                 cmd.toBSON({}),
+                 cmd.toBSON(),
                  {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)}});
 
             pinnedCursor->incNBatches();

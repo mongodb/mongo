@@ -549,7 +549,7 @@ public:
                               "getMore command executor error",
                               "error"_attr = exception.toStatus(),
                               "stats"_attr = redact(stats),
-                              "cmd"_attr = cmd.toBSON({}));
+                              "cmd"_attr = cmd.toBSON());
 
                 exception.addContext("Executor error during getMore");
                 throw;

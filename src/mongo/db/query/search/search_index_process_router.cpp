@@ -65,7 +65,7 @@ boost::optional<UUID> SearchIndexProcessRouter::fetchCollectionUUID(OperationCon
                 opCtx,
                 nss.dbName(),
                 cdb,
-                listCollections.toBSON({}),
+                listCollections.toBSON(),
                 ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
                 Shard::RetryPolicy::kIdempotent);
 

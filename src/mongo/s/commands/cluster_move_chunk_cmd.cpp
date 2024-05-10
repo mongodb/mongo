@@ -225,7 +225,7 @@ public:
             configsvrRequest.setMoveRangeRequestBase(moveRangeReq);
 
             const auto secondaryThrottle = uassertStatusOK(
-                MigrationSecondaryThrottleOptions::createFromCommand(request().toBSON({})));
+                MigrationSecondaryThrottleOptions::createFromCommand(request().toBSON()));
 
             configsvrRequest.setSecondaryThrottle(secondaryThrottle);
 
@@ -237,7 +237,7 @@ public:
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(configsvrRequest.toBSON({})),
+                CommandHelpers::appendMajorityWriteConcern(configsvrRequest.toBSON()),
                 Shard::RetryPolicy::kIdempotent);
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(commandResponse)));
 

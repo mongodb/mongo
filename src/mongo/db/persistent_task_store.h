@@ -92,7 +92,7 @@ public:
         const auto commandResponse = dbClient.runCommand([&] {
             write_ops::InsertCommandRequest insertOp(_storageNss);
             insertOp.setDocuments({task.toBSON()});
-            return insertOp.serialize({});
+            return insertOp.serialize();
         }());
 
         const auto commandReply = commandResponse->getCommandReply();
@@ -148,7 +148,7 @@ public:
                 return entry;
             }()});
 
-            return deleteOp.serialize({});
+            return deleteOp.serialize();
         }());
 
         const auto commandReply = commandResponse->getCommandReply();

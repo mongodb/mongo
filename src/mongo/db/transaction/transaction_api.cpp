@@ -643,7 +643,7 @@ BulkWriteCommandReply SEPTransactionClient::runCRUDOpSync(
 
 ExecutorFuture<std::vector<BSONObj>> SEPTransactionClient::_exhaustiveFind(
     const FindCommandRequest& cmd) const {
-    return runCommand(cmd.getDbName(), cmd.toBSON({}))
+    return runCommand(cmd.getDbName(), cmd.toBSON())
         .thenRunOn(_executor)
         .then([this, batchSize = cmd.getBatchSize(), tenantId = cmd.getDbName().tenantId()](
                   BSONObj reply) {
@@ -670,8 +670,7 @@ ExecutorFuture<std::vector<BSONObj>> SEPTransactionClient::_exhaustiveFind(
                            cursorResponse->getNSS().coll().toString());
                        getMoreRequest.setBatchSize(batchSize);
 
-                       return runCommand(cursorResponse->getNSS().dbName(),
-                                         getMoreRequest.toBSON({}))
+                       return runCommand(cursorResponse->getNSS().dbName(), getMoreRequest.toBSON())
                            .thenRunOn(_executor)
                            .then([response, cursorResponse, tenantId](BSONObj reply) {
                                // We keep the state of cursorResponse to be able to check the

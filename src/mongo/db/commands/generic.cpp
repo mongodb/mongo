@@ -268,7 +268,7 @@ public:
             auto optDebugLevel = cmd.getDebugLevel();
 
             if (optDebugLevel && (severity != MessageSeverityEnum::kDebug)) {
-                auto obj = cmd.toBSON({});
+                auto obj = cmd.toBSON();
                 LOGV2_DEBUG(5060599,
                             3,
                             "Non-debug severity levels must not pass 'debugLevel'",

@@ -81,7 +81,7 @@ public:
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                configsvrRequest.toBSON({}),
+                configsvrRequest.toBSON(),
                 Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(cmdResponse.commandStatus);

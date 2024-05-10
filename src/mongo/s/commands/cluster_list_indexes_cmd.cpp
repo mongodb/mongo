@@ -148,7 +148,7 @@ public:
             // namespace.
             auto targeter = CollectionRoutingInfoTargeter(opCtx, ns());
             auto cri = targeter.getRoutingInfo();
-            auto cmdToBeSent = request().toBSON({});
+            auto cmdToBeSent = request().toBSON();
             if (targeter.timeseriesNamespaceNeedsRewrite(ns())) {
                 cmdToBeSent =
                     timeseries::makeTimeseriesCommand(cmdToBeSent,

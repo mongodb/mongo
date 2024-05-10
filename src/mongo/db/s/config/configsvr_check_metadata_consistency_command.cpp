@@ -160,7 +160,7 @@ public:
                 opCtx->getWriteConcern(),
                 repl::ReadConcernArgs::get(opCtx),
                 ReadPreferenceSetting::get(opCtx),
-                request().toBSON({}),
+                request().toBSON(),
                 {Privilege(ResourcePattern::forClusterResource(nss.tenantId()),
                            ActionType::internal)}};
 

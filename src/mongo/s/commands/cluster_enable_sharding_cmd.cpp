@@ -103,7 +103,7 @@ public:
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(configsvrCreateDatabase.toBSON({})),
+                CommandHelpers::appendMajorityWriteConcern(configsvrCreateDatabase.toBSON()),
                 Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOKWithContext(response.commandStatus,

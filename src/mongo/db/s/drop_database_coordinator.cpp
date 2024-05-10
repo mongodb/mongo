@@ -410,7 +410,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
                     dropDatabaseParticipantCmd.setDbName(_dbName);
                     const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
-                        dropDatabaseParticipantCmd.toBSON({}));
+                        dropDatabaseParticipantCmd.toBSON());
 
                     // The database needs to be dropped first on the db primary shard
                     // because otherwise changestreams won't receive the drop event.

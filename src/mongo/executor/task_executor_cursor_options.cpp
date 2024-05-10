@@ -37,7 +37,7 @@ BSONObj DefaultTaskExecutorCursorGetMoreStrategy::createGetMoreRequest(
     const CursorId& cursorId, const NamespaceString& nss, long long prevBatchNumReceived) {
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(_batchSize);
-    return getMoreRequest.toBSON({});
+    return getMoreRequest.toBSON();
 }
 
 TaskExecutorCursorOptions::TaskExecutorCursorOptions(boost::optional<int64_t> batchSize,

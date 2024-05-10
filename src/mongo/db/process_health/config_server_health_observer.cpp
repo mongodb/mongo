@@ -264,7 +264,7 @@ void ConfigServerHealthObserver::_runSmokeReadShardsCommand(std::shared_ptr<Chec
     findCommand.setLimit(1);
     findCommand.setSingleBatch(true);
     findCommand.setMaxTimeMS(Milliseconds(kServerRequestTimeout).count());
-    findCommand.serialize(BSONObj(), &findCmdBuilder);
+    findCommand.serialize(&findCmdBuilder);
 
     // `runCommand()` is not futurized so this method is blocking.
     Timer t;

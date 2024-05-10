@@ -85,7 +85,7 @@ BSONObj makeCommandObj(const NamespaceString& ns) {
     auto command = _shardsvrReshardingOperationTime(ns);
     command.setDbName(DatabaseNameUtil::deserialize(
         ns.tenantId(), DatabaseName::kAdmin.db(omitTenant), SerializationContext::stateDefault()));
-    return command.toBSON({});
+    return command.toBSON();
 }
 
 auto makeRequests(const BSONObj& cmdObj, const std::vector<ShardId>& recipientShards) {

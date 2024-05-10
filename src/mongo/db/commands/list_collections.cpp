@@ -579,7 +579,7 @@ public:
                 exec->detachFromOperationContext();
             }  // Drop db lock. Global cursor registration must be done without holding any locks.
 
-            auto cmdObj = listCollRequest.toBSON({});
+            auto cmdObj = listCollRequest.toBSON();
             auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
                 opCtx,
                 {std::move(exec),

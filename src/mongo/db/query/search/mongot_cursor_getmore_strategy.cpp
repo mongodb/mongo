@@ -63,7 +63,7 @@ BSONObj MongotTaskExecutorCursorGetMoreStrategy::createGetMoreRequest(
     // TODO SERVER-74941 Remove docsRequested alongside featureFlagSearchBatchSizeLimit.
     if (_currentBatchSize.has_value() || docsNeeded.has_value()) {
         BSONObjBuilder getMoreBob;
-        getMoreRequest.serialize({}, &getMoreBob);
+        getMoreRequest.serialize(&getMoreBob);
         BSONObjBuilder cursorOptionsBob(getMoreBob.subobjStart(mongot_cursor::kCursorOptionsField));
         if (_currentBatchSize.has_value()) {
             cursorOptionsBob.append(mongot_cursor::kBatchSizeField,
@@ -74,7 +74,7 @@ BSONObj MongotTaskExecutorCursorGetMoreStrategy::createGetMoreRequest(
         cursorOptionsBob.doneFast();
         return getMoreBob.obj();
     }
-    return getMoreRequest.toBSON({});
+    return getMoreRequest.toBSON();
 }
 
 long long MongotTaskExecutorCursorGetMoreStrategy::_getNextBatchSize(

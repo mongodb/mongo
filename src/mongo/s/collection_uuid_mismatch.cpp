@@ -99,7 +99,7 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
         executeCommandAgainstDatabasePrimary(opCtx,
                                              info->dbName(),
                                              swDbInfo.getValue(),
-                                             listCollections.toBSON({}),
+                                             listCollections.toBSON(),
                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                              Shard::RetryPolicy::kIdempotent);
     if (!response.swResponse.isOK()) {

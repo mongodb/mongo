@@ -2390,7 +2390,7 @@ OptionsAndIndexes CreateCollectionCoordinator::_getCollectionOptionsAndIndexes(
                             opCtx,
                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                             nss().dbName(),
-                            listCollections.toBSON({}),
+                            listCollections.toBSON(),
                             Milliseconds(-1)))
             .docs;
 
@@ -2412,7 +2412,7 @@ OptionsAndIndexes CreateCollectionCoordinator::_getCollectionOptionsAndIndexes(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         nss().dbName(),
-        listIndexes.toBSON({}),
+        listIndexes.toBSON(),
         Milliseconds(-1));
 
     indexes = std::move(uassertStatusOK(swIndexResponse).docs);

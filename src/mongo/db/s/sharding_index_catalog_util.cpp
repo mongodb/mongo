@@ -155,7 +155,7 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
     sharding_util::sendCommandToShards(
         opCtx,
         userCollectionNss.dbName(),
-        CommandHelpers::appendMajorityWriteConcern(shardsvrBlockWritesRequest.toBSON({})),
+        CommandHelpers::appendMajorityWriteConcern(shardsvrBlockWritesRequest.toBSON()),
         shardIdsVec,
         executor);
 
@@ -167,7 +167,7 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
     sharding_util::sendCommandToShards(
         opCtx,
         userCollectionNss.dbName(),
-        CommandHelpers::appendMajorityWriteConcern(shardsvrBlockWritesRequest.toBSON({})),
+        CommandHelpers::appendMajorityWriteConcern(shardsvrBlockWritesRequest.toBSON()),
         shardIdsVec,
         executor);
 

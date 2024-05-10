@@ -383,7 +383,7 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONOb
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         DatabaseName::kConfig,
-        CommandHelpers::appendMajorityWriteConcern(deleteCmd.toBSON({})),
+        CommandHelpers::appendMajorityWriteConcern(deleteCmd.toBSON()),
         Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOKWithContext(
@@ -551,7 +551,7 @@ void performNoopMajorityWriteLocally(OperationContext* opCtx) {
 
     DBDirectClient client(opCtx);
     const auto commandResponse = client.runCommand(OpMsgRequestBuilder::create(
-        auth::ValidatedTenancyScope::kNotRequired, updateOp.getDbName(), updateOp.toBSON({})));
+        auth::ValidatedTenancyScope::kNotRequired, updateOp.getDbName(), updateOp.toBSON()));
 
     const auto commandReply = commandResponse->getCommandReply();
     uassertStatusOK(getStatusFromWriteCommandReply(commandReply));

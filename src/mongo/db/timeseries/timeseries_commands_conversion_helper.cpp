@@ -240,7 +240,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                                                                               originalKeyField);
                 uassert(ErrorCodes::CannotCreateIndex,
                         str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
-                                      << " Command request: " << redact(origCmd.toBSON({})),
+                                      << " Command request: " << redact(origCmd.toBSON()),
                         bucketsIndexSpecWithStatus.isOK());
 
                 if (timeseries::shouldIncludeOriginalSpec(
@@ -298,7 +298,7 @@ DropIndexes makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
 
         uassert(ErrorCodes::IndexNotFound,
                 str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
-                              << " Command request: " << redact(origCmd.toBSON({})),
+                              << " Command request: " << redact(origCmd.toBSON()),
                 bucketsIndexSpecWithStatus.isOK());
 
         DropIndexes dropIndexCmd(ns);

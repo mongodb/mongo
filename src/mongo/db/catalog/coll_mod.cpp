@@ -1003,7 +1003,7 @@ Status _collModInternal(OperationContext* opCtx,
                 fmt::format(
                     "Unexpected true value for 'recordIdsReplicated' in collMod options for {}: {}",
                     nss.toStringForErrorMsg(),
-                    cmd.toBSON({}).toString()));
+                    cmd.toBSON().toString()));
 
             writableColl->unsetRecordIdsReplicated(opCtx);
         }

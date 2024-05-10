@@ -152,7 +152,7 @@ void DbCheckTest::deleteDocs(OperationContext* opCtx, int startIDNum, int numDoc
             }
             return deleteStatements;
         }()});
-        return deleteOp.toBSON({});
+        return deleteOp.toBSON();
     }();
 
     DBDirectClient client(opCtx);

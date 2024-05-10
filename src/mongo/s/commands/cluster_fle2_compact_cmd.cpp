@@ -119,7 +119,7 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
 
     // Rewrite command verb to _shardSvrCompactStructuredEnccryptionData.
-    auto cmd = request().toBSON({});
+    auto cmd = request().toBSON();
     BSONObjBuilder req;
     for (const auto& elem : cmd) {
         if (elem.fieldNameStringData() == Request::kCommandName) {

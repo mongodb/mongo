@@ -379,7 +379,7 @@ void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSect
                 return entry;
             }()});
 
-            return deleteOp.serialize({});
+            return deleteOp.serialize();
         }());
 
         const auto commandReply = cmdResponse->getCommandReply();

@@ -186,7 +186,7 @@ bool ShardingDDLCoordinator::_removeDocument(OperationContext* opCtx) {
             return entry;
         }()});
 
-        return deleteOp.serialize({});
+        return deleteOp.serialize();
     }());
 
     const auto commandReply = commandResponse->getCommandReply();

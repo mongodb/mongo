@@ -1468,7 +1468,7 @@ bool ReplicationCoordinatorExternalStateImpl::isCWWCSetOnConfigShard(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             DatabaseName::kAdmin,
-            configsvrRequest.toBSON({}),
+            configsvrRequest.toBSON(),
             Shard::RetryPolicy::kIdempotent));
 
     bool isCWWCSet = false;

@@ -257,7 +257,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
             write_ops::InsertCommandRequest insertOp(
                 NamespaceString::kCollectionCriticalSectionsNamespace);
             insertOp.setDocuments({newDoc.toBSON()});
-            return insertOp.serialize({});
+            return insertOp.serialize();
         }());
 
         const auto commandReply = commandResponse->getCommandReply();
@@ -383,7 +383,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
             write_ops::UpdateOpEntry updateEntry(query, updateModification);
             updateOp.setUpdates({updateEntry});
 
-            return updateOp.serialize({});
+            return updateOp.serialize();
         }());
 
         const auto commandReply = commandResponse->getCommandReply();
@@ -511,7 +511,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
                 return entry;
             }()});
 
-            return deleteOp.serialize({});
+            return deleteOp.serialize();
         }());
 
         const auto commandReply = commandResponse->getCommandReply();

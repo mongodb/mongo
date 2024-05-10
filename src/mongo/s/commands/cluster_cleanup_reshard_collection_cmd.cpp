@@ -76,7 +76,7 @@ public:
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                configsvrCleanupReshardCollection.toBSON({}),
+                configsvrCleanupReshardCollection.toBSON(),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(cmdResponse.commandStatus);
             uassertStatusOK(cmdResponse.writeConcernStatus);

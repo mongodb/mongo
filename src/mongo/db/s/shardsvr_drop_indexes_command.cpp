@@ -187,7 +187,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     const DDLLockManager::ScopedCollectionDDLLock collDDLLock{opCtx, ns(), lockReason, MODE_X};
 
     auto resolvedNs = ns();
-    auto dropIdxBSON = dropIdxCmd.toBSON({});
+    auto dropIdxBSON = dropIdxCmd.toBSON();
 
     // Checking if it is a timeseries collection under the collection DDL lock
     if (auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, ns(), true)) {

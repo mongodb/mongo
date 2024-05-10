@@ -306,7 +306,7 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
         invariant(!shard->isConfig() || shard->getConnString());
 
         BSONObjBuilder cmdBuilder;
-        findCommandToForward->serialize(BSONObj(), &cmdBuilder);
+        findCommandToForward->serialize(&cmdBuilder);
         logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &cmdBuilder);
         appendOpKey(opKey, &cmdBuilder);
         appendShardVersion(shardId, cmdBuilder);

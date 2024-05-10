@@ -516,7 +516,7 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
                      [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
                          ShardsvrDropCollection dropCollectionCommand(ns);
                          BSONObj cmdObj = CommandHelpers::appendMajorityWriteConcern(
-                             dropCollectionCommand.toBSON({}), opCtx->getWriteConcern());
+                             dropCollectionCommand.toBSON(), opCtx->getWriteConcern());
                          auto response = executeCommandAgainstDatabasePrimary(
                              opCtx,
                              ns.dbName(),

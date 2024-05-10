@@ -251,7 +251,7 @@ public:
         BSONObj targetingQuery = countRequest.getQuery();
         BSONObj targetingCollation = countRequest.getCollation().value_or(BSONObj());
 
-        const auto explainCmd = ClusterExplain::wrapAsExplain(countRequest.toBSON({}), verbosity);
+        const auto explainCmd = ClusterExplain::wrapAsExplain(countRequest.toBSON(), verbosity);
 
         // We will time how long it takes to run the commands on the shards
         Timer timer;

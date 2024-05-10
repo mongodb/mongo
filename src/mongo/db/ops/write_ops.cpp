@@ -108,13 +108,13 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
             str::stream() << "Number of statement ids must match the number of batch entries. Got "
                           << stmtIds->size() << " statement ids but " << numOps
                           << " operations. Statement ids: " << BSON("stmtIds" << *stmtIds)
-                          << ". Write command: " << op.toBSON({}),
+                          << ". Write command: " << op.toBSON(),
             stmtIds->size() == numOps);
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "May not specify both stmtId and stmtIds in write command. Got "
                               << BSON("stmtId" << *op.getWriteCommandRequestBase().getStmtId()
                                                << "stmtIds" << *stmtIds)
-                              << ". Write command: " << op.toBSON({}),
+                              << ". Write command: " << op.toBSON(),
                 !op.getWriteCommandRequestBase().getStmtId());
     }
 }

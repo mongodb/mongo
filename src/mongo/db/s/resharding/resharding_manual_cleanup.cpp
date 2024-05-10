@@ -107,7 +107,7 @@ std::vector<AsyncRequestsSender::Request> createShardCleanupRequests(
     std::vector<AsyncRequestsSender::Request> requests;
     for (const auto& participant : participants) {
         requests.emplace_back(participant,
-                              ShardsvrCleanupReshardCollection(nss, reshardingUUID).toBSON({}));
+                              ShardsvrCleanupReshardCollection(nss, reshardingUUID).toBSON());
     }
     return requests;
 }
@@ -290,7 +290,7 @@ void ReshardingCoordinatorCleaner::_dropTemporaryReshardingCollection(
         opCtx,
         tempReshardingNss.dbName(),
         dbInfo,
-        CommandHelpers::appendMajorityWriteConcern(dropCollectionCommand.toBSON({}),
+        CommandHelpers::appendMajorityWriteConcern(dropCollectionCommand.toBSON(),
                                                    opCtx->getWriteConcern()),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         Shard::RetryPolicy::kIdempotent);

@@ -129,7 +129,7 @@ boost::optional<Milliseconds> GlobalIndexMetrics::getRecipientHighEstimateRemain
 
 BSONObj GlobalIndexMetrics::getOriginalCommand(const CommonGlobalIndexMetadata& metadata) {
     CreateIndexesCommand cmd(metadata.getNss(), {metadata.getIndexSpec().toBSON()});
-    return cmd.toBSON({});
+    return cmd.toBSON();
 }
 
 StringData GlobalIndexMetrics::getStateString() const noexcept {

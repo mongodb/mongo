@@ -563,7 +563,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
 
     auto reply = std::make_shared<write_ops::DeleteCommandReply>();
 
-    auto ownedRequest = deleteRequest.serialize({});
+    auto ownedRequest = deleteRequest.serialize();
 
     if (gMultitenancySupport) {
         ownedRequest.validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx);
@@ -665,7 +665,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
     // shared_ptrs
     auto reply = std::make_shared<write_ops::UpdateCommandReply>();
 
-    auto ownedRequest = updateRequest.serialize({});
+    auto ownedRequest = updateRequest.serialize();
 
     if (gMultitenancySupport) {
         ownedRequest.validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx);
@@ -936,7 +936,7 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     std::shared_ptr<ReplyType> reply = constructDefaultReply<ReplyType>();
 
 
-    auto ownedRequest = findAndModifyRequest.serialize({});
+    auto ownedRequest = findAndModifyRequest.serialize();
 
     if (gMultitenancySupport) {
         ownedRequest.validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx);
@@ -1652,7 +1652,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLEQueryInterfaceImpl::getTags(
     getCountsCmd.setTokens(toTagSets(tokensSets));
     getCountsCmd.setQueryType(queryTypeTranslation(type));
 
-    auto response = _txnClient.runCommandSync(nss.dbName(), getCountsCmd.toBSON({}));
+    auto response = _txnClient.runCommandSync(nss.dbName(), getCountsCmd.toBSON());
 
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
@@ -1721,7 +1721,7 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteW
     ei2.setCrudProcessed(true);
     findAndModifyRequest.setEncryptionInformation(ei2);
 
-    auto response = _txnClient.runCommandSync(nss.dbName(), findAndModifyRequest.toBSON({}));
+    auto response = _txnClient.runCommandSync(nss.dbName(), findAndModifyRequest.toBSON());
 
     auto status = getStatusFromWriteCommandReply(response);
 
@@ -1787,7 +1787,7 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateW
     ei2.setCrudProcessed(true);
     findAndModifyRequest.setEncryptionInformation(ei2);
 
-    auto response = _txnClient.runCommandSync(nss.dbName(), findAndModifyRequest.toBSON({}));
+    auto response = _txnClient.runCommandSync(nss.dbName(), findAndModifyRequest.toBSON());
 
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
@@ -1858,7 +1858,7 @@ write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
     // WriteConcern is set at the transaction level so strip it out
     newFindAndModifyRequest.setWriteConcern(boost::none);
 
-    auto response = _txnClient.runCommandSync(nss.dbName(), newFindAndModifyRequest.toBSON({}));
+    auto response = _txnClient.runCommandSync(nss.dbName(), newFindAndModifyRequest.toBSON());
 
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
@@ -1945,7 +1945,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
 
     DBDirectClient directClient(opCtx.get());
 
-    auto request = getCountsCmd.serialize({});
+    auto request = getCountsCmd.serialize();
     if (vts) {
         request.validatedTenancyScope = *vts;
     }

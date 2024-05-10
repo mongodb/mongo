@@ -416,7 +416,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(batchSize);
     opMsgRequest = OpMsgRequestBuilder::create(
-        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON({}));
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON());
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -535,7 +535,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(batchSize);
     opMsgRequest = OpMsgRequestBuilder::create(
-        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON({}));
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON());
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -585,7 +585,7 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(batchSize);
     opMsgRequest = OpMsgRequestBuilder::create(
-        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON({}));
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON());
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 

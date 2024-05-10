@@ -201,7 +201,7 @@ repl::OpTime persistParticipantListBlocking(
             entry.setUpsert(true);
             return entry;
         }()});
-        return updateOp.serialize({});
+        return updateOp.serialize();
     }());
 
     const auto upsertStatus = getStatusFromWriteCommandReply(commandResponse->getCommandReply());
@@ -437,7 +437,7 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
 
             return entry;
         }()});
-        return updateOp.serialize({});
+        return updateOp.serialize();
     }());
 
     const auto commandReply = commandResponse->getCommandReply();
@@ -642,7 +642,7 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
             entry.setMulti(false);
             return entry;
         }()});
-        return deleteOp.serialize({});
+        return deleteOp.serialize();
     }());
 
     const auto commandReply = commandResponse->getCommandReply();

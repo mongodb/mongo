@@ -596,7 +596,7 @@ void MovePrimaryCoordinator::commitMetadataToConfig(
     const auto commitCommand = [&] {
         ConfigsvrCommitMovePrimary request(_dbName, preCommitDbVersion, _doc.getToShardId());
         request.setDbName(DatabaseName::kAdmin);
-        return CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
+        return CommandHelpers::appendMajorityWriteConcern(request.toBSON());
     }();
 
     const auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -741,7 +741,7 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(OperationContext* o
         request.setDbName(DatabaseName::kAdmin);
         request.setReason(_csReason);
 
-        auto command = CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
+        auto command = CommandHelpers::appendMajorityWriteConcern(request.toBSON());
         return command.addFields(getNewSession(opCtx).toBSON());
     }();
 
@@ -771,7 +771,7 @@ void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(OperationContext* op
         request.setDbName(DatabaseName::kAdmin);
         request.setReason(_csReason);
 
-        auto command = CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
+        auto command = CommandHelpers::appendMajorityWriteConcern(request.toBSON());
         return command.addFields(getNewSession(opCtx).toBSON());
     }();
 

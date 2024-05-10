@@ -204,7 +204,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(configsvrReshardCollection.toBSON({}),
+                CommandHelpers::appendMajorityWriteConcern(configsvrReshardCollection.toBSON(),
                                                            opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));

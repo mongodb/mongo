@@ -92,7 +92,7 @@ public:
             auto shard =
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
             auto versionedCmdObj = makeVersionedCmdObj(
-                cri, CommandHelpers::filterCommandRequestForPassthrough(request().toBSON({})));
+                cri, CommandHelpers::filterCommandRequestForPassthrough(request().toBSON()));
             auto swResponse = shard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},

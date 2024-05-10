@@ -53,7 +53,7 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
     // Wrapping this function allows us to separate the CommandType parsing logic from the
     // implementation details of executing the remote command asynchronously.
     auto runner = detail::AsyncRPCRunner::get(opCtx->getServiceContext());
-    auto cmdBSON = options->cmd.toBSON({});
+    auto cmdBSON = options->cmd.toBSON();
     const auto shardId = targeter->getShardId();
     if (auto txnRouter = TransactionRouter::get(opCtx); txnRouter) {
         cmdBSON = txnRouter.attachTxnFieldsIfNeeded(opCtx, targeter->getShardId(), cmdBSON);

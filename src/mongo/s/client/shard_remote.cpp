@@ -381,7 +381,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
             findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
         }
 
-        findCommand.serialize(BSONObj(), &findCmdBuilder);
+        findCommand.serialize(&findCmdBuilder);
     }
 
     return _runExhaustiveCursorCommand(

@@ -217,7 +217,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
     LOGV2(22016,
           "Starting chunk migration donation",
-          "requestParameters"_attr = redact(_args.toBSON({})));
+          "requestParameters"_attr = redact(_args.toBSON()));
 
     _moveTimingHelper.done(1);
     moveChunkHangAtStep1.pauseWhileSet();
@@ -566,7 +566,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
                                             migratedChunk,
                                             metadata.getCollPlacementVersion());
 
-        request.serialize({}, &builder);
+        request.serialize(&builder);
         builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
     }
 
@@ -865,7 +865,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
     } catch (const DBException& ex) {
         LOGV2_WARNING(5089001,
                       "Failed to complete the migration",
-                      "chunkMigrationRequestParameters"_attr = redact(_args.toBSON({})),
+                      "chunkMigrationRequestParameters"_attr = redact(_args.toBSON()),
                       "error"_attr = redact(ex),
                       "migrationId"_attr = _coordinator->getMigrationId());
         // Something went really wrong when completing the migration just unset the metadata and let

@@ -157,7 +157,7 @@ public:
                                 dbName,
                                 dbInfo,
                                 CommandHelpers::appendMajorityWriteConcern(
-                                    collModCommand.toBSON({}), opCtx->getWriteConcern()),
+                                    collModCommand.toBSON(), opCtx->getWriteConcern()),
                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                 Shard::RetryPolicy::kIdempotent)
                                 .swResponse);

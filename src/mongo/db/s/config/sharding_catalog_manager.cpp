@@ -1043,7 +1043,7 @@ Status ShardingCatalogManager::_notifyClusterOnNewDatabases(
                                                    event.toBSON());
         BSONObjBuilder bob;
         request.serialize(
-            BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority), &bob);
+            &bob, BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
         rpc::writeAuthDataToImpersonatedUserMetadata(altOpCtx, &bob);
 
         // send cmd
@@ -1577,7 +1577,7 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         NamespaceString::kConfigsvrPlacementHistoryNamespace.dbName(),
-        deleteRequest.toBSON({}),
+        deleteRequest.toBSON(),
         Shard::RetryPolicy::kIdempotent));
 
     LOGV2_DEBUG(7068808, 2, "Cleaning up placement history - done deleting entries");

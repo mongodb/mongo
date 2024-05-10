@@ -169,8 +169,8 @@ public:
 
     BSONObj serialise() const override {
         BSONObjBuilder commandBuilder;
-        _request.serialize(BSON(WriteConcernOptions::kWriteConcernField << _wc.toBSON()),
-                           &commandBuilder);
+        _request.serialize(&commandBuilder,
+                           BSON(WriteConcernOptions::kWriteConcernField << _wc.toBSON()));
         appendCommandMetadataTo(&commandBuilder);
         return commandBuilder.obj();
     }
@@ -309,7 +309,7 @@ public:
     BSONObj serialise() const override {
         ShardSvrMergeAllChunksOnShard req(getNameSpace(), getTarget());
         req.setMaxNumberOfChunksToMerge(AutoMergerPolicy::MAX_NUMBER_OF_CHUNKS_TO_MERGE);
-        return req.toBSON({});
+        return req.toBSON();
     }
 };
 
@@ -338,7 +338,7 @@ public:
 
         shardsvrReshardCollection.setReshardCollectionRequest(std::move(reshardCollectionRequest));
         return appendDbVersionIfPresent(
-            CommandHelpers::appendMajorityWriteConcern(shardsvrReshardCollection.toBSON({})),
+            CommandHelpers::appendMajorityWriteConcern(shardsvrReshardCollection.toBSON()),
             _dbVersion);
     }
 

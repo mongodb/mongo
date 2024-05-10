@@ -219,7 +219,7 @@ BSONObj buildCountChunksInRangeCommand(const UUID& collectionUUID,
     pipeline.push_back(BSON("$count" << ChunkType::collectionUUID.name()));
     countRequest.setPipeline(pipeline);
 
-    return countRequest.toBSON({});
+    return countRequest.toBSON();
 }
 
 BSONObj buildCountSingleChunkCommand(const ChunkType& chunk) {
@@ -234,7 +234,7 @@ BSONObj buildCountSingleChunkCommand(const ChunkType& chunk) {
     pipeline.push_back(BSON("$count" << ChunkType::collectionUUID.name()));
     countRequest.setPipeline(pipeline);
 
-    return countRequest.toBSON({});
+    return countRequest.toBSON();
 }
 
 BSONObj buildCountContiguousChunksByBounds(const UUID& collectionUUID,
@@ -261,7 +261,7 @@ BSONObj buildCountContiguousChunksByBounds(const UUID& collectionUUID,
     pipeline.push_back(BSON("$match" << BSON("$or" << chunkDocArray.arr())));
     pipeline.push_back(BSON("$count" << ChunkType::collectionUUID.name()));
     countRequest.setPipeline(pipeline);
-    return countRequest.toBSON({});
+    return countRequest.toBSON();
 }
 
 /**
@@ -662,7 +662,7 @@ auto doSplitChunk(const txn_api::TransactionClient& txnClient,
     }
     updateOp.setUpdates(entries);
 
-    auto updateBSONObjSize = updateOp.toBSON({}).objsize();
+    auto updateBSONObjSize = updateOp.toBSON().objsize();
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "Spliting the chunk with too many split points, the "
                              "final BSON operation size "
@@ -2526,7 +2526,7 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
             BSON(ChunkType::collectionUUID.name() << migratedChunk.getCollectionUUID()));
 
         auto distinctCommandResponse =
-            txnClient.runCommandSync(DatabaseName::kConfig, distinctRequest.toBSON({}));
+            txnClient.runCommandSync(DatabaseName::kConfig, distinctRequest.toBSON());
 
         uassertStatusOK(getStatusFromWriteCommandReply(distinctCommandResponse));
 

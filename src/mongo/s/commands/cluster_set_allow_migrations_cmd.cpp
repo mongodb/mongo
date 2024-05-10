@@ -88,7 +88,7 @@ public:
                 opCtx,
                 nss.dbName(),
                 dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(shardsvrRequest.toBSON({})),
+                CommandHelpers::appendMajorityWriteConcern(shardsvrRequest.toBSON()),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kIdempotent);
 

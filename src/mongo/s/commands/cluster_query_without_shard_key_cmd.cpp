@@ -258,7 +258,7 @@ BSONObj createAggregateCmdObj(
         return pipeline;
     }());
 
-    return aggregate.toBSON({});
+    return aggregate.toBSON();
 }
 
 ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest& writeReq) {

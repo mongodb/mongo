@@ -224,7 +224,7 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
     ensureChunkVersionIsGreaterThanRequest.setNss(nss);
     ensureChunkVersionIsGreaterThanRequest.setCollectionUUID(collUUID);
     const auto ensureChunkVersionIsGreaterThanRequestBSON =
-        ensureChunkVersionIsGreaterThanRequest.toBSON({});
+        ensureChunkVersionIsGreaterThanRequest.toBSON();
 
     hangInEnsureChunkVersionIsGreaterThanInterruptible.pauseWhileSet(opCtx);
 

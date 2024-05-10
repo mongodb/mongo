@@ -325,7 +325,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
     ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
                                           bucketsColl.dbName(),
                                           uuid2,
-                                          cmd.toBSON({}),
+                                          cmd.toBSON(),
                                           /*allowRenameOutOfTheWay*/ true));
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
     ASSERT_EQUALS(uuid2, getCollectionUuid(opCtx.get(), bucketsColl));
@@ -353,7 +353,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
     ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
                                           bucketsColl.dbName(),
                                           uuid1,
-                                          cmd.toBSON({}),
+                                          cmd.toBSON(),
                                           /*allowRenameOutOfTheWay*/ false));
     // This should rename the old collection back to its original name.
     ASSERT_FALSE(collectionExists(opCtx.get(), *renamedCollectionNss));

@@ -94,7 +94,7 @@ Message assembleCommandRequest(DBClientBase* client,
                                const ReadPreferenceSetting& readPref) {
     // Add the $readPreference and other metadata to the request.
     BSONObjBuilder builder;
-    command.serialize(BSONObj(), &builder);
+    command.serialize(&builder);
     readPref.toContainingBSON(&builder);
     addMetadata(client, &builder);
 

@@ -88,7 +88,7 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
     auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.dbName());
-    auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}));
+    auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON());
     sendCommandToShards(opCtx, DatabaseName::kAdmin, cmdObj, shardIds, executor);
 }
 
@@ -106,7 +106,7 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
         recipientShard->runFireAndForgetCommand(opCtx,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                 DatabaseName::kAdmin,
-                                                cmd.toBSON({}));
+                                                cmd.toBSON());
     }
 }
 

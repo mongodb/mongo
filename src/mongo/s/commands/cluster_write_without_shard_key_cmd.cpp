@@ -257,7 +257,7 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
             bulkWriteRequest->setOps({newDeleteOp});
         }
         bulkWriteRequest->setNsInfo({newNsEntry});
-        return std::make_pair(requestDbName, bulkWriteRequest->toBSON({}));
+        return std::make_pair(requestDbName, bulkWriteRequest->toBSON());
     } else if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
         auto updateRequest = write_ops::UpdateCommandRequest::parse(
             IDLParserContext("_clusterWriteWithoutShardKeyForUpdate"), opMsgRequest.body);
@@ -380,7 +380,7 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
         // _clusterWriteWithoutShardKey.
         findAndModifyRequest.setWriteConcern(boost::none);
         return std::make_pair(requestDbName,
-                              appendShardVersion(findAndModifyRequest.toBSON({}), shardVersion));
+                              appendShardVersion(findAndModifyRequest.toBSON(), shardVersion));
     } else {
         uasserted(ErrorCodes::InvalidOptions,
                   "_clusterWriteWithoutShardKey only supports update, delete, and "

@@ -273,7 +273,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                         sharding_util::sendCommandToShardsWithVersion(
                             opCtx,
                             ns.dbName(),
-                            validateRequest.toBSON({}),
+                            validateRequest.toBSON(),
                             getShardsWithDataForCollection(opCtx, ns),
                             **executor,
                             uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns)),
@@ -351,7 +351,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                             opCtx,
                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                             DatabaseName::kAdmin,
-                            CommandHelpers::appendMajorityWriteConcern(commitRequest.toBSON({})),
+                            CommandHelpers::appendMajorityWriteConcern(commitRequest.toBSON()),
                             Shard::RetryPolicy::kIdempotent);
 
                 uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(commitResponse));
@@ -511,8 +511,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinatorPre71Compatible::_runImp
                     opCtx,
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                     DatabaseName::kAdmin,
-                    CommandHelpers::appendMajorityWriteConcern(
-                        configsvrRefineCollShardKey.toBSON({}), opCtx->getWriteConcern()),
+                    CommandHelpers::appendMajorityWriteConcern(configsvrRefineCollShardKey.toBSON(),
+                                                               opCtx->getWriteConcern()),
                     Shard::RetryPolicy::kIdempotent));
 
                 uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));

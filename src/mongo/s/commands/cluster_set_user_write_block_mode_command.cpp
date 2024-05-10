@@ -88,7 +88,7 @@ public:
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 DatabaseName::kAdmin,
                 CommandHelpers::appendMajorityWriteConcern(
-                    configsvrSetUserWriteBlockModeCmd.toBSON({}), opCtx->getWriteConcern()),
+                    configsvrSetUserWriteBlockModeCmd.toBSON(), opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(cmdResponse.commandStatus);
             uassertStatusOK(cmdResponse.writeConcernStatus);

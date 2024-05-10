@@ -133,9 +133,9 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
     }
 
     if (_activeMoveChunkState) {
-        auto activeMoveChunkStateBSON = _activeMoveChunkState->args.toBSON({});
+        auto activeMoveChunkStateBSON = _activeMoveChunkState->args.toBSON();
 
-        if (activeMoveChunkStateBSON.woCompare(args.toBSON({})) == 0) {
+        if (activeMoveChunkStateBSON.woCompare(args.toBSON()) == 0) {
             LOGV2(6386800,
                   "Registering new chunk donation",
                   logAttrs(args.getCommandParameter()),
@@ -149,7 +149,7 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
               "Rejecting donate chunk due to conflicting migration in progress",
               logAttrs(args.getCommandParameter()),
               "runningMigration"_attr = activeMoveChunkStateBSON,
-              "requestedMigration"_attr = args.toBSON({}));
+              "requestedMigration"_attr = args.toBSON());
 
         return _activeMoveChunkState->constructErrorStatus();
     }
@@ -186,7 +186,7 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
             LOGV2(6386802,
                   "Rejecting receive chunk due to conflicting donate chunk in progress",
                   logAttrs(_activeMoveChunkState->args.getCommandParameter()),
-                  "runningMigration"_attr = _activeMoveChunkState->args.toBSON({}));
+                  "runningMigration"_attr = _activeMoveChunkState->args.toBSON());
             return _activeMoveChunkState->constructErrorStatus();
         }
 

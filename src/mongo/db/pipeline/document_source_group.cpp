@@ -458,7 +458,7 @@ bool DocumentSourceGroup::tryToGenerateCommonSortKey(Pipeline::SourceContainer::
         auto key = getTopBottomAccKey(dynamic_cast<AccumulatorN*>(accN.get()));
         if (key.accType == AccumulatorN::AccumulatorType::kTopN ||
             key.accType == AccumulatorN::AccumulatorType::kBottomN) {
-            key.n = accStmts[accIdx].expr.initializer->serialize({});
+            key.n = accStmts[accIdx].expr.initializer->serialize();
         }
 
         if (auto [it, inserted] =

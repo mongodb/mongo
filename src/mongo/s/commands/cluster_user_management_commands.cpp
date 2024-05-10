@@ -157,9 +157,7 @@ public:
                 Request::kCommandName,
                 cmd.getDbName(),
                 applyReadWriteConcern(
-                    opCtx,
-                    this,
-                    CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON({}))),
+                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON())),
                 &builder);
 
             if constexpr (InvalidatorT::kRequireUserName) {
@@ -264,9 +262,7 @@ public:
                 opCtx,
                 cmd.getDbName(),
                 applyReadWriteConcern(
-                    opCtx,
-                    this,
-                    CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON({}))),
+                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON())),
                 &builder);
 
             auto result = builder.obj();

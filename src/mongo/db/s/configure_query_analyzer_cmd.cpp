@@ -262,7 +262,7 @@ public:
                         opCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                         DatabaseName::kConfig,
-                        request.toBSON({}),
+                        request.toBSON(),
                         Shard::RetryPolicy::kIdempotent);
                     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swResponse));
                     return write_ops::FindAndModifyCommandReply::parse(

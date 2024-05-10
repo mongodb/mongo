@@ -840,7 +840,7 @@ public:
         dassert(validNamespace(nss));
         write_ops::InsertCommandRequest op(nss);
         op.setDocuments(docs);
-        return doCrudOp(op.toBSON({}));
+        return doCrudOp(op.toBSON());
     }
 
     StatusWith<std::uint32_t> update(const NamespaceString& nss, BSONObj query, BSONObj update) {
@@ -851,7 +851,7 @@ public:
         entry.setMulti(true);
         write_ops::UpdateCommandRequest op(nss);
         op.setUpdates({entry});
-        return doCrudOp(op.toBSON({}));
+        return doCrudOp(op.toBSON());
     }
 
     StatusWith<std::uint32_t> remove(const NamespaceString& nss, BSONObj query) {
@@ -861,7 +861,7 @@ public:
         entry.setMulti(true);
         write_ops::DeleteCommandRequest op(nss);
         op.setDeletes({entry});
-        return doCrudOp(op.toBSON({}));
+        return doCrudOp(op.toBSON());
     }
 
     Status commit() {

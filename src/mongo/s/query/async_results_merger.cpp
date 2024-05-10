@@ -508,7 +508,7 @@ BSONObj AsyncResultsMerger::_makeRequest(WithLock,
         getMoreRequest.setIncludeQueryStatsMetrics(true);
     }
     BSONObjBuilder bob;
-    getMoreRequest.serialize(BSONObj{}, &bob);
+    getMoreRequest.serialize(&bob);
     if (_params.getSessionId()) {
         BSONObjBuilder lsidBob{
             bob.subobjStart(OperationSessionInfoFromClient::kSessionIdFieldName)};
