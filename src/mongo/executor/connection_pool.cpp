@@ -917,17 +917,14 @@ ConnectionPool::ConnectionHandle ConnectionPool::SpecificPool::tryGetConnection(
             continue;
         }
 
-        auto connPtr = conn.get();
-
-        if (lease) {
-            _leasedPool[connPtr] = std::move(conn);
-        } else {
-            _checkedOutPool[connPtr] = std::move(conn);
-        }
+        // Use a reference to the target map location as our connection,
+        // so we're not juggling raw pointers any more than we need to.
+        OwnedConnection& mappedConn = (lease ? _leasedPool : _checkedOutPool)[conn.get()];
+        mappedConn = std::move(conn);
 
         // pass it to the user
-        connPtr->resetToUnknown();
-        auto handle = makeHandle(connPtr, lease);
+        mappedConn->resetToUnknown();
+        auto handle = makeHandle(mappedConn.get(), lease);
         return handle;
     }
 
