@@ -315,9 +315,6 @@ public:
     bool isSystemDotViews() const {
         return coll() == kSystemDotViewsCollectionName;
     }
-    bool isSystemDotUsers() const {
-        return coll() == kSystemUsers;
-    }
     bool isServerConfigurationCollection() const {
         return (db() == kAdminDb) && (coll() == "system.version");
     }

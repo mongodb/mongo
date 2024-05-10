@@ -856,10 +856,6 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
     uassert(ErrorCodes::IllegalOperation,
             "Renaming system.buckets collections is not allowed",
             !source.isTimeseriesBucketsCollection());
-
-    uassert(ErrorCodes::IllegalOperation,
-            "renaming system.users collection or renaming to system.users is not allowed",
-            !source.isSystemDotUsers() && !target.isSystemDotUsers());
 }
 
 void validateAndRunRenameCollection(OperationContext* opCtx,
