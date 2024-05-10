@@ -2,7 +2,7 @@ import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {includesErrorCode} from "jstests/libs/error_code_utils.js";
 import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
 
-export var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
+export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnError} = (function() {
     /**
      * Calls 'func' with the print() function overridden to be a no-op.
      *
@@ -192,5 +192,5 @@ export var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
         } while (hasTransientError);
     }
 
-    return {withTxnAndAutoRetry, isKilledSessionCode};
+    return {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnError};
 })();
