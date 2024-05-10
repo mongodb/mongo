@@ -1015,8 +1015,7 @@ tasks:
              include_filter_2: regression,
              exclude_filter: none,
              threads: "1 4",
-             read_cmd: 'true',
-             share_dataset: 'true'}
+             read_cmd: 'true'}
 
   - name: big_collection
     commands:
