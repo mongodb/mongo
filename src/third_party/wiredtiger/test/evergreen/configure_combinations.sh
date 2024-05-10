@@ -37,7 +37,9 @@ echo `pwd`
 
 curdir=`pwd`
 
-flags="-DCMAKE_TOOLCHAIN_FILE=$curdir/cmake/toolchains/gcc.cmake -DCMAKE_C_FLAGS=\"-Werror -Wall -Wextra -Waddress -Waggregate-return -Wbad-function-cast -Wcast-align -Wdeclaration-after-statement -Wformat-security -Wformat-nonliteral -Wformat=2 -Wmissing-declarations -Wmissing-field-initializers -Wmissing-prototypes -Wnested-externs -Wno-unused-parameter -Wpointer-arith -Wredundant-decls -Wshadow -Wundef -Wunused -Wwrite-strings -O -fno-strict-aliasing -Wuninitialized\"
+# FIXME-WT-11788: Remove the -Wno-reserved-identifier flag once the violation of the standard
+# C11 7.1.3 has been addressed.
+flags="-DCMAKE_TOOLCHAIN_FILE=$curdir/cmake/toolchains/gcc.cmake -DCMAKE_C_FLAGS=\"-Werror -Wall -Wextra -Waddress -Waggregate-return -Wbad-function-cast -Wcast-align -Wdeclaration-after-statement -Wformat-security -Wformat-nonliteral -Wformat=2 -Wmissing-declarations -Wmissing-field-initializers -Wmissing-prototypes -Wnested-externs -Wno-reserved-identifier -Wno-unused-parameter -Wpointer-arith -Wredundant-decls -Wshadow -Wundef -Wunused -Wwrite-strings -O -fno-strict-aliasing -Wuninitialized\"
 -DCMAKE_TOOLCHAIN_FILE=$curdir/cmake/toolchains/clang.cmake -DCMAKE_C_FLAGS=\"-Wall -Werror -Qunused-arguments -Wno-self-assign -Wno-parentheses-equality -Wno-array-bounds\""
 
 options="-DHAVE_DIAGNOSTIC=1
