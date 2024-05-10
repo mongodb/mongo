@@ -64,7 +64,9 @@ function getBackupCursorMetadata(backupCursor) {
 function copyBackupCursorFiles(
     backupCursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback) {
     resetDbpath(destinationDirectory);
-    mkdir(destinationDirectory + "/journal");
+    let separator = _isWindows() ? '\\' : '/';
+    // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
+    mkdir(destinationDirectory + separator + "journal");
 
     let copyThread = copyBackupCursorExtendFiles(
         backupCursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback);
@@ -82,6 +84,7 @@ function copyBackupCursorExtendFiles(
         _copyFiles(files, dbpath, destinationDirectory, _copyFileHelper);
     }
 
+    // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
     jsTestLog({
         msg: "Destination",
         destination: destinationDirectory,
@@ -125,6 +128,9 @@ function _copyFileHelper(absoluteFilePath, sourceDbPath, destinationDirectory) {
     let separator = '/';
     if (_isWindows()) {
         separator = '\\';
+        // Convert dbpath which may contain directoryperdb/wiredTigerDirectoryForIndexes
+        // subdirectory in POSIX style.
+        absoluteFilePath = absoluteFilePath.replace(/[\/]/g, separator);
     }
     let lastChar = sourceDbPath[sourceDbPath.length - 1];
     if (lastChar !== '/' && lastChar !== '\\') {
