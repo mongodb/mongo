@@ -72,12 +72,6 @@ selector:
     - jstests/concurrency/fsm_workloads/timeseries_collmod_granularity_update.js
     - jstests/concurrency/fsm_workloads/timeseries_agg_out.js
 
-    # TODO SERVER-89839: Seem to time out waiting for TTL deletion to finish in teardown while
-    # balancing is disabled, which leads config transition hook to timeout.
-    - jstests/concurrency/fsm_workloads/indexed_insert_ttl.js
-    - jstests/concurrency/fsm_workloads/insert_ttl_timeseries.js
-    - jstests/concurrency/fsm_workloads/insert_ttl_retry_writes_timeseries.js
-
     # TODO SERVER-89840: Inconsistent UUIDs for config.system.sessions across config shard and
     # removed/re-added shard.
     - jstests/concurrency/fsm_workloads/add_remove_shards_killop.js
