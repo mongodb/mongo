@@ -104,9 +104,6 @@ patch_aliases:
   - alias: required
     variant_tags: ["required"]
     task: ".*"
-  - alias: embedded
-    variant: ".*"
-    task: "embedded_.*"
   - alias: query
     variant: "^(.*query-patch-only|linux-x86-dynamic-compile-required)$"
     task: ".*"
