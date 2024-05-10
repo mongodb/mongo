@@ -221,6 +221,10 @@ def ninja_bazel_builder(env: SCons.Environment.Environment, _dup_env: SCons.Envi
                 ' & '.join([
                     f"$COPY {input_node.replace('/',os.sep)} {output_node}"
                     for input_node, output_node in zip(ins, outs)
+                ] + [
+                    # Touch output files to make sure that the modified time of inputs is always older than the modified time of outputs.
+                    f"copy /b {output_node} +,, {output_node}" if env["PLATFORM"] ==
+                    "win32" else f"touch {output_node}" for output_node in outs
                 ])
         },
     }
