@@ -35,5 +35,8 @@ testInvalidClusterParameterCommands(st);
 // and the majority of nodes on all replica sets in the cluster.
 testValidClusterParameterCommands(st);
 
+// Ensure that getClusterParameter: "*" works as expected.
+testGetClusterParameterStar(st);
+
 st.stop();
 })();
