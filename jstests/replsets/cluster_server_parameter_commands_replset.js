@@ -9,6 +9,7 @@
  */
 import {
     setupReplicaSet,
+    testGetClusterParameterStar,
     testInvalidClusterParameterCommands,
     testValidClusterParameterCommands,
 } from "jstests/libs/cluster_server_parameter_utils.js";
@@ -29,5 +30,8 @@ testInvalidClusterParameterCommands(rst);
 // Then, ensure that set/getClusterParameter set and retrieve the expected values on the
 // majority of the nodes in the replica set.
 testValidClusterParameterCommands(rst);
+
+// Ensure that getClusterParameter: "*" works as expected.
+testGetClusterParameterStar(rst);
 
 rst.stopSet();

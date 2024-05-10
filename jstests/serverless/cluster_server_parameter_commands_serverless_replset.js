@@ -4,12 +4,12 @@
  * @tags: [
  *   does_not_support_stepdowns,
  *   requires_replication,
- *   requires_fcv_62,
  *   serverless
  *  ]
  */
 import {
     setupReplicaSet,
+    testGetClusterParameterStar,
     testInvalidClusterParameterCommands,
     testValidServerlessClusterParameterCommands,
 } from "jstests/libs/cluster_server_parameter_utils.js";
@@ -38,5 +38,10 @@ for (const tenantId of [undefined, ObjectId()]) {
 // Then, ensure that set/getClusterParameter set and retrieve the expected values on the
 // majority of the nodes in the replica set.
 testValidServerlessClusterParameterCommands(rst);
+
+// Ensure that getClusterParameter: "*" works as expected.
+for (const tenantId of [undefined, ObjectId()]) {
+    testGetClusterParameterStar(rst, tenantId);
+}
 
 rst.stopSet();
