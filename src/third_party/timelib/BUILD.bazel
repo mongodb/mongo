@@ -1,0 +1,55 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "timelib",
+    srcs = [
+        "astro.c",
+        "astro.h",
+        "dow.c",
+        "fallbackmap.h",
+        "interval.c",
+        "parse_date.c",
+        "parse_iso_intervals.c",
+        "parse_posix.c",
+        "parse_tz.c",
+        "parse_zoneinfo.c",
+        "timelib.c",
+        "timelib_private.h",
+        "timezonedb.h",
+        "timezonemap.h",
+        "tm2unixtime.c",
+        "unixtime2tm.c",
+    ],
+    hdrs = [
+        "timelib.h",
+    ] + select({
+        "@platforms//os:windows": [
+            "win_dirent.h",
+        ],
+        "//conditions:default": [],
+    }),
+    copts = [
+        "-DHAVE_GETTIMEOFDAY",
+        "-DHAVE_STRING_H",
+    ] + select({
+        "@platforms//os:windows": [
+            "-DHAVE_IO_H",
+            "-DHAVE_WINSOCK2_H",
+            "/wd4996",
+        ],
+        "@platforms//os:macos": [
+            "-DHAVE_DIRENT_H",
+            "-DHAVE_SYS_TIME_H",
+            "-DHAVE_UNISTD_H",
+        ],
+        "//conditions:default": [
+            "-DHAVE_DIRENT_H",
+            "-DHAVE_SYS_TIME_H",
+            "-DHAVE_UNISTD_H",
+            "-D_GNU_SOURCE",
+        ],
+    }),
+    includes = ["."],
+)
