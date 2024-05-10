@@ -2331,7 +2331,7 @@ tasks:
           num_tasks: 5
           npm_command: resharding-fuzzer
           jstestfuzz_vars: --opType timeseriesReshardCollection --useEsModules
-          suite: resharding_fuzzer
+          suite: resharding_fuzzer_idempotency
 
   ################################################
   #           Catalog & Routing tasks            #
