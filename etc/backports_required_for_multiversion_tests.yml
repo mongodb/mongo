@@ -629,6 +629,10 @@ last-continuous:
     ticket: SERVER-88072
   - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
     ticket: SERVER-89618
+  - test_file: jstests/core/index/express_write.js
+    ticket: SERVER-83760
+  - test_file: jstests/core/index/express_write_explicit_coll_creation.js
+    ticket: SERVER-83760
   - test_file: jstests/core/timeseries/timeseries_geonear_lookup.js
     ticket: SERVER-81454
   - test_file: jstests/sharding/resharding_default_collation.js
@@ -1324,6 +1328,10 @@ last-lts:
     ticket: SERVER-88072
   - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
     ticket: SERVER-89618
+  - test_file: jstests/core/index/express_write.js
+    ticket: SERVER-83760
+  - test_file: jstests/core/index/express_write_explicit_coll_creation.js
+    ticket: SERVER-83760
   - test_file: jstests/core/timeseries/timeseries_geonear_lookup.js
     ticket: SERVER-81454
   - test_file: jstests/sharding/resharding_default_collation.js

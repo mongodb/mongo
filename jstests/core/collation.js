@@ -1182,6 +1182,10 @@ if (!isClustered) {
     explainRes = coll.explain("executionStats").remove({_id: "foo"});
     assert.commandWorked(explainRes);
     planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    if (planStage == null) {
+        // post 8.0 EXPRESS handles delete-by-id
+        planStage = getPlanStage(explainRes.executionStats.executionStages, "EXPRESS_DELETE");
+    }
     assert.neq(null, planStage);
 }
 
@@ -1217,9 +1221,13 @@ if (!isClustered) {
         coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "en_US"}});
     assert.commandWorked(explainRes);
     planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    if (planStage == null) {
+        // post 8.0 EXPRESS handles delete-by-id
+        planStage = getPlanStage(explainRes.executionStats.executionStages, "EXPRESS_DELETE");
+    }
     assert.neq(null, planStage);
 
-    // Remove on _id should not use idhack stage when query collation does not match collection
+    // Remove on _id should not use express stage when query collation does not match collection
     // default.
     coll = testDb.collation_remove10;
     coll.drop();
@@ -1228,6 +1236,8 @@ if (!isClustered) {
         coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "fr_CA"}});
     assert.commandWorked(explainRes);
     planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    assert.eq(null, planStage);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "EXPRESS_DELETE");
     assert.eq(null, planStage);
 }
 

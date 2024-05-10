@@ -67,6 +67,10 @@ selector:
   # will conflict with tests that explicitly set cluster parameters.
   - jstests/core/query/query_settings/**/*.js
 
+  # These tests drop and create indexes throughout their execution. Index creation might fail when
+  # movePrimary is in progress.
+  - jstests/core/index/express_write.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos

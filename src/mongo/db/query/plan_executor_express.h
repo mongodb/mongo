@@ -31,6 +31,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_executor.h"
@@ -67,6 +68,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
     CollectionAcquisition collection,
     ParsedUpdate* parsedUpdate,
     bool returnOwnedBson);
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelete(
+    OperationContext* opCtx, CollectionAcquisition collection, ParsedDelete* parsedDelete);
 
 /**
  * Tries to find an index suitable for use in the express equality path. Excludes indexes which

@@ -280,6 +280,14 @@ function assertExplainResultsMatch(explainOut, expectedMatches, preMsg, currentP
                             preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] + ")" +
                                 " does not match one of the expected values (" + want + ").");
 
+        } else if (key == "stage" && expectedMatches[key] == "DELETE") {
+            // Express handles delete-by-id post 8.0
+            let want = [expectedMatches[key], "EXPRESS_DELETE"]
+            assert.contains(explainOut[key],
+                            want,
+                            preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] + ")" +
+                                " does not match one of the expected values (" + want + ").");
+
         } else {
             assert.eq(explainOut[key],
                       expectedMatches[key],
