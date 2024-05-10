@@ -70,6 +70,17 @@ function assertPlanCacheEntryWithQuerySettings(planCacheKeyHash, expectedQuerySe
     });
 }
 
+/**
+ * Runs the query, asserts that the plan cache entry contains the 'expectedQuerySettings' as well as
+ * returns the corresponding planCacheKeyHash.
+ */
+function runQueryAndAssertPlanCache(expectedQuerySettings) {
+    assert.commandWorked(db.runCommand(query));
+    const planCacheKeyHash = getPlanCacheKeyFromExplain(db.runCommand({explain: query}));
+    assertPlanCacheEntryWithQuerySettings(planCacheKeyHash, expectedQuerySettings);
+    return planCacheKeyHash;
+}
+
 const querySettingsQuery = qsutils.makeFindQueryInstance({filter: {a: 1, b: 5}});
 const query = qsutils.withoutDollarDB(querySettingsQuery);
 
@@ -77,29 +88,17 @@ assertEmptyPlanCache();
 
 // Run query and ensure the corresponding plan cache entry exists and query settings are not
 // present.
-assert.commandWorked(db.runCommand(query));
-const planCacheKeyHashWithoutQuerySettings =
-    getPlanCacheKeyFromExplain(db.runCommand({explain: query}));
-assertPlanCacheEntryWithQuerySettings(planCacheKeyHashWithoutQuerySettings,
-                                      undefined /* querySettings */);
+runQueryAndAssertPlanCache(undefined /* expectedQuerySettings */);
 
 // Ensure that if query settings are set, and 'query' is executed, a new plan cache entry will be
 // created and query settings will be present.
 const settings = {
     indexHints: {ns: {db: db.getName(), coll: coll.getName()}, allowedIndexes: [indexA, indexB]}
 };
-qsutils.withQuerySettings(querySettingsQuery, settings, () => {
-    assert.commandWorked(db.runCommand(query));
+const planCacheKeyHashWithQuerySettings = qsutils.withQuerySettings(
+    querySettingsQuery, settings, () => runQueryAndAssertPlanCache(settings));
 
-    const planCacheKeyHashWithQuerySettings =
-        getPlanCacheKeyFromExplain(db.runCommand({explain: query}));
-    assert.neq(planCacheKeyHashWithQuerySettings, planCacheKeyHashWithoutQuerySettings);
-    assertPlanCacheEntryWithQuerySettings(planCacheKeyHashWithQuerySettings, settings);
-});
-
-// Ensure that once query settings are removed, the previously created plan cache entry will be
-// used.
-assert.eq(getPlanCacheKeyFromExplain(db.runCommand({explain: query})),
-          planCacheKeyHashWithoutQuerySettings);
-assertPlanCacheEntryWithQuerySettings(planCacheKeyHashWithoutQuerySettings,
-                                      undefined /* querySettings */);
+// Ensure that once query settings are removed, a different plan cache entry is used.
+const planCacheKeyHashWithoutQuerySettings =
+    runQueryAndAssertPlanCache(undefined /* expectedQuerySettings */);
+assert.neq(planCacheKeyHashWithoutQuerySettings, planCacheKeyHashWithQuerySettings);
