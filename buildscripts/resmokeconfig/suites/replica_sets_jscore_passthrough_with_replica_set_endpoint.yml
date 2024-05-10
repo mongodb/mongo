@@ -21,6 +21,9 @@ selector:
     # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
     # server parameter.
     - jstests/core/**/set_param1.js
+    # Stats are counted differently on the mongos write path, SERVER-24880.
+    # Mongos ClusteredKillCursors is async with mongod.
+    - jstests/core/**/operation_latency_histogram.js
     # Different explain format
     # TODO(SERVER-81158): Enable these tests.
     # These tests fails while DbCheck running in the background:
