@@ -205,4 +205,40 @@ assert.eq(stringValues.slice(0, 2), ["Value", "vAlue"]);
 // transaction, they effectively occur at exactly the same time.
 assert.sameMembers(stringValues.slice(2, 4), ["vaLue", "valUe"]);
 
+const verifyOnChangeStream =
+    (matchExpression, hasEntriesReturned) => {
+        const string = JSON.stringify(matchExpression);
+        const changeStream = coll.aggregate([{$changeStream: {}}, {$match: matchExpression}]);
+        assert.commandWorked(coll.insert({string}));
+        if (hasEntriesReturned) {
+            assert.soon(() => changeStream.hasNext());
+            const event = changeStream.next();
+            assert.eq(event.fullDocument.string, string, event);
+        } else {
+            assert(!changeStream.hasNext());
+        }
+        changeStream.close();
+    }
+
+// Run a change stream with empty field path match expression to match null. Expect to return all
+// the oplog entries as the field "" is not set in oplogs.
+{
+    verifyOnChangeStream({"": null}, true);
+    verifyOnChangeStream({$or: [{"": null}]}, true);
+    verifyOnChangeStream({"": {$eq: null}}, true);
+    verifyOnChangeStream({"": {$in: [null]}}, true);
+    verifyOnChangeStream({"": {$nin: [0, "Non-Existing Value", 100, -1.23, true, false]}}, true);
+}
+
+// Run a change stream with empty field path match expression to match non-existing value(s).
+// Expect no oplog entries to be returned.
+{
+    verifyOnChangeStream({"": {$gte: 0}}, false);
+    verifyOnChangeStream({"": {$lte: 0}}, false);
+    verifyOnChangeStream({"": {$ne: null}}, false);
+    verifyOnChangeStream({"": "Non-Existing Value"}, false);
+    verifyOnChangeStream({"": {$in: [0, "", 100, -1.23, true, false]}}, false);
+    verifyOnChangeStream({"": {$nin: [null]}}, false);
+}
+
 st.stop();
