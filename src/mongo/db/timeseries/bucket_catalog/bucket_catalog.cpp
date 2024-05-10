@@ -80,7 +80,7 @@ const std::size_t kDefaultNumberOfStripes = 32;
  * documents that have previously been committed to the bucket, and renders the batch
  * inactive. Must have commit rights.
  */
-void prepareWriteBatchForCommit(TrackingContext& trackingContext,
+void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
                                 WriteBatch& batch,
                                 Bucket& bucket) {
     invariant(batch.commitRights.load());
@@ -90,7 +90,10 @@ void prepareWriteBatchForCommit(TrackingContext& trackingContext,
     // by someone else.
     for (auto it = batch.newFieldNamesToBeInserted.begin();
          it != batch.newFieldNamesToBeInserted.end();) {
-        TrackedStringMapHashedKey fieldName(trackingContext, it->first, it->second);
+        TrackedStringMapHashedKey fieldName(
+            getTrackingContext(trackingContexts, TrackingScope::kMiscellaneous),
+            it->first,
+            it->second);
         bucket.uncommittedFieldNames.erase(fieldName);
         if (bucket.fieldNames.contains(fieldName)) {
             batch.newFieldNamesToBeInserted.erase(it++);
@@ -163,37 +166,43 @@ BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
     return getBucketCatalog(svcCtx);
 }
 
-Stripe::Stripe(TrackingContext& trackingContext)
+Stripe::Stripe(TrackingContexts& trackingContexts)
     : openBucketsById(
           make_tracked_unordered_map<BucketId, unique_tracked_ptr<Bucket>, BucketHasher>(
-              trackingContext)),
+              getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
       openBucketsByKey(make_tracked_unordered_map<BucketKey, tracked_set<Bucket*>, BucketHasher>(
-          trackingContext)),
-      idleBuckets(make_tracked_list<Bucket*>(trackingContext)),
+          getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsByKey))),
+      idleBuckets(make_tracked_list<Bucket*>(
+          getTrackingContext(trackingContexts, TrackingScope::kIdleBuckets))),
       archivedBuckets(
           make_tracked_unordered_map<BucketKey::Hash,
                                      tracked_map<Date_t, ArchivedBucket, std::greater<Date_t>>,
-                                     BucketHasher>(trackingContext)),
+                                     BucketHasher>(
+              getTrackingContext(trackingContexts, TrackingScope::kArchivedBuckets))),
       outstandingReopeningRequests(
           make_tracked_unordered_map<
               BucketKey,
               tracked_inlined_vector<shared_tracked_ptr<ReopeningRequest>, kInlinedVectorSize>,
-              BucketHasher>(trackingContext)) {}
+              BucketHasher>(
+              getTrackingContext(trackingContexts, TrackingScope::kReopeningRequests))) {}
 
 BucketCatalog::BucketCatalog()
     : BucketCatalog(kDefaultNumberOfStripes,
                     getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes) {}
 
 BucketCatalog::BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> memoryUsageThreshold)
-    : bucketStateRegistry(trackingContext),
+    : bucketStateRegistry(
+          getTrackingContext(trackingContexts, TrackingScope::kBucketStateRegistry)),
       numberOfStripes(numberOfStripes),
-      stripes(make_tracked_vector<unique_tracked_ptr<Stripe>>(trackingContext)),
-      executionStats(
-          make_tracked_unordered_map<UUID, shared_tracked_ptr<ExecutionStats>>(trackingContext)),
+      stripes(make_tracked_vector<unique_tracked_ptr<Stripe>>(
+          getTrackingContext(trackingContexts, TrackingScope::kMiscellaneous))),
+      executionStats(make_tracked_unordered_map<UUID, shared_tracked_ptr<ExecutionStats>>(
+          getTrackingContext(trackingContexts, TrackingScope::kStats))),
       memoryUsageThreshold(memoryUsageThreshold) {
     stripes.reserve(numberOfStripes);
     std::generate_n(std::back_inserter(stripes), numberOfStripes, [&]() {
-        return make_unique_tracked<Stripe>(trackingContext, trackingContext);
+        return make_unique_tracked<Stripe>(
+            getTrackingContext(trackingContexts, TrackingScope::kMiscellaneous), trackingContexts);
     });
 }
 
@@ -215,7 +224,55 @@ BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& handle) {
 }
 
 uint64_t getMemoryUsage(const BucketCatalog& catalog) {
-    return catalog.trackingContext.allocated();
+#ifndef MONGO_CONFIG_DEBUG_BUILD
+    return catalog.trackingContexts.global.allocated();
+#else
+    return catalog.trackingContexts.archivedBuckets.allocated() +
+        catalog.trackingContexts.bucketStateRegistry.allocated() +
+        catalog.trackingContexts.columnBuilders.allocated() +
+        catalog.trackingContexts.idleBuckets.allocated() +
+        catalog.trackingContexts.miscellaneous.allocated() +
+        catalog.trackingContexts.openBucketsById.allocated() +
+        catalog.trackingContexts.openBucketsByKey.allocated() +
+        catalog.trackingContexts.reopeningRequests.allocated() +
+        catalog.trackingContexts.stats.allocated() + catalog.trackingContexts.summaries.allocated();
+#endif
+}
+
+void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builder) {
+#ifndef MONGO_CONFIG_DEBUG_BUILD
+    return;
+#else
+    BSONObjBuilder subBuilder(builder.subobjStart("memoryUsageDetails"_sd));
+
+    subBuilder.appendNumber(
+        "archivedBuckets",
+        static_cast<long long>(catalog.trackingContexts.archivedBuckets.allocated()));
+    subBuilder.appendNumber(
+        "bucketStateRegistry",
+        static_cast<long long>(catalog.trackingContexts.bucketStateRegistry.allocated()));
+    subBuilder.appendNumber(
+        "columnBuilders",
+        static_cast<long long>(catalog.trackingContexts.columnBuilders.allocated()));
+    subBuilder.appendNumber(
+        "idleBuckets", static_cast<long long>(catalog.trackingContexts.idleBuckets.allocated()));
+    subBuilder.appendNumber(
+        "miscellaneous",
+        static_cast<long long>(catalog.trackingContexts.miscellaneous.allocated()));
+    subBuilder.appendNumber(
+        "openBucketsById",
+        static_cast<long long>(catalog.trackingContexts.openBucketsById.allocated()));
+    subBuilder.appendNumber(
+        "openBucketsByKey",
+        static_cast<long long>(catalog.trackingContexts.openBucketsByKey.allocated()));
+    subBuilder.appendNumber(
+        "reopeningRequests",
+        static_cast<long long>(catalog.trackingContexts.reopeningRequests.allocated()));
+    subBuilder.appendNumber("stats",
+                            static_cast<long long>(catalog.trackingContexts.stats.allocated()));
+    subBuilder.appendNumber("summaries",
+                            static_cast<long long>(catalog.trackingContexts.summaries.allocated()));
+#endif
 }
 
 StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
@@ -519,7 +576,7 @@ Status prepareCommit(BucketCatalog& catalog,
         return getBatchStatus();
     }
 
-    prepareWriteBatchForCommit(catalog.trackingContext, *batch, *bucket);
+    prepareWriteBatchForCommit(catalog.trackingContexts, *batch, *bucket);
 
     return Status::OK();
 }
@@ -672,8 +729,8 @@ void clear(BucketCatalog& catalog, tracked_vector<UUID> clearedCollectionUUIDs) 
 }
 
 void clear(BucketCatalog& catalog, const UUID& collectionUUID) {
-    tracked_vector<UUID> clearedCollectionUUIDs =
-        make_tracked_vector<UUID>(catalog.trackingContext);
+    tracked_vector<UUID> clearedCollectionUUIDs = make_tracked_vector<UUID>(
+        getTrackingContext(catalog.trackingContexts, TrackingScope::kBucketStateRegistry));
     clearedCollectionUUIDs.push_back(collectionUUID);
     clear(catalog, std::move(clearedCollectionUUIDs));
 }
@@ -708,7 +765,11 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
                                                             const TimeseriesOptions& options,
                                                             const BSONObj& doc) {
     auto res = internal::extractBucketingParameters(
-        catalog.trackingContext, collectionUUID, comparator, options, doc);
+        getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsByKey),
+        collectionUUID,
+        comparator,
+        options,
+        doc);
     if (!res.isOK()) {
         return res.getStatus();
     }

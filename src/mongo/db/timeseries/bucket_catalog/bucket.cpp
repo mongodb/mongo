@@ -56,7 +56,7 @@ uint8_t numDigits(uint32_t num) {
 }
 }  // namespace
 
-Bucket::Bucket(TrackingContext& trackingContext,
+Bucket::Bucket(TrackingContexts& trackingContexts,
                const BucketId& bId,
                BucketKey k,
                StringData tf,
@@ -68,15 +68,20 @@ Bucket::Bucket(TrackingContext& trackingContext,
       lastChecked(getCurrentEraAndIncrementBucketCount(bsr)),
       bucketStateRegistry(bsr),
       bucketId(bId),
-      timeField(make_tracked_string(trackingContext, tf.data(), tf.size())),
+      timeField(
+          make_tracked_string(getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById),
+                              tf.data(),
+                              tf.size())),
       key(std::move(k)),
-      fieldNames(makeTrackedStringSet(trackingContext)),
-      uncommittedFieldNames(makeTrackedStringSet(trackingContext)),
-      batches(
-          make_tracked_unordered_map<OperationId, std::shared_ptr<WriteBatch>>(trackingContext)),
-      minmax(trackingContext),
-      schema(trackingContext),
-      measurementMap(trackingContext) {}
+      fieldNames(makeTrackedStringSet(
+          getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
+      uncommittedFieldNames(makeTrackedStringSet(
+          getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
+      batches(make_tracked_unordered_map<OperationId, std::shared_ptr<WriteBatch>>(
+          getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
+      minmax(getTrackingContext(trackingContexts, TrackingScope::kSummaries)),
+      schema(getTrackingContext(trackingContexts, TrackingScope::kSummaries)),
+      measurementMap(getTrackingContext(trackingContexts, TrackingScope::kColumnBuilders)) {}
 
 Bucket::~Bucket() {
     decrementBucketCountForEra(bucketStateRegistry, lastChecked);
@@ -94,7 +99,7 @@ bool schemaIncompatible(Bucket& bucket,
     return (result == Schema::UpdateStatus::Failed);
 }
 
-void calculateBucketFieldsAndSizeChange(TrackingContext& trackingContext,
+void calculateBucketFieldsAndSizeChange(TrackingContexts& trackingContexts,
                                         const Bucket& bucket,
                                         const BSONObj& doc,
                                         boost::optional<StringData> metaField,
@@ -123,7 +128,8 @@ void calculateBucketFieldsAndSizeChange(TrackingContext& trackingContext,
             continue;
         }
 
-        auto hashedKey = TrackedStringSet::hasher().hashed_key(trackingContext, fieldName);
+        auto hashedKey = TrackedStringSet::hasher().hashed_key(
+            getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById), fieldName);
         if (!bucket.fieldNames.contains(hashedKey)) {
             // Record the new field name only if it hasn't been committed yet. There could
             // be concurrent batches writing to this bucket with the same new field name,
@@ -156,7 +162,7 @@ void calculateBucketFieldsAndSizeChange(TrackingContext& trackingContext,
     }
 }
 
-std::shared_ptr<WriteBatch> activeBatch(TrackingContext& trackingContext,
+std::shared_ptr<WriteBatch> activeBatch(TrackingContexts& trackingContexts,
                                         Bucket& bucket,
                                         OperationId opId,
                                         std::uint8_t stripe,
@@ -166,7 +172,7 @@ std::shared_ptr<WriteBatch> activeBatch(TrackingContext& trackingContext,
         it = bucket.batches
                  .try_emplace(opId,
                               std::make_shared<WriteBatch>(
-                                  trackingContext,
+                                  trackingContexts,
                                   BucketHandle{bucket.bucketId, stripe},
                                   bucket.key,
                                   opId,

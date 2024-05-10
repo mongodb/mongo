@@ -391,10 +391,12 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     if (metaFieldName) {
         metadata = bucketDoc.getField(kBucketMetaFieldName);
     }
-    auto key = BucketKey{
-        uuid,
-        BucketMetadata{
-            _bucketCatalog->trackingContext, metadata, coll->getDefaultCollator(), metaFieldName}};
+    auto key = BucketKey{uuid,
+                         BucketMetadata{getTrackingContext(_bucketCatalog->trackingContexts,
+                                                           TrackingScope::kOpenBucketsByKey),
+                                        metadata,
+                                        coll->getDefaultCollator(),
+                                        metaFieldName}};
 
     // Validate the bucket document against the schema.
     auto validator = [&](OperationContext * opCtx, const BSONObj& bucketDoc) -> auto {
@@ -2076,17 +2078,20 @@ TEST_F(BucketCatalogTest, ArchiveBasedReopeningConflictsWithArchiveBasedReopenin
     // Inject an archived record.
     auto options = _getTimeseriesOptions(_ns1);
     BSONObj doc = ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"c"})");
-    BucketKey key{
-        _uuid1,
-        BucketMetadata{
-            _bucketCatalog->trackingContext, doc["tag"], nullptr, options.getMetaField()}};
+    BucketKey key{_uuid1,
+                  BucketMetadata{getTrackingContext(_bucketCatalog->trackingContexts,
+                                                    TrackingScope::kOpenBucketsByKey),
+                                 doc["tag"],
+                                 nullptr,
+                                 options.getMetaField()}};
     auto minTime = roundTimestampToGranularity(doc["time"].Date(), options);
     BucketId id{_uuid1, OID::gen()};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id));
     _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
         minTime,
         ArchivedBucket{id,
-                       make_tracked_string(_bucketCatalog->trackingContext,
+                       make_tracked_string(getTrackingContext(_bucketCatalog->trackingContexts,
+                                                              TrackingScope::kArchivedBuckets),
                                            options.getTimeField().toString())});
 
     // Should try to reopen archived bucket.
@@ -2116,17 +2121,20 @@ TEST_F(BucketCatalogTest,
     // Inject an archived record.
     auto options = _getTimeseriesOptions(_ns1);
     BSONObj doc1 = ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"c"})");
-    BucketKey key{
-        _uuid1,
-        BucketMetadata{
-            _bucketCatalog->trackingContext, doc1["tag"], nullptr, options.getMetaField()}};
+    BucketKey key{_uuid1,
+                  BucketMetadata{getTrackingContext(_bucketCatalog->trackingContexts,
+                                                    TrackingScope::kOpenBucketsByKey),
+                                 doc1["tag"],
+                                 nullptr,
+                                 options.getMetaField()}};
     auto minTime1 = roundTimestampToGranularity(doc1["time"].Date(), options);
     BucketId id1{_uuid1, OID::gen()};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id1));
     _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
         minTime1,
         ArchivedBucket{id1,
-                       make_tracked_string(_bucketCatalog->trackingContext,
+                       make_tracked_string(getTrackingContext(_bucketCatalog->trackingContexts,
+                                                              TrackingScope::kArchivedBuckets),
                                            options.getTimeField().toString())});
 
     // Should try to reopen archived bucket.
@@ -2147,7 +2155,8 @@ TEST_F(BucketCatalogTest,
     _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
         minTime2,
         ArchivedBucket{id2,
-                       make_tracked_string(_bucketCatalog->trackingContext,
+                       make_tracked_string(getTrackingContext(_bucketCatalog->trackingContexts,
+                                                              TrackingScope::kArchivedBuckets),
                                            options.getTimeField().toString())});
 
     // A second attempt should block.
@@ -2168,14 +2177,18 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     ClosedBuckets closedBuckets;
 
     // Create dummy bucket and populate bucket state registry.
-    TrackingContext trackingContext;
     auto dummyUUID = UUID::gen();
     auto dummyBucketId = BucketId(dummyUUID, OID());
     auto dummyBucketKey =
-        BucketKey(dummyUUID, BucketMetadata(trackingContext, BSONElement{}, nullptr, boost::none));
+        BucketKey(dummyUUID,
+                  BucketMetadata(getTrackingContext(sideBucketCatalog->trackingContexts,
+                                                    TrackingScope::kOpenBucketsById),
+                                 BSONElement{},
+                                 nullptr,
+                                 boost::none));
     sideBucketCatalog->bucketStateRegistry.bucketStates.emplace(dummyBucketId,
                                                                 BucketState::kNormal);
-    auto dummyBucket = std::make_unique<Bucket>(trackingContext,
+    auto dummyBucket = std::make_unique<Bucket>(sideBucketCatalog->trackingContexts,
                                                 dummyBucketId,
                                                 dummyBucketKey,
                                                 "time",
@@ -2186,8 +2199,9 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     auto& stripe = *sideBucketCatalog->stripes[0];
     stripe.openBucketsById.try_emplace(
         dummyBucketId,
-        make_unique_tracked<Bucket>(sideBucketCatalog->trackingContext,
-                                    sideBucketCatalog->trackingContext,
+        make_unique_tracked<Bucket>(getTrackingContext(sideBucketCatalog->trackingContexts,
+                                                       TrackingScope::kOpenBucketsById),
+                                    sideBucketCatalog->trackingContexts,
                                     dummyBucketId,
                                     dummyBucketKey,
                                     "time",
@@ -2195,6 +2209,7 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
                                     sideBucketCatalog->bucketStateRegistry));
     stripe.openBucketsByKey[dummyBucketKey].emplace(dummyBucket.get());
     stripe.idleBuckets.push_front(dummyBucket.get());
+    dummyBucket->idleListEntry = stripe.idleBuckets.begin();
     stdx::lock_guard stripeLock{stripe.mutex};
 
     // Create execution stats controller.
@@ -2210,12 +2225,11 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     ASSERT_EQ(0,
               sideBucketCatalog->globalExecutionStats.numBucketsClosedDueToMemoryThreshold.load());
 
-
-    // Set the catalog memory usage to be above the memory usage threshold by the amount of memory
-    // used by the idle bucket.
-    sideBucketCatalog->trackingContext.stats().bytesAllocated(
-        getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() -
-        sideBucketCatalog->trackingContext.allocated() + trackingContext.allocated());
+    // Set the catalog memory usage to be above the memory usage threshold.
+    auto& sideContext =
+        getTrackingContext(sideBucketCatalog->trackingContexts, TrackingScope::kOpenBucketsById);
+    sideContext.stats().bytesAllocated(getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() -
+                                       getMemoryUsage(*sideBucketCatalog) + 1);
 
     // When we exceed the memory usage threshold we will first try to archive idle buckets to try
     // to get below the threshold. If this does not get us beneath the threshold, we will then try
@@ -2244,8 +2258,8 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     // Set the memory usage to be back at the threshold. Now, when we run expire idle buckets again,
     // because there are no idle buckets left to archive, we will close the bucket that we
     // previously archived.
-    sideBucketCatalog->trackingContext.stats().bytesAllocated(
-        getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() + 1);
+    sideContext.stats().bytesAllocated(getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() -
+                                       getMemoryUsage(*sideBucketCatalog) + +1);
     internal::expireIdleBuckets(_makeOperationContext().second.get(),
                                 *sideBucketCatalog,
                                 stripe,

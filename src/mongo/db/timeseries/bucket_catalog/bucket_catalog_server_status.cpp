@@ -95,6 +95,7 @@ public:
         builder.appendNumber("numIdleBuckets", static_cast<long long>(counts.idle));
         builder.appendNumber("numArchivedBuckets", static_cast<long long>(numActive - counts.open));
         builder.appendNumber("memoryUsage", static_cast<long long>(getMemoryUsage(bucketCatalog)));
+        getDetailedMemoryUsage(bucketCatalog, builder);
 
         // Append the global execution stats for all namespaces.
         appendExecutionStatsToBuilder(bucketCatalog.globalExecutionStats, builder);

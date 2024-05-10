@@ -45,6 +45,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
+#include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/future.h"
@@ -94,7 +95,7 @@ struct Sizes {
  */
 struct WriteBatch {
     WriteBatch() = delete;
-    WriteBatch(TrackingContext& trackingContext,
+    WriteBatch(TrackingContexts& trackingContexts,
                const BucketHandle& bucketHandle,
                BucketKey bucketKey,
                OperationId opId,
@@ -128,7 +129,7 @@ struct WriteBatch {
     // For always compressed, adds the compressed measurement sizes while committing.
     int32_t size = 0;
 
-    TrackingContext& trackingContext;
+    TrackingContexts& trackingContexts;
 
     StringData timeField;  // Necessary so we can compress on writes, since the compression
                            // algorithm sorts on the timeField. See compressBucket().
