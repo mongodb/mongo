@@ -46,6 +46,10 @@ db.example.find({x: 55}).batchSize(3);
 There are two distinct query stats store entries here - both the examples which include the batch
 size will be treated separately from the example which does not specify a batch size.
 
+Similarly, `explain` is not included in the query shape, so an aggregation command that has `explain: true`,
+vs. the same command without it, will have the same query shape. However we do want to collect separate metrics
+for these as they are different, so we include `explain` as a dimension in the query stats store key for agg.
+
 The dimensions considered will depend on the command, but can generally be found in the
 [`KeyGenerator`](key_generator.h) interface, which will generate the query stats store keys by which
 we accumulate statistics. As one example, you can find the
@@ -56,7 +60,7 @@ we accumulate statistics. As one example, you can find the
 
 The size of the`QueryStatsStore` can be set by the server parameter
 [`internalQueryStatsCacheSize`](#server-parameters), and the partitions will be created based off
-that. See [`queryStatsStoreManagerRegisterer`](query_stats.cpp#L138-L154) for more details about how
+that. See [`queryStatsStoreManagerRegisterer`](query_stats.cpp#L166-L172) for more details about how
 the number of partitions and their size is determined; Each partition is an LRU cache, therefore, if
 adding a new entry to the partition makes it go over its size limit, the least recently used entries
 will be evicted to drop below the max size. Eviction will be tracked in the new [server status
@@ -72,6 +76,13 @@ continue to aggregate the operation's metrics. Once the query execution is fully
 [`writeQueryStats`](query_stats.h#L200-216) will be called and will either retrieve the entry for
 the key from the store if it exists and update it, or create a new one and add it to the store. See
 more details in the [comments](query_stats.h#L158-L216).
+
+This is the case for all collections apart from change stream collections, for which query stats behaves
+a bit differently. For change stream collections, like normal collections we will still collect query stats
+on creation, but a key difference is that we will actually treat each `getMore` as its own query, and collect
+and update query stats for each one rather than accumulating them on the cursor and recording once execution
+completes. We have a flag to determine whether the collection has a change stream, [\_queryStatsWillNeverExhaust](src/mongo/db/clientcursor.h#L510),
+and decide based on that whether to take the change stream approach.
 
 Some metrics are only known to data-bearing nodes. When a query is selected for query stats
 gathering in a sharded cluster, the router requests that the shards gather those metrics and
@@ -163,7 +174,7 @@ following way:
   observation of this query.
 - `metrics.firstResponseExecMicros`: Estimated time spent computing and returning the first batch.
 - `metrics.totalExecMicros`: Estimated time spent computing and returning all batches, which is the
-  same as the above for single-batch queries.
+  same as the above for single-batch queries, as well as for change streams.
 - `metrics.keysExamined`: Various broken down statistics for the number of index keys examined while
   executing this query, including getMores.
 - `metrics.docsExamined`: Various broken down statistics for the number of documents examined while
