@@ -1046,6 +1046,9 @@ tasks:
         "require_npm",
         "random_name",
         "multiversion",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "initialize multiversion tasks"
@@ -1069,11 +1072,13 @@ tasks:
       [
         "assigned_to_jira_team_server_query_execution",
         "non_deterministic",
-        "incompatible_debug_mode",
         "updatefuzzer",
         "require_npm",
         "random_name",
         "multiversion",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "initialize multiversion tasks"
@@ -1276,6 +1281,9 @@ tasks:
         "change_stream_fuzzer",
         "require_npm",
         "random_name",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1297,6 +1305,9 @@ tasks:
         "change_stream_fuzzer",
         "require_npm",
         "random_name",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1318,6 +1329,9 @@ tasks:
         "change_stream_fuzzer",
         "require_npm",
         "random_name",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"

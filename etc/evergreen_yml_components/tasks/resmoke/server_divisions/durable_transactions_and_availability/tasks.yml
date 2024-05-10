@@ -1923,6 +1923,9 @@ tasks:
         "default",
         "config_fuzzer",
         "large",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1942,6 +1945,9 @@ tasks:
         "config_fuzzer",
         "large",
         "sharded",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1962,6 +1968,9 @@ tasks:
         "default",
         "config_fuzzer",
         "large",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1992,6 +2001,9 @@ tasks:
         "default",
         "config_fuzzer",
         "large",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2010,6 +2022,9 @@ tasks:
         "default",
         "config_fuzzer",
         "large",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2030,6 +2045,9 @@ tasks:
         "config_fuzzer",
         "large",
         "linux_only",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2047,6 +2065,9 @@ tasks:
         "assigned_to_jira_team_server_execution",
         "default",
         "config_fuzzer_stress",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2066,6 +2087,9 @@ tasks:
         "assigned_to_jira_team_server_execution",
         "default",
         "config_fuzzer_stress",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "generate resmoke tasks"
