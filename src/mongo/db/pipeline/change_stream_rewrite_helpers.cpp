@@ -1502,7 +1502,11 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
         }
         default: {
             if (auto pathME = dynamic_cast<const PathMatchExpression*>(root)) {
-                tassert(5687201, "Unexpected empty path", !pathME->path().empty());
+                // Only attempt to rewrite non-empty paths.
+                if (pathME->path().empty()) {
+                    return nullptr;
+                }
+
                 auto firstPath = pathME->fieldRef()->getPart(0).toString();
 
                 // Only attempt to rewrite paths that begin with one of the caller-requested fields.
