@@ -52,13 +52,7 @@ std::strong_ordering compare(const IndexKeyPattern& a, const IndexKeyPattern& b)
 std::strong_ordering compare(const IndexName& a, const IndexName& b) {
     // NOTE: spaceship operator is not available on macos for strings, therefore implementing one
     // myself instead.
-    if (a < b) {
-        return std::strong_ordering::less;
-    } else if (a > b) {
-        return std::strong_ordering::greater;
-    } else {
-        return std::strong_ordering::equal;
-    }
+    return a.compare(b) <=> 0;
 }
 
 std::strong_ordering compare(const NaturalOrderHint& a, const NaturalOrderHint& b) {
