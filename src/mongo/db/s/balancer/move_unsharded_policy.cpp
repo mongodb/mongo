@@ -277,6 +277,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::ReshardCollectionTruncatedError:
                 case ErrorCodes::SnapshotTooOld:
                 case ErrorCodes::StaleDbVersion:
+                case ErrorCodes::ConflictingOperationInProgress:
                     return true;
                 default:
                     return false;

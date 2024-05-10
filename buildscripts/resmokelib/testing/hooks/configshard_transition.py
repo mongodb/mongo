@@ -10,6 +10,7 @@ from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
+from buildscripts.resmokelib.testing.retry import retryable_codes as retryable_network_errs
 
 
 class ContinuousConfigShardTransition(interface.Hook):
@@ -73,6 +74,8 @@ class _TransitionThread(threading.Thread):
     _INTERRUPTED = 11601
     _CONFLICTING_OPERATION_IN_PROGRESS = 117
     _ILLEGAL_OPERATION = 20
+    _SHARD_NOT_FOUND = 70
+    _OPERATION_FAILED = 96
 
     def __init__(self, logger, stepdown_lifecycle, fixture, auth_options, random_balancer_on):
         threading.Thread.__init__(self, name="TransitionThread")
@@ -83,6 +86,7 @@ class _TransitionThread(threading.Thread):
         self._random_balancer_on = random_balancer_on
         self._client = fixture_interface.build_client(self._fixture, self._auth_options)
         self._current_mode = self._current_fixture_mode()
+        self._should_wait_for_balancer_round = False
 
         # Event set when the thread has been stopped using the 'stop()' method.
         self._is_stopped_evt = threading.Event()
@@ -229,24 +233,88 @@ class _TransitionThread(threading.Thread):
                     # Tests with interruptions may interrupt the transition thread while running
                     # movePrimary, leading the thread to retry and hit
                     # ConflictingOperationInProgress.
+                    # Tests with stepdowns might interrupt the movePrimary during the cloning phase,
+                    # but the _shardsvrClongCatalogData command is not idempotent so the coordinator
+                    # will fail the request if cloning has started.
                     if err.code not in [
-                            self._NAMESPACE_NOT_FOUND, self._CONFLICTING_OPERATION_IN_PROGRESS
+                            self._NAMESPACE_NOT_FOUND, self._CONFLICTING_OPERATION_IN_PROGRESS,
+                            7120202
                     ]:
                         raise err
+
+    def _get_balancer_status_on_shard_not_found(self, prev_round_interrupted):
+        try:
+            latest_status = self._client.admin.command({"balancerStatus": 1})
+        except pymongo.errors.OperationFailure as balancerStatusErr:
+            if balancerStatusErr.code in set(retryable_network_errs):
+                self.logger.info("Network error when running balancerStatus after "
+                                 "receiving ShardNotFound error on transition to dedicated, will "
+                                 "retry. err: " + str(balancerStatusErr))
+                prev_round_interrupted = False
+                return None, prev_round_interrupted
+
+            if balancerStatusErr.code not in [self._INTERRUPTED]:
+                raise balancerStatusErr
+
+            prev_round_interrupted = True
+            self.logger.info("Ignoring 'Interrupted' error when running balancerStatus "
+                             "after receiving ShardNotFound error on transition to dedicated.")
+            return None, prev_round_interrupted
+
+        return latest_status, prev_round_interrupted
 
     def _transition_to_dedicated(self):
         self.logger.info("Starting transition from " + self._current_mode)
         res = None
         start_time = time.time()
+        last_balancer_status = None
+        prev_round_interrupted = False
 
         while True:
             try:
+                if last_balancer_status is None:
+                    last_balancer_status = self._client.admin.command({"balancerStatus": 1})
+
+                if self._should_wait_for_balancer_round:
+                    # TODO SERVER-90291: Remove.
+                    #
+                    # Wait for one balancer round after starting to drain if the config server owned no
+                    # chunks to avoid a race where the migration of the first chunk to the config server
+                    # can leave the collection orphaned on it after it's been removed as a shard.
+                    latest_status = self._client.admin.command({"balancerStatus": 1})
+
+                    if last_balancer_status["term"] != latest_status["term"]:
+                        self.logger.info(
+                            "Detected change in repl set term while waiting for a balancer round "
+                            "before transitioning to dedicated CSRS. last term: %d, new term: %d",
+                            last_balancer_status["term"], latest_status["term"])
+                        last_balancer_status = latest_status
+                        time.sleep(1)
+                        continue
+
+                    if last_balancer_status["numBalancerRounds"] >= latest_status[
+                            "numBalancerRounds"]:
+                        self.logger.info(
+                            "Waiting for a balancer round before transition to dedicated. "
+                            "Last round: %d, latest round: %d",
+                            last_balancer_status["numBalancerRounds"],
+                            latest_status["numBalancerRounds"])
+                        time.sleep(1)
+                        continue
+
+                    self.logger.info(
+                        "Done waiting for a balancer round before transition to dedicated")
+                    self._should_wait_for_balancer_round = False
+
                 res = self._client.admin.command({"transitionToDedicatedConfigServer": 1})
 
                 if res["state"] == "completed":
                     self.logger.info("Completed transition to %s in %0d ms", self.DEDICATED,
                                      (time.time() - start_time) * 1000)
                     return True
+                elif res["state"] == "started":
+                    if self._client.config.chunks.count_documents({"shard": "config"}) == 0:
+                        self._should_wait_for_balancer_round = True
                 elif res["state"] == "ongoing":
                     if self._random_balancer_on:
                         # With random balancing, the balancer will move unsplittable collections
@@ -257,6 +325,7 @@ class _TransitionThread(threading.Thread):
                         # currently requires dbsToMove being set.
                         self._move_from_config_no_random_balancer(res["dbsToMove"])
 
+                prev_round_interrupted = False
                 time.sleep(1)
 
                 if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
@@ -271,21 +340,83 @@ class _TransitionThread(threading.Thread):
                     # Abort the transition attempt and make the hook try again later.
                     return False
 
+                # Some suites run with forced failovers, if transitioning fails with a retryable
+                # network error, we should retry.
+                if err.code in set(retryable_network_errs):
+                    self.logger.info("Network error when transitioning to dedicated config server, "
+                                     "will retry. err: " + str(err))
+                    time.sleep(1)
+                    prev_round_interrupted = False
+                    continue
+
+                # If there was a failover when finishing the transition to a dedicated CSRS or if
+                # the transitionToDedicated request was interrupted when finishing the transition,
+                # it's possible that this thread didn't learn that the transition finished. When the
+                # the transition to dedicated is retried, it will fail because the shard "config"
+                # will no longer exist.
+                if err.code in [self._SHARD_NOT_FOUND]:
+                    latest_status, prev_round_interrupted = self._get_balancer_status_on_shard_not_found(
+                        prev_round_interrupted)
+                    if (latest_status is None):
+                        # The balancerStatus request was interrupted, so we retry the transition
+                        # request. We will fail with ShardNotFound again, and will retry this check
+                        # again.
+                        time.sleep(1)
+                        continue
+
+                    if last_balancer_status is None:
+                        last_balancer_status = latest_status
+
+                    if (last_balancer_status["term"] != latest_status["term"]
+                            or prev_round_interrupted):
+                        self.logger.info(
+                            "Did not find entry for 'config' in config.shards after detecting a "
+                            "change in repl set term or after transition was interrutped. Assuming "
+                            "transition to dedicated finished on previous transition request.")
+                        return True
+
                 # Some workloads kill sessions which may interrupt the transition.
-                if err.code not in [self._INTERRUPTED]:
+                # If there is a failover during _shardsvrJoinMigrations, removeShard will fail with
+                # anonymous error 8955101.
+                # TODO SERVER-90212 remove this exception for 8955101.
+                if err.code not in [self._INTERRUPTED, 8955101]:
                     raise err
 
+                prev_round_interrupted = True
                 self.logger.info("Ignoring error transitioning to dedicated: " + str(err))
 
     def _transition_to_config_shard(self):
         self.logger.info("Starting transition from " + self._current_mode)
-        try:
-            self._client.admin.command({"transitionFromDedicatedConfigServer": 1})
-        except pymongo.errors.OperationFailure as err:
-            # Some workloads kill sessions which may interrupt the transition.
-            if err.code not in [self._INTERRUPTED]:
-                raise err
-            self.logger.info("Ignoring error transitioning to config shard: " + str(err))
+        while True:
+            try:
+                self._client.admin.command({"transitionFromDedicatedConfigServer": 1})
+                return
+            except pymongo.errors.OperationFailure as err:
+                # Some suites run with forced failovers, if transitioning fails with a retryable
+                # network error, we should retry.
+                if err.code in set(retryable_network_errs):
+                    self.logger.info("Network error when transitioning from dedicated config "
+                                     "server, will retry. err: " + str(err))
+                    time.sleep(1)
+                    continue
+
+                # If one of the nodes in the config server is killed just before attempting to
+                # transition, addShard will fail because it will not be able to connect. The error
+                # code return is not retryable (it is OperationFailed), so we check the specific
+                # error message as well.
+                if err.code in [self._OPERATION_FAILED
+                                ] and err.errmsg and "Connection refused" in err.errmsg:
+                    self.logger.info("Connection refused when transitioning from dedicated config "
+                                     "server, will retry. err: " + str(err))
+                    time.sleep(1)
+                    continue
+
+                # Some workloads kill sessions which may interrupt the transition.
+                if err.code not in [self._INTERRUPTED]:
+                    self.logger.info("not interrupted :(): " + str(err))
+                    raise err
+
+                self.logger.info("Ignoring error transitioning to config shard: " + str(err))
 
     def _get_non_config_shard_id(self):
         res = self._client.admin.command({"listShards": 1})
