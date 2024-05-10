@@ -343,5 +343,11 @@ std::vector<BatchedCommandRequest> getOperationsToCreateUnsplittableCollectionOn
     const BSONObj& defaultCollation,
     const ShardId& shardId);
 
+/*
+ * Throws IllegalOperation if the cluster is not yet blocking direct shard operations. This ensures
+ * that data cannot be migrated to a new shard before all direct shard operations have been blocked.
+ */
+void assertDataMovementAllowed();
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo

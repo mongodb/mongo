@@ -1297,6 +1297,10 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
         }
     }
 
+    if (recipientShardIds.size() != 1 || donorShardIds != recipientShardIds) {
+        sharding_ddl_util::assertDataMovementAllowed();
+    }
+
     return {constructDonorShardEntries(donorShardIds),
             constructRecipientShardEntries(recipientShardIds),
             initialChunks};

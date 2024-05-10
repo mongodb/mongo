@@ -56,6 +56,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
@@ -129,6 +130,8 @@ public:
             // case where we might have changed a shard's host by removing/adding a shard with the
             // same name.
             Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+
+            sharding_ddl_util::assertDataMovementAllowed();
 
             auto scopedMigration = uassertStatusOK(
                 ActiveMigrationsRegistry::get(opCtx).registerDonateChunk(opCtx, request()));
