@@ -233,9 +233,10 @@ public:
                                       std::string* source);
 
     /**
-     * Reads contents of table using URI and exports all keys to BSON as string elements.
-     * Additional, adds 'uri' field to output document. A filter can be specified to skip desired
-     * fields.
+     * Reads the WT database statistics table using the URI and exports all keys to BSON as string
+     * elements. Additionally, adds the 'uri' field to output document.
+     *
+     * A filter can be specified to skip desired fields.
      */
     static Status exportTableToBSON(WT_SESSION* s,
                                     const std::string& uri,

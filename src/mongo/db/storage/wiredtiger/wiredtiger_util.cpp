@@ -1119,64 +1119,75 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                                          const std::vector<std::string>& filter) {
     invariant(session);
     invariant(bob);
-    WT_CURSOR* c = nullptr;
+    WT_CURSOR* cursor = nullptr;
     const char* cursorConfig = config.empty() ? nullptr : config.c_str();
-    int ret = session->open_cursor(session, uri.c_str(), nullptr, cursorConfig, &c);
+
+    // Attempt to open a statistics cursor on the provided URI.
+    int ret = session->open_cursor(session, uri.c_str(), nullptr, cursorConfig, &cursor);
     if (ret != 0) {
         return Status(ErrorCodes::CursorNotFound,
                       str::stream() << "unable to open cursor at URI " << uri
                                     << ". reason: " << wiredtiger_strerror(ret));
     }
     bob->append("uri", uri);
-    invariant(c);
-    ON_BLOCK_EXIT([&] { c->close(c); });
+    invariant(cursor);
+    ON_BLOCK_EXIT([&] { cursor->close(cursor); });
 
-    std::map<string, BSONObjBuilder*> subs;
-    const char* desc;
-    uint64_t value;
-    while (c->next(c) == 0 && c->get_value(c, &desc, nullptr, &value) == 0) {
-        StringData key(desc);
+    // measurementsMappedByCategory is used to organize the table's nested BSON structure as we
+    // iterate through the WT table. We keep track of each category's measurements in this format:
+    // { "cache":
+    //       {"bytes read into cache": 30.000, "bytes written from cache": 20.000, ...},
+    //   "category":
+    //       {"measurement1": value, "measurement2": value, ...},
+    //   ...
+    // }
+    std::map<string, BSONObjBuilder*> measurementsMappedByCategory;
+    const char* statisticDescription;
+    uint64_t statisticValue;
+    while (cursor->next(cursor) == 0 &&
+           cursor->get_value(cursor, &statisticDescription, nullptr, &statisticValue) == 0) {
+        // The description returned by the statistics cursor of the format: "Category: Measurement",
+        // like "cache: bytes read into cache" or "cache: bytes written from cache".
+        StringData key(statisticDescription);
+        StringData category;
+        StringData measurement;
 
-        StringData prefix;
-        StringData suffix;
-
-        size_t idx = key.find(':');
+        // Attempt to split the description into the category and measurement if a category is
+        // provided. Otherwise, attempt to use the first word of the description as the category.
+        size_t idx = key.find_first_of(": ");
         if (idx != string::npos) {
-            prefix = key.substr(0, idx);
-            suffix = key.substr(idx + 1);
+            category = key.substr(0, idx);
+            measurement = key.substr(idx + 1);
         } else {
-            idx = key.find(' ');
+            category = key;
+            measurement = "num";
         }
 
-        if (idx != string::npos) {
-            prefix = key.substr(0, idx);
-            suffix = key.substr(idx + 1);
-        } else {
-            prefix = key;
-            suffix = "num";
-        }
+        long long value = castStatisticsValue<long long>(statisticValue);
 
-        long long v = castStatisticsValue<long long>(value);
-
-        if (prefix.size() == 0) {
-            bob->appendNumber(desc, v);
+        if (category.size() == 0) {
+            bob->appendNumber(statisticDescription, value);
         } else {
-            bool shouldSkipField = std::find(filter.begin(), filter.end(), prefix) != filter.end();
+            bool shouldSkipField =
+                std::find(filter.begin(), filter.end(), category) != filter.end();
             if (shouldSkipField) {
                 continue;
             }
 
-            BSONObjBuilder*& sub = subs[prefix.toString()];
-            if (!sub)
-                sub = new BSONObjBuilder();
-            sub->appendNumber(str::ltrim(suffix.toString()), v);
+            BSONObjBuilder*& measurementsSubObj = measurementsMappedByCategory[category.toString()];
+            if (!measurementsSubObj)
+                measurementsSubObj = new BSONObjBuilder();
+            measurementsSubObj->appendNumber(str::ltrim(measurement.toString()), value);
         }
     }
 
-    for (std::map<string, BSONObjBuilder*>::const_iterator it = subs.begin(); it != subs.end();
+    // Attach the table statistics to the BSONObjBuilder provided in the function arguments.
+    for (std::map<string, BSONObjBuilder*>::const_iterator it =
+             measurementsMappedByCategory.begin();
+         it != measurementsMappedByCategory.end();
          ++it) {
-        const std::string& s = it->first;
-        bob->append(s, it->second->obj());
+        const std::string& category = it->first;
+        bob->append(category, it->second->obj());
         delete it->second;
     }
     return Status::OK();
