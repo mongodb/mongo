@@ -2,6 +2,8 @@
  * Utilities for turning on/off and waiting for fail points.
  */
 
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+
 export var configureFailPoint;
 
 export var configureFailPointForRS;
@@ -13,14 +15,44 @@ export var kDefaultWaitForFailPointTimeout;
  */
 export var getFailPointName;
 
+export var getActualFailPointName;
+
 (function() {
 if (configureFailPoint) {
     return;  // Protect against this file being double-loaded.
 }
 
+const kWireVersion73 = 24;
+
+// This table is the opposite to failPointRenameTable below. It maps from a fail point name to
+// either a router-specific or a shard-specific version, based on the type of connection that is
+// passed to configureFailPoint.
+const failPointRouterShardRenameTable = {
+    "waitInFindBeforeMakingBatch":
+        {router: "routerWaitInFindBeforeMakingBatch", shard: "shardWaitInFindBeforeMakingBatch"},
+};
+
+getActualFailPointName = function(conn, failPointName, getShard) {
+    const names = failPointRouterShardRenameTable[failPointName];
+    if (!names) {
+        return failPointName;
+    }
+    conn = typeof conn.getMongo == "function" ? conn.getMongo() : conn;
+    const wireVersion = conn.getMaxWireVersion();
+    if (wireVersion <= kWireVersion73) {  // Only correct in 8.0 .
+        return failPointName;
+    }
+    if (getShard !== undefined) {
+        return getShard ? names.shard : names.router;
+    }
+    return isMongos(conn.getDB("admin")) ? names.router : names.shard;
+};
+
 kDefaultWaitForFailPointTimeout = 10 * 60 * 1000;
 
 configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "alwaysOn") {
+    failPointName = getActualFailPointName(conn, failPointName);
+
     const res = sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
         return conn.adminCommand(
             {configureFailPoint: failPointName, mode: failPointMode, data: data});
@@ -66,21 +98,25 @@ configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "a
 };
 
 configureFailPointForRS = function(conns, failPointName, data = {}, failPointMode = "alwaysOn") {
-    conns.forEach((conn) => {
+    var failPointNames = [];
+    conns.forEach((conn, index) => {
+        var actualName = getActualFailPointName(conn, failPointName, true /* getShard */);
+        failPointNames[index] = actualName;
         sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
             return conn.adminCommand(
-                {configureFailPoint: failPointName, mode: failPointMode, data: data});
-        }, "Timed out setting failpoint " + failPointName);
+                {configureFailPoint: actualName, mode: failPointMode, data: data});
+        }, "Timed out setting failpoint " + actualName);
     });
 
     return {
         conns: conns,
-        failPointName: failPointName,
+        failPointNames: failPointNames,
         off: function() {
-            conns.forEach((conn) => {
+            conns.forEach((conn, index) => {
+                var actualName = failPointNames[index];
                 sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-                    return conn.adminCommand({configureFailPoint: failPointName, mode: "off"});
-                }, "Timed out disabling fail point " + failPointName);
+                    return conn.adminCommand({configureFailPoint: actualName, mode: "off"});
+                }, "Timed out disabling fail point " + actualName);
             });
         }
     };
@@ -89,7 +125,6 @@ configureFailPointForRS = function(conns, failPointName, data = {}, failPointMod
 // Add an entry to this map if you are changing the name of an existing fail point.
 // Key is name of the failpoint on master. Value is a function taking wireVersion
 // that returns the correct name of the fail point on that wireVersion.
-const kWireVersion73 = 24;
 const failPointRenameTable = {
     "routerWaitInHello": function(wireVersion) {
         if (wireVersion >= kWireVersion73) {

@@ -2,6 +2,7 @@
 // More cases are covered in unit tests.
 // @tags: [uses_transactions, uses_atclustertime]
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
 function verifyCurrentOpFields(res, isActive) {
@@ -123,8 +124,7 @@ jsTest.log("Inactive transaction.");
 
 jsTest.log("Active transaction.");
 (() => {
-    assert.commandWorked(st.rs0.getPrimary().adminCommand(
-        {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
+    const fp = configureFailPoint(st.rs0.getPrimary(), "waitInFindBeforeMakingBatch");
 
     const txnThread = new Thread(function(host, dbName, collName) {
         const mongosConn = new Mongo(host);
@@ -147,8 +147,7 @@ jsTest.log("Active transaction.");
     const res = getCurrentOpForFilter(st, {"command.comment": "active_txn_find"});
     verifyCurrentOpFields(res, true /* isActive */);
 
-    assert.commandWorked(st.rs0.getPrimary().adminCommand(
-        {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "off"}));
+    fp.off();
     txnThread.join();
 })();
 

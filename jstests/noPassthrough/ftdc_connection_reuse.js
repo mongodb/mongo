@@ -5,6 +5,7 @@
  * @tags: [requires_sharding, requires_fcv_63]
  */
 
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
@@ -31,19 +32,6 @@ function getDiagnosticData() {
     assert(stats.hasOwnProperty('totalWasUsedOnce'));
     assert(stats.hasOwnProperty('totalConnUsageTimeMillis'));
     return stats["pools"]["NetworkInterfaceTL-TaskExecutorPool-0"];
-}
-
-function configureReplSetFailpoint(name, modeValue) {
-    st.rs0.nodes.forEach(function(node) {
-        assert.commandWorked(node.getDB("admin").runCommand({
-            configureFailPoint: name,
-            mode: modeValue,
-            data: {
-                shouldCheckForInterrupt: true,
-                nss: kDbName + "." + kCollName,
-            },
-        }));
-    });
 }
 
 var threads = [];
@@ -111,7 +99,10 @@ assert.commandWorked(st.s.adminCommand({
 
 // Launch 3 blocked finds and verify that all 3 are in-use.
 jsTestLog("Launching blocked finds");
-configureReplSetFailpoint("waitInFindBeforeMakingBatch", "alwaysOn");
+const fpRs =
+    configureFailPointForRS(st.rs0.nodes,
+                            "waitInFindBeforeMakingBatch",
+                            {shouldCheckForInterrupt: true, nss: kDbName + "." + kCollName});
 launchFinds({times: 3, readPref: "primary"});
 assert.soon(() => {
     let poolStats = getDiagnosticData();
@@ -121,7 +112,7 @@ assert.soon(() => {
 // Unblock finds, and reduce pool size to verify that dropped connections were marked as having been
 // used only once and remaining connections are no longer active.
 jsTestLog("Unblocking finds, reducing pool size");
-configureReplSetFailpoint("waitInFindBeforeMakingBatch", "off");
+fpRs.off();
 assert.commandWorked(st.s.adminCommand(
     {"setParameter": 1, ShardingTaskExecutorPoolMinSize: 1, ShardingTaskExecutorPoolMaxSize: 1}));
 assert.soon(() => {

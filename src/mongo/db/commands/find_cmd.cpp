@@ -813,7 +813,8 @@ public:
                 return;
             }
 
-            FindCommon::waitInFindBeforeMakingBatch(opCtx, *exec->getCanonicalQuery());
+            FindCommon::waitInFindBeforeMakingBatch(
+                opCtx, *exec->getCanonicalQuery(), &shardWaitInFindBeforeMakingBatch);
 
             const FindCommandRequest& originalFC =
                 exec->getCanonicalQuery()->getFindCommandRequest();

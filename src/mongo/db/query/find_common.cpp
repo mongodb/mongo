@@ -56,7 +56,8 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(waitInFindBeforeMakingBatch);
+MONGO_FAIL_POINT_DEFINE(shardWaitInFindBeforeMakingBatch);
+MONGO_FAIL_POINT_DEFINE(routerWaitInFindBeforeMakingBatch);
 
 MONGO_FAIL_POINT_DEFINE(disableAwaitDataForGetMoreCmd);
 
@@ -97,9 +98,10 @@ bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, siz
     return fitsInBatch(bytesBuffered, nextDoc.objsize());
 }
 
-void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const CanonicalQuery& cq) {
-    bool hasLogged = false;
-    auto whileWaitingFunc = [&]() {
+void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx,
+                                             const CanonicalQuery& cq,
+                                             FailPoint* fp) {
+    auto whileWaitingFunc = [&, hasLogged = false]() mutable {
         if (!std::exchange(hasLogged, true)) {
             LOGV2(20908,
                   "Waiting in find before making batch for query",
@@ -107,11 +109,8 @@ void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const Cano
         }
     };
 
-    CurOpFailpointHelpers::waitWhileFailPointEnabled(&mongo::waitInFindBeforeMakingBatch,
-                                                     opCtx,
-                                                     "waitInFindBeforeMakingBatch",
-                                                     whileWaitingFunc,
-                                                     cq.nss());
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        fp, opCtx, "waitInFindBeforeMakingBatch", whileWaitingFunc, cq.nss());
 }
 
 std::size_t FindCommon::getBytesToReserveForGetMoreReply(bool isTailable,

@@ -2,6 +2,7 @@
 // @tags: [requires_replication, requires_sharding]
 
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const st = new ShardingTest({shards: 2});
 const conn = st.s;
@@ -12,7 +13,7 @@ const coll = db.test;
 assert.commandWorked(db.getCollection(coll.getName()).insert({x: 1}));
 
 const kFailPointName = "waitInFindBeforeMakingBatch";
-assert.commandWorked(conn.adminCommand({"configureFailPoint": kFailPointName, "mode": "alwaysOn"}));
+const fp = configureFailPoint(conn, kFailPointName);
 
 const queryToKill = `assert.commandFailedWithCode(db.getSiblingDB('${db.getName()}')` +
     `.runCommand({find: '${coll.getName()}', filter: {x: 1}}), ErrorCodes.Interrupted);`;
@@ -37,7 +38,7 @@ assert(result[0].hasOwnProperty("killPending"));
 assert.eq(true, result[0].killPending);
 
 // Release the failpoint. The operation should check for interrupt and then finish.
-assert.commandWorked(conn.adminCommand({"configureFailPoint": kFailPointName, "mode": "off"}));
+fp.off();
 
 awaitShell();
 

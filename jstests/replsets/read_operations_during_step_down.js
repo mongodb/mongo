@@ -3,7 +3,8 @@
  * closed during step down.
  */
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {configureFailPoint, getActualFailPointName} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const testName = "readOpsDuringStepDown";
 const dbName = "test";
@@ -51,15 +52,13 @@ const joinGetMoreThread = startParallelShell(() => {
 waitForCurOpByFailPoint(primaryAdmin, collNss, "waitAfterPinningCursorBeforeGetMoreBatch");
 
 jsTestLog("2. Start blocking find cmd before step down");
-const joinFindThread = startParallelShell(() => {
-    // Enable the fail point for find cmd.
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
-
-    var findRes = assert.commandWorked(
-        db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
-    assert.docEq([{_id: 0}], findRes.cursor.firstBatch);
-}, primary.port);
+const joinFindThread = startParallelShell(
+    funWithArgs((fpName) => {
+        assert.commandWorked(db.adminCommand({configureFailPoint: fpName, mode: "alwaysOn"}));
+        var findRes = assert.commandWorked(
+            db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
+        assert.docEq([{_id: 0}], findRes.cursor.firstBatch);
+    }, getActualFailPointName(primary, "waitInFindBeforeMakingBatch")), primary.port);
 
 // Wait for find cmd to reach the fail point.
 waitForCurOpByFailPoint(primaryAdmin, collNss, "waitInFindBeforeMakingBatch");

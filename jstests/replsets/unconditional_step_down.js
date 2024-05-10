@@ -3,7 +3,8 @@
  * the connections if primary is stepping down to secondary.
  */
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {configureFailPoint, getActualFailPointName} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
 const testName = "txnsDuringStepDown";
@@ -51,53 +52,48 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
 
     jsTestLog("Enable fail point for namespace '" + collNss + "'");
     // Find command.
-    assert.commandWorked(primary.adminCommand({
-        configureFailPoint: readFailPoint,
-        data: {nss: collNss, shouldCheckForInterrupt: true},
-        mode: "alwaysOn"
-    }));
+    configureFailPoint(primary, readFailPoint, {nss: collNss, shouldCheckForInterrupt: true});
     // Insert command.
-    assert.commandWorked(primary.adminCommand({
-        configureFailPoint: writeFailPoint,
-        data: {nss: collNss, shouldCheckForInterrupt: true},
-        mode: "alwaysOn"
-    }));
+    const writeFp =
+        configureFailPoint(primary, writeFailPoint, {nss: collNss, shouldCheckForInterrupt: true});
 
-    var startSafeParallelShell = (func, port) => {
-        TestData.func = func;
-        var safeFunc = (toRemovedState) ? () => {
-            assert.commandWorked(db.adminCommand({hello: 1, hangUpOnStepDown: false}));
-            TestData.func();
-        } : func;
-        return startParallelShell(safeFunc, port);
-    };
+    const joinReadThread = startParallelShell(
+        funWithArgs((toRemovedState) => {
+            if (toRemovedState) {
+                assert.commandWorked(db.adminCommand({hello: 1, hangUpOnStepDown: false}));
+            }
+            jsTestLog("Start blocking find cmd before step down");
+            var findRes = assert.commandWorked(
+                db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
+            assert.eq(findRes.cursor.firstBatch.length, 1);
+        }, toRemovedState), primary.port);
 
-    const joinReadThread = startSafeParallelShell(() => {
-        jsTestLog("Start blocking find cmd before step down");
-        var findRes = assert.commandWorked(
-            db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
-        assert.eq(findRes.cursor.firstBatch.length, 1);
-    }, primary.port);
-
-    const joinWriteThread = startSafeParallelShell(() => {
-        jsTestLog("Start blocking insert cmd before step down");
-        assert.commandFailedWithCode(
-            db.getSiblingDB(TestData.dbName)[TestData.collName].insert([{val: 'writeOp1'}]),
-            ErrorCodes.InterruptedDueToReplStateChange);
-    }, primary.port);
+    const joinWriteThread = startParallelShell(
+        funWithArgs((toRemovedState) => {
+            if (toRemovedState) {
+                assert.commandWorked(db.adminCommand({hello: 1, hangUpOnStepDown: false}));
+            }
+            jsTestLog("Start blocking insert cmd before step down");
+            assert.commandFailedWithCode(
+                db.getSiblingDB(TestData.dbName)[TestData.collName].insert([{val: 'writeOp1'}]),
+                ErrorCodes.InterruptedDueToReplStateChange);
+        }, toRemovedState), primary.port);
 
     // A failpoint to hang in the middle of a 'checkLog' command. This is used to synchronize
     // the 'joinUnblockStepDown' thread with 'stepDown'.
     const hangFp = configureFailPoint(primary, "hangInGetLog");
-    const joinUnblockStepDown = startSafeParallelShell(() => {
-        jsTestLog("Wait for step down to start killing operations");
-        checkLog.contains(db, "Starting to kill user operations");
+    const joinUnblockStepDown = startParallelShell(
+        funWithArgs((fpName, toRemovedState) => {
+            if (toRemovedState) {
+                assert.commandWorked(db.adminCommand({hello: 1, hangUpOnStepDown: false}));
+            }
+            jsTestLog("Wait for step down to start killing operations");
+            checkLog.contains(db, "Starting to kill user operations");
 
-        jsTestLog("Unblock step down");
-        // Turn off fail point on find cmd to allow step down to continue.
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: TestData.readFailPoint, mode: "off"}));
-    }, primary.port);
+            jsTestLog("Unblock step down");
+            // Turn off fail point on find cmd to allow step down to continue.
+            assert.commandWorked(db.adminCommand({configureFailPoint: fpName, mode: "off"}));
+        }, getActualFailPointName(primary, readFailPoint), toRemovedState), primary.port);
 
     jsTestLog("Wait for find cmd to reach the fail point");
     waitForCurOpByFailPoint(primaryDB, collNss, readFailPoint);
@@ -125,7 +121,7 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
     waitForState(primary,
                  (toRemovedState) ? ReplSetTest.State.REMOVED : ReplSetTest.State.SECONDARY);
 
-    assert.commandWorked(primary.adminCommand({configureFailPoint: writeFailPoint, mode: "off"}));
+    writeFp.off();
 
     // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has been
     // cleared, since the node is no longer primary.

@@ -1,3 +1,5 @@
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+
 const runTest = function(conn, failPointConn) {
     jsTestLog("Setting up users");
     const db = conn.getDB("admin");
@@ -10,8 +12,7 @@ const runTest = function(conn, failPointConn) {
     assert.commandWorked(db.getSiblingDB("test").test.insert({}));
 
     jsTestLog("blocking finds and starting parallel shell to create op");
-    assert.commandWorked(failPointConn.getDB("admin").runCommand(
-        {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
+    const fp = configureFailPoint(failPointConn, "waitInFindBeforeMakingBatch");
     let finderWait = startParallelShell(function() {
         assert.eq(db.getSiblingDB("admin").auth("testuser", "pwd"), 1);
         let testDB = db.getSiblingDB("test");
@@ -34,8 +35,7 @@ const runTest = function(conn, failPointConn) {
     });
 
     jsTestLog("found op");
-    assert.commandWorked(failPointConn.getDB("admin").runCommand(
-        {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "off"}));
+    fp.off();
     finderWait();
 
     const authedUsers = myOp["effectiveUsers"];
