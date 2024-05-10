@@ -56,7 +56,12 @@ function runTest(testCase, usingClusteredIndex) {
         } else {
             if (!profileDoc.execStats.inputStage) {
                 // for queries that use express, there is no inputStage
-                assert.eq(profileDoc.execStats.stage, "EXPRESS_UPDATE", profileDoc);
+                const expressWriteStages = ["EXPRESS_DELETE", "EXPRESS_UPDATE"];
+                assert.contains(
+                    profileDoc.execStats.stage,
+                    expressWriteStages,
+                    "Profile doc's execStats did not contain one of the expected values (" +
+                        expressWriteStages + "): " + tojson(profileDoc));
             } else {
                 assert.eq(profileDoc.execStats.inputStage.stage, "CLUSTERED_IXSCAN", profileDoc);
             }
@@ -76,7 +81,12 @@ function runTest(testCase, usingClusteredIndex) {
         } else {
             if (!profileDoc.execStats.inputStage) {
                 // for queries that use express, there is no inputStage
-                assert.eq(profileDoc.execStats.stage, "EXPRESS_UPDATE", profileDoc);
+                const expressWriteStages = ["EXPRESS_DELETE", "EXPRESS_UPDATE"];
+                assert.contains(
+                    profileDoc.execStats.stage,
+                    expressWriteStages,
+                    "Profile doc's execStats did not contain one of the expected values (" +
+                        expressWriteStages + "): " + tojson(profileDoc));
             } else {
                 assert.eq(profileDoc.execStats.inputStage.stage, "IDHACK", profileDoc);
             }

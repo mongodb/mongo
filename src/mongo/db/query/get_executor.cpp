@@ -1227,7 +1227,6 @@ boost::optional<ScopedCollectionFilter> getScopedCollectionFilter(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     const QueryPlannerParams& plannerParams) {
-    // TODO SERVER-87016: don't need sharding filter if it's equality on shard key.
     if (plannerParams.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
         auto collFilter = collections.getMainCollectionPtrOrAcquisition().getShardingFilter(opCtx);
         invariant(collFilter,
@@ -1602,25 +1601,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                           << "Not primary while removing from " << nss.toStringForErrorMsg());
     }
 
-    auto deleteStageParams = std::make_unique<DeleteStageParams>();
-    deleteStageParams->isMulti = request->getMulti();
-    deleteStageParams->fromMigrate = request->getFromMigrate();
-    deleteStageParams->isExplain = request->getIsExplain();
-    deleteStageParams->returnDeleted = request->getReturnDeleted();
-    deleteStageParams->sort = request->getSort();
-    deleteStageParams->opDebug = opDebug;
-    deleteStageParams->stmtId = request->getStmtId();
-
-    if (parsedDelete->isRequestToTimeseries() &&
-        !parsedDelete->isEligibleForArbitraryTimeseriesDelete()) {
-        deleteStageParams->numStatsForDoc = timeseries::numMeasurementsForBucketCounter(
-            collectionPtr->getTimeseriesOptions()->getTimeField());
-    }
-
-    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    const auto policy = parsedDelete->yieldPolicy();
-
     if (!collectionPtr) {
+        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+
         // Treat collections that do not exist as empty collections. Return a PlanExecutor which
         // contains an EOF stage.
         LOGV2_DEBUG(20927,
@@ -1632,7 +1615,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                                            std::move(ws),
                                            std::make_unique<EOFStage>(expCtx.get()),
                                            coll,
-                                           policy,
+                                           parsedDelete->yieldPolicy(),
                                            false, /* whether we must return owned data */
                                            nss);
     }
@@ -1645,8 +1628,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             // create a CanonicalQuery.
             const BSONObj& unparsedQuery = request->getQuery();
 
-            const IndexDescriptor* descriptor =
-                collectionPtr->getIndexCatalog()->findIdIndex(opCtx);
+            bool hasIdIndex = collectionPtr->getIndexCatalog()->findIdIndex(opCtx) ||
+                clustered_util::isClusteredOnId(collectionPtr->getClusteredInfo());
 
             // Construct delete request collator.
             std::unique_ptr<CollatorInterface> collator;
@@ -1662,26 +1645,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                 CollatorInterface::collatorsMatch(collator.get(),
                                                   collectionPtr->getDefaultCollator());
 
-            if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
+            if (hasIdIndex && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
                 request->getProj().isEmpty() && hasCollectionDefaultCollation) {
-                LOGV2_DEBUG(20928, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
 
-                auto idHackStage = std::make_unique<IDHackStage>(
-                    expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), coll, descriptor);
-                std::unique_ptr<DeleteStage> root =
-                    std::make_unique<DeleteStage>(expCtx.get(),
-                                                  std::move(deleteStageParams),
-                                                  ws.get(),
-                                                  coll,
-                                                  idHackStage.release());
-                fastPathQueryCounters.incrementIdHackQueryCounter();
-                return plan_executor_factory::make(expCtx,
-                                                   std::move(ws),
-                                                   std::move(root),
-                                                   coll,
-                                                   policy,
-                                                   false /* whether owned BSON must be returned */,
-                                                   nss);
+                LOGV2_DEBUG(8376000, 2, "Using express", "query"_attr = redact(unparsedQuery));
+
+                return makeExpressExecutorForDelete(opCtx, coll, parsedDelete);
             }
         }
 
@@ -1695,6 +1664,24 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     // This is the regular path for when we have a CanonicalQuery.
     std::unique_ptr<CanonicalQuery> cq(parsedDelete->releaseParsedQuery());
+
+    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    const auto policy = parsedDelete->yieldPolicy();
+
+    auto deleteStageParams = std::make_unique<DeleteStageParams>();
+    deleteStageParams->isMulti = request->getMulti();
+    deleteStageParams->fromMigrate = request->getFromMigrate();
+    deleteStageParams->isExplain = request->getIsExplain();
+    deleteStageParams->returnDeleted = request->getReturnDeleted();
+    deleteStageParams->sort = request->getSort();
+    deleteStageParams->opDebug = opDebug;
+    deleteStageParams->stmtId = request->getStmtId();
+
+    if (parsedDelete->isRequestToTimeseries() &&
+        !parsedDelete->isEligibleForArbitraryTimeseriesDelete()) {
+        deleteStageParams->numStatsForDoc = timeseries::numMeasurementsForBucketCounter(
+            collectionPtr->getTimeseriesOptions()->getTimeField());
+    }
 
     uassert(ErrorCodes::InternalErrorNotSupported,
             "delete command is not eligible for bonsai",
@@ -1821,17 +1808,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) && request->getProj().isEmpty() &&
                 hasCollectionDefaultCollation) {
 
+                const auto idIndexDesc = collectionPtr->getIndexCatalog()->findIdIndex(opCtx);
                 if (!request->isUpsert() &&
-                    (!nss.isLocalDB() || collectionPtr->getIndexCatalog()->findIdIndex(opCtx))) {
+                    (idIndexDesc ||
+                     clustered_util::isClusteredOnId(collectionPtr->getClusteredInfo()))) {
                     // Upserts not supported in express for now.
-                    // Collections in local db not guaranteed to have an _id index.
                     LOGV2_DEBUG(83759, 2, "Using Express", "query"_attr = redact(unparsedQuery));
                     return makeExpressExecutorForUpdate(
                         opCtx, coll, parsedUpdate, false /* return owned BSON */);
 
-                } else if (const IndexDescriptor* descriptor =
-                               collectionPtr->getIndexCatalog()->findIdIndex(opCtx);
-                           descriptor) {
+                } else if (idIndexDesc) {
                     LOGV2_DEBUG(20930, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
                     UpdateStageParams updateStageParams(
                         request, driver, opDebug, std::move(documentCounter));
@@ -1840,7 +1826,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                     return InternalPlanner::updateWithIdHack(opCtx,
                                                              coll,
                                                              updateStageParams,
-                                                             descriptor,
+                                                             idIndexDesc,
                                                              unparsedQuery["_id"].wrap(),
                                                              policy);
                 }

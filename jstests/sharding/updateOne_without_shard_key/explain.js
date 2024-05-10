@@ -301,10 +301,14 @@ function validateResponse(res, testCase, verbosity) {
         assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, "PROJECTION_DEFAULT");
         assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.stage,
                   testCase.opType);
-    } else {
+    } else if (testCase.opType == "UPDATE") {
         // For 8.0 and beyond, EXPRESS will be used for update-by-id
         assert.contains(res.queryPlanner.winningPlan.shards[0].winningPlan.stage,
                         ["EXPRESS_UPDATE", testCase.opType]);
+    } else if (testCase.opType == "DELETE") {
+        // For 8.0 and beyond, EXPRESS will be used for delete-by-id
+        assert.contains(res.queryPlanner.winningPlan.shards[0].winningPlan.stage,
+                        ["EXPRESS_DELETE", testCase.opType]);
     }
 
     assert.eq(res.queryPlanner.winningPlan.shards.length,
@@ -332,10 +336,14 @@ function validateResponse(res, testCase, verbosity) {
                       "PROJECTION_DEFAULT");
             assert.eq(res.executionStats.executionStages.shards[0].executionStages.inputStage.stage,
                       testCase.opType);
-        } else {
+        } else if (testCase.opType == "UPDATE") {
             // For 8.0 and beyond, EXPRESS will be used for update-by-id
             assert.contains(res.executionStats.executionStages.shards[0].executionStages.stage,
                             ["EXPRESS_UPDATE", testCase.opType]);
+        } else if (testCase.opType == "DELETE") {
+            // For 8.0 and beyond, EXPRESS will be used for update-by-id
+            assert.contains(res.executionStats.executionStages.shards[0].executionStages.stage,
+                            ["EXPRESS_DELETE", testCase.opType]);
         }
 
         assert.eq(res.executionStats.executionStages.shards.length,

@@ -61,13 +61,13 @@ assertExpressCounterIncreased(() => {
     assert(isExpress(db, winningPlan), winningPlan);
 });
 
-// Tests that a delete query using idHack, increments the idHack counter.
-assertIdHackCounterIncreased(() => {
-    jsTestLog("Testing with idHack delete query");
+// Tests that a delete query using express increments the express counter.
+assertExpressCounterIncreased(() => {
+    jsTestLog("Testing with express delete query");
     const explain =
         db.runCommand({explain: {delete: collName, deletes: [{q: {_id: {a: 1}}, limit: 0}]}});
     const winningPlan = getWinningPlan(explain.queryPlanner);
-    assert(isIdhack(db, winningPlan), winningPlan);
+    assert(isExpress(db, winningPlan), winningPlan);
 });
 
 // Tests that a find query using express, increments the express counter.

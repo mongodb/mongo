@@ -374,7 +374,7 @@ class IdLookupViaIndex {
 public:
     using CollectionTypeChoice = CollectionType;
 
-    IdLookupViaIndex(const BSONObj& queryFilter) : _queryFilter(queryFilter) {}
+    IdLookupViaIndex(const BSONObj& queryFilter) : _queryFilter(queryFilter.getOwned()) {}
 
     void open(OperationContext* opCtx, CollectionType collection, IteratorStats* stats) {
         _indexCatalogEntry =
@@ -493,7 +493,8 @@ class IdLookupOnClusteredCollection {
 public:
     using CollectionTypeChoice = CollectionType;
 
-    IdLookupOnClusteredCollection(const BSONObj& queryFilter) : _queryFilter(queryFilter) {}
+    IdLookupOnClusteredCollection(const BSONObj& queryFilter)
+        : _queryFilter(queryFilter.getOwned()) {}
 
     void open(OperationContext* opCtx, CollectionType collection, IteratorStats* stats) {
         _collection = std::move(collection);
@@ -1071,6 +1072,114 @@ private:
 
     WriteOperationStats* _stats;
 };
+
+class DeleteOperation {
+public:
+    DeleteOperation(StmtId stmtId, bool fromMigrate, bool returnDeleted)
+        : _stmtId(stmtId), _fromMigrate(fromMigrate), _returnDeleted(returnDeleted) {}
+
+    void open(WriteOperationStats* stats) {
+        _stats = stats;
+        _stats->setStageName("EXPRESS_DELETE");
+    }
+
+    template <class Continuation>
+    PlanProgress write(OperationContext* opCtx,
+                       const CollectionAcquisition& collection,
+                       const ExceptionRecoveryPolicy& exceptionRecoveryPolicy,
+                       const RecordId& rid,
+                       Snapshotted<BSONObj> obj,
+                       bool shouldWriteToOrphan,
+                       Continuation continuation) {
+        // This should be impossible, because an ExpressPlan does not release a snapshot from the
+        // time it reads a record id to the time it has finished all operations on the associated
+        // document.
+        tassert(5555515,
+                "Cannot delete document that is not from the current snapshot",
+                shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId() == obj.snapshotId());
+
+        return recoverFromNonFatalWriteException(
+            opCtx,
+            exceptionRecoveryPolicy,
+            DeleteOperation::name,
+            [&]() {
+                bool noWarn = false;
+                WriteUnitOfWork wunit(opCtx);
+                collection_internal::deleteDocument(opCtx,
+                                                    collection.getCollectionPtr(),
+                                                    obj,
+                                                    _stmtId,
+                                                    rid,
+                                                    &CurOp::get(opCtx)->debug(),
+                                                    _fromMigrate || shouldWriteToOrphan,
+                                                    noWarn,
+                                                    _returnDeleted
+                                                        ? collection_internal::StoreDeletedDoc::On
+                                                        : collection_internal::StoreDeletedDoc::Off,
+                                                    CheckRecordId::Off,
+                                                    write_stage_common::isRetryableWrite(opCtx)
+                                                        ? collection_internal::RetryableWrite::kYes
+                                                        : collection_internal::RetryableWrite::kNo);
+                wunit.commit();
+            },
+            [&]() -> PlanProgress {
+                // This continuation gets called after the write operation succeeds.
+                size_t numDocsDeleted = 1;
+                _stats->incDeletedStats(numDocsDeleted);
+
+                if (_returnDeleted) {
+                    return continuation(std::move(obj.value()));
+                } else {
+                    return Ready{};
+                }
+            });
+    }
+
+    static constexpr StringData name = "delete"_sd;
+
+private:
+    StmtId _stmtId;
+    bool _fromMigrate;
+    bool _returnDeleted;
+
+    WriteOperationStats* _stats;
+};
+
+class DummyDeleteOperationForExplain {
+public:
+    DummyDeleteOperationForExplain(bool returnDeleted) : _returnDeleted(returnDeleted) {}
+
+    void open(WriteOperationStats* stats) {
+        _stats = stats;
+        _stats->setStageName("EXPRESS_DELETE");
+    }
+
+    template <class Continuation>
+    PlanProgress write(OperationContext* opCtx,
+                       const CollectionAcquisition& collection,
+                       const ExceptionRecoveryPolicy& exceptionRecoveryPolicy,
+                       const RecordId& rid,
+                       Snapshotted<BSONObj> obj,
+                       bool shouldWriteToOrphan,
+                       Continuation continuation) {
+        size_t numDocsDeleted = 1;
+        _stats->incDeletedStats(numDocsDeleted);
+
+        if (_returnDeleted) {
+            return continuation(std::move(obj.value()));
+        } else {
+            return Ready{};
+        }
+    }
+
+    static constexpr StringData name = "delete"_sd;
+
+private:
+    bool _returnDeleted;
+
+    WriteOperationStats* _stats;
+};
+
 class NoWriteOperation {
 public:
     static constexpr StringData name = "nowriteop"_sd;
@@ -1169,12 +1278,10 @@ public:
                             std::move(obj),
                             shouldWriteToOrphan,
                             [&](BSONObj outObj) {
-                                // Continue execution after the write
-                                // operation succeeds.
+                                // Continue execution after the write operation succeeds.
                                 return applyProjection(
                                     _projection, std::move(outObj), [&](BSONObj projectionResult) {
-                                        // Continue execution with the
-                                        // result of applying the
+                                        // Continue execution with the result of applying the
                                         // projection.
                                         _planStats->incNumResults(1);
                                         return continuation(std::move(rid),

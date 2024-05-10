@@ -49,6 +49,8 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/delete_request_gen.h"
+#include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -229,11 +231,15 @@ public:
     }
 
     long long executeDelete() override {
-        MONGO_UNREACHABLE_TASSERT(8375805);
+        BSONObj unusedObj;
+        while (getNext(&unusedObj, nullptr /* record id out */) != ExecState::IS_EOF) {
+            // Keep deleting!
+        }
+        return _writeOperationStats.docsDeleted();
     }
 
     long long getDeleteResult() const override {
-        MONGO_UNREACHABLE_TASSERT(8375806);
+        return _writeOperationStats.docsDeleted();
     }
 
     BatchedDeleteStats getBatchedDeleteStats() override {
@@ -676,6 +682,73 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
                 PlanExecutor::Deleter(opCtx)};
         },
         std::move(iterator),
+        std::move(shardFilter));
+}
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelete(
+    OperationContext* opCtx, CollectionAcquisition collection, ParsedDelete* parsedDelete) {
+    const DeleteRequest* request = parsedDelete->getRequest();
+
+    using Iterator = std::variant<express::IdLookupViaIndex<CollectionAcquisition>,
+                                  express::IdLookupOnClusteredCollection<CollectionAcquisition>>;
+    auto iterator = [&]() -> Iterator {
+        bool isClusteredOnId =
+            clustered_util::isClusteredOnId(collection.getCollectionPtr()->getClusteredInfo());
+        if (isClusteredOnId) {
+            return express::IdLookupOnClusteredCollection<CollectionAcquisition>(
+                request->getQuery());
+        } else {
+            return express::IdLookupViaIndex<CollectionAcquisition>(request->getQuery());
+        }
+    }();
+
+    using WriteOperation =
+        std::variant<express::DeleteOperation, express::DummyDeleteOperationForExplain>;
+    using ShardFilter = std::variant<express::NoShardFilter, write_stage_common::PreWriteFilter>;
+    auto [writeOperation, shardFilter] = [&]() -> std::pair<WriteOperation, ShardFilter> {
+        if (request->getIsExplain()) {
+            // We elide the shard filter when executing a delete operation for an explain command.
+            // There's no need to strictly check if a write belongs to the shard if we're not going
+            // to perform it.
+            return {WriteOperation(
+                        express::DummyDeleteOperationForExplain(request->getReturnDeleted())),
+                    ShardFilter(express::NoShardFilter())};
+        } else if (request->getFromMigrate()) {
+            // Write commands issued by chunk migration operations should execute whether or not the
+            // written document belongs to the chunk, so there is no shard filter.
+            return {WriteOperation(express::DeleteOperation(request->getStmtId(),
+                                                            request->getFromMigrate(),
+                                                            request->getReturnDeleted())),
+                    ShardFilter(express::NoShardFilter())};
+        } else {
+            return {WriteOperation(express::DeleteOperation(request->getStmtId(),
+                                                            request->getFromMigrate(),
+                                                            request->getReturnDeleted())),
+                    ShardFilter(write_stage_common::PreWriteFilter(opCtx, collection.nss()))};
+        }
+    }();
+
+    fastPathQueryCounters.incrementExpressQueryCounter();
+    auto recoveryPolicy = getExpressRecoveryPolicy(opCtx, parsedDelete->yieldPolicy());
+
+    return std::visit(
+        [&](auto chosenIterator,
+            auto chosenWriteOperation,
+            auto chosenShardFilter) -> std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> {
+            auto plan = express::ExpressPlan(std::move(chosenIterator),
+                                             std::move(chosenWriteOperation),
+                                             std::move(chosenShardFilter),
+                                             express::IdentityProjection());
+            return {new PlanExecutorExpress(opCtx,
+                                            nullptr /* cq */,
+                                            collection,
+                                            std::move(plan),
+                                            recoveryPolicy,
+                                            false /* returnOwnedBson */),
+                    PlanExecutor::Deleter(opCtx)};
+        },
+        std::move(iterator),
+        std::move(writeOperation),
         std::move(shardFilter));
 }
 

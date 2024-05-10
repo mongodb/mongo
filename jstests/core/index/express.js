@@ -31,7 +31,7 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {runWithParamsAllNodes} from "jstests/libs/optimizer_utils.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
-const coll = db.getCollection(jsTestName());
+const coll = db.getCollection('express_coll');
 
 function runExpressTest(
     {filter, project = {}, limit = 0 /* no limit */, collation = {}, result, usesExpress}) {

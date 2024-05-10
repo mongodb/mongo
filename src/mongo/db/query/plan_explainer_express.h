@@ -154,6 +154,7 @@ public:
     void populateExecStats(BSONObjBuilder& bob) const {
         bob.appendNumber("nWouldModify", static_cast<long long>(docsUpdated()));
         bob.appendNumber("nWouldUpsert", 0LL);
+        bob.appendNumber("nWouldDelete", static_cast<long long>(docsDeleted()));
     }
 
     bool containsDotsAndDollarsField() const {
@@ -164,10 +165,19 @@ public:
         _containsDotsAndDollarsField = val;
     }
 
+    size_t docsDeleted() const {
+        return _docsDeleted;
+    }
+
+    void incDeletedStats(size_t numDocsDeleted) {
+        _docsDeleted += numDocsDeleted;
+    };
+
 private:
     std::string _stageName;
     size_t _docsMatched{0};
     size_t _docsUpdated{0};
+    size_t _docsDeleted{0};
     bool _isModUpdate{false};
     bool _containsDotsAndDollarsField{false};
 };
