@@ -50,13 +50,17 @@ assert.eq(secondaryDb.getCollection(collName).find({}).count(), 0);
 
 configureFailPoint(primary, "holdStableTimestampAtSpecificTimestamp", {timestamp: stableTimestamp});
 
-// TODO SERVER-89921: Uncomment validateMode and secondaryIndex once the relevant tickets are
-// backported.
+// TODO SERVER-89921: Uncomment minKey, maxKey, validateMode and secondaryIndex once the relevant
+// tickets are backported.
 runDbCheck(replSet,
            primaryDb,
            collName,
            {
-               maxDocsPerBatch: 20  // , validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1"
+               maxDocsPerBatch: 20,
+               batchWriteConcern: {w: 1},
+               // minKey: {a: "0"},
+               // maxKey: {a: "199"},
+               // , validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1"
            },
            true /*awaitCompletion*/);
 

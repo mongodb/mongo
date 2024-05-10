@@ -29,6 +29,8 @@ last-continuous:
     ticket: SERVER-30832
   - test_file: jstests/replsets/ignore_dbcheck_in_initial_sync.js
     ticket: SERVER-80340
+  - test_file: jstests/replsets/dbcheck_fails_on_write_concern_error.js
+    ticket: SERVER-88318
   - test_file: jstests/sharding/query/find_and_modify_with_partial_shard_key.js
     ticket: SERVER-44422
   - test_file: jstests/sharding/query/delete_with_partial_shard_key.js
@@ -168,6 +170,8 @@ last-lts:
   all:
   - test_file: jstests/replsets/dbcheck_skip_applying_batch_on_secondary_parameter.js
     ticket: SERVER-88885
+  - test_file: jstests/replsets/dbcheck_fails_on_write_concern_error.js
+    ticket: SERVER-88318
   - test_file: jstests/replsets/ignore_dbcheck_in_startup_recovery.js
     ticket: SERVER-30832
   - test_file: jstests/replsets/ignore_dbcheck_in_rollback.js
