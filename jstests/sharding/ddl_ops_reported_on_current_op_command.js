@@ -14,7 +14,7 @@ const kCollectionName = 'test';
 const nss = kDbName + '.' + kCollectionName;
 const toNss = nss + '_renamed';
 
-let st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 2});
 
 st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName});
 
@@ -83,7 +83,7 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
     let ddlOpThread = new Thread((mongosConnString, dbName, destShard) => {
         let mongos = new Mongo(mongosConnString);
         mongos.adminCommand({movePrimary: dbName, to: destShard});
-    }, st.s0.host, kDbName, st.shard0.shardName);
+    }, st.s0.host, kDbName, st.shard1.shardName);
 
     let currOp = getCurrentOpOfDDL(ddlOpThread, 'MovePrimaryCoordinator');
 
@@ -92,7 +92,7 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
     assert.eq(kDbName, currOp[0].ns);
     assert(currOp[0].command.hasOwnProperty('request'));
     assert(currOp[0].command.request.hasOwnProperty('toShardId'));
-    assert.eq(st.shard0.shardName, currOp[0].command.request.toShardId);
+    assert.eq(st.shard1.shardName, currOp[0].command.request.toShardId);
 }
 
 {

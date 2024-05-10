@@ -48,6 +48,7 @@
 #include "mongo/db/s/move_primary_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/rpc/op_msg.h"
@@ -91,6 +92,8 @@ public:
                 ErrorCodes::InvalidOptions,
                 "cannot move primary of internal database {}"_format(dbNss.toStringForErrorMsg()),
                 !dbNss.isOnInternalDb());
+
+            sharding_ddl_util::assertDataMovementAllowed();
 
             ScopeGuard onBlockExit(
                 [&] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.dbName()); });

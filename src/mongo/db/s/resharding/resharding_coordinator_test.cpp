@@ -63,12 +63,14 @@
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -108,6 +110,7 @@ protected:
         shard1.setName("shard0001");
         shard1.setHost("shard0001:1234");
         setupShards({shard0, shard1});
+        setClusterHasTwoShards();
 
         // Create config.transactions collection
         auto opCtx = operationContext();
@@ -133,6 +136,19 @@ protected:
     void tearDown() override {
         TransactionCoordinatorService::get(operationContext())->onStepDown();
         ConfigServerTestFixture::tearDown();
+    }
+
+    void setClusterHasTwoShards() {
+        // Set the cluster cardinality parameter to true
+        ShardedClusterCardinalityParam cardinality;
+        ClusterServerParameter baseCSP;
+        baseCSP.setClusterParameterTime(LogicalTime(Timestamp(Date_t::now())));
+        baseCSP.set_id("shardedClusterCardinalityForDirectConns"_sd);
+        cardinality.setClusterServerParameter(baseCSP);
+        cardinality.setHasTwoOrMoreShards(true);
+        auto param = ServerParameterSet::getClusterParameterSet()->get(
+            "shardedClusterCardinalityForDirectConns");
+        ASSERT_OK(param->set(cardinality.toBSON(), boost::none));
     }
 
     ReshardingCoordinatorDocument makeCoordinatorDoc(

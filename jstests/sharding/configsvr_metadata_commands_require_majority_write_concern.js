@@ -134,17 +134,33 @@ let st = new ShardingTest({shards: 1});
 // enableSharding
 checkCommandMongos({enableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
 
+newShard = new ReplSetTest({nodes: 1});
+newShard.startSet({shardsvr: ''});
+newShard.initiate();
+
 // TODO SERVER-77915: remove once 8.0 becomes last-lts
 if (FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsUponCreation")) {
     // changePrimary
     checkCommandMongos({changePrimary: dbName, to: st.shard0.shardName},
-                       setupFuncs.createDatabase,
-                       cleanupFuncs.dropDatabase);
+                       function() {
+                           setupFuncs.addShard();
+                           setupFuncs.createDatabase();
+                       },
+                       function() {
+                           cleanupFuncs.dropDatabase();
+                           cleanupFuncs.removeShardIfExists();
+                       });
 } else {
     // movePrimary
     checkCommandMongos({movePrimary: dbName, to: st.shard0.shardName},
-                       setupFuncs.createDatabase,
-                       cleanupFuncs.dropDatabase);
+                       function() {
+                           setupFuncs.addShard();
+                           setupFuncs.createDatabase();
+                       },
+                       function() {
+                           cleanupFuncs.dropDatabase();
+                           cleanupFuncs.removeShardIfExists();
+                       });
 }
 
 // shardCollection
@@ -159,9 +175,6 @@ checkCommandConfigSvr({_configsvrCreateDatabase: dbName, to: st.shard0.shardName
                       cleanupFuncs.dropDatabase);
 
 // addShard
-newShard = new ReplSetTest({nodes: 1});
-newShard.startSet({shardsvr: ''});
-newShard.initiate();
 checkCommandMongos({addShard: newShard.getURL(), name: newShardName},
                    setupFuncs.noop,
                    cleanupFuncs.removeShardIfExists);

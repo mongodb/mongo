@@ -74,6 +74,7 @@
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/remove_tags_gen.h"
+#include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -803,6 +804,20 @@ void runTransactionWithStmtIdsOnShardingCatalog(
     bool useClusterTransaction = true;
     sharding_ddl_util::runTransactionOnShardingCatalog(
         opCtx, std::move(transactionChain), wc, osi, useClusterTransaction, executor);
+}
+
+void assertDataMovementAllowed() {
+    bool clusterHasTwoOrMoreShards = [&]() {
+        auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+        auto* clusterCardinalityParam =
+            clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
+                "shardedClusterCardinalityForDirectConns");
+        return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
+    }();
+
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot migrate data in a cluster before a second shard has been successfully added",
+            clusterHasTwoOrMoreShards);
 }
 
 }  // namespace sharding_ddl_util
