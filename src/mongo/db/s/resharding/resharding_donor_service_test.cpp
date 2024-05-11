@@ -111,9 +111,8 @@ public:
                                    const BSONObj& query,
                                    const BSONObj& update) override {}
 
-    void clearFilteringMetadata(OperationContext* opCtx,
-                                const NamespaceString& sourceNss,
-                                const NamespaceString& tempReshardingNss) override {}
+    void refreshCollectionPlacementInfo(OperationContext* opCtx,
+                                        const NamespaceString& sourceNss) override {}
 };
 
 class ReshardingDonorServiceForTest : public ReshardingDonorService {
