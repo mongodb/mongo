@@ -46,12 +46,15 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
@@ -183,12 +186,9 @@ public:
         }
     }
 
-    void clearFilteringMetadata(OperationContext* opCtx,
-                                const NamespaceString& sourceNss,
-                                const NamespaceString& tempReshardingNss) {
-        stdx::unordered_set<NamespaceString> namespacesToRefresh{sourceNss, tempReshardingNss};
-        resharding::clearFilteringMetadata(
-            opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);
+    void refreshCollectionPlacementInfo(OperationContext* opCtx,
+                                        const NamespaceString& sourceNss) override {
+        onCollectionPlacementVersionMismatch(opCtx, sourceNss, boost::none);
     }
 };
 
@@ -383,8 +383,16 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
 
                {
                    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                   _externalState->clearFilteringMetadata(
-                       opCtx.get(), _metadata.getSourceNss(), _metadata.getTempReshardingNss());
+                   std::initializer_list<NamespaceString> namespacesToRefresh{
+                       _metadata.getSourceNss(), _metadata.getTempReshardingNss()};
+
+                   // Clear filtering metadata for the source and temp resharding nss.
+                   for (const auto& nss : namespacesToRefresh) {
+                       AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
+                       CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                           opCtx.get(), nss)
+                           ->clearFilteringMetadata(opCtx.get());
+                   }
 
                    ShardingRecoveryService::get(opCtx.get())
                        ->releaseRecoverableCriticalSection(
@@ -395,6 +403,13 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
 
                    _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                        getCurrentTime());
+
+                   // We force a refresh to make sure that the placement information is updated in
+                   // cache after abort decision before the donor state document is deleted.
+                   for (const auto& nss : namespacesToRefresh) {
+                       _externalState->refreshCollectionPlacementInfo(opCtx.get(), nss);
+                       _externalState->waitForCollectionFlush(opCtx.get(), nss);
+                   }
                }
 
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
