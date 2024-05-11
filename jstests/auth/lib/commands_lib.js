@@ -7119,23 +7119,6 @@ export const authCommandsLib = {
           }
         },
         {
-          testname: "aggregate_$backupFileCursor",
-          command: {aggregate: 1, cursor: {}, pipeline: [{$_backupFile: {backupId: UUID()}}]},
-          skipSharded: true,
-          // Only enterprise knows of this aggregation stage.
-          skipTest:
-              (conn) =>
-                  !conn.getDB("admin").runCommand({buildInfo: 1}).modules.includes("enterprise"),
-          testcases: [{
-              runOnDb: adminDbName,
-              roles: {__system: 1},
-              privileges: [
-                  {resource: {cluster: true}, actions: ["internal"]},
-              ],
-              expectFail: true
-          }],
-        },
-        {
           testname: "aggregate_$search",
           command: {
               aggregate: "foo",
