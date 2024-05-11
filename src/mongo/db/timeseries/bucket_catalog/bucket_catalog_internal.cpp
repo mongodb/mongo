@@ -95,6 +95,46 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(alwaysUseSameBucketCatalogStripe);
 MONGO_FAIL_POINT_DEFINE(hangTimeSeriesBatchPrepareWaitingForConflictingOperation);
 
+std::string rolloverActionToString(RolloverAction action) {
+    switch (action) {
+        case RolloverAction::kNone:
+            return "kNone";
+        case RolloverAction::kArchive:
+            return "kArchive";
+        case RolloverAction::kHardClose:
+            return "kHardClose";
+        case RolloverAction::kSoftClose:
+            return "kSoftClose";
+    }
+    MONGO_UNREACHABLE;
+}
+
+void assertNoOpenUnclearedBucketsForKey(Stripe& stripe,
+                                        BucketStateRegistry& registry,
+                                        const BucketKey& key) {
+    auto it = stripe.openBucketsByKey.find(key);
+    if (it != stripe.openBucketsByKey.end()) {
+        auto& openSet = it->second;
+        for (Bucket* bucket : openSet) {
+            auto state = getBucketState(registry, bucket);
+            if (bucket->rolloverAction == RolloverAction::kNone && state &&
+                !conflictsWithInsertions(state.value())) {
+                for (Bucket* b : openSet) {
+                    LOGV2_INFO(8999000,
+                               "Dumping buckets for key",
+                               "key"_attr = key.metadata,
+                               "bucketId"_attr = b->bucketId.oid,
+                               "bucketState"_attr =
+                                   bucketStateToString(getBucketState(registry, b).value()),
+                               "rolloverAction"_attr = rolloverActionToString(b->rolloverAction));
+                }
+            }
+            invariant(bucket->rolloverAction != RolloverAction::kNone || !state ||
+                      conflictsWithInsertions(state.value()));
+        }
+    }
+}
+
 Mutex _bucketIdGenLock =
     MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "bucket_catalog_internal::_bucketIdGenLock");
 PseudoRandom _bucketIdGenPRNG(SecureRandom().nextInt64());
@@ -181,6 +221,29 @@ boost::optional<InsertWaiter> checkForWait(const Stripe& stripe,
     }
 
     return boost::none;
+}
+
+void doRollover(OperationContext* opCtx,
+                BucketCatalog& catalog,
+                Stripe& stripe,
+                WithLock stripeLock,
+                Bucket& bucket,
+                ClosedBuckets& closedBuckets,
+                RolloverAction action) {
+    invariant(action != RolloverAction::kNone);
+    if (allCommitted(bucket)) {
+        // The bucket does not contain any measurements that are yet to be committed, so we can take
+        // action now.
+        if (action == RolloverAction::kArchive) {
+            archiveBucket(opCtx, catalog, stripe, stripeLock, bucket, closedBuckets);
+        } else {
+            closeOpenBucket(opCtx, catalog, stripe, stripeLock, bucket, closedBuckets);
+        }
+    } else {
+        // We must keep the bucket around until all measurements are committed committed, just mark
+        // the action we chose now so it we know what to do when the last batch finishes.
+        bucket.rolloverAction = action;
+    }
 }
 }  // namespace
 
@@ -286,32 +349,34 @@ Bucket* useBucket(OperationContext* opCtx,
             : nullptr;
     }
 
+    absl::InlinedVector<Bucket*, 4> bucketsToCleanUp;
+    ScopeGuard cleanup{[&]() {
+        for (Bucket* bucket : bucketsToCleanUp) {
+            abort(catalog,
+                  stripe,
+                  stripeLock,
+                  *bucket,
+                  nullptr,
+                  getTimeseriesBucketClearedError(nss, bucket->bucketId.oid));
+        }
+    }};
+
     auto& openSet = it->second;
-    Bucket* bucket = nullptr;
     for (Bucket* potentialBucket : openSet) {
         if (potentialBucket->rolloverAction == RolloverAction::kNone) {
-            bucket = potentialBucket;
-            break;
+            auto state = getBucketState(catalog.bucketStateRegistry, potentialBucket);
+            if (state && !conflictsWithInsertions(state.value())) {
+                markBucketNotIdle(stripe, stripeLock, *potentialBucket);
+                return potentialBucket;
+            } else if (state) {
+                bucketsToCleanUp.push_back(potentialBucket);
+            } else {
+                // If state is missing, it was already aborted and is just waiting to be cleaned up
+                // after the prepared batch is resolved.
+                invariant(potentialBucket->preparedBatch);
+            }
         }
     }
-    if (!bucket) {
-        return mode == AllowBucketCreation::kYes
-            ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info, time)
-            : nullptr;
-    }
-
-    if (auto state = getBucketState(catalog.bucketStateRegistry, bucket);
-        state && !conflictsWithInsertions(state.value())) {
-        markBucketNotIdle(stripe, stripeLock, *bucket);
-        return bucket;
-    }
-
-    abort(catalog,
-          stripe,
-          stripeLock,
-          *bucket,
-          nullptr,
-          getTimeseriesBucketClearedError(nss, bucket->bucketId.oid));
 
     return mode == AllowBucketCreation::kYes
         ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info, time)
@@ -329,6 +394,18 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
         // No open bucket for this metadata.
         return nullptr;
     }
+
+    absl::InlinedVector<Bucket*, 4> bucketsToCleanUp;
+    ScopeGuard cleanup{[&]() {
+        for (Bucket* bucket : bucketsToCleanUp) {
+            abort(catalog,
+                  stripe,
+                  stripeLock,
+                  *bucket,
+                  nullptr,
+                  getTimeseriesBucketClearedError(nss, bucket->bucketId.oid));
+        }
+    }};
 
     auto& openSet = it->second;
     // In order to potentially erase elements of the set while we iterate it (via _abort), we need
@@ -349,20 +426,16 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
         }
 
         auto state = getBucketState(catalog.bucketStateRegistry, potentialBucket);
-        invariant(state);
-        if (!conflictsWithInsertions(state.value())) {
+        if (state && !conflictsWithInsertions(state.value())) {
             invariant(!potentialBucket->idleListEntry.has_value());
             return potentialBucket;
-        }
-
-        // Clean up the bucket if it has been cleared.
-        if (state && (isBucketStateCleared(state.value()) || isBucketStateFrozen(state.value()))) {
-            abort(catalog,
-                  stripe,
-                  stripeLock,
-                  *potentialBucket,
-                  nullptr,
-                  getTimeseriesBucketClearedError(nss, potentialBucket->bucketId.oid));
+        } else if (state) {
+            // Clean up the bucket if it has been cleared.
+            bucketsToCleanUp.push_back(potentialBucket);
+        } else {
+            // If state is missing, it was already aborted and is just waiting to be cleaned up
+            // after the prepared batch is resolved.
+            invariant(potentialBucket->preparedBatch);
         }
     }
 
@@ -588,6 +661,9 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
     }
 
     // Now actually mark this bucket as open.
+    if constexpr (kDebugBuild) {
+        assertNoOpenUnclearedBucketsForKey(stripe, catalog.bucketStateRegistry, key);
+    }
     stripe.openBucketsByKey[key].emplace(unownedBucket);
     stats.incNumBucketsReopened();
 
@@ -646,7 +722,9 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     AllowBucketCreation mode,
     InsertContext& insertContext,
     Bucket& existingBucket,
-    const Date_t& time) {
+    const Date_t& time,
+    Bucket* excludedBucket,
+    boost::optional<RolloverAction> excludedAction) {
     Bucket::NewFieldNames newFieldNamesToBeInserted;
     Sizes sizesToBeAdded;
 
@@ -670,8 +748,16 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
             return reason;
         } else if (action != RolloverAction::kNone) {
             openedDueToMetadata = false;
-            bucketToUse = rollover(
-                opCtx, catalog, stripe, stripeLock, existingBucket, insertContext, action, time);
+            bucketToUse = rollover(opCtx,
+                                   catalog,
+                                   stripe,
+                                   stripeLock,
+                                   existingBucket,
+                                   insertContext,
+                                   action,
+                                   time,
+                                   excludedBucket,
+                                   excludedAction);
             isNewlyOpenedBucket = true;
         }
     }
@@ -1181,6 +1267,9 @@ Bucket& allocateBucket(OperationContext* opCtx,
             inserted);
 
     Bucket* bucket = it->second.get();
+    if constexpr (kDebugBuild) {
+        assertNoOpenUnclearedBucketsForKey(stripe, catalog.bucketStateRegistry, info.key);
+    }
     stripe.openBucketsByKey[info.key].emplace(bucket);
 
     auto status = initializeBucketState(catalog.bucketStateRegistry, bucket->bucketId);
@@ -1207,20 +1296,19 @@ Bucket& rollover(OperationContext* opCtx,
                  Bucket& bucket,
                  InsertContext& info,
                  RolloverAction action,
-                 const Date_t& time) {
-    invariant(action != RolloverAction::kNone);
-    if (allCommitted(bucket)) {
-        // The bucket does not contain any measurements that are yet to be committed, so we can take
-        // action now.
-        if (action == RolloverAction::kArchive) {
-            archiveBucket(opCtx, catalog, stripe, stripeLock, bucket, info.closedBuckets);
-        } else {
-            closeOpenBucket(opCtx, catalog, stripe, stripeLock, bucket, info.closedBuckets);
-        }
-    } else {
-        // We must keep the bucket around until all measurements are committed committed, just mark
-        // the action we chose now so it we know what to do when the last batch finishes.
-        bucket.rolloverAction = action;
+                 const Date_t& time,
+                 Bucket* additionalBucket,
+                 boost::optional<RolloverAction> additionalAction) {
+    doRollover(opCtx, catalog, stripe, stripeLock, bucket, info.closedBuckets, action);
+    if (additionalBucket) {
+        invariant(additionalAction.has_value());
+        doRollover(opCtx,
+                   catalog,
+                   stripe,
+                   stripeLock,
+                   *additionalBucket,
+                   info.closedBuckets,
+                   additionalAction.value());
     }
 
     return allocateBucket(opCtx, catalog, stripe, stripeLock, info, time);
