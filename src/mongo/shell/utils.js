@@ -51,22 +51,19 @@ function _getErrorWithCode(codeOrObj, message) {
 /**
  * Executes the specified function and retries it if it fails due to retryable error.
  * If it exhausts the number of allowed retries, it simply throws the last exception.
- * Additional error codes can also be specified to be retried.
  *
  * Returns the return value of the input call.
  */
 
-function retryOnRetryableError(func, numRetries, sleepMs, additionalCodesToRetry) {
+function retryOnRetryableError(func, numRetries, sleepMs) {
     numRetries = numRetries || 1;
     sleepMs = sleepMs || 1000;
-    additionalCodesToRetry = additionalCodesToRetry || [];
 
     while (true) {
         try {
             return func();
         } catch (e) {
-            if ((isRetryableError(e) || hasErrorCode(e, additionalCodesToRetry)) &&
-                numRetries > 0) {
+            if (isRetryableError(e) && numRetries > 0) {
                 print("An error occurred and the call will be retried: " +
                       tojson({error: e.toString(), stack: e.stack}));
                 numRetries--;
@@ -189,29 +186,6 @@ function isRetryableError(errorOrResponse) {
 
     // Otherwise fall back to checking by scalar value
     return ErrorCodes.isRetriableError(errorOrResponse);
-}
-
-/**
- * Determine if a provided command response has any of the given error codes.
- * @param {object} response A command response.
- * @param {Array} errorCodes A list of error codes to check.
- */
-function hasErrorCode(response, errorCodes) {
-    // Check if this is a command response, if so determine a match by checking the error code
-    // in the response.
-    if (errorCodes.some(code => response.code == code)) {
-        return true;
-    }
-
-    if (response.writeErrors) {
-        for (let writeError of response.writeErrors) {
-            if (errorCodes.some(code => writeError.code == code)) {
-                return true;
-            }
-        }
-    }
-
-    return false;
 }
 
 /**
