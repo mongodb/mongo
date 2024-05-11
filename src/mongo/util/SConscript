@@ -806,9 +806,7 @@ icuEnv.Library(
 
 icuEnv.Library(
     target='icu',
-    source=[
-        'icu.cpp',
-    ],
+    source=['icu.cpp', '../../third_party/node/icu_get_string_width.cpp'],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/third_party/shim_icu',

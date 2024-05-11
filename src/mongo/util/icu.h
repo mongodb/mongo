@@ -59,4 +59,7 @@ StatusWith<std::string> icuSaslPrep(StringData str, UStringPrepOptions = kUStrin
  */
 StatusWith<std::string> icuX509DNPrep(StringData str);
 
+// Similar to mk_wcswidth, but use the larger unicode database for character lookup.
+int icuGetStringWidth(StringData str, bool ambiguousAsFullWidth, bool expandEmojiSequence);
+
 }  // namespace mongo

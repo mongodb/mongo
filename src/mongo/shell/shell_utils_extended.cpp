@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/exception.hpp>
 #include <boost/filesystem/file_status.hpp>
@@ -52,7 +51,6 @@
 
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_bin_util.h"
 #include "mongo/bson/bson_validate.h"
@@ -67,6 +65,7 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/icu.h"
 #include "mongo/util/md5.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/net/socket_utils.h"
@@ -635,6 +634,14 @@ BSONObj shellGetEnv(const BSONObj& a, void*) {
     return BSON("" << result.c_str());
 }
 
+BSONObj getStringWidth(const BSONObj& a, void* data) {
+    uassert(8730901,
+            "getStringWidth takes a single string argument",
+            a.nFields() == 1 && a.firstElementType() == String);
+    const auto str = a.firstElement().valueStringData();
+    int width = icuGetStringWidth(str, false, true);
+    return BSON("" << width);
+}
 
 }  // namespace
 
@@ -661,6 +668,7 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("_readDumpFile", readDumpFile);
     scope.injectNative("_getEnv", shellGetEnv);
     scope.injectNative("writeBsonArrayToFile", writeBsonArrayToFile);
+    scope.injectNative("getStringWidth", getStringWidth);
 }
 
 }  // namespace shell_utils
