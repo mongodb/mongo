@@ -576,7 +576,7 @@ export const runner = (function() {
             workloads, context, executionOptions, true /* applyMultipliers */);
         var threadMgr = new ThreadManager(clusterOptions);
 
-        var cluster = new Cluster(clusterOptions);
+        var cluster = new Cluster(clusterOptions, executionOptions.sessionOptions);
         cluster.setup();
 
         // Clean up the state left behind by other tests in the concurrency suite

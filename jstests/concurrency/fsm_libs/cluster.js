@@ -4,9 +4,9 @@
 import {FSMShardingTest} from "jstests/concurrency/fsm_libs/shard_fixture.js";
 import {validateCollections} from "jstests/hooks/validate_collections.js";
 
-export const Cluster = function(options) {
+export const Cluster = function(clusterOptions, sessionOptions) {
     if (!(this instanceof Cluster)) {
-        return new Cluster(options);
+        return new Cluster(clusterOptions);
     }
 
     function getObjectKeys(obj) {
@@ -158,6 +158,7 @@ export const Cluster = function(options) {
     }
 
     var conn;
+    var session;
     var secondaryConns;
 
     var st;
@@ -170,25 +171,25 @@ export const Cluster = function(options) {
     var replSets = [];
     var rst;
 
-    validateClusterOptions(options);
-    Object.freeze(options);
+    validateClusterOptions(clusterOptions);
+    Object.freeze(clusterOptions);
 
-    this.setup = function setup() {
+    this.setup = async function setup() {
         var verbosityLevel = 0;
 
         if (initialized) {
             throw new Error('cluster has already been initialized');
         }
 
-        if (options.sharded.enabled) {
+        if (clusterOptions.sharded.enabled) {
             st = new FSMShardingTest(`mongodb://${db.getMongo().host}`);
 
             conn = st.s(0);  // First mongos
 
             this.teardown = function teardown() {
-                options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
-                options.teardownFunctions.mongos.forEach(this.executeOnMongosNodes);
-                options.teardownFunctions.config.forEach(this.executeOnConfigNodes);
+                clusterOptions.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
+                clusterOptions.teardownFunctions.mongos.forEach(this.executeOnMongosNodes);
+                clusterOptions.teardownFunctions.config.forEach(this.executeOnConfigNodes);
             };
 
             this.reestablishConnectionsAfterFailover = function() {
@@ -220,7 +221,7 @@ export const Cluster = function(options) {
                 replSets.push(rs);
             }
 
-        } else if (options.replication.enabled) {
+        } else if (clusterOptions.replication.enabled) {
             rst = new ReplSetTest(db.getMongo().host);
 
             conn = rst.getPrimary();
@@ -228,7 +229,7 @@ export const Cluster = function(options) {
             replSets = [rst];
 
             this.teardown = function teardown() {
-                options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
+                clusterOptions.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
             };
 
             this._addReplicaSetConns(rst);
@@ -240,13 +241,29 @@ export const Cluster = function(options) {
             _conns.mongod = [conn];
         }
 
+        if (typeof sessionOptions !== 'undefined') {
+            session = conn.startSession(sessionOptions);
+            const readPreference = session.getOptions().getReadPreference();
+            if (readPreference && readPreference.mode === 'secondary') {
+                // Unset the explicit read preference so set_read_preference_secondary.js can do
+                // the right thing based on the DB.
+                session.getOptions().setReadPreference(undefined);
+
+                // We import set_read_preference_secondary.js in order to avoid running
+                // commands against the "admin" and "config" databases via mongos with
+                // readPreference={mode: "secondary"} when there's only a single node in
+                // the CSRS.
+                await import("jstests/libs/override_methods/set_read_preference_secondary.js");
+            }
+        }
+
         initialized = true;
         clusterStartTime = new Date();
 
-        options.setupFunctions.mongod.forEach(this.executeOnMongodNodes);
-        options.setupFunctions.config.forEach(this.executeOnConfigNodes);
-        if (options.sharded) {
-            options.setupFunctions.mongos.forEach(this.executeOnMongosNodes);
+        clusterOptions.setupFunctions.mongod.forEach(this.executeOnMongodNodes);
+        clusterOptions.setupFunctions.config.forEach(this.executeOnConfigNodes);
+        if (clusterOptions.sharded) {
+            clusterOptions.setupFunctions.mongos.forEach(this.executeOnMongosNodes);
         }
     };
 
@@ -310,11 +327,14 @@ export const Cluster = function(options) {
 
     this.teardown = function teardown() {
         assert(initialized, 'cluster must be initialized first');
-        options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
+        clusterOptions.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
     };
 
     this.getDB = function getDB(dbName) {
         assert(initialized, 'cluster must be initialized first');
+        if (session) {
+            return session.getDatabase(dbName);
+        }
         return conn.getDB(dbName);
     };
 
@@ -346,19 +366,19 @@ export const Cluster = function(options) {
 
     this.getReplSetNumNodes = function getReplSetNumNodes() {
         assert(this.isReplication() && !this.isSharded(), 'cluster must be a replica set');
-        return options.replication.numNodes;
+        return clusterOptions.replication.numNodes;
     };
 
     this.isSharded = function isSharded() {
-        return Cluster.isSharded(options);
+        return Cluster.isSharded(clusterOptions);
     };
 
     this.isReplication = function isReplication() {
-        return Cluster.isReplication(options);
+        return Cluster.isReplication(clusterOptions);
     };
 
     this.isStandalone = function isStandalone() {
-        return Cluster.isStandalone(options);
+        return Cluster.isStandalone(clusterOptions);
     };
 
     this.shardCollection = function shardCollection() {
@@ -451,7 +471,7 @@ export const Cluster = function(options) {
     };
 
     this.isBalancerEnabled = function isBalancerEnabled() {
-        return this.isSharded() && options.sharded.enableBalancer;
+        return this.isSharded() && clusterOptions.sharded.enableBalancer;
     };
 
     this.validateAllCollections = function validateAllCollections(phase) {
@@ -548,7 +568,7 @@ export const Cluster = function(options) {
     };
 
     this.shouldPerformContinuousStepdowns = function shouldPerformContinuousStepdowns() {
-        return this.isSharded() && (typeof options.sharded.stepdownOptions !== 'undefined');
+        return this.isSharded() && (typeof clusterOptions.sharded.stepdownOptions !== 'undefined');
     };
 
     /*
@@ -569,12 +589,12 @@ export const Cluster = function(options) {
 
     this.isSteppingDownConfigServers = function isSteppingDownConfigServers() {
         return this.shouldPerformContinuousStepdowns() &&
-            options.sharded.stepdownOptions.configStepdown;
+            clusterOptions.sharded.stepdownOptions.configStepdown;
     };
 
     this.isSteppingDownShards = function isSteppingDownShards() {
         return this.shouldPerformContinuousStepdowns() &&
-            options.sharded.stepdownOptions.shardStepdown;
+            clusterOptions.sharded.stepdownOptions.shardStepdown;
     };
 
     this.awaitReplication = () => {
