@@ -170,9 +170,8 @@ Stripe::Stripe(TrackingContexts& trackingContexts)
     : openBucketsById(
           make_tracked_unordered_map<BucketId, unique_tracked_ptr<Bucket>, BucketHasher>(
               getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
-      openBucketsByKey(
-          make_tracked_unordered_map<BucketKey, tracked_flat_hash_set<Bucket*>, BucketHasher>(
-              getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsByKey))),
+      openBucketsByKey(make_tracked_unordered_map<BucketKey, tracked_set<Bucket*>, BucketHasher>(
+          getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsByKey))),
       idleBuckets(make_tracked_list<Bucket*>(
           getTrackingContext(trackingContexts, TrackingScope::kIdleBuckets))),
       archivedBuckets(
@@ -326,9 +325,7 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                             internal::AllowBucketCreation::kNo,
                                             insertContext,
                                             *bucket,
-                                            time,
-                                            nullptr,
-                                            boost::none);
+                                            time);
     // If our insert was successful, return a SuccessfulInsertion with our
     // WriteBatch.
     if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
@@ -355,11 +352,7 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                                internal::AllowBucketCreation::kNo,
                                                insertContext,
                                                *alternate,
-                                               time,
-                                               bucket,
-                                               *reason == RolloverReason::kTimeBackward
-                                                   ? RolloverAction::kArchive
-                                                   : RolloverAction::kSoftClose);
+                                               time);
             if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
                 return SuccessfulInsertion{std::move(*batch),
                                            std::move(insertContext.closedBuckets)};
@@ -458,9 +451,7 @@ StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
                                                     internal::AllowBucketCreation::kYes,
                                                     insertContext,
                                                     bucket,
-                                                    time,
-                                                    nullptr,
-                                                    boost::none);
+                                                    time);
             auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
             invariant(batch);
             return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
@@ -493,9 +484,7 @@ StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
                                             internal::AllowBucketCreation::kYes,
                                             insertContext,
                                             *bucket,
-                                            time,
-                                            nullptr,
-                                            boost::none);
+                                            time);
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);
     return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
@@ -531,9 +520,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                             internal::AllowBucketCreation::kYes,
                                             insertContext,
                                             *bucket,
-                                            time,
-                                            nullptr,
-                                            boost::none);
+                                            time);
 
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);

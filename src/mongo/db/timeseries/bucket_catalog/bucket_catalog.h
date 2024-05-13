@@ -157,7 +157,7 @@ struct Stripe {
 
     // All buckets currently open in the catalog, including buckets which are full or pending
     // closure but not yet committed, indexed by BucketKey. Non-owning pointers.
-    tracked_unordered_map<BucketKey, tracked_flat_hash_set<Bucket*>, BucketHasher> openBucketsByKey;
+    tracked_unordered_map<BucketKey, tracked_set<Bucket*>, BucketHasher> openBucketsByKey;
 
     // Open buckets that do not have any outstanding writes.
     using IdleList = tracked_list<Bucket*>;
