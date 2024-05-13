@@ -240,8 +240,6 @@ public:
     void serialize(StringData field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
-
-    BSONObj toBSON() const;
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ChunkVersion& v) {

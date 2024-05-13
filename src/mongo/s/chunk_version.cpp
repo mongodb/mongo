@@ -78,12 +78,4 @@ std::string ChunkVersion::toString() const {
                          << _timestamp.toString();
 }
 
-BSONObj ChunkVersion::toBSON() const {
-    BSONObjBuilder builder;
-    builder.append("majorVersion", static_cast<int64_t>(majorVersion()));
-    builder.append("minorVersion", static_cast<int64_t>(minorVersion()));
-    builder.append("epoch", _epoch);
-    builder.append("timestamp", _timestamp);
-    return builder.obj();
-}
 }  // namespace mongo
