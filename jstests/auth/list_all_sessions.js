@@ -38,15 +38,13 @@ function runListAllSessionsTest(mongod) {
     // Ensure that the cache now contains the session and is visible by admin
     admin.logout();
     assert(admin.auth('admin', 'pass'));
-    const resultArray =
-        config.system.sessions
-            .aggregate(
-                [{'$listSessions': {allUsers: true}}, {'$sort': {lastUse: -1}}, {'$limit': 1}])
-            .toArray();
+    const resultArray = config.system.sessions.aggregate([{'$listSessions': {allUsers: true}}])
+                            .toArray()
+                            .filter((session) => {
+                                assert(session._id.id !== undefined);
+                                return 0 == bsonWoCompare({y: myid}, {y: session._id.id});
+                            });
     assert.eq(resultArray.length, 1);
-    const cacheid = resultArray[0]._id.id;
-    assert(cacheid !== undefined);
-    assert.eq(0, bsonWoCompare({x: cacheid}, {x: myid}));
 
     // Make sure pipelining other collections fail.
     assertErrorCode(admin.system.collections, pipeline, ErrorCodes.InvalidNamespace);
