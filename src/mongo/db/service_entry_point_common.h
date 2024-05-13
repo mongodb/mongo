@@ -45,7 +45,6 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
-#include "mongo/util/polymorphic_scoped.h"
 
 namespace mongo {
 
@@ -93,13 +92,13 @@ struct ServiceEntryPointCommon {
 
         virtual void attachCurOpErrInfo(OperationContext* opCtx, Status status) const = 0;
 
-        virtual bool refreshDatabase(OperationContext* opCtx,
-                                     const StaleDbRoutingVersion& se) const noexcept = 0;
+        virtual Status refreshDatabase(OperationContext* opCtx,
+                                       const StaleDbRoutingVersion& se) const noexcept = 0;
 
-        virtual bool refreshCollection(OperationContext* opCtx,
-                                       const StaleConfigInfo& se) const noexcept = 0;
+        virtual Status refreshCollection(OperationContext* opCtx,
+                                         const StaleConfigInfo& se) const noexcept = 0;
 
-        virtual bool refreshCatalogCache(
+        virtual Status refreshCatalogCache(
             OperationContext* opCtx,
             const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) const noexcept = 0;
 
@@ -107,9 +106,6 @@ struct ServiceEntryPointCommon {
             OperationContext* opCtx, const StaleConfigInfo& se) const noexcept = 0;
 
         virtual void resetLockerState(OperationContext* opCtx) const noexcept = 0;
-
-        MONGO_WARN_UNUSED_RESULT_FUNCTION virtual std::unique_ptr<PolymorphicScoped>
-        scopedOperationCompletionShardingActions(OperationContext* opCtx) const = 0;
 
         virtual void appendReplyMetadata(OperationContext* opCtx,
                                          const CommonRequestArgs& requestArgs,

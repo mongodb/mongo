@@ -80,6 +80,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(alwaysThrowStaleConfigInfo);
+
 class UntrackedCollection : public ScopedCollectionDescription::Impl {
 public:
     UntrackedCollection() = default;
@@ -486,6 +488,14 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     const auto& receivedShardVersion = optReceivedShardVersion
         ? *optReceivedShardVersion
         : ShardVersionPlacementIgnoredNoIndexes();
+
+    alwaysThrowStaleConfigInfo.execute([&](const auto&) {
+        uasserted(StaleConfigInfo(_nss,
+                                  receivedShardVersion,
+                                  boost::none /* wantedVersion */,
+                                  ShardingState::get(opCtx)->shardId()),
+                  "Failing with StaleConfig as alwaysThrowStaleConfigInfo is enabled");
+    });
 
     {
         auto criticalSectionSignal =

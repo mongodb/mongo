@@ -49,6 +49,8 @@ last-continuous:
       ticket: SERVER-89395
     - test_file: jstests/core/query/explain/explain_skip.js
       ticket: SERVER-88949
+    - test_file: jstests/sharding/transactions_stale_shard_version_errors.js
+      ticket: SERVER-84623
     - test_file: jstests/core/timeseries/timeseries_geonear_lookup.js
       ticket: SERVER-81454
     - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
@@ -126,6 +128,8 @@ last-lts:
       ticket: SERVER-89395
     - test_file: jstests/core/query/explain/explain_skip.js
       ticket: SERVER-88949
+    - test_file: jstests/sharding/transactions_stale_shard_version_errors.js
+      ticket: SERVER-84623
     - test_file: jstests/core/timeseries/timeseries_geonear_lookup.js
       ticket: SERVER-81454
     - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js

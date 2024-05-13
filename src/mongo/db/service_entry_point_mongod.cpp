@@ -56,7 +56,6 @@
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
-#include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_entry_point_common.h"
@@ -87,7 +86,6 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/namespace_string_util.h"
-#include "mongo/util/polymorphic_scoped.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -285,25 +283,24 @@ public:
         }
     }
 
-    bool refreshDatabase(OperationContext* opCtx,
-                         const StaleDbRoutingVersion& se) const noexcept override {
-        return onDbVersionMismatchNoExcept(opCtx, se.getDb(), se.getVersionReceived()).isOK();
+    Status refreshDatabase(OperationContext* opCtx,
+                           const StaleDbRoutingVersion& se) const noexcept override {
+        return onDbVersionMismatchNoExcept(opCtx, se.getDb(), se.getVersionReceived());
     }
 
-    bool refreshCollection(OperationContext* opCtx,
-                           const StaleConfigInfo& se) const noexcept override {
+    Status refreshCollection(OperationContext* opCtx,
+                             const StaleConfigInfo& se) const noexcept override {
         return onCollectionPlacementVersionMismatchNoExcept(
-                   opCtx, se.getNss(), se.getVersionReceived().placementVersion())
-            .isOK();
+            opCtx, se.getNss(), se.getVersionReceived().placementVersion());
     }
 
-    bool refreshCatalogCache(
+    Status refreshCatalogCache(
         OperationContext* opCtx,
         const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) const noexcept override {
         return Grid::get(opCtx)
             ->catalogCache()
             ->getCollectionRoutingInfo(opCtx, refreshInfo.getNss())
-            .isOK();
+            .getStatus();
     }
 
     void handleReshardingCriticalSectionMetrics(OperationContext* opCtx,
@@ -322,11 +319,6 @@ public:
         invariant(!shard_role_details::getLocker(opCtx)->isLocked());
         shard_role_details::swapLocker(
             opCtx, std::make_unique<Locker>(opCtx->getServiceContext()), lk);
-    }
-
-    std::unique_ptr<PolymorphicScoped> scopedOperationCompletionShardingActions(
-        OperationContext* opCtx) const override {
-        return std::make_unique<ScopedOperationCompletionShardingActions>(opCtx);
     }
 };
 

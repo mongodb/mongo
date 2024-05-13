@@ -65,7 +65,9 @@ const OperationContext::Decoration<OperationShardingState> shardingMetadataDecor
 OperationShardingState::OperationShardingState() = default;
 
 OperationShardingState::~OperationShardingState() {
-    invariant(!_shardingOperationFailedStatus);
+    tassert(8462311,
+            "Expected to have handled the sharding op failed status",
+            !_shardingOperationFailedStatus);
 }
 
 OperationShardingState& OperationShardingState::get(OperationContext* opCtx) {

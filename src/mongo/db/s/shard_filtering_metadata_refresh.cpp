@@ -262,6 +262,10 @@ void onDbVersionMismatch(OperationContext* opCtx,
     invariant(!opCtx->getClient()->isInDirectClient());
     ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
+    if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
+        uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
+    }
+
     using namespace fmt::literals;
     tassert(ErrorCodes::IllegalOperation,
             "Can't check version of {} database"_format(dbName.toStringForErrorMsg()),
@@ -541,6 +545,10 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
     ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+
+    if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
+        uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
+    }
 
     Timer t{};
     ScopeGuard finishTiming([&] {
