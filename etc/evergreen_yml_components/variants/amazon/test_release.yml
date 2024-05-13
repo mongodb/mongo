@@ -299,7 +299,8 @@ buildvariants:
         distros:
           - amazon2023.0-arm64-large
 
-  - name: enterprise-amazon2023-arm64
+  - &enterprise-amazon2023-arm64-template
+    name: enterprise-amazon2023-arm64
     display_name: "Enterprise Amazon Linux 2023 arm64"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -442,3 +443,21 @@ buildvariants:
           - amazon2-latest-large
       - name: streams
       - name: streams_kafka
+
+  - <<: *enterprise-amazon2023-arm64-template
+    name: enterprise-amazon2023-arm64-fuzzers
+    display_name: "Enterprise Amazon Linux 2023 arm64 Fuzzers"
+    tags: []
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+      - name: archive_dist_test_debug
+        variant: enterprise-amazon2023-arm64
+    tasks:
+      - name: .aggfuzzer !.multiversion
+      - name: .change_stream_fuzzer
+      - name: .query_fuzzer
+      - name: .updatefuzzer !.multiversion
