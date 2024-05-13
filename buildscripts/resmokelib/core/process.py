@@ -18,8 +18,7 @@ from shlex import quote
 
 import psutil
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import errors, utils
 from buildscripts.resmokelib.core import pipe
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 

@@ -6,20 +6,19 @@ Handles all the nitty-gritty parameter conversion.
 import json
 import os
 import os.path
+from typing import Tuple, Any
 from packaging import version
 import re
 import stat
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.core import process
-from buildscripts.resmokelib.core import network
+from buildscripts.resmokelib import config, utils
+from buildscripts.resmokelib.core import process, network
 from buildscripts.resmokelib.testing.fixtures import standalone, shardedcluster
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.utils.history import make_historic, HistoryDict
 
 
-def make_process(*args, **kwargs):
+def make_process(*args, **kwargs) -> process.Process:
     """Set up the environment for subprocesses."""
     process_cls = process.Process
 
@@ -210,7 +209,8 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     return make_process(logger, args, **process_kwargs), final_mongos_options
 
 
-def mongot_program(logger, job_num, executable=None, process_kwargs=None, mongot_options=None):
+def mongot_program(logger, job_num, executable=None, process_kwargs=None,
+                   mongot_options=None) -> Tuple[process.Process, Any]:
     """Return a Process instance that starts a mongot."""
     args = [executable]
     mongot_options = mongot_options.copy()
@@ -222,7 +222,7 @@ def mongot_program(logger, job_num, executable=None, process_kwargs=None, mongot
 
 
 def mongo_shell_program(logger, executable=None, connection_string=None, filename=None,
-                        test_filename=None, process_kwargs=None, **kwargs):
+                        test_filename=None, process_kwargs=None, **kwargs) -> process.Process:
     """Return a Process instance that starts a mongo shell.
 
     The shell is started with the given connection string and arguments constructed from 'kwargs'.
@@ -496,7 +496,8 @@ def _format_shell_vars(sb, paths, value):
         _format_shell_vars(sb, paths + [subkey], value[subkey])
 
 
-def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **kwargs):
+def dbtest_program(logger, executable=None, suites=None, process_kwargs=None,
+                   **kwargs) -> process.Process:
     """Return a Process instance that starts a dbtest with arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_DBTEST_EXECUTABLE)
@@ -515,14 +516,14 @@ def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **
     return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
 
 
-def genny_program(logger, executable=None, process_kwargs=None, **kwargs):
+def genny_program(logger, executable=None, process_kwargs=None, **kwargs) -> process.Process:
     """Return a Process instance that starts a genny executable with arguments constructed from 'kwargs'."""
     executable = utils.default_if_none(executable, config.DEFAULT_GENNY_EXECUTABLE)
     args = [executable]
     return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
 
 
-def generic_program(logger, args, process_kwargs=None, **kwargs):
+def generic_program(logger, args, process_kwargs=None, **kwargs) -> process.Process:
     """Return a Process instance that starts an arbitrary executable.
 
     The executable arguments are constructed from 'kwargs'.

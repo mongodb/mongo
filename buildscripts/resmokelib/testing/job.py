@@ -67,7 +67,7 @@ class Job(object):
         # Drain the queue to unblock the main thread.
         Job._drain_queue(queue)
 
-    def __call__(
+    def start(
             self,
             queue: 'TestQueue[Union[QueueElemRepeatTime, QueueElem]]',
             interrupt_flag: threading.Event,

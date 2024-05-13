@@ -178,7 +178,7 @@ class TestSuiteExecutor(object):
             # Run each Job instance in its own thread.
             for job in self._jobs:
                 thr = threading.Thread(
-                    target=job, args=(test_queue, interrupt_flag), kwargs=dict(
+                    target=job.start, args=(test_queue, interrupt_flag), kwargs=dict(
                         parent_context=context.get_current(),
                         setup_flag=setup_flag,
                         teardown_flag=teardown_flag,

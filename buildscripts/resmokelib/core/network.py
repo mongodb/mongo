@@ -58,7 +58,7 @@ class PortAllocator(object):
 
     @classmethod
     @_check_port
-    def next_fixture_port(cls, job_num):
+    def next_fixture_port(cls, job_num: int) -> int:
         """Return the next port for a fixture to use.
 
         Raises a PortAllocationError if the fixture has requested more
@@ -81,7 +81,7 @@ class PortAllocator(object):
 
     @classmethod
     @_check_port
-    def min_test_port(cls, job_num):
+    def min_test_port(cls, job_num: int) -> int:
         """Return the lowest port that is reserved for use by tests, for specified job.
 
         Raises a PortAllocationError if that port is higher than the
@@ -91,7 +91,7 @@ class PortAllocator(object):
 
     @classmethod
     @_check_port
-    def max_test_port(cls, job_num):
+    def max_test_port(cls, job_num: int) -> int:
         """Return the highest port that is reserved for use by tests, for specified job.
 
         Raises a PortAllocationError if that port is higher than the

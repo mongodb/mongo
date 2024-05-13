@@ -227,7 +227,7 @@ class TestFixtureSetupAndTeardown(unittest.TestCase):
         setup_flag = threading.Event()
         teardown_flag = threading.Event()
 
-        self.__job_object(queue, interrupt_flag, self.__context, setup_flag, teardown_flag)
+        self.__job_object.start(queue, interrupt_flag, self.__context, setup_flag, teardown_flag)
 
         self.assertEqual(setup_succeeded, not interrupt_flag.is_set())
         self.assertEqual(setup_succeeded, not setup_flag.is_set())

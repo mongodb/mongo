@@ -1,6 +1,4 @@
 """The unittest.TestCase for JavaScript tests."""
-import unittest
-
 import copy
 import os
 import os.path
@@ -8,13 +6,10 @@ import sys
 import shutil
 import threading
 import uuid
+from typing import Optional
 from bson.objectid import ObjectId
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import logging
-from buildscripts.resmokelib import utils
-from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import config, core, logging, utils, errors
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import registry
 
@@ -24,18 +19,20 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self, logger, js_filename, _id, shell_executable=None, shell_options=None):
+    def __init__(self, logger: logging.Logger, js_filename: str, _id: uuid.UUID,
+                 shell_executable: Optional[str] = None, shell_options: Optional[dict] = None):
         """Initialize the _SingleJSTestCase with the JS file to run."""
         interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
 
         # Command line options override the YAML configuration.
-        self.shell_executable = utils.default_if_none(config.MONGO_EXECUTABLE, shell_executable)
+        self.shell_executable: Optional[str] = utils.default_if_none(config.MONGO_EXECUTABLE,
+                                                                     shell_executable)
 
         self.js_filename = js_filename
         self._id = _id
-        self.shell_options = utils.default_if_none(shell_options, {}).copy()
+        self.shell_options: dict = utils.default_if_none(shell_options, {}).copy()
 
-    def configure(self, fixture, *args, **kwargs):
+    def configure(self, fixture: "interface.Fixture", *args, **kwargs):
         """Configure the jstest."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
@@ -100,7 +97,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
         self.shell_options["process_kwargs"] = process_kwargs
 
-    def _get_data_dir(self, global_vars):
+    def _get_data_dir(self, global_vars: dict) -> str:
         """Return the value that mongo shell should set for the MongoRunner.dataDir property."""
         # Command line options override the YAML configuration.
         data_dir_prefix = utils.default_if_none(config.DBPATH_PREFIX,
@@ -110,7 +107,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
             os.path.join(data_dir_prefix, "job%d" % self.fixture.job_num,
                          config.MONGO_RUNNER_SUBDIR))
 
-    def _make_process(self):
+    def _make_process(self) -> "process.Process":
         return core.programs.mongo_shell_program(
             self.logger, executable=self.shell_executable, filename=self.js_filename,
             connection_string=self.fixture.get_shell_connection_url(), **self.shell_options)
@@ -119,23 +116,24 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 class JSTestCaseBuilder(interface.TestCaseFactory):
     """Build the real TestCase in the JSTestCase wrapper."""
 
-    def __init__(self, logger, js_filename, test_id, shell_executable=None, shell_options=None):
+    def __init__(self, logger: logging.Logger, js_filename: str, test_id: uuid.UUID,
+                 shell_executable: Optional[str] = None, shell_options: Optional[dict] = None):
         """Initialize the JSTestCase with the JS file to run."""
         self.test_case_template = _SingleJSTestCase(logger, js_filename, test_id, shell_executable,
                                                     shell_options)
         interface.TestCaseFactory.__init__(self, _SingleJSTestCase, shell_options)
 
-    def configure(self, fixture, *args, **kwargs):
+    def configure(self, fixture: "interface.Fixture", *args, **kwargs):
         """Configure the jstest."""
         self.test_case_template.configure(fixture, *args, **kwargs)
         self.test_case_template.configure_shell()
         self.shell_options = self.test_case_template.shell_options
 
-    def make_process(self):
+    def make_process(self) -> 'process.Process':
         # This function should only be called by MultiClientsTestCase's _make_process().
         return self.test_case_template._make_process()  # pylint: disable=protected-access
 
-    def create_test_case(self, logger, shell_options):
+    def create_test_case(self, logger: logging.Logger, shell_options: dict) -> _SingleJSTestCase:
         test_case = _SingleJSTestCase(logger, self.test_case_template.js_filename,
                                       self.test_case_template._id,
                                       self.test_case_template.shell_executable, shell_options)
@@ -164,7 +162,8 @@ class MultiClientsTestCase(interface.TestCase, interface.UndoDBUtilsMixin):
             except:  # pylint: disable=bare-except
                 self.exc_info = sys.exc_info()
 
-    def __init__(self, logger, test_kind, test_name, test_id, factory):
+    def __init__(self, logger: logging.Logger, test_kind: str, test_name: str, test_id: uuid.UUID,
+                 factory: interface.TestCaseFactory):
         """Initialize the TestCase for running test."""
         super().__init__(logger, test_kind, test_name)
         self._id = test_id
@@ -173,8 +172,8 @@ class MultiClientsTestCase(interface.TestCase, interface.UndoDBUtilsMixin):
         self._factory = factory
 
     def configure(  # pylint: disable=arguments-differ,keyword-arg-before-vararg
-            self, fixture, num_clients=DEFAULT_CLIENT_NUM, use_tenant_client=False, *args,
-            **kwargs):
+            self, fixture: "interface.Fixture", num_clients: int = DEFAULT_CLIENT_NUM,
+            use_tenant_client: bool = False, *args, **kwargs):
         """Configure the test case and its factory."""
         super().configure(fixture, *args, **kwargs)
         self.num_clients = num_clients
@@ -251,7 +250,7 @@ class MultiClientsTestCase(interface.TestCase, interface.UndoDBUtilsMixin):
             self._cull_recordings("mongo")
             raise
 
-    def _raise_if_unsafe_exit(self, return_code):
+    def _raise_if_unsafe_exit(self, return_code: int):
         """Determine if a return code represents and unsafe exit."""
         # 252 and 253 may be returned in failed test executions.
         # (i.e. -4 and -3 in mongo_main.cpp)
@@ -268,7 +267,8 @@ class JSTestCase(MultiClientsTestCase):
     REGISTERED_NAME = "js_test"
     TEST_KIND = "JSTest"
 
-    def __init__(self, logger, js_filename, shell_executable=None, shell_options=None):
+    def __init__(self, logger: logging.Logger, js_filename: str,
+                 shell_executable: Optional[str] = None, shell_options: Optional[dict] = None):
         """Initialize the TestCase for running JS files."""
 
         test_id = uuid.uuid4()

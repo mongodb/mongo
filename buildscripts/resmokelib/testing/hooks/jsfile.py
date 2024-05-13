@@ -1,6 +1,6 @@
 """Interface for customizing the behavior of a test fixture by executing a JavaScript file."""
 
-from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import errors, logging
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.fixtures.interface import MultiClusterFixture
 from buildscripts.resmokelib.testing.testcases import jstest
@@ -83,8 +83,8 @@ class PerClusterDataConsistencyHook(DataConsistencyHook):
 class DynamicJSTestCase(interface.DynamicTestCase):
     """A dynamic TestCase that runs a JavaScript file."""
 
-    def __init__(self, logger, test_name, description, base_test_name, hook, js_filename,
-                 shell_options=None):
+    def __init__(self, logger: logging.Logger, test_name: str, description: str,
+                 base_test_name: str, hook, js_filename: str, shell_options=None):
         """Initialize DynamicJSTestCase."""
         interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
                                            hook)
@@ -92,7 +92,7 @@ class DynamicJSTestCase(interface.DynamicTestCase):
                                                          shell_options=shell_options)
         self._js_test_case = None
 
-    def override_logger(self, new_logger):
+    def override_logger(self, new_logger: logging.Logger):
         """Override logger."""
         interface.DynamicTestCase.override_logger(self, new_logger)
         self._js_test_case.override_logger(new_logger)
