@@ -41,7 +41,7 @@ async function runWorkloads(workloads,
     // which fills in any properties that aren't explicitly present in 'clusterOptions'. We do
     // this before constructing a ThreadManager instance to make its dependency on the
     // 'clusterOptions' being filled in explicit.
-    const cluster = new Cluster(clusterOptions);
+    const cluster = new Cluster(clusterOptions, executionOptions.sessionOptions);
     const threadMgr = new ThreadManager(clusterOptions);
 
     Random.setRandomSeed(clusterOptions.seed);
@@ -52,7 +52,7 @@ async function runWorkloads(workloads,
     let startTime = Date.now();  // Initialize in case setupWorkload fails below.
     let totalTime;
 
-    cluster.setup();
+    await cluster.setup();
 
     if (typeof executionOptions.tenantId !== 'undefined') {
         // Import simulate_atlas_proxy.js to override requests for tenant during preparing
