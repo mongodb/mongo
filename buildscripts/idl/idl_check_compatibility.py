@@ -171,7 +171,13 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'create-param-min',
     'create-param-max',
     'bulkWrite-param-updateMods',
-    'bulkWrite-param-hint'
+    'bulkWrite-param-hint',
+
+    # No actual user-facing difference
+    'bulkWrite-reply-opTime',
+    'getMore-param-lastKnownCommittedOpTime',
+    'hello-reply-opTime',
+    'hello-reply-majorityOpTime',
 ]
 
 # Permit a parameter to move from bson serialisation type any
@@ -186,8 +192,12 @@ IGNORE_ANY_TO_NON_ANY_LIST: List[str] = [
 
 # Permit a parameter to move from a non-any bson serialisation type to any.
 IGNORE_NON_ANY_TO_ANY_LIST: List[str] = [
-    'find-param-indexHints',
     'aggregate-param-indexHints',
+    'bulkWrite-reply-opTime',
+    'find-param-indexHints',
+    'getMore-param-lastKnownCommittedOpTime',
+    'hello-reply-opTime',
+    'hello-reply-majorityOpTime',
 ]
 
 # Permit the cpp type of a parameter to change
@@ -225,6 +235,11 @@ IGNORE_STABLE_TO_UNSTABLE_LIST: List[str] = [
     # Real use cases for changing a field from 'stable' to 'unstable'.
     'find-param-maxTimeMS',
     'count-param-maxTimeMS',
+
+    # No actual user-facing difference
+    'bulkWrite-reply-opTime',
+    'hello-reply-opTime',
+    'hello-reply-majorityOpTime',
 ]
 
 # Once a field is part of the stable API, either by direct addition or by changing it from unstable
@@ -584,9 +599,10 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
 
     # If bson_serialization_type switches from non-any to 'any' type.
     if "any" not in old_field_type.bson_serialization_type and "any" in new_field_type.bson_serialization_type:
-        ctxt.add_new_reply_field_bson_any_error(cmd_name, field_name, old_field_type.name,
-                                                new_field_type.name, new_field.idl_file_path)
-        return
+        if ignore_list_name not in IGNORE_NON_ANY_TO_ANY_LIST:
+            ctxt.add_new_reply_field_bson_any_error(cmd_name, field_name, old_field_type.name,
+                                                    new_field_type.name, new_field.idl_file_path)
+            return
 
     if "any" in old_field_type.bson_serialization_type:
         # If 'any' is not explicitly allowed as the bson_serialization_type.

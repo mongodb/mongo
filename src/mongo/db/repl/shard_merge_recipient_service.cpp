@@ -559,14 +559,14 @@ boost::optional<BSONObj> ShardMergeRecipientService::Instance::reportForCurrentO
     }
 
     if (_stateDoc.getStartAtOpTime()) {
-        _stateDoc.getStartAtOpTime()->append(&bob, "receiveStartOpTime");
+        _stateDoc.getStartAtOpTime()->append("receiveStartOpTime", &bob);
     }
     if (_stateDoc.getStartFetchingDonorOpTime())
-        _stateDoc.getStartFetchingDonorOpTime()->append(&bob, "startFetchingDonorOpTime");
+        _stateDoc.getStartFetchingDonorOpTime()->append("startFetchingDonorOpTime", &bob);
     if (_stateDoc.getStartApplyingDonorOpTime())
-        _stateDoc.getStartApplyingDonorOpTime()->append(&bob, "startApplyingDonorOpTime");
+        _stateDoc.getStartApplyingDonorOpTime()->append("startApplyingDonorOpTime", &bob);
     if (_stateDoc.getCloneFinishedRecipientOpTime())
-        _stateDoc.getCloneFinishedRecipientOpTime()->append(&bob, "cloneFinishedRecipientOpTime");
+        _stateDoc.getCloneFinishedRecipientOpTime()->append("cloneFinishedRecipientOpTime", &bob);
 
     if (_stateDoc.getExpireAt())
         bob.append("expireAt", *_stateDoc.getExpireAt());

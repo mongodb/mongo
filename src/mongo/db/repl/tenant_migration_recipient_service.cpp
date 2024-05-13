@@ -450,13 +450,13 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
     }
 
     if (_stateDoc.getStartFetchingDonorOpTime())
-        _stateDoc.getStartFetchingDonorOpTime()->append(&bob, "startFetchingDonorOpTime");
+        _stateDoc.getStartFetchingDonorOpTime()->append("startFetchingDonorOpTime", &bob);
     if (_stateDoc.getStartApplyingDonorOpTime())
-        _stateDoc.getStartApplyingDonorOpTime()->append(&bob, "startApplyingDonorOpTime");
+        _stateDoc.getStartApplyingDonorOpTime()->append("startApplyingDonorOpTime", &bob);
     if (_stateDoc.getDataConsistentStopDonorOpTime())
-        _stateDoc.getDataConsistentStopDonorOpTime()->append(&bob, "dataConsistentStopDonorOpTime");
+        _stateDoc.getDataConsistentStopDonorOpTime()->append("dataConsistentStopDonorOpTime", &bob);
     if (_stateDoc.getCloneFinishedRecipientOpTime())
-        _stateDoc.getCloneFinishedRecipientOpTime()->append(&bob, "cloneFinishedRecipientOpTime");
+        _stateDoc.getCloneFinishedRecipientOpTime()->append("cloneFinishedRecipientOpTime", &bob);
 
     if (_stateDoc.getExpireAt())
         bob.append("expireAt", *_stateDoc.getExpireAt());

@@ -97,7 +97,7 @@ public:
      * Serializes the contents of this optime to the specified builder in the form:
      *      subObjName : { ts: <timestamp>, t: <term> }
      */
-    void append(BSONObjBuilder* builder, const std::string& subObjName) const;
+    void append(StringData fieldName, BSONObjBuilder* builder) const;
     BSONObj toBSON() const;
 
     static StatusWith<OpTime> parseFromOplogEntry(const BSONObj& obj);
@@ -109,6 +109,7 @@ public:
      * Throws an exception on error.
      */
     static OpTime parse(const BSONObj& obj);
+    static OpTime parse(const BSONElement& elem);
 
     std::string toString() const;
 

@@ -204,7 +204,7 @@ void opTimeSerializerWithTermCheck(repl::OpTime opTime, StringData fieldName, BS
     if (opTime.getTerm() == repl::OpTime::kUninitializedTerm) {
         bob->append(fieldName, opTime.getTimestamp());
     } else {
-        opTime.append(bob, fieldName.toString());
+        opTime.append(fieldName, bob);
     }
 }
 

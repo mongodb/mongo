@@ -159,7 +159,7 @@ bool _hasOnlyAuthErrorUpHeartbeats(const std::vector<MemberData>& hbdata, const 
 }
 
 void appendOpTime(BSONObjBuilder* bob, const char* elemName, const OpTime& opTime) {
-    opTime.append(bob, elemName);
+    opTime.append(elemName, bob);
 }
 }  // namespace
 
@@ -2148,12 +2148,12 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
     // New optimes, to hold them all.
     BSONObjBuilder optimes;
-    _lastCommittedOpTimeAndWallTime.opTime.append(&optimes, "lastCommittedOpTime");
+    _lastCommittedOpTimeAndWallTime.opTime.append("lastCommittedOpTime", &optimes);
 
     optimes.appendDate("lastCommittedWallTime", _lastCommittedOpTimeAndWallTime.wallTime);
 
     if (!rsStatusArgs.readConcernMajorityOpTime.isNull()) {
-        rsStatusArgs.readConcernMajorityOpTime.append(&optimes, "readConcernMajorityOpTime");
+        rsStatusArgs.readConcernMajorityOpTime.append("readConcernMajorityOpTime", &optimes);
     }
 
     appendOpTime(&optimes, "appliedOpTime", lastOpApplied);
@@ -2213,16 +2213,16 @@ StatusWith<BSONObj> TopologyCoordinator::prepareReplSetUpdatePositionCommand(
         }
 
         BSONObjBuilder entry(arrayBuilder.subobjStart());
-        memberData.getLastWrittenOpTime().append(&entry,
-                                                 UpdatePositionArgs::kWrittenOpTimeFieldName);
+        memberData.getLastWrittenOpTime().append(UpdatePositionArgs::kWrittenOpTimeFieldName,
+                                                 &entry);
         entry.appendDate(UpdatePositionArgs::kWrittenWallTimeFieldName,
                          memberData.getLastWrittenWallTime());
-        memberData.getLastAppliedOpTime().append(&entry,
-                                                 UpdatePositionArgs::kAppliedOpTimeFieldName);
+        memberData.getLastAppliedOpTime().append(UpdatePositionArgs::kAppliedOpTimeFieldName,
+                                                 &entry);
         entry.appendDate(UpdatePositionArgs::kAppliedWallTimeFieldName,
                          memberData.getLastAppliedWallTime());
-        memberData.getLastDurableOpTime().append(&entry,
-                                                 UpdatePositionArgs::kDurableOpTimeFieldName);
+        memberData.getLastDurableOpTime().append(UpdatePositionArgs::kDurableOpTimeFieldName,
+                                                 &entry);
         entry.appendDate(UpdatePositionArgs::kDurableWallTimeFieldName,
                          memberData.getLastDurableWallTime());
         entry.append(UpdatePositionArgs::kMemberIdFieldName, memberData.getMemberId().getData());
