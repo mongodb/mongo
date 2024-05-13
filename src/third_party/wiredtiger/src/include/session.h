@@ -283,7 +283,7 @@ struct __wt_session_impl {
 
 /*
  * Note: The WT_SESSION_PREFETCH_THREAD flag is set for prefetch server threads whereas the
- * WT_SESSION_PREFETCH_THREAD flag is set when prefetch has been enabled on the session.
+ * WT_SESSION_PREFETCH_ENABLED flag is set when prefetch has been enabled on the session.
  */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
