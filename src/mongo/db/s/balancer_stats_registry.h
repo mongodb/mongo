@@ -72,6 +72,8 @@ public:
      */
     void initializeAsync(OperationContext* opCtx);
 
+    void terminate();
+
     /**
      * Update orphan document count for a specific collection.
      * `delta` is the increment/decrement that will be applied to the current cached count.
@@ -92,24 +94,16 @@ public:
                                                    const UUID& collectionUUID) const;
 
 private:
-    enum class State {
-        kPrimaryIdle,  // The node is primary but the registry is not initialzed
-        kInitializing,
-        kInitialized,
-        kTerminating,
-        kSecondary,
-    };
-
     void onSetCurrentConfig(OperationContext* opCtx) final {}
     void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) final {}
     void onBecomeArbiter() final {}
+    void onShutdown() final {}
     void onRollback() final {}
 
     void onStartup(OperationContext* opCtx) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;
     void onStepDown() final;
-    void onShutdown() final;
     inline std::string getServiceName() const final {
         return "BalancerStatsRegistry";
     }
@@ -119,15 +113,19 @@ private:
         return _state.load() == State::kInitialized;
     }
 
-    // Stops the activity of the BalancerRegistry. This method cannot be concurrently called by
-    // multiple threads.
-    void _terminate();
-
     struct CollectionStats {
         // Number of orphan documents for this collection
         long long numOrphanDocs;
         // Number of range deletion tasks
         long long numRangeDeletionTasks;
+    };
+
+    enum class State {
+        kPrimaryIdle,  // The node is primary but the registry is not initialzed
+        kInitializing,
+        kInitialized,
+        kTerminating,
+        kSecondary,
     };
 
     mutable Mutex _stateMutex = MONGO_MAKE_LATCH("BalancerStatsRegistry::_stateMutex");

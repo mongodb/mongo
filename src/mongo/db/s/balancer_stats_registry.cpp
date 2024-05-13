@@ -170,7 +170,7 @@ void BalancerStatsRegistry::initializeAsync(OperationContext* opCtx) {
         .getAsync([](auto) {});
 }
 
-void BalancerStatsRegistry::_terminate() {
+void BalancerStatsRegistry::terminate() {
     {
         stdx::lock_guard lk{_stateMutex};
         _state.store(State::kTerminating);
@@ -180,10 +180,8 @@ void BalancerStatsRegistry::_terminate() {
         }
     }
 
-    if (_threadPool) {
-        // Wait for the  asynchronous initialization to complete
-        _threadPool->waitForIdle();
-    }
+    // Wait for the  asynchronous initialization to complete
+    _threadPool->waitForIdle();
 
     {
         // Clear the stats
@@ -197,18 +195,7 @@ void BalancerStatsRegistry::_terminate() {
 }
 
 void BalancerStatsRegistry::onStepDown() {
-    _terminate();
-    _state.store(State::kSecondary);
-}
-
-void BalancerStatsRegistry::onShutdown() {
-    _terminate();
-    if (_threadPool) {
-        _threadPool->shutdown();
-        _threadPool->join();
-        _threadPool.reset();
-    }
-
+    terminate();
     _state.store(State::kSecondary);
 }
 
