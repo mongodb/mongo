@@ -73,6 +73,7 @@ function startShellWithOp(comment) {
     // Confirm that the operation has started in the parallel shell.
     assert.soon(
         function() {
+            let shards = FixtureHelpers.numberOfShardsForCollection(coll);
             let aggRes =
                 db.getSiblingDB("admin")
                     .aggregate([
@@ -80,7 +81,7 @@ function startShellWithOp(comment) {
                         {$match: {ns: "test.currentOp_cursor", "command.comment": TestData.comment}}
                     ])
                     .toArray();
-            return aggRes.length >= 1;
+            return aggRes.length >= shards;
         },
         function() {
             return "Failed to find parallel shell operation in $currentOp output: " +
@@ -116,19 +117,15 @@ res = db.adminCommand({
     ]
 });
 
-if (FixtureHelpers.numberOfShardsForCollection(coll) > 1) {
-    // Assert currentOp truncation behavior for each shard in the cluster.
-    assert(res.inprog.length >= 1, res);
-    res.inprog.forEach((result) => {
-        assert.eq(result.op, "getmore", res);
+assert.eq(res.inprog.length, FixtureHelpers.numberOfShardsForCollection(coll), res);
+res.inprog.forEach((result) => {
+    if (result.op === 'command') {
+        assert(result.command.hasOwnProperty("$truncated"), res);
+    } else {
+        assert.eq(result.op, 'getmore', res);
         assert(result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
-    });
-} else {
-    // Assert currentOp truncation behavior for unsharded collections.
-    assert.eq(res.inprog.length, 1, res);
-    assert.eq(res.inprog[0].op, "command", res);
-    assert(res.inprog[0].command.hasOwnProperty("$truncated"), res);
-}
+    }
+});
 assert(testLogPattern(db, /will be truncated/));
 
 res.inprog.forEach((op) => {
@@ -150,16 +147,15 @@ res = db.currentOp({
     ]
 });
 
-if (FixtureHelpers.numberOfShardsForCollection(coll) > 1) {
-    assert(res.inprog.length >= 1, res);
-    res.inprog.forEach((result) => {
-        assert.eq(result.op, "getmore", res);
+assert.eq(res.inprog.length, FixtureHelpers.numberOfShardsForCollection(coll), res);
+res.inprog.forEach((result) => {
+    if (result.op === 'command') {
+        assert(!result.command.hasOwnProperty("$truncated"), res);
+    } else {
+        assert.eq(result.op, 'getmore', res);
         assert(!result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
-    });
-} else {
-    assert.eq(res.inprog.length, 1, res);
-    assert(!res.inprog[0].command.hasOwnProperty("$truncated"), res);
-}
+    }
+});
 
 res.inprog.forEach((op) => {
     assert.commandWorked(db.killOp(op.opid));
