@@ -614,7 +614,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 textwrap.dedent("""\
             This function will return true every time because there is no underlying BSONObj anchor.
             The object owns the data of all of its members."""))
-            self._writer.write_line("bool isOwner() const { return true; }")
+            self._writer.write_line("bool isOwned() const { return true; }")
 
     def gen_protected_ownership_setters(self, struct):
         # type: (ast.Struct) -> None

@@ -4986,11 +4986,13 @@ TEST(IDLOwnershipTests, ParseOwnAssumesOwnership) {
     {
         auto tmp = BSON("value" << BSON("x" << 42));
         idlStruct = One_plain_object::parseOwned(ctxt, std::move(tmp));
+        ASSERT_TRUE(idlStruct.isOwned());
     }
     // Now that tmp is out of scope, if idlStruct didn't retain ownership, it would be accessing
     // free'd memory which should error on ASAN and debug builds.
     auto obj = idlStruct.getValue();
     ASSERT_BSONOBJ_EQ(obj, BSON("x" << 42));
+    ASSERT_TRUE(idlStruct.isOwned());
 }
 
 TEST(IDLOwnershipTests, ParseSharingOwnershipTmpBSON) {
@@ -4999,11 +5001,13 @@ TEST(IDLOwnershipTests, ParseSharingOwnershipTmpBSON) {
     {
         auto tmp = BSON("value" << BSON("x" << 42));
         idlStruct = One_plain_object::parseSharingOwnership(ctxt, tmp);
+        ASSERT_TRUE(idlStruct.isOwned());
     }
     // Now that tmp is out of scope, if idlStruct didn't particpate in ownership, it would be
     // accessing free'd memory which should error on ASAN and debug builds.
     auto obj = idlStruct.getValue();
     ASSERT_BSONOBJ_EQ(obj, BSON("x" << 42));
+    ASSERT_TRUE(idlStruct.isOwned());
 }
 
 TEST(IDLOwnershipTests, ParseSharingOwnershipTmpIDLStruct) {
@@ -5015,6 +5019,34 @@ TEST(IDLOwnershipTests, ParseSharingOwnershipTmpIDLStruct) {
     ASSERT_BSONOBJ_EQ(bson["value"].Obj(), BSON("x" << 42));
 }
 
+TEST(IDLOwnershipTests, ParseViewStructIsNotOwned) {
+    IDLParserContext ctxt("root");
+
+    {
+        ViewStructChainedStruct view_struct_chained_struct;
+        auto tmp = BSON("view_type" << BSON("a"
+                                            << "b"));
+        view_struct_chained_struct = ViewStructChainedStruct::parse(ctxt, tmp);
+        ASSERT_FALSE(view_struct_chained_struct.isOwned());
+    }
+
+    {
+        ViewStructChainedType view_struct_chained_type;
+        auto tmp = BSON("view_type" << BSON("a"
+                                            << "b"));
+        view_struct_chained_type = ViewStructChainedType::parse(ctxt, tmp);
+        ASSERT_FALSE(view_struct_chained_type.isOwned());
+    }
+
+    {
+        ViewStructWithViewStructMember view_struct_member;
+        auto tmp = BSON("view_struct" << BSON("view_type" << BSON("a"
+                                                                  << "b")));
+        view_struct_member = ViewStructWithViewStructMember::parse(ctxt, tmp);
+        ASSERT_FALSE(view_struct_member.isOwned());
+    }
+}
+
 TEST(IDLOwnershipTests, ChainedParseSharingOwnershipTmpBSON) {
     IDLParserContext ctxt("root");
 
@@ -5023,32 +5055,38 @@ TEST(IDLOwnershipTests, ChainedParseSharingOwnershipTmpBSON) {
         auto tmp = BSON("view_type" << BSON("a"
                                             << "b"));
         view_struct_chained_struct = ViewStructChainedStruct::parseSharingOwnership(ctxt, tmp);
+        ASSERT_TRUE(view_struct_chained_struct.isOwned());
     }
     // Now that tmp is out of scope, if idlStruct didn't particpate in ownership, it would be
     // accessing free'd memory which should error on ASAN and debug builds.
     ASSERT_BSONOBJ_EQ(view_struct_chained_struct.getView_type(),
                       BSON("a"
                            << "b"));
+    ASSERT_TRUE(view_struct_chained_struct.isOwned());
 
     ViewStructChainedType view_struct_chained_type;
     {
         auto tmp = BSON("view_type" << BSON("a"
                                             << "b"));
         view_struct_chained_type = ViewStructChainedType::parseSharingOwnership(ctxt, tmp);
+        ASSERT_TRUE(view_struct_chained_type.isOwned());
     }
     ASSERT_BSONOBJ_EQ(view_struct_chained_type.getViewChainedType().getView_type(),
                       BSON("view_type" << BSON("a"
                                                << "b")));
+    ASSERT_TRUE(view_struct_chained_type.isOwned());
 
     ViewStructWithViewStructMember view_struct_member;
     {
         auto tmp = BSON("view_struct" << BSON("view_type" << BSON("a"
                                                                   << "b")));
         view_struct_member = ViewStructWithViewStructMember::parseSharingOwnership(ctxt, tmp);
+        ASSERT_TRUE(view_struct_member.isOwned());
     }
     ASSERT_BSONOBJ_EQ(view_struct_member.getView_struct().getView_type(),
                       BSON("a"
                            << "b"));
+    ASSERT_TRUE(view_struct_member.isOwned());
 }
 
 /**
@@ -5132,6 +5170,8 @@ TEST(IDLOwnershipTests, NonViewStructParseAssumesOwnership) {
         // We want to test that idlStruct is internally a non view type, and that the struct
         // inherently owns all its members.
         idlStruct = NonViewStruct::parse(ctxt, std::move(tmp));
+
+        ASSERT_TRUE(idlStruct.isOwned());
     }
 
     // Now that tmp is out of scope, if idlStruct is a view type, it would be accessing
