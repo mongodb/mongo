@@ -13,6 +13,7 @@ pre:
 post:
   - func: "dump stacktraces"
   - func: "upload stacktraces"
+  - func: "upload test/format config"
   - func: "dump stderr/stdout"
   - func: "upload artifact"
     vars:
@@ -266,6 +267,19 @@ functions:
       permissions: public-read
       content_type: text/plain
       remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}/
+  "upload test/format config":
+    command: s3.put
+    type: setup
+    params:
+      aws_secret: ${aws_secret}
+      aws_key: ${aws_key}
+      local_files_include_filter:
+        - wiredtiger/cmake_build/test/format/RUNDIR*/CONFIG
+      bucket: build_external
+      permissions: public-read
+      content_type: text/plain
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}/
+      preserve_path: true
   "run data validation stress test checkpoint":
     - *fetch_artifacts
     - command: shell.exec
