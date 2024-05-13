@@ -5,9 +5,10 @@ import "jstests/multiVersion/libs/multi_rs.js";
 
 import {getQueryStatsFindCmd, getQueryStatsKeyHashes} from "jstests/libs/query_stats_utils.js";
 
-// TODO SERVER-86781 Start from the previous version.
-const rst = new ReplSetTest(
-    {nodes: {n1: {binVersion: "latest"}, n2: {binVersion: "latest"}, n3: {binVersion: "latest"}}});
+const rst = new ReplSetTest({
+    nodes:
+        {n1: {binVersion: "last-lts"}, n2: {binVersion: "last-lts"}, n3: {binVersion: "last-lts"}}
+});
 
 // Turn on the collecting of query stats metrics.
 rst.startSet({setParameter: {internalQueryStatsRateLimit: -1}});
