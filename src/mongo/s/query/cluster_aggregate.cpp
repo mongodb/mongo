@@ -578,16 +578,34 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                    request.getLet());
         expCtx->addResolvedNamespaces(involvedNamespaces);
 
+
+        // We might need 'inMongos' temporarily set to true for query stats parsing, but we don't
+        // want to modify the value of 'expCtx' for future code execution so we will set it back to
+        // its original value.
+        ON_BLOCK_EXIT([&expCtx, originalInMongosVal = expCtx->inMongos]() {
+            expCtx->inMongos = originalInMongosVal;
+        });
+
+        // In order to parse a change stream request for query stats, 'inMongos' needs
+        // to be set to true.
+        if (hasChangeStream) {
+            expCtx->inMongos = true;
+        }
+
         // Skip query stats recording for queryable encryption queries.
         if (!shouldDoFLERewrite) {
             // We want to hold off parsing the pipeline until it's clear we must. Because of that,
             // we wait to parse the pipeline until this callback is invoked within
             // query_stats::registerRequest.
-            query_stats::registerRequest(opCtx, namespaces.executionNss, [&]() {
-                auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-                return std::make_unique<query_stats::AggKey>(
-                    request, *pipeline, expCtx, involvedNamespaces, namespaces.executionNss);
-            });
+            query_stats::registerRequest(
+                opCtx,
+                namespaces.executionNss,
+                [&]() {
+                    auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+                    return std::make_unique<query_stats::AggKey>(
+                        request, *pipeline, expCtx, involvedNamespaces, namespaces.executionNss);
+                },
+                hasChangeStream);
         }
     }
 

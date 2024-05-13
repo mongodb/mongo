@@ -733,3 +733,53 @@ export function runForEachDeployment(callbackFn) {
         st.stop();
     }
 }
+
+/**
+ * Given a query stats entry, and stats that the entry should have, this function checks that the
+ * entry is the result of a change stream request and that the metrics are what are expected.
+ */
+export function checkChangeStreamEntry(
+    {queryStatsEntry, db, collectionName, numExecs, numDocsReturned}) {
+    assert.eq(collectionName, queryStatsEntry.key.queryShape.cmdNs.coll);
+
+    // Confirm entry is a change stream request.
+    let stringifiedPipeline = JSON.stringify(queryStatsEntry.key.queryShape.pipeline, null, 0);
+    assert(stringifiedPipeline.includes("_internalChangeStream"));
+
+    // TODO SERVER-76263 Support reporting 'collectionType' on a sharded cluster.
+    if (!FixtureHelpers.isMongos(db)) {
+        assert.eq("changeStream", queryStatsEntry.key.collectionType);
+    }
+
+    // Checking that metrics match expected metrics.
+    assert.eq(queryStatsEntry.metrics.execCount, numExecs);
+    assert.eq(queryStatsEntry.metrics.docsReturned.sum, numDocsReturned);
+
+    // FirstResponseExecMicros and TotalExecMicros match since each getMore is recorded as a new
+    // first response.
+    assert.eq(queryStatsEntry.metrics.totalExecMicros.sum,
+              queryStatsEntry.metrics.firstResponseExecMicros.sum);
+    assert.eq(queryStatsEntry.metrics.totalExecMicros.max,
+              queryStatsEntry.metrics.firstResponseExecMicros.max);
+    assert.eq(queryStatsEntry.metrics.totalExecMicros.min,
+              queryStatsEntry.metrics.firstResponseExecMicros.min);
+}
+
+/**
+ * Given a change stream cursor, this function will return the number of getMores executed until the
+ * change stream is updated. This only applies when the cursor is waiting for one new document (or
+ * set the batchSize of the input cursor to 1) so each hasNext() call will correspond to an internal
+ * getMore.
+ */
+export function getNumberOfGetMoresUntilNextDocForChangeStream(cursor) {
+    let numGetMores = 0;
+    assert.soon(() => {
+        numGetMores++;
+        return cursor.hasNext();
+    });
+
+    // Get the document that is on the cursor to reset the cursor to a state where calling hasNext()
+    // corresponds to a getMore.
+    cursor.next();
+    return numGetMores;
+}

@@ -1,16 +1,17 @@
-// Tests the collection of query stats for a change stream query if the entry is evicted while the
-// cursor is still active.
-// @tags: [
-//   uses_change_streams,
-//   requires_replication,
-//   requires_sharding,
-//   requires_fcv_72
-// ]
+/**
+ * Tests the collection of query stats for a change stream query if the entry is evicted while the
+ * cursor is still active.
+ * @tags: [
+ *   uses_change_streams,
+ *   requires_replication,
+ *   requires_sharding,
+ * ]
+ */
 import {
     assertDropAndRecreateCollection,
 } from "jstests/libs/collection_drop_recreate.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
+    checkChangeStreamEntry,
     getLatestQueryStatsEntry,
     getQueryStats,
     resetQueryStatsStore
@@ -25,14 +26,13 @@ function runTest(conn) {
 
     // Check that change stream entry was recorded.
     let queryStatsEntry = getLatestQueryStatsEntry(db);
-
-    assert.eq("coll", queryStatsEntry.key.queryShape.cmdNs.coll);
-    let stringifiedPipeline = JSON.stringify(queryStatsEntry.key.queryShape.pipeline, null, 0);
-    assert(stringifiedPipeline.includes("_internalChangeStream"));
-    // TODO SERVER-76263 Support reporting 'collectionType' on a sharded cluster.
-    if (!FixtureHelpers.isMongos(db)) {
-        assert.eq("changeStream", queryStatsEntry.key.collectionType);
-    }
+    checkChangeStreamEntry({
+        queryStatsEntry: queryStatsEntry,
+        db: db,
+        collectionName: "coll",
+        numExecs: 1,
+        numDocsReturned: 0
+    });
 
     // Reset the store to evict the change streams metric.
     resetQueryStatsStore(db, "1MB");
