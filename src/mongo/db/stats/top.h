@@ -135,6 +135,7 @@ public:
      */
     void incrementGlobalLatencyStats(OperationContext* opCtx,
                                      uint64_t latency,
+                                     uint64_t workingTime,
                                      Command::ReadWriteType readWriteType);
 
     /**
@@ -149,8 +150,16 @@ public:
                                   bool slowMSBucketsOnly,
                                   BSONObjBuilder* builder);
 
+    /**
+     * Appends the global working time statistics.
+     */
+    void appendWorkingTimeStats(bool includeHistograms,
+                                bool slowMSBucketsOnly,
+                                BSONObjBuilder* builder);
+
 private:
     AtomicOperationLatencyHistogram _globalHistogramStats;
+    AtomicOperationLatencyHistogram _workingTimeHistogramStats;
 
     // _lockUsage should always be acquired before using _usage.
     Mutex _lockUsage = MONGO_MAKE_LATCH("Top::_lockUsage");
