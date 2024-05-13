@@ -197,6 +197,10 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                       std::vector<bool> fromMigrate,
                                       bool defaultFromMigrate,
                                       OpStateAccumulator* opAccumulator) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return;
+    }
+
     const auto& nss = coll->ns();
 
     for (auto it = begin; it != end; ++it) {
@@ -255,8 +259,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                 deletionTask.getCollectionUuid(), numOrphanDocs);
         }
 
-        if (nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
-            !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        if (nss == NamespaceString::kCollectionCriticalSectionsNamespace) {
             const auto collCSDoc = CollectionCriticalSectionDocument::parse(
                 IDLParserContext("ShardServerOpObserver"), insertedDoc);
             invariant(!collCSDoc.getBlockReads());
@@ -299,6 +302,10 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                                      const OplogUpdateEntryArgs& args,
                                      OpStateAccumulator* opAccumulator) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return;
+    }
+
     const auto& updateDoc = args.updateArgs->update;
     // Most of these handlers do not need to run when the update is a full document replacement.
     // An empty updateDoc implies a no-op update and is not a valid oplog entry.
@@ -406,8 +413,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         }
     }
 
-    if (args.coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace &&
-        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    if (args.coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace) {
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
         invariant(collCSDoc.getBlockReads());
@@ -465,6 +471,9 @@ void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
                                           BSONObj const& doc,
                                           OplogDeleteEntryArgs* args,
                                           OpStateAccumulator* opAccumulator) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return;
+    }
 
     if (coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace ||
         coll->ns() == NamespaceString::kRangeDeletionNamespace) {
@@ -598,6 +607,10 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                      const BSONObj& doc,
                                      const OplogDeleteEntryArgs& args,
                                      OpStateAccumulator* opAccumulator) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return;
+    }
+
     const auto& nss = coll->ns();
     auto& documentId = documentIdDecoration(args);
     invariant(!documentId.isEmpty());
@@ -660,8 +673,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         }
     }
 
-    if (nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
-        !repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+    if (nss == NamespaceString::kCollectionCriticalSectionsNamespace) {
         const auto& deletedDoc = documentId;
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), deletedDoc);
@@ -747,6 +759,10 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
                                                const BSONObj& idIndex,
                                                const OplogSlot& createOpTime,
                                                bool fromMigrate) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return;
+    }
+
     // Only the shard primary nodes control the collection creation.
     // On secondaries we force them to clear their filtering metadata here in order to remove
     // anything that was left from a previous instance of the collection. This could happen by first
@@ -795,6 +811,10 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
                                                      std::uint64_t numRecords,
                                                      const CollectionDropType dropType,
                                                      bool markFromMigrate) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return {};
+    }
+
     if (collectionName == NamespaceString::kServerConfigurationNamespace) {
         // Dropping system collections is not allowed for end users
         invariant(!opCtx->writesAreReplicated());
@@ -817,6 +837,10 @@ void ShardServerOpObserver::onCreateIndex(OperationContext* opCtx,
                                           const UUID& uuid,
                                           BSONObj indexDoc,
                                           bool fromMigrate) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return;
+    }
+
     abortOngoingMigrationIfNeeded(opCtx, nss);
 }
 
@@ -826,16 +850,28 @@ void ShardServerOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                               const UUID& indexBuildUUID,
                                               const std::vector<BSONObj>& indexes,
                                               bool fromMigrate) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return;
+    }
+
     abortOngoingMigrationIfNeeded(opCtx, nss);
 }
 
 void ShardServerOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx,
                                                          const NamespaceString& nss) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return;
+    }
+
     abortOngoingMigrationIfNeeded(opCtx, nss);
 }
 
 void ShardServerOpObserver::onAbortIndexBuildSinglePhase(OperationContext* opCtx,
                                                          const NamespaceString& nss) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return;
+    }
+
     abortOngoingMigrationIfNeeded(opCtx, nss);
 }
 
@@ -844,6 +880,10 @@ void ShardServerOpObserver::onDropIndex(OperationContext* opCtx,
                                         const UUID& uuid,
                                         const std::string& indexName,
                                         const BSONObj& indexInfo) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return;
+    }
+
     abortOngoingMigrationIfNeeded(opCtx, nss);
 };
 
@@ -853,6 +893,9 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
                                       const BSONObj& collModCmd,
                                       const CollectionOptions& oldCollOptions,
                                       boost::optional<IndexCollModInfo> indexInfo) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isDataRecovering()) {
+        return;
+    }
     abortOngoingMigrationIfNeeded(opCtx, nss);
 };
 
