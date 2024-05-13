@@ -19,15 +19,7 @@ def print_folded_visit(metrics, span_id: int, prefix: str):
         print_folded_visit(metrics, child_id, new_prefix)
 
 
-def remove_empty_spans(metrics):
-    # Keep only metrics that have non zero count. Make sure to also keep root span.
-    newSpans = [s for s in metrics.spans if s.id == 0 or s.count != 0]
-    return CallMetrics(newSpans)
-
-
 def print_folded(metrics):
-    metrics = copy.deepcopy(metrics)
-
     # Print entire folded tree under the root
     print_folded_visit(metrics, 0, None)
 
@@ -37,12 +29,23 @@ def print_tsv(metrics):
         print("\t".join([str(x) for x in arr]))
 
     print_tsv_line(["id", "name", "parentId", "totalNanos", "netNanos", "exclusive_nanos", "count"])
-    for s in metrics.spans:
+    for s in metrics.spans.values():
         # Skip root span
         if s.id == 0:
             continue
         print_tsv_line(
             [s.id, s.name, s.parent_id, s.total_nanos, s.net_nanos, s.exclusive_nanos, s.count])
+
+
+def remove_empty_spans(metrics):
+    # Keep only metrics that have non zero count. Make sure to also keep root span.
+    metrics = copy.deepcopy(metrics)
+    new_spans = {k: v for (k, v) in metrics.spans.items() if v.id == 0 or v.count != 0}
+
+    for s in new_spans.values():
+        s.children = {k: v for (k, v) in s.children.items() if v in new_spans}
+
+    return CallMetrics(new_spans)
 
 
 def main():

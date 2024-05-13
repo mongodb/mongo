@@ -57,7 +57,7 @@ typedef internal::ProfilerSpan ProfilerSpan;
 #define MONGO_PROFILER_SPAN_LEAVE(span) span.release()
 
 #else
-struct ProfilerSpan {};
+struct [[maybe_unused]] ProfilerSpan {};
 
 #define MONGO_PROFILER_SPAN_ENTER(spanName) (::mongo::tracing_profiler::ProfilerSpan())
 

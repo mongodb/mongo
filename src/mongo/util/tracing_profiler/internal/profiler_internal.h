@@ -512,7 +512,7 @@ private:
  * A guard utility that ensures that profiler is notified when the associated profile span is
  * closed.
  */
-class ProfilerSpan {
+class [[maybe_unused]] ProfilerSpan {
     friend class GlobalProfilerService;
 
 public:

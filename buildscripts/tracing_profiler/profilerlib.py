@@ -24,24 +24,23 @@ class SpanMetrics:
 
 @dataclass
 class CallMetrics:
-    spans: List[SpanMetrics]
+    spans: Dict[int, SpanMetrics]
 
     @staticmethod
     def new_empty():
-        spans = [SpanMetrics(0, '', 0, 0, 0, 0, 0, {})]
+        spans = {0: SpanMetrics(0, '', 0, 0, 0, 0, 0, {})}
         return CallMetrics(spans)
 
     @staticmethod
     def from_json(json):
-        spans = [SpanMetrics(0, '', 0, 0, 0, 0, 0, {})]
+        spans = {0: SpanMetrics(0, '', 0, 0, 0, 0, 0, {})}
         for spanJson in json['spans']:
-            spans.append(
-                SpanMetrics(
-                    int(spanJson['id']), str(spanJson['name']), int(spanJson['parentId']),
-                    int(spanJson['totalNanos']), int(spanJson['netNanos']),
-                    int(spanJson['exclusiveNanos']), int(spanJson['count']), {}))
+            spans[int(spanJson['id'])] = SpanMetrics(
+                int(spanJson['id']), str(spanJson['name']), int(spanJson['parentId']),
+                int(spanJson['totalNanos']), int(spanJson['netNanos']),
+                int(spanJson['exclusiveNanos']), int(spanJson['count']), {})
 
-        for span in spans:
+        for span in spans.values():
             if span.id == 0:
                 continue
             spans[span.parent_id].children[span.name] = span.id
@@ -70,7 +69,7 @@ class CallMetrics:
             return self.spans[parent_id].children[name]
 
         span = SpanMetrics(len(self.spans), name, parent_id, 0, 0, 0, 0, {})
-        self.spans.append(span)
+        self.spans[span.id] = span
         self.spans[parent_id].children[name] = span.id
         return span.id
 
@@ -84,7 +83,11 @@ class CallMetrics:
         return span_id
 
     def to_dict(self):
-        return {'spans': [s.to_dict() for s in self.spans if s.id != 0]}
+        return {
+            'spans': [
+                s.to_dict() for s in sorted(self.spans.values(), key=lambda x: x.id) if s.id != 0
+            ]
+        }
 
     def to_json(self):
         return json.dumps(self.to_dict())
