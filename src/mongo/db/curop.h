@@ -1129,7 +1129,11 @@ private:
     Microseconds computeElapsedTimeTotal(TickSource::Tick startTime,
                                          TickSource::Tick endTime) const;
 
-    Milliseconds _sumBlockedTimeTotal();
+    /**
+     * Returns the time operation spends blocked waiting for locks and tickets. Also returns the
+     * retrieved time waiting for locks.
+     */
+    std::tuple<Milliseconds, Milliseconds> _getAndSumBlockedTimeTotal();
 
     /**
      * Handles failpoints that check whether a command has completed or not.

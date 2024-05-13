@@ -63,7 +63,31 @@ public:
         return latencyBuilder.obj();
     }
 };
+
+class WorkingTimeHistogramServerStatusSection final : public ServerStatusSection {
+    using ServerStatusSection::ServerStatusSection;
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElem) const override {
+        BSONObjBuilder latencyBuilder;
+        bool includeHistograms = false;
+        bool slowBuckets = false;
+        if (configElem.type() == BSONType::Object) {
+            includeHistograms = configElem.Obj()["histograms"].trueValue();
+            slowBuckets = configElem.Obj()["slowBuckets"].trueValue();
+        }
+        Top::get(opCtx->getServiceContext())
+            .appendWorkingTimeStats(includeHistograms, slowBuckets, &latencyBuilder);
+        return latencyBuilder.obj();
+    }
+};
 auto globalHistogramServerStatusSection =
     *ServerStatusSectionBuilder<GlobalHistogramServerStatusSection>("opLatencies");
+
+auto workingTimeHistogramServerStatusSection =
+    *ServerStatusSectionBuilder<WorkingTimeHistogramServerStatusSection>("opWorkingTime");
 }  // namespace
 }  // namespace mongo

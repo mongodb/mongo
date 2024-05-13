@@ -2402,6 +2402,8 @@ void HandleRequest::completeOperation(DbResponse& response) {
         .incrementGlobalLatencyStats(
             opCtx,
             durationCount<Microseconds>(currentOp.elapsedTimeExcludingPauses()),
+            durationCount<Microseconds>(
+                duration_cast<Microseconds>(currentOp.debug().workingTimeMillis)),
             currentOp.getReadWriteType());
 
     if (shouldProfile) {
