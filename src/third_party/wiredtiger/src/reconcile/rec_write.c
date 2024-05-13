@@ -2683,13 +2683,6 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
      */
     WT_ERR(__wt_hs_delete_updates(session, r));
 
-    /* Check if there's work to do. */
-    for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
-        if (multi->supd != NULL)
-            break;
-    if (i == r->multi_next)
-        return (0);
-
     for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
         if (multi->supd != NULL) {
             WT_ERR(__wt_hs_insert_updates(session, r, multi));
