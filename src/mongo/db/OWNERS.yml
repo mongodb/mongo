@@ -12,3 +12,6 @@ filters:
   - "ttl*":
     approvers:
       - 10gen/server-storage-execution
+  - "service_entry_point_common*":
+    approvers:
+      - 10gen/server-service-architecture
