@@ -1,3 +1,4 @@
 matplotlib
 mpld3
 tornado
+pandas

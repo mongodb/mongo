@@ -40,6 +40,7 @@ import subprocess
 import json
 import sys
 import re
+import pandas as pd
 import matplotlib
 matplotlib.use('WebAgg')
 import matplotlib.pyplot as plt
@@ -184,6 +185,22 @@ def histogram(field, chkpt, chkpt_name):
             elif "leaf" in metadata["page_type"]:
                 leaf.append(metadata[field])
 
+    # Using pandas to calculate stats.
+    df_internal = pd.DataFrame(internal, columns=[field])
+    df_leaf = pd.DataFrame(leaf, columns=[field])
+
+    columns = ['mean', '50%', 'min', 'max']
+    stats_internal = df_internal.describe().loc[columns].transpose()
+    stats_internal.columns = columns
+    stats_leaf = df_leaf.describe().loc[columns].transpose()
+    stats_leaf.columns = columns
+
+    stats = pd.DataFrame({
+        'Internal': stats_internal.iloc[0],
+        'Leaf': stats_leaf.iloc[0]
+    }).transpose()
+    stats = stats.round(2)
+
     # plot the histograms
     fig, ax = plt.subplots(2, figsize=(15, 10))
     ax[0].hist(internal, bins=50, color=PLOT_COLORS[field]["internal"], label="internal")
@@ -198,9 +215,11 @@ def histogram(field, chkpt, chkpt_name):
             subplot.set_xlabel(field + ' (bytes)')
         subplot.set_ylabel('Number of pages')
 
-    imgs = mpld3.fig_to_html(fig) 
     plt.close()
-    return imgs
+
+    imgs = mpld3.fig_to_html(fig) 
+    table_stats_html = f"<div style='padding-left: 150px;'> <h2>{field}</h2> {stats.to_html()}</div>"
+    return imgs + table_stats_html
 
 
 def pie_chart(field, chkpt, chkpt_name):
