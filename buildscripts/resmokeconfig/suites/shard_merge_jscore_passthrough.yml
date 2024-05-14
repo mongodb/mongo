@@ -24,6 +24,8 @@ selector:
     - jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
 
   exclude_with_any_tags:
+    - incompatible_with_shard_merge
+
     - assumes_standalone_mongod
     # These tests run getMore commands which are not supported in the tenant migration passthrough.
     - requires_getmore
