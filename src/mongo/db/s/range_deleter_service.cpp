@@ -361,7 +361,7 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
     auto lock = _acquireMutexUnconditionally();
     dassert(_state == kDown, "Service expected to be down before stepping up");
 
-    _state = kInitializing;
+    _state = kReadyForInitialization;
 
     const std::string kExecName("RangeDeleterServiceExecutor");
     auto net = executor::makeNetworkInterface(kExecName);
@@ -386,9 +386,10 @@ void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx
 
                 {
                     auto lock = _acquireMutexUnconditionally();
-                    if (_state != kInitializing) {
+                    if (_state != kReadyForInitialization) {
                         return;
                     }
+                    _state = kInitializing;
                     _initOpCtxHolder = tc->makeOperationContext();
                 }
 

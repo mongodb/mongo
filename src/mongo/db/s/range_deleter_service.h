@@ -198,7 +198,7 @@ private:
     // Mono-threaded executor processing range deletion tasks
     std::shared_ptr<executor::TaskExecutor> _executor;
 
-    enum State { kInitializing, kUp, kDown };
+    enum State { kReadyForInitialization, kInitializing, kUp, kDown };
 
     State _state{kDown};
 
