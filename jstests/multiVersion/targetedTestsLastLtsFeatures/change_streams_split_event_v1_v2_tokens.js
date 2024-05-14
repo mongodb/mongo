@@ -107,7 +107,7 @@ assert.commandWorked(st.s.adminCommand({reshardCollection: testColl.getFullName(
 expectedEvents.push({operationType: "reshardCollection"});
 
 assert.commandWorked(testColl.dropIndex({largeField: 1}));
-expectedEvents.push({operationType: "dropIndexes"});
+expectedEvents.push({operationType: "dropIndexes"}, {operationType: "dropIndexes"});
 
 const newTestCollectionName = "test_";
 assert.commandWorked(testColl.renameCollection(newTestCollectionName));
@@ -124,6 +124,32 @@ assert.commandWorked(testDB.dropDatabase());
 expectedEvents.push({operationType: "dropDatabase"},
                     {operationType: "invalidate"},
                     {operationType: "dropDatabase"});
+
+// Leave only one of two catalog events when they have identical resume tokens, because the
+// second event will be skipped when resuming from the first event's token in such a case.
+// TODO SERVER-90023: Remove this workaround when no longer needed.
+{
+    const csCursor = testDB.watch([], {
+        showExpandedEvents: true,
+        startAfter: testStartV1HWMToken,
+        $_generateV2ResumeTokens: false
+    });
+
+    // The 'drop', 'dropIndexes' and 'rename' events coming from different shards may are likely to
+    // get identical resume tokens in v6.0.
+    for (let prevEvent = csCursor.next(), nextEvent; csCursor.hasNext(); prevEvent = nextEvent) {
+        nextEvent = csCursor.next();
+        if (bsonWoCompare(nextEvent._id, prevEvent._id) === 0) {
+            // If two or more consecutive events have identical resume tokens, remove all but the
+            // last from from the expected events.
+            expectedEvents.splice(expectedEvents.findIndex(
+                                      (event) => (event.operationType === prevEvent.operationType)),
+                                  1);
+        }
+    }
+
+    csCursor.close();
+}
 
 // Helper function to assert on the given event fields.
 function assertEventMatches(event, expectedEvent, errorMsg) {
