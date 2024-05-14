@@ -225,7 +225,7 @@ def ninja_bazel_builder(env: SCons.Environment.Environment, _dup_env: SCons.Envi
         "rule": "BAZEL_COPY_RULE",
         "variables": {
             "cmd":
-                ' & '.join([
+                ' && '.join([
                     f"$COPY {input_node.replace('/',os.sep)} {output_node}"
                     for input_node, output_node in zip(ins, outs)
                 ] + [
