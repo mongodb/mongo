@@ -142,9 +142,7 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
                      boost::optional<LockMode> tenantLockMode,
                      Date_t deadline,
                      Lock::DBLockSkipOptions options)
-    : _dbName(dbName),
-      _dbLock(opCtx, dbName, mode, deadline, std::move(options), tenantLockMode),
-      _db([&] {
+    : _dbName(dbName), _dbLock(opCtx, dbName, mode, deadline, options, tenantLockMode), _db([&] {
           auto databaseHolder = DatabaseHolder::get(opCtx);
           return databaseHolder->getDb(opCtx, dbName);
       }()) {
