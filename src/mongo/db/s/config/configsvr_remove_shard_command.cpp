@@ -50,6 +50,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/replica_set_endpoint_feature_flag.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
@@ -142,8 +143,18 @@ public:
 
         const auto shardId = [&] {
             const auto shardIdOrUrl = request.getCommandParameter();
-            const auto shard =
-                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdOrUrl));
+            auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdOrUrl);
+            if (swShard == ErrorCodes::ShardNotFound) {
+                // If the replica set endpoint is not active, then it isn't safe to allow direct
+                // connections again after a second shard has been added. Unsharded collections are
+                // allowed to be tracked and moved as soon as a second shard is added to the
+                // cluster, and these collections will not handle direct connections properly.
+                if (replica_set_endpoint::isFeatureFlagEnabled()) {
+                    uassertStatusOK(ShardingCatalogManager::get(opCtx)
+                                        ->updateClusterCardinalityParameterIfNeeded(opCtx));
+                }
+            }
+            const auto shard = uassertStatusOK(swShard);
             return shard->getId();
         }();
 

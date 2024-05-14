@@ -243,22 +243,8 @@ void _setShardedClusterCardinalityParameter(
     // parameter to be correct (go back to false when the second shard is removed) so we will need
     // to update the cluster parameter whenever replica set endpoint is enabled.
     if (feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabledOnVersion(requestedVersion)) {
-        // The config.shards collection is stable during FCV changes, so query that to discover the
-        // current number of shards.
-        DBDirectClient client(opCtx);
-        FindCommandRequest findRequest{NamespaceString::kConfigsvrShardsNamespace};
-        findRequest.setLimit(2);
-        auto numShards = client.find(std::move(findRequest))->itcount();
-
-        // Prior to 7.3, the cluster parameter 'hasTwoOrMoreShards' gets set to true when the number
-        // of shards goes from 1 to 2 but doesn't get set to false when the number of shards goes
-        // down to 1.
-        if (numShards >= 2) {
-            return;
-        }
-
-        uassertStatusOK(ShardingCatalogManager::get(opCtx)->updateClusterCardinalityParameter(
-            opCtx, numShards));
+        uassertStatusOK(
+            ShardingCatalogManager::get(opCtx)->updateClusterCardinalityParameterIfNeeded(opCtx));
     }
 }
 

@@ -97,6 +97,8 @@ last-continuous:
       ticket: SERVER-89342
     - test_file: jstests/sharding/secondaries_clear_filtering_metadata.js
       ticket: SERVER-86669
+    - test_file: jstests/sharding/cluster_cardinality_parameter_interrupt.js
+      ticket: SERVER-90334
   suites: null
 last-lts:
   all:
@@ -176,4 +178,6 @@ last-lts:
       ticket: SERVER-89342
     - test_file: jstests/sharding/secondaries_clear_filtering_metadata.js
       ticket: SERVER-86669
+    - test_file: jstests/sharding/cluster_cardinality_parameter_interrupt.js
+      ticket: SERVER-90334
   suites: null

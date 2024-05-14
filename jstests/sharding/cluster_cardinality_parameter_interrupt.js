@@ -1,7 +1,7 @@
 /**
  * Tests that the cluster parameter "shardedClusterCardinalityForDirectConns" has the correct value
- * after the addShard command is interrupted before the cluster parameter is updated but the
- * addShard command is retried after that.
+ * after an addShard/removeShard command is interrupted before the cluster parameter is updated but
+ * the addShard/removeShard command is retried after that.
  *
  * Additionally check that data movement is properly disallowed while the cluster parameter has yet
  * to be updated by the addShard command.
@@ -12,9 +12,11 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     checkClusterParameter,
-    interruptConfigsvrAddShard
+    interruptConfigsvrAddShard,
+    interruptConfigsvrRemoveShard
 } from "jstests/sharding/libs/cluster_cardinality_parameter_util.js";
 
 const st = new ShardingTest({shards: 1});
@@ -43,8 +45,24 @@ function addShard(mongosHost, shardURL, shardName) {
 
     jsTest.log("Start adding shard " + tojsononeline({shardURL, shardName}));
     const res = mongos.adminCommand({addShard: shardURL, name: shardName});
-    jsTest.log("Finished adding shard " + tojsononeline({shardURL, shardName}));
+    jsTest.log("Finished adding shard " + tojsononeline({shardURL, shardName, res}));
     return res;
+}
+
+function removeShard(mongosHost, cmdName, shardName, expectedError) {
+    const mongos = new Mongo(mongosHost);
+
+    jsTest.log("Start removing shard " + tojsononeline({shardName}));
+    assert.soon(() => {
+        const res = mongos.adminCommand({[cmdName]: shardName});
+        if (!res.ok && res.code == expectedError) {
+            return true;
+        }
+        assert.commandWorked(res);
+        return res.state == "complete";
+    });
+    jsTest.log("Finished removing shard " + tojsononeline({shardName}));
+    return;
 }
 
 const shard1Name = "shard1";
@@ -55,14 +73,14 @@ shard1Rst.initiate();
 jsTest.log(
     "Run an addShard command but interrupt it before it updates the cluster cardinality parameter");
 const configPrimary = st.configRS.getPrimary();
-const fp =
+const addShardFp =
     configureFailPoint(configPrimary, "hangAddShardBeforeUpdatingClusterCardinalityParameter");
 const addShardThread = new Thread(addShard, st.s.host, shard1Rst.getURL(), shard1Name);
 addShardThread.start();
-fp.wait();
+addShardFp.wait();
 interruptConfigsvrAddShard(configPrimary);
 assert.commandFailedWithCode(addShardThread.returnData(), ErrorCodes.Interrupted);
-fp.off();
+addShardFp.off();
 
 jsTest.log("Checking the cluster parameter");
 // The addShard command has not set the cluster parameter to true again because of the interrupt.
@@ -138,6 +156,43 @@ if (!isMultiversion) {
     assert.commandWorked(st.s.adminCommand(
         {unshardCollection: dbName + '.' + shardedCollName3, toShard: shard1Rst.name}));
 }
+
+// Move the remaining data out of shard0 so it can be removed.
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: "config.system.sessions", find: {_id: 0}, to: shard1Name, _waitForDelete: true}));
+
+jsTest.log(
+    "Run a removeShard command but interrupt it before it updates the cluster cardinality parameter");
+const removeShardCmdName =
+    (st.shard0.shardName == "config") ? "transitionToDedicatedConfigServer" : "removeShard";
+const removeShardFp =
+    configureFailPoint(configPrimary, "hangRemoveShardBeforeUpdatingClusterCardinalityParameter");
+const removeShardThread = new Thread(
+    removeShard, st.s.host, removeShardCmdName, st.shard0.shardName, ErrorCodes.Interrupted);
+removeShardThread.start();
+removeShardFp.wait();
+interruptConfigsvrRemoveShard(configPrimary);
+removeShardThread.join();
+removeShardFp.off();
+
+jsTest.log("Checking the cluster parameter");
+// The removeShard command has not set the cluster parameter to false again because of the
+// interrupt.
+checkClusterParameter(st.configRS, true);
+checkClusterParameter(st.rs0, true);
+checkClusterParameter(shard1Rst, true);
+
+jsTest.log("Retry the removeShard command");
+assert.commandFailedWithCode(st.s.adminCommand({[removeShardCmdName]: st.shard0.shardName}),
+                             ErrorCodes.ShardNotFound);
+
+jsTest.log("Checking the cluster parameter");
+// The removeShard command should set to cluster parameter to false if the replica set endpoint
+// feature flag is enabled.
+const expectedHasTwoOrMoreShards =
+    !FeatureFlagUtil.isPresentAndEnabled(configPrimary, "ReplicaSetEndpoint");
+checkClusterParameter(st.configRS, expectedHasTwoOrMoreShards);
+checkClusterParameter(shard1Rst, expectedHasTwoOrMoreShards);
 
 st.stop();
 shard1Rst.stopSet();

@@ -9,24 +9,28 @@ export function checkClusterParameter(rst, expectedValue) {
 }
 
 /**
- * Interrupts the command for the command with the given name if it is running on the given node.
+ * Interrupts the commands with the given names if they are running on the given node.
  */
-export function interruptAdminCommand(node, cmdName) {
+export function interruptAdminCommand(node, cmdNames) {
     const adminDB = node.getDB("admin");
+    const cmdNameFilter = [];
+    cmdNames.forEach(cmdName => {
+        cmdNameFilter.push({["command." + cmdName]: {$exists: true}});
+    });
     const results =
         adminDB
-            .aggregate([{$currentOp: {}}, {$match: {["command." + cmdName]: {$exists: true}}}],
+            .aggregate([{$currentOp: {}}, {$match: {$or: cmdNameFilter}}],
                        {$readPreference: {mode: "primaryPreferred"}})  // specify secondary ok.
             .toArray();
-    if (results.length > 0) {
-        adminDB.killOp(results[0].opid);
-    }
+    results.forEach(result => {adminDB.killOp(result.opid)});
 }
 
 export function interruptConfigsvrAddShard(configPrimary) {
-    interruptAdminCommand(configPrimary, "_configsvrAddShard");
+    interruptAdminCommand(configPrimary,
+                          ["_configsvrAddShard", "_configsvrTransitionToDedicatedConfigServer"]);
 }
 
 export function interruptConfigsvrRemoveShard(configPrimary) {
-    interruptAdminCommand(configPrimary, "_configsvrRemoveShard");
+    interruptAdminCommand(configPrimary,
+                          ["_configsvrRemoveShard", "_configsvrTransitionToDedicatedConfigServer"]);
 }

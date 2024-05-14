@@ -100,6 +100,7 @@
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/replica_set_endpoint_feature_flag.h"
 #include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -167,6 +168,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAddShardBeforeUpdatingClusterCardinalityParameter);
 MONGO_FAIL_POINT_DEFINE(hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer);
+MONGO_FAIL_POINT_DEFINE(hangRemoveShardBeforeUpdatingClusterCardinalityParameter);
 MONGO_FAIL_POINT_DEFINE(skipUpdatingClusterCardinalityParameterAfterAddShard);
 MONGO_FAIL_POINT_DEFINE(skipUpdatingClusterCardinalityParameterAfterRemoveShard);
 
@@ -793,8 +795,9 @@ void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext
     }
 }
 
-Status ShardingCatalogManager::updateClusterCardinalityParameter(OperationContext* opCtx,
-                                                                 int numShards) {
+Status ShardingCatalogManager::_updateClusterCardinalityParameter(const Lock::ExclusiveLock&,
+                                                                  OperationContext* opCtx,
+                                                                  int numShards) {
     ConfigsvrSetClusterParameter configsvrSetClusterParameter(BSON(
         "shardedClusterCardinalityForDirectConns"
         << BSON(ShardedClusterCardinalityParam::kHasTwoOrMoreShardsFieldName << (numShards >= 2))));
@@ -812,7 +815,7 @@ Status ShardingCatalogManager::updateClusterCardinalityParameter(OperationContex
 }
 
 Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterAddShardIfNeeded(
-    const Lock::ExclusiveLock&, OperationContext* opCtx) {
+    const Lock::ExclusiveLock& clusterCardinalityParameterLock, OperationContext* opCtx) {
     if (MONGO_unlikely(skipUpdatingClusterCardinalityParameterAfterAddShard.shouldFail())) {
         return Status::OK();
     }
@@ -820,13 +823,14 @@ Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterAddShardIf
     auto numShards = Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx);
     if (numShards == 2) {
         // Only need to update the parameter when adding the second shard.
-        return updateClusterCardinalityParameter(opCtx, numShards);
+        return _updateClusterCardinalityParameter(
+            clusterCardinalityParameterLock, opCtx, numShards);
     }
     return Status::OK();
 }
 
 Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
-    const Lock::ExclusiveLock&, OperationContext* opCtx) {
+    const Lock::ExclusiveLock& clusterCardinalityParameterLock, OperationContext* opCtx) {
     if (MONGO_unlikely(skipUpdatingClusterCardinalityParameterAfterRemoveShard.shouldFail())) {
         return Status::OK();
     }
@@ -835,16 +839,30 @@ Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterRemoveShar
     // again after a second shard has been added. Unsharded collections are allowed to be tracked
     // and moved as soon as a second shard is added to the cluster, and these collections will not
     // handle direct connections properly.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (fcvSnapshot.isVersionInitialized() &&
-        !feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabled(fcvSnapshot)) {
+    if (!replica_set_endpoint::isFeatureFlagEnabled()) {
         return Status::OK();
     }
 
     auto numShards = Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx);
     if (numShards == 1) {
         // Only need to update the parameter when removing the second shard.
-        return updateClusterCardinalityParameter(opCtx, numShards);
+        return _updateClusterCardinalityParameter(
+            clusterCardinalityParameterLock, opCtx, numShards);
+    }
+    return Status::OK();
+}
+
+Status ShardingCatalogManager::updateClusterCardinalityParameterIfNeeded(OperationContext* opCtx) {
+    Lock::ExclusiveLock clusterCardinalityParameterLock(opCtx, _kClusterCardinalityParameterLock);
+
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    shardRegistry->reload(opCtx);
+
+    auto numShards = shardRegistry->getNumShards(opCtx);
+    if (numShards <= 2) {
+        // Only need to update the parameter when adding or removing the second shard.
+        return _updateClusterCardinalityParameter(
+            clusterCardinalityParameterLock, opCtx, numShards);
     }
     return Status::OK();
 }
@@ -1124,6 +1142,12 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     const auto name = shardId.toString();
     audit::logRemoveShard(opCtx->getClient(), name);
 
+    // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
+    // so that no add/remove shard operation and its set cluster cardinality parameter operation can
+    // interleave with the ones below. Release the shard membership lock before initiating the
+    // _configsvrSetClusterParameter command after finishing the remove shard operation since
+    // setting a cluster parameter requires taking this lock.
+    Lock::ExclusiveLock clusterCardinalityParameterLock(opCtx, _kClusterCardinalityParameterLock);
     Lock::ExclusiveLock shardMembershipLock(opCtx, _kShardMembershipLock);
 
     auto findShardResponse = uassertStatusOK(
@@ -1134,9 +1158,19 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                   BSON(ShardType::name() << name),
                                                   BSONObj(),
                                                   1));
-    uassert(ErrorCodes::ShardNotFound,
-            str::stream() << "Shard " << shardId << " does not exist",
-            !findShardResponse.docs.empty());
+
+    if (findShardResponse.docs.empty()) {
+        // Release the shard membership lock since the set cluster parameter operation below
+        // requires taking this lock.
+        shardMembershipLock.unlock();
+
+        auto updateStatus = _updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
+            clusterCardinalityParameterLock, opCtx);
+        uassertStatusOK(updateStatus);
+        uasserted(ErrorCodes::ShardNotFound,
+                  str::stream() << "Shard " << shardId << " does not exist");
+    }
+
     const auto shard = uassertStatusOK(ShardType::fromBSON(findShardResponse.docs[0]));
 
     // Find how many *other* shards exist, which are *not* currently draining
@@ -1193,6 +1227,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     }
 
     shardMembershipLock.unlock();
+    clusterCardinalityParameterLock.unlock();
 
     // Draining has already started, now figure out how many chunks and databases are still on the
     // shard.
@@ -1290,15 +1325,10 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Draining is done, now finish removing the shard.
     LOGV2(21949, "Going to remove shard", "shardId"_attr = name);
 
-    // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
-    // so that no add/remove shard operation and its set cluster cardinality parameter operation can
-    // interleave with the ones below. Release the shard membership lock before initiating the
-    // _configsvrSetClusterParameter command after finishing the remove shard operation since
-    // setting a cluster parameter requires taking this lock.
-    Lock::ExclusiveLock clusterCardinalityParameterLock(opCtx, _kClusterCardinalityParameterLock);
     // Synchronize the control shard selection, the shard's document removal, and the topology time
     // update to exclude potential race conditions in case of concurrent add/remove shard
     // operations.
+    clusterCardinalityParameterLock.lock();
     shardMembershipLock.lock();
 
     // Find a controlShard to be updated.
@@ -1325,6 +1355,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Remove the shard's document and update topologyTime within a transaction.
     _removeShardInTransaction(opCtx, name, controlShardName, newTopologyTime.asTimestamp());
 
+    // Release the shard membership lock since the set cluster parameter operation below
+    // require taking this lock.
     shardMembershipLock.unlock();
 
     // The shard which was just removed must be reflected in the shard registry, before the replica
@@ -1344,6 +1376,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                            ShardingCatalogClient::kLocalWriteConcern,
                                            _localConfigShard,
                                            _localCatalogClient.get());
+
+    hangRemoveShardBeforeUpdatingClusterCardinalityParameter.pauseWhileSet(opCtx);
 
     uassertStatusOK(_updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
         clusterCardinalityParameterLock, opCtx));
