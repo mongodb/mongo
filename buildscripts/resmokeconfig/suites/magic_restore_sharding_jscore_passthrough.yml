@@ -55,6 +55,8 @@ selector:
     # config server node on a different port than the configuration we pass in. We will have a
     # targeted test that handles this case for correctness.
     - jstests/core/query/query_settings/query_settings_size_limits.js
+    # BF-33295. Magic restore fails in burn_in tasks with NamespaceNotFound error
+    - jstests/core/query/sort/sortj.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

@@ -59,6 +59,9 @@ selector:
     # durable history that is required to do PIT reads for consistency checks.
     - jstests/core/query/query_settings/query_settings_size_limits.js
 
+    # BF-33295. Magic restore fails in burn_in tasks with NamespaceNotFound error
+    - jstests/core/query/sort/sortj.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     # After SERVER-80339, the server runs a "listIndexes" command on the background, which could show
