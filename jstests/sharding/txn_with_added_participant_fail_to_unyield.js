@@ -2,7 +2,7 @@
  * Tests that a transaction will be aborted in the event a transaction participant that adds another
  * participant to the transaction fails to unyield its resources.
  * @tags: [
- *   featureFlagAllowAdditionalParticipants,
+ *   requires_fcv_80,
  *   temp_disabled_embedded_router_metrics,
  * ]
  */

@@ -14,7 +14,7 @@
  * @tags: [
  *     uses_transactions,
  *     assumes_snapshot_transactions,
- *     featureFlagAllowAdditionalParticipants,
+ *     requires_fcv_80,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

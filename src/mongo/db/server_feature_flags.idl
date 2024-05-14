@@ -43,7 +43,8 @@ feature_flags:
     featureFlagAllowAdditionalParticipants:
         description: "Enable adding additional participants to active transaction"
         cpp_varname: gFeatureFlagAllowAdditionalParticipants
-        default: false
+        default: true
+        version: 8.0
         shouldBeFCVGated: true
     featureFlagBulkWriteCommand:
         description: "Support for bulkWrite command and one-shot transactions"
