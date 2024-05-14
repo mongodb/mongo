@@ -2,6 +2,7 @@
  * Tests that the aggregate command can use command-level let variables with $merge.
  *
  * @tags: [
+ *   incompatible_with_shard_merge,
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_causal_consistency,
