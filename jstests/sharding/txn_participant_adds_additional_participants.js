@@ -1,6 +1,6 @@
 /**
  * Tests that additional participants can be added to an existing transaction.
- * @tags: [featureFlagAllowAdditionalParticipants]
+ * @tags: [requires_fcv_80]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

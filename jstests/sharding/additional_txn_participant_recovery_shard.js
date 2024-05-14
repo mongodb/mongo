@@ -1,7 +1,7 @@
 /**
  * Tests that a read-only transaction will choose a recovery shard if an additional participant is
  * ever marked as 'outstanding'.
- * @tags: [featureFlagAllowAdditionalParticipants, uses_transactions]
+ * @tags: [requires_fcv_80, uses_transactions]
  */
 
 let st = new ShardingTest({mongos: 2, shards: 2});

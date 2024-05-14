@@ -1,7 +1,7 @@
 /**
  * Tests that a transaction will be aborted in the event a transaction participant that adds another
  * participant to the transaction fails to unyield its resources.
- * @tags: [featureFlagAllowAdditionalParticipants]
+ * @tags: [requires_fcv_80]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

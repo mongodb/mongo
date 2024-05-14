@@ -1,7 +1,7 @@
 /**
  * Tests that snapshot readConcern and placementConflictTime are respected on participants added to
  * a transaction by other participants when there are conflicting operations.
- * @tags: [featureFlagAllowAdditionalParticipants]
+ * @tags: [requires_fcv_80]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
