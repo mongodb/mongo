@@ -110,26 +110,39 @@ const auto cappedCollectionState =
 
 }  // namespace
 
+
+bool insertsAreDueToOplogApplication(OperationContext* opCtx, const CollectionPtr& collection) {
+    // Secondaries only delete from capped collections via oplog application when there are explicit
+    // delete oplog entries.
+    if (!opCtx->isEnforcingConstraints()) {
+        return true;
+    }
+
+    if (collection->ns().isTemporaryReshardingCollection()) {
+        // Don't do capped deletes if this is a temporary resharding collection since that could
+        // lead to multi-timestamp violation. The recipient shard will apply the capped delete oplog
+        // entries from the donor shard anyway.
+        // TODO PM-3667: Reevaluate if we can setEnforceConstraints(false) during resharding and
+        // rely solely on the above check.
+        return true;
+    }
+
+    return false;
+}
+
 void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
                                              const CollectionPtr& collection,
                                              const RecordId& justInserted) {
     if (!collection->isCappedAndNeedsDelete(opCtx))
         return;
 
-    // Secondaries only delete from capped collections via oplog application when there are explicit
-    // delete oplog entries
-    if (!opCtx->isEnforcingConstraints())
-        return;
-
-    const auto& nss = collection->ns();
-
-    if (nss.isTemporaryReshardingCollection()) {
-        // Don't do capped deletes if this is a temporary resharding collection since that could
-        // lead to multi-timestamp violation. The recipient shard will apply the capped delete oplog
-        // entries from the donor shard anyway.
+    if (insertsAreDueToOplogApplication(opCtx, collection)) {
+        // The primary has already executed the following logic and generated the necessary delete
+        // oplogs. We will apply them later.
         return;
     }
 
+    const auto& nss = collection->ns();
     auto& ccs = cappedCollectionState(*collection->getSharedDecorations());
 
     stdx::unique_lock<Latch> cappedFirstRecordMutex(ccs.cappedFirstRecordMutex, stdx::defer_lock);

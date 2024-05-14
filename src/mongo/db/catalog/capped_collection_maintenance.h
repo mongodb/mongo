@@ -36,6 +36,8 @@
 namespace mongo {
 namespace collection_internal {
 
+bool insertsAreDueToOplogApplication(OperationContext* opCtx, const CollectionPtr& collection);
+
 /**
  * If the collection is capped and the current data size or number of records exceeds cappedMaxSize
  * or cappedMaxDocs respectively, this method will block and delete as many documents as necessary

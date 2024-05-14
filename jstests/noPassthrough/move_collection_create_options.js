@@ -143,8 +143,6 @@ const testCases = [
                 }
             });
         },
-        // TODO (SERVER-89342): moveCollection fails for capped collections.
-        expectedMoveCollectionError: ErrorCodes.OperationCannotBeBatched,
         // Cannot shard capped collections.
         expectedShardCollectionError: ErrorCodes.InvalidOptions,
     },
@@ -170,8 +168,6 @@ const testCases = [
                 }
             });
         },
-        // TODO (SERVER-89342): moveCollection fails for capped collections.
-        expectedMoveCollectionError: ErrorCodes.OperationCannotBeBatched,
         // Cannot shard capped collections.
         expectedShardCollectionError: ErrorCodes.InvalidOptions,
     },
