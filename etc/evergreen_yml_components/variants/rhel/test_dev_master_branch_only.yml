@@ -181,16 +181,26 @@ variables:
 
 buildvariants:
   - <<: *generic_linux_compile_params
-    name: &linux-x86-dynamic-compile-future-tag-multiversion linux-x86-dynamic-compile-future-tag-multiversion
-    display_name: "Linux x86 Shared Library Compile (future git tag multiversion)"
+    name: &linux-x86-dynamic-compile-future-tag-multiversion-latest linux-x86-dynamic-compile-future-tag-multiversion-latest
+    display_name: "Linux x86 Shared Library Compile (future git tag multiversion - latest)"
     tags: []
     expansions:
       <<: *linux-x86-dynamic-enterprise-compile-expansions
       bv_future_git_tag: r100.0.0-9999
-      compile_variant: *linux-x86-dynamic-compile-future-tag-multiversion
+      compile_variant: *linux-x86-dynamic-compile-future-tag-multiversion-latest
     tasks:
       - name: version_expansions_future_git_tag_multiversion_gen
       - name: compile_test_serial_future_git_tag_multiversion_TG
+
+  - <<: *generic_linux_compile_params
+    name: &linux-x86-dynamic-compile-future-tag-multiversion-last-continuous linux-x86-dynamic-compile-future-tag-multiversion-last-continuous
+    display_name: "Linux x86 Shared Library Compile (future git tag multiversion - last continuous)"
+    tags: []
+    expansions:
+      <<: *linux-x86-dynamic-enterprise-compile-expansions
+      compile_variant: *linux-x86-dynamic-compile-future-tag-multiversion-last-continuous
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
 
   - <<: *linux-x86-dynamic-compile-params
     name: &linux-stitch-compile-suggested linux-stitch-compile-suggested
@@ -447,7 +457,7 @@ buildvariants:
       test_flags: >-
         --runNoFeatureFlagTests
 
-  # This variant exists becuase this is the only way to test future multiversion tags
+  # This variant exists because this is the only way to test future multiversion tags
   # version_expansions_gen will pretend we are upgrading to "bv_future_git_tag"
   # which is like simulating a branching task
   - &enterprise-rhel-80-64-bit-future-git-tag-multiversion-template
@@ -461,11 +471,12 @@ buildvariants:
       scons_cache_mode: all
       resmoke_jobs_factor: 0.5
       bv_future_git_tag: r100.0.0-9999
-      compile_variant: linux-x86-dynamic-compile-future-tag-multiversion
+      compile_variant: *linux-x86-dynamic-compile-future-tag-multiversion-latest
       test_flags: >-
         --excludeWithAnyTags=future_git_tag_incompatible
       unique_gen_suffix: "-future"
       last_versions: last_lts,last_continuous
+      multiversion_last_continuous_variant: *linux-x86-dynamic-compile-future-tag-multiversion-last-continuous
     depends_on:
       - name: version_gen
         variant: generate-tasks-for-version
@@ -473,15 +484,12 @@ buildvariants:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
       - name: archive_dist_test_debug_future_git_tag_multiversion
-        variant: linux-x86-dynamic-compile-future-tag-multiversion
+        variant: *linux-x86-dynamic-compile-future-tag-multiversion-latest
+      - name: archive_dist_test_debug
+        variant: *linux-x86-dynamic-compile-future-tag-multiversion-last-continuous
     tasks:
       - name: .multiversion !.future_git_tag_incompatible
       - name: .multiversion_future_git_tag
-    # This task does not work because it depends on archive_dist_test_debug
-    # Because we override the task dependencies in the future git tag varients we can't have
-    # multiple tasks in one varient depend on muliple different compile variant tasks
-    # If we decide we need this task we can add it to its own variant that depends on archive_dist_test_debug
-    # - name: generate_buildid_to_debug_symbols_mapping
 
   - <<: *enterprise-rhel-79-64-bit-template
     name: &hot_backups-rhel-79-64-bit hot_backups-rhel-79-64-bit
