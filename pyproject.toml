@@ -104,6 +104,7 @@ types-requests = "2.31.0.1"
 tqdm = "*"
 colorama = "^0.4.6"
 evergreen-lint = "^0.1.6"
+ruff = "^0.4.4"
 
 [tool.poetry.group.platform.dependencies]
 pypiwin32 = { version = ">=223", markers = "sys_platform == 'win32'" }
@@ -174,6 +175,13 @@ libdeps = [
 # Currently this does nothing
 [tool.poetry.scripts]
 resmoke = "buildscripts.resmoke:entrypoint"
+
+[tool.ruff]
+exclude = [
+    "site_scons/third_party",
+    "src/third_party",
+]
+extend-include = ["*/SConscript"]
 
 [build-system]
 requires = ["poetry-core"]
