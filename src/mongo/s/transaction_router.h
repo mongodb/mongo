@@ -122,7 +122,7 @@ public:
      * the transaction that created it.
      */
     struct Participant {
-        enum class ReadOnly { kUnset, kReadOnly, kNotReadOnly, kOutstandingAdditionalParticipant };
+        enum class ReadOnly { kUnset, kReadOnly, kNotReadOnly };
 
         Participant(bool isCoordinator,
                     StmtId stmtIdCreatedAt,
@@ -141,8 +141,8 @@ public:
         // True if the participant has been chosen as the coordinator for its transaction
         const bool isCoordinator{false};
 
-        // Is updated to kReadOnly, kNotReadOnly, or kOutstandingAdditionalParticipant based on the
-        // readOnly field in the participant's responses to statements.
+        // Is updated to kReadOnly or kNotReadOnly based on the readOnly field in the participant's
+        // responses to statements.
         const ReadOnly readOnly{ReadOnly::kUnset};
 
         // Returns the shared transaction options this participant was created with
@@ -440,7 +440,8 @@ public:
          */
         void processParticipantResponse(OperationContext* opCtx,
                                         const ShardId& shardId,
-                                        const BSONObj& responseObj);
+                                        const BSONObj& responseObj,
+                                        bool forAsyncGetMore = false);
 
         /**
          * Returns true if the current transaction can retry on a stale version error from a

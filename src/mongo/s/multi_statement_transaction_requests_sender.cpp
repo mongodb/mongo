@@ -45,6 +45,19 @@
 namespace mongo {
 
 namespace transaction_request_sender_details {
+namespace {
+void processReplyMetadata(OperationContext* opCtx,
+                          const ShardId& shardId,
+                          const BSONObj& responseBson,
+                          bool forAsyncGetMore = false) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    if (!txnRouter) {
+        return;
+    }
+
+    txnRouter.processParticipantResponse(opCtx, shardId, responseBson, forAsyncGetMore);
+}
+}  // namespace
 
 std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     OperationContext* opCtx, const std::vector<AsyncRequestsSender::Request>& requests) {
@@ -84,15 +97,10 @@ void processReplyMetadata(OperationContext* opCtx, const AsyncRequestsSender::Re
     processReplyMetadata(opCtx, response.shardId, response.swResponse.getValue().data);
 }
 
-void processReplyMetadata(OperationContext* opCtx,
-                          const ShardId& shardId,
-                          const BSONObj& responseBson) {
-    auto txnRouter = TransactionRouter::get(opCtx);
-    if (!txnRouter) {
-        return;
-    }
-
-    txnRouter.processParticipantResponse(opCtx, shardId, responseBson);
+void processReplyMetadataForAsyncGetMore(OperationContext* opCtx,
+                                         const ShardId& shardId,
+                                         const BSONObj& responseBson) {
+    processReplyMetadata(opCtx, shardId, responseBson, true /* forAsyncGetMore */);
 }
 
 }  // namespace transaction_request_sender_details
