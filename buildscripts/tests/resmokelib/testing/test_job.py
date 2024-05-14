@@ -8,8 +8,7 @@ import mock
 from opentelemetry.context.context import Context
 
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing import job
-from buildscripts.resmokelib.testing import queue_element
+from buildscripts.resmokelib.testing import job, queue_element
 from buildscripts.resmokelib.testing.fixtures import interface as _fixtures
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.utils import queue as _queue

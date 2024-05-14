@@ -2,6 +2,7 @@
 
 import time
 
+from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.testing.testcases import interface
 
 
@@ -10,7 +11,7 @@ class SleepTestCase(interface.TestCase):
 
     REGISTERED_NAME = "sleep_test"
 
-    def __init__(self, logger, sleep_duration_secs):
+    def __init__(self, logger: logging.Logger, sleep_duration_secs: int):
         """Initialize the SleepTestCase with the duration to sleep for."""
 
         sleep_duration_secs = int(sleep_duration_secs)

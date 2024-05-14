@@ -8,16 +8,13 @@ from typing import Generic, List, Optional, TypeVar, Union
 from opentelemetry import context
 
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import logging
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import errors, logging, utils
 from buildscripts.resmokelib.core import network
-from buildscripts.resmokelib.testing import fixtures
+from buildscripts.resmokelib.testing import fixtures, testcases
 from buildscripts.resmokelib.testing import hook_test_archival as archival
 from buildscripts.resmokelib.testing import hooks as _hooks
 from buildscripts.resmokelib.testing import job as _job
 from buildscripts.resmokelib.testing import report as _report
-from buildscripts.resmokelib.testing import testcases
 from buildscripts.resmokelib.testing.docker_cluster_image_builder import DockerComposeImageBuilder, build_images
 from buildscripts.resmokelib.testing.fixtures.interface import Fixture
 from buildscripts.resmokelib.testing.hooks.interface import Hook
@@ -284,7 +281,7 @@ class TestSuiteExecutor(object):
         return _job.Job(job_num, job_logger, fixture, hooks, report, self.archival,
                         self._suite.options, self.test_queue_logger)
 
-    def _create_queue_elem_for_test_name(self, test_name):
+    def _create_queue_elem_for_test_name(self, test_names: list[str]):
         """
         Create the appropriate queue_elem to run the given test_name.
 
@@ -292,7 +289,7 @@ class TestSuiteExecutor(object):
         :return: queue_elem representing the test_name to be run.
         """
         test_case = testcases.make_test_case(self._suite.test_kind, self.test_queue_logger,
-                                             test_name, **self.test_config)
+                                             test_names, **self.test_config)
         return queue_elem_factory(test_case, self.test_config, self._suite.options)
 
     def _make_test_queue(self) -> 'TestQueue[Union[QueueElemRepeatTime, QueueElem]]':
@@ -312,8 +309,9 @@ class TestSuiteExecutor(object):
         test_cases = []
 
         # Make test cases to put in test queue
+        # TODO: this could be optimized to run several tests in the same mongo shell invocation
         for test_name in self._suite.make_test_case_names_list():
-            queue_elem = self._create_queue_elem_for_test_name(test_name)
+            queue_elem = self._create_queue_elem_for_test_name([test_name])
             test_cases.append(queue_elem)
             if _config.SANITY_CHECK:
                 break

@@ -4,25 +4,46 @@ import os
 import os.path
 import time
 import shutil
+from typing import Optional
 import uuid
 
 import yaml
 
 import pymongo
 import pymongo.errors
+from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.testing.fixtures.interface import _FIXTURES
 from buildscripts.resmokelib.testing.fixtures.mongot import MongoTFixture
+from buildscripts.resmokelib.utils.history import HistoryDict
 
 
 class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a standalone mongod to run against."""
 
-    def __init__(self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
-                 add_feature_flags=False, dbpath_prefix=None, preserve_dbpath=False, port=None,
-                 launch_mongot=False):
-        """Initialize MongoDFixture with different options for the mongod process."""
+    def __init__(self, logger: logging.Logger, job_num: int, fixturelib: FixtureLib,
+                 mongod_executable: Optional[str] = None, mongod_options: Optional[dict] = None,
+                 add_feature_flags: bool = False, dbpath_prefix: Optional[str] = None,
+                 preserve_dbpath: bool = False, port: Optional[int] = None,
+                 launch_mongot: bool = False):
+        """Initialize MongoDFixture with different options for the mongod process.
+
+        Args:
+            logger (logging.Logger): logger
+            job_num (int): Which job this fixture is a part of. Used for multithreading
+            fixturelib (FixtureLib): fixturelib
+            mongod_executable (Optional[str], optional): Optional path to mongod executable. Defaults to None.
+            mongod_options (Optional[dict], optional): Optional mongod startup options. Defaults to None.
+            add_feature_flags (bool, optional): Sets all feature flags to true when set. Defaults to False.
+            dbpath_prefix (Optional[str], optional): Sets the dbpath_prefix. Defaults to None.
+            preserve_dbpath (bool, optional): preserve_dbpath. Defaults to False.
+            port (Optional[int], optional): Port to use for mongod. Defaults to None.
+            launch_mongot (bool, optional): Should mongot be launched as well. Defaults to False.
+
+        Raises
+            ValueError: _description_
+        """
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
         self.mongod_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongod_options, {}))
@@ -281,13 +302,15 @@ DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY = {
 class MongodLauncher(object):
     """Class with utilities for launching a mongod."""
 
-    def __init__(self, fixturelib):
+    def __init__(self, fixturelib: FixtureLib):
         """Initialize MongodLauncher."""
         self.fixturelib = fixturelib
         self.config = fixturelib.get_config()
 
-    def launch_mongod_program(self, logger, job_num, executable=None, process_kwargs=None,
-                              mongod_options=None):
+    def launch_mongod_program(
+            self, logger: logging.Logger, job_num: str, executable: Optional[str] = None,
+            process_kwargs: Optional[dict] = None,
+            mongod_options: Optional[HistoryDict] = None) -> tuple["process.Process", HistoryDict]:
         """
         Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
 

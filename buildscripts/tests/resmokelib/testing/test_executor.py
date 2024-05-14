@@ -58,10 +58,10 @@ class TestCreateQueueElemForTestName(unittest.TestCase):
         test_config = {}
         suite = mock_suite(num_tests)
         ut_executor = UnitTestExecutor(suite, test_config)
-        queue_elem = ut_executor._create_queue_elem_for_test_name('test_name')
+        queue_elem = ut_executor._create_queue_elem_for_test_name(['test_name'])
         self.assertEqual(queue_elem_mock.return_value, queue_elem)
         make_test_case_mock.assert_called_with(suite.test_kind, ut_executor.test_queue_logger,
-                                               'test_name', **test_config)
+                                               ['test_name'], **test_config)
         queue_elem_mock.assert_called_with(make_test_case_mock.return_value, test_config,
                                            suite.options)
 
@@ -77,7 +77,7 @@ class TestMakeTestQueue(unittest.TestCase):
         self.assertEqual(len(self.suite.tests), test_queue.qsize())
         while not test_queue.empty():
             element = test_queue.get()
-            self.assertIn(element, self.suite.tests)
+            self.assertIn(element[0], self.suite.tests)
 
     def test_repeat_three_times(self):
         num_repeats = 3
@@ -86,7 +86,7 @@ class TestMakeTestQueue(unittest.TestCase):
         self.assertEqual(num_repeats * len(self.suite.tests), test_queue.qsize())
         while not test_queue.empty():
             element = test_queue.get()
-            self.assertIn(element, self.suite.tests)
+            self.assertIn(element[0], self.suite.tests)
 
 
 class TestTestQueueAddTestCases(unittest.TestCase):

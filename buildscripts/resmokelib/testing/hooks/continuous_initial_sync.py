@@ -487,7 +487,11 @@ class _InitialSyncThread(threading.Thread):
                 throw e;
             }}"""
         shell_options = {"nodb": "", "eval": js_cmds.format(client_conn)}
-        shell_proc = core.programs.mongo_shell_program(self.logger, **shell_options)
+        shell_proc = core.programs.mongo_shell_program(
+            self.logger,
+            test_name="initial_sync",
+            **shell_options,
+        )
         shell_proc.start()
         return_code = shell_proc.wait()
         if return_code:

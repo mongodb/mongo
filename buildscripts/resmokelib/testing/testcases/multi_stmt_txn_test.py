@@ -1,5 +1,7 @@
 """unittest.TestCase for multi-statement transaction passthrough tests."""
 
+from typing import Optional
+from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.testing.testcases import jsrunnerfile
 
 
@@ -8,10 +10,13 @@ class MultiStmtTxnTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     REGISTERED_NAME = "multi_stmt_txn_passthrough"
 
-    def __init__(self, logger, multi_stmt_txn_test_file, shell_executable=None, shell_options=None):
+    def __init__(self, logger: logging.Logger, multi_stmt_txn_test_files: list[str],
+                 shell_executable: Optional[str] = None, shell_options: Optional[dict] = None):
         """Initilize MultiStmtTxnTestCase."""
+
+        assert len(multi_stmt_txn_test_files) == 1
         jsrunnerfile.JSRunnerFileTestCase.__init__(
-            self, logger, "Multi-statement Transaction Passthrough", multi_stmt_txn_test_file,
+            self, logger, "Multi-statement Transaction Passthrough", multi_stmt_txn_test_files[0],
             test_runner_file="jstests/libs/txns/txn_passthrough_runner.js",
             shell_executable=shell_executable, shell_options=shell_options)
 

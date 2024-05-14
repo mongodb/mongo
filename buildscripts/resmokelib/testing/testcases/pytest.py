@@ -2,7 +2,7 @@
 import os
 import sys
 
-from buildscripts.resmokelib import core
+from buildscripts.resmokelib import core, logging
 from buildscripts.resmokelib.testing.testcases import interface
 
 
@@ -11,9 +11,10 @@ class PyTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "py_test"
 
-    def __init__(self, logger, py_filename):
+    def __init__(self, logger: logging.Logger, py_filenames: list[str]):
         """Initialize PyTestCase."""
-        interface.ProcessTestCase.__init__(self, logger, "PyTest", py_filename)
+        assert len(py_filenames) == 1
+        interface.ProcessTestCase.__init__(self, logger, "PyTest", py_filenames[0])
 
     def _make_process(self):
         return core.programs.generic_program(

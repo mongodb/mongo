@@ -7,6 +7,7 @@ import os
 import os.path
 import unittest
 import uuid
+import timeit
 
 from typing import Any, Dict, Callable, Optional
 
@@ -40,7 +41,7 @@ class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TE
             raise TypeError("test_kind must be a string")
 
         if not isinstance(test_name, str):
-            raise TypeError("test_name must be a string")
+            raise TypeError(f"test_name must be a string instead it is {type(test_name)}")
 
         self._id = uuid.uuid4()
 
@@ -172,18 +173,22 @@ class ProcessTestCase(TestCase, UndoDBUtilsMixin):
 
     def _execute(self, process: "process.Process"):
         """Run the specified process."""
+
+        start_time = timeit.default_timer()
         self.logger.info("Starting %s...\n%s", self.short_description(), process.as_command())
 
         process.start()
         self.logger.info("%s started with pid %s.", self.short_description(), process.pid)
-
         self.return_code = process.wait()
+        finished_time = timeit.default_timer()
         if self.return_code != 0:
-            raise self.failureException("%s failed" % (self.short_description()))
+            raise self.failureException("%s failed. Duration of process %fs" %
+                                        (self.short_description(), finished_time - start_time))
 
-        self.logger.info("%s finished.", self.short_description())
+        self.logger.info("%s finished. Duration of process %fs", self.short_description(),
+                         finished_time - start_time)
 
-    def _make_process(self):
+    def _make_process(self) -> "process.Process":
         """Return a new Process instance that could be used to run the test or log the command."""
         raise NotImplementedError("_make_process must be implemented by TestCase subclasses")
 

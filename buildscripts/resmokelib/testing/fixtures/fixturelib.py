@@ -2,14 +2,10 @@
 from logging import Logger, Handler
 from typing import Dict
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
-from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import config, core, errors, utils, logging
 from buildscripts.resmokelib.core import network
 from buildscripts.resmokelib.utils.dictionary import merge_dicts
-from buildscripts.resmokelib.utils.history import make_historic as _make_historic
+from buildscripts.resmokelib.utils.history import HistoryDict, make_historic as _make_historic
 from buildscripts.resmokelib.testing.fixtures import _builder
 from buildscripts.resmokelib.testing.retry import with_naive_retry
 
@@ -41,11 +37,13 @@ class FixtureLib:
     # Programs #
     ############
 
-    def make_fixture(self, class_name, logger, job_num, *args, **kwargs):
+    def make_fixture(self, class_name, logger: logging.Logger, job_num: int, *args, **kwargs):
         """Build fixtures by calling builder API."""
         return _builder.make_fixture(class_name, logger, job_num, *args, **kwargs)
 
-    def mongod_program(self, logger, job_num, executable, process_kwargs, mongod_options):
+    def mongod_program(self, logger: logging.Logger, job_num: int, executable: str,
+                       process_kwargs: dict,
+                       mongod_options: HistoryDict) -> tuple["process.Process", HistoryDict]:
         """
         Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
 
@@ -57,19 +55,19 @@ class FixtureLib:
         return core.programs.mongod_program(logger, job_num, executable, process_kwargs,
                                             mongod_options)
 
-    def mongos_program(self, logger, job_num, executable=None, process_kwargs=None,
-                       mongos_options=None):
+    def mongos_program(self, logger: logging.Logger, job_num: int, executable=None,
+                       process_kwargs=None, mongos_options=None):
         """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
         return core.programs.mongos_program(logger, job_num, executable, process_kwargs,
                                             mongos_options)
 
-    def mongot_program(self, logger, job_num, executable=None, process_kwargs=None,
-                       mongot_options=None):
+    def mongot_program(self, logger: logging.Logger, job_num: int, executable=None,
+                       process_kwargs=None, mongot_options=None):
         """Return a Process instance that starts a mongot with arguments constructed from 'kwargs'."""
         return core.programs.mongot_program(logger, job_num, executable, process_kwargs,
                                             mongot_options)
 
-    def generic_program(self, logger, args, process_kwargs=None, **kwargs):
+    def generic_program(self, logger: logging.Logger, args, process_kwargs=None, **kwargs):
         """Return a Process instance that starts an arbitrary executable.
 
         The executable arguments are constructed from 'kwargs'.

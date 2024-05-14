@@ -2,7 +2,9 @@
 
 import os
 import os.path
+from typing import Optional
 
+from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.testing.testcases import jsrunnerfile
 
 
@@ -11,11 +13,13 @@ class MqlModelMongodTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     REGISTERED_NAME = "mql_model_mongod_test"
 
-    def __init__(self, logger, json_filename, shell_executable=None, shell_options=None):
+    def __init__(self, logger: logging.Logger, json_filenames: list[str],
+                 shell_executable: Optional[str] = None, shell_options: Optional[dict] = None):
         """Initialize the MqlModelMongodTestCase with the JSON test file."""
 
+        assert len(json_filenames) == 1
         jsrunnerfile.JSRunnerFileTestCase.__init__(
-            self, logger, "MQL MongoD Model test", json_filename,
+            self, logger, "MQL MongoD Model test", json_filenames[0],
             test_runner_file="jstests/libs/mql_model_mongod_test_runner.js",
             shell_executable=shell_executable, shell_options=shell_options)
 

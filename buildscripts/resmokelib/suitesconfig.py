@@ -4,7 +4,7 @@ import copy
 import os
 import pathlib
 from threading import Lock
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import yaml
 from buildscripts.resmokelib.utils.external_suite import make_external
@@ -88,7 +88,7 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
     return test_membership
 
 
-def get_suites(suite_names_or_paths, test_files) -> List[_suite.Suite]:
+def get_suites(suite_names_or_paths: list[str], test_files: list[str]) -> List[_suite.Suite]:
     """Retrieve the Suite instances based on suite configuration files and override parameters.
 
     Args:
@@ -168,7 +168,7 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
     _named_suites = {}
 
     @classmethod
-    def get_config_obj_no_verify(cls, suite_name):
+    def get_config_obj_no_verify(cls, suite_name: str) -> dict:
         """Get the suite config object in the given file."""
         if suite_name in cls.get_named_suites():
             # Check if is a named suite first for efficiency.
@@ -473,14 +473,15 @@ class SuiteFinder(object):
         explicit_suite = ExplicitSuiteConfig.get_config_obj_no_verify(suite_path)
         matrix_suite = MatrixSuiteConfig.get_config_obj_no_verify(suite_path)
 
-        if not (explicit_suite or matrix_suite):
-            raise errors.SuiteNotFound("Unknown suite '%s'" % suite_path)
+        suites = [item for item in [explicit_suite, matrix_suite] if item is not None]
 
-        if explicit_suite and matrix_suite:
+        if len(suites) == 0:
+            raise errors.SuiteNotFound("Unknown suite '%s'" % suite_path)
+        elif len(suites) > 1:
             raise errors.DuplicateSuiteDefinition(
                 "Multiple definitions for suite '%s'" % suite_path)
 
-        suite = matrix_suite or explicit_suite
+        suite = suites[0]
 
         # If this is running against an External System Under Test, we need to make the suite compatible.
         if _config.NOOP_MONGO_D_S_PROCESSES:

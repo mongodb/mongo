@@ -7,8 +7,7 @@ import logging
 from collections import namedtuple
 from typing import List, Optional, Union, TYPE_CHECKING
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import config, errors
 from buildscripts.resmokelib.testing import testcases
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.fixtures.interface import Fixture, create_fixture_table
@@ -191,7 +190,7 @@ class Job(object):
 
         queue_elem.testcase = testcases.make_test_case(
             queue_elem.testcase.REGISTERED_NAME, queue_elem.testcase.logger,
-            queue_elem.testcase.test_name, **queue_elem.test_config)
+            [queue_elem.testcase.test_name], **queue_elem.test_config)
 
         if not interrupt_flag.is_set():
             self._log_requeue_test(queue_elem)

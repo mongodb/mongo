@@ -1,8 +1,8 @@
 """The unittest.TestCase for tests using a MongoDB vendored version of Google Benchmark."""
 
+from typing import Optional
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import core, utils, logging
 from buildscripts.resmokelib.testing.testcases import interface
 
 
@@ -11,13 +11,15 @@ class BenchmarkTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "benchmark_test"
 
-    def __init__(self, logger, program_executable, program_options=None):
+    def __init__(self, logger: logging.Logger, program_executables: list[str],
+                 program_options: Optional[dict] = None):
         """Initialize the BenchmarkTestCase with the executable to run."""
 
-        interface.ProcessTestCase.__init__(self, logger, "Benchmark test", program_executable)
+        assert len(program_executables) == 1
+        interface.ProcessTestCase.__init__(self, logger, "Benchmark test", program_executables[0])
         self.validate_benchmark_options()
 
-        self.bm_executable = program_executable
+        self.bm_executable = program_executables[0]
         self.suite_bm_options = program_options
         self.bm_options = {}
 

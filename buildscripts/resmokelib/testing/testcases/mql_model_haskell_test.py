@@ -2,10 +2,9 @@
 
 import os
 import os.path
+from typing import Optional
 
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import core, errors, utils, logging
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import globstar
 
@@ -15,15 +14,19 @@ class MqlModelHaskellTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "mql_model_haskell_test"
 
-    def __init__(self, logger, json_filename, mql_executable=None):
+    def __init__(self, logger: logging.Logger, json_filenames: list[str],
+                 mql_executable: Optional[str] = None):
         """Initialize the MqlModelHaskellTestCase with the executable to run."""
 
-        interface.ProcessTestCase.__init__(self, logger, "MQL Haskell Model test", json_filename)
+        assert len(json_filenames) == 1
+        interface.ProcessTestCase.__init__(self, logger, "MQL Haskell Model test",
+                                           json_filenames[0])
 
-        self.json_test_file = json_filename
+        self.json_test_file = json_filenames[0]
 
         # Determine the top level directory where we start a search for a mql binary
-        self.top_level_dirname = os.path.join(os.path.normpath(json_filename).split(os.sep)[0], "")
+        self.top_level_dirname = os.path.join(
+            os.path.normpath(self.json_test_file).split(os.sep)[0], "")
 
         # Our haskell cabal build produces binaries in an unique directory
         # .../dist-sandbox-<some hex hash>/...

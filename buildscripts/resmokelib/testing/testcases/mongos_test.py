@@ -1,8 +1,6 @@
 """The unittest.TestCase for mongos --test."""
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import config, logging, core, utils
 from buildscripts.resmokelib.testing.testcases import interface
 
 
@@ -11,7 +9,7 @@ class MongosTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "mongos_test"
 
-    def __init__(self, logger, mongos_options):
+    def __init__(self, logger: logging.Logger, mongos_options: dict):
         """Initialize the mongos test and saves the options."""
 
         self.mongos_executable = utils.default_if_none(config.MONGOS_EXECUTABLE,

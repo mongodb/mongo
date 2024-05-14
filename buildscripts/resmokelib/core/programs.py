@@ -6,12 +6,12 @@ Handles all the nitty-gritty parameter conversion.
 import json
 import os
 import os.path
-from typing import Tuple, Any
+from typing import Optional, Tuple, Any
 from packaging import version
 import re
 import stat
 
-from buildscripts.resmokelib import config, utils
+from buildscripts.resmokelib import config, logging, utils
 from buildscripts.resmokelib.core import process, network
 from buildscripts.resmokelib.testing.fixtures import standalone, shardedcluster
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
@@ -69,7 +69,8 @@ def remove_set_parameter_if_before_version(set_parameters, parameter_name, bin_v
         set_parameters.pop(parameter_name, None)
 
 
-def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
+def mongod_program(logger: logging.Logger, job_num: int, executable: str, process_kwargs: dict,
+                   mongod_options: HistoryDict) -> tuple[process.Process, HistoryDict]:
     """
     Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
 
@@ -221,15 +222,22 @@ def mongot_program(logger, job_num, executable=None, process_kwargs=None,
     return make_process(logger, args, **process_kwargs), final_mongot_options
 
 
-def mongo_shell_program(logger, executable=None, connection_string=None, filename=None,
-                        test_filename=None, process_kwargs=None, **kwargs) -> process.Process:
+def mongo_shell_program(logger: logging.Logger, test_name: str, executable: Optional[str] = None,
+                        connection_string: Optional[str] = None,
+                        filenames: Optional[list[str]] = None,
+                        process_kwargs: Optional[dict] = None, **kwargs) -> process.Process:
     """Return a Process instance that starts a mongo shell.
 
-    The shell is started with the given connection string and arguments constructed from 'kwargs'.
+    Args:
+        logger (logging.Logger): logger
+        test_name (str): Name of the test. Passed into the test as 'testName'.
+        executable (Optional[str], optional): Path to the mongo shell binary. Defaults to None. If not given will be inferred.
+        connection_string (Optional[str], optional): Connection string to mongodb. Defaults to None. If not given will be inferred.
+        filenames (Optional[list[str]], optional): The files to run by the mongo shell in a single invocation. Defaults to None.
+        process_kwargs (Optional[dict], optional): Extra args to pass into make_process. Defaults to None.
 
-    :param filename: the file run by the mongo shell
-    :param test_filename: The test file - it's usually  `filename`, but may be different for
-                          tests that use JS runner files, which in turn run real JS files.
+    Returns
+        process.Process: The mongo shell invocation.
     """
 
     executable = utils.default_if_none(
@@ -238,16 +246,6 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
 
     eval_sb = []  # String builder.
     global_vars = kwargs.pop("global_vars", {}).copy()
-
-    def basename(filepath):
-        return os.path.splitext(os.path.basename(filepath))[0]
-
-    if test_filename is not None:
-        test_name = basename(test_filename)
-    elif filename is not None:
-        test_name = basename(filename)
-    else:
-        test_name = None
 
     # the Shell fixtures uses hyphen-delimited versions (e.g. last-lts) while resmoke.py
     # uses underscore (e.g. last_lts). resmoke's version is needed as it's part of the task name.
@@ -461,8 +459,8 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
         args.append(connection_string)
 
     # Have the mongo shell run the specified file.
-    if filename is not None:
-        args.append(filename)
+    if filenames:
+        args.extend(filenames)
 
     _set_keyfile_permissions(test_data)
 

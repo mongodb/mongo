@@ -88,8 +88,13 @@ class DynamicJSTestCase(interface.DynamicTestCase):
         """Initialize DynamicJSTestCase."""
         interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
                                            hook)
-        self._js_test_builder = jstest.JSTestCaseBuilder(logger, js_filename, self.id(),
-                                                         shell_options=shell_options)
+        self._js_test_builder = jstest.JSTestCaseBuilder(
+            logger,
+            [js_filename],
+            test_name=js_filename,
+            test_id=self.id(),
+            shell_options=shell_options,
+        )
         self._js_test_case = None
 
     def override_logger(self, new_logger: logging.Logger):

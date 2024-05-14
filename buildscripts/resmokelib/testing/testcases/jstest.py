@@ -19,16 +19,17 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self, logger: logging.Logger, js_filename: str, _id: uuid.UUID,
-                 shell_executable: Optional[str] = None, shell_options: Optional[dict] = None):
+    def __init__(self, logger: logging.Logger, js_filenames: list[str], test_name: str,
+                 _id: uuid.UUID, shell_executable: Optional[str] = None,
+                 shell_options: Optional[dict] = None):
         """Initialize the _SingleJSTestCase with the JS file to run."""
-        interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
+        interface.ProcessTestCase.__init__(self, logger, "JSTest", test_name)
 
         # Command line options override the YAML configuration.
         self.shell_executable: Optional[str] = utils.default_if_none(config.MONGO_EXECUTABLE,
                                                                      shell_executable)
 
-        self.js_filename = js_filename
+        self.js_filenames = js_filenames
         self._id = _id
         self.shell_options: dict = utils.default_if_none(shell_options, {}).copy()
 
@@ -65,8 +66,12 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
         # The tests in 'timeseries' directory need to use a different logic for implicity sharding
         # the collection. Make sure that we consider both unix and windows directory structures.
-        test_data["implicitlyShardOnCreateCollectionOnly"] = "/timeseries/" in self.js_filename or \
-        "\\timeseries\\" in self.js_filename
+        # Check if any test being run is a timeseries test
+        for js_filename in self.js_filenames:
+            is_timeseries_file = "/timeseries/" in js_filename or "\\timeseries\\" in js_filename
+            test_data["implicitlyShardOnCreateCollectionOnly"] = is_timeseries_file
+            if is_timeseries_file:
+                break
 
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
@@ -109,18 +114,24 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
     def _make_process(self) -> "process.Process":
         return core.programs.mongo_shell_program(
-            self.logger, executable=self.shell_executable, filename=self.js_filename,
-            connection_string=self.fixture.get_shell_connection_url(), **self.shell_options)
+            self.logger,
+            executable=self.shell_executable,
+            filenames=self.js_filenames,
+            test_name=os.path.splitext(os.path.basename(self.test_name))[0],
+            connection_string=self.fixture.get_shell_connection_url(),
+            **self.shell_options,
+        )
 
 
 class JSTestCaseBuilder(interface.TestCaseFactory):
     """Build the real TestCase in the JSTestCase wrapper."""
 
-    def __init__(self, logger: logging.Logger, js_filename: str, test_id: uuid.UUID,
-                 shell_executable: Optional[str] = None, shell_options: Optional[dict] = None):
+    def __init__(self, logger: logging.Logger, js_filenames: list[str], test_name: str,
+                 test_id: uuid.UUID, shell_executable: Optional[str] = None,
+                 shell_options: Optional[dict] = None):
         """Initialize the JSTestCase with the JS file to run."""
-        self.test_case_template = _SingleJSTestCase(logger, js_filename, test_id, shell_executable,
-                                                    shell_options)
+        self.test_case_template = _SingleJSTestCase(logger, js_filenames, test_name, test_id,
+                                                    shell_executable, shell_options)
         interface.TestCaseFactory.__init__(self, _SingleJSTestCase, shell_options)
 
     def configure(self, fixture: "interface.Fixture", *args, **kwargs):
@@ -134,9 +145,14 @@ class JSTestCaseBuilder(interface.TestCaseFactory):
         return self.test_case_template._make_process()  # pylint: disable=protected-access
 
     def create_test_case(self, logger: logging.Logger, shell_options: dict) -> _SingleJSTestCase:
-        test_case = _SingleJSTestCase(logger, self.test_case_template.js_filename,
-                                      self.test_case_template._id,
-                                      self.test_case_template.shell_executable, shell_options)
+        test_case = _SingleJSTestCase(
+            logger,
+            self.test_case_template.js_filenames,
+            self.test_case_template.test_name,
+            self.test_case_template._id,
+            self.test_case_template.shell_executable,
+            shell_options,
+        )
         test_case.configure(self.test_case_template.fixture)
         return test_case
 
@@ -267,13 +283,24 @@ class JSTestCase(MultiClientsTestCase):
     REGISTERED_NAME = "js_test"
     TEST_KIND = "JSTest"
 
-    def __init__(self, logger: logging.Logger, js_filename: str,
+    def __init__(self, logger: logging.Logger, js_filenames: list[str],
                  shell_executable: Optional[str] = None, shell_options: Optional[dict] = None):
         """Initialize the TestCase for running JS files."""
-
+        assert len(js_filenames) >= 1
         test_id = uuid.uuid4()
-        factory = JSTestCaseBuilder(logger, js_filename, test_id, shell_executable, shell_options)
-        MultiClientsTestCase.__init__(self, logger, self.TEST_KIND, js_filename, test_id, factory)
+        if len(js_filenames) > 1:
+            test_name = "combination_test"
+        else:
+            test_name = js_filenames[0]
+        factory = JSTestCaseBuilder(
+            logger,
+            js_filenames,
+            test_name,
+            test_id,
+            shell_executable,
+            shell_options,
+        )
+        MultiClientsTestCase.__init__(self, logger, self.TEST_KIND, test_name, test_id, factory)
 
 
 class AllVersionsJSTestCase(JSTestCase):

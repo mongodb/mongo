@@ -98,8 +98,13 @@ def list_commands_for_api(api_version: str, mongod_or_mongos: str, install_dir: 
         logger = loggers.new_fixture_logger("MongoDFixture", 0)
         logger.parent = LOGGER
         fixture: interface.Fixture = fixturelib.make_fixture(
-            "MongoDFixture", logger, 0, dbpath_prefix=dbpath.name,
-            mongod_executable=mongod_executable, mongod_options={"set_parameters": {}})
+            "MongoDFixture",
+            logger,
+            0,
+            dbpath_prefix=dbpath.name,
+            mongod_executable=mongod_executable,
+            mongod_options={"set_parameters": {}},
+        )
     else:
         logger = loggers.new_fixture_logger("ShardedClusterFixture", 0)
         logger.parent = LOGGER
