@@ -45,6 +45,11 @@
 
 namespace mongo {
 namespace executor {
+namespace details {
+constexpr inline auto kStartSize = 0;
+constexpr inline auto kPartitionStepSize = 50;
+constexpr inline auto kMaxPartitionSize = 1000;
+}  // namespace details
 
 /**
  * Histogram type to be used for tracking how long it took the connection pool to return a

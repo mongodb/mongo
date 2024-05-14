@@ -217,7 +217,9 @@ public:
      * Records the connection waittime in the connAcquisitionWaitTime histogram
      */
     inline void recordConnectionWaitTime(Date_t requestedAt) {
-        _connAcquisitionWaitTimeStats.increment(Date_t::now() - requestedAt);
+        auto connTime = Date_t::now() - requestedAt;
+        _connAcquisitionWaitTimeStats.increment(connTime);
+        _connTime = connTime;
     }
 
     /**
@@ -272,6 +274,9 @@ private:
 
     // Whether our parent DBConnectionPool object is in destruction
     bool _parentDestroyed;
+
+    // Time it took for the last connection to be established
+    Milliseconds _connTime;
 
     executor::ConnectionWaitTimeHistogram _connAcquisitionWaitTimeStats{};
 
@@ -367,6 +372,12 @@ public:
     DBClientBase* get(const std::string& host, double socketTimeout = 0);
     DBClientBase* get(const ConnectionString& host, double socketTimeout = 0);
     DBClientBase* get(const MongoURI& uri, double socketTimeout = 0);
+
+    /**
+     * Gets the time it took for the last connection to be established from the PoolMap given a host
+     * and timeout.
+     */
+    Milliseconds getPoolHostConnTime_forTest(const std::string& host, double timeout) const;
 
     /**
      * Gets the number of connections available in the pool.
