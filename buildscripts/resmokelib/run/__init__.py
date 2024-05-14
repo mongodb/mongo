@@ -12,6 +12,7 @@ import sys
 import textwrap
 import time
 from typing import List, Optional
+import yaml
 
 import psutil
 from opentelemetry import trace
@@ -295,8 +296,133 @@ class TestRunner(Subcommand):
         self._log_suite_summary(suite)
         return interrupted
 
+    def _get_fuzzed_param_log_str(self, binary_name_str, set_parameters):
+        """
+        Helper function that creates a string containing the fuzzed parameters when the config fuzzer is invoked, along with the fuzzed parameters' min and maxes.
+
+        Input:
+        binary_name_str - A string that represents the parameters of the binary that is getting fuzzed, e.g. "mongod"
+        set_parameters - A dictionary consisting with a key of being the parameter being fuzzed and the value being the fuzzed parameter value.
+                         e.g. {
+                         "analyzeShardKeySplitPointExpirationSecs": 50,
+                         "chunkMigrationConcurrency": 4,
+                         ...
+                         }
+
+        Output:
+        analyzeShardKeySplitPointExpirationSecs: 216, 50: 1, max: 300
+        chunkMigrationConcurrency: 4, min: 1, max: 16, options: [1, 4, 16]
+        ...
+        """
+        from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
+
+        param_limits = config_fuzzer_params[binary_name_str]
+        local_args = to_local_args()
+        local_args = strip_fuzz_config_params(local_args)
+        params_str = ""
+        set_parameters = yaml.safe_load(set_parameters)
+        for param in set_parameters:
+            curr_params_str = (param + ": " + str(set_parameters[param]))
+            # The param should be in both min and max in the case that the param has a min or a max.
+            if (param in param_limits
+                    and "min" in param_limits[param]) and (param in param_limits
+                                                           and "max" in param_limits[param]):
+                curr_params_str += ", min: " + str(param_limits[param]["min"])
+                curr_params_str += ", max: " + str(param_limits[param]["max"])
+
+            if param in param_limits and "choices" in param_limits[param]:
+                curr_params_str += ", options: " + str(param_limits[param]["choices"])
+            params_str += (curr_params_str + "\n")
+        return params_str
+
+    def _log_fuzzed_wired_tiger_config_str(self):
+        """
+        Helper function that logs the fuzzed WiredTiger config string, along with the fuzzed parameters' min and maxes.
+
+        This function only supports one level of WT config string nesting.
+
+        Input:
+        debug_mode=(eviction=false,realloc_exact=true,rollback_error=0,slow_checkpoint=false),eviction_checkpoint_target=4
+
+        Output:
+        debug_mode.eviction: false
+        debug_mode.realloc_exact: true
+        debug_mode.rollback_error: 0
+        debug_mode.slow_checkpoint: false
+        eviction_checkpoint_target: 4, min: 1, max: 99 
+        """
+        from buildscripts.resmokelib.config_fuzzer_wt_limits import config_fuzzer_params
+
+        # check_limit_dict checks if a parameter is in a dictionary that may have the parameter's mins and maxes (limits).
+        def check_limit_dict(limit_dict, param_name):
+            limit_substr = ''
+            if (param_name in limit_dict):
+                if "min" in limit_dict[curr_param_name] and "max" in limit_dict[param_name]:
+                    limit_substr += ", min: " + str(
+                        limit_dict[param_name]["min"]) + ", max: " + str(
+                            limit_dict[param_name]["max"])
+                if "choices" in limit_dict[param_name]:
+                    limit_substr += ", options: " + str(wt_table_params[curr_param_name]["choices"])
+            return limit_substr
+
+        wt_table_params = config_fuzzer_params["wt_table"]
+        wt_params = config_fuzzer_params["wt"]
+        wt_engine_config_str = []
+        curr_param_name = ''
+        current_word = ''
+        curr_paren_word = ''
+
+        prev_word_closing_paren = False
+        # Parsing the WiredTiger configuration string, accounting for when there is one-level nested arguments.
+        for char in str(config.WT_ENGINE_CONFIG):
+            if char == '(':
+                curr_paren_word = current_word[:len(current_word) - 2]
+                current_word = ''
+            elif char == '=':
+                curr_param_name = current_word
+                current_word += ": "
+            elif char in (',', ')'):
+                limit_substr = ''
+
+                # Checks both the wt_table_params and wt_params to see if the current parameters has limits in either of these limit dictionaries.
+                # check_limit_dict returns an empty string if there are no limits found in a dictionary, so we can append results from
+                # checking both limit dictionaries.
+                limit_substr += check_limit_dict(wt_table_params, curr_param_name)
+                limit_substr += check_limit_dict(wt_params, curr_param_name)
+                if not prev_word_closing_paren:
+                    if curr_paren_word != '':
+                        wt_engine_config_str.append(curr_paren_word + "." + current_word.strip() +
+                                                    limit_substr)
+                    else:
+                        wt_engine_config_str.append(current_word.strip() + limit_substr)
+
+                if char == ')':
+                    prev_word_closing_paren = True
+                    curr_paren_word = ''
+                else:
+                    prev_word_closing_paren = False
+
+                current_word = ''
+            else:
+                current_word += char
+        if current_word:
+            wt_engine_config_str.append(current_word.strip())
+
+        # Blank line for readability
+        wt_engine_config_str.append("")
+        wt_engine_config_str = '\n'.join(wt_engine_config_str)
+        self._resmoke_logger.info("Fuzzed wiredTigerConnectionString: \n%s", wt_engine_config_str)
+
     def _log_local_resmoke_invocation(self):
         """Log local resmoke invocation example."""
+        if config.FUZZ_MONGOD_CONFIGS:
+            params_str = self._get_fuzzed_param_log_str("mongod", config.MONGOD_SET_PARAMETERS)
+            self._resmoke_logger.info("Fuzzed mongodSetParameters:\n%s", params_str)
+            self._log_fuzzed_wired_tiger_config_str()
+
+        if config.FUZZ_MONGOS_CONFIGS:
+            params_str = self._get_fuzzed_param_log_str("mongos", config.MONGOS_SET_PARAMETERS)
+            self._resmoke_logger.info("Fuzzed mongosSetParameters:\n%s", params_str)
 
         if config.FUZZ_MONGOD_CONFIGS or config.FUZZ_MONGOS_CONFIGS:
             self._resmoke_logger.info("configFuzzSeed: \n%s", str(config.CONFIG_FUZZ_SEED))
@@ -352,24 +478,13 @@ class TestRunner(Subcommand):
         local_resmoke_invocation = (
             f"{os.path.join('buildscripts', 'resmoke.py')} {' '.join(local_args)}")
 
-        using_config_fuzzer = False
         if config.FUZZ_MONGOD_CONFIGS:
-            using_config_fuzzer = True
             local_resmoke_invocation += f" --fuzzMongodConfigs={config.FUZZ_MONGOD_CONFIGS}"
 
-            self._resmoke_logger.info("Fuzzed mongodSetParameters:\n%s",
-                                      config.MONGOD_SET_PARAMETERS)
-            self._resmoke_logger.info("Fuzzed wiredTigerConnectionString: %s",
-                                      config.WT_ENGINE_CONFIG)
-
         if config.FUZZ_MONGOS_CONFIGS:
-            using_config_fuzzer = True
             local_resmoke_invocation += f" --fuzzMongosConfigs={config.FUZZ_MONGOS_CONFIGS}"
 
-            self._resmoke_logger.info("Fuzzed mongosSetParameters:\n%s",
-                                      config.MONGOS_SET_PARAMETERS)
-
-        if using_config_fuzzer:
+        if config.FUZZ_MONGOD_CONFIGS or config.FUZZ_MONGOS_CONFIGS:
             local_resmoke_invocation += f" --configFuzzSeed={str(config.CONFIG_FUZZ_SEED)}"
 
         if multiversion_bin_version:

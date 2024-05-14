@@ -4,17 +4,25 @@ import random
 from buildscripts.resmokelib import utils
 
 
-def generate_eviction_configs(rng, mode):
+def generate_eviction_configs(rng, fuzzer_stress_mode):
     """Generate random configurations for wiredTigerEngineConfigString parameter."""
-    eviction_checkpoint_target = rng.randint(1, 99)
-    eviction_target = rng.randint(50, 95)
-    eviction_trigger = rng.randint(eviction_target + 1, 99)
+    from buildscripts.resmokelib.config_fuzzer_wt_limits import config_fuzzer_params, target_bytes_max
+
+    params = config_fuzzer_params["wt"]
+    eviction_checkpoint_target = rng.randint(params["eviction_checkpoint_target"]["min"],
+                                             params["eviction_checkpoint_target"]["max"])
+    eviction_target = rng.randint(params["eviction_target"]["min"],
+                                  params["eviction_target"]["max"])
+    eviction_trigger = rng.randint(eviction_target + params["eviction_trigger"]["min"],
+                                   params["eviction_trigger"]["max"])
 
     # Fuzz eviction_dirty_target and trigger both as relative and absolute values
-    target_bytes_min = 50 * 1024 * 1024  # 50MB # 5% of 1GB default cache size on Evergreen
-    target_bytes_max = 256 * 1024 * 1024  # 256MB # 1GB default cache size on Evergreen
-    eviction_dirty_target = rng.choice(
-        [rng.randint(5, 50), rng.randint(target_bytes_min, target_bytes_max)])
+    eviction_dirty_target = rng.choice([
+        rng.randint(params["eviction_dirty_target_1"]["min"],
+                    params["eviction_dirty_target_1"]["max"]),
+        rng.randint(params["eviction_dirty_target_2"]["min"],
+                    params["eviction_dirty_target_2"]["max"])
+    ])
     trigger_max = 75 if eviction_dirty_target <= 50 else target_bytes_max
     eviction_dirty_trigger = rng.randint(eviction_dirty_target + 1, trigger_max)
 
@@ -30,24 +38,28 @@ def generate_eviction_configs(rng, mode):
     eviction_updates_trigger = rng.randint(eviction_updates_target + 1, eviction_dirty_trigger - 1)
 
     # Fuzz File manager settings
-    close_idle_time_secs = rng.randint(1, 100)
-    close_handle_minimum = rng.randint(0, 1000)
-    close_scan_interval = rng.randint(1, 100)
+    close_idle_time_secs = rng.randint(params["close_idle_time_secs"]["min"],
+                                       params["close_idle_time_secs"]["max"])
+    close_handle_minimum = rng.randint(params["close_handle_minimum"]["min"],
+                                       params["close_handle_minimum"]["max"])
+    close_scan_interval = rng.randint(params["close_scan_interval"]["min"],
+                                      params["close_scan_interval"]["max"])
 
-    # The debug_mode for WiredTiger offers some settings to change internal behavior that could help
+    # WiredTiger's debug_mode offers some settings to change internal behavior that could help
     # find bugs. Settings to fuzz:
     # eviction - Turns aggressive eviction on/off
     # realloc_exact - Finds more memory bugs by allocating the memory for the exact size asked
     # rollback_error - Forces WiredTiger to return a rollback error every Nth call
     # slow_checkpoint - Adds internal delays in processing internal leaf pages during a checkpoint
-    dbg_eviction = rng.choice(['true', 'false'])
-    dbg_realloc_exact = rng.choice(['true', 'false'])
+    dbg_eviction = rng.choice(params["dbg_eviction"]["choices"])
+    dbg_realloc_exact = rng.choice(params["dbg_realloc_exact"]["choices"])
     # Rollback every Nth transaction. The values have been tuned after looking at how many
     # WiredTiger transactions happen per second for the config-fuzzed jstests.
     # The setting is trigerring bugs, disabled until they get resolved.
     # dbg_rollback_error = rng.choice([0, rng.randint(250, 1500)])
     dbg_rollback_error = 0
-    dbg_slow_checkpoint = 'false' if mode != 'stress' else rng.choice(['true', 'false'])
+    dbg_slow_checkpoint = 'false' if fuzzer_stress_mode != 'stress' else rng.choice(
+        params["dbg_slow_checkpoint"]["choices"])
 
     return "debug_mode=(eviction={0},realloc_exact={1},rollback_error={2}, slow_checkpoint={3}),"\
            "eviction_checkpoint_target={4},eviction_dirty_target={5},eviction_dirty_trigger={6},"\
@@ -71,20 +83,24 @@ def generate_eviction_configs(rng, mode):
 
 def generate_table_configs(rng):
     """Generate random configurations for WiredTiger tables."""
+    from buildscripts.resmokelib.config_fuzzer_wt_limits import config_fuzzer_params
 
-    internal_page_max = rng.choice([4, 8, 12, 1024, 10 * 1024]) * 1024
-    leaf_page_max = rng.choice([4, 8, 12, 1024, 10 * 1024]) * 1024
-    leaf_value_max = rng.choice([1, 32, 128, 256]) * 1024 * 1024
+    params = config_fuzzer_params["wt_table"]
+    internal_page_max = rng.choice(params["internal_page_max"]["choices"]) * 1024
+    leaf_page_max = rng.choice(params["leaf_page_max"]["choices"]) * 1024
+    leaf_value_max = rng.choice(params["leaf_value_max"]["choices"]) * 1024 * 1024
 
     memory_page_max_lower_bound = leaf_page_max
     # Assume WT cache size of 1GB as most MDB tests specify this as the cache size.
     memory_page_max_upper_bound = round(
-        (rng.randint(256, 1024) * 1024 * 1024) / 10)  # cache_size / 10
+        (rng.randint(params["memory_page_max_upper_bound"]["min"],
+                     params["memory_page_max_upper_bound"]["max"]) * 1024 * 1024) /
+        10)  # cache_size / 10
     memory_page_max = rng.randint(memory_page_max_lower_bound, memory_page_max_upper_bound)
 
-    split_pct = rng.choice([50, 60, 75, 100])
-    prefix_compression = rng.choice(["true", "false"])
-    block_compressor = rng.choice(["none", "snappy", "zlib", "zstd"])
+    split_pct = rng.choice(params["split_pct"]["choices"])
+    prefix_compression = rng.choice(params["prefix_compression"]["choices"])
+    block_compressor = rng.choice(params["block_compressor"]["choices"])
 
     return "block_compressor={0},internal_page_max={1},leaf_page_max={2},leaf_value_max={3},"\
            "memory_page_max={4},prefix_compression={5},split_pct={6}".format(block_compressor,
@@ -96,82 +112,107 @@ def generate_table_configs(rng):
                                                                              split_pct)
 
 
-def generate_flow_control_parameters(rng):
-    """Generate parameters related to flow control and returns a dictionary."""
-    configs = {}
-    configs["enableFlowControl"] = rng.choice([True, False])
-    if not configs["enableFlowControl"]:
-        return configs
-
-    configs["flowControlTargetLagSeconds"] = rng.randint(1, 1000)
-    configs["flowControlThresholdLagPercentage"] = rng.random()
-    configs["flowControlMaxSamples"] = rng.randint(1, 1000 * 1000)
-    configs["flowControlSamplePeriod"] = rng.randint(1, 1000 * 1000)
-    configs["flowControlMinTicketsPerSecond"] = rng.randint(1, 10 * 1000)
-
-    return configs
-
-
-def generate_mongod_parameters(rng, mode):
+def generate_mongod_parameters(rng, fuzzer_stress_mode):
     """Return a dictionary with values for each mongod parameter."""
+    from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
+
+    params = config_fuzzer_params["mongod"]
     ret = {}
-    ret["analyzeShardKeySplitPointExpirationSecs"] = rng.randint(1, 300)
-    ret["chunkMigrationConcurrency"] = rng.choice([1, 4, 16])
-    ret["disableLogicalSessionCacheRefresh"] = rng.choice([True, False])
-    ret["enableAutoCompaction"] = rng.choice([True, False])
-    ret["ingressAdmissionControllerTicketPoolSize"] = rng.randint(4, 1000 * 1000)
-    ret["initialServiceExecutorUseDedicatedThread"] = rng.choice([True, False])
+    ret["analyzeShardKeySplitPointExpirationSecs"] = rng.randint(
+        params["analyzeShardKeySplitPointExpirationSecs"]["min"],
+        params["analyzeShardKeySplitPointExpirationSecs"]["max"])
+    ret["chunkMigrationConcurrency"] = rng.choice(params["chunkMigrationConcurrency"]["choices"])
+    ret["disableLogicalSessionCacheRefresh"] = rng.choice(
+        params["disableLogicalSessionCacheRefresh"]["choices"])
+    ret["enableAutoCompaction"] = rng.choice(params["enableAutoCompaction"]["choices"])
+    ret["initialServiceExecutorUseDedicatedThread"] = rng.choice(
+        params["initialServiceExecutorUseDedicatedThread"]["choices"])
     # TODO (SERVER-75632): Uncomment this to enable passthrough testing.
     # ret["lockCodeSegmentsInMemory"] = rng.choice([True, False])
     if not ret["disableLogicalSessionCacheRefresh"]:
-        ret["logicalSessionRefreshMillis"] = rng.choice([100, 1000, 10000, 100000])
+        ret["logicalSessionRefreshMillis"] = rng.choice(
+            params["logicalSessionRefreshMillis"]["choices"])
     ret["maxNumberOfTransactionOperationsInSingleOplogEntry"] = rng.randint(1, 10) * rng.choice(
-        [1, 10, 100])
+        params["maxNumberOfTransactionOperationsInSingleOplogEntry"]["choices"])
+    ret["wiredTigerCursorCacheSize"] = rng.randint(params["wiredTigerCursorCacheSize"]["min"],
+                                                   params["wiredTigerCursorCacheSize"]["max"])
+    ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(
+        params["wiredTigerSessionCloseIdleTimeSecs"]["min"],
+        params["wiredTigerSessionCloseIdleTimeSecs"]["max"])
+    ret["storageEngineConcurrencyAdjustmentIntervalMillis"] = rng.randint(
+        params["storageEngineConcurrencyAdjustmentIntervalMillis"]["min"],
+        params["storageEngineConcurrencyAdjustmentIntervalMillis"]["max"])
+    ret["throughputProbingStepMultiple"] = rng.uniform(
+        params["throughputProbingStepMultiple"]["min"],
+        params["throughputProbingStepMultiple"]["max"])
+    ret["throughputProbingInitialConcurrency"] = rng.randint(
+        params["throughputProbingInitialConcurrency"]["min"],
+        params["throughputProbingInitialConcurrency"]["max"])
+    ret["throughputProbingMinConcurrency"] = rng.randint(
+        params["throughputProbingMinConcurrency"]["min"],
+        ret["throughputProbingInitialConcurrency"])
+    ret["throughputProbingMaxConcurrency"] = rng.randint(
+        ret["throughputProbingInitialConcurrency"],
+        params["throughputProbingMaxConcurrency"]["max"])
+    ret["storageEngineConcurrencyAdjustmentAlgorithm"] = rng.choices(
+        params["storageEngineConcurrencyAdjustmentAlgorithm"]["choices"], weights=[10, 1])[0]
+    ret["throughputProbingReadWriteRatio"] = rng.uniform(
+        params["throughputProbingReadWriteRatio"]["min"],
+        params["throughputProbingReadWriteRatio"]["max"])
     ret["minSnapshotHistoryWindowInSeconds"] = rng.choice([300, rng.randint(30, 600)])
     ret["mirrorReads"] = {"samplingRate": rng.random()}
-    ret["queryAnalysisWriterMaxMemoryUsageBytes"] = rng.randint(1, 100) * 1024 * 1024
     ret["syncdelay"] = rng.choice([60, rng.randint(15, 180)])
-    ret["wiredTigerCursorCacheSize"] = rng.randint(-100, 100)
-    ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(0, 300)
-    ret["storageEngineConcurrencyAdjustmentAlgorithm"] = rng.choices(
-        ["throughputProbing", "fixedConcurrentTransactions"], weights=[10, 1])[0]
-    ret["storageEngineConcurrencyAdjustmentIntervalMillis"] = rng.randint(10, 1000)
-    ret["throughputProbingStepMultiple"] = rng.uniform(0.1, 0.5)
-    ret["throughputProbingInitialConcurrency"] = rng.randint(4, 128)
-    ret["throughputProbingMinConcurrency"] = rng.randint(4,
-                                                         ret["throughputProbingInitialConcurrency"])
-    ret["throughputProbingMaxConcurrency"] = rng.randint(ret["throughputProbingInitialConcurrency"],
-                                                         128)
-    ret["throughputProbingReadWriteRatio"] = rng.uniform(0, 1)
     ret["throughputProbingConcurrencyMovingAverageWeight"] = 1 - rng.random()
+    ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(
+        params["wiredTigerConcurrentWriteTransactions"]["min"],
+        params["wiredTigerConcurrentWriteTransactions"]["max"])
+    ret["wiredTigerConcurrentReadTransactions"] = rng.randint(
+        params["wiredTigerConcurrentReadTransactions"]["min"],
+        params["wiredTigerConcurrentReadTransactions"]["max"])
+    ret["wiredTigerStressConfig"] = False if fuzzer_stress_mode != 'stress' else rng.choice(
+        params["wiredTigerStressConfig"]["choices"])
+    ret["wiredTigerSizeStorerPeriodicSyncHits"] = rng.randint(
+        params["wiredTigerSizeStorerPeriodicSyncHits"]["min"],
+        params["wiredTigerSizeStorerPeriodicSyncHits"]["max"])
+    ret["wiredTigerSizeStorerPeriodicSyncPeriodMillis"] = rng.randint(
+        params["wiredTigerSizeStorerPeriodicSyncPeriodMillis"]["min"],
+        params["wiredTigerSizeStorerPeriodicSyncPeriodMillis"]["max"])
 
-    ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(5, 32)
-    ret["wiredTigerConcurrentReadTransactions"] = rng.randint(5, 32)
-    ret["wiredTigerStressConfig"] = False if mode != 'stress' else rng.choice([True, False])
-    ret["wiredTigerSizeStorerPeriodicSyncHits"] = rng.randint(1, 100000)
-    ret["wiredTigerSizeStorerPeriodicSyncPeriodMillis"] = rng.randint(1, 60000)
+    ret["oplogFetcherUsesExhaust"] = rng.choice(params["oplogFetcherUsesExhaust"]["choices"])
+    ret["replWriterThreadCount"] = rng.randint(params["replWriterThreadCount"]["min"],
+                                               params["replWriterThreadCount"]["max"])
 
-    ret["oplogFetcherUsesExhaust"] = rng.choice([True, False])
-    ret["replWriterThreadCount"] = rng.randint(1, 256)
-    # The actual maximum of `replBatchLimitOperations` is 1000 * 1000 but this range doesn't work
-    # for WINDOWS DEBUG, so that maximum is multiplied by 0.2, which is still a lot more than the
-    # default value of 5000. The reason why the full range [1, 1000*1000] doesn't work on WINDOWS
-    # DEBUG seems to be because it would wait for the batch to fill up to the batch limit
-    # operations, but when that number is too high it would just time out before reaching the
-    # batch limit operations.
-    ret["replBatchLimitOperations"] = rng.randint(1, 0.2 * 1000 * 1000)
-    ret["replBatchLimitBytes"] = rng.randint(16 * 1024 * 1024, 100 * 1024 * 1024)
-    # For `initialSyncSourceReadPreference`, the option `secondary` is excluded from the fuzzer
-    # because the generated mongod parameters are used for every node in the replica set, so the
-    # secondaries in the replica set will not be able to find a valid sync source.
+    ret["replBatchLimitOperations"] = rng.randint(params["replBatchLimitOperations"]["min"],
+                                                  params["replBatchLimitOperations"]["max"])
+    ret["replBatchLimitBytes"] = rng.randint(params["replBatchLimitBytes"]["min"],
+                                             params["replBatchLimitBytes"]["max"])
     ret["initialSyncSourceReadPreference"] = rng.choice(
-        ["nearest", "primary", "primaryPreferred", "secondaryPreferred"])
-    ret["initialSyncMethod"] = rng.choice(["fileCopyBased", "logical"])
+        params["initialSyncSourceReadPreference"]["choices"])
+    ret["initialSyncMethod"] = rng.choice(params["initialSyncMethod"]["choices"])
 
     # Query parameters
-    ret["internalQueryExecYieldIterations"] = rng.choices([1, rng.randint(1, 1000)],
-                                                          weights=[1, 10])[0]
-    ret["internalQueryExecYieldPeriodMS"] = rng.randint(1, 100)
+    ret["queryAnalysisWriterMaxMemoryUsageBytes"] = rng.randint(
+        params["queryAnalysisWriterMaxMemoryUsageBytes"]["min"],
+        params["queryAnalysisWriterMaxMemoryUsageBytes"]["max"])
+    ret["internalQueryExecYieldIterations"] = rng.choices([
+        1,
+        rng.randint(params["internalQueryExecYieldIterations"]["min"],
+                    params["internalQueryExecYieldIterations"]["max"])
+    ], weights=[1, 10])[0]
+    ret["internalQueryExecYieldPeriodMS"] = rng.randint(
+        params["internalQueryExecYieldPeriodMS"]["min"],
+        params["internalQueryExecYieldPeriodMS"]["max"])
+
+    # Flow control parameters
+    ret["enableFlowControl"] = rng.choice(params["enableFlowControl"]["choices"])
+    if ret["enableFlowControl"]:
+        ret["flowControlThresholdLagPercentage"] = rng.random()
+        param_names = [
+            "flowControlTargetLagSeconds", "flowControlMaxSamples", "flowControlSamplePeriod",
+            "flowControlMinTicketsPerSecond"
+        ]
+        for name in param_names:
+            ret[name] = rng.randint(params[name]["min"], params[name]["max"])
 
     # We need a higher timeout to account for test slowness
     ret["receiveChunkWaitForRangeDeleterTimeoutMS"] = 300000
@@ -179,40 +220,45 @@ def generate_mongod_parameters(rng, mode):
     return ret
 
 
-def generate_mongos_parameters(rng, mode):
+def generate_mongos_parameters(rng, fuzzer_stress_mode):
     """Return a dictionary with values for each mongos parameter."""
+    from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
+
+    params = config_fuzzer_params["mongos"]
     ret = {}
-    ret["initialServiceExecutorUseDedicatedThread"] = rng.choice([True, False])
-    ret["opportunisticSecondaryTargeting"] = rng.choice([True, False])
+    ret["initialServiceExecutorUseDedicatedThread"] = rng.choice(
+        params["initialServiceExecutorUseDedicatedThread"]["choices"])
+    ret["opportunisticSecondaryTargeting"] = rng.choice(
+        params["opportunisticSecondaryTargeting"]["choices"])
 
     # We need a higher timeout to account for test slowness
     ret["defaultConfigCommandTimeoutMS"] = 90000
     return ret
 
 
-def fuzz_mongod_set_parameters(mode, seed, user_provided_params):
+def fuzz_mongod_set_parameters(fuzzer_stress_mode, seed, user_provided_params):
     """Randomly generate mongod configurations and wiredTigerConnectionString."""
     rng = random.Random(seed)
 
     ret = {}
-    params = [generate_flow_control_parameters(rng), generate_mongod_parameters(rng, mode)]
-    for dct in params:
-        for key, value in dct.items():
-            ret[key] = value
+    mongod_params = generate_mongod_parameters(rng, fuzzer_stress_mode)
+
+    for key, value in mongod_params.items():
+        ret[key] = value
 
     for key, value in utils.load_yaml(user_provided_params).items():
         ret[key] = value
 
-    return utils.dump_yaml(ret), generate_eviction_configs(rng, mode), generate_table_configs(rng), \
+    return utils.dump_yaml(ret), generate_eviction_configs(rng, fuzzer_stress_mode), generate_table_configs(rng), \
         generate_table_configs(rng)
 
 
-def fuzz_mongos_set_parameters(mode, seed, user_provided_params):
+def fuzz_mongos_set_parameters(fuzzer_stress_mode, seed, user_provided_params):
     """Randomly generate mongos configurations."""
     rng = random.Random(seed)
 
     ret = {}
-    params = generate_mongos_parameters(rng, mode)
+    params = generate_mongos_parameters(rng, fuzzer_stress_mode)
     for key, value in params.items():
         ret[key] = value
 
