@@ -149,9 +149,6 @@ selector:
     # collection to be killed.
     - requires_getmore
 
-    # TODO SERVER-90239 Enable time series tests.
-    - requires_timeseries
-
 executor:
   archive:
     hooks:
@@ -212,6 +209,7 @@ executor:
             skipMoveCollectionThreshold: 0.5
           mode: alwaysOn
         balancerMigrationsThrottlingMs: 100
+        featureFlagReshardingForTimeseries: true
     num_rs_nodes_per_shard: 3
     # Use 3 shards so there's always at least two for workloads with manual migrations, etc.
     num_shards: 3

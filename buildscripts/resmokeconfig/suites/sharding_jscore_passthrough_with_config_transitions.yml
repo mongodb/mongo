@@ -61,13 +61,8 @@ selector:
     - config_shard_incompatible
     # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
     - assumes_balancer_off
-    # TODO SERVER-90239: Remove this tag after project completes.
-    - requires_timeseries
     # MoveCollection changes the collection uuid.
     - assumes_stable_collection_uuid
-
-    # TODO SERVER-90239 Enable time series tests.
-    - requires_timeseries
 
 executor:
   archive:
@@ -99,4 +94,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        featureFlagReshardingForTimeseries: true
     num_rs_nodes_per_shard: 1
