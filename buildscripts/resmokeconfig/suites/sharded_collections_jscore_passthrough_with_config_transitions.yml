@@ -204,7 +204,9 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_config_transition_errors.js");
   hooks:
     - class: ContinuousConfigShardTransition
       random_balancer_on: false
