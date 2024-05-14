@@ -86,6 +86,10 @@ selector:
     - jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js
     - jstests/concurrency/fsm_workloads/random_DDL_operations.js
     - jstests/concurrency/fsm_workloads/rename_sharded_collection.js
+    - jstests/concurrency/fsm_workloads/rename_capped_collection_chain.js
+    - jstests/concurrency/fsm_workloads/rename_capped_collection_droptarget.js
+    - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
+    - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_droptarget.js
 
     ##
     # Denylists from concurrency_sharded_multi_stmt_txn_with_balancer
