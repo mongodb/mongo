@@ -1,7 +1,11 @@
 /**
- * This tests that mongos correctly reports 'n' and 'nModified' for retried retryable writes with
- * _id without shard key of sent with batch size of 1 after combining responses from multiple shards
- * post session migration.
+ * This tests that mongos correctly reports 'n'/'nModified' for retried retryable updates/deletes
+ * with _id without shard key after combining responses from multiple shards post session migration
+ * in the following cases:
+ * 1) If they are sent with batch size of 1 with ordered:true or ordered:false.
+ * 2) If they are sent with batch size > 1 with ordered: true.
+ *
+ * The case of batch size > 1 with ordered: false will be taken care by PM-3673.
  *
  * @tags: [requires_fcv_80]
  */
@@ -18,12 +22,12 @@ const collection = db.getCollection("mycoll");
 CreateShardedCollectionUtil.shardCollectionWithChunks(collection, {x: 1}, [
     {min: {x: MinKey}, max: {x: 0}, shard: st.shard0.shardName},
     {min: {x: 0}, max: {x: 10}, shard: st.shard0.shardName},
-    {min: {x: 10}, max: {x: 20}, shard: st.shard1.shardName},
-    {min: {x: 20}, max: {x: MaxKey}, shard: st.shard1.shardName},
+    {min: {x: 10}, max: {x: MaxKey}, shard: st.shard1.shardName},
 ]);
 
-assert.commandWorked(collection.insert({_id: 0, x: 5, counter: 0}));
-assert.commandWorked(collection.insert({_id: 1, x: 6, counter: 0}));
+for (let i = 0; i < 5; i++) {
+    assert.commandWorked(collection.insert({_id: i, x: 5, counter: 0}));
+}
 
 const sessionCollection = st.s.startSession({causalConsistency: false, retryWrites: false})
                               .getDatabase(db.getName())
@@ -31,36 +35,92 @@ const sessionCollection = st.s.startSession({causalConsistency: false, retryWrit
 
 // Updates by _id are broadcasted to all shards which own chunks for the collection. After the
 // session information is migrated to shard1 from the moveChunk command, both shard0 and shard1
-// will report {n: 1, nModified: 1} for stmtId=0.
+// will report {n: 1, nModified: 1} for the retried stmt ids.
 const updateCmd = {
     updates: [
         {q: {_id: 0}, u: {$inc: {counter: 1}}},
     ],
+    ordered: true,
     txnNumber: NumberLong(0),
 };
 
 const deleteCmd = {
-    deletes: [{q: {_id: 1}, limit: 1}],
+    deletes: [{q: {_id: 0}, limit: 1}],
+    ordered: true,
     txnNumber: NumberLong(1),
 }
 
-let firstRes = assert.commandWorked(sessionCollection.runCommand("update", updateCmd));
-assert.eq({n: firstRes.n, nModified: firstRes.nModified}, {n: 1, nModified: 1});
+const updateCmdUnordered = {
+    updates: [
+        {q: {_id: 1}, u: {$inc: {counter: 1}}},
+    ],
+    ordered: false,
+    txnNumber: NumberLong(2),
+};
 
-assert.commandWorked(
-    db.adminCommand({moveChunk: collection.getFullName(), find: {x: 5}, to: st.shard1.shardName}));
+const deleteCmdUnordered = {
+    deletes: [
+        {q: {_id: 1}, limit: 1},
+    ],
+    ordered: false,
+    txnNumber: NumberLong(3),
+};
 
-let secondRes = assert.commandWorked(sessionCollection.runCommand("update", updateCmd));
-assert.eq({n: secondRes.n, nModified: secondRes.nModified}, {n: 1, nModified: 1});
+const updateCmdWithMultipleUpdatesOrdered = {
+    updates: [
+        {q: {_id: 2}, u: {$inc: {counter: 1}}},
+        {q: {_id: 3}, u: {$inc: {counter: 1}}},
+        {q: {_id: 4}, u: {$inc: {counter: 1}}},
+    ],
+    ordered: true,
+    txnNumber: NumberLong(4),
+};
 
-firstRes = assert.commandWorked(sessionCollection.runCommand("delete", deleteCmd));
-assert.eq(firstRes.n, 1);
+const deleteCmdWithMultipleDeletesOrdered = {
+    deletes: [
+        {q: {_id: 2}, limit: 1},
+        {q: {_id: 3}, limit: 1},
+        {q: {_id: 4}, limit: 1},
+    ],
+    ordered: true,
+    txnNumber: NumberLong(5),
+};
 
-assert.commandWorked(
-    db.adminCommand({moveChunk: collection.getFullName(), find: {x: 5}, to: st.shard0.shardName}));
+function runUpdateAndMoveChunk(cmdObj, coll, toShard, expected) {
+    const firstRes = assert.commandWorked(coll.runCommand("update", cmdObj));
+    assert.eq({n: firstRes.n, nModified: firstRes.nModified}, expected);
 
-secondRes = assert.commandWorked(sessionCollection.runCommand("delete", deleteCmd));
-assert.eq(secondRes.n, 1);
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {x: 5}, to: toShard}));
+
+    const secondRes = assert.commandWorked(coll.runCommand("update", cmdObj));
+    assert.eq({n: secondRes.n, nModified: secondRes.nModified}, expected);
+}
+
+function runDeleteAndMoveChunk(cmdObj, coll, toShard, expected) {
+    const firstRes = assert.commandWorked(coll.runCommand("delete", cmdObj));
+    assert.eq(firstRes.n, expected);
+
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {x: 5}, to: toShard}));
+
+    const secondRes = assert.commandWorked(coll.runCommand("delete", cmdObj));
+    assert.eq(secondRes.n, expected);
+}
+
+runUpdateAndMoveChunk(updateCmd, sessionCollection, st.shard1.shardName, {n: 1, nModified: 1});
+runDeleteAndMoveChunk(deleteCmd, sessionCollection, st.shard0.shardName, 1);
+
+runUpdateAndMoveChunk(
+    updateCmdUnordered, sessionCollection, st.shard1.shardName, {n: 1, nModified: 1});
+runDeleteAndMoveChunk(deleteCmdUnordered, sessionCollection, st.shard0.shardName, 1);
+
+runUpdateAndMoveChunk(updateCmdWithMultipleUpdatesOrdered,
+                      sessionCollection,
+                      st.shard1.shardName,
+                      {n: 3, nModified: 3});
+runDeleteAndMoveChunk(
+    deleteCmdWithMultipleDeletesOrdered, sessionCollection, st.shard0.shardName, 3);
 
 st.stop();
 })();
