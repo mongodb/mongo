@@ -152,6 +152,9 @@ selector:
 
     # TODO SERVER-89841: Performs many sharding DDL operations and can time out taking the DDL lock
     # on slower variants.
+    - jstests/concurrency/fsm_workloads/agg_lookup.js
+    - jstests/concurrency/fsm_workloads/agg_lookup_in_txn.js
+    - jstests/concurrency/fsm_workloads/agg_out.js
     - jstests/concurrency/fsm_workloads/agg_sort.js
     - jstests/concurrency/fsm_workloads/map_reduce_interrupt.js
     - jstests/concurrency/fsm_workloads/map_reduce_replace.js
