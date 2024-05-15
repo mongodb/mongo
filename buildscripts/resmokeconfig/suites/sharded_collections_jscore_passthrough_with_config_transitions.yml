@@ -192,6 +192,8 @@ selector:
     - config_shard_incompatible
     # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
     - assumes_balancer_off
+    # Fast count doesn't filter orphan documents
+    - requires_fastcount
 
 executor:
   archive:
