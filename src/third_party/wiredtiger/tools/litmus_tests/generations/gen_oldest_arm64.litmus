@@ -1,0 +1,15 @@
+AArch64 wt_gen_oldest
+{
+conn_gen=5;sess_gen=0;
+0:X0=conn_gen; 0:X1=sess_gen;
+1:X0=conn_gen; 1:X1=sess_gen;
+2:X0=conn_gen; 2:X1=sess_gen;
+}
+
+ P0            | P1           | P2                   ;
+ LDR X2, [X0]  | LDR X2, [X0] | MOV W9, #1           ;
+ dmb ishld     | STR X2, [X1] | ldaddal W9, W1, [X0] ;
+ LDR X3, [X1]  | dmb ish      |                      ;
+               | LDR X4, [X0] |                      ;
+
+exists (0:X2=6 /\ 0:X3=0 /\ 1:X2=5 /\ 1:X4=5)
