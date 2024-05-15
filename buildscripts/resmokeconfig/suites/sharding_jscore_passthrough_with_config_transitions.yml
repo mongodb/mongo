@@ -75,11 +75,18 @@ executor:
       eval: >-
         await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
         await import("jstests/libs/override_methods/implicitly_retry_on_config_transition_errors.js");
+      global_vars:
+        TestData:
+          transitioningConfigShard: true
   hooks:
     - class: ContinuousConfigShardTransition
       random_balancer_on: false
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            transitioningConfigShard: true
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN

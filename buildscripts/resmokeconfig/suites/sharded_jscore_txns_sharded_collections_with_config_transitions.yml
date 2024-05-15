@@ -61,6 +61,9 @@ executor:
       eval: >-
         globalThis.testingReplication = true;
         await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
+      global_vars:
+        TestData:
+          transitioningConfigShard: true
   hooks:
     # We don't execute dbHash or oplog consistency checks since there is only a single replica set
     # node.
@@ -68,6 +71,10 @@ executor:
       random_balancer_on: false
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            transitioningConfigShard: true
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN
