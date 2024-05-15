@@ -48,7 +48,7 @@ background_compact(void *arg)
 
     /* Open a session. */
     memset(&sap, 0, sizeof(sap));
-    wt_wrap_open_session(conn, &sap, NULL, &session);
+    wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
 
     /*
      * Start the background compaction server at somewhere under 5 seconds, and then enable/disable
@@ -110,7 +110,7 @@ compact(void *arg)
 
     /* Open a session. */
     memset(&sap, 0, sizeof(sap));
-    wt_wrap_open_session(conn, &sap, NULL, &session);
+    wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
 
     /*
      * Perform compaction at somewhere under 15 seconds (so we get at least one done), and then at

@@ -91,7 +91,7 @@ table_load(TABLE *base, TABLE *table)
     conn = g.wts_conn;
 
     memset(&sap, 0, sizeof(sap));
-    wt_wrap_open_session(conn, &sap, NULL, &session);
+    wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
 
     testutil_snprintf(track_buf, sizeof(track_buf), "table %u %s load", table->id,
       base == NULL ? "bulk" : "mirror");
@@ -280,7 +280,7 @@ wts_load(void)
     /* Checkpoint to ensure bulk loaded records are durable. */
     if (!GV(RUNS_IN_MEMORY)) {
         memset(&sap, 0, sizeof(sap));
-        wt_wrap_open_session(conn, &sap, NULL, &session);
+        wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
         testutil_check(session->checkpoint(session, NULL));
         wt_wrap_close_session(session);
     }

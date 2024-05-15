@@ -496,7 +496,8 @@ void val_gen_init(WT_ITEM *);
 void val_gen_teardown(WT_ITEM *);
 void val_init(TABLE *, void *);
 void val_to_flcs(TABLE *, WT_ITEM *, uint8_t *);
-void wt_wrap_open_session(WT_CONNECTION *conn, SAP *sap, const char *track, WT_SESSION **sessionp);
+void wt_wrap_open_session(
+  WT_CONNECTION *conn, SAP *sap, const char *track, const char *cfg, WT_SESSION **sessionp);
 void wt_wrap_close_session(WT_SESSION *session);
 void wts_checkpoints(void);
 void wts_close(WT_CONNECTION **);
