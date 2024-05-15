@@ -212,7 +212,7 @@ size_t FTSQueryImpl::getApproximateSize() const {
     auto computeVectorSize = [](const std::vector<std::string>& v) {
         size_t size = 0;
         for (const auto& str : v) {
-            size += sizeof(str) + str.size() + 1;
+            size += sizeof(std::string) + str.size() + 1;
         }
         return size;
     };
@@ -220,7 +220,7 @@ size_t FTSQueryImpl::getApproximateSize() const {
     auto computeSetSize = [](const std::set<std::string>& s) {
         size_t size = 0;
         for (const auto& str : s) {
-            size += sizeof(str) + str.size() + 1;
+            size += sizeof(std::string) + str.size() + 1;
         }
         return size;
     };
