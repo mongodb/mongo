@@ -1470,6 +1470,26 @@ ReshardingCoordinator::ReshardingCoordinator(
         _reshardingCoordinatorObserver->onReshardingParticipantTransition(coordinatorDoc);
     }
 
+    /*
+     * _originalReshardingStatus is used to return the final status of the operation
+     * if set. If we are in the quiesced state here, it means we completed the
+     * resharding operation on a different primary and failed over. Since we
+     * completed the operation previously we do not want to report a failure status
+     * from aborting (if _originalReshardingStatus is empty). Explicitly set the
+     * previous status to Status:OK() unless we actually had an abort reason from
+     * before the failover.
+     *
+     * If we are in the aborting state, we do want to preserve the original abort reason
+     * to report in the final status.
+     */
+    if (coordinatorDoc.getAbortReason()) {
+        invariant(coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced ||
+                  coordinatorDoc.getState() == CoordinatorStateEnum::kAborting);
+        _originalReshardingStatus.emplace(resharding::getStatusFromAbortReason(coordinatorDoc));
+    } else if (coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced) {
+        _originalReshardingStatus.emplace(Status::OK());
+    }
+
     _metrics->onStateTransition(boost::none, coordinatorDoc.getState());
 }
 
@@ -1634,11 +1654,15 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
             }
 
             auto nss = _coordinatorDoc.getSourceNss();
+
+            // If we have an original resharding status due to a failover occurring, we want to
+            // log the original abort reason from before the failover in lieu of the generic
+            // ReshardCollectionAborted status.
             LOGV2(4956903,
                   "Resharding failed",
                   logAttrs(nss),
                   "newShardKeyPattern"_attr = _coordinatorDoc.getReshardingKey(),
-                  "error"_attr = status);
+                  "error"_attr = _originalReshardingStatus ? *_originalReshardingStatus : status);
 
             // Allow abort to continue except when stepped down.
             _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(), _markKilledExecutor);
@@ -1646,13 +1670,6 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
             // If we're already quiesced here it means we failed over and need to preserve the
             // original abort reason.
             if (_coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced) {
-                _originalReshardingStatus.emplace(Status::OK());
-                auto originalAbortReason = _coordinatorDoc.getAbortReason();
-                if (originalAbortReason) {
-                    _originalReshardingStatus.emplace(
-                        sharding_ddl_util_deserializeErrorStatusFromBSON(
-                            BSON("status" << *originalAbortReason).firstElement()));
-                }
                 markCompleted(*_originalReshardingStatus, _metrics.get());
                 // We must return status here, not _originalReshardingStatus, because the latter
                 // may be Status::OK() and not abort the future flow.
@@ -2209,8 +2226,6 @@ void ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
         if (_coordinatorDoc.getState() == CoordinatorStateEnum::kAborting ||
             _coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced) {
             _ctHolder->abort();
-            // Force future chain to enter onError flow
-            uasserted(ErrorCodes::ReshardCollectionAborted, "aborted");
         }
 
         return;
