@@ -276,6 +276,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::SnapshotTooOld:
                 case ErrorCodes::StaleDbVersion:
                 case ErrorCodes::ConflictingOperationInProgress:
+                case ErrorCodes::UserWritesBlocked:
                     return true;
                 default:
                     return false;
