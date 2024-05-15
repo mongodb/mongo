@@ -581,11 +581,11 @@ done:
 }
 
 /*
- * __wt_txn_config_operation_timeout --
+ * __txn_config_operation_timeout --
  *     Configure a transactions operation timeout duration.
  */
-int
-__wt_txn_config_operation_timeout(WT_SESSION_IMPL *session, const char *cfg[], bool start_timer)
+static int
+__txn_config_operation_timeout(WT_SESSION_IMPL *session, const char *cfg[], bool start_timer)
 {
     WT_CONFIG_ITEM cval;
     WT_TXN *txn;
@@ -1737,7 +1737,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || txn->mod_count == 0);
 
     /* Configure the timeout for this commit operation. */
-    WT_ERR(__wt_txn_config_operation_timeout(session, cfg, true));
+    WT_ERR(__txn_config_operation_timeout(session, cfg, true));
 
     /*
      * Clear the prepared round up flag if the transaction is not prepared. There is no rounding up
@@ -2234,7 +2234,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
 
     /* Configure the timeout for this rollback operation. */
-    WT_TRET(__wt_txn_config_operation_timeout(session, cfg, true));
+    WT_TRET(__txn_config_operation_timeout(session, cfg, true));
 
     /*
      * Resolving prepared updates is expensive. Sort prepared modifications so all updates for each
