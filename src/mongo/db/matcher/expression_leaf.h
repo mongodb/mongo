@@ -204,6 +204,23 @@ public:
         _rhs = elem;
     }
 
+    /**
+     * Populate the _backingBSON for this ComparisonMatchExpression. Typically, we want '_rhs' to be
+     * a BSONElement which points to FindCommandRequest owned BSON to avoid unnecessary copies.
+     * However, there are cases during optimization when we construct a new MatchExpression with a
+     * RHS that contains a value which isn't present in the original command. This function is
+     * useful in this case to avoid forcing callers to construct BSON and needing to keep it alive
+     * for the length of this MatchExpression. Callers should take care to avoid using this function
+     * in the hotpath.
+     */
+    void setBackingBSON(const BSONObj& obj) {
+        invariant(obj.isOwned());
+        _backingBSON = obj;
+
+        // TODO: SERVER-87277 remove this after removing _backingBSON creation
+        _rhs = _backingBSON.firstElement();
+    }
+
     const CollatorInterface* getCollator() const {
         return _collator;
     }

@@ -627,8 +627,11 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
             return simplifiedExpression;
         } else if (ime._equalities->hasSingleElement() && regexes.empty()) {
             // Simplify IN of exactly one equality to be an EqualityMatchExpression.
-            auto simplifiedExpression = std::make_unique<EqualityMatchExpression>(
-                expression->path(), *(ime._equalities->getElements().begin()));
+            BSONObj obj(BSON(expression->path() << *(ime._equalities->getElements().begin())));
+            auto simplifiedExpression =
+                std::make_unique<EqualityMatchExpression>(expression->path(), obj.firstElement());
+            simplifiedExpression->setBackingBSON(obj);
+
             simplifiedExpression->setCollator(collator);
             if (expression->getTag()) {
                 simplifiedExpression->setTag(expression->getTag()->clone());
