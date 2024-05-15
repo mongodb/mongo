@@ -1308,6 +1308,11 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
         cq.getOpCtx() && APIParameters::get(cq.getOpCtx()).getAPIStrict().value_or(false);
     keyBuilder << (apiStrict ? "t" : "f");
 
+    // Encode whether the query is marked SBE compatible or not. This ensures that we won't re-use
+    // a cache entry that was planned using SBE (specifically when SBE uses the classic plan cache)
+    // with a cache entry that was created from the standard classic path.
+    keyBuilder << (cq.isSbeCompatible() ? "t" : "f");
+
     return keyBuilder.str();
 }
 
