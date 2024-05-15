@@ -46,9 +46,9 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     OperationContext* opCtx, const std::vector<AsyncRequestsSender::Request>& requests);
 
 void processReplyMetadata(OperationContext* opCtx, const AsyncRequestsSender::Response& response);
-void processReplyMetadataForAsyncGetMore(OperationContext* opCtx,
-                                         const ShardId& shardId,
-                                         const BSONObj& responseBson);
+void processReplyMetadata(OperationContext* opCtx,
+                          const ShardId& shardId,
+                          const BSONObj& responseBson);
 }  // namespace transaction_request_sender_details
 
 /**
