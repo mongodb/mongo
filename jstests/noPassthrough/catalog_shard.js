@@ -260,8 +260,8 @@ const newShardName =
     // The config server owns no chunks, but must wait for its range deletions.
     assert.eq(0, getCatalogShardChunks(st.s).length, () => getCatalogShardChunks(st.s));
     removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
-    assert.eq("pendingRangeDeletions", removeRes.state);
-    assert.eq("waiting for pending range deletions", removeRes.msg);
+    assert.eq("pendingDataCleanup", removeRes.state);
+    assert.eq("waiting for data to be cleaned up", removeRes.msg);
     assert.eq(1, removeRes.pendingRangeDeletions);
 
     suspendRangeDeletionFp.off();
@@ -313,6 +313,106 @@ const newShardName =
         collMod: "onConfig",
         changeStreamPreAndPostImages: {enabled: true}
     }));
+    // Drop to allow future transitions to embedded mode.
+    assert.commandWorked(configPrimary.getDB("directDB").dropDatabase());
+}
+
+{
+    //
+    // Transitioning to embedded mode fails if there are unexpectedly documents on the config server
+    // after draining it.
+    //
+
+    assert.commandWorked(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
+
+    moveDatabaseAndUnshardedColls(st.s.getDB(dbName), configShardName);
+    moveDatabaseAndUnshardedColls(st.s.getDB(unshardedDbName), configShardName);
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 0}, to: configShardName}));
+
+    let removeRes =
+        assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.eq("started", removeRes.state);
+
+    moveDatabaseAndUnshardedColls(st.s.getDB(dbName), newShardName);
+    moveDatabaseAndUnshardedColls(st.s.getDB(unshardedDbName), newShardName);
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 0}, to: newShardName}));
+    ConfigShardUtil.waitForRangeDeletions(st.s);
+
+    // Insert documents directly onto the config server after it has fully drained and verify we
+    // can't complete the transition.
+
+    // Drained sharded collection.
+    assert.commandWorked(st.configRS.getPrimary().getCollection(ns).insert({x: 1}));
+    removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.eq("pendingDataCleanup", removeRes.state);
+    assert.eq("waiting for data to be cleaned up", removeRes.msg);
+    assert.eq(0, removeRes.pendingRangeDeletions, tojson(removeRes));
+    assert.eq(ns, removeRes.firstNonEmptyCollection, tojson(removeRes));
+    assert.commandWorked(st.configRS.getPrimary().getCollection(ns).remove({x: 1}));
+
+    // Drained unsharded collection.
+    assert.commandWorked(st.configRS.getPrimary().getCollection(unshardedNs).insert({x: 1}));
+    removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.eq("pendingDataCleanup", removeRes.state);
+    assert.eq("waiting for data to be cleaned up", removeRes.msg);
+    assert.eq(0, removeRes.pendingRangeDeletions, tojson(removeRes));
+    assert.eq(unshardedNs, removeRes.firstNonEmptyCollection, tojson(removeRes));
+    assert.commandWorked(st.configRS.getPrimary().getCollection(unshardedNs).remove({x: 1}));
+
+    // Drained time series collection.
+    assert.commandWorked(
+        st.configRS.getPrimary().getCollection(timeseriesShardedNs).insert({time: ISODate()}));
+    removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.eq("pendingDataCleanup", removeRes.state);
+    assert.eq("waiting for data to be cleaned up", removeRes.msg);
+    assert.eq(0, removeRes.pendingRangeDeletions, tojson(removeRes));
+    assert.eq(timeseriesShardedNs, removeRes.firstNonEmptyCollection, tojson(removeRes));
+    assert.commandWorked(st.configRS.getPrimary().getCollection(timeseriesShardedNs).remove({}));
+
+    // Previously non-existent collection in a drained database, e.g. a temporary collection created
+    // by an in-progress operation or a new untracked unsharded collection.
+    assert.commandWorked(
+        st.configRS.getPrimary().getDB(dbName)["newOrphanCollection"].insert({x: 1}));
+    removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.eq("pendingDataCleanup", removeRes.state);
+    assert.eq("waiting for data to be cleaned up", removeRes.msg);
+    assert.eq(0, removeRes.pendingRangeDeletions, tojson(removeRes));
+    assert.eq(
+        dbName + ".newOrphanCollection", removeRes.firstNonEmptyCollection, tojson(removeRes));
+    assert.commandWorked(
+        st.configRS.getPrimary().getDB(dbName)["newOrphanCollection"].remove({x: 1}));
+
+    // Logical sessions collection.
+    assert.commandWorked(
+        st.configRS.getPrimary().getCollection("config.system.sessions").insert({x: 1}));
+    removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.eq("pendingDataCleanup", removeRes.state);
+    assert.eq("waiting for data to be cleaned up", removeRes.msg);
+    assert.eq(0, removeRes.pendingRangeDeletions, tojson(removeRes));
+    assert.eq("config.system.sessions", removeRes.firstNonEmptyCollection, tojson(removeRes));
+    assert.commandWorked(
+        st.configRS.getPrimary().getCollection("config.system.sessions").remove({x: 1}));
+
+    // More than one collection.
+    assert.commandWorked(st.configRS.getPrimary().getCollection(ns).insert({x: 1}));
+    assert.commandWorked(st.configRS.getPrimary().getCollection(unshardedNs).insert({x: 1}));
+    removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.eq("pendingDataCleanup", removeRes.state);
+    assert.eq("waiting for data to be cleaned up", removeRes.msg);
+    assert.eq(0, removeRes.pendingRangeDeletions, tojson(removeRes));
+    // Only the first non-empty collection found is in the response, so either ns or unshardedNs.
+    assert.contains(removeRes.firstNonEmptyCollection, [ns, unshardedNs], tojson(removeRes));
+    assert.commandWorked(st.configRS.getPrimary().getCollection(ns).remove({x: 1}));
+    assert.commandWorked(st.configRS.getPrimary().getCollection(unshardedNs).remove({x: 1}));
+
+    // The transition has not removed the config server as a shard yet.
+    assert.neq(null, st.s.getDB("config").shards.findOne({_id: "config"}));
+
+    removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.eq("completed", removeRes.state);
+
+    // The transition has now removed the config server as a shard.
+    assert.eq(null, st.s.getDB("config").shards.findOne({_id: "config"}));
 }
 
 {
@@ -349,6 +449,8 @@ const newShardName =
     // Basic CRUD and sharded DDL work.
     basicCRUD(st.s);
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 0}, to: configShardName}));
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: "config.system.sessions", find: {_id: 0}, to: configShardName}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 5}}));
     basicCRUD(st.s);
 

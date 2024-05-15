@@ -89,13 +89,13 @@ struct RemoveShardProgress {
     /**
      * Used to indicate to the caller of the removeShard method whether draining of chunks for
      * a particular shard has started, is ongoing, or has been completed. When removing a catalog
-     * shard, there is a new state when waiting for range deletions of all moved away chunks.
-     * Removing other shards will skip this state.
+     * shard, there is a new state when waiting for range deletions of all moved away chunks and any
+     * in progress drops of user collections. Removing other shards will skip this state.
      */
     enum DrainingShardStatus {
         STARTED,
         ONGOING,
-        PENDING_RANGE_DELETIONS,
+        PENDING_DATA_CLEANUP,
         COMPLETED,
     };
 
@@ -112,6 +112,7 @@ struct RemoveShardProgress {
     DrainingShardStatus status;
     boost::optional<DrainingShardUsage> remainingCounts;
     boost::optional<long long> pendingRangeDeletions;
+    boost::optional<NamespaceString> firstNonEmptyCollection;
 };
 
 /**

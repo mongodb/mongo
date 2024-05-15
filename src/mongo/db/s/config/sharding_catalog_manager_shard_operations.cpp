@@ -66,6 +66,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -1137,6 +1138,26 @@ void ShardingCatalogManager::addConfigShard(OperationContext* opCtx) {
     uassertStatusOK(addShard(opCtx, &shardName, configConnString, true));
 }
 
+boost::optional<RemoveShardProgress> checkCollectionsAreEmpty(
+    OperationContext* opCtx, const std::vector<NamespaceString>& collections) {
+    for (const auto& nss : collections) {
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        if (!autoColl) {
+            // Can't find the collection, so it must not have data.
+            continue;
+        }
+
+        if (!autoColl->isEmpty(opCtx)) {
+            LOGV2(9022300, "removeShard: found non-empty local collection", logAttrs(nss));
+            RemoveShardProgress progress{
+                RemoveShardProgress::PENDING_DATA_CLEANUP, boost::none, 0, nss};
+            return {progress};
+        }
+    }
+
+    return boost::none;
+}
+
 RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                         const ShardId& shardId) {
     const auto name = shardId.toString();
@@ -1285,22 +1306,41 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                   "removeShard: waiting for range deletions",
                   "pendingRangeDeletions"_attr = pendingRangeDeletions);
 
-            return {
-                RemoveShardProgress::PENDING_RANGE_DELETIONS, boost::none, pendingRangeDeletions};
+            return {RemoveShardProgress::PENDING_DATA_CLEANUP, boost::none, pendingRangeDeletions};
         }
 
         // Drop all tracked databases locally now that all user data has been drained so the config
         // server can transition back to catalog shard mode without requiring users to manually drop
         // them.
-        LOGV2(7509600, "Locally dropping drained databases", "shardId"_attr = name);
 
+        // First, verify all collections we would drop are empty. In normal operation, a collection
+        // may still have data because of a sharded drop (which non-atomically updates metadata
+        // before dropping user data). If this state persists, manual intervention will be required
+        // to complete the transition, so we don't accidentally delete real data.
         auto trackedDBs =
             _localCatalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+
+        LOGV2(9022301, "Checking all local collections are empty", "shardId"_attr = name);
+
         for (auto&& db : trackedDBs) {
             tassert(7783700,
                     "Cannot drop admin or config database from the config server",
                     !db.getDbName().isConfigDB() && !db.getDbName().isAdminDB());
 
+            auto collections = [&] {
+                Lock::DBLock dbLock(opCtx, db.getDbName(), MODE_S);
+                auto catalog = CollectionCatalog::get(opCtx);
+                return catalog->getAllCollectionNamesFromDb(opCtx, db.getDbName());
+            }();
+            if (auto pendingDataCleanupState = checkCollectionsAreEmpty(opCtx, collections)) {
+                return *pendingDataCleanupState;
+            }
+        }
+
+        // Now actually drop the databases.
+        LOGV2(7509600, "Locally dropping drained databases", "shardId"_attr = name);
+
+        for (auto&& db : trackedDBs) {
             DBDirectClient client(opCtx);
             BSONObj result;
             if (!client.dropDatabase(
@@ -1313,6 +1353,11 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
         // Also drop the sessions collection, which we assume is the only sharded collection in the
         // config database.
+        if (auto pendingDataCleanupState =
+                checkCollectionsAreEmpty(opCtx, {NamespaceString::kLogicalSessionsNamespace})) {
+            return *pendingDataCleanupState;
+        }
+
         DBDirectClient client(opCtx);
         BSONObj result;
         if (!client.dropCollection(NamespaceString::kLogicalSessionsNamespace,
@@ -1430,10 +1475,18 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
             result.appendElements(dbInfo);
             break;
         }
-        case RemoveShardProgress::PENDING_RANGE_DELETIONS: {
-            result.append("msg", "waiting for pending range deletions");
-            result.append("state", "pendingRangeDeletions");
+        case RemoveShardProgress::PENDING_DATA_CLEANUP: {
+            result.append("msg", "waiting for data to be cleaned up");
+            result.append("state", "pendingDataCleanup");
             result.append("pendingRangeDeletions", *shardDrainingStatus.pendingRangeDeletions);
+            if (shardDrainingStatus.firstNonEmptyCollection) {
+                // We only check for non-empty collections if there are no pending range deletions,
+                // so only include it if it's set to avoid reporting false negatives.
+                result.append(
+                    "firstNonEmptyCollection",
+                    NamespaceStringUtil::serialize(*shardDrainingStatus.firstNonEmptyCollection,
+                                                   SerializationContext::stateDefault()));
+            }
             break;
         }
         case RemoveShardProgress::COMPLETED:
