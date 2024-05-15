@@ -1320,11 +1320,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                   opCtx,
                   std::move(canonicalQuery),
                   collections.getMainCollectionPtrOrAcquisition(),
-                  std::move(collectionFilter))
+                  std::move(collectionFilter),
+                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA)
             : makeExpressExecutorForFindById(opCtx,
                                              std::move(canonicalQuery),
                                              collections.getMainCollectionPtrOrAcquisition(),
-                                             std::move(collectionFilter));
+                                             std::move(collectionFilter),
+                                             plannerOptions &
+                                                 QueryPlannerParams::RETURN_OWNED_DATA);
 
         setCurOpQueryFramework(expressExecutor.get());
         return std::move(expressExecutor);
@@ -1343,7 +1346,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                 std::move(canonicalQuery),
                 collections.getMainCollectionPtrOrAcquisition(),
                 *indexEntry,
-                getScopedCollectionFilter(opCtx, collections, *paramsForSingleCollectionQuery));
+                getScopedCollectionFilter(opCtx, collections, *paramsForSingleCollectionQuery),
+                plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA);
             setCurOpQueryFramework(expressExecutor.get());
             return std::move(expressExecutor);
         }
