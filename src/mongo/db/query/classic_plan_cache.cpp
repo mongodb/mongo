@@ -132,6 +132,8 @@ std::string SolutionCacheData::toString() const {
             MONGO_verify(this->tree.get());
             return str::stream() << "(index-tagged expression tree: "
                                  << "tree=" << this->tree->toString() << ")";
+        case VIRTSCAN_SOLN:
+            return "(virtual scan)";
     }
     MONGO_UNREACHABLE;
 }

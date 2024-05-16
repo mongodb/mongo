@@ -197,6 +197,24 @@ struct PlanCacheIndexTree {
 };
 
 /**
+ * Data cached to construct a query plan whose data access is a virtual scan.
+ * TODO SERVER-90496: Deduplicate this with members in VirtualScanNode.
+ */
+struct VirtualScanCacheData {
+    VirtualScanCacheData() : docs({}), hasRecordId(false), indexKeyPattern(BSONObj()){};
+
+    VirtualScanCacheData(const std::vector<BSONArray>& docs,
+                         bool hasRecordId,
+                         const BSONObj& keyPattern)
+        : docs(docs), hasRecordId(hasRecordId), indexKeyPattern(keyPattern){};
+
+    std::vector<BSONArray> docs;
+    bool hasRecordId;
+    // Set when 'scanType' is 'kIxscan'.
+    BSONObj indexKeyPattern;
+};
+
+/**
  * Data stored inside a QuerySolution which can subsequently be used to create a cache entry. When
  * this data is retrieved from the cache, it is sufficient to reconstruct the original
  * QuerySolution.
@@ -233,7 +251,9 @@ struct SolutionCacheData {
 
         // Build the solution by using 'tree'
         // to tag the match expression.
-        USE_INDEX_TAGS_SOLN
+        USE_INDEX_TAGS_SOLN,
+
+        VIRTSCAN_SOLN,
     } solnType;
 
     // The direction of the index scan used as
@@ -243,6 +263,9 @@ struct SolutionCacheData {
 
     // True if index filter was applied.
     bool indexFilterApplied;
+
+    // Set iff 'solnType' is VIRTSCAN_SOLN.
+    std::unique_ptr<VirtualScanCacheData> virtualScanData = nullptr;
 
     // Hash of the QuerySolution that led to this cache data.
     size_t solutionHash;
