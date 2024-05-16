@@ -2254,9 +2254,12 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
 
         repl::UnreplicatedWritesBlock notReplicated(splitOpCtx.get());
         const auto& session = sessInfos.session;
-        splitOpCtx->setLogicalSessionId(session.getSessionId());
-        splitOpCtx->setTxnNumber(session.getTxnNumber());
-        splitOpCtx->setInMultiDocumentTransaction();
+        {
+            auto lk = stdx::lock_guard(*splitOpCtx->getClient());
+            splitOpCtx->setLogicalSessionId(session.getSessionId());
+            splitOpCtx->setTxnNumber(session.getTxnNumber());
+            splitOpCtx->setInMultiDocumentTransaction();
+        }
 
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(splitOpCtx.get());
         checkedOutSession = mongoDSessionCatalog->checkOutSession(splitOpCtx.get());
@@ -2485,9 +2488,12 @@ void TransactionParticipant::Participant::_abortSplitPreparedTxnOnPrimary(
         std::unique_ptr<MongoDSessionCatalog::Session> checkedOutSession;
 
         repl::UnreplicatedWritesBlock notReplicated(splitOpCtx.get());
-        splitOpCtx->setLogicalSessionId(sessionInfo.session.getSessionId());
-        splitOpCtx->setTxnNumber(sessionInfo.session.getTxnNumber());
-        splitOpCtx->setInMultiDocumentTransaction();
+        {
+            auto lk = stdx::lock_guard(*splitOpCtx->getClient());
+            splitOpCtx->setLogicalSessionId(sessionInfo.session.getSessionId());
+            splitOpCtx->setTxnNumber(sessionInfo.session.getTxnNumber());
+            splitOpCtx->setInMultiDocumentTransaction();
+        }
 
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(splitOpCtx.get());
         checkedOutSession = mongoDSessionCatalog->checkOutSession(splitOpCtx.get());
