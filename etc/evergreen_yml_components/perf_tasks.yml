@@ -766,6 +766,14 @@ tasks:
           test_control: medical_workload_diagnosis_50_50
           auto_workload_path: ./src/genny/dist/etc/genny/workloads/encrypted/medical_workload-diagnosis-50-50.yml
 
+  - name: qe_range_balance_50_50_high_value
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: qe_range_balance_50_50
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/encrypted/qe-range-balance-50-50.yml
+
   - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
     priority: 5
     commands:

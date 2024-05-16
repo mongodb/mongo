@@ -165,6 +165,8 @@ buildvariants:
       - *schedule_variant_auto_tasks_task
       - name: medical_workload_diagnosis_50_50_high_value
         cron: *high-value-workload-cron
+      - name: qe_range_balance_50_50_high_value
+        cron: *high-value-workload-cron
       - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
         cron: *high-value-workload-cron
 
